@@ -163,8 +163,25 @@ test('Fabricate wires RecipeManager to the live crafting-system manager', () => 
   // cannot be instrumented, cached or indexed by the performance programme.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,?\s*\}\)/s,
+    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
     'RecipeManager production initialization should receive the live crafting-system resolver and manager'
+  );
+});
+
+test('Fabricate wires the world currency config into both currency readers', () => {
+  // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
+  // per-system `enabled` flag with the world's ladder. Both readers must therefore hold the
+  // store: RecipeManager for craftability projection, CraftingEngine for the afford gate and
+  // the spend/refund paths. Without it they fall back to the `game.fabricate` global, which is
+  // exactly the un-instrumentable path issue 1072 removed.
+  assert.ok(
+    mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
+    'main.js should construct the world currency config store'
+  );
+  assert.match(
+    mainSource,
+    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*this\.currencyConfigStore/,
+    'CraftingEngine should receive the world currency config store'
   );
 });
 

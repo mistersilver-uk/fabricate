@@ -23,6 +23,12 @@ const tagsCategoriesPath = resolve(
   'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
 );
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
+// World > Currency (issue 1278): the relocated currency editor, whose contract used to be part
+// of SystemEditView's.
+const worldCurrencyPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
+);
 const craftingSettingsPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
@@ -123,6 +129,7 @@ const essenceStudioSources = readdirSync(essenceStudioDir)
 const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
 const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
@@ -731,33 +738,43 @@ describe('CraftingSystemManager source contract', () => {
       systemEditSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
       'modifier editor should keep the localized Expression label'
     );
+    // --- World > Currency (issue 1278) --------------------------------------------------
+    // The ladder, spend strategy, provider and macro set are WORLD scope: a world runs one
+    // ruleset, so there is one way actors store coins and two crafting systems cannot
+    // meaningfully disagree about it. The whole editor therefore reads WorldCurrencyTab. What
+    // survives on System Settings is the participation toggle alone, asserted at the end.
     for (const snippet of [
-      'data-system-currency-units',
+      'data-world-currency-units',
       'manager-currency-unit-card',
       'handleAddCurrencyUnit',
       'onSeedCurrencyPresets',
-      'manager-character-modifier-summary',
       'manager-currency-subunit-builder',
+      // The unit card's collapsed summary row reuses the character-modifier summary class; it
+      // moved with the card rather than staying behind on System Settings.
+      'manager-character-modifier-summary',
       'manager-availability-pill is-currency',
       'manager-availability-pill-amount',
     ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+      assert.ok(
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include ${snippet}`
+      );
     }
     // Asserted as patterns rather than snippets in the list above: Prettier (issue 923) prints
     // both calls one argument per line.
     assert.ok(
       /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
-        systemEditSource
+        worldCurrencySource
       ),
-      'SystemEditView should bind the sub-unit amount input to onUpdateCurrencySubUnit'
+      'WorldCurrencyTab should bind the sub-unit amount input to onUpdateCurrencySubUnit'
     );
     assert.ok(
-      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(systemEditSource),
-      'SystemEditView should wire the sub-unit delete action'
+      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(worldCurrencySource),
+      'WorldCurrencyTab should wire the sub-unit delete action'
     );
     assert.ok(
       rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
-      'root should pass selected currency units to SystemEditView'
+      'root should pass the world currency units to WorldCurrencyTab'
     );
     // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
     // rewrites the long form to it (issue 923). Anchored on the leading whitespace that starts
@@ -765,36 +782,36 @@ describe('CraftingSystemManager source contract', () => {
     // such as `{noOnAddCurrencySubUnit}`.
     assert.ok(
       rootSource.includes(' {onAddCurrencySubUnit}'),
-      'root should pass currency sub-unit actions to SystemEditView'
+      'root should pass currency sub-unit actions to WorldCurrencyTab'
     );
     assert.ok(
       rootSource.includes('{currencySpendStrategy}'),
-      'root should thread the spend strategy to SystemEditView'
+      'root should thread the spend strategy to WorldCurrencyTab'
     );
     // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
     // select renders all three options and the editor branches on each strategy.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
+      worldCurrencySource.includes("currencySpendStrategy === 'actorInventory'"),
       'currency editor should branch on the actorInventory spend strategy'
     );
     for (const value of ['actorProperty', 'actorInventory', 'macro']) {
       assert.ok(
-        systemEditSource.includes(`value: '${value}'`),
+        worldCurrencySource.includes(`value: '${value}'`),
         `currency editor should offer the ${value} spend strategy option`
       );
     }
     // Currency spend-strategy / provider / macro controls.
     for (const snippet of [
-      'data-system-currency-strategy-select',
+      'data-world-currency-strategy-select',
       'onSetCurrencySpendStrategy(event.currentTarget.value)',
       // The single shared strategy hint reflects the selected strategy.
-      'data-system-currency-strategy-hint',
+      'data-world-currency-strategy-hint',
       'currencySpendStrategyHint()',
-      'data-system-currency-provider-select',
+      'data-world-currency-provider-select',
       'onSetCurrencyProvider(event.currentTarget.value)',
-      'data-system-currency-no-provider',
-      'data-system-currency-macros',
-      'data-system-currency-macro-dropzone',
+      'data-world-currency-no-provider',
+      'data-world-currency-macros',
+      'data-world-currency-macro-dropzone',
       'manager-component-source-drop-zone',
       'use:dragDrop',
       'resolveDropData',
@@ -804,110 +821,113 @@ describe('CraftingSystemManager source contract', () => {
       // distinguishable to assistive tech (the linked-state group already has a field-specific label).
       'aria-label={currencyMacroDropZoneLabel(field)}',
     ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+      assert.ok(
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include ${snippet}`
+      );
     }
     // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
     assert.ok(
-      !systemEditSource.includes('data-system-currency-inventory-mode-select'),
+      !worldCurrencySource.includes('data-world-currency-inventory-mode-select'),
       'currency editor should not render the removed nested inventory-mode select'
     );
     assert.ok(
-      !systemEditSource.includes('inventoryMode'),
+      !worldCurrencySource.includes('inventoryMode'),
       'currency editor should not reference the removed inventoryMode model'
     );
     // The macro branch renders only under the peer macro strategy.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'macro'"),
+      worldCurrencySource.includes("currencySpendStrategy === 'macro'"),
       'currency editor should branch on the macro spend strategy'
     );
-    // A system with no registered provider can still select actorInventory but is steered to the
+    // A world with no registered provider can still select actorInventory but is steered to the
     // macro strategy via a no-provider callout, and its units are never wiped.
     assert.ok(
-      systemEditSource.includes(
+      worldCurrencySource.includes(
         'const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'
       ),
-      'currency editor should derive whether the system has any providers'
+      'currency editor should derive whether the world has any providers'
     );
     // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
     // single responsive row via a namespaced container class.
     assert.ok(
-      systemEditSource.includes('manager-currency-macro-zones manager-currency-macro-row'),
+      worldCurrencySource.includes('manager-currency-macro-zones manager-currency-macro-row'),
       'macro drop zones should be wrapped in the single-row container'
     );
     // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
     // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
     // not render in provider (read-only) or macro modes.
     assert.ok(
-      systemEditSource.includes('const currencyMacroMode = $derived('),
+      worldCurrencySource.includes('const currencyMacroMode = $derived('),
       'currency editor should derive a macro-mode flag'
     );
     assert.ok(
-      systemEditSource.includes('{#if currencyMacroMode}'),
+      worldCurrencySource.includes('{#if currencyMacroMode}'),
       'currency editor should gate the per-unit editor body on the macro-mode flag'
     );
     // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
     // non-macro branch, after the `{#if currencyMacroMode}` gate.
     assert.ok(
-      systemEditSource.indexOf('{#if currencyMacroMode}') <
-        systemEditSource.indexOf('manager-currency-subunit-section'),
+      worldCurrencySource.indexOf('{#if currencyMacroMode}') <
+        worldCurrencySource.indexOf('manager-currency-subunit-section'),
       'sub-unit section should render only in the non-macro (actorProperty) branch'
     );
     // Macro mode shows a conversion hint instead of any sub-unit controls.
     assert.ok(
-      systemEditSource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
+      worldCurrencySource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
       'macro mode should include the macro-conversion hint'
     );
     // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
     // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
     // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
     assert.ok(
-      systemEditSource.includes(
+      worldCurrencySource.includes(
         'const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'
       ),
       'currency editor should derive a read-only flag for the active provider inventory branch'
     );
     assert.ok(
-      systemEditSource.includes('{#if !currencyUnitsReadOnly}'),
+      worldCurrencySource.includes('{#if !currencyUnitsReadOnly}'),
       'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
     );
     assert.ok(
-      systemEditSource.includes('{#if currencyUnitsReadOnly}'),
+      worldCurrencySource.includes('{#if currencyUnitsReadOnly}'),
       'currency editor should render a dedicated read-only branch in provider mode'
     );
     for (const snippet of [
-      'data-system-currency-provider-managed',
+      'data-world-currency-provider-managed',
       'manager-currency-provider-managed-callout',
       'currencyProviderManagedHint()',
       'manager-currency-provider-managed-summary',
       'manager-currency-readonly-fields',
-      'data-system-currency-readonly-label',
-      'data-system-currency-abbreviation',
-      'data-system-currency-denomination',
+      'data-world-currency-readonly-label',
+      'data-world-currency-abbreviation',
+      'data-world-currency-denomination',
       'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
     ]) {
       assert.ok(
-        systemEditSource.includes(snippet),
-        `SystemEditView should include read-only ${snippet}`
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include read-only ${snippet}`
       );
     }
     // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
-    // they must NOT render sub-unit chips. The only `data-system-currency-subunit` occurrence lives
+    // they must NOT render sub-unit chips. The only `data-world-currency-subunit` occurrence lives
     // in the editable (actorProperty) branch, after the provider-managed read-only branch.
     assert.ok(
-      systemEditSource.indexOf('data-system-currency-provider-managed') <
-        systemEditSource.indexOf('data-system-currency-subunit'),
+      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
+        worldCurrencySource.indexOf('data-world-currency-subunit'),
       'provider-managed read-only branch should render before the editable sub-unit chips'
     );
     assert.equal(
-      systemEditSource.split('data-system-currency-subunit=').length - 1,
+      worldCurrencySource.split('data-world-currency-subunit=').length - 1,
       1,
       'sub-unit chips should appear only once (in the editable actorProperty branch)'
     );
     // The read-only branch precedes the editable branch, so the editable controls (editable amount
     // input, remove cross) live only after the provider-managed branch.
     assert.ok(
-      systemEditSource.indexOf('data-system-currency-provider-managed') <
-        systemEditSource.indexOf('class="manager-availability-pill-amount"'),
+      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
+        worldCurrencySource.indexOf('class="manager-availability-pill-amount"'),
       'provider-managed read-only branch should render before the editable unit list'
     );
     for (const prop of [
@@ -921,7 +941,7 @@ describe('CraftingSystemManager source contract', () => {
       '{onSetCurrencyMacro}',
       '{onClearCurrencyMacro}',
     ]) {
-      assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
+      assert.ok(rootSource.includes(prop), `root should thread ${prop} to WorldCurrencyTab`);
     }
     // The removed nested inventory-mode setter must no longer be threaded.
     assert.ok(
@@ -932,9 +952,10 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('getCurrencyProvidersForFoundrySystem'),
       'root should derive provider options from the currency provider registry'
     );
-    // The currency feature toggle lives in the Optional features section, reads
-    // requirements.currency.enabled, and calls onToggleCurrency. It renders always (so the section is
-    // never empty), and the Currency Units card is gated on the enabled flag.
+    // --- What survives on System Settings ------------------------------------------------
+    // The participation toggle and nothing else. It reads `requirements.currency.enabled` and
+    // calls `onToggleCurrency`, and renders always so the Optional features section is never
+    // empty.
     for (const snippet of [
       'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
       'data-system-currency-toggle',
@@ -944,18 +965,28 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The currency toggle tile renders independently of visibleFeatures, so the toggle list is no
-    // longer hidden behind the empty-feature guard.
     assert.ok(
       systemEditSource.includes('data-feature-key="currency"'),
       'currency toggle tile should always render in the Optional features section'
     );
-    // The Currency Units card is gated on currencyEnabled.
-    assert.ok(
-      systemEditSource.indexOf('{#if currencyEnabled}') <
-        systemEditSource.indexOf('manager-currency-unit-card'),
-      'Currency Units card should be gated behind the currencyEnabled flag'
-    );
+    // The editor itself is GONE from the crafting system page (issue 1278). These are markers of
+    // the card that was deleted; any of them reappearing means the per-system currency surface
+    // has crept back and the two scopes can disagree again.
+    for (const removed of [
+      'manager-currency-unit-card',
+      'data-system-currency-units',
+      'data-system-currency-strategy-select',
+      'data-system-currency-macros',
+      'currencyProviderOptions',
+      'onSetCurrencySpendStrategy',
+      'onAddCurrencyUnit',
+    ]) {
+      assert.equal(
+        systemEditSource.includes(removed),
+        false,
+        `SystemEditView should no longer carry the relocated currency control ${removed}`
+      );
+    }
     assert.ok(
       rootSource.includes("store.toggleRequirement?.('currency', next)"),
       'root should thread onToggleCurrency to store.toggleRequirement'

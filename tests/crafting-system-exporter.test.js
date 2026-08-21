@@ -413,7 +413,9 @@ test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1
 
 test('buildExportPayload: writes the explicit schemaVersion + runtimeStateIncluded markers', () => {
   const payload = buildExportPayload(makeSystem(), [], '1.0.0');
-  assert.equal(payload.schemaVersion, 2);
+  // 3 since issue 1278 added the world `currencyConfig` slice to the envelope.
+  assert.equal(payload.schemaVersion, 3);
+  assert.ok(payload.currencyConfig && typeof payload.currencyConfig === 'object');
   assert.equal(payload.runtimeStateIncluded, false);
   assert.ok(Array.isArray(payload.gatheringEnvironments));
   assert.ok(payload.gatheringConfig && typeof payload.gatheringConfig === 'object');
@@ -468,8 +470,11 @@ test('validateImportData: upcasts a legacy payload then accepts it (no schemaVer
 });
 
 test('validateImportData: rejects a non-array gatheringEnvironments', () => {
+  // Pinned to the CURRENT schema deliberately: a lower version routes through the upcast,
+  // which defaults a malformed `gatheringEnvironments` to `[]` and would repair the very
+  // field this test asserts is rejected.
   const result = validateImportData({
-    schemaVersion: 2,
+    schemaVersion: 3,
     fabricateVersion: '1.0.0',
     system: { name: 'X' },
     gatheringEnvironments: { not: 'array' }

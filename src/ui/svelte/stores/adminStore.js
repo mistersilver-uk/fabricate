@@ -88,8 +88,8 @@ import {
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
-  normalizeCurrencyConfig,
   normalizeCurrencyUnit,
+  normalizeWorldCurrencyConfig,
 } from '../../../systems/currencyProfile.js';
 import {
   authoredCheckModifierIds,
@@ -1159,6 +1159,20 @@ function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
   };
 }
 
+// The WORLD currency projection (issue 1278). A top-level sibling key, never hung off
+// `selectedSystem`, because the config is world scope: hanging it off the selection would make
+// the same ladder appear to change when the GM merely clicks a different crafting system.
+function _emptyWorldCurrencyState() {
+  return {
+    worldCurrency: {
+      spendStrategy: 'actorProperty',
+      providerId: '',
+      macros: { canAfford: '', increment: '', decrement: '' },
+      units: [],
+    },
+  };
+}
+
 function _emptyTravelState() {
   return {
     travelParties: [],
@@ -1839,6 +1853,7 @@ export function createAdminStore(services) {
     knowledge: projectKnowledgeSnapshot(null, { active: false }),
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
+    ..._emptyWorldCurrencyState(),
   });
 
   function _setEnvironmentDraftState(
@@ -4502,6 +4517,12 @@ export function createAdminStore(services) {
       featureCount: Object.values(s.features || {}).filter((value) => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
+      // Whether this system PARTICIPATES in the world currency (issue 1278). Projected as a
+      // flat boolean because this list is a deliberate allowlist that does not carry
+      // `requirements` — a consumer reaching for `requirements.currency.enabled` here reads
+      // undefined and silently counts zero, which is how the World > Currency subtitle came to
+      // report every ladder as unadopted.
+      currencyEnabled: s?.requirements?.currency?.enabled === true,
       selected: s.id === resolvedSystemId,
     }));
 
@@ -4719,7 +4740,18 @@ export function createAdminStore(services) {
       graphSearchTerm: get(graphSearch),
       ...environmentState,
       ...travel.buildState(),
+      ...buildWorldCurrencyState(),
     }));
+  }
+
+  // Read the world currency config straight from its store on every publish. It is cheap (one
+  // setting read plus a normalize) and it keeps the projection honest when another client's GM
+  // edits the ladder — there is no per-system cache to invalidate because there is no per-system
+  // copy any more.
+  function buildWorldCurrencyState() {
+    const store = services.getCurrencyConfigStore?.();
+    if (!store) return _emptyWorldCurrencyState();
+    return { worldCurrency: normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID }) };
   }
 
   // ---------------------------------------------------------------------------
@@ -5975,17 +6007,15 @@ export function createAdminStore(services) {
       JSON.stringify(
         system.requirements || {
           time: { enabled: true },
-          currency: { enabled: false, units: [] },
+          currency: { enabled: false },
         }
       )
     );
     requirements[requirement] = requirements[requirement] || {};
     requirements[requirement].enabled = enabled;
-    if (requirement === 'currency') {
-      requirements.currency = normalizeCurrencyConfig(requirements.currency, {
-        randomID: _randomID,
-      });
-    }
+    // Currency is NOT re-normalized here any more (issue 1278): the system owns only the
+    // participation flag, and the ladder this used to normalize lives in the world config,
+    // which this write must not touch.
 
     await systemManager.updateSystem(sysId, { requirements });
     await refresh();
@@ -8027,32 +8057,35 @@ export function createAdminStore(services) {
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
-  async function _updateCurrencyConfig(systemId, mutate) {
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = systemId || get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
+  // ---------------------------------------------------------------------------
+  // Currency (WORLD scope, issue 1278)
+  //
+  // The ladder, spend strategy, provider and macro set describe the WORLD, not a crafting
+  // system: a world runs exactly one Foundry game system and so has exactly one way actors
+  // store coins. Every action below therefore takes no `systemId` — what a crafting system
+  // still owns is only `requirements.currency.enabled`, written by `toggleRequirement`.
+  //
+  // Persistence goes through `CurrencyConfigStore`, which normalizes and always saves. The
+  // mutate-callback shape is kept from the per-system era on purpose: the provider and
+  // strategy rules below are unchanged by the move, so they are carried across verbatim
+  // rather than re-derived.
+  // ---------------------------------------------------------------------------
 
-    const requirements = JSON.parse(
-      JSON.stringify(
-        system.requirements || {
-          time: { enabled: true },
-          currency: { enabled: false, units: [] },
-        }
-      )
-    );
-    requirements.currency = normalizeCurrencyConfig(requirements.currency, { randomID: _randomID });
-    const result = await mutate(requirements.currency, system);
+  async function _updateCurrencyConfig(mutate) {
+    const store = services.getCurrencyConfigStore?.();
+    if (!store) return false;
+
+    const currency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
+    const result = await mutate(currency);
     if (result === false) return false;
 
-    await systemManager.updateSystem(sysId, { requirements });
+    await store.save(currency);
     await refresh();
     return result ?? true;
   }
 
-  async function addCurrencyUnit(systemId, partial = {}) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function addCurrencyUnit(partial = {}) {
+    return await _updateCurrencyConfig((currency) => {
       const id = String(partial?.id || _randomID()).trim();
       if (!id || currency.units.some((unit) => unit.id === id)) return null;
       const unit = normalizeCurrencyUnit(
@@ -8075,8 +8108,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function updateCurrencyUnit(systemId, unitId, updates = {}) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function updateCurrencyUnit(unitId, updates = {}) {
+    return await _updateCurrencyConfig((currency) => {
       if (!unitId) return false;
       let changed = false;
       currency.units = currency.units.map((unit) => {
@@ -8088,8 +8121,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function deleteCurrencyUnit(systemId, unitId) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function deleteCurrencyUnit(unitId) {
+    return await _updateCurrencyConfig((currency) => {
       const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
       if (!nextUnits) return false;
       currency.units = nextUnits;
@@ -8099,16 +8132,16 @@ export function createAdminStore(services) {
 
   /**
    * Move one currency unit from `fromIndex` to `toIndex` (issue 768). Array order
-   * IS the persisted order, so the reorder rewrites the currency units array and
-   * persists through updateSystem. Returns false on an invalid/no-op move.
+   * IS the persisted order, so the reorder rewrites the world currency units array and
+   * persists through `CurrencyConfigStore`. Takes no system id: the ladder is world scope
+   * (issue 1278). Returns false on an invalid/no-op move.
    *
-   * @param {string} [systemId] Target crafting system id.
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
    * @returns {Promise<boolean>}
    */
-  async function reorderCurrencyUnit(fromIndex, toIndex, systemId = get(selectedSystemId)) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function reorderCurrencyUnit(fromIndex, toIndex) {
+    return await _updateCurrencyConfig((currency) => {
       const next = _reorderListByIndex(currency.units, fromIndex, toIndex);
       if (!next) return false;
       currency.units = next;
@@ -8116,8 +8149,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function addCurrencySubUnit(systemId, parentUnitId, subUnitId, amount = 1) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function addCurrencySubUnit(parentUnitId, subUnitId, amount = 1) {
+    return await _updateCurrencyConfig((currency) => {
       if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
       const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
       currency.units = currency.units.map((unit) =>
@@ -8132,8 +8165,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function updateCurrencySubUnit(systemId, parentUnitId, subUnitId, amount) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function updateCurrencySubUnit(parentUnitId, subUnitId, amount) {
+    return await _updateCurrencyConfig((currency) => {
       const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
       const { nextUnits, changed } = _updateSubUnitAmountInList(
         currency.units,
@@ -8146,8 +8179,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function deleteCurrencySubUnit(systemId, parentUnitId, subUnitId) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function deleteCurrencySubUnit(parentUnitId, subUnitId) {
+    return await _updateCurrencyConfig((currency) => {
       const { nextUnits, changed } = _deleteSubUnitFromList(
         currency.units,
         parentUnitId,
@@ -8180,11 +8213,11 @@ export function createAdminStore(services) {
     currency.units = normalizedCanonical;
   }
 
-  async function setCurrencySpendStrategy(systemId, spendStrategy) {
+  async function setCurrencySpendStrategy(spendStrategy) {
     const nextStrategy = ['actorInventory', 'macro'].includes(spendStrategy)
       ? spendStrategy
       : 'actorProperty';
-    return await _updateCurrencyConfig(systemId, (currency) => {
+    return await _updateCurrencyConfig((currency) => {
       currency.spendStrategy = nextStrategy;
       // Switching to actorInventory seeds a sensible default providerId (when the system ships a
       // provider) and syncs the provider's canonical, provider-owned units. The sync is guarded
@@ -8201,8 +8234,8 @@ export function createAdminStore(services) {
     });
   }
 
-  async function setCurrencyProvider(systemId, providerId) {
-    return await _updateCurrencyConfig(systemId, (currency) => {
+  async function setCurrencyProvider(providerId) {
+    return await _updateCurrencyConfig((currency) => {
       currency.providerId = String(providerId || '').trim();
       // Selecting a provider adopts its canonical units under the actorInventory strategy; under
       // other strategies the providerId is inert and user-managed units stay untouched.
@@ -8213,19 +8246,19 @@ export function createAdminStore(services) {
     });
   }
 
-  async function setCurrencyMacro(systemId, key, uuid) {
+  async function setCurrencyMacro(key, uuid) {
     if (!CURRENCY_MACRO_KEYS.includes(key)) return false;
-    return await _updateCurrencyConfig(systemId, (currency) => {
+    return await _updateCurrencyConfig((currency) => {
       currency.macros = { ...currency.macros, [key]: String(uuid || '').trim() };
       return true;
     });
   }
 
-  async function clearCurrencyMacro(systemId, key) {
-    return await setCurrencyMacro(systemId, key, '');
+  async function clearCurrencyMacro(key) {
+    return await setCurrencyMacro(key, '');
   }
 
-  async function seedCurrencyUnitPresets(systemId = get(selectedSystemId)) {
+  async function seedCurrencyUnitPresets() {
     const foundrySystemId =
       typeof services.getFoundrySystemId === 'function'
         ? String(services.getFoundrySystemId() || '')
@@ -8234,7 +8267,7 @@ export function createAdminStore(services) {
     if (!presets || presets.length === 0) {
       return { added: [], skipped: [], unsupported: true, foundrySystemId };
     }
-    return await _updateCurrencyConfig(systemId, (currency) => {
+    return await _updateCurrencyConfig((currency) => {
       const result = seedCurrencyPresets({
         presets,
         currentUnits: currency.units || [],
@@ -8989,12 +9022,18 @@ export function createAdminStore(services) {
     const gatheringEnvironments =
       typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
     const gatheringConfig = services.getSetting?.(GATHERING_CONFIG_SETTING) || {};
+    // The world currency ladder rides along too (issue 1278). It is WORLD scope, so unlike the
+    // gathering slice there is nothing on the system to fall back on: omit it and the export
+    // carries an empty ladder, and every currency cost in it lands in the destination world as
+    // an unresolvable unit id.
+    const currencyConfig = services.getCurrencyConfigStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
-      gatheringConfig
+      gatheringConfig,
+      currencyConfig
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);

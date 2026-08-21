@@ -32,7 +32,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
   // Envelope carries the explicit schema markers.
-  assert.equal(first.schemaVersion, 2);
+  assert.equal(first.schemaVersion, 3);
   assert.equal(first.runtimeStateIncluded, false);
   // Runtime state stripped on export.
   for (const env of first.gatheringEnvironments) {

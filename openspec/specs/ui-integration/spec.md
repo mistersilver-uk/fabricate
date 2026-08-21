@@ -380,7 +380,7 @@ Two live non-conformances are recorded here rather than left to be discovered, b
 - `src/ui/svelte/components/ChanceSlider.svelte` keeps a bare number input paired with its range track, and is a non-conformance to the FIRST rule only.
   Its range track is already a pointer-driven stepping affordance for the same value, so adding adjuncts would make three pointer paths to one number, and its `%` affix is absolutely positioned exactly where the `+` adjunct would land.
   It therefore keeps its own keydown handler, which is what preserves keyboard stepping there, and its spinner IS suppressed by a rule scoped to that control — the `iff` above reached through the range track rather than through adjuncts.
-- `src/ui/svelte/apps/manager/SystemEditView.svelte`'s currency sub-unit amount keeps a bare number input AND its native spinner.
+- `src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte`'s currency sub-unit amount keeps a bare number input AND its native spinner.
   It sits inside a bordered, filled currency chip with its own minimum height, and a bordered filled stepper inside a bordered filled chip widens every wrapping chip; a chip is not a form row.
   Keeping its spinner is the correct `iff` outcome rather than a lapse, since it has no other pointer affordance at all.
 
@@ -545,7 +545,11 @@ Selected-system navigation:
   It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - After every selected-system navigation entry, including placeholders such as Graph, the rail
   always exposes a localized `WORLD` / `every system` presentation group containing a direct
-  `Parties` destination and the total world-party count.
+  `Parties` destination with the total world-party count, and directly beneath it a direct
+  `Currency` destination with the configured world currency-unit count.
+  Both are UNGATED: neither is hidden by a feature flag, by the experimental gate, or by any
+  crafting system's own toggles, and `Currency` in particular stays reachable when every system
+  has currency switched off, because a GM authors the world's coins before a system opts in.
   World remains available with no system
   selected and across selected-system capability changes; the heading changes no aggregate ownership.
 - When the selected system enables Gathering and its `gatheringRealmSettings.enabled` card is on,
@@ -556,7 +560,7 @@ Selected-system navigation:
   preserves that child.
   Only the concrete destination carries `aria-current="page"`.
   Stable ids are `manager-world-heading`, `manager-world-scope`, `manager-world-nav-parties`,
-  `manager-nav-travel`, `manager-travel-toggle`, `manager-travel-submenu`,
+  `manager-world-nav-currency`, `manager-nav-travel`, `manager-travel-toggle`, `manager-travel-submenu`,
   `manager-travel-nav-realms`, and `manager-travel-nav-map`, paired with `data-world-nav-section`,
   `data-world-nav-item`, `data-system-travel-section`, `data-system-travel-toggle`, and
   `data-system-travel-submenu`.
@@ -575,7 +579,7 @@ Selected-system navigation:
   Disabling Travel & Realms from an active child runs that same guard and, when allowed, returns to Gathering Environments.
   Switching from enabled system A to enabled system B preserves the active child while re-projecting B's realms, map links, and Party override evidence.
   Switching to a Gathering system whose card is off returns to Gathering Environments; losing Gathering or clearing the selected system returns to the systems browser.
-  A current World Parties route survives every one of these capability, card, and selection transitions.
+  A current World Parties or World Currency route survives every one of these capability, card, and selection transitions.
 - World Parties has dedicated `WORLD / every system`, title, hint, and action-region names rather than inheriting Gathering Environments presentation.
   It remains fully operable without a selected system.
   Realms and Map Region Links likewise expose destination-specific visible titles, hints, action-region names, and inspector names; Party copy is not reused for either child.
@@ -688,8 +692,7 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
 - Effect transfer toggle (`features.effectTransfer`)
 - Time requirements toggle (`requirements.time.enabled`): GM toggle, default on — an absent key defaults true, a present key must be exactly `false` to disable.
   It renders as a tile in the System Settings Optional features section (beside the currency toggle) and gates the recipe Duration surfaces (the single-step Duration card and the per-step duration editor) and the application of recipe/step durations at craft time.
-- Currency requirements toggle (`requirements.currency.enabled`)
-- Currency unit profile editor (`requirements.currency.units[]`)
+- Currency requirements toggle (`requirements.currency.enabled`) — the system's ONLY currency control; the unit profile is world scope and is authored under World > Currency
 - Multi-step recipes toggle (`features.multiStepRecipes`)
 - Gathering toggle (`features.gathering`)
 - Salvage toggle (`features.salvage`, default on)
@@ -887,20 +890,14 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
   It renders always (like the currency toggle).
   When time requirements are enabled the recipe Duration card (single-step) and the per-step duration editor are authorable and their durations apply at craft time; when disabled, both editors are hidden and a step's `timeRequirement` no longer arms a timed run (the craft resolves immediately).
   Existing authored durations are preserved while the toggle is off (they render as read-only chips where a step summary is shown) and re-apply when it is turned back on.
-- Currency toggle in the Optional features section, bound to `requirements.currency.enabled`.
+- Currency toggle in the Optional features section, bound to `requirements.currency.enabled`, rendered as a `manager-feature-tile` with `data-feature-key="currency"` and the stable hook `data-system-currency-toggle`.
   It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
-- Currency units card under character modifiers, rendered only when `requirements.currency.enabled === true`.
-  When currency is disabled the entire currency-units configuration block (spend strategy, provider, macros, and units) is hidden.
-- A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy.
-  When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the system has none).
-  When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is invoked to refund currency when a player cancels an in-progress craft (the `refundOnPlayerCancel` policy).
-  There is no nested inventory-mode `<select>` — macro is its own peer strategy.
-- Add currency unit and seed preset actions
-- Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
-- Under `actorInventory` (with a provider) the GM-editable unit editors are replaced by a separate read-only, provider-managed denomination list (a "provider-managed denominations" callout plus per-unit label/abbreviation/coin-denomination shown as static values); the selected provider owns the denomination ladder, so the units are not GM-editable.
-  The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
-- Add-sub-unit dropdown with plus action
-- Sub-unit pills with editable amount and remove action
+- **The toggle is the ONLY currency control on System Settings.**
+  The units card and every strategy, provider, macro, unit and sub-unit control moved to the World > Currency route, because the coin ladder is world scope (`data-models/spec.md` -> CurrencyConfig): a world runs exactly one Foundry game system, so two crafting systems cannot meaningfully disagree about how to read the same actor's purse.
+  The System Settings tab therefore renders no currency configuration at all, whether the toggle is on or off, and the `data-system-currency-*` hooks that backed those controls were renamed `data-world-currency-*` and now live on the World route.
+  `data-system-currency-toggle` is the one hook that stayed.
+- What the toggle governs is unchanged: it gates the recipe currency-cost authoring affordances, the player display of a currency option, and engine consideration of currency for THAT system.
+  It does not gate the World > Currency route, and it authors nothing about the ladder.
 
 If `features.gathering === false`:
 
@@ -967,7 +964,8 @@ The rail item SHALL surface a count badge with the number of open critical-plus-
 
 #### Settings Tab
 
-The default-selected Settings tab renders the system settings form (identity, optional features, character modifiers, and currency configuration) unchanged.
+The default-selected Settings tab renders the system settings form (identity, optional features, and character modifiers) unchanged.
+The currency configuration is no longer part of it: only the Currency participation toggle remains, in the Optional features section, and the ladder is authored under World > Currency.
 It writes through the existing admin-store persistence and confirmation flows.
 Recipe resolution mode, salvage resolution mode, and the Recipe Visibility card moved to the Crafting group's Settings page (`crafting-settings`); the System Overview Settings tab no longer renders them.
 
@@ -976,7 +974,7 @@ The Name / Description inputs SHALL seed from the persisted system on system-ide
 As a consequence, a concurrent external edit to the same open system is not merged into the open form and is overwritten on Save (last-writer-wins), matching the manager's staged-draft model for recipes, components, and essences.
 The identity sub-form (Name + Description only) SHALL participate in the Manager confirm-discard route-exit chain as a `system-details` kind, evaluated after the tools tail of the cascade: navigating away from, or switching systems on, a dirty details form prompts the standard three-way Save / Discard / Keep-editing dialog — Save persists the pending name and description before navigating, Discard reverts the inputs and proceeds, Keep-editing stays.
 A navigation that re-enters the System Overview page on the same system (the validation-blocker link, or re-selecting the already-selected system) SHALL NOT prompt, because the form stays mounted and its pending edit survives.
-The optional-features toggles, character-modifier / prerequisite cards, and currency editor on the same tab live-apply through the store and stage no draft, so they do not participate in this guard.
+The optional-features toggles (the Currency participation toggle included) and the character-modifier / prerequisite cards on the same tab live-apply through the store and stage no draft, so they do not participate in this guard.
 
 The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — a system-owned library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes (behaviour in `recipe-visibility`).
 It is an accordion list (one entry expanded at a time): each collapsed row shows the entry name and a live `@path op value` preview, and the expanded body edits the name, then the property `path` (rendered with a leading `@` affordance), an operator dropdown (the nine `CharacterPrerequisite.op` tokens), and a `value` field that is hidden for the valueless operators (`is true` / `is false` / `exists`).
@@ -985,14 +983,17 @@ Each control live-applies through the admin store (`addCharacterPrerequisite` / 
 
 #### Settings-List Ergonomics
 
-The three System Settings library lists — **Character modifiers**, **Character prerequisites**, and **Currency units** — share a set of ergonomic affordances (issue 768).
+Three Manager library lists — **Character modifiers** and **Character prerequisites** on System Settings, and **Currency units** on the World > Currency route — share a set of ergonomic affordances (issue 768).
+The Currency-units list moved out of System Settings with the rest of the currency editor (issue 1278), and the shared contract follows it: the ergonomics are a property of the list, not of the page it sits on.
 
 The Character-modifiers list SHALL render as a compact summary-row accordion mirroring the Character-prerequisites card: each collapsed row is one line — a chevron, the modifier's icon, its label, and its expression shown inline with the leading `@` sigil stripped for a cleaner read — with the row actions (copy, delete) to the right; activating the summary expands the row to the editor (Icon, Label, Expression).
 The Character-modifier editor SHALL edit its `icon` with the shared pop-over `IconPicker` (the same control the Currency-unit and Character-prerequisite editors use), not a raw icon-class text input; a modifier with no explicit icon falls back to `fa-solid fa-user`.
 The editor's Expression field keeps the raw stored value (including any leading `@`); only the collapsed summary strips the sigil for display.
 
-Each of the three list cards SHALL render a whole-section collapse toggle in its header: a `<button aria-expanded aria-controls>` with a chevron affordance that hides or reveals the section body (the list and its controls) while leaving the card header visible.
-The collapse state is session-local (in-memory, one collapse Set for the page) — preserved across store refreshes, reset when a different system is selected, and never persisted.
+Each of the two SYSTEM SETTINGS list cards SHALL render a whole-section collapse toggle in its header: a `<button aria-expanded aria-controls>` with a chevron affordance that hides or reveals the section body (the list and its controls) while leaving the card header visible.
+The collapse state is session-local (in-memory) — preserved across store refreshes and never persisted — and is one collapse Set for the page, reset when a different system is selected.
+The World Currency card SHALL NOT render one.
+A collapse toggle earns its place by yielding space to the siblings below it; as a whole route the currency card has no siblings, so the same control would only hide the page and leave a bare header row.
 It is distinct from the Character-prerequisites card's per-item accordion (which opens one entry at a time); a section may be collapsed independently of which entry, if any, is open.
 
 Each Character-modifier row SHALL offer a row-level **Copy to prerequisites** action, and — only when `features.gathering` is enabled — each Character-prerequisite row SHALL offer a **Copy to modifiers** action.
@@ -1001,7 +1002,8 @@ The pass/fail `op`/`value` and the roll math have no counterpart on the other si
 On copy the destination card SHALL open the new entry in edit mode and a polite `aria-live` region SHALL announce that the name and icon were copied and the condition still needs setting, so the dropped logic is a visible gap rather than a silent loss.
 
 Each row of all three lists SHALL offer keyboard-accessible **Move up** / **Move down** chevron `<button>`s, disabled at the ends, that reorder the list by one position through a single index-based store op (`reorderGatheringCharacterModifier` / `reorderCharacterPrerequisite` / `reorderCurrencyUnit`), with the new position announced through a polite `aria-live` region.
-No new persisted field backs the order: array order IS the persisted order, so each op rewrites the list array in place and saves through that list's existing whole-payload path (the gathering config for modifiers, `updateSystem` for prerequisites and currency units), and the order-preserving normalizers round-trip it.
+No new persisted field backs the order: array order IS the persisted order, so each op rewrites the list array in place and saves through that list's existing whole-payload path (the gathering config for modifiers, `updateSystem` for prerequisites, and the world `currencyConfig` setting through `CurrencyConfigStore` for currency units), and the order-preserving normalizers round-trip it.
+`reorderCurrencyUnit(fromIndex, toIndex)` takes NO `systemId`: there is exactly one world ladder to reorder, so the parameter the per-system era carried has been removed rather than defaulted.
 The provider-managed (read-only) currency-unit list carries no reorder controls, because the selected provider owns its denomination order.
 
 #### Validation Tab
@@ -1708,6 +1710,42 @@ The environments editor must block save when:
 - a task is missing required routed or progressive fields
 - a task's result groups violate reserved failure keyword rules
 
+### GM World Currency Route
+
+World always exposes `Currency` beside `Parties`, including with no selected system.
+It is the ONE place the world coin ladder, spend strategy, provider and GM macro set are authored (`data-models/spec.md` -> CurrencyConfig); a crafting system's Settings tab keeps only the participation toggle.
+
+- **The route is UNGATED**, like Parties and unlike experimental-gated Downtime.
+  It is reachable with no crafting system selected, with every system's currency toggle off, and with `fabricate.experimentalFeatures` disabled, because a GM must be able to author the coins BEFORE any system opts in — gating the authoring surface on the participation flag would make the ladder unauthorable from a standing start.
+- The rail entry sits directly under `Parties` inside the existing `.manager-world-nav` section, carries the stable id `manager-world-nav-currency` and the hook `data-world-nav-item="currency"`, uses the `fa-coins` icon and a localized accessible name, and surfaces the configured unit count on `.manager-nav-count`.
+  The route token is `world-currency`; it survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and it participates in the Manager confirm-discard route-exit chain like every other destination.
+- The page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries the page hook `data-world-currency-page`.
+  It is full-width with no right inspector, matching World Parties: the route MUST be excluded from the shell's shared `.manager-inspector` aside, not merely left without an inspector branch of its own.
+  The aside's fall-through renders a generic "Select a system" panel, so a route omitted from the exclusion list gains a permanent 300px column of unrelated content beside an editor that has no selected system at all.
+  The route also carries a `grid-template-rows: minmax(0, 1fr)` layout override, as the Downtime route does and for the same reason: the tab renders a single child straight into `.manager-main`, so on the shared three-row shell it would land in an auto-sized row and a tall ladder would grow the Manager instead of scrolling inside its own panel.
+- **The page header offers NO actions.** The route's own two actions — Add currency unit and Seed presets — live on the card header, where the provider read-only condition that hides them is computed.
+  The exclusion is required rather than incidental: the header-actions block falls through to Import / Export / Create for any route without a branch of its own, and those act on CRAFTING SYSTEMS — so on a route that deliberately has no selected system, "Create" would create a crafting system and "Export" would sit permanently disabled against an id the route does not have.
+  This is where World Currency departs from World Parties, which lifts its single New party action into the page header instead.
+- **The editor moved wholesale rather than being redesigned.** Every control below is the one that stood in the System Settings units card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*`; no new primitive is introduced.
+
+Shipped controls:
+
+- A whole-section collapse toggle in the card header (`<button aria-expanded aria-controls>` with a chevron), matching the Settings-list ergonomics contract; the state is in-memory and never persisted.
+- A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy.
+  When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the active Foundry system has none).
+  When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is invoked to refund currency when a player cancels an in-progress craft (the `refundOnPlayerCancel` policy).
+  There is no nested inventory-mode `<select>` — macro is its own peer strategy.
+- Add currency unit and seed preset actions
+- Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
+- Under `actorInventory` (with a provider) the GM-editable unit editors are replaced by a separate read-only, provider-managed denomination list (a "provider-managed denominations" callout plus per-unit label/abbreviation/coin-denomination shown as static values); the selected provider owns the denomination ladder, so the units are not GM-editable.
+  The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
+- Add-sub-unit dropdown with plus action
+- Sub-unit pills with editable amount and remove action
+
+Every control live-applies through the admin store and stages no draft.
+Each store action addresses the ONE world configuration and takes no `systemId`; persistence goes through `CurrencyConfigStore`, which normalizes and always saves (`data-models/spec.md` -> CurrencyConfig requirement 4), rather than through `updateSystem`.
+The projection reads the world config straight from its store on every publish, so another GM's edit to the ladder is picked up without a per-system cache to invalidate.
+
 ### GM Travel Route
 
 World always exposes `Parties` for global party management, including with no selected system.
@@ -2085,7 +2123,8 @@ It is a single flat **"Accept instead"** list of the four real ingredient match 
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
-Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND configures units, not merely when units exist; the normalizer seeds preset units even for a disabled-currency system, so unit presence alone is not authorisation.
+Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
+Unit presence alone is not authorisation, and since issue 1278 it is emphatically not: the ladder is WORLD scope, so a world with a fully authored ladder still has systems that do not charge for anything, and the participation toggle is the only thing that says which do.
 Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
@@ -3467,7 +3506,7 @@ The client-supplied `recipeId` is ignored; trusting it also allowed advancing on
 This section is GM Manager scope throughout.
 Every premium signal it requires — the title-bar badge, the rail chip, the padlocks and the Patreon call to action — belongs to the Manager window and to no other; §Player Navigation Extension forbids all of them in the player window.
 
-- The GM Manager's permanent World navigation contains `Parties` always, and `Downtime` only while `fabricate.experimentalFeatures` is enabled (see Experimental gate below).
+- The GM Manager's permanent World navigation contains `Parties` and `Currency` always, and `Downtime` only while `fabricate.experimentalFeatures` is enabled (see Experimental gate below).
 - `Parties` retains its identifiers, count, availability, route-exit behavior, CRUD, membership, travel-actor validation, realm resolution, `GatheringParty` aggregate, and `fabricate.gatheringParties` persistence unchanged, and is not gated in any way.
 - Core's Downtime fallback is a read-only four-tab preview whose ids are `tracking`, `activities`, `factions`, and `settings`.
 That list is Core's own preview CONTENT, not part of the extension contract, and no part of the registry reads it.
@@ -3720,6 +3759,7 @@ World settings:
 - `fabricate.gatheringEnvironments`
 - `fabricate.gatheringConfig`
 - `fabricate.gatheringParties`
+- `fabricate.currencyConfig`
 - `fabricate.migrationVersion`
 - `fabricate.theme`
 - `fabricate.experimentalFeatures`

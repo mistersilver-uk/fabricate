@@ -2588,7 +2588,7 @@ function systemRules(eventVisibility) {
  * `CraftingSystemManager.initialize()` and `RecipeManager.initialize()` load and normalize them
  * through the real code paths rather than being handed pre-normalized objects.
  *
- * @returns {{systems: object[], recipes: object[], environments: object[], gatheringConfig: object, realms: object[]}}
+ * @returns {{systems: object[], recipes: object[], environments: object[], gatheringConfig: object, currencyConfig: object, realms: object[]}}
  */
 /**
  * System-level crafting-check configuration.
@@ -3000,7 +3000,8 @@ const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
 });
 
 /**
- * The currency-unit ladder the Currency Units card is photographed against.
+ * The currency-unit ladder the World > Currency card is photographed against. WORLD scope since
+ * issue 1278: one ladder for the whole world, shared by every system that switches currency on.
  *
  * Authored rather than seeded. `_normalizeCurrencyConfig` only falls back to a preset bundle for a
  * LEGACY `provider: 'system'` config, so a system that merely switches the feature on comes back
@@ -3445,8 +3446,10 @@ export function buildLabContent() {
       // Safe on this system specifically: herbalism is knowledge-gated and no lab actor has been
       // granted it, so no herbalism recipe reaches the player crafting listing at all, and the
       // Tool Studio's currency-bearing repair rows are captured on smithing and runework.
+      // Participation only: the ladder itself is WORLD scope since issue 1278 and is seeded once,
+      // as `currencyConfig`, below.
       requirements: {
-        currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
+        currency: { enabled: true },
       },
     },
     {
@@ -3562,7 +3565,7 @@ export function buildLabContent() {
       // and tool frames. Runework has no tools, and the two cases that render it are a recipe
       // editor's Results tab and the Checks view, neither of which reads the flag.
       requirements: {
-        currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
+        currency: { enabled: true },
       },
     },
     // LAST in the array on purpose. `RecipeManager.getRecipes()` returns recipes in persisted
@@ -3697,6 +3700,14 @@ export function buildLabContent() {
     ],
     environments: ENVIRONMENTS,
     gatheringConfig,
+    // The WORLD currency config (issue 1278). One ladder for the whole world, which is what
+    // World > Currency edits and what every currency-enabled system spends against.
+    currencyConfig: {
+      spendStrategy: 'actorProperty',
+      providerId: '',
+      macros: { canAfford: '', increment: '', decrement: '' },
+      units: CURRENCY_UNITS,
+    },
     realms: [...REALMS, ...SMITHING_REALMS],
     components: [
       ...SMITHING_COMPONENTS,

@@ -426,12 +426,13 @@ CraftingSystem = {
       enabled: boolean, // default true
     },
 
+    // PARTICIPATION ONLY. The coin ladder, the spend strategy, the selected provider and
+    // the GM macro set are WORLD scope (see CurrencyConfig below): a world runs exactly
+    // ONE Foundry game system, so there is exactly one way actors store coins and two
+    // crafting systems cannot meaningfully disagree about how to read the same actor's
+    // purse. This block says only whether THIS system charges the world's currency.
     currency: {
-      enabled: boolean,
-      spendStrategy: "actorProperty" | "actorInventory" | "macro", // default "actorProperty"
-      providerId: string,                     // default ""; selected preconfigured provider (actorInventory)
-      macros: { canAfford: string, increment: string, decrement: string }, // default all ""; currency macro UUIDs (macro)
-      units: CurrencyUnit[],
+      enabled: boolean, // default false
     },
   },
 
@@ -499,12 +500,14 @@ CraftingSystem = {
     Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (world setting `fabricate.gatheringParties`; see the Gathering Party requirements in `gathering-and-harvesting`) and are excluded from system import/export.
     Beyond the `system` object and its realms, per-system gathering environments (the `gatheringEnvironments` world setting) and the per-system `gatheringConfig` slice (rules, conditions, vocabularies, economy, reusable tasks, reusable events, character modifiers) ride along with crafting-system import/export; the runtime-versus-authoring boundary, migration, reference reporting, and copy-mode rebinding rules are defined in `import-export` (Specification 010).
     The `gatheringParties` exclusion above still holds.
-15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
+15. `CurrencyConfig.units[]` — the WORLD currency configuration (see the CurrencyConfig section) — defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
+    A crafting system owns no `units[]` of its own; it contributes only `requirements.currency.enabled`, and the runtime composes the two at one chokepoint (`getCurrencyRequirementConfig`), taking `enabled` from the system and everything else from the world config.
 16. Currency unit profiles must be acyclic.
     Each connected conversion branch must resolve to exactly one terminal base unit.
-17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
-18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; normalized currency requirements do not emit them. (The new `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
-19. `requirements.currency.spendStrategy` selects how currency is read and spent.
+17. Legacy `provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
+    The resolution belongs to `normalizeWorldCurrencyConfig` rather than to the crafting-system normalizer, because a legacy block can now only reach normalization through the world config — carried up by the `1.26.0` migration or by the export upcast.
+18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; the normalized world currency config does not emit them. (The `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
+19. `CurrencyConfig.spendStrategy` selects how currency is read and spent, once per world.
     It is one of **three peer top-level strategies** — `"actorProperty"` (default), `"actorInventory"`, or `"macro"`; any other value normalizes to `"actorProperty"`.
     A legacy nested config (`"actorInventory"` with the retired `inventoryMode === "macro"`) maps forward to the peer `"macro"` strategy on normalization; `inventoryMode` is never re-emitted.
     The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding).
@@ -518,8 +521,8 @@ CraftingSystem = {
     A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
     The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
-    The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
-20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
+    The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
     Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
     Absent fields back-compat default to `""`/empty macros with no migration.
     The retired `inventoryMode` field is never emitted.
@@ -692,6 +695,51 @@ Requirements:
    I/O — so it is unit-testable and reusable from both the synchronous visibility
    hot-path and the GM overview view.
 
+## CurrencyConfig
+
+### Purpose
+
+Define the WORLD currency configuration: the one coin ladder a world has, how coins are read and spent, the selected provider, and the GM macro set.
+
+Currency is world scope rather than per crafting system because a world runs exactly ONE Foundry game system, so there is exactly one way actors store coins.
+Two crafting systems cannot meaningfully disagree about how to read the same actor's purse, yet the per-system model invited a GM to configure the ladder repeatedly and let two systems disagree.
+What a crafting system still owns is a single boolean — `requirements.currency.enabled`, whether it PARTICIPATES — which is deliberately NOT duplicated here, because a world-level flag and a system-level flag could then disagree.
+
+It is persisted as the `fabricate.currencyConfig` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `CurrencyConfigStore` is the persistence shell and `normalizeWorldCurrencyConfig` is the normalizer.
+
+```ts
+type CurrencyConfig = {
+  spendStrategy: "actorProperty" | "actorInventory" | "macro"; // default "actorProperty"
+  providerId: string; // default ""; meaningful only under actorInventory, always persisted
+  macros: { canAfford: string; increment: string; decrement: string }; // default all ""; meaningful only under macro
+  units: CurrencyUnit[]; // default []
+};
+```
+
+### Requirements
+
+1. The config carries **no** `enabled` key.
+   Participation is a per-crafting-system decision (`requirements.currency.enabled`), and keeping the flag out of this shape is what stops the two scopes from ever contradicting each other.
+2. `spendStrategy`, `providerId`, `macros`, and the `units[]` profile rules are unchanged in substance by the move to world scope — only their owner changed.
+   `CraftingSystem` requirements 15-20 define them and the `CurrencyUnit` section defines a unit; this section does not restate them.
+3. Normalization is total and non-throwing.
+   `normalizeWorldCurrencyConfig` always emits all four keys, drops an unusable unit entry (a non-object, or one resolving to an empty id) rather than repairing it while normalizing every usable entry to the canonical `CurrencyUnit` shape, maps a legacy `provider === "system"` + `systemAdapter` block forward to the matching seeded profile and spend strategy (requirement 17), and never re-emits the legacy `provider`, `systemAdapter`, or `inventoryMode` inputs.
+   It is `normalizeCurrencyConfig` minus `enabled`, so the world shape and the legacy per-system shape cannot drift apart.
+4. **Persistence is NOT gated on profile validity, and that is deliberate.**
+   A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
+   The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
+5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
+   Validity is resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
+6. The one structural refusal the store makes is a sub-unit edit that would self-reference or create a cycle, because that corrupts the graph every reader walks rather than merely leaving the ladder incomplete.
+   Deleting a unit additionally strips every `contains[]` entry pointing at it, so a deletion never leaves a dangling edge for a reader to defend against.
+7. **Unit `id`s are stable and are never rewritten**, because recipe currency options (`Ingredient.match.unit`) and salvage currency requirements (`CurrencyRequirement.unit`) store unit ids rather than labels, so a dropped or re-keyed unit orphans every reference to it.
+   Every reconciliation of two ladders is therefore keyed by `id` and is reference-preserving: the `1.26.0` migration UNIONS units by id across every crafting system (the first system wins an id collision), and import merges an incoming ladder by id with the DESTINATION definition winning (see `import-export`).
+8. Exactly one runtime chokepoint composes the two scopes.
+   `getCurrencyRequirementConfig` takes `enabled` from the crafting system and `units` / `spendStrategy` / `providerId` / `macros` from this config, reaching each through a seam (`getCraftingSystemManager`, `getCurrencyConfig`) with a `game.fabricate` global fallback.
+   No affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
+   The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
+
 ## CurrencyUnit
 
 ### Purpose
@@ -700,7 +748,7 @@ Define one actor-backed currency denomination and its optional sub-unit breakdow
 
 ```ts
 type CurrencyUnit = {
-  id: string; // stable internal reference used by CurrencyRequirement.unit
+  id: string; // stable internal reference used by CurrencyRequirement.unit and Ingredient.match.unit
   label: string;
   abbreviation: string;
   icon: string;
@@ -715,7 +763,8 @@ type CurrencyUnit = {
 
 ### Requirements
 
-1. `id` is stable after creation and is the value stored by salvage currency requirements.
+1. `id` is stable after creation and is the value stored by salvage currency requirements and recipe currency options.
+   A unit lives in the world `CurrencyConfig.units[]`, not on a crafting system.
 2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
    `abbreviation` is **optional** and defaults to the empty string when unauthored.
    It is **never** defaulted to, or persisted as, the unit `id`.
@@ -725,7 +774,7 @@ type CurrencyUnit = {
    A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
-6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `requirements.currency.spendStrategy`:
+6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `CurrencyConfig.spendStrategy`:
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
@@ -1499,7 +1548,7 @@ Ingredient = {
     tagMatch?: "any" | "all", // default "any"
 
     // type = "currency"
-    unit?: string,    // a configured requirements.currency.units[].id
+    unit?: string,    // a configured CurrencyConfig.units[].id (world scope)
     amount?: number,  // positive cost in that unit
 
     // type = "essence"
@@ -1519,7 +1568,7 @@ Ingredient = {
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
-7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost.
+7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
    A currency option matches no inventory item and contributes no alchemy signature.
 8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
    It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
@@ -1542,7 +1591,7 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
 1. Selection is **items-first, currency-fallback** per group.
    Every non-currency option is tried first; the first item-satisfiable option wins even if a currency option is authored earlier (items strictly beat currency).
    Only if no item option satisfies does the resolver choose the first AFFORDABLE currency option in author order among the group's currency options.
-2. Affordability is evaluated against the crafting actor through the same currency profile/spend strategy the system configures (`actorProperty` / `actorInventory` / `macro`).
+2. Affordability is evaluated against the crafting actor through the world's currency profile and spend strategy (`actorProperty` / `actorInventory` / `macro`), which the system's toggle only admits or refuses.
    The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends.
    With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
 3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated per terminal base unit — **before** any item or currency mutation.
@@ -1554,7 +1603,7 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
    A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
-   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
+   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the resolved world currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
    This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
 
 ### Essence-Alternative Consumption (Craft-Time)

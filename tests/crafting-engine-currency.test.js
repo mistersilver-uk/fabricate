@@ -15,6 +15,7 @@ import {
   formatCurrencyRequirement,
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
+  normalizeWorldCurrencyConfig,
   readCurrencyBalances,
   validateCurrencyProfile,
 } from '../src/systems/currencyProfile.js';
@@ -233,7 +234,11 @@ test('CraftingSystemManager defaults time requirements ON, honouring an explicit
   assert.equal(manager._normalizeRequirements({ time: { enabled: false } }).time.enabled, false);
 });
 
-test('CraftingSystemManager normalizes legacy system adapter currency to seeded units', () => {
+// Since issue 1278 the crafting system keeps ONLY the participation flag: the ladder, strategy,
+// provider and macros are world scope. So the per-system normalizer is asserted to emit nothing
+// else, and the legacy-adapter resolution is asserted where that legacy block can now actually
+// arrive — the world normalizer, fed by the 1.26.0 migration and the export upcast.
+test('CraftingSystemManager reduces the per-system currency block to the participation flag', () => {
   setupGlobals({});
   const manager = new CraftingSystemManager({});
   const normalized = manager._normalizeRequirements({
@@ -241,12 +246,24 @@ test('CraftingSystemManager normalizes legacy system adapter currency to seeded 
       enabled: true,
       provider: 'system',
       systemAdapter: 'dnd5e',
+      units: [{ id: 'gp' }],
+      spendStrategy: 'macro',
     },
   });
-  assert.equal(normalized.currency.enabled, true);
-  assert.equal(normalized.currency.units.length, DND5E_CURRENCY_PRESETS.length);
-  assert.equal('provider' in normalized.currency, false);
-  assert.equal('systemAdapter' in normalized.currency, false);
+  assert.deepEqual(normalized.currency, { enabled: true });
+});
+
+test('world normalizer resolves a legacy system adapter to seeded units', () => {
+  setupGlobals({});
+  const normalized = normalizeWorldCurrencyConfig({
+    provider: 'system',
+    systemAdapter: 'dnd5e',
+  });
+  assert.equal(normalized.units.length, DND5E_CURRENCY_PRESETS.length);
+  assert.equal('provider' in normalized, false);
+  assert.equal('systemAdapter' in normalized, false);
+  // The world config describes WHAT the currency is; participation is the system's call.
+  assert.equal('enabled' in normalized, false);
 });
 
 function buildPf2eActor(coins, removeImpl) {
@@ -496,20 +513,15 @@ test('currency presets survive normalization with their abbreviations intact', (
   }
 });
 
-test('CraftingSystemManager normalizes legacy pf2e adapter to actorInventory units', () => {
+test('world normalizer maps a legacy pf2e adapter to actorInventory units', () => {
   setupGlobals({});
-  const manager = new CraftingSystemManager({});
-  const normalized = manager._normalizeRequirements({
-    currency: {
-      enabled: true,
-      provider: 'system',
-      systemAdapter: 'pf2e',
-    },
+  const normalized = normalizeWorldCurrencyConfig({
+    provider: 'system',
+    systemAdapter: 'pf2e',
   });
-  assert.equal(normalized.currency.enabled, true);
-  assert.equal(normalized.currency.spendStrategy, 'actorInventory');
-  assert.equal(normalized.currency.units.length, PF2E_CURRENCY_PRESETS.length);
-  const gp = normalized.currency.units.find((unit) => unit.id === 'gp');
+  assert.equal(normalized.spendStrategy, 'actorInventory');
+  assert.equal(normalized.units.length, PF2E_CURRENCY_PRESETS.length);
+  const gp = normalized.units.find((unit) => unit.id === 'gp');
   assert.equal(gp.denomination, 'gp');
 });
 

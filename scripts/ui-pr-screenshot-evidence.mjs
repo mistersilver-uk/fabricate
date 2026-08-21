@@ -286,9 +286,13 @@ export const VIEW_RECIPES = Object.freeze([
   },
   {
     id: 'manager-currency',
-    label: 'Manager currency configuration (spend strategy, units, macros)',
+    label: 'World currency configuration (spend strategy, units, macros)',
     smokeLabels: ['currency-actor-property', 'currency-macro', 'currency-actor-inventory'],
     matches: [
+      // The editor itself, world scope since issue 1278. It used to be a card inside
+      // `SystemEditView`, which is why this recipe once had no view of its own.
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      /^src\/systems\/CurrencyConfigStore\.js$/,
       /^src\/systems\/currencyProfile\.js$/,
       /^src\/systems\/CoinSpenders\.js$/,
       /^src\/config\/currency(?:Presets|Providers)\.js$/,

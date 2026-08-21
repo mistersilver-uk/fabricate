@@ -93,6 +93,83 @@ describe('handleFabricateSettingChange', () => {
     );
   });
 
+  // --- World currency (issue 1278) -----------------------------------------------------
+  // Currency used to be per-system state, so editing it wrote `requirements` on a crafting
+  // system and the systems branch above announced `resolution-config` for THAT system. The
+  // ladder is world scope now and no system record changes, so this branch is the ONLY thing
+  // that tells a connected player's shell a GM moved the coins.
+  it('reloads the world currency store and scopes the change to PARTICIPATING systems', () => {
+    const emitted = [];
+    let loadCalls = 0;
+    const handled = handleFabricateSettingChange('fabricate.currencyConfig', {
+      currencyConfigStore: {
+        load: () => {
+          loadCalls += 1;
+        },
+      },
+      craftingSystemManager: {
+        getSystems: () => [
+          { id: 'on', requirements: { currency: { enabled: true } } },
+          { id: 'off', requirements: { currency: { enabled: false } } },
+          { id: 'none', requirements: {} },
+        ],
+      },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+
+    assert.equal(handled, true);
+    assert.equal(loadCalls, 1, 'the replicated ladder is re-read into the cache');
+    assert.deepEqual(emitted, [
+      // The manager republish comes first and is unconditional: a second GM's World > Currency
+      // tab is stale whether or not any crafting system currently participates.
+      [
+        'fabricate.craftingSystemsChanged',
+        [
+          { id: 'on', requirements: { currency: { enabled: true } } },
+          { id: 'off', requirements: { currency: { enabled: false } } },
+          { id: 'none', requirements: {} },
+        ],
+      ],
+      [
+        'fabricate.craftingDataChanged',
+        {
+          source: 'systems',
+          // Only the participating system. A system with currency off resolves nothing against
+          // the ladder, so re-narrowing it could not produce an observable difference.
+          scopes: [{ systemId: 'on', domains: ['resolution-config'] }],
+        },
+      ],
+    ]);
+  });
+
+  it('emits NOTHING when no system participates, rather than an unattributable payload', () => {
+    // `craftingDataChange` treats an empty domain set as poisoning the whole payload into a
+    // broad invalidation, so emitting an empty-scope change here would invalidate every shell
+    // in the world for an edit that can affect none of them.
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.currencyConfig', {
+      currencyConfigStore: { load: () => {} },
+      craftingSystemManager: { getSystems: () => [{ id: 'off', requirements: {} }] },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+
+    assert.equal(handled, true);
+    assert.deepEqual(
+      emitted,
+      [['fabricate.craftingSystemsChanged', [{ id: 'off', requirements: {} }]]],
+      'the manager still republishes; only the scoped shell signal is withheld'
+    );
+  });
+
+  it('tolerates a missing currency store and a manager that cannot list systems', () => {
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.currencyConfig', {
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+    assert.equal(handled, true, 'the key is still claimed, so nothing else tries to handle it');
+    assert.deepEqual(emitted, [['fabricate.craftingSystemsChanged', []]]);
+  });
+
   it('ignores unrelated settings without touching the managers', () => {
     const emitted = [];
     let reloadCalls = 0;

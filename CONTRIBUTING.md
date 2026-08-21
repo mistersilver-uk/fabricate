@@ -599,7 +599,7 @@ A `window` case's shortfall is accounted for by a class-level entry in the known
 As of this writing the registry holds 248 cases: 146 `exact`, 3 `window`, 99 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 34 of the 248 publishable cases.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 35 of the 248 publishable cases.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
 It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.

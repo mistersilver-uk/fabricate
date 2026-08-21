@@ -158,12 +158,22 @@ function makePf2eActor({ id = 'pf2e', coins = {}, items = [] } = {}) {
 // Crafting-system manager stub (requirements.currency)
 // ---------------------------------------------------------------------------
 
+// Issue 1278 split currency across two scopes: the crafting system carries ONLY whether it
+// participates (`requirements.currency.enabled`), while the ladder, spend strategy and macro set
+// are world scope. A test still describes one coherent currency setup through one options object
+// — `makeCurrencySystem` builds the system half and stashes the world half here, and `setupGame`
+// publishes it on the fabricate global. The stash works because every test in this file calls
+// `makeCurrencySystem` immediately before `setupGame`; `worldCurrency` is exported from the
+// stash so a test that needs to tweak the world half (see the macro cases) can do so directly.
+let worldCurrency = null;
+
 function setupGame(systemConfig, fabricateExtra = {}) {
   globalThis.game = {
     user: { id: 'u1', isGM: true },
     time: { worldTime: 0 },
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: () => systemConfig }),
+      getCurrencyConfigStore: () => ({ get: () => worldCurrency }),
       ...fabricateExtra,
     },
   };
@@ -173,13 +183,19 @@ function setupGame(systemConfig, fabricateExtra = {}) {
 function makeCurrencySystem({ spendStrategy = 'actorProperty', units, enabled = true } = {}) {
   const resolvedUnits =
     units || (spendStrategy === 'actorInventory' ? PF2E_CURRENCY_PRESETS : DND5E_CURRENCY_PRESETS);
+  worldCurrency = {
+    spendStrategy,
+    providerId: '',
+    macros: { canAfford: '', increment: '', decrement: '' },
+    units: resolvedUnits,
+  };
   return {
     id: 'sys-cur',
     resolutionMode: 'simple',
     features: { multiStepRecipes: false, craftingChecks: false, essences: false },
     craftingCheck: { enabled: false, consumption: { consumeIngredientsOnFail: false } },
     components: [],
-    requirements: { currency: { enabled, spendStrategy, units: resolvedUnits, macros: {} } },
+    requirements: { currency: { enabled } },
   };
 }
 
@@ -908,7 +924,7 @@ test('engine: async-gate failure (macro) does not fall back to an unselected ite
     units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [] }],
   });
   // Macro config needs canAfford + decrement to validate.
-  system.requirements.currency.macros = { canAfford: 'Macro.afford', decrement: 'Macro.dec' };
+  worldCurrency.macros = { canAfford: 'Macro.afford', increment: '', decrement: 'Macro.dec' };
   setupGame(system);
   const set = makeSet([[currencyOption('gp', 1)]]);
   const recipe = makeRecipe({ ingredientSet: set });

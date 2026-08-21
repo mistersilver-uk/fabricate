@@ -1651,7 +1651,7 @@
             "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
             "RefundOnPlayerCancel": "Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.",
             "RefundOnPlayerCancelDisabled": "Enable Time requirements to configure this — a player can only cancel a timed craft in progress.",
-            "Currency": "Enables the currency configuration for this system.",
+            "Currency": "Lets this system's recipes charge the world's currency. Configure the coins under World > Currency.",
             "Time": "Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting."
           }
         },
@@ -4027,8 +4027,9 @@
         },
         "CurrencyUnits": {
           "Title": "Currency units",
-          "Hint": "Define actor currency paths and denomination breakdowns for this crafting system.",
+          "Hint": "Define the coins of your world, and how they break down. Every crafting system that enables currency shares them.",
           "Empty": "No currency units yet.",
+          "EmptyHint": "Add a coin, or seed the presets for your world, using the buttons above.",
           "Add": "Add currency unit",
           "Edit": "Edit currency unit",
           "Delete": "Delete currency unit",
@@ -4051,7 +4052,7 @@
           "NoOtherUnits": "Add another currency unit before defining a breakdown.",
           "NoEligibleSubUnits": "No eligible sub-units.",
           "SpendStrategy": "Spend strategy",
-          "SpendStrategyHint": "Choose how this system reads and spends actor currency.",
+          "SpendStrategyHint": "Choose how your world reads and spends actor currency.",
           "SpendStrategyActorProperty": "Actor data path",
           "SpendStrategyActorPropertyHint": "Read and spend coins at a flat actor data path (e.g. dnd5e currency).",
           "SpendStrategyActorInventory": "Actor inventory",
@@ -4064,7 +4065,7 @@
           "MacroCanAfford": "Can afford macro",
           "MacroCanAffordHint": "Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.",
           "MacroIncrement": "Increment macro",
-          "MacroIncrementHint": "Reserved for a future refund flow — configured now but not yet invoked.",
+          "MacroIncrementHint": "Runs to return currency when a player cancels an in-progress craft, if the system refunds on cancel.",
           "MacroDecrement": "Decrement macro",
           "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
           "MacroDropHint": "Drag a macro here to link it.",
@@ -4288,6 +4289,8 @@
           "PartiesHint": "Create and manage parties shared across every crafting system.",
           "PartiesActions": "World party actions",
           "PartiesInspector": "Selected world party",
+          "CurrencyNav": "Currency",
+          "CurrencyTitle": "World Currency",
           "Downtime": {
             "Title": "Downtime",
             "Nav": "Downtime",
@@ -4592,6 +4595,11 @@
             "Override": {
               "Eyebrow": "Current realm override"
             }
+          },
+          "Currency": {
+            "Subtitle": "{count} coins · used by {systems} of {total} crafting systems",
+            "SubtitleOne": "1 coin · used by {systems} of {total} crafting systems",
+            "SubtitleEmpty": "No coins yet · world-level, shared by every crafting system that enables currency"
           }
         },
         "Tools": {
