@@ -55,6 +55,10 @@ const SELECTED_SYSTEM_FIELDS = [
   'essenceDefinitions',
   'features',
   'gatheringCraftingCheck',
+  // Travel & Realms PARTICIPATION, and nothing else (issue 1282): the realm library, the reveal
+  // mode and the modifier visibility are world scope, so a `realms` array here would be a second
+  // and always-empty source of truth for whoever reached for it.
+  'gatheringRealmSettings',
   'id',
   'itemTags',
   'managedItemOptions',

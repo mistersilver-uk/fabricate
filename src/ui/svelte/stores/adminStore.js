@@ -1181,7 +1181,7 @@ function _emptyTravelState() {
     travelSaving: false,
     travelError: null,
     travelFieldErrors: {},
-    selectedSystemRealms: [],
+    worldRealms: [],
     actorOptions: [],
   };
 }
@@ -2613,10 +2613,10 @@ export function createAdminStore(services) {
       if (!selectedId && parties.length > 0) selectedId = parties[0].id;
       if (selectedId !== get(travelSelectedPartyId)) travelSelectedPartyId.set(selectedId);
 
-      const realms =
-        systemId && realmStore?.listBySystem
-          ? _clonePlain(realmStore.listBySystem(systemId) || [])
-          : [];
+      // The WORLD's realm library (issue 1282). No system id: realms are geography, so the
+      // library is the same whichever crafting system is selected — and World > Travel has to
+      // render it before any system opts in.
+      const realms = realmStore?.list ? _clonePlain(realmStore.list() || []) : [];
       const realmById = new Map(realms.map((realm) => [realm.id, realm]));
       const locationService = getLocationService();
       const partyRealmOverridesAvailable = canUsePartyRealmOverrides(systemId);
@@ -2629,7 +2629,7 @@ export function createAdminStore(services) {
       for (const party of parties) {
         const evidence =
           partyRealmOverridesAvailable && locationService?.resolveCurrentRealms
-            ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
+            ? locationService.resolveCurrentRealms({ partyId: party.id })
             : {
                 resolved: false,
                 source: 'unresolved',
@@ -2696,21 +2696,14 @@ export function createAdminStore(services) {
         };
       });
 
-      // Per-realm counts for the Realms tab header chips. Environments are
-      // fetched once (sync arrays only — listBySystem may be async); parties
-      // reuse the raw list already built above.
+      // Per-realm counts for the Realms tab header chips. EVERY environment in the world,
+      // not one system's (issue 1282): a world realm can be cited by an environment belonging
+      // to any crafting system that opted in, and World > Travel reports all of them — the
+      // same rule `GatheringRealmStore._collectReferences` applies to delete evidence.
       const realmEnvList = (() => {
         if (realms.length === 0) return [];
         const environmentStore = _getEnvironmentStore();
-        if (!environmentStore) return [];
-        // listBySystem may be async; prefer its synchronous array, else fall
-        // back to a synchronous list() (realm ids are unique per system).
-        const bySystem =
-          typeof environmentStore.listBySystem === 'function'
-            ? environmentStore.listBySystem(systemId)
-            : null;
-        if (Array.isArray(bySystem)) return bySystem;
-        const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
+        const all = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
         return Array.isArray(all) ? all : [];
       })();
       const realmEnvironments = (realmId) =>
@@ -2782,7 +2775,7 @@ export function createAdminStore(services) {
         travelSaving: get(travelSaving),
         travelError: get(travelError),
         travelFieldErrors: _clonePlain(get(travelFieldErrors)),
-        selectedSystemRealms: realms.map((realm) => {
+        worldRealms: realms.map((realm) => {
           const environments = realmEnvironments(realm.id);
           const partiesInRealm = realmParties(realm.id);
           return {
@@ -2799,10 +2792,22 @@ export function createAdminStore(services) {
             parties: partiesInRealm,
           };
         }),
-        gatheringRealmSettings:
-          systemId && realmStore?.getRealmSettings
-            ? realmStore.getRealmSettings(systemId)
-            : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
+        // Two sources, deliberately: `enabled` is the SELECTED SYSTEM's participation flag and
+        // the reveal/visibility pair is the WORLD's behaviour. The world travel config carries
+        // no `enabled` at all since issue 1282, so reading one out of it would be permanently
+        // false — the trap `canUsePartyRealmOverrides` above already names.
+        gatheringRealmSettings: {
+          ...(realmStore?.getRealmSettings
+            ? realmStore.getRealmSettings()
+            : { revealMode: 'manual', modifierVisibility: 'visible' }),
+          // `enabled` is spread LAST on purpose. The world config carries none today and a store
+          // test pins that, but if one ever came back it would land here as a permanently false
+          // participation flag — silently, since the symptom is an unreachable control rather
+          // than an error. Ordering it last makes the system's answer win by construction.
+          enabled: isGatheringRealmsEnabled(
+            services.getCraftingSystemManager?.()?.getSystem?.(String(systemId || '')) || null
+          ),
+        },
         partyRealmOverridesAvailable,
         actorOptions,
       };
@@ -2963,14 +2968,18 @@ export function createAdminStore(services) {
         return withSave((store) => store.setCurrentRealmOverride(partyId, nextIds));
       },
       // --- Realm quick list (name/enabled only; never touches other fields). ---
-      async createRealmQuick(systemId, name) {
+      //
+      // None of these takes a crafting system id any more (issue 1282). The realm library is
+      // world scope, so World > Travel authors it whether or not a system is selected — and a
+      // system-gated write here would refuse the very first realm a GM creates.
+      async createRealmQuick(name) {
         const realmStore = getRealmStore();
-        if (!realmStore || !systemId) return false;
+        if (!realmStore) return false;
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const created = await realmStore.create(systemId, { name: String(name ?? '').trim() });
+          const created = await realmStore.create({ name: String(name ?? '').trim() });
           // Return the new realm id so callers can select it; fall back to true.
           return created?.id || true;
         } catch (error) {
@@ -2981,47 +2990,34 @@ export function createAdminStore(services) {
           patch();
         }
       },
-      renameRealm: async (systemId, realmId, name) => _realmPatch(systemId, realmId, { name: String(name ?? '') }),
-      toggleRealmEnabled: async (systemId, realmId, enabled) => _realmPatch(systemId, realmId, { enabled: enabled === true }),
+      renameRealm: async (realmId, name) => _realmPatch(realmId, { name: String(name ?? '') }),
+      toggleRealmEnabled: async (realmId, enabled) => _realmPatch(realmId, { enabled: enabled === true }),
       // Merge-patch a single realm; the store merges over the existing record so
       // fields the caller omits round-trip untouched. Backs the full Travel
       // realm authoring surface (description/img/secret/biomes).
-      updateRealm: async (systemId, realmId, patch = {}) => _realmPatch(systemId, realmId, patch && typeof patch === 'object' ? patch : {}),
+      updateRealm: async (realmId, patch = {}) => _realmPatch(realmId, patch && typeof patch === 'object' ? patch : {}),
       // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
       // realm. Single-valued: the scene region is stripped from every realm's
-      // sceneMappings (on this scene) before being attached to the chosen realm;
-      // a falsy realmId just clears the link. Only realms that actually change
-      // are persisted, so this is a no-op write when nothing moved.
+      // sceneMappings before being attached to the chosen one; a falsy realmId just
+      // clears the link.
+      //
+      // ONE store call, not one `update()` per realm (issue 1282). Against a
+      // setting-backed store the old loop was a guaranteed lost update — iteration N+1
+      // read the cache as it stood before N — so the strip-and-attach is expressed as a
+      // single `setSceneRegionLink` write. It takes no crafting system id either: a
+      // Scene Region points at a place, not at a ruleset.
       async setMapRegionLink(sceneRegionUuid, fabricateRealmId) {
         const realmStore = getRealmStore();
-        const systemId = get(selectedSystemId);
         const targetSceneRegionUuid = String(sceneRegionUuid || '');
-        if (!realmStore || !systemId || !targetSceneRegionUuid) return false;
+        if (!realmStore?.setSceneRegionLink || !targetSceneRegionUuid) return false;
         const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
         const sceneUuid = String(sceneData.sceneUuid || '');
         const nextRealmId = fabricateRealmId ? String(fabricateRealmId) : '';
-        const matchesTarget = (mapping) =>
-          mapping?.sceneRegionUuid === targetSceneRegionUuid &&
-          (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const realms = realmStore.listBySystem?.(systemId) || [];
-          const realmList = Array.isArray(realms) ? realms : [];
-
-          for (const realm of realmList) {
-            const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
-            const filtered = mappings.filter((mapping) => !matchesTarget(mapping));
-            if (nextRealmId && realm.id === nextRealmId) {
-              await realmStore.update(systemId, realm.id, {
-                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }],
-              });
-            } else if (filtered.length !== mappings.length) {
-              await realmStore.update(systemId, realm.id, { sceneMappings: filtered });
-            }
-          }
-
+          await realmStore.setSceneRegionLink(targetSceneRegionUuid, nextRealmId, { sceneUuid });
           // No current-realm writes here: a party's current realm is derived
           // LIVE from its travel marker's position (GatheringLocationService auto
           // sensing), so inside markers resolve to the new link automatically.
@@ -3034,27 +3030,10 @@ export function createAdminStore(services) {
           patch();
         }
       },
-      async setGatheringRealmsEnabled(systemId, enabled) {
+      async deleteRealm(realmId) {
         const realmStore = getRealmStore();
-        if (!realmStore?.updateRealmSettings || !systemId) return false;
-        clearErrors();
-        travelSaving.set(true);
-        patch();
-        try {
-          await realmStore.updateRealmSettings(systemId, { enabled: enabled === true });
-          return true;
-        } catch (error) {
-          applyError(error);
-          return false;
-        } finally {
-          travelSaving.set(false);
-          patch();
-        }
-      },
-      async deleteRealm(systemId, realmId) {
-        const realmStore = getRealmStore();
-        if (!realmStore || !systemId) return false;
-        const realm = realmStore.get?.(systemId, realmId);
+        if (!realmStore) return false;
+        const realm = realmStore.getRealm?.(realmId);
         // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
         // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
         // is HTML.
@@ -3063,7 +3042,7 @@ export function createAdminStore(services) {
         // Collect referenced-by evidence WITHOUT deleting first: GatheringRealmStore.delete
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
-        const references = _collectRealmReferences(systemId, realmId);
+        const references = _collectRealmReferences(realmId);
         const refLine =
           references.environments.length > 0 || references.parties.length > 0
             ? `<p>${
@@ -3090,7 +3069,7 @@ export function createAdminStore(services) {
         travelSaving.set(true);
         patch();
         try {
-          await realmStore.delete(systemId, realmId, {
+          await realmStore.delete(realmId, {
             environmentStore: _getEnvironmentStore(),
             partyStore: getPartyStore(),
           });
@@ -3105,17 +3084,13 @@ export function createAdminStore(services) {
       },
     };
 
-    function _collectRealmReferences(systemId, realmId) {
+    function _collectRealmReferences(realmId) {
       const environments = [];
       const parties = [];
       const environmentStore = _getEnvironmentStore();
-      const envList =
-        typeof environmentStore?.listBySystem === 'function'
-          ? environmentStore.listBySystem(systemId)
-          : typeof environmentStore?.list === 'function'
-            ? environmentStore.list()
-            : [];
-      // listBySystem may be async (environment store); only use synchronous arrays here.
+      // EVERY environment in the world (issue 1282), not the selected system's: the GM has to
+      // see each one that names the place they are about to delete.
+      const envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
       if (Array.isArray(envList)) {
         for (const env of envList) {
           const included =
@@ -3137,14 +3112,14 @@ export function createAdminStore(services) {
       return { environments, parties };
     }
 
-    async function _realmPatch(systemId, realmId, patchData) {
+    async function _realmPatch(realmId, patchData) {
       const realmStore = getRealmStore();
-      if (!realmStore || !systemId) return false;
+      if (!realmStore) return false;
       clearErrors();
       travelSaving.set(true);
       patch();
       try {
-        await realmStore.update(systemId, realmId, patchData);
+        await realmStore.update(realmId, patchData);
         return true;
       } catch (error) {
         applyError(error);
@@ -6000,6 +5975,30 @@ export function createAdminStore(services) {
     if (!sysId) return false;
     const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
     await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Whether this crafting system PARTICIPATES in Travel & Realms.
+   *
+   * It sits beside `toggleRequirement` rather than in the travel section (issue 1282) because
+   * it writes a CRAFTING SYSTEM, not the world travel config. The realm library, the reveal
+   * mode and the modifier visibility are world scope; what a system still owns is this one
+   * boolean, with exactly three jobs — whether the party's location gates its environment
+   * access in the engine, what its UI shows, and whether its environments offer the realm
+   * controls. Its home in the Manager is the System Settings feature tile beside Currency.
+   *
+   * @param {string} systemId
+   * @param {boolean} enabled
+   */
+  async function setGatheringRealmsEnabled(systemId, enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = systemId || get(selectedSystemId);
+    if (!sysId || !systemManager?.updateSystem) return false;
+    await systemManager.updateSystem(sysId, {
+      gatheringRealmSettings: { enabled: enabled === true },
+    });
     await refresh();
     return true;
   }
@@ -9033,13 +9032,25 @@ export function createAdminStore(services) {
     // carries an empty ladder, and every currency cost in it lands in the destination world as
     // an unresolvable unit id.
     const currencyConfig = services.getCurrencyConfigStore?.()?.get?.() || {};
+    // And the world realm library (issue 1282), for the same reason and with the same
+    // consequence: realms are WORLD scope, so omitting this exports an empty library and every
+    // realm-gated environment in the payload lands in the destination world citing realm ids
+    // that name nothing.
+    //
+    // THIS CALL AND `game.fabricate.exportSystem` ARE TWO PATHS TO ONE PAYLOAD. Every parameter
+    // of `buildExportPayload` is defaulted, so a forgotten argument here produces a silently
+    // empty slice rather than an error — which is precisely how the Manager's Export button
+    // came to disagree with the API's (issue 642). `tests/export-system-gathering-bundle.test.js`
+    // pins both call sites against the exporter's own signature so they cannot drift again.
+    const travelConfig = services.getGatheringRealmStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
       gatheringConfig,
-      currencyConfig
+      currencyConfig,
+      travelConfig
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);
@@ -9668,7 +9679,7 @@ export function createAdminStore(services) {
     updateRealm: travel.updateRealm,
     setMapRegionLink: travel.setMapRegionLink,
     deleteRealm: travel.deleteRealm,
-    setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
+    setGatheringRealmsEnabled,
     // --- GM Knowledge surface (issue 785) ---
     setKnowledgeActive,
     refreshKnowledge,

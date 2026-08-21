@@ -1305,9 +1305,9 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
 });
 
 test('system Travel Map evidence is populated and long-label focus cannot duplicate stacked', () => {
-  const normal = getCaseById('manager-system-travel-map-normal');
-  const stacked = getCaseById('manager-system-travel-map-stacked');
-  const longLabel = getCaseById('manager-system-travel-long-label-focus');
+  const normal = getCaseById('manager-world-travel-map-normal');
+  const stacked = getCaseById('manager-world-travel-map-stacked');
+  const longLabel = getCaseById('manager-world-travel-long-label-focus');
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
   const contentSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labContent.js'), 'utf8');
   const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');

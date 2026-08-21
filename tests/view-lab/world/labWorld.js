@@ -57,6 +57,11 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // system carries only `requirements.currency.enabled`, so without this the World > Currency
   // page photographs an empty card and every currency cost renders as a raw unit id.
   put('currencyConfig', content.currencyConfig);
+  // The world travel config (issue 1282). World scope for the same reason the currency ladder
+  // is: a crafting system carries only `gatheringRealmSettings.enabled`, so without this the
+  // World > Travel page photographs an empty realm list and every realm-gated environment
+  // resolves against nothing.
+  put('travelConfig', content.travelConfig);
   // FIVE parties, and every one of them earns its place in the World > Parties card list:
   // the pane is paged at four, searchable once more than one exists, and draws its enable
   // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in

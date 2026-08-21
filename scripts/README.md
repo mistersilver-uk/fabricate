@@ -488,8 +488,8 @@ Read the reported window, decide whether it matters, and pin it with a test wher
 `svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and that is
 the fast local signal.
 It is not sufficient on its own: a Vite build compiles the ENTRY GRAPH, and this repository has
-components nothing imports (`GatheringTravelView.svelte`, issue 927), whose warnings would never
-reach it.
+components nothing imports (`RowDisclosure.svelte`; the sweep was motivated by issue 927), whose
+warnings would never reach it.
 So this walks the tree directly with `lib/svelteComponentFiles.js` — the same walker
 `compare-svelte-render.mjs` uses — and compiles each component with the build's own options, read
 out of `svelte.config.js` by `lib/svelteCompilerWarnings.js`.

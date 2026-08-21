@@ -3321,14 +3321,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-default-collapsed',
-    label: 'Manager — system Travel collapsed by default',
-    smokeLabels: ['manager-system-travel-default-collapsed'],
+    id: 'manager-world-travel-default-collapsed',
+    label: 'Manager — World Travel collapsed by default',
+    smokeLabels: ['manager-world-travel-default-collapsed'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [],
     expectView: 'systems',
-    expectSelector: '#manager-nav-travel[aria-expanded="false"]:not(.is-active)',
+    expectSelector: '#manager-world-nav-travel[aria-expanded="false"]:not(.is-active)',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
@@ -3337,15 +3337,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-expanded-neutral',
-    label: 'Manager — system Travel expanded neutral',
-    smokeLabels: ['manager-system-travel-expanded-neutral'],
+    id: 'manager-world-travel-expanded-neutral',
+    label: 'Manager — World Travel expanded neutral',
+    smokeLabels: ['manager-world-travel-expanded-neutral'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [{ selector: '#manager-travel-toggle', press: 'Space' }],
     expectView: 'systems',
     expectSelector:
-      '.manager-system-travel-group:has(#manager-nav-travel[aria-expanded="true"])' +
+      '.manager-world-travel-group:has(#manager-world-nav-travel[aria-expanded="true"])' +
       ':not(:has([aria-current="page"]))',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
@@ -3958,14 +3958,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-card-off',
-    label: 'Manager — system Travel card off',
-    smokeLabels: ['manager-system-travel-card-off'],
+    // World > Travel is UNGATED (issue 1282). This case used to prove the opposite — that the
+    // selected-system Travel group DISAPPEARED when that system's Travel & Realms toggle was
+    // off — and the fact it asserted went with the route. It now proves the rule that replaced
+    // it, on the same non-participating system: the World entry is there regardless, because
+    // realms are world geography and have to be authorable before any system opts in.
+    id: 'manager-world-travel-ungated',
+    label: 'Manager — World Travel present for a non-participating system',
+    smokeLabels: ['manager-world-travel-ungated'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [],
     expectView: 'systems',
-    expectSelector: '.manager-nav:not(:has(#manager-nav-travel)) #manager-world-nav-parties',
+    expectSelector: '.manager-world-nav:has(#manager-world-nav-travel) #manager-world-nav-parties',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
@@ -3974,9 +3979,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-with-gathering-expanded',
-    label: 'Manager — Gathering and system Travel expanded together',
-    smokeLabels: ['manager-system-travel-with-gathering-expanded'],
+    id: 'manager-world-travel-with-gathering-expanded',
+    label: 'Manager — Gathering and World Travel expanded together',
+    smokeLabels: ['manager-world-travel-with-gathering-expanded'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
@@ -3988,8 +3993,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'systems',
     expectSelector:
-      '.manager-nav-group:has(#manager-gathering-submenu) + ' +
-      '.manager-system-travel-group:has(#manager-travel-submenu)',
+      '.manager-nav:has(.manager-nav-group #manager-gathering-submenu)' +
+      ':has(.manager-world-travel-group #manager-travel-submenu)',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
@@ -3998,52 +4003,52 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-realms-normal',
-    label: 'Manager — system Travel Realms expanded',
-    smokeLabels: ['manager-system-travel-realms-normal'],
+    id: 'manager-world-travel-realms-normal',
+    label: 'Manager — World Travel Realms expanded',
+    smokeLabels: ['manager-world-travel-realms-normal'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-realms', press: 'Enter' },
     ],
-    expectView: 'environments',
+    expectView: 'world-travel',
     expectSelector: '.manager-travel-inspector[aria-label="Selected realm"]',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-realms-stacked',
-    label: 'Manager — system Travel Realms stacked',
-    smokeLabels: ['manager-system-travel-realms-stacked'],
+    id: 'manager-world-travel-realms-stacked',
+    label: 'Manager — World Travel Realms stacked',
+    smokeLabels: ['manager-world-travel-realms-stacked'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-realms', press: 'Enter' },
     ],
-    expectView: 'environments',
+    expectView: 'world-travel',
     expectSelector: '[data-travel-panel="realms"]',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-map-normal',
-    label: 'Manager — system Travel Map Region Links normal',
-    smokeLabels: ['manager-system-travel-map-normal'],
+    id: 'manager-world-travel-map-normal',
+    label: 'Manager — World Travel Map Region Links normal',
+    smokeLabels: ['manager-world-travel-map-normal'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-map', press: 'Enter' },
     ],
-    expectView: 'environments',
+    expectView: 'world-travel',
     expectSelector:
       '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
       '.manager-map-link-name):has(.manager-travel-inspector' +
@@ -4051,21 +4056,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-map-stacked',
-    label: 'Manager — system Travel Map Region Links stacked',
-    smokeLabels: ['manager-system-travel-map-stacked'],
+    id: 'manager-world-travel-map-stacked',
+    label: 'Manager — World Travel Map Region Links stacked',
+    smokeLabels: ['manager-world-travel-map-stacked'],
     reaches: 'exact',
-    distinctEvidenceGroup: 'manager-system-travel-map-label-focus',
+    distinctEvidenceGroup: 'manager-world-travel-map-label-focus',
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-map', press: 'Enter' },
     ],
-    expectView: 'environments',
+    expectView: 'world-travel',
     expectSelector:
       '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
       '.manager-map-link-name):has(.manager-travel-inspector' +
@@ -4073,13 +4078,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-map-collapsed-rail',
-    label: 'Manager — system Travel Map Region Links collapsed rail',
-    smokeLabels: ['manager-system-travel-map-collapsed-rail'],
+    id: 'manager-world-travel-map-collapsed-rail',
+    label: 'Manager — World Travel Map Region Links collapsed rail',
+    smokeLabels: ['manager-world-travel-map-collapsed-rail'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
@@ -4087,28 +4092,28 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-travel-nav-map', press: 'Enter' },
       { selector: '[data-manager-rail-toggle]', press: 'Enter' },
     ],
-    expectView: 'environments',
-    expectSelector: '.manager-body.is-rail-collapsed #manager-nav-travel.is-active',
+    expectView: 'world-travel',
+    expectSelector: '.manager-body.is-rail-collapsed #manager-world-nav-travel.is-active',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
     ],
   }),
   managerCase({
-    id: 'manager-system-travel-long-label-focus',
-    label: 'Manager — system Travel long child label keyboard focus',
+    id: 'manager-world-travel-long-label-focus',
+    label: 'Manager — World Travel long child label keyboard focus',
     // The live smoke uses shipped localization, so its ordinary focused Map row is not long-label
     // evidence. The View Lab supplies the localized stress string and guards it against duplicates.
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', longTravelLabels: '1' },
-    distinctEvidenceGroup: 'manager-system-travel-map-label-focus',
+    distinctEvidenceGroup: 'manager-world-travel-map-label-focus',
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-map', press: 'Space' },
     ],
-    expectView: 'environments',
+    expectView: 'world-travel',
     expectSelector: '#manager-travel-nav-map[aria-current="page"]:focus-visible',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],

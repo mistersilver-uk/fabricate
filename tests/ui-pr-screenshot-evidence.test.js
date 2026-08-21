@@ -314,16 +314,16 @@ describe('UI PR screenshot evidence', () => {
 
   it('pins World Parties and system Travel sources to the ten truthful smoke captures', () => {
     const worldLabels = [
-      'manager-system-travel-default-collapsed',
-      'manager-system-travel-expanded-neutral',
+      'manager-world-travel-default-collapsed',
+      'manager-world-travel-expanded-neutral',
       'manager-world-parties-normal',
-      'manager-system-travel-card-off',
-      'manager-system-travel-with-gathering-expanded',
-      'manager-system-travel-realms-normal',
-      'manager-system-travel-realms-stacked',
-      'manager-system-travel-map-normal',
-      'manager-system-travel-map-stacked',
-      'manager-system-travel-map-collapsed-rail',
+      'manager-world-travel-ungated',
+      'manager-world-travel-with-gathering-expanded',
+      'manager-world-travel-realms-normal',
+      'manager-world-travel-realms-stacked',
+      'manager-world-travel-map-normal',
+      'manager-world-travel-map-stacked',
+      'manager-world-travel-map-collapsed-rail',
     ];
     for (const label of worldLabels) {
       assert.deepEqual(
@@ -356,7 +356,7 @@ describe('UI PR screenshot evidence', () => {
       'manager-world-parties-search-filtered',
       'manager-world-parties-last-page',
       'manager-world-parties-actor-picker',
-      'manager-system-travel-long-label-focus',
+      'manager-world-travel-long-label-focus',
     ]) {
       assert.equal(
         VIEW_RECIPES.some((view) => view.id === viewLabOnly),

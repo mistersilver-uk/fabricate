@@ -389,26 +389,26 @@ test('every capture-map label appears as a literal in the harness (no phantom ro
   }
 });
 
-test('World Parties and system Travel capture-map order mirrors the live Foundry walk', () => {
-  const start = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+test('World Parties and World Travel capture-map order mirrors the live Foundry walk', () => {
+  const start = HARNESS.indexOf('// World Parties plus World Travel (#1179');
   const end = HARNESS.indexOf('// Doc journey (quickstart Step 7', start);
   assert.ok(start >= 0 && end > start, 'the #1179 Foundry capture block must remain bounded');
   const harnessLabels = [
     ...HARNESS.slice(start, end).matchAll(
-      /label: '(manager-(?:world-parties|system-travel)[^']+)'/g
+      /label: '(manager-world-(?:parties|travel)[^']+)'/g
     ),
   ].map((match) => match[1]);
   const mappedLabels = SCREENSHOT_CAPTURE_ORDER.filter(
-    (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-system-travel')
+    (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-world-travel')
   );
 
   assert.deepEqual(mappedLabels, harnessLabels);
   assert.ok(!harnessLabels.includes('manager-world-parties-no-selection'));
-  assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
+  assert.ok(!harnessLabels.includes('manager-world-travel-long-label-focus'));
 });
 
 test('the Foundry Map capture uses a deterministic click while View Lab retains keyboard evidence', () => {
-  const blockStart = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+  const blockStart = HARNESS.indexOf('// World Parties plus World Travel (#1179');
   const mapDestinationStart = HARNESS.indexOf('const mapDestination = page.locator', blockStart);
   const mapPanelWait = HARNESS.indexOf('[data-travel-panel="map"]', mapDestinationStart);
   assert.ok(
@@ -424,7 +424,7 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
     ({ path }) => path === 'scripts/lib/viewLabCases.js'
   ).source;
   const keyboardCaseStart = viewLabCases.indexOf(
-    "id: 'manager-system-travel-long-label-focus'"
+    "id: 'manager-world-travel-long-label-focus'"
   );
   const keyboardCaseEnd = viewLabCases.indexOf('\n  managerCase({', keyboardCaseStart);
   assert.ok(

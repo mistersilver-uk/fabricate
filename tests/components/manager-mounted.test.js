@@ -268,7 +268,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   // The library inspector, extracted out of the root (issue 643). It lives under
@@ -1026,9 +1025,11 @@ function managerSubtitle() {
   return target.querySelector('.manager-header .manager-subtitle').textContent.trim();
 }
 
-function systemTravelItem(id) {
+// World > Travel's rail group (issue 1282). The parent moved into the World section; the two
+// destination sub-items kept their ids, because neither ever named a crafting system.
+function worldTravelItem(id) {
   return target.querySelector(
-    id === 'travel' ? '#manager-nav-travel' : `#manager-travel-nav-${id}`
+    id === 'travel' ? '#manager-world-nav-travel' : `#manager-travel-nav-${id}`
   );
 }
 
@@ -1322,6 +1323,10 @@ function createStore(calls = [], options = {}) {
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
       gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
+      // Travel & Realms PARTICIPATION (issue 1282). The System Settings feature tile beside
+      // Currency reads it off the selected system, exactly as the Currency tile reads
+      // `requirements.currency.enabled`.
+      gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
       features: selectedFeatures,
       // Overridable so a test can supply its own component set (the Tool display
       // precedence cases resolve `componentId` against their own fixtures); defaults to
@@ -1394,6 +1399,7 @@ function createStore(calls = [], options = {}) {
       name: 'Smithing',
       description: 'Heavy equipment work',
       resolutionMode: 'routedByCheck',
+      gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
       features: options.smithingFeatures || {
         gathering: false,
         itemTags: false,
@@ -2018,9 +2024,9 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
-    gatheringRealmSettings: options.worldTravelBySystem?.alchemy?.gatheringRealmSettings || {
-      enabled: options.gatheringRealmsEnabled === true,
-    },
+    // Participation is the SELECTED SYSTEM's answer; the reveal/visibility pair beside it is
+    // the world's (issue 1282).
+    gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
     // `memberActorUuids` is carried by the REAL projection — `adminStore` spreads the stored
     // party before adding `memberCards` — and the card body and the page-header subtitle both
     // read it. A double that omitted it was looser than the helper it stands for, which is
@@ -2055,16 +2061,16 @@ function createStore(calls = [], options = {}) {
     ],
     partyRealmOverridesAvailable:
       options.partyRealmOverridesAvailable ?? options.gatheringRealmsEnabled === true,
-    selectedSystemRealms: options.worldTravelBySystem?.alchemy?.realms ||
-      options.selectedSystemRealms || [
-        {
-          id: 'realm-forest',
-          name: 'Green March',
-          enabled: true,
-          environmentCount: 1,
-          partyCount: 1,
-        },
-      ],
+    // The WORLD's realm library (issue 1282) — one library, whichever system is selected.
+    worldRealms: options.worldRealms || [
+      {
+        id: 'realm-forest',
+        name: 'Green March',
+        enabled: true,
+        environmentCount: 1,
+        partyCount: 1,
+      },
+    ],
     currentSceneRegions: options.currentSceneRegions || [],
     currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
@@ -2082,9 +2088,11 @@ function createStore(calls = [], options = {}) {
     viewState.update((state) => ({
       ...state,
       selectedSystem: nextSelected,
-      gatheringRealmSettings:
-        options.worldTravelBySystem?.[id]?.gatheringRealmSettings || state.gatheringRealmSettings,
-      selectedSystemRealms: options.worldTravelBySystem?.[id]?.realms || state.selectedSystemRealms,
+      // `worldRealms` is deliberately NOT re-projected here: the realm library does not change
+      // when the selected crafting system does (issue 1282).
+      gatheringRealmSettings: {
+        enabled: nextSelected?.gatheringRealmSettings?.enabled === true,
+      },
       itemCards: componentCardsFor(id),
       essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
@@ -2654,11 +2662,18 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) =>
       calls.push(['deleteGatheringVocabularyValue', ...args]),
+    // Participation is a CRAFTING SYSTEM write since issue 1282, so the double republishes BOTH
+    // projections of it: the System Settings tile reads `selectedSystem.gatheringRealmSettings`
+    // and the travel view-model carries its own copy. A double that moved only one of them would
+    // leave the tile stuck at its old state and read as a toggle that does nothing.
     setGatheringRealmsEnabled: (systemId, enabled) => {
       calls.push(['setGatheringRealmsEnabled', systemId, enabled]);
       viewState.update((state) => ({
         ...state,
-        gatheringRealmSettings: { ...(state.gatheringRealmSettings || {}), enabled },
+        gatheringRealmSettings: { ...state.gatheringRealmSettings, enabled },
+        selectedSystem: state.selectedSystem
+          ? { ...state.selectedSystem, gatheringRealmSettings: { enabled } }
+          : state.selectedSystem,
       }));
       return true;
     },
@@ -3210,7 +3225,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
-        // World > Currency (issue 1278) sits under Parties and is UNGATED, unlike Downtime.
+        // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
+        // are UNGATED, unlike Downtime.
+        'Travel',
         'Currency',
       ]
     );
@@ -6700,10 +6717,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    // 'Parties' and 'Currency': both World leaves are ungated. The Downtime group is
-    // experimental-gated (issue 1257) and this fixture leaves `fabricate.experimentalFeatures`
-    // at its default off.
-    assert.deepEqual(navLabels, ['Parties', 'Currency']);
+    // 'Parties', 'Travel' and 'Currency': all three World entries are ungated — Travel because
+    // realms are world geography and have to be authorable before any system opts in (issue
+    // 1282). The Downtime group is experimental-gated (issue 1257) and this fixture leaves
+    // `fabricate.experimentalFeatures` at its default off.
+    assert.deepEqual(navLabels, ['Parties', 'Travel', 'Currency']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6808,7 +6826,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
-        // World > Currency (issue 1278) sits under Parties and is UNGATED, unlike Downtime.
+        // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
+        // are UNGATED, unlike Downtime.
+        'Travel',
         'Currency',
       ]
     );
@@ -6935,6 +6955,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Gathering',
         'Graph',
         'Parties',
+        'Travel',
         'Currency',
         'Downtime',
       ]
@@ -12654,7 +12675,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       true
     );
     // The parent count is the sum of records (environments + tasks + events), not
-    // the subitem count. Travel is hidden by default (Travel & Realms toggle off).
+    // the subitem count. Travel is not among them: it is a WORLD entry (issue 1282).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
@@ -13594,12 +13615,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
     assert.equal(target.querySelector('[data-gathering-vocabulary-panel="regions"]'), null);
     assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
-    // The Travel & Realms toggle card hosts the subsystem flag.
-    assert.ok(target.querySelector('[data-gathering-realm-toggle-panel]'));
-    assert.ok(target.querySelector('[data-gathering-realm-toggle]'));
+    // The Travel & Realms toggle LEFT this tab for a System Settings feature tile beside
+    // Currency (issue 1282), because participation in a world-scope subsystem is the same kind
+    // of statement Currency's toggle makes.
+    assert.ok(!target.querySelector('[data-gathering-realm-toggle-panel]'));
+    assert.ok(!target.querySelector('[data-gathering-realm-toggle]'));
     assert.ok(target.textContent.includes('Times of day'));
     assert.ok(target.textContent.includes('Weather conditions'));
-    assert.ok(target.textContent.includes('Travel & Realms'));
+    assert.equal(target.textContent.includes('Travel & Realms'), false);
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(
       target.textContent.includes(
@@ -14016,7 +14039,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
-  it('renders permanent World Parties and gated top-level Travel after Gathering', async () => {
+  it('renders permanent World Parties, Travel and Currency entries', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -14040,55 +14063,61 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
-      // Currency sits between them: it is a permanent World leaf like Parties (issue 1278),
-      // whereas Downtime is the experimental-gated one.
-      ['manager-world-nav-parties', 'manager-world-nav-currency', 'manager-world-nav-downtime']
+      // Parties, Travel and Currency are all permanent World entries (issues 1182, 1278, 1282);
+      // Downtime is the experimental-gated one.
+      [
+        'manager-world-nav-parties',
+        'manager-world-nav-travel',
+        'manager-world-nav-currency',
+        'manager-world-nav-downtime',
+      ]
     );
     assert.ok(worldNavItem('parties').querySelector('.fa-users'));
     assert.ok(worldNavItem('downtime').querySelector('.fa-hourglass-half'));
-    assert.ok(systemTravelItem('travel').querySelector('.fa-route'));
+    assert.ok(worldTravelItem('travel').querySelector('.fa-route'));
     assert.equal(
       worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
       '2'
     );
     assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
     assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
-    assert.equal(systemTravelItem('travel').textContent.trim(), 'Travel');
     assert.equal(
-      systemTravelItem('travel').getAttribute('aria-controls'),
+      worldTravelItem('travel').querySelector('.manager-nav-label').textContent.trim(),
+      'Travel'
+    );
+    // The realm count rides the parent, as the party count rides Parties and the coin count
+    // rides Currency — one number per World entry, naming what it holds.
+    assert.equal(
+      worldTravelItem('travel').querySelector('.manager-nav-count').textContent.trim(),
+      '1'
+    );
+    assert.equal(
+      worldTravelItem('travel').getAttribute('aria-controls'),
       'manager-travel-submenu'
     );
-    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('[data-system-travel-submenu]'), null);
-
-    // Enter the shared Gathering browser through the direct-mount suite's established route
-    // before selecting a Travel destination. The real-Chromium View Lab case pins the
-    // destination inspector itself; happy-dom reliably exercises the destination projection
-    // only after this parent route has settled.
-    navButton('Gathering').click();
-    await settleRouteExit();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
 
     target.querySelector('#manager-travel-toggle').click();
     await tick();
     flushSync();
-    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
     assert.equal(
       target.querySelector('#manager-travel-toggle').getAttribute('aria-controls'),
       'manager-travel-submenu'
     );
-    assert.ok(target.querySelector('[data-system-travel-submenu]'));
-    assert.ok(systemTravelItem('realms').querySelector('.fa-mountain-sun'));
-    assert.ok(systemTravelItem('map').querySelector('.fa-map-location-dot'));
-    systemTravelItem('realms').click();
+    assert.ok(target.querySelector('[data-world-travel-submenu]'));
+    assert.ok(worldTravelItem('realms').querySelector('.fa-mountain-sun'));
+    assert.ok(worldTravelItem('map').querySelector('.fa-map-location-dot'));
+    worldTravelItem('realms').click();
     await settleRouteExit();
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
-      'environments',
-      'the Realms destination commits the system Travel route'
+      'world-travel',
+      'the Realms destination commits the World Travel route'
     );
     assert.equal(target.querySelectorAll('.fabricate-manager').length, 1);
-    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
     assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
     assert.equal(
       target.querySelector('[data-travel-panel="realms"]').getAttribute('role'),
@@ -14106,7 +14135,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'Realm actions'
     );
-    systemTravelItem('map').click();
+    worldTravelItem('map').click();
     await settleRouteExit();
     assert.equal(
       target.querySelector('.manager-header .manager-title').textContent.trim(),
@@ -16160,22 +16189,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('keeps either active top-level Travel child selected when the parent is activated', async () => {
+  it('keeps either active World Travel child selected when the parent is activated', async () => {
     mountManager([], { gatheringRealmsEnabled: true });
-    systemTravelItem('travel').click();
+    worldTravelItem('travel').click();
     await tick();
     flushSync();
 
     for (const childId of ['realms', 'map']) {
-      systemTravelItem(childId).click();
+      worldTravelItem(childId).click();
       await tick();
       flushSync();
-      systemTravelItem('travel').click();
+      worldTravelItem('travel').click();
       await tick();
       flushSync();
 
-      assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
-      assert.equal(systemTravelItem(childId).getAttribute('aria-current'), 'page');
+      assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(worldTravelItem(childId).getAttribute('aria-current'), 'page');
       assert.equal(
         target.querySelectorAll('#manager-travel-submenu [aria-current="page"]').length,
         1
@@ -16192,15 +16221,15 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
     assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
-    assert.equal(systemTravelItem('travel').getAttribute('aria-label'), 'Travel');
+    assert.equal(worldTravelItem('travel').getAttribute('aria-label'), 'Travel');
     assert.equal(worldNavItem('parties').tagName, 'BUTTON');
-    assert.equal(systemTravelItem('travel').tagName, 'BUTTON');
+    assert.equal(worldTravelItem('travel').tagName, 'BUTTON');
   });
 
-  it('keeps a system Travel child reachable after collapsing and re-expanding the rail', async () => {
+  it('keeps a World Travel child reachable after collapsing and re-expanding the rail', async () => {
     mountManager([], { gatheringRealmsEnabled: true });
 
-    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
     const railToggle = target.querySelector('[data-manager-rail-toggle]');
     railToggle.click();
     await tick();
@@ -16212,17 +16241,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(!target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
 
-    systemTravelItem('travel').click();
+    worldTravelItem('travel').click();
     await tick();
     flushSync();
-    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
-    systemTravelItem('realms').click();
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    worldTravelItem('realms').click();
     await settleRouteExit();
-    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
     assert.ok(target.querySelector('[data-travel-panel="realms"]'));
   });
 
-  it('flips Travel & Realms and reveals top-level Travel while World remains', async () => {
+  // Issue 1282: the toggle states PARTICIPATION, so it lives on System Settings beside
+  // Currency and gates nothing about the World > Travel route, which is always reachable.
+  it('flips Travel & Realms from the System Settings tile while World Travel stays put', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -16232,17 +16263,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
+    assert.ok(worldTravelItem('travel'), 'World Travel is present before any system opts in');
+    assert.equal(
+      target.querySelector('[data-gathering-realm-toggle]'),
+      null,
+      'the toggle is not on the systems library route'
+    );
 
-    assert.ok(target.querySelector('[data-world-nav-section]'), 'World is available before opt-in');
-    assert.equal(systemTravelItem('travel'), null, 'Travel nav item hidden by default');
-    const toggle = target.querySelector('[data-gathering-realm-toggle]');
-    assert.ok(toggle, 'realm toggle card renders on the settings tab');
+    navButton('System Overview').click();
+    await settleRouteExit();
+
+    const tile = target.querySelector('[data-feature-key="gatheringRealms"]');
+    assert.ok(tile, 'the feature tile renders beside Currency');
+    assert.ok(
+      target.querySelector('[data-feature-key="currency"]'),
+      'and the Currency tile it is modelled on is its neighbour'
+    );
+    const toggle = tile.querySelector('[data-gathering-realm-toggle]');
+    assert.ok(toggle, 'the tile carries the toggle');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle starts unpressed');
 
     toggle.click();
@@ -16261,11 +16299,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true',
       'toggle reflects the new pressed state'
     );
-    assert.ok(systemTravelItem('travel'), 'top-level Travel becomes available');
+    assert.ok(worldTravelItem('travel'), 'and World Travel is unaffected either way');
     assert.ok(!gatheringSubitem('Travel'), 'Travel is not nested inside Gathering');
   });
 
-  it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
+  // The route used to evaporate under the GM when the selected system's toggle went off, which
+  // is the fallback this replaced (issue 1282). Realms are world geography: the page they are
+  // authored on cannot depend on which crafting system happens to be selected.
+  it('keeps World Travel on screen when the selected system opts out of Travel & Realms', async () => {
     const calls = [];
     const store = createStore(calls, { gatheringRealmsEnabled: true });
     target = document.createElement('div');
@@ -16276,14 +16317,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-
-    systemTravelItem('travel').click();
-    await tick();
-    flushSync();
-    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
+    worldTravelItem('travel').click();
+    await settleRouteExit();
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
 
     store.viewState.update((state) => ({
       ...state,
@@ -16293,42 +16329,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.ok(target.querySelector('[data-world-nav-section]'), 'World remains available');
-    assert.equal(systemTravelItem('travel'), null, 'system Travel is hidden again');
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
-    assert.ok(target.querySelector('[data-environment-id]'));
-    assert.equal(target.querySelector('#manager-nav-travel'), null);
+    assert.ok(worldTravelItem('travel'), 'World Travel stays put');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
+    assert.ok(target.querySelector('[data-travel-panel="realms"]'));
   });
 
-  it('reprojects system-owned Travel records while keeping the World party list global', async () => {
-    const travelBySystem = {
-      alchemy: {
-        gatheringRealmSettings: { enabled: true },
-        realms: [{ id: 'realm-forest', name: 'Green March', enabled: true }],
-      },
-      smithing: {
-        gatheringRealmSettings: { enabled: true },
-        realms: [{ id: 'realm-forge', name: 'Forge Quarter', enabled: true }],
-      },
-    };
+  // Realms became WORLD geography in issue 1282, so the library is the same library whichever
+  // crafting system is selected. Before it, a GM running two systems authored the same valley
+  // twice and the two copies could disagree.
+  it('keeps the realm library and the party list global across a scope switch', async () => {
     mountManager([], {
-      worldTravelBySystem: travelBySystem,
+      gatheringRealmsEnabled: true,
+      worldRealms: [
+        { id: 'realm-forest', name: 'Green March', enabled: true },
+        { id: 'realm-forge', name: 'Forge Quarter', enabled: true },
+      ],
       smithingFeatures: { gathering: true, salvage: true },
     });
-    systemTravelItem('travel').click();
-    await tick();
-    flushSync();
-    systemTravelItem('realms').click();
-    await tick();
-    flushSync();
+    worldTravelItem('travel').click();
+    await settleRouteExit();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
     assert.ok(target.textContent.includes('Green March'));
+    assert.ok(target.textContent.includes('Forge Quarter'));
     assert.equal(
       worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
       '2'
     );
 
-    assert.equal(await switchScopeSystemTo('smithing'), 'environments');
+    assert.equal(await switchScopeSystemTo('smithing'), 'world-travel');
+    assert.ok(target.textContent.includes('Green March'));
     assert.ok(target.textContent.includes('Forge Quarter'));
-    assert.equal(target.textContent.includes('Green March'), false);
     assert.equal(
       worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
       '2'
@@ -16617,7 +16647,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     target = null;
   });
 
-  it('falls back from active system Travel when Gathering or the selection vanishes', async () => {
+  it('keeps active World Travel when Gathering or the selected system vanishes', async () => {
     for (const fallback of ['gathering-off', 'selection-cleared']) {
       const store = createStore([], { gatheringRealmsEnabled: true });
       target = document.createElement('div');
@@ -16627,7 +16657,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         props: { store, services: { openCurrentAdmin: () => {} } },
       });
       flushSync();
-      systemTravelItem('travel').click();
+      worldTravelItem('travel').click();
       await tick();
       flushSync();
 
@@ -16649,8 +16679,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       await tick();
       flushSync();
 
-      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-      assert.equal(target.querySelector('#manager-nav-travel'), null);
+      // A world route, so neither a gathering-off system nor a cleared selection can evict it.
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
+      assert.ok(worldTravelItem('travel'));
       assert.ok(target.querySelector('[data-world-nav-section]'));
 
       unmount(mounted);
@@ -21292,6 +21323,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
+  // Every destination this guard walks is a WORLD route since issue 1282 — Parties, Downtime
+  // and the Travel realms child alike — so the expected view is a flat lookup rather than the
+  // nested ternary the per-system Travel route needed.
+  const WORLD_EXIT_DESTINATION_VIEWS = Object.freeze({
+    parties: 'world',
+    downtime: 'world-downtime',
+    realms: 'world-travel',
+    map: 'world-travel',
+  });
+
   async function attemptDirtyGatheringWorldExit(kind, outcome, destination) {
     const calls = [];
     const title = kind === 'task' ? 'Task' : 'Event';
@@ -21314,7 +21355,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('#manager-travel-toggle').click();
       await tick();
       flushSync();
-      assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
       assert.equal(
         calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
         false,
@@ -21325,7 +21366,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const activateDestination = async () => {
       (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
-        : systemTravelItem(destination)
+        : worldTravelItem(destination)
       ).click();
       await settleRouteExit();
     };
@@ -21333,11 +21374,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     else await activateDestination();
 
     const expectedView = outcome.proceeds
-      ? ['parties', 'downtime'].includes(destination)
-        ? destination === 'downtime'
-          ? 'world-downtime'
-          : 'world'
-        : 'environments'
+      ? WORLD_EXIT_DESTINATION_VIEWS[destination]
       : `gathering-${kind}-edit`;
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
@@ -21347,7 +21384,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
-        : systemTravelItem(destination)
+        : worldTravelItem(destination)
       ).getAttribute('aria-current'),
       outcome.proceeds ? 'page' : null,
       `${kind} ${outcome.name} ${destination} must not leave a hidden active navigation control`
@@ -23082,12 +23119,12 @@ describe('CraftingSystemManager mounted behavior', () => {
         enterChild: () => navButton('Gathering').click(),
       },
       {
-        id: 'systemTravel',
+        id: 'worldTravel',
         label: 'Travel',
         toggle: '#manager-travel-toggle',
         submenu: '#manager-travel-submenu',
-        childView: 'environments',
-        enterChild: () => systemTravelItem('travel').click(),
+        childView: 'world-travel',
+        enterChild: () => worldTravelItem('travel').click(),
       },
       {
         id: 'worldDowntime',
