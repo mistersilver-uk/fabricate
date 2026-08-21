@@ -26,9 +26,21 @@ import {
 } from './currencyProfile.js';
 
 /**
- * Read the recipe's crafting-system currency config (`requirements.currency`).
+ * Resolve the effective currency config for a recipe, composed from TWO scopes.
+ *
+ * `enabled` is a per-crafting-system decision (`requirements.currency.enabled`): it says whether
+ * this system participates in currency at all. Everything that describes WHAT the currency is —
+ * the coin ladder, how coins are read and spent, the provider, the GM macro set — comes from the
+ * WORLD config (issue 1278), because a world runs exactly one Foundry game system and so has
+ * exactly one way actors store coins.
+ *
+ * This function is the single chokepoint through which the whole runtime reads currency: the
+ * engine's afford gate and spend/refund paths, `RecipeManager.evaluateCraftability`, and
+ * `CraftingListingBuilder` all reach it via `resolveCurrencyContext`. Composing the two scopes
+ * here is what let the config move scope without any engine logic changing.
+ *
  * @param {object} recipe
- * @param {{ getCraftingSystemManager?: () => object }} [seams]
+ * @param {{ getCraftingSystemManager?: () => object, getCurrencyConfig?: () => object }} [seams]
  * @returns {{ enabled: boolean, spendStrategy: string, providerId: string, macros: object,
  *   units: object[], system: object }|null}
  */
@@ -45,17 +57,19 @@ export function getCurrencyRequirementConfig(recipe, seams = {}) {
   const system = systemManager?.getSystem(systemId);
   if (!system) return null;
 
-  const currency = system?.requirements?.currency || {};
-  const spendStrategy = ['actorInventory', 'macro'].includes(currency.spendStrategy)
-    ? currency.spendStrategy
+  // The world config follows the same seam-first, global-fallback rule, for the same reason.
+  const world =
+    seams.getCurrencyConfig?.() ?? game.fabricate?.getCurrencyConfigStore?.()?.get() ?? {};
+  const spendStrategy = ['actorInventory', 'macro'].includes(world.spendStrategy)
+    ? world.spendStrategy
     : 'actorProperty';
-  const macros = currency.macros && typeof currency.macros === 'object' ? currency.macros : {};
+  const macros = world.macros && typeof world.macros === 'object' ? world.macros : {};
   return {
-    enabled: currency.enabled === true,
+    enabled: system?.requirements?.currency?.enabled === true,
     spendStrategy,
-    providerId: String(currency.providerId || ''),
+    providerId: String(world.providerId || ''),
     macros,
-    units: Array.isArray(currency.units) ? currency.units : [],
+    units: Array.isArray(world.units) ? world.units : [],
     system,
   };
 }

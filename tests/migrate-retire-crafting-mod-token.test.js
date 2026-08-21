@@ -438,16 +438,17 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
 
   const result = await runnerOver(store).run();
 
-  // FIVE migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
+  // SIX migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
   // lifts the catalogue to the system level (issue 1095), `1.23.0` merges it with the
   // gathering character-modifier library (issue 1117), `1.24.0` marks the routed
-  // DC-source downgrade boundary (issue 1096) as a deliberate no-op, and `1.25.0` seeds
-  // the failure-result policy to `never` on every existing check (issue 1098). The count
-  // is asserted rather than loosened so a SIXTH migration landing here is noticed rather
-  // than absorbed — which is exactly how the fourth and fifth were.
-  assert.equal(result.ran, 5);
+  // DC-source downgrade boundary (issue 1096) as a deliberate no-op, `1.25.0` seeds
+  // the failure-result policy to `never` on every existing check (issue 1098), and
+  // `1.26.0` lifts the currency configuration to world scope (issue 1278). The count
+  // is asserted rather than loosened so a SEVENTH migration landing here is noticed rather
+  // than absorbed — which is exactly how the fourth, fifth and sixth were.
+  assert.equal(result.ran, 6);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.25.0');
+  assert.equal(store.get('migrationVersion'), '1.26.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

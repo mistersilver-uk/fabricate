@@ -77,16 +77,19 @@ export const TWO_TERMINAL_CURRENCY_UNITS = [
 ];
 
 /**
- * Build a crafting-system stub whose `requirements.currency` drives the actorProperty
- * spend strategy over the supplied units.
+ * Build a crafting-system stub that PARTICIPATES in currency.
  *
- * @param {{ id?: string, units?: object[], features?: object, components?: object[] }} [options]
+ * Since issue 1278 a crafting system carries only `requirements.currency.enabled`; the ladder and
+ * spend strategy are world scope. Pair this with {@link makeWorldCurrencyConfig} — the units
+ * argument is accepted here only so a caller can build the matching world config from one place.
+ *
+ * @param {{ id?: string, features?: object, components?: object[], enabled?: boolean }} [options]
  */
 export function makeCurrencyCraftingSystem({
   id = 'sys-currency',
-  units = SINGLE_TERMINAL_CURRENCY_UNITS,
   features = {},
   components = [],
+  enabled = true,
 } = {}) {
   return {
     id,
@@ -95,9 +98,33 @@ export function makeCurrencyCraftingSystem({
     craftingCheck: { enabled: false, consumption: {} },
     components,
     requirements: {
-      currency: { enabled: true, spendStrategy: 'actorProperty', units, macros: {} },
+      currency: { enabled },
     },
   };
+}
+
+/**
+ * Build the WORLD currency configuration (issue 1278) that the runtime reads the ladder from.
+ *
+ * @param {{ units?: object[], spendStrategy?: string, providerId?: string, macros?: object }} [o]
+ */
+export function makeWorldCurrencyConfig({
+  units = SINGLE_TERMINAL_CURRENCY_UNITS,
+  spendStrategy = 'actorProperty',
+  providerId = '',
+  macros = { canAfford: '', increment: '', decrement: '' },
+} = {}) {
+  return { spendStrategy, providerId, macros, units };
+}
+
+/**
+ * A `getCurrencyConfigStore`-shaped stub for the `game.fabricate` global, so a fixture that drives
+ * the runtime through the global (rather than an injected seam) still resolves a ladder.
+ *
+ * @param {object} [config] - a {@link makeWorldCurrencyConfig} result
+ */
+export function makeCurrencyConfigStoreStub(config = makeWorldCurrencyConfig()) {
+  return { get: () => config };
 }
 
 /**

@@ -1,7 +1,6 @@
 /**
  * Manages crafting systems and their item libraries
  */
-import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
 import {
   getFabricateFlag,
   setFabricateFlag,
@@ -78,7 +77,6 @@ import {
   PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
-import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
@@ -1493,34 +1491,19 @@ export class CraftingSystemManager {
     };
   }
 
+  /**
+   * Normalize the per-system currency block, which since issue 1278 is ONLY the participation
+   * flag. The coin ladder, spend strategy, provider and macro set moved to the world
+   * `currencyConfig` setting, because a world runs exactly one Foundry game system and so has
+   * exactly one way actors store coins.
+   *
+   * This normalizer is a whitelist rebuild, so a system still carrying the pre-1278 sibling keys
+   * sheds them on its next save. That is intentional cleanup rather than data loss: the 1.26.0
+   * `migrateCurrencyToWorldScope` migration lifts those keys into the world config first, and it
+   * runs before any system write.
+   */
   _normalizeCurrencyConfig(currency = {}) {
-    const units = Array.isArray(currency?.units) ? currency.units : [];
-    const legacyAdapter =
-      currency?.provider === 'system' && ['dnd5e', 'pf2e'].includes(currency?.systemAdapter)
-        ? currency.systemAdapter
-        : '';
-    const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
-    // A legacy pf2e system-adapter config seeded fresh pf2e units, which read/spend coins
-    // through the actor inventory rather than a flat actor property; carry that intent forward
-    // as the actorInventory spend strategy when no explicit strategy was persisted. A legacy
-    // dnd5e adapter maps to the default actorProperty strategy.
-    const legacyAdapterSpendStrategy = { pf2e: 'actorInventory', dnd5e: 'actorProperty' };
-    const spendStrategy =
-      currency?.spendStrategy || legacyAdapterSpendStrategy[legacyAdapter] || undefined;
-    // `inventoryMode` is no longer part of the currency model. It is forwarded ONLY so
-    // normalizeCurrencyConfig's legacy shim can map a stored actorInventory + inventoryMode:
-    // 'macro' to the peer `macro` strategy; it is never re-emitted from the normalized output.
-    return normalizeCurrencyConfig(
-      {
-        enabled: currency?.enabled === true,
-        spendStrategy,
-        inventoryMode: currency?.inventoryMode,
-        providerId: currency?.providerId,
-        macros: currency?.macros,
-        units: seededUnits,
-      },
-      { randomID: () => foundry.utils.randomID() }
-    );
+    return { enabled: currency?.enabled === true };
   }
 
   _normalizeStringList(value) {

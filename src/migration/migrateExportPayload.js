@@ -12,6 +12,10 @@
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
+import {
+  buildWorldCurrencyConfig,
+  stripSystemCurrencyConfig,
+} from './migrateCurrencyToWorldScope.js';
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
@@ -170,6 +174,37 @@ function unifyModifierLibraries(migrated) {
  * export/import round trip from resetting a GM's `always` back to `never`.
  * @private
  */
+/**
+ * Lift a pre-1278 export's per-system currency block up to the envelope-level `currencyConfig`
+ * (issue 1278), and reduce the system's own block to the participation flag.
+ *
+ * BRANCH-INDEPENDENT ON PURPOSE. `migrateExportPayload` returns early once `schemaVersion` is
+ * already current, so a derivation reachable only from the schema-bump path would silently skip
+ * every payload authored at the current schema. This one runs from BOTH branches, exactly like
+ * `upcastLegacyTools` and its siblings, and is idempotent: once the envelope carries units, the
+ * lift is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
+ *
+ * An export carries one system, so the "union across systems" the world migration performs
+ * degenerates here to that system's own ladder — but it is the SAME function, so the two paths
+ * cannot drift on how a unit is carried across.
+ */
+function liftCurrencyToWorldScope(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+
+  const existing = migrated.currencyConfig;
+  const alreadyLifted =
+    existing &&
+    typeof existing === 'object' &&
+    Array.isArray(existing.units) &&
+    existing.units.length > 0;
+
+  if (!alreadyLifted) {
+    migrated.currencyConfig = buildWorldCurrencyConfig([system]);
+  }
+  migrated.system = stripSystemCurrencyConfig([system])[0];
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -196,6 +231,7 @@ export function migrateExportPayload(payload) {
     liftCheckModifierCatalogue(current);
     unifyModifierLibraries(current);
     seedFailureResultPolicy(current);
+    liftCurrencyToWorldScope(current);
     return current;
   }
 
@@ -231,6 +267,7 @@ export function migrateExportPayload(payload) {
   liftCheckModifierCatalogue(migrated);
   unifyModifierLibraries(migrated);
   seedFailureResultPolicy(migrated);
+  liftCurrencyToWorldScope(migrated);
 
   return migrated;
 }

@@ -7,6 +7,7 @@ import { migrateExportPayload } from '../migration/migrateExportPayload.js';
 
 import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
+  assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
 } from './authoringExport.js';
 import {
@@ -38,7 +39,10 @@ export function buildExportPayload(
   recipes,
   fabricateVersion,
   gatheringEnvironments = [],
-  gatheringConfig = {}
+  gatheringConfig = {},
+  // The world currency configuration (issue 1278). Defaulted so every existing call site keeps
+  // working; an export produced without it simply carries an empty ladder.
+  currencyConfig = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -72,6 +76,7 @@ export function buildExportPayload(
     recipes: exportRecipes,
     gatheringEnvironments: bundle.gatheringEnvironments,
     gatheringConfig: bundle.gatheringConfig,
+    currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
   };
 }
 

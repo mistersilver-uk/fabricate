@@ -119,8 +119,9 @@ function makeSystem() {
     id: 'sys-cancel',
     features: { refundOnPlayerCancel: true },
     components: [{ id: 'wood', name: 'Wood', registeredItemUuid: 'Item.wood-src' }],
+    // Issue 1278: the system carries only participation; the ladder is WORLD scope.
     requirements: {
-      currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
+      currency: { enabled: true },
     },
   };
 }
@@ -133,6 +134,14 @@ function setupGame(system, { sourceActor } = {}) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: (id) => (id === system.id ? system : null) }),
+      getCurrencyConfigStore: () => ({
+        get: () => ({
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: {},
+          units: CURRENCY_UNITS,
+        }),
+      }),
     },
     user: { id: 'user-1' },
     time: { worldTime: 1000 },
