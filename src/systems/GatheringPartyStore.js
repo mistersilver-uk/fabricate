@@ -163,35 +163,28 @@ export class GatheringPartyStore {
     return this._mutateParty(partyId, (party) => ({ ...party, enabled: enabled === true }));
   }
 
-  async setCurrentRealmOverride(partyId, systemId, realmIds = []) {
-    const sysId = stringOrEmpty(systemId);
+  /** Place the party in one or more world realms. No `systemId`: a party is in ONE place. */
+  async setCurrentRealmOverride(partyId, realmIds = []) {
     const ids = normalizeIdList(realmIds);
     return this._mutateParty(partyId, (party) => ({
       ...party,
-      currentRealmOverrides: {
-        ...party.currentRealmOverrides,
-        [sysId]: {
-          mode: 'manual',
-          realmIds: ids,
-          updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId()),
-        },
+      currentRealmOverride: {
+        mode: 'manual',
+        realmIds: ids,
+        updatedAt: this.now(),
+        updatedByUserId: stringOrEmpty(this.getUserId()),
       },
     }));
   }
 
-  async clearCurrentRealmOverride(partyId, systemId) {
-    const sysId = stringOrEmpty(systemId);
+  async clearCurrentRealmOverride(partyId) {
     return this._mutateParty(partyId, (party) => ({
       ...party,
-      currentRealmOverrides: {
-        ...party.currentRealmOverrides,
-        [sysId]: {
-          mode: 'none',
-          realmIds: [],
-          updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId()),
-        },
+      currentRealmOverride: {
+        mode: 'none',
+        realmIds: [],
+        updatedAt: this.now(),
+        updatedByUserId: stringOrEmpty(this.getUserId()),
       },
     }));
   }
@@ -245,8 +238,8 @@ export class GatheringPartyStore {
       enabled: data?.enabled === true,
       memberActorUuids: normalizeIdList(data?.memberActorUuids),
       travelActorUuid: optionalString(data?.travelActorUuid),
-      currentRealmOverrides: normalizeOverrides(
-        data?.currentRealmOverrides ?? data?.currentRegionOverrides
+      currentRealmOverride: normalizeOverride(
+        data?.currentRealmOverride ?? data?.currentRealmOverrides ?? data?.currentRegionOverrides
       ),
     };
   }
@@ -309,12 +302,9 @@ export class GatheringPartyStore {
 
     // Override mode vocab.
     for (const party of parties) {
-      for (const [systemId, override] of Object.entries(party.currentRealmOverrides)) {
-        if (!OVERRIDE_MODES.has(override.mode)) {
-          errors.push(
-            `Party "${party.name}" override for system "${systemId}" has invalid mode "${override.mode}"`
-          );
-        }
+      const override = party.currentRealmOverride;
+      if (override && !OVERRIDE_MODES.has(override.mode)) {
+        errors.push(`Party "${party.name}" override has invalid mode "${override.mode}"`);
       }
     }
 
@@ -322,20 +312,49 @@ export class GatheringPartyStore {
   }
 }
 
-function normalizeOverrides(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const result = {};
-  for (const [systemId, override] of Object.entries(value)) {
-    const key = stringOrEmpty(systemId);
-    if (!key || !override || typeof override !== 'object') continue;
-    result[key] = {
-      mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
-      realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
-      updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
-      updatedByUserId: stringOrEmpty(override.updatedByUserId),
-    };
+/**
+ * Normalize a party's ONE current-realm override (issue 1282).
+ *
+ * It used to be a map keyed by crafting system, because realms were per-system. A party is one
+ * set of tokens standing in one place, so with world realms that key had no referent — "where
+ * is the party, according to system A" is not a question with an answer.
+ *
+ * Legacy read: a stored map is collapsed to its most recently updated entry, preferring one
+ * that actually places the party over one that merely records the GM clearing it. The 1.27.0
+ * migration performs the same collapse on disk; this handles a party read before it runs.
+ */
+function normalizeOverride(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const single = (override) => ({
+    mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
+    realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
+    updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
+    updatedByUserId: stringOrEmpty(override.updatedByUserId),
+  });
+
+  // Already the singular shape.
+  if (value.mode !== undefined || value.realmIds !== undefined || value.regionIds !== undefined) {
+    return single(value);
   }
-  return result;
+
+  const entries = Object.values(value).filter(
+    (entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+  );
+  if (entries.length === 0) return null;
+  const placed = entries.filter(
+    (entry) =>
+      entry.mode === 'manual' &&
+      Array.isArray(entry.realmIds ?? entry.regionIds) &&
+      (entry.realmIds ?? entry.regionIds).length > 0
+  );
+  const candidates = placed.length > 0 ? placed : entries;
+  const winner = candidates.reduce(
+    (best, entry) =>
+      !best || Number(entry.updatedAt || 0) > Number(best.updatedAt || 0) ? entry : best,
+    null
+  );
+  return winner ? single(winner) : null;
 }
 
 function cloneJson(value) {

@@ -131,17 +131,19 @@ function createServices({
       if (party) party.enabled = enabled === true;
       return clone(party);
     },
-    setCurrentRealmOverride: async (id, sys, ids) => {
-      calls.setOverride.push({ id, sys, ids: clone(ids) });
+    // One override per party since issue 1282: a party is one set of tokens standing in one
+    // place, so the per-system map collapsed to a single `currentRealmOverride`.
+    setCurrentRealmOverride: async (id, ids) => {
+      calls.setOverride.push({ id, ids: clone(ids) });
       maybeThrow();
       const party = partyRecords.find(p => p.id === id);
-      if (party) party.currentRealmOverrides = { ...party.currentRealmOverrides, [sys]: { mode: 'manual', realmIds: clone(ids) } };
+      if (party) party.currentRealmOverride = { mode: 'manual', realmIds: clone(ids) };
       return clone(party);
     },
-    clearCurrentRealmOverride: async (id, sys) => {
-      calls.clearOverride.push({ id, sys });
+    clearCurrentRealmOverride: async (id) => {
+      calls.clearOverride.push({ id });
       const party = partyRecords.find(p => p.id === id);
-      if (party) party.currentRealmOverrides = { ...party.currentRealmOverrides, [sys]: { mode: 'none', realmIds: [] } };
+      if (party) party.currentRealmOverride = { mode: 'none', realmIds: [] };
       return clone(party);
     }
   };

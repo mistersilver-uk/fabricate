@@ -82,6 +82,7 @@ export class GatheringEnvironmentStore {
     setSetting = defaultSetSetting,
     systemManager = null,
     getSystems = null,
+    travelStore = null,
     randomID = null,
     runCleanup = null,
   } = {}) {
@@ -89,6 +90,7 @@ export class GatheringEnvironmentStore {
     this.setSetting = setSetting;
     this.systemManager = systemManager;
     this.getSystems = getSystems;
+    this.travelStore = travelStore;
     this.randomID = randomID || (() => foundry.utils.randomID());
     this.runCleanup = runCleanup;
     this.environments = [];
@@ -360,14 +362,18 @@ export class GatheringEnvironmentStore {
       );
     }
 
-    // Realm-id availability validation runs only at save boundaries where the
-    // owning system context resolves (realms live on the system, environments in
-    // a world setting). Load paths never reach here with a throw because the
-    // load path normalizes without validating. Stale biome ids are not rejected
-    // here — they remain compatibility input until a biome vocabulary surface
-    // ships.
-    if (system && Array.isArray(system.gatheringRealms)) {
-      const realmIds = new Set(system.gatheringRealms.map((realm) => realm?.id).filter(Boolean));
+    // Realm-id availability validation runs only at save boundaries; load paths never reach
+    // here with a throw because the load path normalizes without validating. Stale biome ids
+    // are not rejected here — they remain compatibility input until a biome vocabulary
+    // surface ships.
+    //
+    // Realms are WORLD scope since issue 1282, so this resolves against the world library
+    // rather than the owning system's copy. That makes it strictly more resolvable than it
+    // was: an environment citing a realm another system happened to author was previously
+    // invalid-but-inert, and is now simply valid.
+    const worldRealms = this.travelStore?.list?.();
+    if (Array.isArray(worldRealms)) {
+      const realmIds = new Set(worldRealms.map((realm) => realm?.id).filter(Boolean));
       for (const realmId of normalized.includedRealmIds) {
         if (!realmIds.has(realmId)) {
           errors.push(

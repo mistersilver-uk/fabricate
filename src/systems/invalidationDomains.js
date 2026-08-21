@@ -290,7 +290,13 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   // Classified across domains the
   // gathering store subscribes to, because the listing reads realm names, realm-gated task
   // availability and the tools a realm offers.
-  gatheringRealms: Object.freeze([LABELLING, COMPONENT_DEFINITIONS, ACCESS_AND_KNOWLEDGE]),
+  // `gatheringRealms` is GONE from the crafting system (issue 1282) — the realm library is a
+  // world setting now, so a realm edit no longer writes a system record and this map can no
+  // longer carry it. `settingChangeBridge`'s `travelConfig` leg announces those edits instead,
+  // scoped per participating system.
+  //
+  // `gatheringRealmSettings` stays: `{ enabled }` still lives on the system, and toggling a
+  // system's participation genuinely changes what its listing shows.
   gatheringRealmSettings: Object.freeze([LABELLING, COMPONENT_DEFINITIONS, ACCESS_AND_KNOWLEDGE]),
 });
 

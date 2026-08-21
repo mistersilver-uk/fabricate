@@ -212,7 +212,7 @@ describe('the export/import round trip carries the ladder into a fresh world', (
     return buildExportPayload(
       { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },
       [],
-      '1.26.0',
+      '1.27.0',
       [],
       {},
       worldLadder
@@ -257,7 +257,7 @@ describe('the ladder survives the WHOLE import composition, not just the merge h
     buildExportPayload(
       { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },
       [],
-      '1.26.0',
+      '1.27.0',
       [],
       {},
       {

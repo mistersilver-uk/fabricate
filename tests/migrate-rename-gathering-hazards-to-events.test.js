@@ -208,14 +208,14 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at t
 
   await runner.run();
 
-  assert.equal(store.get('migrationVersion'), '1.26.0', 'advances to the new highest version');
+  assert.equal(store.get('migrationVersion'), '1.27.0', 'advances to the new highest version');
   const sys = store.get('gatheringConfig').systems['sys-a'];
   assert.ok(Array.isArray(sys.events), 'persisted gatheringConfig was rewritten to events');
   assert.equal(sys.rules.eventPolicy, 'failureWithEvent');
   assert.deepEqual(store.get('gatheringEnvironments')[0].enabledEventIds, ['h1']);
-  // After the 1.1.0 rename migration runs (in semver order, after 1.0.0), the
-  // per-system realm library is persisted under `gatheringRealms`.
-  assert.equal(store.get('craftingSystems')[0].gatheringRealms[0].modifiers[0].kind, 'eventChance');
+  // The 1.1.0 rename migration renames the library to `gatheringRealms`, and 1.27.0 then lifts
+  // it to the world `travelConfig` (issue 1282) — carrying the renamed modifier kind with it.
+  assert.equal(store.get('travelConfig').realms[0].modifiers[0].kind, 'eventChance');
 });
 
 // ---------------------------------------------------------------------------

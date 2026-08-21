@@ -223,8 +223,10 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   // realm/travel subsystem is disabled for the target system, reading the
   // single shared predicate so the gate never drifts from the engine/resolver.
   assert.ok(
-    mainSource.includes("import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"),
-    'main.js imports the shared isGatheringRealmsEnabled predicate'
+    mainSource.includes(
+      "import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"
+    ),
+    'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
   );
   // Each guard resolves the system via craftingSystemManager and bails before doing work.
   assert.ok(
@@ -242,8 +244,13 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
 });
 
 test('Fabricate registers a GM-only discipline on realm mutators', () => {
-  // The reveal mutator validates realm membership via the owning system snapshot.
-  assert.ok(mainSource.includes('validateRealmInSystem: system'), 'reveal validates realm belongs to system');
+  // The reveal mutator validates the realm against the WORLD library (issue 1282). `systemId`
+  // survives on the public method as the GATE — whether that system surfaces travel at all —
+  // and no longer as the thing the realm must belong to.
+  assert.ok(
+    mainSource.includes('validateRealmExists: this.gatheringRealmStore?.get?.()'),
+    'reveal validates the realm exists in the world travel config'
+  );
 });
 
 test('game.fabricate.api exposes the canonical realm class + deprecated alias', () => {

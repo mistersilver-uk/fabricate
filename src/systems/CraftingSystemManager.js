@@ -77,7 +77,7 @@ import {
   PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
-import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
@@ -473,21 +473,18 @@ export class CraftingSystemManager {
       // Normalized wholesale from the incoming array; settings replace (not
       // deep-merge), so a removed entry does not resurrect.
       characterPrerequisites,
-      // Per-system gathering realm library (geography) + realm behavior
-      // settings. Realms ride along with export/import for free because the
-      // exporter clones the normalized system and import funnels back through
-      // _normalizeSystem, which forces each realm's craftingSystemId to this
-      // system id (self-heal on a copy-import that rebinds the system id).
-      // Accept the legacy `gatheringRegions`/`gatheringRegionSettings` keys on
-      // read (imported or pre-1.1.0-migration payloads) so an old export still
-      // loads before the startup migration runs.
-      gatheringRealms: normalizeGatheringRealmList(
-        system.gatheringRealms ?? system.gatheringRegions,
-        {
-          craftingSystemId: systemId,
-          randomID: () => foundry.utils.randomID(),
-        }
-      ),
+      // PARTICIPATION ONLY (issue 1282). The realm library itself is world scope — realms are
+      // geography, and the same valley is the same valley whichever crafting system a
+      // character is there to serve — so it lives in the `travelConfig` world setting and
+      // this rebuild deliberately stops emitting `gatheringRealms` at all.
+      //
+      // That omission is load-bearing and destructive by design: this normalizer is an
+      // ALLOWLIST REBUILD, so the first save after the 1.27.0 migration is what actually
+      // removes the stale per-system copy. It is also why the migration must run before any
+      // system save — see the runner's before-any-load ordering.
+      //
+      // The legacy `gatheringRegionSettings` key is still accepted on read, so a pre-1.1.0
+      // export still loads before the startup migration runs.
       gatheringRealmSettings: normalizeGatheringRealmSettings(
         system.gatheringRealmSettings ?? system.gatheringRegionSettings
       ),

@@ -145,7 +145,6 @@ const APPROVED_SYSTEM_FIELD_DOMAINS = {
   components: ['labelling', 'narrative', 'component-definitions'],
   tools: ['labelling', 'narrative', 'component-definitions', 'resolution-config'],
   characterPrerequisites: ['labelling', 'access-and-knowledge'],
-  gatheringRealms: ['labelling', 'component-definitions', 'access-and-knowledge'],
   gatheringRealmSettings: ['labelling', 'component-definitions', 'access-and-knowledge'],
 };
 const APPROVED_RECIPE_FIELD_DOMAINS = {
@@ -393,7 +392,10 @@ describe('field attribution fails SAFE', () => {
     // store that renders it. Pinned because the exception is stated in the canonical spec and a
     // prose-only claim rots silently.
     const gatheringDomains = new Set(STORE_DOMAINS[INVALIDATION_STORES.GATHERING]);
-    for (const field of ['gatheringRealms', 'gatheringRealmSettings']) {
+    // `gatheringRealms` left the crafting system in issue 1282 — the realm library is a
+    // world setting, so it has no row here and `settingChangeBridge`'s travel leg announces
+    // realm edits instead. `gatheringRealmSettings` stays: `{ enabled }` still lives here.
+    for (const field of ['gatheringRealmSettings']) {
       const domains = domainsForSystemFields([field]);
       assert.ok(
         !domains.includes(INVALIDATION_DOMAINS.NARRATIVE),
