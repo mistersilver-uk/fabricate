@@ -30,7 +30,9 @@
   let popoverRoot = $state(null);
   let triggerButton = $state(null);
   let searchInput = $state(null);
+  let optionsList = $state(null);
   let popoverStyle = $state('');
+  let optionsStyle = $state('');
 
   const iconOptions = getEssenceIconOptions();
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
@@ -125,6 +127,34 @@
     };
   }
 
+  /**
+   * The row pitch and the popover chrome the whole-row flooring needs (issue 1280).
+   *
+   * Measured rather than assumed: the row height is a derived CSS value
+   * (`--fab-icon-picker-row`) and the gaps are tokens, so restating either here would be a second
+   * copy free to drift from the stylesheet — which is the exact fault this change exists to fix.
+   *
+   * Chrome is composed from the popover's own computed box rather than by subtracting the list's
+   * height, which would be circular: the list's height is what we are about to set.
+   */
+  function measurePopoverMetrics() {
+    if (!popoverRoot || !optionsList) return {};
+    const popoverStyles = getComputedStyle(popoverRoot);
+    const listStyles = getComputedStyle(optionsList);
+    const firstRow = optionsList.querySelector('.essence-icon-picker-option');
+    const rowHeight = firstRow?.getBoundingClientRect?.().height ?? 0;
+    const rowGap = Number.parseFloat(listStyles.rowGap) || 0;
+    if (!rowHeight) return {};
+
+    const chromeHeight =
+      (Number.parseFloat(popoverStyles.paddingTop) || 0) +
+      (Number.parseFloat(popoverStyles.paddingBottom) || 0) +
+      (Number.parseFloat(popoverStyles.rowGap) || 0) +
+      (searchInput?.getBoundingClientRect?.().height ?? 0);
+
+    return { rowPitch: rowHeight + rowGap, rowGap, chromeHeight };
+  }
+
   function updatePopoverPosition() {
     if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
 
@@ -152,11 +182,13 @@
         horizontalAlign: iconOnly ? 'left' : 'right',
         minLeft: horizontalBounds.minLeft,
         maxRight: horizontalBounds.maxRight,
+        ...measurePopoverMetrics(),
       }
     );
 
     if (!layout) {
       popoverStyle = '';
+      optionsStyle = '';
       return;
     }
 
@@ -172,6 +204,11 @@
       `max-height: ${layout.maxHeight}px;`,
       verticalPosition,
     ].join(' ');
+    // Null on the first pass, before any row has been laid out to measure. The list then falls
+    // back to filling the popover, exactly as it did before — one frame of the old behaviour is
+    // better than a guessed height that jumps once the real one arrives.
+    optionsStyle =
+      typeof layout.listMaxHeight === 'number' ? `max-height: ${layout.listMaxHeight}px;` : '';
   }
 
   function isPopoverScroll(event) {
@@ -294,8 +331,10 @@
       </div>
 
       <div
+        bind:this={optionsList}
         class="essence-icon-picker-options"
         role="listbox"
+        style={optionsStyle}
         aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
       >
         {#if pinnedOption}

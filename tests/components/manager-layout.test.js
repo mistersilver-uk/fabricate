@@ -3798,7 +3798,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
     'essence source drop target should have a stable wide drop-zone height'
   );
   assert.ok(
-    iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'),
+    iconTriggerBlock.includes(
+      'grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr) 16px;'
+    ),
     'icon picker trigger should be a real picker control, not a raw text field'
   );
   assert.ok(
