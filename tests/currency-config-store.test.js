@@ -152,3 +152,45 @@ describe('CurrencyConfigStore', () => {
     }
   });
 });
+
+describe('CurrencyConfigStore under overlapping edits', () => {
+  // Callers read-modify-write, and the editor fires one of those per keystroke on a label field,
+  // so a second edit routinely starts while the first write is still in flight. If the cache is
+  // published only after the await, that second edit reads the pre-first-edit config and clobbers
+  // it — the GM's typing silently disappears. The per-system path this replaced was safe by
+  // construction, so publishing late would have been a regression rather than a new limitation.
+  function makeSlowStore(delayMs) {
+    const settings = { currencyConfig: { units: [{ id: 'gp', label: 'Gold' }] } };
+    const store = new CurrencyConfigStore({
+      getSetting: (key) => settings[key] ?? null,
+      setSetting: (key, value) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            settings[key] = value;
+            resolve(value);
+          }, delayMs);
+        }),
+      randomID: () => 'gen',
+    });
+    return { store, persisted: () => settings.currencyConfig };
+  }
+
+  it('serves the first edit to a read that starts before the write lands', async () => {
+    const { store, persisted } = makeSlowStore(20);
+
+    const first = store.save({ ...store.get(), spendStrategy: 'macro' });
+    // A second caller reads while the first write is still in flight, exactly as the editor does.
+    const readDuringFlight = store.get();
+    assert.equal(
+      readDuringFlight.spendStrategy,
+      'macro',
+      'the in-flight edit must already be visible, or the next read-modify-write clobbers it'
+    );
+
+    const second = store.save({ ...readDuringFlight, providerId: 'pf2e-inventory' });
+    await Promise.all([first, second]);
+
+    assert.equal(persisted().spendStrategy, 'macro', 'the first edit survived the second');
+    assert.equal(persisted().providerId, 'pf2e-inventory');
+  });
+});

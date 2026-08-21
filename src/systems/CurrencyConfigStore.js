@@ -64,12 +64,27 @@ export class CurrencyConfigStore {
     });
   }
 
+  /**
+   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE, not after.
+   *
+   * Callers read-modify-write: `adminStore._updateCurrencyConfig` reads `get()`, mutates, and
+   * saves. The editor fires one of those per keystroke on a label field, so a second edit
+   * routinely starts while the first `setSetting` is still in flight. Publish after the await and
+   * that second edit reads the pre-first-edit config and clobbers it — the GM's typing silently
+   * disappears when they click a chevron before the round trip settles.
+   *
+   * The per-system path this replaced was safe by construction for exactly this reason:
+   * `CraftingSystemManager.updateSystem` writes `this.systems.set(...)` before its own `await`.
+   * The cost is a cache that is briefly ahead of the setting if the write rejects — recoverable
+   * on the next `load()`, and the replication bridge calls that whenever the setting changes.
+   * A lost update is not recoverable at all.
+   */
   async _persist(next) {
     const normalized = this._normalize(next);
     const payload = cloneJson(normalized);
-    await this.setSetting(SETTING_KEYS.CURRENCY_CONFIG, payload);
     this.config = normalized;
     this.loaded = true;
+    await this.setSetting(SETTING_KEYS.CURRENCY_CONFIG, payload);
     return cloneJson(payload);
   }
 

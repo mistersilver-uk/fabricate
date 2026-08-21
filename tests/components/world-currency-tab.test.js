@@ -111,8 +111,13 @@ describe('World > Currency tab (mounted)', () => {
 
   it('disables Seed presets when the world ruleset has no preset bundle', async () => {
     const unsupported = await harness.mount({ currencyUnits: [], currencyPresetsSupported: false });
-    const seedOff = unsupported.querySelector('button[data-tooltip]');
-    assert.ok(seedOff?.disabled, 'Seed presets is disabled and explains itself in a tooltip');
+    // Pinned by its label, not by "the first tooltipped button on the page" — that would pass on
+    // any other disabled control that happens to carry a tooltip.
+    const seedOff = [...unsupported.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Seed presets')
+    );
+    assert.equal(seedOff.disabled, true, 'Seed presets is disabled');
+    assert.ok(seedOff.getAttribute('data-tooltip'), 'and explains itself in a tooltip');
 
     harness.remount();
     const supported = await harness.mount({ currencyUnits: [], currencyPresetsSupported: true });

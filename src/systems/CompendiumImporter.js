@@ -2,6 +2,7 @@
  * Orchestrates importing crafting systems and recipes from pack JSON data.
  * Handles UUID remapping with deterministic precedence and fallback item ID management.
  */
+import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
 import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResolver.js';
 
@@ -661,7 +662,12 @@ export class CompendiumImporter {
       if (incoming.macros && typeof incoming.macros === 'object') next.macros = incoming.macros;
     }
 
-    await this._setSetting(CURRENCY_CONFIG_KEY, next);
+    // Normalize before writing. Every other writer of this setting goes through
+    // `CurrencyConfigStore`, which normalizes on write; this one does not have the store, so
+    // without this a hand-edited export could persist a shape the readers only repair on read —
+    // and a unit that arrived without an id would be minted a FRESH id on every `load()`,
+    // changing its identity from one reload to the next.
+    await this._setSetting(CURRENCY_CONFIG_KEY, normalizeWorldCurrencyConfig(next));
   }
 
   /**

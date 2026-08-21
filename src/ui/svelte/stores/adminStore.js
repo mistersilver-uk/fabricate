@@ -4517,6 +4517,12 @@ export function createAdminStore(services) {
       featureCount: Object.values(s.features || {}).filter((value) => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
+      // Whether this system PARTICIPATES in the world currency (issue 1278). Projected as a
+      // flat boolean because this list is a deliberate allowlist that does not carry
+      // `requirements` — a consumer reaching for `requirements.currency.enabled` here reads
+      // undefined and silently counts zero, which is how the World > Currency subtitle came to
+      // report every ladder as unadopted.
+      currencyEnabled: s?.requirements?.currency?.enabled === true,
       selected: s.id === resolvedSystemId,
     }));
 

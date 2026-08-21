@@ -1649,8 +1649,11 @@
   // subtitle reports it so a GM who has configured a ladder that NO system uses can see that
   // immediately — the commonest way this feature looks broken when it is merely unadopted.
   const allSystems = $derived($viewState.systems || []);
+  // Reads the projected `currencyEnabled` flag, NOT `requirements.currency.enabled`: the system
+  // list is a deliberate allowlist projection that does not carry `requirements`, so the deep
+  // read counted zero for every world and the subtitle reported every ladder as unadopted.
   const currencyEnabledSystemCount = $derived(
-    allSystems.filter((system) => system?.requirements?.currency?.enabled === true).length
+    allSystems.filter((system) => system?.currencyEnabled === true).length
   );
   const currencySpendStrategy = $derived(worldCurrency.spendStrategy || 'actorProperty');
   const currencyProviderId = $derived(worldCurrency.providerId || '');

@@ -1731,6 +1731,11 @@ function createStore(calls = [], options = {}) {
             featureCount: 3,
             componentCount: alchemyManagedItemOptions.length,
             recipeCount: 2,
+            // The REAL projection carries participation as a flat boolean (issue 1278): the
+            // system list is an allowlist that does not include `requirements`, so a double that
+            // omitted this would be looser than the projection it stands for — and the World >
+            // Currency subtitle counts exactly this field.
+            currencyEnabled: options.selectedCurrency?.enabled === true,
             selected: options.selected !== false,
           },
           {
@@ -1743,6 +1748,7 @@ function createStore(calls = [], options = {}) {
             featureCount: 1,
             componentCount: 6,
             recipeCount: 5,
+            currencyEnabled: false,
             selected: false,
           },
         ],
@@ -20680,6 +20686,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       'clicking the on toggle should disable time requirements through toggleRequirement'
     );
+  });
+
+  it('counts PARTICIPATING systems in the World Currency subtitle (issue 1278)', async () => {
+    // The affordance exists to stop a GM misdiagnosing an unadopted ladder as a broken one, so a
+    // count that is always zero asserts the false half of that diagnosis to every GM. It reads
+    // the projected `currencyEnabled` flag; reaching for `requirements.currency.enabled` on this
+    // list silently yields undefined, because the projection is an allowlist without it.
+    await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: true,
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [{ id: 'gp', label: 'Gold' }],
+      },
+    });
+
+    const subtitle = target.querySelector('.manager-subtitle')?.textContent ?? '';
+    assert.match(subtitle, /1 coin/, `the unit count is stated: ${subtitle}`);
+    assert.match(subtitle, /used by 1 of 2/, `one of the two fixture systems opts in: ${subtitle}`);
+  });
+
+  it('says the ladder is empty rather than counting zero coins', async () => {
+    await mountCurrencyEditor();
+
+    const subtitle = target.querySelector('.manager-subtitle')?.textContent ?? '';
+    assert.match(subtitle, /No coins yet/, subtitle);
   });
 
   it('renders World Currency full width, with no inspector aside (issue 1278)', async () => {

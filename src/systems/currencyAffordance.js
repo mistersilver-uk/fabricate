@@ -58,8 +58,26 @@ export function getCurrencyRequirementConfig(recipe, seams = {}) {
   if (!system) return null;
 
   // The world config follows the same seam-first, global-fallback rule, for the same reason.
+  //
+  // `??` rather than `||` throughout, and the distinction matters at the last hop: an injected
+  // seam that returns `null`/`undefined` is treated as ABSENT and falls through to the global,
+  // so a seam cannot express "this world has no ladder" distinctly from "no seam was injected".
+  // That is deliberate — both resolve to `{}` here and the caller cannot tell them apart anyway,
+  // because an empty ladder and a missing one produce the same refusal downstream: an authored
+  // cost against zero units fails `validateCurrencyProfile`, so `resolveCurrencyContext` sets
+  // `error`, the probe reads false, and the spend refuses. Display agrees with execution either
+  // way. A future seam that needs the two to differ must say so with an explicit sentinel.
+  //
+  // `globalThis.game?.` rather than the bare `game.` its neighbour above uses, because this
+  // fallback is reached far more often: `CraftingEngine._currencySeams` returns
+  // `() => this.currencyConfigStore?.get()`, which is legitimately `undefined` whenever the
+  // store was not injected — the options bag defaults it to `null`. A bare reference throws
+  // `ReferenceError` in any context without the Foundry global, and a throw here lands on the
+  // craftability path rather than degrading to the empty ladder this line is written to return.
   const world =
-    seams.getCurrencyConfig?.() ?? game.fabricate?.getCurrencyConfigStore?.()?.get() ?? {};
+    seams.getCurrencyConfig?.() ??
+    globalThis.game?.fabricate?.getCurrencyConfigStore?.()?.get() ??
+    {};
   const spendStrategy = ['actorInventory', 'macro'].includes(world.spendStrategy)
     ? world.spendStrategy
     : 'actorProperty';

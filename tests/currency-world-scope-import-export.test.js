@@ -91,7 +91,9 @@ describe('importing the world currency config', () => {
 
     assert.equal(settings.currencyConfig.spendStrategy, 'actorProperty');
     assert.equal(settings.currencyConfig.providerId, '');
-    assert.equal(settings.currencyConfig.macros, undefined);
+    // The write is normalized, so the macro set is always present in full shape — what matters is
+    // that it holds the DESTINATION's empty macros rather than the incoming pack's.
+    assert.equal(settings.currencyConfig.macros.canAfford, '');
   });
 
   it('is idempotent: re-importing the same pack writes nothing new', async () => {
