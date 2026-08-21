@@ -440,8 +440,7 @@ CraftingSystem = {
   // NOTE: a Gathering Realm is the Fabricate geography concept; it is distinct from a
   // Foundry Scene Region (RegionDocument / Region Behaviour), which a realm maps to
   // many-to-one through sceneMappings[].sceneRegionUuid.
-  gatheringRealms?: GatheringRealm[],          // default []; was gatheringRegions
-  gatheringRealmSettings?: GatheringRealmSettings, // defaults: enabled false, revealMode "manual", modifierVisibility "visible"
+  gatheringRealmSettings?: GatheringRealmSettings, // { enabled } only; default false. The realm library, reveal mode and modifier visibility are world scope — see TravelConfig
 }
 ```
 
@@ -489,7 +488,11 @@ CraftingSystem = {
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
-14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in.
+14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
+    A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
+    `enabled` decides consumption only — whether the party's current location gates this system's environments, what its UI shows, and whether its environments offer the realm controls — so the world's realms stay authorable and resolvable whether or not any system has opted in.
+    The normalizer is an allowlist rebuild that does not emit `gatheringRealms`, `gatheringRegions` or `gatheringRegionSettings`, so the first system save after the `1.27.0` migration is what removes a stale per-system copy.
+    That omission is destructive by design and is why the migration must run before any system save.
     A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour).
     Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed.
     The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids).
@@ -739,6 +742,46 @@ type CurrencyConfig = {
    No affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
+
+## TravelConfig
+
+### Purpose
+
+Define the WORLD travel configuration: the one realm library a world has, how realms are revealed to players, and whether realm modifiers are disclosed.
+
+Travel is world scope rather than per crafting system because realms are geography.
+Northreach Vale is the same valley whether a character is there to gather herbs or to quarry stone, yet the per-system model made a GM running two systems author it twice, link the same Foundry Scene Region to both copies, and reveal it to a character twice — and let the two copies then disagree.
+The engine conceded as much: its listing realm context gave up entirely and reported no realm whenever more than one realm-enabled system existed, because it could not say which system's answer was the real one.
+What a crafting system still owns is a single boolean — `gatheringRealmSettings.enabled`, whether it PARTICIPATES — which is deliberately NOT duplicated here, because a world-level flag and a system-level flag could then disagree.
+
+It is persisted as the `fabricate.travelConfig` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `GatheringRealmStore` is the persistence shell and `normalizeTravelConfig` is the normalizer.
+
+```ts
+type TravelConfig = {
+  revealMode: "manual" | "onPartyTokenEntry" | "alwaysVisible"; // default "manual"
+  modifierVisibility: "visible" | "gmOnly";                     // default "visible"
+  realms: GatheringRealm[];                                     // default []
+};
+```
+
+### Requirements
+
+1. The config carries **no** `enabled` key.
+   Participation is a per-crafting-system decision (`gatheringRealmSettings.enabled`), and keeping the flag out of this shape is what stops the two scopes from ever contradicting each other.
+   A reader that takes participation from here is reading the wrong object.
+2. `revealMode`, `modifierVisibility` and the `GatheringRealm` record are unchanged in substance by the move to world scope — only their owner changed, and `craftingSystemId` is dropped because a world realm has no owner.
+   `gathering-and-harvesting` defines their semantics; this section does not restate them.
+3. Normalization is total and non-throwing, always emitting all three keys.
+4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
+   Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+5. The store publishes its cache BEFORE awaiting the write.
+   Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
+   The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.
+   The cost is a cache briefly ahead of the setting if the write rejects, which the next load recovers; a lost update is not recoverable at all.
+6. Pointing a Foundry Scene Region at a realm is a SINGLE write (`setSceneRegionLink`), because a region maps to at most one realm and so the move must both detach and attach.
+   A read-modify-write loop over the realm list would lose every iteration but the last.
+7. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
+   The difference is that an exported environment's realm gating names a realm id that is unusable unless the realm arrives with it, whereas no exported record references a party.
 
 ## CurrencyUnit
 
@@ -2151,14 +2194,12 @@ Requirements:
 
 ```js
 Actor.flags.fabricate.discoveredGatheringRealms = {        // was discoveredGatheringRegions
-  [systemId: string]: {
-    [realmId: string]: {                                   // was regionId
-      discoveredAt: number,
-      source: "manual" | "partyToken" | "import" | "api",
-      partyId?: string,
-      sceneUuid?: string,        // Foundry bridge — NOT renamed
-      sceneRegionUuid?: string,  // Foundry bridge — NOT renamed
-    },
+  [realmId: string]: {                                     // was [systemId][realmId]
+    discoveredAt: number,
+    source: "manual" | "partyToken" | "import" | "api",
+    partyId?: string,
+    sceneUuid?: string,        // Foundry bridge — NOT renamed
+    sceneRegionUuid?: string,  // Foundry bridge — NOT renamed
   },
 }
 ```
@@ -2166,13 +2207,20 @@ Actor.flags.fabricate.discoveredGatheringRealms = {        // was discoveredGath
 Requirements:
 
 1. The flag is actor-scoped and world-local so realm knowledge follows the character across party changes.
-2. `systemId` must refer to the crafting system that owns the realm; `realmId` must refer to a `GatheringRealm` in that system.
-   Discovery writes validate this before persisting.
+2. Discovery is WORLD-WIDE and is keyed by `realmId` alone.
+   Realms are geography, so knowing one is knowledge of the world: a character who has found Northreach Vale has found it, whichever crafting system they were serving at the time.
+   `realmId` must refer to a `GatheringRealm` in the world library, and discovery writes validate that before persisting.
 3. `discoveredAt` must be a timestamp and `source` must be one of the listed values.
 4. Reads never throw on a stale `partyId`; missing or stale realm ids must not disclose secret realm names to non-GM users.
-5. Because this is an actor flag (not a world setting), it is **not** rewritten by the `1.1.0` migration runner.
-   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
-6. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).
+5. Because this is an actor flag (not a world setting), it is **not** rewritten by the migration runner, which reaches two corpora and four world settings and has no actor access at all.
+   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback, flatten a legacy `[systemId][realmId]` map on read, and every write persists only the current shape, upgrading each actor lazily.
+   That is the same mechanism the earlier `discoveredGatheringRegions` rename used, for the same reason.
+   Two details make the lazy upgrade safe.
+   The DISCRIMINATOR is `discoveredAt`: every entry has one and no `systemId` bucket ever does, so an object carrying a numeric `discoveredAt` is a realm entry and any other object is a legacy bucket.
+   And a HALF-UPGRADED map is reachable in normal use rather than hypothetical — upgrade an actor, write, then discover a second realm, and the map holds both shapes at once until the next full read — so the flattener handles a mixed map rather than assuming one shape.
+6. On a collision between two legacy buckets the EARLIEST `discoveredAt` wins.
+   Discovery records the first time a character saw a place; a later duplicate recorded under another crafting system is not a re-discovery.
+7. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).
 
 ## Run Journal Projection
 
