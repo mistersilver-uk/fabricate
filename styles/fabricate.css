@@ -92,6 +92,16 @@
   --fab-space-md: var(--fab-space-3); /* 12 */
   --fab-space-lg: var(--fab-space-4); /* 16 */
   --fab-space-xl: var(--fab-space-6); /* 24 */
+
+  /* The icon picker's chip, and the row that has to contain it (issue 1280).
+     Declared together because the row height is NOT an independent choice: a row shorter than
+     the chip plus its own padding and border cannot centre that chip — `align-items: center`
+     centres nothing that overflows its track — so the chip spills past the bottom edge and the
+     row reads as both mis-aligned and unpadded. That is exactly how a 28px chip came to sit in
+     a 34px row needing 38px. Deriving one from the other is what stops them drifting apart
+     again; `tests/components/icon-picker-layout.test.js` fails if this arithmetic is broken. */
+  --fab-icon-picker-chip: 28px;
+  --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
   --fab-v2-bg: var(--fab-bg-0);
   --fab-v2-surface-1: var(--fab-bg-1);
   --fab-v2-surface-2: var(--fab-bg-2);
@@ -8828,12 +8838,12 @@
 
 .fabricate-manager .essence-icon-picker-trigger {
   display: inline-grid;
-  grid-template-columns: 28px minmax(0, 1fr) 16px;
+  grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr) 16px;
   align-items: center;
   gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
-  min-height: 36px;
+  min-height: var(--fab-icon-picker-row);
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -8848,8 +8858,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--fab-icon-picker-chip);
+  height: var(--fab-icon-picker-chip);
   border-radius: 6px;
   color: var(--fab-mv2-accent);
   background: var(--fab-overlay-dark-16);
@@ -8989,11 +8999,11 @@
 
 .fabricate-manager .essence-icon-picker-option {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);
   gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
-  min-height: 34px;
+  min-height: var(--fab-icon-picker-row);
   padding: var(--fab-space-1) var(--fab-space-2);
   text-align: left;
 }
