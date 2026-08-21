@@ -144,6 +144,14 @@ export function handleFabricateSettingChange(
     // world where no system participates produces no scopes, and `emitCraftingDataChanged` is
     // skipped entirely rather than emitting an empty payload that would route broadly.
     currencyConfigStore?.load?.();
+    // Republish the MANAGER too, not only the player shells. Before issue 1278 a currency edit
+    // wrote the `craftingSystems` setting, so a second GM with the manager open saw it through
+    // the systems branch above; a world setting announces nothing, and the manager subscribes to
+    // the three published hooks rather than to the unpublished `craftingDataChanged` signal. So
+    // without this a second GM's World > Currency tab shows the pre-edit ladder until reload.
+    // Unconditional, because the manager's own currency tab is stale whether or not any crafting
+    // system currently participates.
+    callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
     const scopes = currencyParticipantScopes(craftingSystemManager);
     if (scopes.length > 0) {
       emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);

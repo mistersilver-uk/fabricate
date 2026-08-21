@@ -20682,6 +20682,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('renders World Currency full width, with no inspector aside (issue 1278)', async () => {
+    // The shell's shared `.manager-inspector` falls through to a generic "Select a system" panel
+    // for any route it is not explicitly excluded from. Omitting this route from that exclusion
+    // list gave the currency editor a permanent 300px column of unrelated content beside it — on
+    // a page that has no selected system at all.
+    await mountCurrencyEditor();
+
+    assert.ok(target.querySelector('[data-world-currency-page]'), 'the route rendered');
+    assertNoElement(
+      target,
+      '.manager-body > .manager-inspector',
+      'World Currency is full width, like World Parties'
+    );
+  });
+
   it('keeps the World Currency ladder ungated by any system\u2019s participation toggle (issue 1278)', async () => {
     // Currency is WORLD scope now. The ladder is authored once, for the whole world, and a
     // crafting system's `requirements.currency.enabled` decides only whether THAT system

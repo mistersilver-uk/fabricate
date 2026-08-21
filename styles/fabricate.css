@@ -2293,6 +2293,14 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+/* Same contract for the World Currency route (issue 1278), and for the same reason: the tab
+   renders a single child straight into `.manager-main`, so without this it lands in the shared
+   shell's auto-sized first row and a tall ladder grows the Manager instead of scrolling inside
+   `.manager-world-currency`'s own overflow. */
+.fabricate-manager[data-manager-view="world-currency"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-checks-page {
   display: grid;
   gap: var(--fab-space-3);

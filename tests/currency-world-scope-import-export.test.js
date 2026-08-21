@@ -17,7 +17,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CompendiumImporter } from '../src/systems/CompendiumImporter.js';
-import { buildExportPayload } from '../src/systems/CraftingSystemExporter.js';
+import { buildExportPayload, prepareForImport } from '../src/systems/CraftingSystemExporter.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 
@@ -242,5 +242,76 @@ describe('the export/import round trip carries the ladder into a fresh world', (
       'Gold',
       'the label a recipe cost renders is what came across'
     );
+  });
+});
+
+describe('the ladder survives the WHOLE import composition, not just the merge helper', () => {
+  // `prepareForImport` is what both production import paths build pack data through, and it
+  // rebuilds the pack object key by key. A slice it forgets is silently dropped: the importer
+  // then reaches `_persistCurrencyConfig(undefined)`, which returns immediately, and every
+  // imported currency cost lands as an unresolvable unit id. Pinning the merge helper alone
+  // cannot catch that, because the helper is never reached.
+  const envelope = () =>
+    buildExportPayload(
+      { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },
+      [],
+      '1.26.0',
+      [],
+      {},
+      {
+        spendStrategy: 'macro',
+        providerId: 'pf2e-inventory',
+        macros: { canAfford: 'Macro.can', increment: '', decrement: '' },
+        units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }],
+      }
+    );
+
+  it('carries currencyConfig through prepareForImport in keep mode', () => {
+    const packData = prepareForImport(envelope(), 'keep');
+
+    assert.deepEqual(
+      packData.currencyConfig.units.map((unit) => unit.id),
+      ['gp']
+    );
+    assert.equal(packData.currencyConfig.spendStrategy, 'macro');
+    assert.equal(packData.currencyConfig.providerId, 'pf2e-inventory');
+  });
+
+  it('carries it through COPY mode too, without rebinding unit ids', () => {
+    // Unit ids are world scope and shared by every crafting system, so rebinding them the way a
+    // copy rebinds recipe and component ids would orphan the very costs the copy carries.
+    const packData = prepareForImport(envelope(), 'copy');
+
+    assert.deepEqual(
+      packData.currencyConfig.units.map((unit) => unit.id),
+      ['gp']
+    );
+  });
+
+  it('does not alias the raw envelope, so a later mutation cannot reach the pack', () => {
+    const raw = envelope();
+    const packData = prepareForImport(raw, 'keep');
+    raw.currencyConfig.units[0].label = 'Mutated';
+
+    assert.equal(packData.currencyConfig.units[0].label, 'Gold');
+  });
+
+  it('lands the ladder in a fresh world through the composition end to end', async () => {
+    const packData = prepareForImport(envelope(), 'keep');
+    const { importer, settings } = importerOver(undefined);
+    await importer._persistCurrencyConfig(packData.currencyConfig);
+
+    assert.deepEqual(
+      settings.currencyConfig.units.map((unit) => unit.id),
+      ['gp']
+    );
+    assert.equal(settings.currencyConfig.spendStrategy, 'macro');
+  });
+
+  it('tolerates a legacy envelope that carries no currency slice', () => {
+    // The upcast still runs, so the slice arrives as an empty ladder rather than as `undefined`.
+    // The importer short-circuits on an empty unit list, so nothing is written.
+    const packData = prepareForImport({ schemaVersion: 3, system: { id: 'x', name: 'X' } }, 'keep');
+    assert.deepEqual(packData.currencyConfig.units, []);
   });
 });

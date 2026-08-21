@@ -4029,6 +4029,7 @@
           "Title": "Currency units",
           "Hint": "Define the coins of your world, and how they break down. Every crafting system that enables currency shares them.",
           "Empty": "No currency units yet.",
+          "EmptyHint": "Add a coin, or seed the presets for your world, using the buttons above.",
           "Add": "Add currency unit",
           "Edit": "Edit currency unit",
           "Delete": "Delete currency unit",
@@ -4291,7 +4292,6 @@
           "CurrencyNav": "Currency",
           "CurrencyTitle": "World Currency",
           "CurrencyActions": "World currency actions",
-          "CurrencyInspector": "Selected currency unit",
           "Downtime": {
             "Title": "Downtime",
             "Nav": "Downtime",

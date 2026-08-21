@@ -990,9 +990,10 @@ The Character-modifiers list SHALL render as a compact summary-row accordion mir
 The Character-modifier editor SHALL edit its `icon` with the shared pop-over `IconPicker` (the same control the Currency-unit and Character-prerequisite editors use), not a raw icon-class text input; a modifier with no explicit icon falls back to `fa-solid fa-user`.
 The editor's Expression field keeps the raw stored value (including any leading `@`); only the collapsed summary strips the sigil for display.
 
-Each of the three list cards SHALL render a whole-section collapse toggle in its header: a `<button aria-expanded aria-controls>` with a chevron affordance that hides or reveals the section body (the list and its controls) while leaving the card header visible.
-The collapse state is session-local (in-memory) — preserved across store refreshes and never persisted.
-For the two System Settings cards it is one collapse Set for the page, reset when a different system is selected; the World Currency card owns its own local state, because it is the whole page and has no selected system to reset against.
+Each of the two SYSTEM SETTINGS list cards SHALL render a whole-section collapse toggle in its header: a `<button aria-expanded aria-controls>` with a chevron affordance that hides or reveals the section body (the list and its controls) while leaving the card header visible.
+The collapse state is session-local (in-memory) — preserved across store refreshes and never persisted — and is one collapse Set for the page, reset when a different system is selected.
+The World Currency card SHALL NOT render one.
+A collapse toggle earns its place by yielding space to the siblings below it; as a whole route the currency card has no siblings, so the same control would only hide the page and leave a bare header row.
 It is distinct from the Character-prerequisites card's per-item accordion (which opens one entry at a time); a section may be collapsed independently of which entry, if any, is open.
 
 Each Character-modifier row SHALL offer a row-level **Copy to prerequisites** action, and — only when `features.gathering` is enabled — each Character-prerequisite row SHALL offer a **Copy to modifiers** action.
@@ -1719,7 +1720,9 @@ It is the ONE place the world coin ladder, spend strategy, provider and GM macro
 - The rail entry sits directly under `Parties` inside the existing `.manager-world-nav` section, carries the stable id `manager-world-nav-currency` and the hook `data-world-nav-item="currency"`, uses the `fa-coins` icon and a localized accessible name, and surfaces the configured unit count on `.manager-nav-count`.
   The route token is `world-currency`; it survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and it participates in the Manager confirm-discard route-exit chain like every other destination.
 - The page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries the page hook `data-world-currency-page`.
-  It is full-width with no right inspector, matching World Parties.
+  It is full-width with no right inspector, matching World Parties: the route MUST be excluded from the shell's shared `.manager-inspector` aside, not merely left without an inspector branch of its own.
+  The aside's fall-through renders a generic "Select a system" panel, so a route omitted from the exclusion list gains a permanent 300px column of unrelated content beside an editor that has no selected system at all.
+  The route also carries a `grid-template-rows: minmax(0, 1fr)` layout override, as the Downtime route does and for the same reason: the tab renders a single child straight into `.manager-main`, so on the shared three-row shell it would land in an auto-sized row and a tall ladder would grow the Manager instead of scrolling inside its own panel.
 - **The editor moved wholesale rather than being redesigned.** Every control below is the one that stood in the System Settings units card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*`; no new primitive is introduced.
 
 Shipped controls:

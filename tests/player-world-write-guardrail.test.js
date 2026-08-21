@@ -62,6 +62,8 @@ test('world-scope keys are derived from the real setting definitions', () => {
   assert.ok(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.GATHERING_ENVIRONMENTS));
   assert.ok(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.CRAFTING_SYSTEMS));
   assert.ok(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.RECIPES));
+  // The world currency ladder (issue 1278). A GM authors it; a player must never write it.
+  assert.ok(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.CURRENCY_CONFIG));
   // client-scope (localStorage) and user-scope settings are NOT GM-only.
   assert.ok(!WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.FAVOURITE_RECIPES));
   assert.ok(!WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER));

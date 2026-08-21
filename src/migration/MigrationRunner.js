@@ -876,6 +876,19 @@ export class MigrationRunner {
       }
     }
     try {
+      // ORDER IS LOAD-BEARING: `currencyConfig` is written BEFORE `craftingSystems`.
+      //
+      // The 1.26.0 migration LIFTS the currency ladder out of the systems and then shrinks each
+      // system's block to `{ enabled }`, so systems are the SOURCE and this setting is the
+      // DESTINATION. Write the source first and a tear between the two — any rejection below
+      // abandons the rest and leaves `migrationVersion` behind — destroys the ladder
+      // irrecoverably: the re-run finds systems already shrunk, lifts nothing, and the
+      // idempotence guard keeps the still-empty world config. Writing the destination first
+      // makes the same tear fully recoverable, because the re-run finds a populated world
+      // ladder, keeps it, and re-applies a shrink that is idempotent by construction.
+      if (currencyConfigChanged) {
+        await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
+      }
       if (systemsChanged) {
         await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
@@ -887,9 +900,6 @@ export class MigrationRunner {
       }
       if (gatheringPartiesChanged) {
         await this._setSetting(SETTING_KEYS.GATHERING_PARTIES, data.gatheringParties);
-      }
-      if (currencyConfigChanged) {
-        await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
       }
 
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);

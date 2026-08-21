@@ -77,7 +77,8 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
 }
 
 /**
- * The three peer top-level currency spend strategies (`requirements.currency.spendStrategy`):
+ * The three peer top-level currency spend strategies (`currencyConfig.spendStrategy`, world
+ * scope since issue 1278):
  *
  * - `actorProperty` (default) — units located by `actorPath`, spent via `actor.update`.
  * - `actorInventory` — a preconfigured provider (filtered by `game.system.id`) owns the
@@ -125,7 +126,12 @@ function resolveSpendStrategy(currency = {}) {
 }
 
 /**
- * Normalize a crafting system's `requirements.currency` config block.
+ * Normalize a raw currency config block.
+ *
+ * Since issue 1278 this describes no PERSISTED shape of its own: the only production caller is
+ * `normalizeWorldCurrencyConfig` below, which strips `enabled` and hands the rest to the world
+ * `currencyConfig` setting. It still accepts a legacy per-system block verbatim, which is what
+ * lets the migration and the export upcast feed it one.
  *
  * `spendStrategy` is one of `actorProperty` (default), `actorInventory`, or `macro`; any other
  * value falls back to `actorProperty`. A legacy `actorInventory` + `inventoryMode: 'macro'` config

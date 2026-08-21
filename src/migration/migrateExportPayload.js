@@ -2,10 +2,16 @@
  * Pure, idempotent upcast of a Fabricate export payload to the current schema.
  *
  * A legacy export carries no `schemaVersion` and only `{ fabricateVersion,
- * system, recipes }`; it is treated as schema 1 and upcast to schema 2 by adding
- * the gathering-authoring fields and the envelope markers. The migrator is
- * idempotent: `migrate(migrate(v1))` deep-equals `migrate(v1)`, and `migrate(v2)`
- * is a no-op.
+ * system, recipes }`; it is treated as schema 1 and upcast by adding the
+ * gathering-authoring fields and the envelope markers (schema 2), then by hoisting the currency
+ * ladder out of the system and into an envelope-level `currencyConfig` (schema 3, issue 1278).
+ * The migrator is idempotent: `migrate(migrate(v1))` deep-equals `migrate(v1)`.
+ *
+ * A payload ALREADY at the current schema is not a no-op: it still runs every field-level upcast,
+ * because an export stamped with the current version can predate a field-level change. Any
+ * derivation added here must therefore be written branch-independently — reachable from the
+ * early return as well as from the main path — which is why `liftCurrencyToWorldScope` is called
+ * from both.
  *
  * Foundry-free (no globals) so it runs before validation/import and in tests.
  */
@@ -193,11 +199,13 @@ function liftCurrencyToWorldScope(migrated) {
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
 
   const existing = migrated.currencyConfig;
+  // Gate on the envelope carrying ANY world config, not on it carrying UNITS. A schema-3 export
+  // whose world picked the macro spend strategy before authoring a ladder has scalars and an
+  // empty `units`; a units-count guard would rebuild over it from a system block already reduced
+  // to `{ enabled }`, discarding the strategy, provider and macro UUIDs — and making this
+  // module's own idempotence claim false for that payload.
   const alreadyLifted =
-    existing &&
-    typeof existing === 'object' &&
-    Array.isArray(existing.units) &&
-    existing.units.length > 0;
+    existing && typeof existing === 'object' && Object.keys(existing).length > 0;
 
   if (!alreadyLifted) {
     migrated.currencyConfig = buildWorldCurrencyConfig([system]);
@@ -221,8 +229,8 @@ export function migrateExportPayload(payload) {
   }
 
   // Already current — no-op for the schema envelope, but still run every field-level
-  // upcast, because a schema-2 export can predate #561's first-class tool fields or
-  // #1055's modifier pick cap. Clone so callers never alias the input.
+  // upcast, because an export stamped at the current schema can predate #561's first-class tool
+  // fields, #1055's modifier pick cap, or #1278's world currency slice. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);

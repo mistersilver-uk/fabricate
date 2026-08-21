@@ -85,9 +85,11 @@ export function buildWorldCurrencyConfig(systems) {
       }
       // Legacy provider/adapter fields are read-compatible inputs the shared normalizer knows
       // how to map forward, so carry them across rather than resolving them here.
-      if (currency.provider !== undefined) picked.provider = currency.provider;
-      if (currency.systemAdapter !== undefined) picked.systemAdapter = currency.systemAdapter;
-      if (currency.inventoryMode !== undefined) picked.inventoryMode = currency.inventoryMode;
+      if (currency.provider !== undefined) picked.provider = clone(currency.provider);
+      if (currency.systemAdapter !== undefined)
+        picked.systemAdapter = clone(currency.systemAdapter);
+      if (currency.inventoryMode !== undefined)
+        picked.inventoryMode = clone(currency.inventoryMode);
       scalars = picked;
       scalarsFromEnabled = enabled;
     }

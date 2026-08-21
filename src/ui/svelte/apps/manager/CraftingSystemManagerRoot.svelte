@@ -4039,8 +4039,6 @@
       );
     if (isWorldRoute)
       return text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party');
-    if (isWorldCurrencyRoute)
-      return text('FABRICATE.Admin.Manager.World.CurrencyInspector', 'Selected currency unit');
     if (isSystemTravelRoute)
       return activeTravelTab === 'map'
         ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
@@ -10079,7 +10077,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute}
       <aside
         class="manager-inspector"
         aria-label={isSystemTravelRoute

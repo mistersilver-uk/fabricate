@@ -1101,3 +1101,117 @@ test('every migration whose downgrade LOSES DATA names that in its own label', (
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// Group 8: the world currency leg (issue 1278)
+//
+// The runner's settings payload went from FIVE keys to six. Every one of the five points that
+// key must appear at — read, snapshot, payload literal, change detection, writeback — is silent
+// when omitted: the migration still runs, every other setting still writes, and the whole suite
+// stays green while every upgraded world loses its currency configuration. These pin the leg
+// end to end through the real runner rather than through the pure transform.
+// ---------------------------------------------------------------------------
+
+test('1.26.0 lifts per-system currency into the currencyConfig setting', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [
+        {
+          id: 'alchemy',
+          requirements: {
+            currency: {
+              enabled: true,
+              spendStrategy: 'macro',
+              units: [{ id: 'gp', label: 'Gold' }]
+            }
+          }
+        },
+        {
+          id: 'smithing',
+          requirements: { currency: { enabled: false, units: [{ id: 'sp', label: 'Silver' }] } }
+        }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  const written = settings.store.get('currencyConfig');
+  assert.deepEqual(
+    written.units.map(unit => unit.id),
+    ['gp', 'sp'],
+    "a disabled system's units are lifted too: its recipes may still reference them"
+  );
+  assert.equal(written.spendStrategy, 'macro', 'scalars come from the first ENABLED system');
+
+  const systems = settings.store.get('craftingSystems');
+  assert.deepEqual(systems[0].requirements.currency, { enabled: true });
+  assert.deepEqual(systems[1].requirements.currency, { enabled: false });
+});
+
+test('the currencyConfig write PRECEDES the craftingSystems write, so a tear is recoverable', async () => {
+  // Systems are the SOURCE of the lift and currencyConfig is the DESTINATION. Writing the source
+  // first and then tearing would leave systems shrunk with an empty world ladder, and the re-run
+  // would find nothing to lift — the configuration would be gone with no error and no copy.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [
+        { id: 'alchemy', requirements: { currency: { enabled: true, units: [{ id: 'gp' }] } } }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  const order = settings.calls.set.map(call => call.key);
+  assert.ok(
+    order.indexOf('currencyConfig') < order.indexOf('craftingSystems'),
+    `currencyConfig must be written before craftingSystems, got ${order.join(' -> ')}`
+  );
+});
+
+test('a world that never used currency acquires no currencyConfig write at all', async () => {
+  // The no-churn guard. Emitting a freshly-built `{ units: [] }` over a stored `{}` would
+  // register as a change and write the setting in every world on earth during an upgrade that
+  // otherwise did nothing — an unexplained write with no cause a maintainer could trace.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [{ id: 'alchemy', requirements: { time: { enabled: false } } }]
+    }
+  });
+
+  await runner.run();
+
+  assert.equal(
+    settings.calls.set.some(call => call.key === 'currencyConfig'),
+    false,
+    'no currency write for a world with nothing to lift'
+  );
+});
+
+test('a populated world ladder is authoritative: a re-run never re-merges stale system blocks', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      // The GM has since deleted `sp`; the stale system block still names it.
+      currencyConfig: { units: [{ id: 'gp', label: 'Gold' }] },
+      craftingSystems: [
+        {
+          id: 'alchemy',
+          requirements: { currency: { enabled: true, units: [{ id: 'gp' }, { id: 'sp' }] } }
+        }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  assert.deepEqual(
+    settings.store.get('currencyConfig').units.map(unit => unit.id),
+    ['gp'],
+    'the deleted unit must not come back'
+  );
+});

@@ -120,6 +120,16 @@ describe('handleFabricateSettingChange', () => {
     assert.equal(handled, true);
     assert.equal(loadCalls, 1, 'the replicated ladder is re-read into the cache');
     assert.deepEqual(emitted, [
+      // The manager republish comes first and is unconditional: a second GM's World > Currency
+      // tab is stale whether or not any crafting system currently participates.
+      [
+        'fabricate.craftingSystemsChanged',
+        [
+          { id: 'on', requirements: { currency: { enabled: true } } },
+          { id: 'off', requirements: { currency: { enabled: false } } },
+          { id: 'none', requirements: {} },
+        ],
+      ],
       [
         'fabricate.craftingDataChanged',
         {
@@ -144,7 +154,11 @@ describe('handleFabricateSettingChange', () => {
     });
 
     assert.equal(handled, true);
-    assert.deepEqual(emitted, []);
+    assert.deepEqual(
+      emitted,
+      [['fabricate.craftingSystemsChanged', [{ id: 'off', requirements: {} }]]],
+      'the manager still republishes; only the scoped shell signal is withheld'
+    );
   });
 
   it('tolerates a missing currency store and a manager that cannot list systems', () => {
@@ -153,7 +167,7 @@ describe('handleFabricateSettingChange', () => {
       callAll: (hook, payload) => emitted.push([hook, payload]),
     });
     assert.equal(handled, true, 'the key is still claimed, so nothing else tries to handle it');
-    assert.deepEqual(emitted, []);
+    assert.deepEqual(emitted, [['fabricate.craftingSystemsChanged', []]]);
   });
 
   it('ignores unrelated settings without touching the managers', () => {

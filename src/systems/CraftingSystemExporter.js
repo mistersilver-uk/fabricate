@@ -185,7 +185,18 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.gatheringConfig)
       : { system: {}, shared: {} };
 
-  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig };
+  // The WORLD currency ladder (issue 1278). It rides the envelope rather than the system, so
+  // unlike every other slice above there is nothing on `system` to fall back on: drop it here
+  // and `CompendiumImporter._persistCurrencyConfig` receives `undefined` and returns
+  // immediately, which lands every imported currency cost in the destination world as an
+  // unresolvable unit id. Deliberately NOT rebound under `copy` mode: unit ids are world scope,
+  // shared by every crafting system, and the merge already lets the destination win a collision.
+  const currencyConfig =
+    data.currencyConfig && typeof data.currencyConfig === 'object'
+      ? structuredClone(data.currencyConfig)
+      : {};
+
+  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig, currencyConfig };
 
   if (mode === 'copy') {
     delete system.id;

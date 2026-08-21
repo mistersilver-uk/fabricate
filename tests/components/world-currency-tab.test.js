@@ -71,20 +71,31 @@ describe('World > Currency tab (mounted)', () => {
     assert.ok(root.querySelector('[data-world-currency-unit="sp"]'), 'silver renders');
   });
 
-  it('starts EXPANDED, because here the card is the whole page', async () => {
-    // On the Settings tab it shared a collapse rhythm with the sibling cards and the smoke walk
-    // collapsed it to fit the modifiers card in frame. As a page there is nothing to make room
-    // for, so a collapsed-by-default card would just be an empty screen.
+  it('carries NO collapse toggle, because collapsing a whole route only blanks it', async () => {
+    // On the Settings tab the chevron yielded space to the sibling cards below it. As a route
+    // there is nothing to make room for, so the same control would hide the page and leave a
+    // bare header row.
     const root = await harness.mount({ currencyUnits: UNITS });
-    const card = root.querySelector('[data-world-currency-units]');
 
-    assert.equal(card.classList.contains('is-section-collapsed'), false);
-    const collapse = root.querySelector('[data-section-collapse="currency"]');
-    assert.equal(collapse.getAttribute('aria-expanded'), 'true');
+    assertNoElement(
+      root,
+      '[data-section-collapse="currency"]',
+      'the collapse chevron does not belong on a route that has no siblings'
+    );
+    assert.ok(
+      root.querySelector('#manager-section-body-currency'),
+      'and the body it used to hide renders unconditionally'
+    );
+  });
 
-    collapse.dispatchEvent(clickEvent());
-    await flushRender();
-    assert.equal(card.classList.contains('is-section-collapsed'), true, 'and it still collapses');
+  it('gives the page a single section heading directly under the shell heading', async () => {
+    // The shell renders <h1>World Currency</h1>; the card's own title used to be an <h3> under
+    // the Settings tab's <h2>. Left as an h3 it would skip a level, which costs a screen-reader
+    // user the landmark they navigate the page by.
+    const root = await harness.mount({ currencyUnits: UNITS });
+    const heading = root.querySelector('.manager-card-title');
+
+    assert.equal(heading.tagName.toLowerCase(), 'h2');
   });
 
   it('renders an empty state instead of a bare card when no coins are authored yet', async () => {

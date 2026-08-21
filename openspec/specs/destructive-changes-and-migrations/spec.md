@@ -683,8 +683,14 @@ The `1.26.0` settings-data migration (`src/migration/migrateCurrencyToWorldScope
    An export carries one system, so the union degenerates there to that system's own ladder — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a unit is carried across.
 10. **Mutated setting keys:** `currencyConfig` (created) and `craftingSystems` (shrunk).
     This is the migration that took the runner's payload from five settings to six; `currencyConfig` is read, snapshotted, passed, change-detected and written back exactly like the five that preceded it.
-11. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+11. **The `currencyConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 8's is.
+    Systems are the SOURCE of the lift and `currencyConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldCurrencyConfig` lifts nothing, and requirement 7's no-churn guard correctly declines to write — so the ladder, strategy, provider and macros are gone with no error and no recoverable copy.
+    Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world ladder, requirement 6's guard keeps it, and the shrink it re-applies is idempotent by construction.
+12. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
     `1.25.0` reads currency only from the crafting system, so a downgraded world would find no configuration at all and every authored currency cost would stop resolving until the GM re-authored it per system.
+    A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.26.0`, so the pass does not re-run, and `CraftingSystemManager._normalizeCurrencyConfig`'s allowlist rebuild discards the re-authored ladder on that system's next save.
+    The re-upgrade path is therefore re-authoring at World > Currency, not re-authoring per system.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 
