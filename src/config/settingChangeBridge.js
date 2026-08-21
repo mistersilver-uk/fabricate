@@ -1,4 +1,5 @@
 import { craftingDataChange, emitCraftingDataChanged } from '../systems/craftingDataChange.js';
+import { INVALIDATION_DOMAINS } from '../systems/invalidationDomains.js';
 
 import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
 
@@ -6,6 +7,34 @@ const CRAFTING_SYSTEMS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CRA
 const RECIPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPES}`;
 const GATHERING_ENVIRONMENTS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`;
 const PLAYER_CHARACTER_TYPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`;
+const CURRENCY_CONFIG_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CURRENCY_CONFIG}`;
+
+/**
+ * The invalidation scopes a world currency edit produces (issue 1278).
+ *
+ * Currency used to be per-system state, so editing it wrote `requirements` on a crafting system
+ * and the ordinary systems branch announced `resolution-config` for THAT system. The ladder is
+ * world scope now and no system record changes, so without this a GM's edit is invisible to every
+ * connected player: their shells keep projecting costs against the ladder they last read.
+ *
+ * The scope stays PER SYSTEM rather than becoming one unattributable world-wide scope, because
+ * `craftingDataChange` treats an unattributable leg as poisoning the whole payload into a broad
+ * invalidation. Only systems that PARTICIPATE are listed: a system with
+ * `requirements.currency.enabled === false` resolves nothing against the ladder, so re-narrowing
+ * it would be work with no possible observable difference.
+ *
+ * @param {{ getSystems: () => any[] }|null|undefined} craftingSystemManager
+ * @returns {Array<{systemId: string, domains: readonly string[]}>}
+ */
+function currencyParticipantScopes(craftingSystemManager) {
+  const systems = craftingSystemManager?.getSystems?.() ?? [];
+  return (Array.isArray(systems) ? systems : [])
+    .filter((system) => system?.requirements?.currency?.enabled === true)
+    .map((system) => ({
+      systemId: system.id,
+      domains: [INVALIDATION_DOMAINS.RESOLUTION_CONFIG],
+    }));
+}
 
 /**
  * The invalidation scopes a manager's most recent replicated change produced (issue 1078 B1).
@@ -59,6 +88,10 @@ function announceScopedChange(source, manager, callAll) {
  * @param {object} deps
  * @param {{ reload: () => boolean, getSystems: () => any[] }} [deps.craftingSystemManager]
  * @param {{ reload: () => boolean, getRecipes: () => any[] }} [deps.recipeManager]
+ * @param {{ load: () => any }} [deps.currencyConfigStore] The world currency config store
+ *   (issue 1278), reloaded so a GM's ladder edit is visible on every client. The store caches
+ *   the config in memory and otherwise only re-reads at startup, so without this a player's
+ *   currency costs keep resolving against a stale ladder.
  * @param {{ load: () => any[] }} [deps.gatheringEnvironmentStore] Gathering environment
  *   store, reloaded so replicated `nodeRuntime` changes (a GM-applied gather
  *   depletion, a restock, a world-time respawn) are visible on every client. The
@@ -69,7 +102,13 @@ function announceScopedChange(source, manager, callAll) {
  */
 export function handleFabricateSettingChange(
   settingKey,
-  { craftingSystemManager, recipeManager, gatheringEnvironmentStore, callAll } = {}
+  {
+    craftingSystemManager,
+    recipeManager,
+    gatheringEnvironmentStore,
+    currencyConfigStore,
+    callAll,
+  } = {}
 ) {
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
     if (craftingSystemManager?.reload?.()) {
@@ -97,6 +136,18 @@ export function handleFabricateSettingChange(
     // on: the store's `load()` returns the list, not a changed flag.
     gatheringEnvironmentStore?.load?.();
     callAll?.('fabricate.gatheringEnvironmentsChanged');
+    return true;
+  }
+  if (settingKey === CURRENCY_CONFIG_KEY) {
+    // Re-read the replicated ladder into the store's cache, then tell the shells which systems
+    // it moved. `load()` only reads, so there is no write -> `updateSetting` -> write loop. A
+    // world where no system participates produces no scopes, and `emitCraftingDataChanged` is
+    // skipped entirely rather than emitting an empty payload that would route broadly.
+    currencyConfigStore?.load?.();
+    const scopes = currencyParticipantScopes(craftingSystemManager);
+    if (scopes.length > 0) {
+      emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
+    }
     return true;
   }
   if (settingKey === PLAYER_CHARACTER_TYPES_KEY) {

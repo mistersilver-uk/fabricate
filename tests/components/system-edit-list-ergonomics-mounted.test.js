@@ -90,11 +90,6 @@ const PREREQUISITES = Object.freeze([
   { id: 'pre-open', name: 'Copy target', icon: 'fa-solid fa-user-shield', path: '', op: 'gte', value: null }
 ]);
 
-const CURRENCY_UNITS = Object.freeze([
-  { id: 'cur-gold', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [] },
-  { id: 'cur-silver', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
-]);
-
 function clickEvent() {
   return new globalThis.window.Event('click', { bubbles: true });
 }
@@ -300,25 +295,6 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     // The move announces its new position via the shared aria-live region.
     const announcement = root.querySelector('[data-list-reorder-announcement]');
     assert.ok(announcement && announcement.textContent.includes('Herbalism'), 'a reorder is announced');
-  });
-
-  it('reorders a Currency Unit via the Move up/down chevrons on the summary row', async () => {
-    const calls = [];
-    const root = await harness.mount({
-      selectedSystem: makeSystem(),
-      currencyUnits: CURRENCY_UNITS,
-      onReorderCurrencyUnit: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
-    });
-
-    const firstUp = root.querySelector('[data-move-currency-up="cur-gold"]');
-    const lastUp = root.querySelector('[data-move-currency-up="cur-silver"]');
-    assert.ok(firstUp && lastUp, 'each currency summary row has a Move up chevron');
-    assert.equal(firstUp.disabled, true, 'Move up disabled on the first unit');
-    assert.equal(lastUp.disabled, false, 'Move up enabled on the last unit');
-
-    lastUp.dispatchEvent(clickEvent());
-    await flushRender();
-    assert.deepEqual(calls, [[1, 0]], 'Move up fires the reorder op with (index, index-1)');
   });
 
   it('reorders a Character Prerequisite via the Move up/down chevrons', async () => {

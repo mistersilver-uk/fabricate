@@ -130,6 +130,7 @@
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
+  import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
   import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
   import {
@@ -1615,15 +1616,23 @@
   const selectedSystemModifiers = $derived(
     Array.isArray(selectedSystem?.modifiers) ? selectedSystem.modifiers : []
   );
-  const selectedCurrencyUnits = $derived(
-    Array.isArray(selectedSystem?.requirements?.currency?.units)
-      ? selectedSystem.requirements.currency.units
-      : []
+  // The currency ladder is WORLD scope (issue 1278) — one config for the whole world, because a
+  // world runs exactly one ruleset and so has exactly one way actors store coins.
+  const worldCurrency = $derived(
+    $viewState.worldCurrency || {
+      spendStrategy: 'actorProperty',
+      providerId: '',
+      macros: { canAfford: '', increment: '', decrement: '' },
+      units: [],
+    }
   );
-  // Units are seeded from adapter presets even for a currency-disabled system, so the
-  // recipe editor must gate cost affordances on the explicit enable flag, not on unit
-  // presence. Threaded alongside the units so existing requirements can render read-only
-  // (rather than vanish) when currency is off.
+  const selectedCurrencyUnits = $derived(
+    Array.isArray(worldCurrency.units) ? worldCurrency.units : []
+  );
+  // Units exist world-wide regardless of any one system, so the recipe editor must gate cost
+  // affordances on the SYSTEM's explicit enable flag, not on unit presence. Threaded alongside
+  // the units so existing requirements can render read-only (rather than vanish) when the
+  // selected system has currency off.
   const selectedCurrencyEnabled = $derived(
     selectedSystem?.requirements?.currency?.enabled === true
   );
@@ -1636,12 +1645,17 @@
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
-  const currencySpendStrategy = $derived(
-    selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty'
+  // How many crafting systems actually opt into the world's currency. The World > Currency
+  // subtitle reports it so a GM who has configured a ladder that NO system uses can see that
+  // immediately — the commonest way this feature looks broken when it is merely unadopted.
+  const allSystems = $derived($viewState.systems || []);
+  const currencyEnabledSystemCount = $derived(
+    allSystems.filter((system) => system?.requirements?.currency?.enabled === true).length
   );
-  const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
+  const currencySpendStrategy = $derived(worldCurrency.spendStrategy || 'actorProperty');
+  const currencyProviderId = $derived(worldCurrency.providerId || '');
   const currencyMacros = $derived(
-    selectedSystem?.requirements?.currency?.macros || {
+    worldCurrency.macros || {
       canAfford: '',
       increment: '',
       decrement: '',
@@ -1704,53 +1718,46 @@
     await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
   }
 
+  // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them
+  // require a selected crafting system — a GM configures the world's coins from the World tab
+  // before any system opts in.
   async function onAddCurrencyUnit() {
-    if (!selectedSystemId) return null;
-    return await store.addCurrencyUnit(selectedSystemId);
+    return await store.addCurrencyUnit();
   }
   async function onUpdateCurrencyUnit(unitId, patch) {
-    if (!selectedSystemId) return;
-    await store.updateCurrencyUnit(selectedSystemId, unitId, patch);
+    await store.updateCurrencyUnit(unitId, patch);
   }
   async function onDeleteCurrencyUnit(unitId) {
-    if (!selectedSystemId) return;
-    await store.deleteCurrencyUnit(selectedSystemId, unitId);
+    await store.deleteCurrencyUnit(unitId);
   }
   async function onReorderCurrencyUnit(fromIndex, toIndex) {
-    if (!selectedSystemId) return;
-    await store.reorderCurrencyUnit(fromIndex, toIndex, selectedSystemId);
+    await store.reorderCurrencyUnit(fromIndex, toIndex);
   }
   async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
-    if (!selectedSystemId) return;
-    await store.addCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+    await store.addCurrencySubUnit(parentUnitId, subUnitId);
   }
   async function onUpdateCurrencySubUnit(parentUnitId, subUnitId, amount) {
-    if (!selectedSystemId) return;
-    await store.updateCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId, amount);
+    await store.updateCurrencySubUnit(parentUnitId, subUnitId, amount);
   }
   async function onDeleteCurrencySubUnit(parentUnitId, subUnitId) {
-    if (!selectedSystemId) return;
-    await store.deleteCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+    await store.deleteCurrencySubUnit(parentUnitId, subUnitId);
   }
   async function onSeedCurrencyPresets() {
-    if (!selectedSystemId || !currencyPresetsSupported) return;
-    await store.seedCurrencyUnitPresets(selectedSystemId);
+    if (!currencyPresetsSupported) return;
+    await store.seedCurrencyUnitPresets();
   }
   async function onSetCurrencySpendStrategy(spendStrategy) {
-    if (!selectedSystemId) return;
-    await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
+    await store.setCurrencySpendStrategy(spendStrategy);
   }
   async function onSetCurrencyProvider(providerId) {
-    if (!selectedSystemId) return;
-    await store.setCurrencyProvider(selectedSystemId, providerId);
+    await store.setCurrencyProvider(providerId);
   }
   async function onSetCurrencyMacro(key, uuid) {
-    if (!selectedSystemId || !uuid) return;
-    await store.setCurrencyMacro(selectedSystemId, key, uuid);
+    if (!uuid) return;
+    await store.setCurrencyMacro(key, uuid);
   }
   async function onClearCurrencyMacro(key) {
-    if (!selectedSystemId) return;
-    await store.clearCurrencyMacro(selectedSystemId, key);
+    await store.clearCurrencyMacro(key);
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -2524,6 +2531,10 @@
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
+  // World > Currency (issue 1278). UNGATED, like Parties and unlike experimental-gated Downtime:
+  // a GM has to be able to configure the world's coins BEFORE any crafting system opts in, so
+  // gating this on a system having currency enabled would be a chicken-and-egg lock-out.
+  const isWorldCurrencyRoute = $derived(currentView === 'world-currency');
   // THE WORLD > DOWNTIME EXPERIMENTAL GATE (issue 1257), and it is TEMPORARY.
   //
   // The route exists to host the premium Downtime Studio, and the Studio is unreleased: both
@@ -3639,7 +3650,7 @@
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
-    if (view === 'world' || view === 'world-downtime') return view;
+    if (view === 'world' || view === 'world-downtime' || view === 'world-currency') return view;
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
@@ -3711,6 +3722,8 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    if (currentView === 'world-currency')
+      return text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency');
     // The Downtime route titles itself after the tab on screen, not after the route: a GM
     // switching sub-tabs must see the page name change with them, and a companion's screens
     // must not wear Core's preview copy.
@@ -3848,6 +3861,27 @@
         .replace('{assigned}', String(assignedCharacterCount))
         .replace('{total}', String(playerCharacterUuids.size));
     }
+    if (currentView === 'world-currency') {
+      if (selectedCurrencyUnits.length === 0)
+        return text(
+          'FABRICATE.Admin.Manager.World.Currency.SubtitleEmpty',
+          'No coins yet · world-level, shared by every crafting system that enables currency'
+        );
+      const template =
+        selectedCurrencyUnits.length === 1
+          ? text(
+              'FABRICATE.Admin.Manager.World.Currency.SubtitleOne',
+              '1 coin · used by {systems} of {total} crafting systems'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.World.Currency.Subtitle',
+              '{count} coins · used by {systems} of {total} crafting systems'
+            );
+      return template
+        .replace('{count}', String(selectedCurrencyUnits.length))
+        .replace('{systems}', String(currencyEnabledSystemCount))
+        .replace('{total}', String(allSystems.length));
+    }
     if (currentView === 'world-downtime')
       return downtimeChrome(
         'subtitle',
@@ -3946,6 +3980,8 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
+    if (currentView === 'world-currency')
+      return text('FABRICATE.Admin.Manager.World.CurrencyActions', 'World currency actions');
     if (currentView === 'world-downtime')
       return downtimeChrome(
         'actionsLabel',
@@ -4003,6 +4039,8 @@
       );
     if (isWorldRoute)
       return text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party');
+    if (isWorldCurrencyRoute)
+      return text('FABRICATE.Admin.Manager.World.CurrencyInspector', 'Selected currency unit');
     if (isSystemTravelRoute)
       return activeTravelTab === 'map'
         ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
@@ -6705,6 +6743,15 @@
     });
   }
 
+  // World > Currency (issue 1278). No availability refusal, unlike `openWorldDowntime` below:
+  // the route is ungated because the world's coins have to be configurable before any crafting
+  // system can enable currency.
+  function openWorldCurrency() {
+    return afterTruthyResult(confirmRouteExit('world-currency'), () => {
+      activeView = 'world-currency';
+    });
+  }
+
   function openWorldDowntime() {
     // Issue 1257. The rail row does not render while the gate is shut, so this refusal is for
     // every OTHER caller — a restored token, a future deep link, a test — and it is stated on
@@ -7777,13 +7824,13 @@
           <button type="button" onclick={() => selectSystemAndShowBrowser()}
             >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
           >
-          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute}
+          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={() => editSystem(selectedSystem.id)}
               >{selectedSystem.name}</button
             >
           {/if}
-          {#if isWorldRoute || isWorldDowntimeRoute}
+          {#if isWorldRoute || isWorldDowntimeRoute || isWorldCurrencyRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <!--
               `World.Heading` is the RAIL's micro-label and is authored in caps for the
@@ -7794,6 +7841,10 @@
             <span data-breadcrumb-world
               >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
             >
+            {#if isWorldCurrencyRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}</span>
+            {/if}
             {#if isWorldDowntimeRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
@@ -9175,6 +9226,21 @@
             </span>
             <span class="manager-nav-count">{travelParties.length}</span>
           </button>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${isWorldCurrencyRoute ? 'is-active' : ''}`}
+            id="manager-world-nav-currency"
+            data-world-nav-item="currency"
+            aria-label={text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
+            aria-current={isWorldCurrencyRoute ? 'page' : undefined}
+            onclick={openWorldCurrency}
+          >
+            <i class="fas fa-coins" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
+            </span>
+            <span class="manager-nav-count">{selectedCurrencyUnits.length}</span>
+          </button>
           <!--
             Downtime is a GROUP, not a leaf: the design nests the same four previews under it
             that Core's own tab strip offers, each carrying a premium padlock. The structure
@@ -9344,6 +9410,39 @@
           emitHook={managerExtensions?.emitHook}
           chromeChannel={downtimeChromeChannel}
           onProviderFault={noteDowntimeProviderFault}
+        />
+      </main>
+    {:else if isWorldCurrencyRoute}
+      <!--
+        World > Currency renders its own `manager-main` straight from the root, following the
+        Downtime route rather than Parties: Parties reuses `EnvironmentsBrowserView` as its
+        container, which is a leftover from when it was a Travel tab and not a shape to copy.
+        There is no right-hand inspector — the unit editors expand in place, as they did on the
+        Settings tab they came from.
+      -->
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency')}
+      >
+        <WorldCurrencyTab
+          currencyUnits={selectedCurrencyUnits}
+          {currencyPresetsSupported}
+          {currencySpendStrategy}
+          {currencyProviderId}
+          {currencyMacros}
+          {currencyProviderOptions}
+          {onAddCurrencyUnit}
+          {onUpdateCurrencyUnit}
+          {onDeleteCurrencyUnit}
+          {onReorderCurrencyUnit}
+          {onAddCurrencySubUnit}
+          {onUpdateCurrencySubUnit}
+          {onDeleteCurrencySubUnit}
+          {onSeedCurrencyPresets}
+          {onSetCurrencySpendStrategy}
+          {onSetCurrencyProvider}
+          {onSetCurrencyMacro}
+          {onClearCurrencyMacro}
         />
       </main>
     {:else if currentView === 'environments' || currentView === 'world'}
@@ -9641,8 +9740,8 @@
         essenceOptions={selectedSystem?.features?.essences === true
           ? selectedSystem?.essenceDefinitions || []
           : []}
-        currencyUnits={selectedSystem?.requirements?.currency?.units || []}
-        currencyEnabled={selectedSystem?.requirements?.currency?.enabled === true}
+        currencyUnits={selectedCurrencyUnits}
+        currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onOpenSystems={selectSystemAndShowBrowser}
@@ -9948,24 +10047,6 @@
             {onDeleteCharacterPrerequisite}
             {onReorderCharacterPrerequisite}
             {onSeedCharacterPrerequisitePresets}
-            currencyUnits={selectedCurrencyUnits}
-            {currencyPresetsSupported}
-            {currencySpendStrategy}
-            {currencyProviderId}
-            {currencyMacros}
-            {currencyProviderOptions}
-            {onAddCurrencyUnit}
-            {onUpdateCurrencyUnit}
-            {onDeleteCurrencyUnit}
-            {onReorderCurrencyUnit}
-            {onAddCurrencySubUnit}
-            {onUpdateCurrencySubUnit}
-            {onDeleteCurrencySubUnit}
-            {onSeedCurrencyPresets}
-            {onSetCurrencySpendStrategy}
-            {onSetCurrencyProvider}
-            {onSetCurrencyMacro}
-            {onClearCurrencyMacro}
             onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
             onToggleTime={(next) => store.toggleRequirement?.('time', next)}
           />

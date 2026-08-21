@@ -1545,7 +1545,7 @@
            `type="range"` track already gives a pointer a way to step the value, and its
            own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
            by the scoped rule at `.manager-drop-rate-percent`.
-       R2  `apps/manager/SystemEditView.svelte`'s currency sub-unit amount — a bare field
+       R2  `apps/manager/world/WorldCurrencyTab.svelte`'s currency sub-unit amount — a bare field
            inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
            form row and cannot hold a Stepper without widening every wrapping chip. It
            KEEPS its native spinner.
@@ -5041,6 +5041,20 @@
   display: flex;
   gap: var(--fab-space-chip);
   justify-content: flex-end;
+}
+
+/* World > Currency page body (issue 1278).
+
+   The currency editor moved out of the System Settings form, where the surrounding form
+   supplied its padding and scrolling. Standing alone in `manager-main` it has to supply both
+   itself, so the page scrolls in its own right rather than growing the window. */
+.fabricate-manager .manager-world-currency {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .fabricate-manager .manager-currency-unit-card {

@@ -7052,6 +7052,22 @@ async function main() {
       const craftingSetup = await page.evaluate(async ({ gathererUserId, crafterId, travelMemberId }) => {
         const csm = game.fabricate.getCraftingSystemManager();
 
+        // The WORLD currency ladder (issue 1278). One config for the whole world, which is what
+        // World > Currency edits and what every currency-enabled system spends against; a
+        // crafting system carries only `requirements.currency.enabled`. Seeded here rather than
+        // on the system so the recipe editor's currency-cost row has a unit to target — its
+        // `canAddCost` gate reads the world's units, not the system's.
+        await game.settings.set('fabricate', 'currencyConfig', {
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: { canAfford: '', increment: '', decrement: '' },
+          units: [
+            { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [] },
+            { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
+          ]
+        });
+        await game.fabricate.getCurrencyConfigStore?.()?.load?.();
+
         // Create the crafting system
         const system = await csm.createSystem({
           name: 'Arcane Forge',
@@ -7202,7 +7218,6 @@ async function main() {
               ]
             }
           },
-          // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
           // Two authored recipe categories, so the library's group-by-category treatment
           // is exercised with MORE THAN ONE group. A single "General" bucket proves
@@ -7215,14 +7230,11 @@ async function main() {
           // discarded and this fixture had zero authored categories for as long as the
           // seed has existed, leaving issue 643's grouping treatment unexercised.
           categories: ['Alchemy', 'Smithing'],
+          // Participation only. The unit LADDER is world scope since issue 1278 and is seeded
+          // as the `currencyConfig` world setting below, which is what gives the currency-cost
+          // requirement row a unit to target.
           requirements: {
-            currency: {
-              enabled: true,
-              units: [
-                { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' },
-                { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins' }
-              ]
-            }
+            currency: { enabled: true }
           },
           // Two character prerequisites so the System Settings Character
           // Prerequisites list renders populated for the issue-768 list-ergonomics
@@ -8631,13 +8643,6 @@ async function main() {
         await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(200);
 
-        // Collapse the Currency Units section to demonstrate whole-section collapse.
-        const currencyCollapseToggle = page.locator('.fabricate-manager [data-section-collapse="currency"]').first();
-        if (await currencyCollapseToggle.count() > 0) {
-          await currencyCollapseToggle.click();
-          await page.waitForTimeout(150);
-        }
-
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
         const firstModifierRow = modifierRows.first();
@@ -8651,8 +8656,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-lists');
 
-        // Reset: close the editor (also dismisses the IconPicker popover) and
-        // re-expand the Currency Units section for the currency captures below.
+        // Reset: close the editor, which also dismisses the IconPicker popover.
         const modifierDone = firstModifierRow
           .locator('.manager-character-modifier-editor button:has-text("Done")')
           .first();
@@ -8660,24 +8664,18 @@ async function main() {
           await modifierDone.click().catch(() => {});
           await page.waitForTimeout(150);
         }
-        if (await page.locator('.fabricate-manager [data-system-currency-units].is-section-collapsed').count() > 0) {
-          await page.locator('.fabricate-manager [data-section-collapse="currency"]').first().click();
-          await page.waitForTimeout(150);
-        }
 
-        // --- Currency configuration (#393) ---
-        // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
-        // unit ladder, then capture each spend strategy. The smoke world is dnd5e, so the
-        // actorInventory branch shows the no-provider callout (the pf2e provider grid needs
-        // a pf2e world, which the e2e fixtures do not ship).
+        // --- World currency configuration (#393, rehomed by #1278) ---
+        // The ladder is WORLD scope now, so this walks to World > Currency rather than a
+        // crafting system's Settings tab, and needs no participation toggle to get there: the
+        // page is ungated precisely so a GM can author the coins BEFORE any system enables
+        // them. Seed the dnd5e (actorProperty) ladder, then capture each spend strategy. The
+        // smoke world is dnd5e, so the actorInventory branch shows the no-provider callout
+        // (the pf2e provider grid needs a pf2e world, which the e2e fixtures do not ship).
         await setManagerWindowSize(page, { width: 1280, height: 900 });
-        const currencyToggle = page.locator('.fabricate-manager [data-system-currency-toggle]').first();
-        await currencyToggle.waitFor({ state: 'visible', timeout: 5_000 });
-        await currencyToggle.scrollIntoViewIfNeeded();
-        if (await page.locator('.fabricate-manager [data-system-currency-units]').count() === 0) {
-          await currencyToggle.click();
-        }
-        const currencyCard = page.locator('.fabricate-manager [data-system-currency-units]').first();
+        await page.locator('.fabricate-manager #manager-world-nav-currency').first().click();
+        await page.waitForTimeout(300);
+        const currencyCard = page.locator('.fabricate-manager [data-world-currency-units]').first();
         await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });
         const currencySeed = currencyCard.locator('button:has-text("Seed presets")').first();
         if (await currencySeed.count() > 0) {
@@ -8687,7 +8685,7 @@ async function main() {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
           });
         }
-        await currencyCard.locator('[data-system-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await currencyCard.locator('[data-world-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // Scroll the Currency Units card to the top of the manager's scroll area, then capture
         // the WHOLE normal-sized GM window (nav rail, header, context panel + the card) so the
         // feature is shown in context rather than as a cropped element.
@@ -8699,18 +8697,19 @@ async function main() {
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-property');
 
-        const currencyStrategy = page.locator('.fabricate-manager [data-system-currency-strategy-select]').first();
+        const currencyStrategy = page.locator('.fabricate-manager [data-world-currency-strategy-select]').first();
         await currencyStrategy.selectOption('macro');
-        await page.locator('.fabricate-manager [data-system-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-world-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-macro');
 
         await currencyStrategy.selectOption('actorInventory');
-        await page.locator('.fabricate-manager [data-system-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-world-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-inventory');
 
-        // Leave the persisted smoke system on the default strategy.
+        // Leave the persisted world on the default strategy. The walk does not navigate back:
+        // the next section opens its own manager route (`openManagerCraftingSection`).
         await currencyStrategy.selectOption('actorProperty');
         await page.waitForTimeout(300);
 

@@ -100,7 +100,8 @@ The resolution mode determines how ingredients map to results:
 ## Multi-Step Recipes
 
 When multi-step recipes are enabled, recipes can have several sequential steps.
-Each step has its own ingredients, results, required tools, and optional time and currency requirements.
+Each step has its own ingredients, results, required tools, and an optional time requirement.
+An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 Conceptually, each step is a separate recipe that is part of a larger recipe.
 You could achieve the same outcome using multiple recipes.
 

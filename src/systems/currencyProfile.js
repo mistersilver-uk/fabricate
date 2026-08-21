@@ -1,5 +1,4 @@
 import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
-
 import { getByPath } from '../utils/objectPath.js';
 
 function defaultRandomID() {

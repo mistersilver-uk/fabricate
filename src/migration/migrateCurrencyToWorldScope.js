@@ -102,7 +102,7 @@ export function buildWorldCurrencyConfig(systems) {
     }
   }
 
-  return { ...(scalars || {}), units };
+  return { ...scalars, units };
 }
 
 /**

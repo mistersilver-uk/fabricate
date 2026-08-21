@@ -894,7 +894,7 @@ export class MigrationRunner {
 
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
     } catch (error) {
-      // The remaining four legs and the version bump share one containment and one
+      // The remaining five legs and the version bump share one containment and one
       // disposition: a rejection from any of them would otherwise propagate out of `run()`
       // past a caller with no `catch`, leaving a partial writeback with no GM-facing notice.
       return this._deferOnWriteFailure(error);

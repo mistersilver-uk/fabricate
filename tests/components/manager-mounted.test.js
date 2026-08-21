@@ -20,7 +20,7 @@ import {
 } from '../helpers/toolDisplayPrecedenceCases.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
-import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 // The ONE compiled-import rewrite every mounted suite resolves its temp tree against. This
 // suite predates `createMountedComponentHarness` and still drives its own compile/mount, but a
 // second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
@@ -252,6 +252,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
@@ -1191,11 +1192,28 @@ function applyRecipeKnowledgeMode(system, mode) {
 // (which re-reads systemDetails) preserves the currency config across an Edit click.
 // Mutates the passed systemDetails map. Kept out of createStore to hold that helper
 // under the cognitive-complexity budget.
+// Issue 1278 split currency across two scopes, so one fixture option still describes one
+// coherent setup but lands in two places: `enabled` (participation) on the crafting system, and
+// the ladder/strategy/provider/macros on the WORLD projection. Tests keep passing a single
+// `selectedCurrency` object; `worldCurrencyFrom` below reads the world half back out of it.
 function applySelectedCurrency(systemDetails, selectedCurrency) {
   if (!selectedCurrency) return;
   systemDetails.alchemy = {
     ...systemDetails.alchemy,
-    requirements: { ...systemDetails.alchemy.requirements, currency: selectedCurrency },
+    requirements: {
+      ...systemDetails.alchemy.requirements,
+      currency: { enabled: selectedCurrency.enabled === true },
+    },
+  };
+}
+
+function worldCurrencyFrom(selectedCurrency) {
+  const source = selectedCurrency || {};
+  return {
+    spendStrategy: source.spendStrategy || 'actorProperty',
+    providerId: source.providerId || '',
+    macros: source.macros || { canAfford: '', increment: '', decrement: '' },
+    units: Array.isArray(source.units) ? source.units : [],
   };
 }
 
@@ -2001,6 +2019,7 @@ function createStore(calls = [], options = {}) {
     // party before adding `memberCards` — and the card body and the page-header subtitle both
     // read it. A double that omitted it was looser than the helper it stands for, which is
     // exactly how a subtitle that always counted zero assigned characters would pass green.
+    worldCurrency: worldCurrencyFrom(options.selectedCurrency),
     travelParties: options.travelParties || [
       {
         id: 'party-one',
@@ -2236,17 +2255,19 @@ function createStore(calls = [], options = {}) {
     toggleRequirement: (requirement, enabled) => {
       calls.push(['toggleRequirement', requirement, enabled]);
     },
-    setCurrencySpendStrategy: async (id, strategy) => {
-      calls.push(['setCurrencySpendStrategy', strategy, id]);
+    // No system id on any of these: currency is world scope since issue 1278, so the store's
+    // currency actions address the ONE world config rather than a crafting system.
+    setCurrencySpendStrategy: async (strategy) => {
+      calls.push(['setCurrencySpendStrategy', strategy]);
     },
-    setCurrencyProvider: async (id, providerId) => {
-      calls.push(['setCurrencyProvider', providerId, id]);
+    setCurrencyProvider: async (providerId) => {
+      calls.push(['setCurrencyProvider', providerId]);
     },
-    setCurrencyMacro: async (id, key, uuid) => {
-      calls.push(['setCurrencyMacro', key, uuid, id]);
+    setCurrencyMacro: async (key, uuid) => {
+      calls.push(['setCurrencyMacro', key, uuid]);
     },
-    clearCurrencyMacro: async (id, key) => {
-      calls.push(['clearCurrencyMacro', key, id]);
+    clearCurrencyMacro: async (key) => {
+      calls.push(['clearCurrencyMacro', key]);
     },
     createRecipe: () => {
       calls.push(['createRecipe']);
@@ -2937,11 +2958,12 @@ function createStore(calls = [], options = {}) {
   };
 }
 
-// Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
-// tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
-// `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
-// `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
-async function mountCurrencyEditor(storeOptions) {
+// Mount the manager against a store double, click through to one page, and settle the DOM. The
+// tests below repeat this exact mount + navigate + flush dance and differ only in the
+// `createStore` options and the page they open, so it lives here instead of being inlined per
+// test. Assigns the shared `mounted`/`target` so the suite's `afterEach` tears them down.
+// Returns the captured `calls`.
+async function mountManagerRoute(storeOptions, openRoute) {
   const calls = [];
   target = document.createElement('div');
   document.body.appendChild(target);
@@ -2953,12 +2975,28 @@ async function mountCurrencyEditor(storeOptions) {
     },
   });
   flushSync();
-  target.querySelector('[aria-label="Edit Alchemy"]').click();
+  openRoute(target);
   await Promise.resolve();
   await Promise.resolve();
   await tick();
   flushSync();
   return { calls };
+}
+
+// Open the Alchemy crafting system's editor, which lands on its System Settings tab.
+async function mountSystemSettings(storeOptions) {
+  return mountManagerRoute(storeOptions, (root) =>
+    root.querySelector('[aria-label="Edit Alchemy"]').click()
+  );
+}
+
+// Open WORLD > CURRENCY, which is where the currency ladder is authored since issue 1278. It
+// used to be a card on System Settings; the route needs no selected crafting system, because
+// the config it edits is world scope.
+async function mountCurrencyEditor(storeOptions) {
+  return mountManagerRoute(storeOptions, (root) =>
+    root.querySelector('[data-world-nav-item="currency"]').click()
+  );
 }
 
 // Mount the manager and open the tabbed System Overview page for Alchemy with an
@@ -3097,7 +3135,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     ).default;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -3108,6 +3146,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // strings and then FAILS would otherwise leak its localizer into every later test,
     // turning one failure into a cascade that hides its own cause.
     globalThis.game.i18n.localize = identityLocalize;
+    // Yield to a NEW event-loop turn before the next test mounts. Happy DOM memoizes
+    // `querySelector`/`querySelectorAll` results behind `WeakRef`s, and V8 keeps a WeakRef's
+    // target strongly reachable for the remainder of the job that read it
+    // (`weak_refs_keep_during_job`). Tests here run back-to-back inside one turn whenever they
+    // never await anything real, so every unmounted manager DOM tree — and, through its
+    // listeners, its whole Svelte component graph — stays pinned until some macrotask boundary
+    // finally arrives. That is retention, not a leak: it is reclaimable, but not before the
+    // suite has stacked up hundreds of trees. Without this line the file needs >2 GB of heap;
+    // with it the whole suite runs green under `--max-old-space-size=768`.
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   after(() => {
@@ -3156,6 +3204,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
+        // World > Currency (issue 1278) sits under Parties and is UNGATED, unlike Downtime.
+        'Currency',
       ]
     );
     assert.equal(
@@ -6644,9 +6694,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    // 'Parties' alone: the Downtime group is experimental-gated (issue 1257) and this
-    // fixture leaves `fabricate.experimentalFeatures` at its default off.
-    assert.deepEqual(navLabels, ['Parties']);
+    // 'Parties' and 'Currency': both World leaves are ungated. The Downtime group is
+    // experimental-gated (issue 1257) and this fixture leaves `fabricate.experimentalFeatures`
+    // at its default off.
+    assert.deepEqual(navLabels, ['Parties', 'Currency']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6751,6 +6802,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
+        // World > Currency (issue 1278) sits under Parties and is UNGATED, unlike Downtime.
+        'Currency',
       ]
     );
 
@@ -6876,6 +6929,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Gathering',
         'Graph',
         'Parties',
+        'Currency',
         'Downtime',
       ]
     );
@@ -13980,7 +14034,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
-      ['manager-world-nav-parties', 'manager-world-nav-downtime']
+      // Currency sits between them: it is a permanent World leaf like Parties (issue 1278),
+      // whereas Downtime is the experimental-gated one.
+      ['manager-world-nav-parties', 'manager-world-nav-currency', 'manager-world-nav-downtime']
     );
     assert.ok(worldNavItem('parties').querySelector('.fa-users'));
     assert.ok(worldNavItem('downtime').querySelector('.fa-hourglass-half'));
@@ -20058,7 +20114,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the Salvage feature toggle and routes its change', async () => {
-    const { calls } = await mountCurrencyEditor();
+    const { calls } = await mountSystemSettings();
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage feature toggle renders in System Settings');
     // The default fixture has salvage on, so toggling sends false.
@@ -20072,7 +20128,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('hides the salvage resolution-mode card when the salvage feature is off (toggle stays available)', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -20096,7 +20152,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('gives every feature tile an icon chip whose state class tracks the feature', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -20133,7 +20189,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('flips the feature chip state class when the feature toggles', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -20146,7 +20202,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon').classList;
     assert.ok(chipClasses().contains('is-off'), 'the salvage chip starts off');
 
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -20172,7 +20228,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const strategy = target.querySelector('[data-system-currency-strategy-select]');
+    const strategy = target.querySelector('[data-world-currency-strategy-select]');
     assert.ok(strategy, 'spend-strategy select should render');
     const optionValues = [...strategy.querySelectorAll('option')].map((option) => option.value);
     assert.deepEqual(
@@ -20182,7 +20238,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // The single shared strategy hint reflects the selected strategy.
     assert.ok(
-      target.querySelector('[data-system-currency-strategy-hint]'),
+      target.querySelector('[data-world-currency-strategy-hint]'),
       'a strategy hint should render'
     );
     strategy.value = 'macro';
@@ -20203,22 +20259,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const macroRow = target.querySelector('[data-system-currency-macros]');
+    const macroRow = target.querySelector('[data-world-currency-macros]');
     assert.ok(macroRow, 'macro zones container should render');
     // The three drop zones share one single-row container.
     assert.ok(
       macroRow.classList.contains('manager-currency-macro-row'),
       'the three macro drop zones should share the single-row container'
     );
-    const dropzones = macroRow.querySelectorAll('[data-system-currency-macro-dropzone]');
+    const dropzones = macroRow.querySelectorAll('[data-world-currency-macro-dropzone]');
     assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     assert.equal(
-      target.querySelectorAll('[data-system-currency-macro-dropzone]').length,
+      target.querySelectorAll('[data-world-currency-macro-dropzone]').length,
       3,
       'all three drop zones live inside the single-row container'
     );
     // The removed nested inventory-mode select must not render.
-    assert.equal(target.querySelector('[data-system-currency-inventory-mode-select]'), null);
+    assert.equal(target.querySelector('[data-world-currency-inventory-mode-select]'), null);
   });
 
   it('gives each empty macro drop zone a field-specific accessible name', async () => {
@@ -20232,7 +20288,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
+    const dropzones = [...target.querySelectorAll('[data-world-currency-macro-dropzone]')];
     assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     const labels = dropzones.map((zone) => zone.getAttribute('aria-label'));
     // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
@@ -20268,17 +20324,17 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // No provider select is offered; the no-provider callout renders instead.
     assert.equal(
-      target.querySelector('[data-system-currency-provider-select]'),
+      target.querySelector('[data-world-currency-provider-select]'),
       null,
       'no provider select should render for a no-provider system'
     );
     assert.ok(
-      target.querySelector('[data-system-currency-no-provider]'),
+      target.querySelector('[data-world-currency-no-provider]'),
       'the no-provider callout should appear, steering the GM to the macro strategy'
     );
     // The removed inventory-mode select must not render.
     assert.equal(
-      target.querySelector('[data-system-currency-inventory-mode-select]'),
+      target.querySelector('[data-world-currency-inventory-mode-select]'),
       null,
       'the nested inventory-mode select should be gone'
     );
@@ -20320,7 +20376,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Expand the gp unit's editor.
     const card = target.querySelector('.manager-currency-unit-card');
     card
-      .querySelector('[data-system-currency-unit="gp"] [aria-label="Edit currency unit"]')
+      .querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]')
       .click();
     await tick();
     flushSync();
@@ -20338,12 +20394,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no add-sub-unit builder in macro mode'
     );
     assert.equal(
-      card.querySelectorAll('[data-system-currency-subunit]').length,
+      card.querySelectorAll('[data-world-currency-subunit]').length,
       0,
       'no sub-unit chips in macro mode'
     );
     assert.ok(
-      card.querySelector('[data-system-currency-unit-macro-note]'),
+      card.querySelector('[data-world-currency-unit-macro-note]'),
       'macro-conversion hint should render'
     );
   });
@@ -20369,7 +20425,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const card = target.querySelector('.manager-currency-unit-card');
     card
       .querySelector(
-        `[data-system-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`
+        `[data-world-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`
       )
       .click();
     await tick();
@@ -20512,7 +20568,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // The provider-managed callout renders and the Add/Seed header actions are hidden.
     assert.ok(
-      target.querySelector('[data-system-currency-provider-managed]'),
+      target.querySelector('[data-world-currency-provider-managed]'),
       'provider-managed callout should render'
     );
     assert.equal(
@@ -20524,7 +20580,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // Units render read-only: no pen/edit, delete, or remove controls, no editable amount inputs.
     const card = target.querySelector('.manager-currency-unit-card');
-    assert.ok(card.querySelector('[data-system-currency-unit="gp"]'), 'gp unit should render');
+    assert.ok(card.querySelector('[data-world-currency-unit="gp"]'), 'gp unit should render');
     assert.equal(
       card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button')
         .length,
@@ -20544,27 +20600,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Provider read-only units present label / abbreviation / denomination as static field/value
     // pairs and render NO sub-unit chips.
     assert.equal(
-      card.querySelectorAll('[data-system-currency-subunit]').length,
+      card.querySelectorAll('[data-world-currency-subunit]').length,
       0,
       'no sub-unit chips in provider read-only mode'
     );
-    const gpUnit = card.querySelector('[data-system-currency-unit="gp"]');
+    const gpUnit = card.querySelector('[data-world-currency-unit="gp"]');
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-readonly-label]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-readonly-label]').textContent.trim(),
       'Gold'
     );
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-abbreviation]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-abbreviation]').textContent.trim(),
       'gp'
     );
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-denomination]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-denomination]').textContent.trim(),
       'gp'
     );
   });
 
   it('renders the currency feature toggle in Optional features and routes its change', async () => {
-    const { calls } = await mountCurrencyEditor({
+    const { calls } = await mountSystemSettings({
       selectedCurrency: {
         enabled: false,
         spendStrategy: 'actorProperty',
@@ -20593,7 +20649,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the time-requirements feature toggle in Optional features and routes its change (issue 714)', async () => {
-    const { calls } = await mountCurrencyEditor({
+    const { calls } = await mountSystemSettings({
       selectedCurrency: {
         enabled: false,
         spendStrategy: 'actorProperty',
@@ -20626,44 +20682,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('hides the Currency Units card when currency is disabled and shows it when enabled', async () => {
-    await mountCurrencyEditor({
-      selectedCurrency: {
-        enabled: false,
-        spendStrategy: 'actorProperty',
-        providerId: '',
-        macros: { canAfford: '', increment: '', decrement: '' },
-        units: [],
-      },
-    });
-    assert.equal(
-      target.querySelector('[data-system-currency-units]'),
-      null,
-      'Currency Units card should be hidden when currency is disabled'
-    );
-    // The toggle tile still renders even with the card hidden.
-    assert.ok(
-      target.querySelector('[data-feature-key="currency"]'),
-      'currency toggle tile should still render'
-    );
+  it('keeps the World Currency ladder ungated by any system\u2019s participation toggle (issue 1278)', async () => {
+    // Currency is WORLD scope now. The ladder is authored once, for the whole world, and a
+    // crafting system's `requirements.currency.enabled` decides only whether THAT system
+    // participates. Gating this page on participation would be a chicken-and-egg lock-out: a
+    // GM could never author the coins that a system has to enable in order to show them.
+    for (const enabled of [false, true]) {
+      await mountCurrencyEditor({
+        selectedCurrency: {
+          enabled,
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: { canAfford: '', increment: '', decrement: '' },
+          units: [],
+        },
+      });
 
-    // Tear down before re-mounting with currency enabled.
-    if (mounted) unmount(mounted);
-    if (target?.parentNode) target.remove();
+      assert.ok(
+        target.querySelector('[data-world-currency-units]'),
+        `the Currency Units card should render with the system toggle ${enabled ? 'on' : 'off'}`
+      );
+      // The participation toggle stays on System Settings, where the per-system decision is
+      // made; it is deliberately absent from the world page.
+      assertNoElement(
+        target,
+        '[data-feature-key="currency"]',
+        'the per-system currency toggle tile does not belong on the world page'
+      );
 
-    await mountCurrencyEditor({
-      selectedCurrency: {
-        enabled: true,
-        spendStrategy: 'actorProperty',
-        providerId: '',
-        macros: { canAfford: '', increment: '', decrement: '' },
-        units: [],
-      },
-    });
-    assert.ok(
-      target.querySelector('[data-system-currency-units]'),
-      'Currency Units card should render when currency is enabled'
-    );
+      if (mounted) {
+        unmount(mounted);
+        mounted = null;
+      }
+      target?.remove();
+      target = null;
+    }
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {

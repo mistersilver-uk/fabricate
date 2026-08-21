@@ -24,6 +24,9 @@ A system export carries every supported GM-authored record type for that system:
 - Its recipes: identity, steps, ingredients (including grouped and alternative options), outputs, checks, tools, and outcomes.
 - Its gathering environments: identity, enabled state, selection and composition mode, scene gate, realm membership, biomes, danger, manual include/exclude/force lists, and local adjustments.
 - Its per-system gathering configuration: gathering rules, the biome, danger, weather, and time-of-day options you have configured, reusable Gathering Tasks, reusable events, gathering tools, per-drop modifiers, and your stamina and resource-node settings.
+- Your world's currency configuration: the coin ladder, the spend strategy, the provider, and the currency macros.
+This is carried along with every export because currency is a world setting shared by every crafting system, not something each system configures on its own.
+See [World Currency]({% link world-currency.md %}) for how it merges into the destination world on import.
 
 Every export records a version marker so future format changes stay backward compatible.
 Older exports still import.

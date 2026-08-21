@@ -3,7 +3,7 @@
 ## Purpose
 
 Define how Fabricate exports and imports the complete GM-authored model of a crafting system.
-This covers crafting authoring (the `system` object plus its recipes) and gathering authoring (per-system environments and the per-system `gatheringConfig` slice).
+This covers crafting authoring (the `system` object plus its recipes), gathering authoring (per-system environments and the per-system `gatheringConfig` slice), and the world currency configuration the system's recipes charge against.
 The goal is a clean restore or transfer of a system between worlds without manually rebuilding newer features.
 
 ## Scope
@@ -26,6 +26,8 @@ From `data-models/spec.md`:
 - The `gatheringEnvironments` world setting (per-system environment records).
 - The `gatheringConfig` world setting (per-system `rules`, `conditions`, `vocabularies`, `economy`, reusable `tasks`, reusable `events`).
   The modifier library moved onto the crafting system in issue 1117 and is exported with it.
+- The `currencyConfig` world setting (the world coin ladder, spend strategy, provider, and macro set; see `data-models/spec.md` -> CurrencyConfig).
+  Currency moved to world scope in issue 1278; each crafting system carries only `requirements.currency.enabled`.
 - The excluded `gatheringParties` world setting.
 
 ## Requirements
@@ -33,8 +35,10 @@ From `data-models/spec.md`:
 ### Export completeness
 
 A system export MUST include every supported GM-authored record type for that system.
-This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, and `gatheringConfig` settings.
+This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, `gatheringConfig`, and `currencyConfig` settings.
 The per-system `economy` slice (stamina defaults and resource-node/limitation flags) MUST ride along.
+The world currency configuration MUST ride along as its own envelope slice even though it is not part of the `CraftingSystem` record, because an exported recipe's currency option and an exported component's salvage currency requirement both name a unit by `id` and are unusable in the destination world unless that unit arrives with them.
+Unlike the gathering slices there is no per-system filtering to do: the world has exactly one currency configuration, so the whole of it travels.
 
 Completeness is a property of the authoring DATA, not of the key set: an exported recipe carries whatever `Recipe.toJSON()` emits, which since issue 1087 omits the flat top-level `results` alias and every field whose absence the constructor rebuilds to the identical value (see `data-models/spec.md` requirement 18).
 An export produced after that change is therefore smaller and key-sparser than one produced before it while describing the same system, and MUST NOT be treated as incomplete for the keys it leaves out.
@@ -43,7 +47,8 @@ Import MUST keep ACCEPTING both, permanently: the read fallbacks are what let an
 ### Explicit schema markers
 
 The export envelope MUST carry an integer `schemaVersion` that is distinct from `fabricateVersion`.
-The current schema version is `2`.
+The current schema version is `3`.
+Schema `3` added the envelope-level `currencyConfig` slice; schema `2` added the explicit version marker and the runtime-state boundary flag.
 The envelope MUST carry a `runtimeStateIncluded` boolean marker, which is `false` for authoring-only exports.
 
 ### Authoring-versus-runtime boundary
@@ -64,6 +69,25 @@ A legacy export carries no `schemaVersion` and is treated as schema `1`.
 The migration MUST be idempotent: migrating an already-current payload is a no-op, and migrating a migrated payload equals migrating it once.
 A payload's `craftingCheck.maxModifierPicks` MUST be derived by `migrateExportPayload` from the payload's own system, by the same per-system transform the world-side `1.20.0` settings migration applies (stamp `1` onto a system on the `playerPicks` combination rule that carries no usable cap, and leave every other rule — the subject-selecting one included — unbounded), and this derivation MUST run **branch-independently** of the schema-envelope upcast: a bundle already at the current `schemaVersion` still needs it, because the cap is a field added on an OLD schema version and its absence is orthogonal to the envelope version.
 An authored cap in the bundle MUST survive the import, which is what makes the derivation idempotent.
+A pre-`3` payload carries its currency configuration on the system at `requirements.currency`, and `migrateExportPayload` MUST hoist it to the envelope-level `currencyConfig` and reduce the system's own block to `{ enabled }`, using the SAME union-merge transform the world-side `1.26.0` migration applies (`buildWorldCurrencyConfig` / `stripSystemCurrencyConfig`), not a second implementation of it.
+An export carries one system, so the union across systems degenerates here to that system's own ladder — but it is the same function, so the two paths cannot drift on how a unit is carried across.
+This hoist MUST also run **branch-independently**, for the reason every other field-level upcast does: `migrateExportPayload` returns early once `schemaVersion` is current, so a derivation reachable only from the schema-bump path would silently skip every payload authored at the current schema.
+It is idempotent: once the envelope carries units the hoist is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
+
+### Currency configuration merge on import
+
+Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.
+Currency is world scope, so unlike the per-system gathering slice there is no key under which an import may simply replace what is there; overwriting would destroy a ladder the destination GM authored for systems that have nothing to do with this import.
+
+Units MUST merge by `id` with the DESTINATION winning a collision: an id already present in the destination keeps its own definition, and only genuinely new denominations are appended.
+That is what makes an import safe to run twice, and it is what keeps the destination's existing recipe currency costs resolving to the units their author meant.
+The merge MUST NOT reorder or remove a destination unit.
+
+The scalars — `spendStrategy`, `providerId`, and `macros` — MUST be seeded ONLY into an unconfigured world (one whose ladder is empty).
+A world that already has a ladder has already answered "how do actors here store coins", and an imported system does not get to overrule it.
+
+An incoming configuration carrying no units MUST write nothing, and a merge that adds no unit to an already-configured world MUST write nothing, so an import that changes no currency data issues no setting write.
+Copy-mode import MUST NOT regenerate currency unit ids: they are cross-referenced by recipe currency options and salvage currency requirements, and regenerating them would orphan every one of those references (see `data-models/spec.md` -> CurrencyConfig requirement 7).
 
 ### GM gating
 
@@ -149,6 +173,9 @@ A bundle carrying the pre-1095 `craftingCheck.checkModifiers`, the pre-1117 `Cra
 The two run in that order because it is observable: the merge reads only the system-level key, so running it first would merge an empty catalogue out of a pre-1095 bundle and then retire it.
 The gathering slice therefore carries NO `characterModifiers` on export, and a re-keyed entry's references inside the slice are rewritten with it.
 A legacy recipe-level `craftingModifier.policy` in a source bundle is inert and is not required to round-trip: `Recipe._normalizeCraftingModifier` drops it on read (see `data-models/spec.md` requirement 13a), and no resolver consults it.
+The world `currencyConfig` slice MUST round-trip under keep mode into an UNCONFIGURED destination world — every unit, its `contains[]` breakdown, the spend strategy, the provider, and the macro set.
+Into an ALREADY-CONFIGURED destination the round trip is deliberately NOT identity, and that is the merge rule rather than a round-trip failure: a destination unit id wins over the incoming definition and the destination's scalars are left alone, so the re-export describes the destination's ladder.
+A bundle carrying the pre-`3` per-system currency block is upcast by the hoist above and is NOT required to round-trip in its legacy form.
 
 ## Out of Scope
 

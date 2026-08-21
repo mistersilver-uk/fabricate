@@ -1,12 +1,16 @@
 /**
  * System Overview settings-list manual reorder (issue 768, increment 2). The
- * three lists — Modifiers, Character Prerequisites and Currency Units (all three
- * on the crafting system since issue 1117) — persist their
+ * three lists — Modifiers, Character Prerequisites and Currency Units — persist their
  * order AS the array order, so each reorder op rewrites the array in place through
  * the list's existing save path and the order-preserving normalizer round-trips
  * it. These tests drive the REAL adminStore + normalizers (no stubs), asserting
  * the reordered order survives re-projection and persistence, and that
  * invalid/no-op moves are rejected.
+ *
+ * Modifiers and prerequisites are crafting-system state and persist through `updateSystem`.
+ * Currency units are WORLD state since issue 1278 and persist through the world currency
+ * setting instead, which is why the currency case below drives a real `CurrencyConfigStore`
+ * and reads its order back off `viewState.worldCurrency` rather than off the selected system.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +18,7 @@ import { get } from 'svelte/store';
 
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../../src/systems/characterPrerequisites.js';
+import { CurrencyConfigStore } from '../../src/systems/CurrencyConfigStore.js';
 
 function createServices({ modifiers = [], prerequisites = [], currencyUnits = [] } = {}) {
   let idSeq = 0;
@@ -32,7 +37,8 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     recipeVisibility: { listMode: 'global' },
     requirements: {
       time: { enabled: false },
-      currency: { enabled: true, units: currencyUnits },
+      // Participation only: the ladder itself is world scope (issue 1278).
+      currency: { enabled: true },
     },
     tools: [],
     characterPrerequisites: normalizeCharacterPrerequisiteList(prerequisites, () => `seed-${++idSeq}`),
@@ -60,11 +66,20 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
       return system;
     },
   };
+  const getSetting = (key) => settingStore[key] ?? null;
+  const setSetting = async (key, value) => {
+    settingStore[key] = value;
+  };
+  settingStore.currencyConfig = { units: currencyUnits };
+  const currencyStore = new CurrencyConfigStore({
+    getSetting,
+    setSetting,
+    randomID: () => `cur-seed-${++idSeq}`,
+  });
   return {
-    getSetting: (key) => settingStore[key] ?? null,
-    setSetting: async (key, value) => {
-      settingStore[key] = value;
-    },
+    getSetting,
+    setSetting,
+    getCurrencyConfigStore: () => currencyStore,
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], listBySystem: async () => [] }),
@@ -93,7 +108,7 @@ function prerequisiteIds(store) {
   return (get(store.viewState).selectedSystem.characterPrerequisites || []).map((entry) => entry.id);
 }
 function currencyUnitIds(store) {
-  return (get(store.viewState).selectedSystem.requirements.currency.units || []).map((unit) => unit.id);
+  return (get(store.viewState).worldCurrency?.units || []).map((unit) => unit.id);
 }
 
 const MODIFIERS = [
@@ -145,13 +160,13 @@ describe('adminStore settings-list reorder (issue 768)', () => {
     const { store, services } = await storeFor({ currencyUnits: CURRENCY_UNITS });
     assert.deepEqual(currencyUnitIds(store), ['cur-a', 'cur-b', 'cur-c']);
 
-    const ok = await store.reorderCurrencyUnit(1, 0, 'sys1');
+    const ok = await store.reorderCurrencyUnit(1, 0);
     assert.equal(ok, true);
     assert.deepEqual(currencyUnitIds(store), ['cur-b', 'cur-a', 'cur-c']);
     assert.deepEqual(
-      services._system.requirements.currency.units.map((u) => u.id),
+      services._settingStore.currencyConfig.units.map((u) => u.id),
       ['cur-b', 'cur-a', 'cur-c'],
-      'persisted through updateSystem'
+      'persisted through the world currency setting'
     );
   });
 
@@ -164,7 +179,7 @@ describe('adminStore settings-list reorder (issue 768)', () => {
 
     await store.reorderSystemModifier(0, 2, 'sys1');
     await store.reorderCharacterPrerequisite(0, 2, 'sys1');
-    await store.reorderCurrencyUnit(0, 2, 'sys1');
+    await store.reorderCurrencyUnit(0, 2);
 
     // Re-select from scratch to force a fresh projection off the persisted state.
     await store.selectSystem('');
@@ -187,8 +202,8 @@ describe('adminStore settings-list reorder (issue 768)', () => {
     assert.equal(await store.reorderSystemModifier(-1, 1, 'sys1'), false, 'from out of range');
     assert.equal(await store.reorderCharacterPrerequisite(2, 2, 'sys1'), false, 'no-op');
     assert.equal(await store.reorderCharacterPrerequisite(0, 5, 'sys1'), false, 'out of range');
-    assert.equal(await store.reorderCurrencyUnit(1, 1, 'sys1'), false, 'no-op');
-    assert.equal(await store.reorderCurrencyUnit(0, -3, 'sys1'), false, 'out of range');
+    assert.equal(await store.reorderCurrencyUnit(1, 1), false, 'no-op');
+    assert.equal(await store.reorderCurrencyUnit(0, -3), false, 'out of range');
 
     assert.deepEqual(modifierIds(store), ['mod-a', 'mod-b', 'mod-c'], 'order unchanged');
     assert.deepEqual(prerequisiteIds(store), ['pre-a', 'pre-b', 'pre-c'], 'order unchanged');

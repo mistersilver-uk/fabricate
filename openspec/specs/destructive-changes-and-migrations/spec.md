@@ -219,7 +219,7 @@ The action's stated purpose and its confirmation prompt must name description re
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives a five-key `{ recipes, systems, gatheringConfig, environments, gatheringParties }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, and `GATHERING_PARTIES` settings) and returns the transformed payload **or a subset of its keys**.
+- Each migration receives a six-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, and `CURRENCY_CONFIG` settings) and returns the transformed payload **or a subset of its keys**.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
@@ -242,7 +242,7 @@ On module initialization (on the primary-GM client):
 2. Filter the migration registry for entries where `migration.version > migrationVersion` using numeric semver comparison.
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
-5. Read all five current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, and `fabricate.gatheringParties`.
+5. Read all six current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, and `fabricate.currencyConfig`.
 6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
 8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
@@ -253,8 +253,8 @@ On module initialization (on the primary-GM client):
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist each of the five settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`).
-13. Each of the five write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+12. Persist each of the six settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`).
+13. Each of the six write-on-change comparisons is independent, so an unchanged setting is never rewritten.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
@@ -307,7 +307,7 @@ The layout reaches both surfaces from the value the pass already resolved, never
 
 ### Write-on-Change Persistence
 
-- Each of the five migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
+- Each of the six migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
 - On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
 - On aborted migration passes, `migrationVersion` is unchanged.
@@ -653,6 +653,38 @@ The `1.25.0` settings-data migration (`src/migration/migrateSeedFailureResultPol
 8. **The downgrade is CLEAN, and is deliberately NOT declared `downgradeLosesData`.**
    `1.24.0`'s normalizers do not emit `failureResultPolicy`, so the key is dropped on the next save — and since that release has no failure-result capability at all, nothing changes behaviourally.
    It is the first entry since `1.21.0` of which that is true, and the rule `1.22.0` established is about naming a REAL loss in the label rather than about every entry claiming one.
+
+### Currency World-Scope Migration (`1.26.0`, `downgradeTo: '1.25.0'`, pure, non-mutating, idempotent)
+
+Issue 1278 moves the whole currency configuration — the coin ladder, the spend strategy, the selected provider and the GM macro set — off every crafting system's `requirements.currency` block and into the `currencyConfig` WORLD setting, leaving each system only `requirements.currency.enabled`.
+The `1.26.0` settings-data migration (`src/migration/migrateCurrencyToWorldScope.js`) reads the `craftingSystems` and `currencyConfig` payloads and returns both; it mutates neither input, and it throws no `FatalMigrationError` — every level is guarded, and a malformed system, requirements block or unit is SKIPPED rather than repaired, because repair is the normalizer's job.
+
+1. **Without it, every upgraded world silently loses its currency**, which is why it is not optional cleanup.
+   The reader (`getCurrencyRequirementConfig`) no longer looks at the system block at all, so an unmigrated world would present an empty ladder and every authored currency cost would stop resolving.
+2. **Units are UNION-MERGED across every system, keyed by unit `id`, first system wins a collision.**
+   The union is not arbitrary: recipe currency options (`match.unit`) and salvage currency requirements store unit **ids**, so a dropped unit orphans every reference to it and taking the union preserves the most references.
+   Keying by `id` rather than by label is what makes the merge reference-preserving at all.
+   On an id collision the earlier system's definition wins, because choosing either is arbitrary and "first" is at least deterministic and order-stable across re-runs.
+3. **The scalars cannot be unioned, so they are ADOPTED from the first system that had currency ENABLED.**
+   A system with currency switched off never configured `spendStrategy` / `providerId` / `macros` deliberately, so preferring an enabled system's choice is the one signal available.
+   If no system has currency enabled, the first system carrying any currency block supplies them, so a world where every system is switched off still keeps the strategy its GM configured rather than reverting to `actorProperty`; failing that, the normalizer's defaults apply.
+   The legacy `provider` / `systemAdapter` / `inventoryMode` inputs are carried across verbatim rather than resolved here, because the shared normalizer (`normalizeWorldCurrencyConfig`) already knows how to map them forward.
+4. **It is genuinely lossy when two systems disagree, and the label says so.**
+   Only one strategy, provider and macro set survives, so the registry entry's **`label` STRING** — the one string a GM ever reads about this migration — names that outcome and tells them to check World > Currency afterwards.
+5. **Every system's block is rewritten to `{ enabled }`, with no guard of its own.**
+   That leg needs none, because it is already idempotent: a system reduced to `{ enabled }` has nothing left to strip, and the transform returns such a system BY REFERENCE rather than rebuilding an equal copy, so the runner's per-setting change detection stays honest.
+6. **The world-config leg IS guarded, and the guard is load-bearing.**
+   Once the world ladder carries units it is authoritative and is never re-merged, because a second pass must not re-impose stale system blocks over a ladder the GM has since edited — they may have deliberately deleted a unit.
+7. **It seeds NOTHING onto a world that never used currency**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `1.22.0` and `1.25.0` already record.
+   When there was nothing to lift the migration returns the ORIGINAL stored object rather than a freshly-built `{ units: [] }`, because the runner detects change by JSON comparison and emitting the latter over a stored `{}` would register as a change and write the setting in every world that has never used currency — churn showing up as an unexplained write in an otherwise no-op upgrade.
+8. **The runner's before-any-load ordering is load-bearing**, and more sharply here than for `1.22.0`, `1.23.0` or `1.25.0`.
+   `CraftingSystemManager._normalizeCurrencyConfig` is now an ALLOWLIST REBUILD emitting `{ enabled }` and nothing else, so had any system save run before the pass, the ladder, strategy, provider and macros would have been DELETED rather than lifted — silently, with no error and no recoverable copy.
+9. **The transforms are SHARED with the export-payload upcast** (`buildWorldCurrencyConfig` and `stripSystemCurrencyConfig`), not reimplemented; `migrateExportPayload` applies them branch-independently.
+   An export carries one system, so the union degenerates there to that system's own ladder — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a unit is carried across.
+10. **Mutated setting keys:** `currencyConfig` (created) and `craftingSystems` (shrunk).
+    This is the migration that took the runner's payload from five settings to six; `currencyConfig` is read, snapshotted, passed, change-detected and written back exactly like the five that preceded it.
+11. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+    `1.25.0` reads currency only from the crafting system, so a downgraded world would find no configuration at all and every authored currency cost would stop resolving until the GM re-authored it per system.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 

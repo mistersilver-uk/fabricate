@@ -418,6 +418,17 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
     },
     async mount(props = {}) {
+      // Cross a macrotask boundary BEFORE building the next tree. Happy DOM memoizes
+      // `querySelector`/`querySelectorAll` results behind `WeakRef`s, and V8 keeps a WeakRef's
+      // target strongly reachable for the rest of the job that read it
+      // (`weak_refs_keep_during_job`). A suite whose tests never await anything real runs
+      // back-to-back inside ONE turn, so every torn-down tree — and, through its listeners, its
+      // whole Svelte component graph — stays pinned until some macrotask finally arrives. That
+      // is retention rather than a leak, but it stacks up a tree per test and pushes a large
+      // mounted suite past 2 GB of heap. Yielding here rather than in `remount()` covers every
+      // consumer: `mount()` is async and always awaited, whereas `remount()` is called
+      // synchronously from hundreds of places.
+      await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
       document.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props });
