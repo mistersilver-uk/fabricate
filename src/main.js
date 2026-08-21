@@ -1277,7 +1277,7 @@ class Fabricate {
   }
 
   /**
-   * Read redaction-safe current-realm evidence for a selected actor and system.
+   * Read redaction-safe current-realm evidence for a selected actor, gated on a system.
    * Player-callable: the result reports only the resolved source token and
    * disclosure-safe realm display data, never raw secret realm records.
    *
@@ -1301,7 +1301,10 @@ class Fabricate {
   }
 
   /**
-   * Set a party's manual current-realm override for one crafting system. GM-only.
+   * Set a party's manual current-realm override. GM-only.
+   *
+   * A party has ONE override since issue 1282, so `systemId` gates the write — whether that
+   * system participates in travel — rather than selecting which override is written.
    *
    * @param {{ partyId: string, systemId: string, realmIds?: string[] }} options
    * @returns {Promise<object|null>}
@@ -1352,8 +1355,8 @@ class Fabricate {
   }
 
   /**
-   * Reveal a realm's discovery on an actor. GM-only; validates the realm
-   * belongs to the referenced crafting system before writing.
+   * Reveal a realm's discovery on an actor. GM-only; validates the realm exists in the WORLD
+   * library before writing. `systemId` is the participation gate, not an ownership claim.
    *
    * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
