@@ -109,6 +109,10 @@
     // Currency's only remaining surface here is the participation toggle (issue 1278). The ladder,
     // spend strategy, provider and macro set are world scope and are authored under World > Currency.
     onToggleCurrency = async () => {},
+    // Travel & Realms' only surface here is the participation toggle (issue 1282). The realm
+    // library, its reveal mode and its modifier visibility are world scope and are authored
+    // under World > Travel.
+    onToggleGatheringRealms = async () => {},
     onToggleTime = async () => {},
   } = $props();
 
@@ -286,12 +290,22 @@
   // wrapped in an `{#if}`, and `{@const}` is only legal as the immediate child of a block.
   const modifiersCollapsed = $derived(isSectionCollapsed('modifiers'));
   const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
+  // Travel & Realms is meaningful only to a gathering system: everything the toggle governs —
+  // location-gated environment access, the environment realm controls, party realm overrides —
+  // is a gathering affordance. It moved here from the Gathering Settings tab (issue 1282),
+  // which carried the same gate implicitly.
+  const gatheringFeatureEnabled = $derived(selectedSystem?.features?.gathering === true);
+  const gatheringRealmsEnabled = $derived(selectedSystem?.gatheringRealmSettings?.enabled === true);
   // Time requirements default ON (issue 714): an absent flag reads as enabled, so only
   // an explicit GM opt-out (`enabled === false`) turns the toggle off.
   const timeRequirementsEnabled = $derived(selectedSystem?.requirements?.time?.enabled !== false);
 
   async function handleToggleCurrency() {
     await onToggleCurrency(!currencyEnabled);
+  }
+
+  async function handleToggleGatheringRealms() {
+    await onToggleGatheringRealms(!gatheringRealmsEnabled);
   }
 
   async function handleToggleTime() {
@@ -851,6 +865,53 @@
                       >
                     </div>
                   </div>
+                  {#if gatheringFeatureEnabled}
+                    <div class="manager-feature-tile" data-feature-key="gatheringRealms">
+                      <span
+                        class={`manager-feature-tile-icon ${gatheringRealmsEnabled ? 'is-on' : 'is-off'}`}
+                        aria-hidden="true"><i class="fas fa-route"></i></span
+                      >
+                      <div class="manager-feature-tile-body">
+                        <div class="manager-feature-tile-head">
+                          <strong
+                            >{text(
+                              'FABRICATE.Admin.Manager.Feature.GatheringRealms',
+                              'Travel & Realms'
+                            )}</strong
+                          >
+                          <button
+                            type="button"
+                            class={`manager-status-toggle ${gatheringRealmsEnabled ? 'is-on' : 'is-off'}`}
+                            aria-pressed={gatheringRealmsEnabled}
+                            aria-label={text(
+                              'FABRICATE.Admin.Manager.Feature.GatheringRealms',
+                              'Travel & Realms'
+                            )}
+                            data-gathering-realm-toggle
+                            onclick={handleToggleGatheringRealms}
+                          >
+                            <span class="manager-status-toggle-track" aria-hidden="true"
+                              ><span class="manager-status-toggle-knob"></span></span
+                            >
+                            <span class="manager-status-toggle-label"
+                              >{gatheringRealmsEnabled
+                                ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                                : text(
+                                    'FABRICATE.Admin.Manager.SystemEdit.FeatureOff',
+                                    'Off'
+                                  )}</span
+                            >
+                          </button>
+                        </div>
+                        <small
+                          >{text(
+                            'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.GatheringRealms',
+                            "Gates this system's environments on where the party is, and gives them realm controls. Realms themselves are authored under World > Travel and shared by every system that turns this on."
+                          )}</small
+                        >
+                      </div>
+                    </div>
+                  {/if}
                 </div>
               </section>
 

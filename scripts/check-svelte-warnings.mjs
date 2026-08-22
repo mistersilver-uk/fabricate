@@ -7,7 +7,7 @@
  * `svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and
  * that is the fast local signal. It is not sufficient on its own: a Vite build compiles the
  * ENTRY GRAPH, and this repository has components that nothing under `src/` imports
- * (`GatheringTravelView.svelte`, issue 927). A warning in one of those would never reach
+ * (`RowDisclosure.svelte` is one today; issue 927). A warning in one of those would never reach
  * `onwarn`, and a gate that silently skips files is the failure mode this whole static-analysis
  * programme exists to remove — the same graph-blindness that made an earlier baseline in it
  * unsound.

@@ -41,6 +41,7 @@ import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
+import { migrateTravelToWorldScope } from './migrateTravelToWorldScope.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
@@ -527,6 +528,28 @@ const MIGRATIONS = [
     downgradeLosesData: true,
     migrate: (data) => migrateCurrencyToWorldScope(data),
   },
+  {
+    version: '1.27.0',
+    label:
+      'Move the travel configuration from each crafting system to WORLD scope. Realms, their ' +
+      'map region links, the reveal mode and the modifier visibility now live once per world, ' +
+      'because realms are geography — the same valley is the same valley whichever crafting ' +
+      'system a character is there to serve — and a crafting system keeps only whether it ' +
+      'participates. Realms from every system are UNIONED by realm id (the first system wins ' +
+      'an id collision) because environments, party overrides and character discovery all ' +
+      'reference realms by id, so dropping any realm would orphan them. Two systems that ' +
+      'authored a realm of the SAME NAME keep both records; merge them by hand if you want ' +
+      'one. The reveal mode and modifier visibility cannot be unioned, so they are taken from ' +
+      'the first system that had travel ENABLED — if two of your systems set DIFFERENT reveal ' +
+      'modes, only one survives, so check World > Travel afterwards. Each party now has ONE ' +
+      'current-realm override rather than one per system, keeping the most recently set. ' +
+      'DOWNGRADING IS NOT LOSSLESS: 1.26.0 reads realms only from the crafting system, so it ' +
+      'would find none, every realm-gated environment would report no current realm, and ' +
+      'Travel would go dark until you re-authored it per system',
+    downgradeTo: '1.26.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateTravelToWorldScope(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -705,6 +728,7 @@ export class MigrationRunner {
     const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
     const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
     const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
+    const rawTravelConfig = this._getSetting(SETTING_KEYS.TRAVEL_CONFIG) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
@@ -712,6 +736,7 @@ export class MigrationRunner {
     const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
     const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
     const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
+    const originalTravelConfigJson = JSON.stringify(rawTravelConfig);
 
     let data = {
       recipes: rawRecipes,
@@ -720,6 +745,7 @@ export class MigrationRunner {
       environments: rawEnvironments,
       gatheringParties: rawGatheringParties,
       currencyConfig: rawCurrencyConfig,
+      travelConfig: rawTravelConfig,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -856,6 +882,7 @@ export class MigrationRunner {
       JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
     const currencyConfigChanged =
       JSON.stringify(data.currencyConfig) !== originalCurrencyConfigJson;
+    const travelConfigChanged = JSON.stringify(data.travelConfig) !== originalTravelConfigJson;
 
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
@@ -889,6 +916,19 @@ export class MigrationRunner {
       if (currencyConfigChanged) {
         await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
       }
+      // `travelConfig` is the SECOND destination written before its source, for the identical
+      // reason (issue 1282): 1.27.0 lifts the realm library out of the systems and then strips
+      // it, so a tear after the systems write would leave every system shrunk and the world
+      // library empty, the re-run would lift nothing, and the idempotence guard would
+      // correctly decline to write. The realms, their scene mappings and the reveal mode would
+      // be gone with no error and no recoverable copy.
+      //
+      // `gatheringParties` is NOT ordered against the systems write: its collapse is a
+      // transform of parties into themselves and takes nothing from the systems, so a tear
+      // either side of it is equally recoverable.
+      if (travelConfigChanged) {
+        await this._setSetting(SETTING_KEYS.TRAVEL_CONFIG, data.travelConfig);
+      }
       if (systemsChanged) {
         await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
@@ -904,7 +944,7 @@ export class MigrationRunner {
 
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
     } catch (error) {
-      // The remaining five legs and the version bump share one containment and one
+      // The remaining six legs and the version bump share one containment and one
       // disposition: a rejection from any of them would otherwise propagate out of `run()`
       // past a caller with no `catch`, leaving a partial writeback with no GM-facing notice.
       return this._deferOnWriteFailure(error);

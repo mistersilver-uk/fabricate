@@ -1,60 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GatheringRealmStore, GatheringRealmValidationError } from '../src/systems/GatheringRealmStore.js';
-import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from '../src/systems/gatheringRealms.js';
+import {
+  GatheringRealmStore,
+  GatheringRealmValidationError
+} from '../src/systems/GatheringRealmStore.js';
 
-function makeSystemManager(initialSystems = []) {
-  const systems = new Map(initialSystems.map(s => [s.id, normalizeSystem(s)]));
-  const updates = [];
-  return {
-    updates,
-    getSystem: id => systems.get(id) || null,
-    getSystems: () => Array.from(systems.values()),
-    updateSystem: async (systemId, patch) => {
-      const current = systems.get(systemId);
-      if (!current) throw new Error(`system not found: ${systemId}`);
-      const merged = normalizeSystem({ ...current, ...patch, id: systemId });
-      systems.set(systemId, merged);
-      updates.push({ systemId, patch });
-      return merged;
-    }
-  };
+/**
+ * The realm store is WORLD scope since issue 1282: it persists the `travelConfig` setting
+ * rather than writing realms onto a crafting system through `updateSystem`. Every method lost
+ * its leading `systemId`, and `getRealmSettings()` no longer carries `enabled` — participation
+ * is a crafting system's answer, not the world's.
+ *
+ * These drive the real store over an in-memory setting, so the normalizer it round-trips
+ * through is exercised rather than stubbed.
+ */
+function makeStore(seed = null) {
+  const settings = { travelConfig: seed };
+  let counter = 0;
+  const store = new GatheringRealmStore({
+    getSetting: (key) => settings[key] ?? null,
+    setSetting: async (key, value) => {
+      settings[key] = value;
+    },
+    randomID: () => `r-${++counter}`
+  });
+  return { store, settings, persisted: () => settings.travelConfig };
 }
 
-// Minimal mirror of CraftingSystemManager normalization for realms only.
-let generatedRealmIdSeq = 0;
-function normalizeSystem(system) {
-  return {
-    ...system,
-    id: system.id,
-    gatheringRealms: normalizeGatheringRealmList(system.gatheringRealms, {
-      craftingSystemId: system.id,
-      // Deterministic generated ids — no Math.random (weak-crypto hotspot).
-      randomID: () => `gen-${generatedRealmIdSeq++}`
-    }),
-    gatheringRealmSettings: normalizeGatheringRealmSettings(system.gatheringRealmSettings)
-  };
-}
+test('create appends a realm to the world library, with no owning system', async () => {
+  const { store } = makeStore();
+  const realm = await store.create({ name: 'Verdant', craftingSystemId: 'foreign' });
 
-let counter = 0;
-const randomID = () => `r-${++counter}`;
-
-test('create persists a realm with craftingSystemId self-healed to the owner', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
-  const realm = await store.create('system-a', { name: 'Verdant', craftingSystemId: 'foreign' });
-  assert.equal(realm.craftingSystemId, 'system-a');
-  assert.equal(store.listBySystem('system-a').length, 1);
+  assert.equal(realm.name, 'Verdant');
+  assert.equal(
+    'craftingSystemId' in realm,
+    false,
+    'a world realm has no owner, and a supplied one must not survive'
+  );
+  assert.equal(store.list().length, 1);
 });
 
 test('update merges over the existing record, leaving untouched fields intact', async () => {
-  const systemManager = makeSystemManager([{
-    id: 'system-a',
-    gatheringRealms: [{ id: 'r1', name: 'Old', description: 'keep me', secret: true, biomes: ['forest'] }]
-  }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
-  const updated = await store.update('system-a', 'r1', { name: 'New', enabled: false });
+  const { store } = makeStore({
+    realms: [{ id: 'r1', name: 'Old', description: 'keep me', secret: true, biomes: ['forest'] }]
+  });
+  const updated = await store.update('r1', { name: 'New', enabled: false });
+
   assert.equal(updated.name, 'New');
   assert.equal(updated.enabled, false);
   assert.equal(updated.description, 'keep me');
@@ -62,103 +54,151 @@ test('update merges over the existing record, leaving untouched fields intact', 
   assert.deepEqual(updated.biomes, ['forest']);
 });
 
-test('reorder reorders only the system realms and keeps the rest', async () => {
-  const systemManager = makeSystemManager([{
-    id: 'system-a',
-    gatheringRealms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }, { id: 'r3', name: 'C' }]
-  }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
-  const reordered = await store.reorder('system-a', ['r3', 'r1']);
-  assert.deepEqual(reordered.map(r => r.id), ['r3', 'r1', 'r2']);
+test('reorder moves the named realms and keeps the rest in place', async () => {
+  const { store } = makeStore({
+    realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }, { id: 'r3', name: 'C' }]
+  });
+  const reordered = await store.reorder(['r3', 'r1']);
+  assert.deepEqual(
+    reordered.map((r) => r.id),
+    ['r3', 'r1', 'r2']
+  );
 });
 
 test('delete returns repair evidence from environment and party stores; never blocks', async () => {
-  const systemManager = makeSystemManager([{
-    id: 'system-a',
-    gatheringRealms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }]
-  }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
+  const { store } = makeStore({ realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }] });
+  // Environments from DIFFERENT crafting systems both cite the realm — which is the point of a
+  // world library, and why the evidence is collected across the whole world rather than one
+  // system's slice.
   const environmentStore = {
-    listBySystem: () => [
+    list: () => [
       { id: 'env1', name: 'Forest', craftingSystemId: 'system-a', includedRealmIds: ['r1'] },
-      { id: 'env2', name: 'Cave', craftingSystemId: 'system-a', excludedRealmIds: ['r1'] }
+      { id: 'env2', name: 'Cave', craftingSystemId: 'system-b', excludedRealmIds: ['r1'] }
     ]
   };
   const partyStore = {
-    list: () => [{ id: 'p1', name: 'Heroes', currentRealmOverrides: { 'system-a': { mode: 'manual', realmIds: ['r1'] } } }]
+    list: () => [
+      { id: 'p1', name: 'Heroes', currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } }
+    ]
   };
-  const result = await store.delete('system-a', 'r1', { environmentStore, partyStore });
+
+  const result = await store.delete('r1', { environmentStore, partyStore });
   assert.equal(result.deleted.id, 'r1');
   assert.equal(result.referencedBy.environments.length, 2);
+  assert.deepEqual(
+    result.referencedBy.environments.map((env) => env.craftingSystemId),
+    ['system-a', 'system-b'],
+    'the GM needs to see every system that cites the place they are deleting'
+  );
   assert.equal(result.referencedBy.partyOverrides.length, 1);
-  assert.equal(store.listBySystem('system-a').length, 1);
+  assert.equal(store.list().length, 1);
 });
 
-test('updateRealmSettings rejects unknown values at save boundary', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
+test('updateRealmSettings rejects unknown values at the save boundary', async () => {
+  const { store } = makeStore();
   await assert.rejects(
-    () => store.updateRealmSettings('system-a', { revealMode: 'bogus' }),
+    () => store.updateRealmSettings({ revealMode: 'bogus' }),
     GatheringRealmValidationError
   );
-  const settings = await store.updateRealmSettings('system-a', { revealMode: 'alwaysVisible' });
+  const settings = await store.updateRealmSettings({ revealMode: 'alwaysVisible' });
   assert.equal(settings.revealMode, 'alwaysVisible');
 });
 
-test('updateRealmSettings round-trips the enabled flag (default false, then true, then back)', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
+test('realm settings are WORLD behaviour only — never a participation flag', async () => {
+  // `enabled` deliberately has no home here. A store that answered it is how the admin store's
+  // override predicate came to read the per-system gate through the wrong object.
+  const { store } = makeStore();
+  const settings = await store.updateRealmSettings({ modifierVisibility: 'gmOnly' });
 
-  // Default: a fresh system has the realm subsystem disabled.
-  assert.equal(store.getRealmSettings('system-a').enabled, false);
-
-  const enabled = await store.updateRealmSettings('system-a', { enabled: true });
-  assert.equal(enabled.enabled, true);
-  // Persisted and re-read identically.
-  assert.equal(store.getRealmSettings('system-a').enabled, true);
-  // Unrelated settings round-trip untouched by the enabled merge.
-  assert.equal(enabled.revealMode, 'manual');
-  assert.equal(enabled.modifierVisibility, 'visible');
-
-  const disabled = await store.updateRealmSettings('system-a', { enabled: false });
-  assert.equal(disabled.enabled, false);
-  assert.equal(store.getRealmSettings('system-a').enabled, false);
+  assert.deepEqual(Object.keys(settings).sort(), ['modifierVisibility', 'revealMode']);
+  assert.equal(settings.modifierVisibility, 'gmOnly');
+  assert.equal(settings.revealMode, 'manual', 'the untouched scalar round-trips');
 });
 
-test('updateRealmSettings rejects a non-boolean enabled at the save boundary', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
-  await assert.rejects(
-    () => store.updateRealmSettings('system-a', { enabled: 'yes' }),
-    GatheringRealmValidationError
+test('the world config round-trips through a save and re-read', async () => {
+  const { store, persisted } = makeStore();
+  await store.updateRealmSettings({ revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' });
+  await store.create({ id: 'r1', name: 'Verdant' });
+
+  assert.equal(persisted().revealMode, 'alwaysVisible');
+  assert.equal(persisted().modifierVisibility, 'gmOnly');
+  assert.deepEqual(
+    persisted().realms.map((r) => r.id),
+    ['r1']
   );
-});
-
-test('realm settings (incl. enabled) survive an export/import round-trip through _normalizeSystem', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
-  await store.updateRealmSettings('system-a', { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' });
-
-  // Simulate export: JSON clone of the normalized system. Simulate import: feed it
-  // back through the system normalizer (mirrored here by normalizeSystem).
-  const exported = JSON.parse(JSON.stringify(systemManager.getSystem('system-a')));
-  const reimported = normalizeSystem({ ...exported, id: 'system-a' });
-
-  assert.deepEqual(reimported.gatheringRealmSettings, {
-    enabled: true,
-    revealMode: 'alwaysVisible',
-    modifierVisibility: 'gmOnly'
-  });
+  assert.equal(store.get().revealMode, 'alwaysVisible', 'and the cache agrees with the setting');
 });
 
 test('create rejects an invalid modifier enum at the save boundary', async () => {
-  const systemManager = makeSystemManager([{ id: 'system-a' }]);
-  const store = new GatheringRealmStore({ systemManager, randomID });
+  const { store } = makeStore();
   await assert.rejects(
-    () => store.create('system-a', {
-      name: 'Bad',
-      modifiers: [{ id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 }]
-    }),
+    () =>
+      store.create({
+        name: 'Bad',
+        modifiers: [{ id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 }]
+      }),
     GatheringRealmValidationError
   );
+});
+
+test('setSceneRegionLink moves a region between realms in ONE write', async () => {
+  // The caller used to await one update per realm in a loop, which against a setting-backed
+  // store loses the earlier iterations. One method, one write.
+  const { store, settings } = makeStore({
+    realms: [
+      { id: 'r1', name: 'A', sceneMappings: [{ sceneUuid: 'S', sceneRegionUuid: 'S.R1' }] },
+      { id: 'r2', name: 'B' }
+    ]
+  });
+  let writes = 0;
+  const originalSet = store.setSetting;
+  store.setSetting = async (key, value) => {
+    writes += 1;
+    return originalSet(key, value);
+  };
+
+  await store.setSceneRegionLink('S.R1', 'r2', { sceneUuid: 'S' });
+
+  assert.equal(writes, 1, 'one write, not one per realm');
+  const realms = store.list();
+  assert.deepEqual(realms.find((r) => r.id === 'r1').sceneMappings, [], 'stripped from the old');
+  assert.equal(realms.find((r) => r.id === 'r2').sceneMappings[0].sceneRegionUuid, 'S.R1');
+  assert.equal(settings.travelConfig.realms.length, 2);
+});
+
+test('setSceneRegionLink with no realm unlinks the region entirely', async () => {
+  const { store } = makeStore({
+    realms: [{ id: 'r1', name: 'A', sceneMappings: [{ sceneUuid: 'S', sceneRegionUuid: 'S.R1' }] }]
+  });
+  await store.setSceneRegionLink('S.R1', '');
+  assert.deepEqual(store.list()[0].sceneMappings, []);
+});
+
+test('the cache is published BEFORE the write, so overlapping edits cannot clobber', async () => {
+  // Callers read-modify-write. Publish late and a second edit starting mid-flight reads the
+  // pre-first-edit config. The per-system store this replaced was safe by construction.
+  const settings = { travelConfig: { realms: [] } };
+  const store = new GatheringRealmStore({
+    getSetting: (key) => settings[key] ?? null,
+    setSetting: (key, value) =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          settings[key] = value;
+          resolve(value);
+        }, 20);
+      }),
+    randomID: () => 'gen'
+  });
+
+  const first = store.updateRealmSettings({ revealMode: 'alwaysVisible' });
+  assert.equal(
+    store.get().revealMode,
+    'alwaysVisible',
+    'the in-flight edit must already be visible to the next reader'
+  );
+  const second = store.updateRealmSettings({ modifierVisibility: 'gmOnly' });
+  await Promise.all([first, second]);
+
+  assert.equal(settings.travelConfig.revealMode, 'alwaysVisible', 'the first edit survived');
+  assert.equal(settings.travelConfig.modifierVisibility, 'gmOnly');
 });

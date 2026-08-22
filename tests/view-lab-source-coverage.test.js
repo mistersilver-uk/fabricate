@@ -129,9 +129,9 @@ test('no case claims a component that appears in no window', () => {
   // The completeness test above checks one direction — that everything renderable is claimed. This
   // is the other, and it is the direction that produces WRONG evidence rather than none.
   //
-  // `GatheringTravelView.svelte` was claimed by eight cases through a `Gathering` prefix, and
-  // `EnvironmentsBrowserView.svelte` says outright that it "is imported by nothing under src/". So a
-  // PR editing it selected eight frames as evidence of a change none of them can contain.
+  // A retired combined Travel view was claimed by eight cases through a `Gathering` prefix while
+  // being imported by nothing under `src/`. So a PR editing it selected eight frames as evidence
+  // of a change none of them can contain.
   //
   // It also bounds pattern BREADTH, which nothing else did: the registry could be satisfied by
   // pasting one blanket `/^src\/ui\//` onto a single case, which reports zero unclaimed and passes.

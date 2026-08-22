@@ -8475,37 +8475,35 @@ async function main() {
           if (!crafter) {
             throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
-          // Travel & Realms is disabled by default (#286). Enable it on this
-          // system before the manager opens so the Travel nav item is visible
-          // for the capture step.
-          await realmStore.updateRealmSettings(sysId, { enabled: true });
+          // Travel & Realms is disabled by default (#286). Participation is a CRAFTING
+          // SYSTEM flag since #1282 — the realm library itself is world scope — so this is a
+          // system write, not a realm-store one. Enable it before the manager opens so the
+          // environment realm controls and the party override are live for the captures.
+          const systemManager = game.fabricate.getCraftingSystemManager?.();
+          await systemManager?.updateSystem?.(sysId, { gatheringRealmSettings: { enabled: true } });
           for (const party of partyStore.list()) {
             await partyStore.delete(party.id);
           }
-          const existingRealm = realmStore.listBySystem(sysId)
+          const existingRealm = realmStore.list()
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
-            || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+            || await realmStore.create({ name: 'Northreach Vale', enabled: true });
           const scene = game.scenes.get(sceneId);
           const sceneRegion = scene?.regions?.get(regionId);
           if (!scene || !sceneRegion) {
             throw new Error('Smoke Travel map Region fixture is unavailable.');
           }
-          const otherMappings = (realm.sceneMappings || []).filter(
-            mapping => mapping?.sceneRegionUuid !== sceneRegion.uuid
-          );
-          await realmStore.update(sysId, realm.id, {
-            sceneMappings: [
-              ...otherMappings,
-              { sceneUuid: scene.uuid, sceneRegionUuid: sceneRegion.uuid }
-            ]
+          // ONE write (#1282): `setSceneRegionLink` strips the region from every realm and
+          // attaches it to this one, so the old read-modify-write loop cannot lose an update.
+          await realmStore.setSceneRegionLink(sceneRegion.uuid, realm.id, {
+            sceneUuid: scene.uuid
           });
           const party = await partyStore.create({ name: 'The Vale Wardens' });
           await partyStore.addMember(party.id, crafter.uuid);
           if (travelMember) await partyStore.addMember(party.id, travelMember.uuid);
           await partyStore.setTravelActor(party.id, crafter.uuid);
           await partyStore.setEnabled(party.id, true);
-          await partyStore.setCurrentRealmOverride(party.id, sysId, [realm.id]);
+          await partyStore.setCurrentRealmOverride(party.id, [realm.id]);
 
           // Realm-lock evidence (#294): a second realm the party is NOT in, plus
           // an environment that REQUIRES it. The player Gathering tab then shows a
@@ -8514,8 +8512,8 @@ async function main() {
           // with no party — either way the card locks). Idempotent across reruns.
           const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
           if (environmentStore) {
-            const hiddenVale = realmStore.listBySystem(sysId).find(r => r.name === 'Hidden Vale')
-              || await realmStore.create(sysId, { name: 'Hidden Vale', enabled: true });
+            const hiddenVale = realmStore.list().find(r => r.name === 'Hidden Vale')
+              || await realmStore.create({ name: 'Hidden Vale', enabled: true });
             const existingEnvs = (typeof environmentStore.listBySystem === 'function')
               ? (environmentStore.listBySystem(sysId) || [])
               : [];
@@ -10187,23 +10185,23 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-event-editor-normal');
 
-        // World Parties plus system Travel (#1179): disclosure starts collapsed.
-        // Capture each disclosure/selection state through its stable navigation id; the
-        // retired Gathering Travel subitem no longer exists.
+        // World Parties plus World Travel (#1179, moved to world scope by #1282): the Travel
+        // disclosure starts collapsed. Capture each disclosure/selection state through its
+        // stable navigation id.
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager #manager-nav-travel[aria-expanded="false"]')
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="false"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'System Travel collapsed by default',
-          label: 'manager-system-travel-default-collapsed'
+          layout: 'World Travel collapsed by default',
+          label: 'manager-world-travel-default-collapsed'
         });
 
         await page.locator('.fabricate-manager #manager-travel-toggle').first().click();
-        await page.locator('.fabricate-manager #manager-nav-travel[aria-expanded="true"]')
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="true"]')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
         await captureStableManagerView(page, {
-          layout: 'System Travel expanded neutral',
-          label: 'manager-system-travel-expanded-neutral'
+          layout: 'World Travel expanded neutral',
+          label: 'manager-world-travel-expanded-neutral'
         });
 
         const gatheringToggle = page.locator(
@@ -10216,8 +10214,8 @@ async function main() {
           await gatheringSubmenu.waitFor({ state: 'visible', timeout: 5_000 });
         }
         await captureStableManagerView(page, {
-          layout: 'Gathering and system Travel expanded together',
-          label: 'manager-system-travel-with-gathering-expanded'
+          layout: 'Gathering and World Travel expanded together',
+          label: 'manager-world-travel-with-gathering-expanded'
         });
         if (!gatheringWasExpanded) {
           await gatheringToggle.click();
@@ -10236,14 +10234,14 @@ async function main() {
         await page.locator('.fabricate-manager [data-travel-panel="realms"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'System Travel Realms normal',
-          label: 'manager-system-travel-realms-normal'
+          layout: 'World Travel Realms normal',
+          label: 'manager-world-travel-realms-normal'
         });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
-          layout: 'System Travel Realms stacked',
-          label: 'manager-system-travel-realms-stacked',
+          layout: 'World Travel Realms stacked',
+          label: 'manager-world-travel-realms-stacked',
           settleMs: 250
         });
 
@@ -10263,14 +10261,14 @@ async function main() {
           '[aria-label="Selected map region link"]:has-text("Northreach Vale")'
         ).first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'System Travel Map Region Links normal',
-          label: 'manager-system-travel-map-normal'
+          layout: 'World Travel Map Region Links normal',
+          label: 'manager-world-travel-map-normal'
         });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
-          layout: 'System Travel Map Region Links stacked',
-          label: 'manager-system-travel-map-stacked',
+          layout: 'World Travel Map Region Links stacked',
+          label: 'manager-world-travel-map-stacked',
           settleMs: 250
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -10278,13 +10276,16 @@ async function main() {
         await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
         await captureStableManagerView(page, {
-          layout: 'System Travel Map Region Links collapsed rail',
-          label: 'manager-system-travel-map-collapsed-rail'
+          layout: 'World Travel Map Region Links collapsed rail',
+          label: 'manager-world-travel-map-collapsed-rail'
         });
         await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
         await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
 
+        // World > Travel is UNGATED as of #1282: realms are world geography, so the entry
+        // stays put when the selected system opts OUT of Travel & Realms. This capture is what
+        // proves that — it used to prove the opposite, that the selected-system group vanished.
         try {
           await page.evaluate(async (systemId) => {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.setGatheringRealmsEnabled?.(
@@ -10292,11 +10293,11 @@ async function main() {
               false
             );
           }, craftingSetup.systemId);
-          await page.locator('.fabricate-manager #manager-nav-travel')
-            .first().waitFor({ state: 'detached', timeout: 5_000 });
+          await page.locator('.fabricate-manager #manager-world-nav-travel')
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
           await captureStableManagerView(page, {
-            layout: 'System Travel card off',
-            label: 'manager-system-travel-card-off'
+            layout: 'World Travel present for a non-participating system',
+            label: 'manager-world-travel-ungated'
           });
         } finally {
           await page.evaluate(async (systemId) => {

@@ -50,32 +50,33 @@ Enable it per system with the **Enable Travel & Realms** toggle on the Gathering
 While the toggle is **off**, the system behaves as a non-location-aware system:
 
 - **World > Parties** remains available for global Party management; current-realm overrides are unavailable.
-- Selected-system **Travel** is hidden, and an open Travel destination falls back to Gathering **Environments**.
+- **World > Travel** also remains available: realms are world geography, so the toggle never hides the place you author them.
 - The environment editor shows no realm selectors.
 - No current-realm, availability, or discovery surfaces appear for that system.
 - Every environment is available.
   Composition (biome and danger) is unaffected.
 
-The **Settings** tab itself stays visible while disabled, since it hosts the toggle.
-Turning the toggle on reveals **Gathering > Travel > Realms** and **Gathering > Travel > Map Region Links**, enables the selected system's current-realm override on **World > Parties**, and reveals the environment editor's multi-realm selector.
+Turning the toggle on enables the selected system's current-realm override on **World > Parties** and reveals the environment editor's multi-realm selector.
+It does not reveal a navigation destination: **World > Travel** is there whether or not any system has opted in.
 
-## World Parties and system Travel
+## World Parties and World Travel
 
 Choose **World > Parties** at any time for the world party list and editor (name, enabled state, members, and travel actor), including when no crafting system is selected.
-Select a Gathering-enabled crafting system and turn on **Enable Travel & Realms** to use its current-realm override or expand top-level **Travel** for **Realms** and **Map Region Links**.
+Choose **World > Travel** the same way for **Realms** and **Map Region Links**.
 **Travel** is initially collapsed when the Crafting System Manager opens.
 Each party is a fully expanded card in a full-width content area, so its editing controls are available without selecting the party first.
 When the list has more than one page, the pagination controls stay below the scrolling party cards and do not cover them.
 When no parties exist yet, the panel shows a simple **No parties yet** empty state.
 It does not render a setup checklist.
 
-The `WORLD / every system` heading and Parties remain visible when the toggle is off and when no system is selected.
-Parties and their count are world-level, while overrides, realms, and authored map links re-project for the selected crafting system.
-Create realms under **Gathering > Travel > Realms** before assigning environments to them.
+The `WORLD / every system` heading, Parties and Travel all remain visible when the toggle is off and when no system is selected.
+Parties, realms and authored map links are all world-level and identical under every selection; only the current-realm override is gated on the selected crafting system.
+Create realms under **World > Travel > Realms** before assigning environments to them.
 
 ## Realms
 
-Each realm belongs to one crafting system and stores:
+A realm belongs to the world rather than to a crafting system — Northreach Vale is the same valley whether a character is there to gather herbs or to quarry stone — and every crafting system that enables Travel & Realms shares the same library.
+Each realm stores:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -87,7 +88,7 @@ Each realm belongs to one crafting system and stores:
 | **Enabled** | Disabled realms are flagged in the UI. A manual override that includes a disabled realm still resolves it (marked **Disabled**) so GMs can preview or diagnose |
 | **Secret** | A secret realm is never disclosed to players (not even its name) until the actor discovers it (see [Secret realms and discovery](#secret-realms-and-discovery)) |
 | **Biomes** | Biome tags (from the system's biome list) used by environment biome availability rules |
-| **Scene mappings** | Links from the realm to one or more Foundry Scene Regions, authored from **Gathering > Travel > Map Region Links** and used by live token sensing |
+| **Scene mappings** | Links from the realm to one or more Foundry Scene Regions, authored from **World > Travel > Map Region Links** and used by live token sensing |
 | **Modifiers** | Adjustments to event chance, drop rate, yield, difficulty, stamina cost, and attempt limit (plus custom adjustments) are stored and checked now, and applied to gathering calculations in a later phase |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -102,9 +103,9 @@ The two are bridged but not the same:
   Several Foundry Scene Regions can map onto one realm, so a single realm can span multiple drawn map areas.
 - Scene region automation senses which realm a travel actor occupies from its placed token's Region membership, with a position hit-test fallback.
 
-### Authoring realms (Gathering > Travel > Realms)
+### Authoring realms (World > Travel > Realms)
 
-Realm create, edit, and delete live under **Gathering > Travel > Realms**, as a realm list with a detail editor:
+Realm create, edit, and delete live under **World > Travel > Realms**, as a realm list with a detail editor:
 
 - Create a realm, then edit its **name, description, image, enabled** state, **secret** flag, and **biomes** (chosen from the system biome vocabulary).
 - **Delete realm** goes through the standard confirmation dialog.
@@ -112,21 +113,20 @@ Realm create, edit, and delete live under **Gathering > Travel > Realms**, as a 
   Deletion never blocks.
   Dangling references become stale repair evidence instead.
 
-Scene mappings are authored under **Gathering > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
+Scene mappings are authored under **World > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
 Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime.
 Existing modifier values are preserved untouched.
 
-### Realm settings (per system)
+### Realm settings
 
-Each crafting system stores a few realm behavior settings.
-The **Enable Travel & Realms** toggle (off by default) is set from the Settings tab.
-The remaining settings are set through the API (see [API](#api)):
+The reveal mode and modifier visibility are **world** settings, shared by every crafting system, and are set through the API (see [API](#api)).
+Only the **Enable Travel & Realms** toggle (off by default) is per system, set from that system's Settings tab:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Setting | Values | Effect |
 |:--------|:-------|:-------|
-| Travel & Realms | off (default), on | Gates the whole realm, travel, and availability subsystem for the system. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
+| Travel & Realms (per system) | off (default), on | Whether this system's environments are gated on where the party is, and whether they offer realm controls. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
 | Reveal mode | manual (default), on party token entry, always visible | "Always visible" discloses realm names to players even when secret and undiscovered. Automatic discovery on party-token entry remains a follow-up. Live realm sensing itself is already shipped |
 | Modifier visibility | visible (default), GM only | Default disclosure for realm modifiers once modifiers apply during play |
 
@@ -135,8 +135,8 @@ The remaining settings are set through the API (see [API](#api)):
 ## Parties
 
 Parties are **world-level** records shared across every crafting system.
-Only the current-realm override is per system.
-A party stores a name, an enabled flag, member actor UUIDs, one optional travel actor UUID, and per-system current-realm overrides.
+A party stores a name, an enabled flag, member actor UUIDs, one optional travel actor UUID, and one current-realm override.
+The override is single because a party is one set of tokens standing in one place: it used to be keyed by crafting system, which modelled a party as being in several places at once.
 
 - **Members** can be added through the searchable picker, removed, or moved to another party.
   A move is a single persisted update, so a member never momentarily belongs to two parties mid-move.
@@ -181,8 +181,8 @@ The party card includes the current-realm override control for the selected syst
 ## Environment Realm Membership
 
 An environment declares which realms it belongs to, and it can belong to **multiple** realms.
-When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (like the biome selector) listing the system's realms.
-When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to **Gathering > Travel > Realms** to create realms first.
+When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (like the biome selector) listing the world's realms.
+When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to **World > Travel** to create realms first.
 The selector is hidden while the toggle is off.
 
 ## Environment Location Rules
@@ -262,7 +262,7 @@ Revealing a realm checks that it belongs to the right crafting system, and each 
 
 Most realm and travel work is done in the UI described above.
 For macro authors, Fabricate also exposes the same capabilities programmatically.
-GM-facing entry points cover party management (members, travel actor, current-realm overrides) and per-system realm management and settings, including the few realm settings not surfaced in the UI.
+GM-facing entry points cover party management (members, travel actor, current-realm override) and world realm management and settings, including the few realm settings not surfaced in the UI.
 A player-callable lookup returns a redaction-safe current-realm summary for an actor: a non-GM caller never receives a secret undiscovered realm's name.
 GM-only calls set or clear a party's current-realm override and reveal or hide a realm's discovery for an actor.
 Older macros that used the pre-rename names keep working.

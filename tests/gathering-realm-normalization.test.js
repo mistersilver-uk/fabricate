@@ -7,20 +7,24 @@ import {
   normalizeGatheringRealmModifier,
   normalizeGatheringRealmSceneMapping,
   normalizeGatheringRealmSettings,
+  normalizeTravelConfig,
   validateGatheringRealm,
   validateGatheringRealmList,
-  validateGatheringRealmSettings
+  validateGatheringRealmSettings,
+  validateTravelConfig
 } from '../src/systems/gatheringRealms.js';
 
 let counter = 0;
 const randomID = () => `id-${++counter}`;
 
-test('normalizeGatheringRealm applies defaults and forces craftingSystemId to owner', () => {
+test('normalizeGatheringRealm applies defaults and carries NO owning system', () => {
+  // This used to assert the opposite — that a supplied owner was overwritten with the real
+  // one. Realms are world scope now (issue 1282), so a supplied owner is simply dropped.
   const realm = normalizeGatheringRealm(
     { name: 'Verdant Expanse', craftingSystemId: 'foreign-system' },
-    { craftingSystemId: 'system-a', randomID }
+    { randomID }
   );
-  assert.equal(realm.craftingSystemId, 'system-a');
+  assert.equal('craftingSystemId' in realm, false);
   assert.equal(realm.enabled, true);
   assert.equal(realm.secret, false);
   assert.deepEqual(realm.biomes, []);
@@ -32,7 +36,7 @@ test('normalizeGatheringRealm applies defaults and forces craftingSystemId to ow
 test('normalizeGatheringRealm honors explicit enabled/secret/biomes', () => {
   const realm = normalizeGatheringRealm(
     { id: 'r1', name: 'Ashen March', enabled: false, secret: true, biomes: ['Volcanic', 'volcanic', 'Ash'] },
-    { craftingSystemId: 'system-a', randomID }
+    { randomID }
   );
   assert.equal(realm.id, 'r1');
   assert.equal(realm.enabled, false);
@@ -114,15 +118,16 @@ test('validateGatheringRealmList rejects duplicate realm ids', () => {
   assert.ok(errors.some(e => e.includes('Duplicate realm id "r1"')));
 });
 
-test('normalizeGatheringRealmSettings coerces unknown values to defaults on read (BOTH directions)', () => {
-  assert.deepEqual(normalizeGatheringRealmSettings({}), { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' });
-  assert.deepEqual(
-    normalizeGatheringRealmSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' }),
-    { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }
-  );
+test('normalizeGatheringRealmSettings emits PARTICIPATION ONLY', () => {
+  // `revealMode` and `modifierVisibility` describe the world's realms, not one system's
+  // relationship to them, and moved to `travelConfig` (issue 1282). They are DROPPED here
+  // rather than passed through, deliberately: both consumers coerce a missing reveal mode to
+  // `'manual'`, so a silently-preserved key would turn every `alwaysVisible` world into a
+  // `manual` one with no error anywhere. Omitting it makes a missed reader fail loudly.
+  assert.deepEqual(normalizeGatheringRealmSettings({}), { enabled: false });
   assert.deepEqual(
     normalizeGatheringRealmSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
-    { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
+    { enabled: true }
   );
 });
 
@@ -135,12 +140,25 @@ test('normalizeGatheringRealmSettings: enabled defaults false and only explicit 
   assert.equal(normalizeGatheringRealmSettings({ enabled: 1 }).enabled, false, 'number 1 → false');
 });
 
-test('validateGatheringRealmSettings rejects unknown values at save boundary', () => {
-  assert.deepEqual(validateGatheringRealmSettings({ enabled: false, revealMode: 'manual', modifierVisibility: 'visible' }), []);
-  const errors = validateGatheringRealmSettings({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
+test('validateTravelConfig rejects unknown WORLD values at the save boundary', () => {
+  // The scalars are validated where they now live. `validateGatheringRealmSettings` keeps only
+  // the participation flag.
+  assert.deepEqual(validateTravelConfig({ revealMode: 'manual', modifierVisibility: 'visible' }), []);
+  const errors = validateTravelConfig({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
   assert.equal(errors.length, 2);
   assert.ok(errors.some(e => e.includes('revealMode')));
   assert.ok(errors.some(e => e.includes('modifierVisibility')));
+});
+
+test('normalizeTravelConfig coerces unknown WORLD values to defaults on read', () => {
+  assert.deepEqual(normalizeTravelConfig({}), {
+    revealMode: 'manual',
+    modifierVisibility: 'visible',
+    realms: []
+  });
+  const coerced = normalizeTravelConfig({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
+  assert.equal(coerced.revealMode, 'manual');
+  assert.equal(coerced.modifierVisibility, 'visible');
 });
 
 test('validateGatheringRealmSettings rejects a non-boolean enabled but accepts booleans', () => {
@@ -154,7 +172,7 @@ test('validateGatheringRealmSettings rejects a non-boolean enabled but accepts b
 test('normalizeGatheringRealmList preserves stale scene mappings as readable', () => {
   const list = normalizeGatheringRealmList(
     [{ id: 'r1', name: 'A', sceneMappings: [{ id: 'sm1', sceneUuid: 'Scene.stale', sceneRegionUuid: 'gone' }] }],
-    { craftingSystemId: 'system-a', randomID }
+    { randomID }
   );
   assert.equal(list[0].sceneMappings[0].sceneUuid, 'Scene.stale');
   assert.equal(list[0].sceneMappings[0].sceneRegionUuid, 'gone');

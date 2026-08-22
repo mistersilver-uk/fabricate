@@ -23,9 +23,9 @@ import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
-import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIdsForSystem } from './systems/gatheringRealmDiscovery.js';
+import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIds } from './systems/gatheringRealmDiscovery.js';
 import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
-import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
+import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -711,8 +711,18 @@ class Fabricate {
     await this.recipeManager.initialize();
     await this.craftingSystemManager.initialize();
     this._startupMarks.end(STARTUP_PHASES.DATA_LOAD);
+    // The WORLD travel configuration (issue 1282): the realm library, the reveal mode and the
+    // modifier visibility. Constructed FIRST because the environment store validates realm
+    // references against it, and the resolver and engine both read realms through it.
+    this.gatheringRealmStore = new GatheringRealmStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.gatheringRealmStore.load();
     this.gatheringEnvironmentStore = new GatheringEnvironmentStore({
       systemManager: this.craftingSystemManager,
+      travelStore: this.gatheringRealmStore,
       runCleanup: {
         removeRunsForSystem: (systemId) => this.gatheringRunManager.removeRunsForSystem(systemId),
         removeRunsForEnvironment: (environmentId) => this.gatheringRunManager.removeRunsForEnvironment(environmentId),
@@ -720,11 +730,9 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
-    // Per-system gathering realms + Fabricate-managed parties + current-realm
-    // resolver for location-aware gathering. Parties persist to a world setting;
-    // realms live on the crafting system via the realm store's updateSystem
-    // seam. The resolver is constructor-injected into the engine (not imported).
-    this.gatheringRealmStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
+    // Fabricate-managed parties + the current-realm resolver for location-aware gathering.
+    // Both are world scope; the resolver is constructor-injected into the engine, never
+    // imported, so the engine stays testable without Foundry.
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
@@ -735,7 +743,7 @@ class Fabricate {
     this.gatheringPartyStore.load();
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
-      systemManager: this.craftingSystemManager,
+      travelStore: this.gatheringRealmStore,
       // Live token-derived sensing: which Scene Region UUIDs the party's travel
       // marker token currently sits inside, across the marker's own scene(s).
       // Prefer Foundry's AUTHORITATIVE membership (V13 `TokenDocument#regions`),
@@ -844,6 +852,7 @@ class Fabricate {
       }),
       getRunViewer: getGatheringRunViewer,
       locationResolver: this.gatheringLocationService,
+      travelStore: this.gatheringRealmStore,
       localize: localizeGathering,
       // Interactable-scoped node respawn enumeration (issue 302): scan scenes for
       // scoped-node behaviours and route the changed `system.node` write through the
@@ -1268,7 +1277,7 @@ class Fabricate {
   }
 
   /**
-   * Read redaction-safe current-realm evidence for a selected actor and system.
+   * Read redaction-safe current-realm evidence for a selected actor, gated on a system.
    * Player-callable: the result reports only the resolved source token and
    * disclosure-safe realm display data, never raw secret realm records.
    *
@@ -1281,17 +1290,21 @@ class Fabricate {
     if (!resolvedActor || !systemId) return null;
     // Realm/travel disabled for this system ⇒ no location surface at all.
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor, systemId });
+    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor });
     if (!context) return null;
     const isGM = game.user?.isGM === true;
-    const system = this.craftingSystemManager?.getSystem(systemId);
-    const revealMode = system?.gatheringRealmSettings?.revealMode || 'manual';
-    const discoveredRealmIds = getDiscoveredRealmIdsForSystem(resolvedActor, systemId);
+    // Reveal mode and realm discovery are both WORLD facts now (issue 1282). `systemId` above
+    // remains the GATE — whether this system surfaces a location at all — and nothing more.
+    const revealMode = getRealmRevealMode(this.gatheringRealmStore?.get?.());
+    const discoveredRealmIds = getDiscoveredRealmIds(resolvedActor);
     return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRealmIds });
   }
 
   /**
-   * Set a party's manual current-realm override for one crafting system. GM-only.
+   * Set a party's manual current-realm override. GM-only.
+   *
+   * A party has ONE override since issue 1282, so `systemId` gates the write — whether that
+   * system participates in travel — rather than selecting which override is written.
    *
    * @param {{ partyId: string, systemId: string, realmIds?: string[] }} options
    * @returns {Promise<object|null>}
@@ -1302,7 +1315,7 @@ class Fabricate {
     if (!partyId || !systemId) return null;
     // Realm/travel disabled ⇒ no-op (no override writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, systemId, realmIds);
+    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, realmIds);
   }
 
   /**
@@ -1328,7 +1341,7 @@ class Fabricate {
     if (!partyId || !systemId) return null;
     // Realm/travel disabled ⇒ no-op (no override writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId, systemId);
+    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId);
   }
 
   /**
@@ -1342,8 +1355,8 @@ class Fabricate {
   }
 
   /**
-   * Reveal a realm's discovery on an actor. GM-only; validates the realm
-   * belongs to the referenced crafting system before writing.
+   * Reveal a realm's discovery on an actor. GM-only; validates the realm exists in the WORLD
+   * library before writing. `systemId` is the participation gate, not an ownership claim.
    *
    * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
@@ -1356,12 +1369,14 @@ class Fabricate {
     const system = this.craftingSystemManager?.getSystem(systemId);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
     if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);
+    // `systemId` above stays the GATE — whether this system surfaces travel at all. The realm
+    // itself is validated against the WORLD library (issue 1282), and the discovery it writes
+    // is world-wide.
     return revealGatheringRealm(resolvedActor, {
-      systemId,
       realmId,
       source,
       partyId,
-      validateRealmInSystem: system,
+      validateRealmExists: this.gatheringRealmStore?.get?.(),
       now: () => Date.now()
     });
   }
@@ -1389,7 +1404,7 @@ class Fabricate {
     if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
-    return hideGatheringRealm(resolvedActor, { systemId, realmId });
+    return hideGatheringRealm(resolvedActor, { realmId });
   }
 
   /**
@@ -3421,13 +3436,19 @@ function bindFabricateGlobal() {
     // carries an empty ladder, and every currency cost in it lands in the destination world as
     // an unresolvable unit id.
     const currencyConfig = fabricate.currencyConfigStore?.get?.() ?? {};
+    // The world realm library rides along too (issue 1282), for the same reason and with the
+    // same consequence: realms are WORLD scope, so omitting this exports an empty library and
+    // every realm-gated environment in the payload lands in the destination world citing realm
+    // ids that name nothing.
+    const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
       gatheringConfig,
-      currencyConfig
+      currencyConfig,
+      travelConfig
     );
   };
 
@@ -3713,6 +3734,7 @@ Hooks.once('ready', async () => {
     recipeManager: fabricate.recipeManager,
     gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
     currencyConfigStore: fabricate.currencyConfigStore,
+    travelStore: fabricate.gatheringRealmStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {

@@ -692,6 +692,60 @@ The `1.26.0` settings-data migration (`src/migration/migrateCurrencyToWorldScope
     A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.26.0`, so the pass does not re-run, and `CraftingSystemManager._normalizeCurrencyConfig`'s allowlist rebuild discards the re-authored ladder on that system's next save.
     The re-upgrade path is therefore re-authoring at World > Currency, not re-authoring per system.
 
+### Travel World-Scope Migration (`1.27.0`, `downgradeTo: '1.26.0'`, pure, non-mutating, idempotent)
+
+Issue 1282 moves the whole travel configuration — the realm library, the reveal mode, the modifier visibility and the Foundry Scene Region links nested inside each realm as `sceneMappings[]` — off every crafting system and into the `travelConfig` WORLD setting, leaving each system only `gatheringRealmSettings.enabled`.
+It also collapses each party's per-system realm override into one.
+The `1.27.0` settings-data migration (`src/migration/migrateTravelToWorldScope.js`) reads the `craftingSystems`, `gatheringParties` and `travelConfig` payloads and returns all three; it mutates none of them, and it throws no `FatalMigrationError` — every level is guarded, and a malformed system, party or realm is SKIPPED rather than repaired, because repair is the normalizer's job.
+
+1. **Without it, every upgraded world silently loses its realms**, which is why it is not optional cleanup.
+   No reader looks at the system block any more, so an unmigrated world would present an empty library, every environment's realm gating would stop resolving, and every Scene Region link would be gone.
+2. **Realms are UNION-MERGED across every system, keyed by realm `id`, first system wins a collision.**
+   The union is not arbitrary: environments (`includedRealmIds` / `excludedRealmIds`), party overrides and actor discovery flags all store realm **ids**, so a dropped realm orphans every reference to it and taking the union preserves the most references.
+   Keying by `id` rather than by name is what makes the merge reference-preserving at all, and is why two systems that both authored "Northreach Vale" keep both records rather than being silently fused.
+3. **A collision is REPORTED, never re-keyed.**
+   Ids are `randomID()`, so a collision can only arise from a hand edit or a copy-import that skipped id rebinding — but re-keying the loser would orphan every reference to it, which is the precise harm requirement 2 exists to prevent, so the first wins and the discarded copy is reported.
+4. **The scalars cannot be unioned, so they are ADOPTED from the first system that had travel ENABLED.**
+   A system with the toggle off never configured `revealMode` / `modifierVisibility` deliberately, so preferring an enabled system's choice is the one signal available.
+   If no system has travel enabled, the first system carrying any settings block supplies them, so a world where every system is switched off still keeps the reveal mode its GM configured rather than silently reverting to `manual` — which would start hiding realm names from players with no error anywhere.
+5. **Parties collapse to ONE override, keeping the entry with the highest `updatedAt`.**
+   A party is one set of tokens standing in one place, so a per-system map modelled it as being in several places at once.
+   Unlike `1.26.0`, which had to settle for "first wins because picking either is arbitrary", there is a real signal here: the most recent entry is the GM's latest statement of where the party is.
+   A `mode: "none"` entry records that the GM CLEARED the override for one system, which is not a statement about where the party is, so a real manual placement outranks a cleared one however recently it was cleared.
+6. **Environments are deliberately untouched.**
+   Under first-wins every realm id survives, so `includedRealmIds` / `excludedRealmIds` need no rewrite and adding one would be pure churn.
+   One consequence is worth naming: an environment citing a realm that belonged to a DIFFERENT system was previously invalid-but-inert, because validation ran only at save boundaries and only against the owning system.
+   It becomes valid and live, so it starts gating.
+   That is reachable only by hand edit or copy-import, but it is a real behaviour change on upgrade.
+7. **Every system's block is rewritten to `{ enabled }`, with no guard of its own.**
+   That leg needs none, because it is already idempotent: a system reduced to `{ enabled }` has nothing left to strip, and the transform returns such a system BY REFERENCE rather than rebuilding an equal copy, so the runner's per-setting change detection stays honest.
+   The legacy pre-`1.1.0` `gatheringRegions` and `gatheringRegionSettings` keys are dropped by the same leg, so they cannot resurrect the library.
+8. **The world-config leg IS guarded, and the guard is load-bearing.**
+   Once the world library carries realms it is authoritative and is never re-merged, because a second pass must not re-impose stale system blocks over a library the GM has since edited — they may have deliberately deleted a realm.
+   This is reachable in normal use: a legacy export re-imported over an already-migrated world resets the systems, because the import path does not re-run migrations inline.
+9. **It seeds NOTHING onto a world that never used travel**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `1.22.0`, `1.25.0` and `1.26.0` already record.
+   When there was nothing to lift the migration returns the ORIGINAL stored object rather than a freshly-built `{ realms: [] }`, because the runner detects change by JSON comparison and emitting the latter over a stored `{}` would register as a change and write the setting in every world that has never used travel.
+10. **The runner's before-any-load ordering is load-bearing**, in the same way requirement 8 of `1.26.0` is, and with more to lose.
+    `CraftingSystemManager._normalizeSystem` is an ALLOWLIST REBUILD that no longer emits `gatheringRealms` at all, so had any system save run before the pass, the whole library AND every `sceneMappings` entry would have been DELETED rather than lifted — silently, with no error and no recoverable copy.
+    This is also why the change lands as one atomic commit: the normalizer change and the migration cannot be separated by even one release.
+11. **The transforms are SHARED with the export-payload upcast** (`buildWorldTravelConfig` and `stripSystemTravelConfig`), not reimplemented; `migrateExportPayload` applies them branch-independently.
+    An export carries one system, so the union degenerates there to that system's own library — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a realm is carried across.
+12. **The actor discovery flag CANNOT be migrated here, and the reason is structural rather than a choice.**
+    The runner reaches two corpora and four world settings and has no actor access at all, so `flags.fabricate.discoveredGatheringRealms` is re-keyed LAZILY on read instead.
+    That is the same mechanism the `1.1.0` region-to-realm rename used, and it is specified in `data-models` (*Discovered Gathering Realms Flag*).
+13. **Mutated setting keys:** `travelConfig` (created), `craftingSystems` (shrunk) and `gatheringParties` (overrides collapsed).
+    This is the migration that took the runner's payload from six settings to seven; `travelConfig` is read, snapshotted, passed, change-detected and written back exactly like the six that preceded it.
+14. **The `travelConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 11 of `1.26.0` is.
+    Systems are the SOURCE of the lift and `travelConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldTravelConfig` lifts nothing, and requirement 9's no-churn guard correctly declines to write — so the library and every Scene Region link are gone with no error and no recoverable copy.
+    Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world library, requirement 8's guard keeps it, and the shrink it re-applies is idempotent by construction.
+15. **Each of those four legs is mutation-checked** — suppressing the payload read, the writeback, the writeback ORDER, or requirement 8's idempotence guard must each turn a test red.
+    A silent leg is the failure mode that destroys worlds, and it is not detectable by a green suite that never exercised the leg at all.
+16. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+    `1.26.0` reads realms only from the crafting system, so a downgraded world would find no library at all, every environment's realm gating would stop resolving, and every Scene Region link would need re-authoring per system.
+    A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.27.0`, so the pass does not re-run, and the allowlist rebuild discards the re-authored library on that system's next save.
+    The re-upgrade path is therefore re-authoring at World > Travel, not re-authoring per system.
+
 ### Catalyst → Tool Migration (`0.6.0`)
 
 The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.

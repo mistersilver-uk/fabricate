@@ -4,6 +4,7 @@
  */
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
+import { normalizeTravelConfig } from './gatheringRealms.js';
 import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResolver.js';
 
 /** World-setting key for the per-system gathering config (mirrors SETTING_KEYS.GATHERING_CONFIG). */
@@ -11,6 +12,9 @@ const GATHERING_CONFIG_KEY = 'gatheringConfig';
 
 /** World-setting key for the currency config (mirrors SETTING_KEYS.CURRENCY_CONFIG). */
 const CURRENCY_CONFIG_KEY = 'currencyConfig';
+
+/** World-setting key for the travel config (mirrors SETTING_KEYS.TRAVEL_CONFIG). */
+const TRAVEL_CONFIG_KEY = 'travelConfig';
 
 /** How often (in recipes processed) Phase 4 emits an interim progress tick. */
 const RECIPE_PROGRESS_INTERVAL = 10;
@@ -597,8 +601,23 @@ export class CompendiumImporter {
     // Resolve + classify references (external existence + broken-internal), then
     // report them. Realm scene refs live on the already-created system; the
     // default resolver never rewrites external UUIDs, so they are reported only.
+    // The realm library rides the ENVELOPE since issue 1282, so it is handed to the resolver
+    // alongside the rest: every realm's `sceneMappings[]` carries a scene and scene-region UUID
+    // that the destination world may not have, and dropping it here is what would silently stop
+    // those being reported.
+    const travelConfig =
+      packData.travelConfig && typeof packData.travelConfig === 'object'
+        ? structuredClone(packData.travelConfig)
+        : null;
+
     const { resolved, unresolvedReferences } = await resolveImportReferences(
-      { system, recipes: recipesData, gatheringEnvironments: environments, gatheringConfig },
+      {
+        system,
+        recipes: recipesData,
+        gatheringEnvironments: environments,
+        gatheringConfig,
+        travelConfig,
+      },
       { resolveUuid: this._resolveExternalUuid }
     );
     summary.unresolvedReferences.push(...unresolvedReferences);
@@ -611,6 +630,67 @@ export class CompendiumImporter {
     await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistGatheringConfig(system.id, resolvedConfig);
     await this._persistCurrencyConfig(packData.currencyConfig);
+    await this._persistTravelConfig(resolved.travelConfig);
+  }
+
+  /**
+   * Merge the imported world travel config into this world's own (issue 1282).
+   *
+   * NON-DESTRUCTIVE, and the direction matters for the same reason it does for currency:
+   * realms are WORLD scope, so unlike the per-system gathering slice there is no key under
+   * which an import may simply replace what is there. Overwriting would destroy the geography
+   * the destination GM authored for systems that have nothing to do with this import.
+   *
+   * So realms merge by `id` with the DESTINATION winning a collision — an id already in this
+   * world keeps its own definition, including its `sceneMappings[]`, and only genuinely new
+   * places are appended. Environments (`includedRealmIds` / `excludedRealmIds`), party
+   * overrides and actor discovery flags ALL cite realms by id, so a destination realm replaced
+   * by an incoming one of the same id would silently re-point every one of those references at
+   * a different place. Destination-wins is also what makes an import safe to run twice.
+   *
+   * The scalars (reveal mode, modifier visibility) are seeded ONLY into an unconfigured world.
+   * A world that already has realms has already answered how it discloses its places, and an
+   * imported system does not get to overrule it.
+   * @private
+   */
+  async _persistTravelConfig(incoming) {
+    if (!this._getSetting || !this._setSetting) return;
+    if (!incoming || typeof incoming !== 'object') return;
+
+    const current = this._getSetting(TRAVEL_CONFIG_KEY) || {};
+    const currentRealms = Array.isArray(current.realms) ? current.realms : [];
+    const incomingRealms = Array.isArray(incoming.realms) ? incoming.realms : [];
+    if (incomingRealms.length === 0) return;
+
+    const seen = new Set(
+      currentRealms.map((realm) => String(realm?.id || '').trim()).filter(Boolean)
+    );
+    const added = [];
+    for (const realm of incomingRealms) {
+      const id = String(realm?.id || '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      added.push(structuredClone(realm));
+    }
+
+    const worldWasUnconfigured = currentRealms.length === 0;
+    if (added.length === 0 && !worldWasUnconfigured) return;
+
+    const next = {
+      ...current,
+      realms: [...currentRealms, ...added],
+    };
+    if (worldWasUnconfigured) {
+      if (incoming.revealMode) next.revealMode = incoming.revealMode;
+      if (incoming.modifierVisibility) next.modifierVisibility = incoming.modifierVisibility;
+    }
+
+    // Normalize before writing, for the reason `_persistCurrencyConfig` does: every other
+    // writer of this setting goes through `GatheringRealmStore`, which normalizes on write.
+    // Without this a hand-edited export could persist a shape the readers only repair on read —
+    // and a scene mapping that arrived without an id would be minted a FRESH id on every
+    // `load()`, changing its identity from one reload to the next.
+    await this._setSetting(TRAVEL_CONFIG_KEY, normalizeTravelConfig(next));
   }
 
   /**

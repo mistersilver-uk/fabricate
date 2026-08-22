@@ -17,7 +17,6 @@
  *   travel-actor-less party, or a marker in no linked Scene Region, resolves to
  *   `unresolved`.
  */
-import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 
 export class GatheringLocationService {
   /**
@@ -28,34 +27,32 @@ export class GatheringLocationService {
    *   Returns the Scene Region UUIDs the marker token currently sits inside.
    *   Foundry-backed at runtime; defaults to none so the service stays pure in tests.
    */
-  constructor({ partyStore, systemManager, senseSceneRegions = () => [] } = {}) {
+  constructor({ partyStore, travelStore, senseSceneRegions = () => [] } = {}) {
     this.partyStore = partyStore;
-    this.systemManager = systemManager;
+    this.travelStore = travelStore;
     this.senseSceneRegions = typeof senseSceneRegions === 'function' ? senseSceneRegions : () => [];
   }
 
-  _getRealms(systemId) {
-    const system = this.systemManager?.getSystem?.(systemId);
-    return Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : [];
+  _getRealms() {
+    const realms = this.travelStore?.list?.();
+    return Array.isArray(realms) ? realms : [];
   }
 
   /**
-   * Whether the realm/travel subsystem is enabled for the given system. Reads
-   * the same shared flag the engine and public API gate on, so a disabled system
-   * resolves to "unresolved" everywhere without re-implementing the check.
+   * WHERE A PARTY IS DOES NOT DEPEND ON A CRAFTING SYSTEM (issue 1282).
    *
-   * @param {string} systemId
-   * @returns {boolean}
+   * This resolver used to take a `systemId`, gate on that system's travel toggle, and read
+   * that system's realms. All three dissolved when realms became world scope: a party is one
+   * set of tokens standing in one place, and that fact is not a property of a crafting system.
+   *
+   * The per-system toggle moved entirely to the CONSUMPTION side — it decides whether a
+   * system's environments are gated by the resolved location, never whether the location
+   * resolves. `GatheringEngine._locationBlockedReasons` still holds that gate, unchanged.
+   *
+   * @param {{ partyId: string }} args
+   * @returns {{ resolved: boolean, source: 'manualOverride'|'travelActor'|'unresolved', realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null }}
    */
-  _realmsEnabled(systemId) {
-    return isGatheringRealmsEnabled(this.systemManager?.getSystem?.(systemId));
-  }
-
-  /**
-   * @param {{ partyId: string, systemId: string }} args
-   * @returns {{ resolved: boolean, source: 'manualOverride'|'travelActor'|'unresolved', realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null, systemId: string }}
-   */
-  resolveCurrentRealms({ partyId, systemId } = {}) {
+  resolveCurrentRealms({ partyId } = {}) {
     const empty = {
       resolved: false,
       source: 'unresolved',
@@ -63,19 +60,15 @@ export class GatheringLocationService {
       realmIds: [],
       staleRealmIds: [],
       partyId: partyId || null,
-      systemId: systemId || '',
     };
-    if (!partyId || !systemId) return empty;
-    // Realm/travel disabled ⇒ never resolve a current realm (no location gating).
-    if (!this._realmsEnabled(systemId)) return empty;
+    if (!partyId) return empty;
 
     const party = this.partyStore?.get?.(partyId);
     if (!party) return empty;
 
-    const override =
-      party.currentRealmOverrides?.[systemId] ?? party.currentRegionOverrides?.[systemId];
+    const override = party.currentRealmOverride;
     if (override && override.mode === 'manual') {
-      const realmsById = new Map(this._getRealms(systemId).map((realm) => [realm.id, realm]));
+      const realmsById = new Map(this._getRealms().map((realm) => [realm.id, realm]));
       const realms = [];
       const realmIds = [];
       const staleRealmIds = [];
@@ -102,7 +95,6 @@ export class GatheringLocationService {
         realmIds,
         staleRealmIds,
         partyId,
-        systemId,
       };
     }
 
@@ -111,16 +103,16 @@ export class GatheringLocationService {
     // their sceneMappings. A travel-actor-less party, or a marker in no linked
     // realm, resolves to unresolved.
     const travelActorUuid = party.travelActorUuid ? String(party.travelActorUuid) : '';
-    if (!travelActorUuid) return { ...empty, partyId, systemId };
+    if (!travelActorUuid) return { ...empty, partyId };
 
     const sensed = this.senseSceneRegions(travelActorUuid);
     const sceneRegionUuids =
       sensed instanceof Set ? sensed : new Set(Array.isArray(sensed) ? sensed : []);
-    if (sceneRegionUuids.size === 0) return { ...empty, partyId, systemId };
+    if (sceneRegionUuids.size === 0) return { ...empty, partyId };
 
     const realms = [];
     const realmIds = [];
-    for (const realm of this._getRealms(systemId)) {
+    for (const realm of this._getRealms()) {
       const mappings = Array.isArray(realm?.sceneMappings) ? realm.sceneMappings : [];
       if (mappings.some((mapping) => sceneRegionUuids.has(mapping?.sceneRegionUuid))) {
         realms.push(realm);
@@ -134,17 +126,20 @@ export class GatheringLocationService {
       realmIds,
       staleRealmIds: [],
       partyId,
-      systemId,
     };
   }
 
   /**
    * Resolve current realms for the enabled party that contains the actor.
    *
-   * @param {{ actor: object, systemId: string }} args
+   * No `systemId`, and no travel gate: where an actor's party is standing is the same answer
+   * whichever crafting system is asking. The gate lives at the consumption side, in
+   * `GatheringEngine._locationBlockedReasons`.
+   *
+   * @param {{ actor: object }} args
    * @returns {object} Same shape as resolveCurrentRealms.
    */
-  resolveForActor({ actor, systemId } = {}) {
+  resolveForActor({ actor } = {}) {
     const unresolved = {
       resolved: false,
       source: 'unresolved',
@@ -152,23 +147,20 @@ export class GatheringLocationService {
       realmIds: [],
       staleRealmIds: [],
       partyId: null,
-      systemId: systemId || '',
     };
-    // Realm/travel disabled ⇒ fast-exit to unresolved-empty (no party lookup).
-    if (!this._realmsEnabled(systemId)) return unresolved;
     const actorUuid = actor?.uuid ?? null;
     const party = actorUuid ? this.partyStore?.findEnabledPartyForActor?.(actorUuid) : null;
     if (!party) return unresolved;
-    return this.resolveCurrentRealms({ partyId: party.id, systemId });
+    return this.resolveCurrentRealms({ partyId: party.id });
   }
 
   /**
    * Build the current-realm context consumed by `evaluateLocationAvailability`.
    *
-   * @param {{ actor: object, systemId: string }} args
-   * @returns {{ resolved: boolean, source: string, realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null, systemId: string }}
+   * @param {{ actor: object }} args
+   * @returns {{ resolved: boolean, source: string, realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null }}
    */
-  buildCurrentRealmContext({ actor, systemId } = {}) {
-    return this.resolveForActor({ actor, systemId });
+  buildCurrentRealmContext({ actor } = {}) {
+    return this.resolveForActor({ actor });
   }
 }

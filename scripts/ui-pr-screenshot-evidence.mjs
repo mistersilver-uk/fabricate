@@ -603,28 +603,28 @@ export const VIEW_RECIPES = Object.freeze([
   toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
   worldNavigationFrame(
-    'manager-system-travel-default-collapsed',
+    'manager-world-travel-default-collapsed',
     'Manager Travel — default collapsed'
   ),
   worldNavigationFrame(
-    'manager-system-travel-expanded-neutral',
+    'manager-world-travel-expanded-neutral',
     'Manager Travel — expanded neutral'
   ),
   worldNavigationFrame('manager-world-parties-normal', 'Manager World — Parties'),
-  worldNavigationFrame('manager-system-travel-card-off', 'Manager Travel — card off'),
+  worldNavigationFrame('manager-world-travel-ungated', 'Manager Travel — non-participating system'),
   worldNavigationFrame(
-    'manager-system-travel-with-gathering-expanded',
+    'manager-world-travel-with-gathering-expanded',
     'Manager Travel — Gathering and Travel expanded'
   ),
-  worldNavigationFrame('manager-system-travel-realms-normal', 'Manager Travel — Realms'),
+  worldNavigationFrame('manager-world-travel-realms-normal', 'Manager Travel — Realms'),
   worldNavigationFrame(
-    'manager-system-travel-realms-stacked',
+    'manager-world-travel-realms-stacked',
     'Manager Travel — Realms stacked'
   ),
-  worldNavigationFrame('manager-system-travel-map-normal', 'Manager Travel — Map'),
-  worldNavigationFrame('manager-system-travel-map-stacked', 'Manager Travel — Map stacked'),
+  worldNavigationFrame('manager-world-travel-map-normal', 'Manager Travel — Map'),
+  worldNavigationFrame('manager-world-travel-map-stacked', 'Manager Travel — Map stacked'),
   worldNavigationFrame(
-    'manager-system-travel-map-collapsed-rail',
+    'manager-world-travel-map-collapsed-rail',
     'Manager Travel — Map collapsed rail'
   ),
   {

@@ -230,7 +230,7 @@ test('runner: surfaces the GM-notice system names and never persists the transie
   const summary = await runner.run();
 
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'system names surfaced for the GM notice');
-  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.27.0');
 
   // The transient field is never written into any persisted setting payload.
   for (const { value } of settings.calls.set) {
@@ -238,9 +238,12 @@ test('runner: surfaces the GM-notice system names and never persists the transie
     assert.equal(json.includes('_unifiedRegionSystems'), false);
   }
 
-  // The data transform was actually persisted.
+  // The data transform was actually persisted. 1.27.0 runs after this unification and lifts the
+  // derived realms to the world `travelConfig` (issue 1282), so that is where they land — the
+  // system keeps only its participation flag.
   const savedSystems = settings.store.get('craftingSystems');
-  assert.equal(savedSystems[0].gatheringRealms[0].id, 'north');
+  assert.equal(savedSystems[0].gatheringRealms, undefined);
+  assert.equal(settings.store.get('travelConfig').realms[0].id, 'north');
   const savedEnvs = settings.store.get('gatheringEnvironments');
   assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
   const savedConfig = settings.store.get('gatheringConfig');
@@ -263,8 +266,8 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
 
   // First run upgrades.
   await runner.run();
-  const afterFirst = clone(settings.store.get('craftingSystems'));
-  assert.equal(afterFirst[0].gatheringRealms[0].id, 'north');
+  const afterFirst = clone(settings.store.get('travelConfig'));
+  assert.equal(afterFirst.realms[0].id, 'north');
 
   // Simulate a fresh import of the SAME legacy export over the upgraded world, then
   // a version reset (the import path does not re-run migrations), then next startup.
@@ -275,8 +278,12 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
 
   const summary = await runner.run();
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'the re-imported legacy data is upgraded again');
+  // The re-imported realms are stripped from the system again, but 1.27.0's idempotence guard
+  // holds: the already-populated world library is authoritative and is NOT re-merged, so the GM
+  // keeps whatever they have since edited there rather than having the import re-imposed on it.
   const savedSystems = settings.store.get('craftingSystems');
-  assert.equal(savedSystems[0].gatheringRealms[0].id, 'north');
+  assert.equal(savedSystems[0].gatheringRealms, undefined);
+  assert.deepEqual(settings.store.get('travelConfig'), afterFirst, 'the world library is untouched');
   const savedEnvs = settings.store.get('gatheringEnvironments');
   assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
 });
@@ -296,5 +303,5 @@ test('runner: no GM notice and no gatheringConfig rewrite when there is no legac
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringConfig'), false, 'no rewrite when nothing to unify');
   assert.equal(setKeys.includes('craftingSystems'), false, 'systems untouched when no regions derived');
-  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.27.0');
 });

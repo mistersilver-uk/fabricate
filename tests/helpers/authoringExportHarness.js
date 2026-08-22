@@ -36,12 +36,16 @@ globalThis.fromUuid = globalThis.fromUuid || (async () => null); // all external
 /**
  * Stand up the shared single-store harness for a fixture.
  *
- * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object }} fixture
+ * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig?: object }} fixture
  * @returns {{ settings: Map, getSetting: Function, setSetting: Function, systemManager: object, recipeManager: object, environmentStore: GatheringEnvironmentStore }}
  */
 export function makeHarness(fixture) {
   const settings = new Map();
   settings.set('gatheringConfig', structuredClone(fixture.gatheringConfig));
+  // The WORLD travel configuration (issue 1282). It is a world SETTING now rather than a field
+  // on the system, so the single shared settings map is where an export reads it from and where
+  // an import writes it back to.
+  settings.set('travelConfig', structuredClone(fixture.travelConfig ?? {}));
   const getSetting = (key) => settings.get(key);
   const setSetting = async (key, value) => {
     settings.set(key, structuredClone(value));
@@ -99,8 +103,9 @@ export function makeHarness(fixture) {
 /**
  * Faithful reproduction of `src/main.js`'s `game.fabricate.exportSystem` argument
  * resolution: resolve the environment store's FULL global list and the raw
- * `gatheringConfig` setting, then hand all five args to `buildExportPayload`. The
- * `?? []` / `|| {}` defaults mirror the public-API path exactly. Pinned to the
+ * `gatheringConfig` setting plus the two WORLD configs (currency, travel), then hand all
+ * seven args to `buildExportPayload`. The `?? []` / `|| {}` defaults mirror the public-API
+ * path exactly. Pinned to the
  * real `src/main.js` closure by a source-contract guard in
  * `tests/export-system-gathering-bundle.test.js`.
  *
@@ -113,7 +118,17 @@ export function exportViaPublicApiResolution(h, systemId) {
   const recipes = h.recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.toJSON());
   const gatheringEnvironments = h.environmentStore?.list?.() ?? [];
   const gatheringConfig = h.getSetting('gatheringConfig') || {};
-  return buildExportPayload(system, recipes, VERSION, gatheringEnvironments, gatheringConfig);
+  const currencyConfig = h.getSetting('currencyConfig') || {};
+  const travelConfig = h.getSetting('travelConfig') || {};
+  return buildExportPayload(
+    system,
+    recipes,
+    VERSION,
+    gatheringEnvironments,
+    gatheringConfig,
+    currencyConfig,
+    travelConfig
+  );
 }
 
 /**
@@ -134,7 +149,17 @@ export function exportViaAdminStoreResolution(h, systemId) {
   const gatheringEnvironments =
     typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
   const gatheringConfig = h.getSetting?.('gatheringConfig') || {};
-  return buildExportPayload(system, recipes, VERSION, gatheringEnvironments, gatheringConfig);
+  const currencyConfig = h.getSetting?.('currencyConfig') || {};
+  const travelConfig = h.getSetting?.('travelConfig') || {};
+  return buildExportPayload(
+    system,
+    recipes,
+    VERSION,
+    gatheringEnvironments,
+    gatheringConfig,
+    currencyConfig,
+    travelConfig
+  );
 }
 
 /**

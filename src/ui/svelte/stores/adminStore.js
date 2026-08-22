@@ -23,24 +23,35 @@
  * concurrent callers share the same in-flight confirmation promise.
  */
 import { writable, get } from 'svelte/store';
+
 import {
-  createRecipeGraphIndex,
-  buildBoundedRecipeGraph,
-  layoutGraph,
-} from '../util/recipeGraphBuilder.js';
-import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
-import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
+  getCharacterPrerequisitePresetsForFoundrySystem,
+  seedCharacterPrerequisitePresets,
+} from '../../../config/characterPrerequisitePresets.js';
 import {
-  TIME_OF_DAY_ICONS,
-  WEATHER_ICONS,
-  WEATHER_FALLBACK_ICON,
-} from '../util/gatheringConditionIcons.js';
+  getCurrencyPresetsForFoundrySystem,
+  seedCurrencyPresets,
+} from '../../../config/currencyPresets.js';
+import {
+  getDefaultProviderId,
+  getProviderCanonicalUnits,
+} from '../../../config/currencyProviders.js';
+import { getFabricateFlag } from '../../../config/flags.js';
+import {
+  getCharacterModifierPresetsForFoundrySystem,
+  seedCharacterModifierPresets,
+} from '../../../config/gatheringCharacterModifierPresets.js';
+import {
+  normalizeCharacterPrerequisite,
+  normalizeCharacterPrerequisiteList,
+} from '../../../systems/characterPrerequisites.js';
 import {
   buildExportPayload,
   validateImportData,
   prepareForImport,
   makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
+import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
 import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
@@ -65,26 +76,6 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../../../utils/vocabularyCascade.js';
-import {
-  getCharacterModifierPresetsForFoundrySystem,
-  seedCharacterModifierPresets,
-} from '../../../config/gatheringCharacterModifierPresets.js';
-import {
-  getCharacterPrerequisitePresetsForFoundrySystem,
-  seedCharacterPrerequisitePresets,
-} from '../../../config/characterPrerequisitePresets.js';
-import {
-  normalizeCharacterPrerequisite,
-  normalizeCharacterPrerequisiteList,
-} from '../../../systems/characterPrerequisites.js';
-import {
-  getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets,
-} from '../../../config/currencyPresets.js';
-import {
-  getDefaultProviderId,
-  getProviderCanonicalUnits,
-} from '../../../config/currencyProviders.js';
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
@@ -114,30 +105,42 @@ import {
   activityFailureResultPolicy,
   normalizeFailureResultPolicy,
 } from '../../../utils/failureResultPolicy.js';
-import { getFabricateFlag } from '../../../config/flags.js';
+import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
 } from '../apps/manager/knowledge/knowledgeStudio.js';
+import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
+import {
+  TIME_OF_DAY_ICONS,
+  WEATHER_ICONS,
+  WEATHER_FALLBACK_ICON,
+} from '../util/gatheringConditionIcons.js';
+import {
+  createRecipeGraphIndex,
+  buildBoundedRecipeGraph,
+  layoutGraph,
+} from '../util/recipeGraphBuilder.js';
+
 // The GM browser projection (issue 1090). Row, card and inspector projection are pure
 // modules now; this store is the reactive wiring and service orchestration around them.
 // Each is imported back under the module-private name it had while it lived here, so the
 // call sites below are unchanged — the same shape the knowledge projection uses above
 // after issue 785 extracted it.
 import {
+  buildItemCards as _buildItemCards,
+  republishHydratedItemCards as _republishHydratedItemCards,
+} from './adminComponentRowProjection.js';
+import {
+  buildRecipeList as _buildRecipeList,
+  
+  withoutDerivedRecipeProjectionFields,
+} from './adminRecipeRowProjection.js';
+import {
   clonePlain as _clonePlain,
   fallbackRandomID as _fallbackRandomID,
   normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
 } from './adminStoreInternals.js';
-import {
-  buildRecipeList as _buildRecipeList,
-  DERIVED_RECIPE_PROJECTION_FIELDS,
-  withoutDerivedRecipeProjectionFields,
-} from './adminRecipeRowProjection.js';
-import {
-  buildItemCards as _buildItemCards,
-  republishHydratedItemCards as _republishHydratedItemCards,
-} from './adminComponentRowProjection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
@@ -146,7 +149,7 @@ import {
 // `DERIVED_RECIPE_PROJECTION_FIELDS` and `withoutDerivedRecipeProjectionFields` moved to
 // the row projection alongside the derivation they describe, and are re-exported here so
 // this module's public surface is unchanged for any importer of the old path.
-export { DERIVED_RECIPE_PROJECTION_FIELDS, withoutDerivedRecipeProjectionFields };
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -389,11 +392,9 @@ function _buildManagedItemOptions(managedItems = []) {
     // different things. Normalization guarantees the key, so it is projected
     // unconditionally rather than through a hasOwnProperty guard.
     category: item.category || 'general',
-    ...(item.originItemUuid ? { originItemUuid: item.originItemUuid } : {}),
-    ...(item.registeredItemUuid ? { registeredItemUuid: item.registeredItemUuid } : {}),
-    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
-      ? { difficulty: item.difficulty }
-      : {}),
+    ...(item.originItemUuid && { originItemUuid: item.originItemUuid }),
+    ...(item.registeredItemUuid && { registeredItemUuid: item.registeredItemUuid }),
+    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && { difficulty: item.difficulty }),
   }));
 }
 
@@ -468,18 +469,18 @@ function _normalizeGatheringConditionId(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '');
 }
 
 function _normalizeGatheringTagList(value) {
   const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
-  return Array.from(new Set(values.map(_normalizeGatheringTag).filter(Boolean)));
+  return [...new Set(values.map(_normalizeGatheringTag).filter(Boolean))];
 }
 
 function _normalizeGatheringConditionIdList(value) {
   const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
-  return Array.from(new Set(values.map(_normalizeGatheringConditionId).filter(Boolean)));
+  return [...new Set(values.map(_normalizeGatheringConditionId).filter(Boolean))];
 }
 
 function _seedGatheringVocabulary(raw, defaults) {
@@ -845,7 +846,7 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     // Preserve the resource-node config (count/depletion/respawn/depletedBehavior)
     // so authoring it on a task survives the save (the runtime reads it back to
     // seed per-env pools; canvas tokens snapshot it for per-token depletion).
-    ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {}),
+    ...(normalizeNodeConfig(task.nodes) && { nodes: normalizeNodeConfig(task.nodes) }),
     // This task's own check-modifier pick (issue 1095), consulted only under the
     // `bySubject` combination rule. Attached ONLY when authored: an authored EMPTY array
     // is a real pick of zero, distinct from an absent one which inherits
@@ -1041,7 +1042,7 @@ function _normalizeGatheringConfig(raw = {}, randomID = _fallbackRandomID) {
       // Preserve the economy block (stamina/nodes limitation flags + stamina
       // config) so views can read the active flags reactively. Owned/normalized
       // by the service.
-      ...(systemConfig?.economy ? { economy: _clonePlain(systemConfig.economy) } : {}),
+      ...(systemConfig?.economy && { economy: _clonePlain(systemConfig.economy) }),
     };
   }
   return {
@@ -1088,7 +1089,7 @@ function _normalizeGatheringSystemConditions(raw = {}, fallback = {}) {
 }
 
 function _escapeHtml(value) {
-  return String(value ?? '').replace(
+  return String(value ?? '').replaceAll(
     /[&<>"']/g,
     (character) =>
       ({
@@ -1180,7 +1181,7 @@ function _emptyTravelState() {
     travelSaving: false,
     travelError: null,
     travelFieldErrors: {},
-    selectedSystemRealms: [],
+    worldRealms: [],
     actorOptions: [],
   };
 }
@@ -1251,7 +1252,7 @@ function _environmentValidationMessages(err) {
 
 function _fieldSelectorForPath(path) {
   if (!path) return null;
-  const escaped = String(path).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const escaped = String(path).replaceAll('\\', '\\\\').replaceAll('"', String.raw`\"`);
   return `[data-environment-field="${escaped}"]`;
 }
 
@@ -1418,7 +1419,7 @@ function _findTaskForValidationMessage(message, draft) {
 }
 
 function _domIdFromPath(path) {
-  return String(path || 'field').replace(/[^a-zA-Z0-9_-]+/g, '-');
+  return String(path || 'field').replaceAll(/[^a-zA-Z0-9_-]+/g, '-');
 }
 
 function _taskCopyName(name, localizeFn) {
@@ -1947,7 +1948,7 @@ export function createAdminStore(services) {
     const overlay = (entries, entry) => {
       if (!entry) return entries.map(_clonePlain);
       const index = entries.findIndex((tool) => String(tool.id) === String(entry.id));
-      if (index < 0) return [...entries.map(_clonePlain), _clonePlain(entry)];
+      if (index === -1) return [...entries.map(_clonePlain), _clonePlain(entry)];
       return entries.map((tool, toolIndex) =>
         toolIndex === index ? _clonePlain(entry) : _clonePlain(tool)
       );
@@ -2035,7 +2036,7 @@ export function createAdminStore(services) {
     const merged = { ...current, ...patch };
     for (const key of nested) {
       if (patch[key] && typeof patch[key] === 'object') {
-        merged[key] = { ...(current[key] || {}), ...patch[key] };
+        merged[key] = { ...current[key], ...patch[key] };
       }
     }
     toolDraft.set(_normalizeGatheringLibraryTool(merged, _randomID));
@@ -2570,12 +2571,18 @@ export function createAdminStore(services) {
       return Array.isArray(options) ? _clonePlain(options) : [];
     }
 
+    // Reads the SHARED gate helper off the system, not `enabled` through the realm store.
+    //
+    // That indirection was a real trap (issue 1282): the world travel config carries no
+    // `enabled` — participation is a crafting system's answer, not the world's — so a
+    // predicate reading it through `getRealmSettings()` would be permanently false, party
+    // overrides would become unreachable, and the UI would show a hint about a prerequisite
+    // the GM had already met.
     function canUsePartyRealmOverrides(systemId = get(selectedSystemId)) {
       const id = String(systemId || '');
       if (!id || id !== String(get(selectedSystemId) || '')) return false;
       const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
-      const settings = getRealmStore()?.getRealmSettings?.(id) || null;
-      return system?.features?.gathering === true && settings?.enabled === true;
+      return system?.features?.gathering === true && isGatheringRealmsEnabled(system);
     }
 
     function clearErrors() {
@@ -2602,14 +2609,14 @@ export function createAdminStore(services) {
       const actorByUuid = new Map(actorOptions.map((actor) => [actor.uuid, actor]));
 
       let selectedId = get(travelSelectedPartyId);
-      if (selectedId && !parties.some((party) => party.id === selectedId)) selectedId = '';
+      if (selectedId && parties.every((party) => !(party.id === selectedId))) selectedId = '';
       if (!selectedId && parties.length > 0) selectedId = parties[0].id;
       if (selectedId !== get(travelSelectedPartyId)) travelSelectedPartyId.set(selectedId);
 
-      const realms =
-        systemId && realmStore?.listBySystem
-          ? _clonePlain(realmStore.listBySystem(systemId) || [])
-          : [];
+      // The WORLD's realm library (issue 1282). No system id: realms are geography, so the
+      // library is the same whichever crafting system is selected — and World > Travel has to
+      // render it before any system opts in.
+      const realms = realmStore?.list ? _clonePlain(realmStore.list() || []) : [];
       const realmById = new Map(realms.map((realm) => [realm.id, realm]));
       const locationService = getLocationService();
       const partyRealmOverridesAvailable = canUsePartyRealmOverrides(systemId);
@@ -2622,7 +2629,7 @@ export function createAdminStore(services) {
       for (const party of parties) {
         const evidence =
           partyRealmOverridesAvailable && locationService?.resolveCurrentRealms
-            ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
+            ? locationService.resolveCurrentRealms({ partyId: party.id })
             : {
                 resolved: false,
                 source: 'unresolved',
@@ -2650,13 +2657,10 @@ export function createAdminStore(services) {
           realmIds: [],
           staleRealmIds: [],
         };
-        const override = partyRealmOverridesAvailable
-          ? (party.currentRealmOverrides?.[systemId] ??
-            party.currentRegionOverrides?.[systemId] ??
-            null)
-          : null;
-        const overrideRealmIds =
-          override?.mode === 'manual' ? (override.realmIds ?? override.regionIds ?? []) : [];
+        // One override per party since issue 1282 — realms are world geography, so a party is
+        // in one place rather than one place per crafting system.
+        const override = partyRealmOverridesAvailable ? (party.currentRealmOverride ?? null) : null;
+        const overrideRealmIds = override?.mode === 'manual' ? (override.realmIds ?? []) : [];
         const memberCards = party.memberActorUuids.map((uuid) => ({
           uuid,
           name: actorByUuid.get(uuid)?.name || '',
@@ -2692,21 +2696,14 @@ export function createAdminStore(services) {
         };
       });
 
-      // Per-realm counts for the Realms tab header chips. Environments are
-      // fetched once (sync arrays only — listBySystem may be async); parties
-      // reuse the raw list already built above.
+      // Per-realm counts for the Realms tab header chips. EVERY environment in the world,
+      // not one system's (issue 1282): a world realm can be cited by an environment belonging
+      // to any crafting system that opted in, and World > Travel reports all of them — the
+      // same rule `GatheringRealmStore._collectReferences` applies to delete evidence.
       const realmEnvList = (() => {
         if (realms.length === 0) return [];
         const environmentStore = _getEnvironmentStore();
-        if (!environmentStore) return [];
-        // listBySystem may be async; prefer its synchronous array, else fall
-        // back to a synchronous list() (realm ids are unique per system).
-        const bySystem =
-          typeof environmentStore.listBySystem === 'function'
-            ? environmentStore.listBySystem(systemId)
-            : null;
-        if (Array.isArray(bySystem)) return bySystem;
-        const all = typeof environmentStore.list === 'function' ? environmentStore.list() : [];
+        const all = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
         return Array.isArray(all) ? all : [];
       })();
       const realmEnvironments = (realmId) =>
@@ -2751,7 +2748,7 @@ export function createAdminStore(services) {
         (sceneRegion) => {
           const linkedRegionId = linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || '';
           // Parties whose travel marker currently sits inside this Scene Region.
-          const insideUuids = markerUuids.length
+          const insideUuids = markerUuids.length > 0
             ? new Set(
                 services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) ||
                   []
@@ -2778,7 +2775,7 @@ export function createAdminStore(services) {
         travelSaving: get(travelSaving),
         travelError: get(travelError),
         travelFieldErrors: _clonePlain(get(travelFieldErrors)),
-        selectedSystemRealms: realms.map((realm) => {
+        worldRealms: realms.map((realm) => {
           const environments = realmEnvironments(realm.id);
           const partiesInRealm = realmParties(realm.id);
           return {
@@ -2795,10 +2792,22 @@ export function createAdminStore(services) {
             parties: partiesInRealm,
           };
         }),
-        gatheringRealmSettings:
-          systemId && realmStore?.getRealmSettings
-            ? realmStore.getRealmSettings(systemId)
-            : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
+        // Two sources, deliberately: `enabled` is the SELECTED SYSTEM's participation flag and
+        // the reveal/visibility pair is the WORLD's behaviour. The world travel config carries
+        // no `enabled` at all since issue 1282, so reading one out of it would be permanently
+        // false — the trap `canUsePartyRealmOverrides` above already names.
+        gatheringRealmSettings: {
+          ...(realmStore?.getRealmSettings
+            ? realmStore.getRealmSettings()
+            : { revealMode: 'manual', modifierVisibility: 'visible' }),
+          // `enabled` is spread LAST on purpose. The world config carries none today and a store
+          // test pins that, but if one ever came back it would land here as a permanently false
+          // participation flag — silently, since the symptom is an unreachable control rather
+          // than an error. Ordering it last makes the system's answer win by construction.
+          enabled: isGatheringRealmsEnabled(
+            services.getCraftingSystemManager?.()?.getSystem?.(String(systemId || '')) || null
+          ),
+        },
         partyRealmOverridesAvailable,
         actorOptions,
       };
@@ -2817,8 +2826,8 @@ export function createAdminStore(services) {
       try {
         await operation(partyStore);
         return true;
-      } catch (err) {
-        applyError(err, fieldContext);
+      } catch (error) {
+        applyError(error, fieldContext);
         return false;
       } finally {
         travelSaving.set(false);
@@ -2848,12 +2857,8 @@ export function createAdminStore(services) {
         });
         return created;
       },
-      async renameParty(partyId, name) {
-        return withSave((partyStore) => partyStore.update(partyId, { name: String(name ?? '') }));
-      },
-      async setPartyEnabled(partyId, enabled) {
-        return withSave((partyStore) => partyStore.setEnabled(partyId, enabled === true));
-      },
+      renameParty: async (partyId, name) => withSave((partyStore) => partyStore.update(partyId, { name: String(name ?? '') })),
+      setPartyEnabled: async (partyId, enabled) => withSave((partyStore) => partyStore.setEnabled(partyId, enabled === true)),
       async deleteParty(partyId) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
@@ -2880,9 +2885,7 @@ export function createAdminStore(services) {
           if (get(travelSelectedPartyId) === partyId) travelSelectedPartyId.set('');
         });
       },
-      async addPartyMember(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members');
-      },
+      addPartyMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members'),
       async addOrMovePartyMember(targetPartyId, actorUuid) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
@@ -2930,152 +2933,107 @@ export function createAdminStore(services) {
         }
         return withSave((store) => store.addMember(targetPartyId, uuid), 'members');
       },
-      async removePartyMember(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members');
-      },
-      async movePartyMember(fromPartyId, toPartyId, actorUuid) {
-        return withSave(
+      removePartyMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members'),
+      movePartyMember: async (fromPartyId, toPartyId, actorUuid) => withSave(
           (partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid),
           'members'
-        );
-      },
-      async setPartyTravelActor(partyId, actorUuid) {
-        return withSave(
+        ),
+      setPartyTravelActor: async (partyId, actorUuid) => withSave(
           (partyStore) => partyStore.setTravelActor(partyId, actorUuid),
           'travelActor'
-        );
-      },
-      async clearPartyTravelActor(partyId) {
-        return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
-      },
+        ),
+      clearPartyTravelActor: async (partyId) => withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
       async setPartyRealmOverride(partyId, systemId, realmIds) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
         return withSave((partyStore) =>
-          partyStore.setCurrentRealmOverride(partyId, systemId, realmIds || [])
+          partyStore.setCurrentRealmOverride(partyId, realmIds || [])
         );
       },
       async clearPartyRealmOverride(partyId, systemId) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
-        return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId, systemId));
+        return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId));
       },
-      async removeStaleMember(partyId, actorUuid) {
-        return withSave((partyStore) => partyStore.removeMember(partyId, actorUuid));
-      },
-      async clearStaleTravelActor(partyId) {
-        return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
-      },
+      removeStaleMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.removeMember(partyId, actorUuid)),
+      clearStaleTravelActor: async (partyId) => withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
       async dropStaleOverrideRealm(partyId, systemId, realmId) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);
-        const override =
-          party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
-        const overrideIds = override?.realmIds ?? override?.regionIds;
+        const override = party?.currentRealmOverride;
+        const overrideIds = override?.realmIds;
         const nextIds = Array.isArray(overrideIds)
           ? overrideIds.filter((id) => id !== realmId)
           : [];
-        return withSave((store) => store.setCurrentRealmOverride(partyId, systemId, nextIds));
+        return withSave((store) => store.setCurrentRealmOverride(partyId, nextIds));
       },
       // --- Realm quick list (name/enabled only; never touches other fields). ---
-      async createRealmQuick(systemId, name) {
+      //
+      // None of these takes a crafting system id any more (issue 1282). The realm library is
+      // world scope, so World > Travel authors it whether or not a system is selected — and a
+      // system-gated write here would refuse the very first realm a GM creates.
+      async createRealmQuick(name) {
         const realmStore = getRealmStore();
-        if (!realmStore || !systemId) return false;
+        if (!realmStore) return false;
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const created = await realmStore.create(systemId, { name: String(name ?? '').trim() });
+          const created = await realmStore.create({ name: String(name ?? '').trim() });
           // Return the new realm id so callers can select it; fall back to true.
           return created?.id || true;
-        } catch (err) {
-          applyError(err);
+        } catch (error) {
+          applyError(error);
           return false;
         } finally {
           travelSaving.set(false);
           patch();
         }
       },
-      async renameRealm(systemId, realmId, name) {
-        return _realmPatch(systemId, realmId, { name: String(name ?? '') });
-      },
-      async toggleRealmEnabled(systemId, realmId, enabled) {
-        return _realmPatch(systemId, realmId, { enabled: enabled === true });
-      },
+      renameRealm: async (realmId, name) => _realmPatch(realmId, { name: String(name ?? '') }),
+      toggleRealmEnabled: async (realmId, enabled) => _realmPatch(realmId, { enabled: enabled === true }),
       // Merge-patch a single realm; the store merges over the existing record so
       // fields the caller omits round-trip untouched. Backs the full Travel
       // realm authoring surface (description/img/secret/biomes).
-      async updateRealm(systemId, realmId, patch = {}) {
-        return _realmPatch(systemId, realmId, patch && typeof patch === 'object' ? patch : {});
-      },
+      updateRealm: async (realmId, patch = {}) => _realmPatch(realmId, patch && typeof patch === 'object' ? patch : {}),
       // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
       // realm. Single-valued: the scene region is stripped from every realm's
-      // sceneMappings (on this scene) before being attached to the chosen realm;
-      // a falsy realmId just clears the link. Only realms that actually change
-      // are persisted, so this is a no-op write when nothing moved.
+      // sceneMappings before being attached to the chosen one; a falsy realmId just
+      // clears the link.
+      //
+      // ONE store call, not one `update()` per realm (issue 1282). Against a
+      // setting-backed store the old loop was a guaranteed lost update — iteration N+1
+      // read the cache as it stood before N — so the strip-and-attach is expressed as a
+      // single `setSceneRegionLink` write. It takes no crafting system id either: a
+      // Scene Region points at a place, not at a ruleset.
       async setMapRegionLink(sceneRegionUuid, fabricateRealmId) {
         const realmStore = getRealmStore();
-        const systemId = get(selectedSystemId);
         const targetSceneRegionUuid = String(sceneRegionUuid || '');
-        if (!realmStore || !systemId || !targetSceneRegionUuid) return false;
+        if (!realmStore?.setSceneRegionLink || !targetSceneRegionUuid) return false;
         const sceneData = services.getCurrentSceneRegions?.() || { sceneUuid: '', regions: [] };
         const sceneUuid = String(sceneData.sceneUuid || '');
         const nextRealmId = fabricateRealmId ? String(fabricateRealmId) : '';
-        const matchesTarget = (mapping) =>
-          mapping?.sceneRegionUuid === targetSceneRegionUuid &&
-          (!sceneUuid || !mapping?.sceneUuid || mapping.sceneUuid === sceneUuid);
         clearErrors();
         travelSaving.set(true);
         patch();
         try {
-          const realms = realmStore.listBySystem?.(systemId) || [];
-          const realmList = Array.isArray(realms) ? realms : [];
-
-          for (const realm of realmList) {
-            const mappings = Array.isArray(realm.sceneMappings) ? realm.sceneMappings : [];
-            const filtered = mappings.filter((mapping) => !matchesTarget(mapping));
-            if (nextRealmId && realm.id === nextRealmId) {
-              await realmStore.update(systemId, realm.id, {
-                sceneMappings: [...filtered, { sceneUuid, sceneRegionUuid: targetSceneRegionUuid }],
-              });
-            } else if (filtered.length !== mappings.length) {
-              await realmStore.update(systemId, realm.id, { sceneMappings: filtered });
-            }
-          }
-
+          await realmStore.setSceneRegionLink(targetSceneRegionUuid, nextRealmId, { sceneUuid });
           // No current-realm writes here: a party's current realm is derived
           // LIVE from its travel marker's position (GatheringLocationService auto
           // sensing), so inside markers resolve to the new link automatically.
           return true;
-        } catch (err) {
-          applyError(err);
+        } catch (error) {
+          applyError(error);
           return false;
         } finally {
           travelSaving.set(false);
           patch();
         }
       },
-      async setGatheringRealmsEnabled(systemId, enabled) {
+      async deleteRealm(realmId) {
         const realmStore = getRealmStore();
-        if (!realmStore?.updateRealmSettings || !systemId) return false;
-        clearErrors();
-        travelSaving.set(true);
-        patch();
-        try {
-          await realmStore.updateRealmSettings(systemId, { enabled: enabled === true });
-          return true;
-        } catch (err) {
-          applyError(err);
-          return false;
-        } finally {
-          travelSaving.set(false);
-          patch();
-        }
-      },
-      async deleteRealm(systemId, realmId) {
-        const realmStore = getRealmStore();
-        if (!realmStore || !systemId) return false;
-        const realm = realmStore.get?.(systemId, realmId);
+        if (!realmStore) return false;
+        const realm = realmStore.getRealm?.(realmId);
         // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
         // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
         // is HTML.
@@ -3084,7 +3042,7 @@ export function createAdminStore(services) {
         // Collect referenced-by evidence WITHOUT deleting first: GatheringRealmStore.delete
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
-        const references = _collectRealmReferences(systemId, realmId);
+        const references = _collectRealmReferences(realmId);
         const refLine =
           references.environments.length > 0 || references.parties.length > 0
             ? `<p>${
@@ -3111,13 +3069,13 @@ export function createAdminStore(services) {
         travelSaving.set(true);
         patch();
         try {
-          await realmStore.delete(systemId, realmId, {
+          await realmStore.delete(realmId, {
             environmentStore: _getEnvironmentStore(),
             partyStore: getPartyStore(),
           });
           return true;
-        } catch (err) {
-          applyError(err);
+        } catch (error) {
+          applyError(error);
           return false;
         } finally {
           travelSaving.set(false);
@@ -3126,17 +3084,13 @@ export function createAdminStore(services) {
       },
     };
 
-    function _collectRealmReferences(systemId, realmId) {
+    function _collectRealmReferences(realmId) {
       const environments = [];
       const parties = [];
       const environmentStore = _getEnvironmentStore();
-      const envList =
-        typeof environmentStore?.listBySystem === 'function'
-          ? environmentStore.listBySystem(systemId)
-          : typeof environmentStore?.list === 'function'
-            ? environmentStore.list()
-            : [];
-      // listBySystem may be async (environment store); only use synchronous arrays here.
+      // EVERY environment in the world (issue 1282), not the selected system's: the GM has to
+      // see each one that names the place they are about to delete.
+      const envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
       if (Array.isArray(envList)) {
         for (const env of envList) {
           const included =
@@ -3149,9 +3103,8 @@ export function createAdminStore(services) {
       const partyStore = getPartyStore();
       const partyList = typeof partyStore?.list === 'function' ? partyStore.list() : [];
       for (const party of Array.isArray(partyList) ? partyList : []) {
-        const override =
-          party?.currentRealmOverrides?.[systemId] ?? party?.currentRegionOverrides?.[systemId];
-        const overrideIds = override?.realmIds ?? override?.regionIds;
+        const override = party?.currentRealmOverride;
+        const overrideIds = override?.realmIds;
         if (override && Array.isArray(overrideIds) && overrideIds.includes(realmId)) {
           parties.push({ id: party.id, name: party.name });
         }
@@ -3159,17 +3112,17 @@ export function createAdminStore(services) {
       return { environments, parties };
     }
 
-    async function _realmPatch(systemId, realmId, patchData) {
+    async function _realmPatch(realmId, patchData) {
       const realmStore = getRealmStore();
-      if (!realmStore || !systemId) return false;
+      if (!realmStore) return false;
       clearErrors();
       travelSaving.set(true);
       patch();
       try {
-        await realmStore.update(systemId, realmId, patchData);
+        await realmStore.update(realmId, patchData);
         return true;
-      } catch (err) {
-        applyError(err);
+      } catch (error) {
+        applyError(error);
         return false;
       } finally {
         travelSaving.set(false);
@@ -3400,7 +3353,7 @@ export function createAdminStore(services) {
     if (!id) return { added: 0, skipped: 0, unsupported: true, foundrySystemId: '' };
     const foundrySystemId = String(services.getFoundrySystemId?.() || '');
     const presets = getCharacterPrerequisitePresetsForFoundrySystem(foundrySystemId);
-    if (!presets.length) {
+    if (presets.length === 0) {
       return { added: 0, skipped: 0, unsupported: true, foundrySystemId };
     }
     const { added, skipped, next } = seedCharacterPrerequisitePresets({
@@ -4362,7 +4315,7 @@ export function createAdminStore(services) {
 
       if (canKeepNewDraft) {
         environmentId = '';
-      } else if (!environments.some((environment) => environment.id === environmentId)) {
+      } else if (environments.every((environment) => !(environment.id === environmentId))) {
         environmentId = environments[0]?.id || '';
         selectedEnvironmentId.set(environmentId);
       }
@@ -4378,15 +4331,15 @@ export function createAdminStore(services) {
           get(environmentDraft)?.id === environmentId &&
           get(environmentDraft)?.craftingSystemId === selectedSystem.id;
 
-        if (!canPreserveDirtyDraft) {
+        if (canPreserveDirtyDraft) {
+          persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
+        } else {
           _setEnvironmentDraftState(persistedDraft, {
             persistedDraft,
             dirty: false,
             isNew: false,
             saveError: null,
           });
-        } else {
-          persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
         }
       }
 
@@ -4398,10 +4351,10 @@ export function createAdminStore(services) {
         environmentTaskCounts,
         ..._currentEnvironmentViewPatch(),
       };
-    } catch (err) {
+    } catch (error) {
       return _clearEnvironmentDraftState({
         canShowEnvironmentsTab: true,
-        error: _environmentErrorMessage(err),
+        error: _environmentErrorMessage(error),
       });
     }
   }
@@ -5275,9 +5228,7 @@ export function createAdminStore(services) {
     const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
     const nextTab = _resolveVisibleTab(tabName, selectedSystem);
     if (nextTab === get(activeTab)) return true;
-    if (get(activeTab) === ENVIRONMENTS_TAB && nextTab !== ENVIRONMENTS_TAB) {
-      if (!(await _discardDirtyEnvironmentDraftForNavigation())) return false;
-    }
+    if (get(activeTab) === ENVIRONMENTS_TAB && nextTab !== ENVIRONMENTS_TAB && !(await _discardDirtyEnvironmentDraftForNavigation())) return false;
     activeTab.set(nextTab);
     await refresh();
     return true;
@@ -5412,17 +5363,30 @@ export function createAdminStore(services) {
     const next = _clonePlain(current);
     for (const [field, value] of Object.entries(updates)) {
       if (!allowed.has(field)) continue;
-      if (field === 'enabled') {
+      switch (field) {
+      case 'enabled': {
         next.enabled = value === true;
-      } else if (field === 'compositionMode') {
+      
+      break;
+      }
+      case 'compositionMode': {
         next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
-      } else if (field === 'sceneUuid') {
+      
+      break;
+      }
+      case 'sceneUuid': {
         const normalized = String(value ?? '').trim();
         next.sceneUuid = normalized || null;
-      } else if (field === 'img') {
+      
+      break;
+      }
+      case 'img': {
         const normalized = String(value ?? '').trim();
         next.img = normalized || null;
-      } else if (['biomes', 'dangerTags'].includes(field)) {
+      
+      break;
+      }
+      default: { if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
       } else if (
         [
@@ -5437,28 +5401,48 @@ export function createAdminStore(services) {
           'eventOrder',
         ].includes(field)
       ) {
-        next[field] = Array.from(
-          new Set(
+        next[field] = [...new Set(
             (Array.isArray(value) ? value : [])
               .map((entry) => String(entry || '').trim())
               .filter(Boolean)
-          )
-        );
-      } else if (field === 'eventDropRateAdjustments') {
+          )];
+      } else switch (field) {
+ case 'eventDropRateAdjustments': {
         next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
-      } else if (field === 'eventDropRateAdjustmentsEnabled') {
+      
+ break;
+ }
+ case 'eventDropRateAdjustmentsEnabled': {
         next.eventDropRateAdjustmentsEnabled =
           _normalizeDraftEventDropRateAdjustmentsEnabled(value);
-      } else if (field === 'taskDropRateAdjustments') {
+      
+ break;
+ }
+ case 'taskDropRateAdjustments': {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
-      } else if (field === 'taskDropRateAdjustmentsEnabled') {
+      
+ break;
+ }
+ case 'taskDropRateAdjustmentsEnabled': {
         next.taskDropRateAdjustmentsEnabled = _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
-      } else if (field === 'blindSelection') {
+      
+ break;
+ }
+ case 'blindSelection': {
         next.blindSelection = _normalizeDraftBlindSelection(value);
-      } else if (field === 'nodeRuntime') {
+      
+ break;
+ }
+ case 'nodeRuntime': {
         next.nodeRuntime = normalizeNodeRuntime(value);
-      } else {
+      
+ break;
+ }
+ default: {
         next[field] = String(value ?? '');
+      }
+ }
+      }
       }
     }
 
@@ -5654,10 +5638,10 @@ export function createAdminStore(services) {
       environmentSaving.set(false);
       await refresh();
       return { ok: true, environment: _clonePlain(get(environmentDraft)) };
-    } catch (err) {
-      const message = _environmentErrorMessage(err);
+    } catch (error) {
+      const message = _environmentErrorMessage(error);
       const validationState = _buildEnvironmentValidationState(
-        err,
+        error,
         get(environmentDraft),
         services.localize,
         ++environmentValidationAttempt
@@ -5690,8 +5674,8 @@ export function createAdminStore(services) {
       });
       await refresh();
       return _clonePlain(get(environmentDraft));
-    } catch (err) {
-      environmentSaveError.set(_environmentErrorMessage(err));
+    } catch (error) {
+      environmentSaveError.set(_environmentErrorMessage(error));
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
       return null;
@@ -5758,8 +5742,8 @@ export function createAdminStore(services) {
       }
       await refresh();
       return true;
-    } catch (err) {
-      environmentSaveError.set(_environmentErrorMessage(err));
+    } catch (error) {
+      environmentSaveError.set(_environmentErrorMessage(error));
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
       return false;
@@ -5775,7 +5759,7 @@ export function createAdminStore(services) {
       const reordered = await environmentStore.reorder(systemId, orderedEnvironmentIds);
       const environments = Array.isArray(reordered) ? reordered : [];
       const selectedId = get(selectedEnvironmentId);
-      if (selectedId && !environments.some((environment) => environment.id === selectedId)) {
+      if (selectedId && environments.every((environment) => !(environment.id === selectedId))) {
         selectedEnvironmentId.set(environments[0]?.id || '');
         environmentDraftDirty.set(false);
         environmentDraftIsNew.set(false);
@@ -5784,8 +5768,8 @@ export function createAdminStore(services) {
       environmentValidationState.set(null);
       await refresh();
       return _clonePlain(get(viewState).environments || []);
-    } catch (err) {
-      environmentSaveError.set(_environmentErrorMessage(err));
+    } catch (error) {
+      environmentSaveError.set(_environmentErrorMessage(error));
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
       return [];
@@ -5795,7 +5779,7 @@ export function createAdminStore(services) {
   async function moveEnvironmentDraft(environmentId, direction) {
     const environments = get(viewState).environments || [];
     const index = environments.findIndex((environment) => environment.id === environmentId);
-    if (index < 0) return [];
+    if (index === -1) return [];
 
     const nextIndex = direction === 'up' ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= environments.length) return environments;
@@ -5848,8 +5832,8 @@ export function createAdminStore(services) {
       environmentValidationState.set(null);
       await refresh();
       return true;
-    } catch (err) {
-      environmentSaveError.set(_environmentErrorMessage(err));
+    } catch (error) {
+      environmentSaveError.set(_environmentErrorMessage(error));
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
       return false;
@@ -5907,8 +5891,8 @@ export function createAdminStore(services) {
       environmentValidationState.set(null);
       await refresh();
       return true;
-    } catch (err) {
-      environmentSaveError.set(_environmentErrorMessage(err));
+    } catch (error) {
+      environmentSaveError.set(_environmentErrorMessage(error));
       environmentValidationState.set(null);
       _patchEnvironmentViewState();
       return false;
@@ -5991,6 +5975,30 @@ export function createAdminStore(services) {
     if (!sysId) return false;
     const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
     await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Whether this crafting system PARTICIPATES in Travel & Realms.
+   *
+   * It sits beside `toggleRequirement` rather than in the travel section (issue 1282) because
+   * it writes a CRAFTING SYSTEM, not the world travel config. The realm library, the reveal
+   * mode and the modifier visibility are world scope; what a system still owns is this one
+   * boolean, with exactly three jobs — whether the party's location gates its environment
+   * access in the engine, what its UI shows, and whether its environments offer the realm
+   * controls. Its home in the Manager is the System Settings feature tile beside Currency.
+   *
+   * @param {string} systemId
+   * @param {boolean} enabled
+   */
+  async function setGatheringRealmsEnabled(systemId, enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = systemId || get(selectedSystemId);
+    if (!sysId || !systemManager?.updateSystem) return false;
+    await systemManager.updateSystem(sysId, {
+      gatheringRealmSettings: { enabled: enabled === true },
+    });
     await refresh();
     return true;
   }
@@ -6146,7 +6154,7 @@ export function createAdminStore(services) {
     const system = systemManager.getSystem(sysId);
     if (!system) return;
     const lower = value.trim().toLowerCase();
-    const tags = Array.from(new Set([...(system.itemTags || system.tags || []), lower]));
+    const tags = [...new Set([...(system.itemTags || system.tags || []), lower])];
     await systemManager.updateSystem(sysId, { itemTags: tags });
     await refresh();
   }
@@ -6284,10 +6292,8 @@ export function createAdminStore(services) {
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
         colorToken: colorToken || null,
-        ...(has('enabled') ? { enabled: options.enabled !== false } : {}),
-        ...(has('propertyMacroUuid')
-          ? { propertyMacroUuid: options.propertyMacroUuid || null }
-          : {}),
+        ...(has('enabled') && { enabled: options.enabled !== false }),
+        ...(has('propertyMacroUuid') && { propertyMacroUuid: options.propertyMacroUuid || null }),
         ...sourceFields,
       },
     ];
@@ -6471,9 +6477,9 @@ export function createAdminStore(services) {
         );
       }
       return { updated, invalidatedRecipes };
-    } catch (err) {
-      console.error('Fabricate | Failed to change essence enabled state:', err);
-      services.notify?.error?.(err?.message || 'Failed to change essence enabled state');
+    } catch (error) {
+      console.error('Fabricate | Failed to change essence enabled state:', error);
+      services.notify?.error?.(error?.message || 'Failed to change essence enabled state');
       return idle;
     }
   }
@@ -6521,9 +6527,9 @@ export function createAdminStore(services) {
         updated: Number(result?.updated) || 0,
         essenceIds: Array.isArray(result?.essenceIds) ? result.essenceIds : [],
       };
-    } catch (err) {
-      console.error('Fabricate | Failed to apply essence bulk edit:', err);
-      services.notify?.error?.(err?.message || 'Failed to apply essence bulk edit');
+    } catch (error) {
+      console.error('Fabricate | Failed to apply essence bulk edit:', error);
+      services.notify?.error?.(error?.message || 'Failed to apply essence bulk edit');
       return null;
     }
   }
@@ -6698,9 +6704,9 @@ export function createAdminStore(services) {
         recipesUpdated: Number(result?.recipesUpdated) || 0,
         recipesDisabled: Number(result?.recipesDisabled) || 0,
       };
-    } catch (err) {
-      console.error('Fabricate | Failed to delete essences:', err);
-      services.notify?.error?.(err?.message || 'Failed to delete essences');
+    } catch (error) {
+      console.error('Fabricate | Failed to delete essences:', error);
+      services.notify?.error?.(error?.message || 'Failed to delete essences');
       return empty;
     }
   }
@@ -6789,7 +6795,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const setting = systemConfig.conditions[kind];
-    if (!setting.values.some((existing) => existing.id === option.id))
+    if (setting.values.every((existing) => !(existing.id === option.id)))
       setting.values = [...setting.values, option];
     if (!setting.current) setting.current = option.id;
     config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
@@ -6818,10 +6824,10 @@ export function createAdminStore(services) {
       return {
         ...option,
         label:
-          updates.label !== undefined
-            ? String(updates.label || '').trim() || option.label
-            : option.label,
-        icon: updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon,
+          updates.label === undefined
+            ? option.label
+            : String(updates.label || '').trim() || option.label,
+        icon: updates.icon === undefined ? option.icon : normalizeEssenceIcon(updates.icon),
       };
     });
     if (!changed) return false;
@@ -6847,7 +6853,7 @@ export function createAdminStore(services) {
     const nextValues = setting.values.filter((existing) => existing.id !== tag);
     if (nextValues.length === setting.values.length) return true;
     setting.values = nextValues;
-    if (!setting.values.some((option) => option.id === setting.current)) {
+    if (setting.values.every((option) => !(option.id === setting.current))) {
       setting.current = setting.values[0]?.id || DEFAULT_GATHERING_CONDITIONS[kind];
     }
     systemConfig.tasks = systemConfig.tasks.map((task) => ({
@@ -6876,7 +6882,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return false;
     const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
-    if (!vocabulary.values.some((existing) => existing.id === option.id)) {
+    if (vocabulary.values.every((existing) => !(existing.id === option.id))) {
       vocabulary.values = [...vocabulary.values, option];
     }
     systemConfig.vocabularies[kind] = vocabulary;
@@ -6905,20 +6911,20 @@ export function createAdminStore(services) {
       const next = {
         ...option,
         label:
-          updates.label !== undefined
-            ? String(updates.label || '').trim() || option.label
-            : option.label,
+          updates.label === undefined
+            ? option.label
+            : String(updates.label || '').trim() || option.label,
       };
       if (kind === 'biomes') {
-        next.icon = updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon;
+        next.icon = updates.icon === undefined ? option.icon : normalizeEssenceIcon(updates.icon);
         next.colorToken =
-          updates.colorToken !== undefined
-            ? _normalizeBiomeColorToken(updates.colorToken)
-            : option.colorToken;
+          updates.colorToken === undefined
+            ? option.colorToken
+            : _normalizeBiomeColorToken(updates.colorToken);
         next.customColor =
-          updates.customColor !== undefined
-            ? _normalizeCustomHex(updates.customColor)
-            : option.customColor;
+          updates.customColor === undefined
+            ? option.customColor
+            : _normalizeCustomHex(updates.customColor);
       }
       return next;
     });
@@ -7467,11 +7473,11 @@ export function createAdminStore(services) {
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
     const taskIndex = systemConfig.tasks.findIndex((task) => task.id === taskId);
-    if (taskIndex < 0) return false;
+    if (taskIndex === -1) return false;
     const task = systemConfig.tasks[taskIndex];
     const rows = Array.isArray(task.dropRows) ? task.dropRows : [];
     const rowIndex = rows.findIndex((row) => row.id === rowId);
-    if (rowIndex < 0) return false;
+    if (rowIndex === -1) return false;
     const nextRow = mutate({ ...rows[rowIndex] });
     if (!nextRow) return false;
     const nextRows = [...rows];
@@ -7561,7 +7567,7 @@ export function createAdminStore(services) {
     const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
       const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
       const index = refs.findIndex((ref) => ref.id === refId);
-      if (index < 0) return null;
+      if (index === -1) return null;
       const merged = { ...refs[index], ...patch };
       const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
       if (!normalized) return null;
@@ -7629,7 +7635,7 @@ export function createAdminStore(services) {
     ).trim();
     if (!modifierId) return null;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
-    if (eventIndex < 0) return null;
+    if (eventIndex === -1) return null;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const id = String(partial?.id || _randomID());
@@ -7677,11 +7683,11 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId || !refId) return false;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
-    if (eventIndex < 0) return false;
+    if (eventIndex === -1) return false;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const index = refs.findIndex((ref) => ref.id === refId);
-    if (index < 0) return false;
+    if (index === -1) return false;
     const merged = { ...refs[index], ...patch };
     const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
     if (!normalized) return false;
@@ -7715,7 +7721,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId || !refId) return false;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
-    if (eventIndex < 0) return false;
+    if (eventIndex === -1) return false;
     const event = systemConfig.events[eventIndex];
     const refs = Array.isArray(event.characterModifiers) ? event.characterModifiers : [];
     const nextRefs = refs.filter((ref) => ref.id !== refId);
@@ -7817,8 +7823,8 @@ export function createAdminStore(services) {
           { resultGroups: nextResultGroups, steps: nextSteps },
           { allowIncomplete: true, notify: false }
         );
-      } catch (err) {
-        console.error('Fabricate | Failed to strip deleted routed tier ids from recipe:', err);
+      } catch (error) {
+        console.error('Fabricate | Failed to strip deleted routed tier ids from recipe:', error);
       }
     }
 
@@ -7893,7 +7899,7 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, {
       craftingCheck: {
         ...existing,
-        consumption: { ...(existing.consumption || {}), ...patch },
+        consumption: { ...existing.consumption, ...patch },
       },
     });
     await refresh();
@@ -8004,7 +8010,7 @@ export function createAdminStore(services) {
     const activityKey = CHECK_ACTIVITY_SYSTEM_KEYS[activity];
     if (!activityKey || Object.keys(patch).length === 0) return;
     await systemManager.updateSystem(sysId, {
-      [activityKey]: { ...(system[activityKey] || {}), ...patch },
+      [activityKey]: { ...system[activityKey], ...patch },
     });
     await refresh();
   }
@@ -8330,7 +8336,7 @@ export function createAdminStore(services) {
     if (!system) return;
     const next = ['none', 'simple', 'tiered'].includes(checkMode) ? checkMode : 'none';
     await systemManager.updateSystem(sysId, {
-      alchemy: { ...(system.alchemy || {}), checkMode: next },
+      alchemy: { ...system.alchemy, checkMode: next },
     });
     await refresh();
   }
@@ -8356,15 +8362,14 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeId) return;
     const rid = String(recipeId);
-    const wanted = new Set((Array.isArray(bookIds) ? bookIds : []).map((id) => String(id)));
+    const wanted = new Set((Array.isArray(bookIds) ? bookIds : []).map(String));
     const system = systemManager.getSystem?.(sysId);
     const definitions = Array.isArray(system?.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
     let changed = false;
     for (const def of definitions) {
-      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) =>
-        String(id)
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map(String
       );
       const has = currentIds.includes(rid);
       const want = wanted.has(String(def.id));
@@ -8403,9 +8408,9 @@ export function createAdminStore(services) {
       await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, patch);
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to save recipe item:', err);
-      services.notify?.error?.(err?.message || 'Failed to save recipe item');
+    } catch (error) {
+      console.error('Fabricate | Failed to save recipe item:', error);
+      services.notify?.error?.(error?.message || 'Failed to save recipe item');
       return false;
     }
   }
@@ -8428,9 +8433,9 @@ export function createAdminStore(services) {
       await systemManager.deleteRecipeItemDefinition(sysId, recipeItemId);
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to delete recipe item:', err);
-      services.notify?.error?.(err?.message || 'Failed to delete recipe item');
+    } catch (error) {
+      console.error('Fabricate | Failed to delete recipe item:', error);
+      services.notify?.error?.(error?.message || 'Failed to delete recipe item');
       return false;
     }
   }
@@ -8466,11 +8471,11 @@ export function createAdminStore(services) {
       );
       await refresh();
       return created?.id ? { id: created.id } : null;
-    } catch (err) {
-      console.error('Fabricate | Failed to create recipe:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to create recipe:', error);
       services.notify?.error?.(
-        localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to create recipe'
       );
       return null;
@@ -8751,15 +8756,15 @@ export function createAdminStore(services) {
         recipeItemsRewritten: Number(result?.recipeItemsRewritten) || 0,
         learnersAffected: Number(result?.learnersAffected) || 0,
       };
-    } catch (err) {
+    } catch (error) {
       // The write genuinely throws for a caller whose `SETTINGS_MODIFY` has been revoked —
       // the server refuses and the socket dispatch rejects — so this path is reachable and
       // must not be silent. The GM sees the error; the caller returns the card to idle
       // with the selection intact.
-      console.error('Fabricate | Failed to delete recipes:', err);
+      console.error('Fabricate | Failed to delete recipes:', error);
       services.notify?.error?.(
         services.localize?.('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed') ||
-          err?.message ||
+          error?.message ||
           'Failed to delete recipes'
       );
       return empty;
@@ -8784,11 +8789,11 @@ export function createAdminStore(services) {
       await recipeManager.createRecipe(data, { allowIncomplete: true });
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to duplicate recipe:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to duplicate recipe:', error);
       services.notify?.error?.(
-        localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to duplicate recipe'
       );
       return false;
@@ -8825,15 +8830,15 @@ export function createAdminStore(services) {
       );
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to toggle recipe enabled state:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to toggle recipe enabled state:', error);
       // An enable/save failure is surfaced as a localized, id-free message:
       // RecipeActivationError (enable, issue 550) or RecipePersistenceError (save,
       // issue 595) each carry coded issues the localizer maps to lang copy.
       const message =
-        localizeRecipeActivationError(err, services.localize) ||
-        localizeRecipePersistenceError(err, services.localize) ||
-        err?.message ||
+        localizeRecipeActivationError(error, services.localize) ||
+        localizeRecipePersistenceError(error, services.localize) ||
+        error?.message ||
         'Failed to update recipe';
 
       if (typeof options?.onBlocked === 'function') options.onBlocked(message);
@@ -8869,11 +8874,11 @@ export function createAdminStore(services) {
       );
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to toggle recipe locked state:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to toggle recipe locked state:', error);
       services.notify?.error?.(
-        localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to update recipe'
       );
       return false;
@@ -8914,11 +8919,11 @@ export function createAdminStore(services) {
       );
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to save recipe access:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to save recipe access:', error);
       services.notify?.error?.(
-        localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to update recipe access'
       );
       return false;
@@ -8952,15 +8957,15 @@ export function createAdminStore(services) {
       });
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to update recipe:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to update recipe:', error);
       // A save that flips a recipe to enabled can fail activation (issue 550); an
       // ordinary save can fail structural/reference validation (issue 595). Localize
       // either rather than surfacing the raw, id-leaking aggregate.
       services.notify?.error?.(
-        localizeRecipeActivationError(err, services.localize) ||
-          localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipeActivationError(error, services.localize) ||
+          localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to update recipe'
       );
       return false;
@@ -8976,9 +8981,9 @@ export function createAdminStore(services) {
       const result = await systemManager.addRecipeItemFromUuid(sysId, itemUuid);
       await refresh();
       return result;
-    } catch (err) {
-      console.error('Fabricate | Failed to add recipe item:', err);
-      services.notify?.error?.(err?.message || 'Failed to add recipe item');
+    } catch (error) {
+      console.error('Fabricate | Failed to add recipe item:', error);
+      services.notify?.error?.(error?.message || 'Failed to add recipe item');
       return false;
     }
   }
@@ -9027,13 +9032,25 @@ export function createAdminStore(services) {
     // carries an empty ladder, and every currency cost in it lands in the destination world as
     // an unresolvable unit id.
     const currencyConfig = services.getCurrencyConfigStore?.()?.get?.() || {};
+    // And the world realm library (issue 1282), for the same reason and with the same
+    // consequence: realms are WORLD scope, so omitting this exports an empty library and every
+    // realm-gated environment in the payload lands in the destination world citing realm ids
+    // that name nothing.
+    //
+    // THIS CALL AND `game.fabricate.exportSystem` ARE TWO PATHS TO ONE PAYLOAD. Every parameter
+    // of `buildExportPayload` is defaulted, so a forgotten argument here produces a silently
+    // empty slice rather than an error — which is precisely how the Manager's Export button
+    // came to disagree with the API's (issue 642). `tests/export-system-gathering-bundle.test.js`
+    // pins both call sites against the exporter's own signature so they cannot drift again.
+    const travelConfig = services.getGatheringRealmStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
       gatheringConfig,
-      currencyConfig
+      currencyConfig,
+      travelConfig
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);
@@ -9237,9 +9254,9 @@ export function createAdminStore(services) {
         recipesUpdated: Number(result?.recipesUpdated) || 0,
         recipesDisabled: Number(result?.recipesDisabled) || 0,
       };
-    } catch (err) {
-      console.error('Fabricate | Failed to delete components:', err);
-      services.notify?.error?.(err?.message || 'Failed to delete components');
+    } catch (error) {
+      console.error('Fabricate | Failed to delete components:', error);
+      services.notify?.error?.(error?.message || 'Failed to delete components');
       return empty;
     }
   }
@@ -9255,9 +9272,9 @@ export function createAdminStore(services) {
       await systemManager.updateItem(sysId, itemId, updates);
       await refresh();
       return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to update component:', err);
-      services.notify?.error?.(err?.message || 'Failed to update component');
+    } catch (error) {
+      console.error('Fabricate | Failed to update component:', error);
+      services.notify?.error?.(error?.message || 'Failed to update component');
       return false;
     }
   }
@@ -9306,9 +9323,9 @@ export function createAdminStore(services) {
         updated: Number(result?.updated) || 0,
         componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
       };
-    } catch (err) {
-      console.error('Fabricate | Failed to apply component bulk edit:', err);
-      services.notify?.error?.(err?.message || 'Failed to apply component bulk edit');
+    } catch (error) {
+      console.error('Fabricate | Failed to apply component bulk edit:', error);
+      services.notify?.error?.(error?.message || 'Failed to apply component bulk edit');
       return null;
     }
   }
@@ -9359,15 +9376,15 @@ export function createAdminStore(services) {
       const result = await systemManager.applyBulkEditToRecipes(sysId, ids, edit);
       await refresh();
       return _normalizeBulkRecipeEditResult(result);
-    } catch (err) {
-      console.error('Fabricate | Failed to apply recipe bulk edit:', err);
+    } catch (error) {
+      console.error('Fabricate | Failed to apply recipe bulk edit:', error);
       // The batch fails as a whole through the same two coded error classes the
       // single-recipe writes raise, so reuse their localizers: the GM gets the coded,
       // id-free copy rather than a raw English aggregate naming internal ids.
       services.notify?.error?.(
-        localizeRecipeActivationError(err, services.localize) ||
-          localizeRecipePersistenceError(err, services.localize) ||
-          err?.message ||
+        localizeRecipeActivationError(error, services.localize) ||
+          localizeRecipePersistenceError(error, services.localize) ||
+          error?.message ||
           'Failed to apply recipe bulk edit'
       );
       return null;
@@ -9662,7 +9679,7 @@ export function createAdminStore(services) {
     updateRealm: travel.updateRealm,
     setMapRegionLink: travel.setMapRegionLink,
     deleteRealm: travel.deleteRealm,
-    setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
+    setGatheringRealmsEnabled,
     // --- GM Knowledge surface (issue 785) ---
     setKnowledgeActive,
     refreshKnowledge,
@@ -9681,3 +9698,5 @@ export function createAdminStore(services) {
     destroy,
   };
 }
+
+export {withoutDerivedRecipeProjectionFields, DERIVED_RECIPE_PROJECTION_FIELDS} from './adminRecipeRowProjection.js';

@@ -163,22 +163,24 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    44,
-    'expected 44 legitimate namespace bases to resolve to an object — ' +
-      'update this count only if the number of such bases genuinely changes. The 39th is ' +
+    43,
+    'expected 43 legitimate namespace bases to resolve to an object — ' +
+      'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
+      'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
+      'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base. The 38th is ' +
       '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
-      '1036), the shared base the eight colour-token labels are localized under. The 40th is ' +
+      '1036), the shared base the eight colour-token labels are localized under. The 39th is ' +
       '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in ' +
       '`src/migration/migrateRetireCraftingModToken.js` (issue 1094), the base its four ' +
       'per-cause notice clauses are localized under — the clauses are separate keys so the ' +
-      'notice can join only the non-zero ones rather than reporting three zeros. The 41st is ' +
+      'notice can join only the non-zero ones rather than reporting three zeros. The 40th is ' +
       '`NAMESPACE` in `src/ui/svelte/apps/manager/checks/checkModeCallout.js` (issue 1096), ' +
       'the base every per-mode title, explanation and fact value is localized under — that ' +
       'module is a pure data table, so the suffixes are data and the base is the literal. The ' +
-      '42nd is `NAMESPACE` in ' +
+      '41st is `NAMESPACE` in ' +
       '`src/ui/svelte/apps/manager/checks/checkTriggerPresets.js` (issue 1096), the base its ' +
       'two preset labels and their six per-kind effect phrases are localized under — the same ' +
-      'pure-data-table shape, for the same reason. The 43rd and 44th are the Preview and Tabs ' +
+      'pure-data-table shape, for the same reason. The 42nd and 43rd are the Preview and Tabs ' +
       'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
       'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time.'
   );

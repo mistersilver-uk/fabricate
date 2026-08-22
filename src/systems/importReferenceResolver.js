@@ -52,11 +52,22 @@ function localId() {
 }
 
 /**
- * Copy-mode: regenerate record-CONTAINER ids (realm ids, environment record ids)
- * and rewire their internal cross-references, while PRESERVING task / event /
- * characterModifier ids so environment→library linkages survive (D3). The
- * `craftingSystemId` and the `gatheringConfig` system key are rebound by the
- * importer once `createSystem` has produced the fresh system id.
+ * Copy-mode: regenerate record-CONTAINER ids (environment record ids) while PRESERVING
+ * task / event / characterModifier ids so environment→library linkages survive (D3). The
+ * `craftingSystemId` and the `gatheringConfig` system key are rebound by the importer once
+ * `createSystem` has produced the fresh system id.
+ *
+ * REALM IDS ARE NO LONGER PART OF WHAT A COPY REBINDS (issue 1282). They were, while realms
+ * belonged to the crafting system and a copy of that system therefore needed its own copies of
+ * its places. Realms are WORLD scope now: they ride the envelope rather than the system, and
+ * `CompendiumImporter._persistTravelConfig` merges them by id with the destination winning a
+ * collision. Rebinding them here would defeat that merge outright — every realm in the pack
+ * would arrive under an id the world has never seen, so a copy-import would DUPLICATE the
+ * world's entire geography instead of recognising it, and the copy's environments would gate on
+ * the duplicates while every other system kept gating on the originals.
+ *
+ * That is also why `includedRealmIds` / `excludedRealmIds` are left exactly as authored: the
+ * ids they cite are the world's, and they still name the same places after the copy.
  *
  * @param {{ system: object, recipes: object[], gatheringEnvironments: object[], gatheringConfig: object }} prepared
  * @param {{ generateId?: () => string }} [deps]
@@ -64,31 +75,13 @@ function localId() {
  */
 export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
-  const { system, gatheringEnvironments } = prepared;
+  const { gatheringEnvironments } = prepared;
 
-  // --- Realm ids ---
-  const realmIdMap = new Map();
-  const realms = Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : [];
-  for (const realm of realms) {
-    if (realm && realm.id) {
-      const nextId = generateId();
-      realmIdMap.set(realm.id, nextId);
-      realm.id = nextId;
-    }
-  }
-
-  const remapRealmList = (ids) =>
-    Array.isArray(ids) ? ids.map((id) => realmIdMap.get(id) ?? id) : ids;
-
-  // --- Environment record ids + realm cross-refs ---
+  // --- Environment record ids ---
   const environments = Array.isArray(gatheringEnvironments) ? gatheringEnvironments : [];
   for (const env of environments) {
     if (!env || typeof env !== 'object') continue;
     if (env.id) env.id = generateId();
-    if (Array.isArray(env.includedRealmIds))
-      env.includedRealmIds = remapRealmList(env.includedRealmIds);
-    if (Array.isArray(env.excludedRealmIds))
-      env.excludedRealmIds = remapRealmList(env.excludedRealmIds);
   }
 
   return prepared;
@@ -295,7 +288,7 @@ export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
  * remapped external values applied, plus the structured `unresolvedReferences[]`
  * collection.
  *
- * @param {{ system?: object, recipes?: object[], gatheringEnvironments?: object[], gatheringConfig?: object }} payload
+ * @param {{ system?: object, recipes?: object[], gatheringEnvironments?: object[], gatheringConfig?: object, travelConfig?: object }} payload
  * @param {{ resolveUuid?: (uuid: string) => Promise<null | { uuid: string }> }} [deps]
  * @returns {Promise<{ resolved: object, unresolvedReferences: object[] }>}
  */
@@ -369,8 +362,9 @@ function collectExternalDescriptors(payload) {
     }
   }
 
-  // Realm scene mappings (scene + scene-region).
-  for (const realm of arrayOf(system.gatheringRealms)) {
+  // Realm scene mappings (scene + scene-region). Realms ride the ENVELOPE since issue 1282,
+  // so they are read from the world travel config rather than off the system.
+  for (const realm of arrayOf(payload.travelConfig?.realms)) {
     for (const mapping of arrayOf(realm?.sceneMappings)) {
       if (mapping?.sceneUuid) {
         descriptors.push({

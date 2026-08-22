@@ -9,6 +9,7 @@ import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
   assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
+  assembleTravelAuthoringBundle,
 } from './authoringExport.js';
 import {
   rebindCopyContainerIds,
@@ -32,6 +33,8 @@ const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
  * @param {string} fabricateVersion - Current module version string
  * @param {object[]} [gatheringEnvironments=[]] - FULL global environment array (all systems)
  * @param {object} [gatheringConfig={}] - FULL `gatheringConfig` setting object
+ * @param {object} [currencyConfig={}] - FULL `currencyConfig` world setting
+ * @param {object} [travelConfig={}] - FULL `travelConfig` world setting
  * @returns {object} Export envelope ready for JSON.stringify
  */
 export function buildExportPayload(
@@ -42,7 +45,11 @@ export function buildExportPayload(
   gatheringConfig = {},
   // The world currency configuration (issue 1278). Defaulted so every existing call site keeps
   // working; an export produced without it simply carries an empty ladder.
-  currencyConfig = {}
+  currencyConfig = {},
+  // The world travel configuration (issue 1282): the realm library plus its two scalars.
+  // Defaulted for the same reason, with the same consequence — an export produced without it
+  // carries an empty library, and every realm-gated environment in it lands unresolvable.
+  travelConfig = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -77,6 +84,7 @@ export function buildExportPayload(
     gatheringEnvironments: bundle.gatheringEnvironments,
     gatheringConfig: bundle.gatheringConfig,
     currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
+    travelConfig: assembleTravelAuthoringBundle(travelConfig),
   };
 }
 
@@ -116,29 +124,40 @@ export function validateImportData(rawData) {
     errors.push('"gatheringConfig" field must be an object');
   }
 
+  // Travel authoring bundle shape (present after migration, issue 1282).
+  if (
+    data.travelConfig !== undefined &&
+    (typeof data.travelConfig !== 'object' || Array.isArray(data.travelConfig))
+  ) {
+    errors.push('"travelConfig" field must be an object');
+  }
+
   // System checks
   if (!data.system || typeof data.system !== 'object') {
     errors.push('Missing required "system" field');
+  } else if (!data.system.name || typeof data.system.name !== 'string') {
+    errors.push('System is missing a "name" field');
+  }
+
+  // Realms ride the ENVELOPE since issue 1282, not the system. A malformed legacy value is
+  // checked against the RAW payload rather than the migrated one, because the upcast has
+  // already hoisted (and, for a non-array, discarded) `system.gatheringRealms` by the time we
+  // look at `data`. Accept the legacy `gatheringRegions` key on read (pre-1.1.0-migration
+  // exports) so an old export still validates under the canonical name.
+  const legacySystemRealms = rawData.system?.gatheringRealms ?? rawData.system?.gatheringRegions;
+  if (legacySystemRealms !== undefined && !Array.isArray(legacySystemRealms)) {
+    errors.push('System "gatheringRealms" field must be an array');
+  }
+
+  // Each realm should carry a name (warning, not a hard error, so a hand-trimmed export still
+  // imports).
+  const realms = data.travelConfig?.realms;
+  if (realms !== undefined && !Array.isArray(realms)) {
+    errors.push('"travelConfig.realms" field must be an array');
   } else {
-    if (!data.system.name || typeof data.system.name !== 'string') {
-      errors.push('System is missing a "name" field');
-    }
-    // Gathering realms ride along with the system. If present they must be an
-    // array; each realm should carry a name (warning, not a hard error, so a
-    // hand-trimmed export still imports). Accept the legacy `gatheringRegions`
-    // key on read (pre-1.1.0-migration exports) so an old export still validates.
-    const gatheringRealms = data.system.gatheringRealms ?? data.system.gatheringRegions;
-    if (gatheringRealms !== undefined) {
-      if (Array.isArray(gatheringRealms)) {
-        for (const [i, realm] of gatheringRealms.entries()) {
-          if (realm && typeof realm === 'object' && !realm.name) {
-            warnings.push(
-              `Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`
-            );
-          }
-        }
-      } else {
-        errors.push('System "gatheringRealms" field must be an array');
+    for (const [i, realm] of (realms ?? []).entries()) {
+      if (realm && typeof realm === 'object' && !realm.name) {
+        warnings.push(`Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`);
       }
     }
   }
@@ -196,7 +215,26 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.currencyConfig)
       : {};
 
-  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig, currencyConfig };
+  // The WORLD realm library (issue 1282), carried for exactly the reason the ladder above is:
+  // it rides the envelope rather than the system, so there is nothing on `system` to fall back
+  // on. Drop it here and `CompendiumImporter._persistTravelConfig` receives `undefined` and
+  // returns immediately, landing every realm-gated environment in the destination world citing
+  // realm ids that name nothing. Deliberately NOT rebound under `copy` mode: realm ids are
+  // world scope, shared by every crafting system that opts in, and the merge already lets the
+  // destination win a collision — rebinding would fork the world's own geography per copy.
+  const travelConfig =
+    data.travelConfig && typeof data.travelConfig === 'object'
+      ? structuredClone(data.travelConfig)
+      : {};
+
+  const prepared = {
+    system,
+    recipes,
+    gatheringEnvironments,
+    gatheringConfig,
+    currencyConfig,
+    travelConfig,
+  };
 
   if (mode === 'copy') {
     delete system.id;

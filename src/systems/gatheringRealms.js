@@ -5,10 +5,10 @@
  * by the system normalizer, the realm store, import/export validation, and the
  * location resolver.
  *
- * Realms are geography scoped to a crafting system (see the data-models spec
- * delta). `normalizeGatheringRealm` forces `craftingSystemId` to the owning
- * system so a stored or imported realm can never claim ownership by a foreign
- * system. Unknown enum values in modifiers and settings are coerced to defaults
+ * Realms are geography scoped to the WORLD (issue 1282): the same valley is the same
+ * valley whichever crafting system a character is there to serve, so realms live in the
+ * `travelConfig` world setting and every system that opts in shares them. A realm therefore
+ * carries no owning system. Unknown enum values in modifiers and settings are coerced to defaults
  * when READ (so existing data never throws on load) AND reported as invalid by
  * the matching `validate*` helpers when SAVED (so the GM/import boundary rejects
  * them).
@@ -148,21 +148,21 @@ function normalizeModifierList(value, collaborators) {
 }
 
 /**
- * Normalize one gathering realm to its canonical persisted shape. The owning
- * `craftingSystemId` is forced so a realm can never claim a foreign owner.
+ * Normalize one gathering realm to its canonical persisted shape.
+ *
+ * A realm carries NO owning system (issue 1282). Realms are geography: the same valley is
+ * the same valley whether a character is there to gather herbs or to quarry stone, so they
+ * live in the world's `travelConfig` and every crafting system that opts in shares them. The
+ * retired `craftingSystemId` is deliberately not preserved on read — leaving it would keep a
+ * field that looks meaningful, and every reader that once filtered on it must stop.
  *
  * @param {object} data
- * @param {{ craftingSystemId?: string, randomID?: () => string }} [collaborators]
+ * @param {{ randomID?: () => string }} [collaborators]
  * @returns {object}
  */
-export function normalizeGatheringRealm(
-  data = {},
-  { craftingSystemId = '', randomID = defaultRandomID } = {}
-) {
-  const ownerId = stringOrEmpty(craftingSystemId) || stringOrEmpty(data?.craftingSystemId);
+export function normalizeGatheringRealm(data = {}, { randomID = defaultRandomID } = {}) {
   const realm = {
     id: data?.id ? String(data.id) : randomID(),
-    craftingSystemId: ownerId,
     name: trimmedOrDefault(data?.name, 'New Realm'),
     description: stringOrEmpty(data?.description),
     img: optionalString(data?.img),
@@ -178,10 +178,10 @@ export function normalizeGatheringRealm(
 }
 
 /**
- * Normalize a list of realms for one owning system.
+ * Normalize the world's realm list.
  *
  * @param {*} value
- * @param {{ craftingSystemId?: string, randomID?: () => string }} [collaborators]
+ * @param {{ randomID?: () => string }} [collaborators]
  * @returns {object[]}
  */
 export function normalizeGatheringRealmList(value, collaborators = {}) {
@@ -292,23 +292,23 @@ export function validateGatheringRealmList(realms) {
 }
 
 /**
- * Normalize realm settings, coercing unknown/missing values to defaults on read.
- * Only an explicit boolean `true` enables the realm/travel subsystem; anything
- * else (missing, non-boolean) coerces to `false` so the subsystem stays opt-in.
+ * Normalize a crafting system's realm settings — PARTICIPATION ONLY (issue 1282).
+ *
+ * Only an explicit boolean `true` opts the system in; anything else coerces to `false` so the
+ * subsystem stays opt-in.
+ *
+ * `revealMode` and `modifierVisibility` are deliberately NOT emitted here any more: they
+ * describe the world's realms, not one system's relationship to them, and they live in
+ * `travelConfig`. Dropping them rather than passing them through is what makes a missed
+ * reader fail loudly — both consumers coerce a missing reveal mode to `'manual'`, so a
+ * silently-preserved key would turn every `alwaysVisible` world into a `manual` one with no
+ * error anywhere.
  *
  * @param {object} data
- * @returns {{ enabled: boolean, revealMode: GatheringRealmRevealMode, modifierVisibility: GatheringRealmModifierVisibility }}
+ * @returns {{ enabled: boolean }}
  */
 export function normalizeGatheringRealmSettings(data = {}) {
-  return {
-    enabled: data?.enabled === true,
-    revealMode: REVEAL_MODE_SET.has(data?.revealMode)
-      ? data.revealMode
-      : DEFAULT_REALM_SETTINGS.revealMode,
-    modifierVisibility: MODIFIER_VISIBILITY_SET.has(data?.modifierVisibility)
-      ? data.modifierVisibility
-      : DEFAULT_REALM_SETTINGS.modifierVisibility,
-  };
+  return { enabled: data?.enabled === true };
 }
 
 /**
@@ -327,18 +327,88 @@ export function validateGatheringRealmSettings(data = {}) {
   if (data.enabled !== undefined && typeof data.enabled !== 'boolean') {
     errors.push('gatheringRealmSettings enabled must be a boolean');
   }
+  return errors;
+}
+
+/**
+ * Normalize the WORLD travel configuration (issue 1282).
+ *
+ * This is the world's answer to "what places exist, and how are they disclosed" — the realm
+ * library plus the two scalars that used to sit on every crafting system. A crafting system
+ * keeps only `gatheringRealmSettings.enabled`, which decides whether it PARTICIPATES.
+ *
+ * Coerces on read, exactly as the per-system settings did, so existing data never throws on
+ * load; `validateTravelConfig` is the save/import boundary that rejects rather than coerces.
+ *
+ * @param {object} data
+ * @param {{ randomID?: () => string }} [collaborators]
+ * @returns {{ revealMode: string, modifierVisibility: string, realms: object[] }}
+ */
+export function normalizeTravelConfig(data = {}, collaborators = {}) {
+  const raw = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  return {
+    revealMode: REVEAL_MODE_SET.has(raw.revealMode)
+      ? raw.revealMode
+      : DEFAULT_REALM_SETTINGS.revealMode,
+    modifierVisibility: MODIFIER_VISIBILITY_SET.has(raw.modifierVisibility)
+      ? raw.modifierVisibility
+      : DEFAULT_REALM_SETTINGS.modifierVisibility,
+    realms: normalizeGatheringRealmList(raw.realms, collaborators),
+  };
+}
+
+/**
+ * Validate the world travel configuration at save/import boundaries: unknown enum values are
+ * invalid here, where {@link normalizeTravelConfig} silently coerces them on read.
+ *
+ * @param {object} data
+ * @returns {string[]}
+ */
+export function validateTravelConfig(data = {}) {
+  if (data === undefined || data === null) return [];
+  if (typeof data !== 'object' || Array.isArray(data)) return ['travelConfig must be an object'];
+  const errors = [];
   if (data.revealMode !== undefined && !REVEAL_MODE_SET.has(data.revealMode)) {
     errors.push(
-      `gatheringRealmSettings revealMode must be one of: ${GATHERING_REALM_REVEAL_MODES.join(', ')}`
+      `travelConfig revealMode must be one of: ${GATHERING_REALM_REVEAL_MODES.join(', ')}`
     );
   }
   if (
     data.modifierVisibility !== undefined &&
     !MODIFIER_VISIBILITY_SET.has(data.modifierVisibility)
   ) {
-    errors.push('gatheringRealmSettings modifierVisibility must be visible or gmOnly');
+    errors.push('travelConfig modifierVisibility must be visible or gmOnly');
   }
-  return errors;
+  if (data.realms !== undefined) errors.push(...validateGatheringRealmList(data.realms));
+  return [...new Set(errors)];
+}
+
+/**
+ * How realm names are disclosed to players, read from the WORLD config.
+ *
+ * Routed through a helper rather than read inline because both consumers coerce a missing
+ * value to `'manual'`: a reader left pointing at the retired per-system field would turn
+ * every `alwaysVisible` world into a `manual` one silently, with no error to notice.
+ *
+ * @param {object} travelConfig
+ * @returns {string}
+ */
+export function getRealmRevealMode(travelConfig) {
+  return REVEAL_MODE_SET.has(travelConfig?.revealMode)
+    ? travelConfig.revealMode
+    : DEFAULT_REALM_SETTINGS.revealMode;
+}
+
+/**
+ * Whether realm modifiers are shown to players, read from the WORLD config.
+ *
+ * @param {object} travelConfig
+ * @returns {string}
+ */
+export function getRealmModifierVisibility(travelConfig) {
+  return MODIFIER_VISIBILITY_SET.has(travelConfig?.modifierVisibility)
+    ? travelConfig.modifierVisibility
+    : DEFAULT_REALM_SETTINGS.modifierVisibility;
 }
 
 /**

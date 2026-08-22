@@ -12,6 +12,9 @@ function makeMemoryStore({
     { id: 'system-disabled', features: { gathering: false } }
   ],
   ids = ['env-new', 'task-new', 'env-copy', 'task-copy-1', 'task-copy-2'],
+  // Realms are WORLD scope since issue 1282, so realm-reference validation resolves against
+  // one library rather than the owning system's copy.
+  realms = [],
   runCleanup = null
 } = {}) {
   const settings = new Map([
@@ -28,6 +31,7 @@ function makeMemoryStore({
       return value;
     },
     getSystems: () => systems,
+    travelStore: { list: () => realms },
     randomID: () => {
       const next = nextIds.shift();
       if (!next) throw new Error('test ID queue exhausted');
@@ -447,7 +451,13 @@ test('preserves a per-environment nodeRuntime map through update and resets it o
 });
 
 test('normalizes the four location availability id lists; legacy region/biomes preserved', async () => {
-  const { store } = makeMemoryStore({ ids: ['env-loc', 'task-loc'] });
+  // The realms have to exist: realm references are validated at save boundaries, and a
+  // normalized system always carried a realm array, so this only ever passed here because the
+  // raw fixture systems omitted the key entirely.
+  const { store } = makeMemoryStore({
+    ids: ['env-loc', 'task-loc'],
+    realms: [{ id: 'r1' }, { id: 'r2' }]
+  });
   store.load();
   const created = await store.create(environment({
     id: undefined,
@@ -470,10 +480,7 @@ test('normalizes the four location availability id lists; legacy region/biomes p
 
 test('save-time validation rejects an includedRealmId not present on the owning system', async () => {
   const { store } = makeMemoryStore({
-    systems: [
-      { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }], gatheringRealms: [{ id: 'known' }] },
-      { id: 'system-disabled', features: { gathering: false } }
-    ],
+    realms: [{ id: 'known' }],
     ids: ['env-bad', 'task-bad']
   });
   store.load();
@@ -489,10 +496,7 @@ test('save-time validation rejects an includedRealmId not present on the owning 
 test('load never throws on a stale includedRealmId (validation is save-time only)', () => {
   const { store } = makeMemoryStore({
     saved: [environment({ id: 'env-stale', includedRealmIds: ['gone'] })],
-    systems: [
-      { id: 'system-a', features: { gathering: true }, components: [], gatheringRealms: [{ id: 'known' }] },
-      { id: 'system-disabled', features: { gathering: false } }
-    ]
+    realms: [{ id: 'known' }]
   });
   // load() normalizes without validating; no throw, stale id preserved.
   const loaded = store.load();

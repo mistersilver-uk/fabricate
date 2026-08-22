@@ -16,21 +16,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CompendiumImporter } from '../src/systems/CompendiumImporter.js';
 import { buildExportPayload, prepareForImport } from '../src/systems/CraftingSystemExporter.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 
+import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
+
 function importerOver(seedCurrencyConfig) {
-  const settings = { currencyConfig: seedCurrencyConfig };
-  // Seams are the THIRD constructor argument; the currency merge touches neither manager.
-  const importer = new CompendiumImporter(null, null, {
-    getSetting: (key) => settings[key],
-    setSetting: async (key, value) => {
-      settings[key] = value;
-    },
-  });
-  return { importer, settings };
+  return importerOverSettings({ currencyConfig: seedCurrencyConfig });
 }
 
 describe('importing the world currency config', () => {
@@ -212,7 +205,7 @@ describe('the export/import round trip carries the ladder into a fresh world', (
     return buildExportPayload(
       { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },
       [],
-      '1.26.0',
+      '1.27.0',
       [],
       {},
       worldLadder
@@ -257,7 +250,7 @@ describe('the ladder survives the WHOLE import composition, not just the merge h
     buildExportPayload(
       { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },
       [],
-      '1.26.0',
+      '1.27.0',
       [],
       {},
       {

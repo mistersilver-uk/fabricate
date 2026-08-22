@@ -44,8 +44,8 @@ import {
   evaluateLocationAvailability,
 } from './gatheringLocation.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
-import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
-import { isGatheringRealmsEnabled } from './gatheringRealms.js';
+import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
+import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { computeSystemVisibility } from './systemValidation.js';
@@ -162,6 +162,7 @@ export class GatheringEngine {
     hookPublisher = null,
     getRunViewer = null,
     locationResolver = null,
+    travelStore = null,
     random = Math.random,
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
@@ -224,6 +225,11 @@ export class GatheringEngine {
     // Constructor-injected current-realm resolver (GatheringLocationService),
     // NOT a module import — keeps the engine system-agnostic and testable.
     this.locationResolver = locationResolver;
+    // The WORLD travel configuration (issue 1282): the realm library and the reveal mode.
+    // Injected for the same reason, and deliberately NOT reached through a composer — unlike
+    // currency, whose reader starts from a recipe carrying only a system id, every realm
+    // reader here is a class that already receives its collaborators this way.
+    this.travelStore = travelStore;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
@@ -1205,13 +1211,17 @@ export class GatheringEngine {
    * @param {Map<string, object>|null} [args.cache]
    * @returns {object} Current-realm context (resolved/source/realms/...).
    */
-  _resolveRealmContext({ actor, systemId, cache = null }) {
-    if (cache && cache.has(systemId)) return cache.get(systemId);
+  _resolveRealmContext({ actor, cache = null }) {
+    // ONE cache entry, not one per system (issue 1282). Where the actor's party is standing is
+    // world-wide now, so keying this by `systemId` would recompute an identical answer once
+    // per crafting system in the listing.
+    const key = 'world';
+    if (cache && cache.has(key)) return cache.get(key);
     const context =
       typeof this.locationResolver?.buildCurrentRealmContext === 'function'
-        ? this.locationResolver.buildCurrentRealmContext({ actor, systemId })
+        ? this.locationResolver.buildCurrentRealmContext({ actor })
         : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
-    if (cache) cache.set(systemId, context);
+    if (cache) cache.set(key, context);
     return context;
   }
 
@@ -1265,14 +1275,14 @@ export class GatheringEngine {
     const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const availability = evaluateLocationAvailability(environment, context);
     const isGM = viewer?.isGM === true;
-    const revealMode = this._realmRevealMode(system);
+    const revealMode = this._realmRevealMode();
+    // The FULL world library, not `context.realms`: this feeds `buildTravelGuidance`, which
+    // names the destinations a player could travel to, not merely the ones they are in.
+    const worldRealms = this.travelStore?.list?.();
     const realmsById = new Map(
-      (Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : []).map((realm) => [
-        realm.id,
-        realm,
-      ])
+      (Array.isArray(worldRealms) ? worldRealms : []).map((realm) => [realm.id, realm])
     );
-    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
+    const discoveredRealmIds = actor ? getDiscoveredRealmIds(actor) : new Set();
 
     const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
       buildRealmDisclosure(realm, {
@@ -1333,8 +1343,8 @@ export class GatheringEngine {
     const systemId = stringOrNull(environment?.craftingSystemId);
     const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const isGM = viewer?.isGM === true;
-    const revealMode = this._realmRevealMode(system);
-    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
+    const revealMode = this._realmRevealMode();
+    const discoveredRealmIds = actor ? getDiscoveredRealmIds(actor) : new Set();
     const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
       buildRealmDisclosure(realm, {
         isGM,
@@ -1388,10 +1398,17 @@ export class GatheringEngine {
           .filter(Boolean)
       ),
     ];
-    // System-singularity rule: a single chip can only honestly represent one
-    // system's realm context. Zero realm-enabled systems → chip stays hidden;
-    // more than one → ambiguous, fall back to selection-driven behavior.
-    if (realmEnabledSystemIds.length !== 1) {
+    // The system-singularity rule is GONE (issue 1282).
+    //
+    // It used to refuse the chip whenever more than one realm-enabled system appeared, on the
+    // grounds that "a single chip can only honestly represent one system's realm context".
+    // That was true, and it was an artefact of the wrong scope rather than a rule worth
+    // keeping: the realm library, the reveal mode and the party's location are all world-wide
+    // now, so every enabled system would answer identically and WHICH one supplies the gate is
+    // no longer observable. The chip shows whenever at least one system participates.
+    //
+    // Zero participating systems still hides it — there is nothing the location could gate.
+    if (realmEnabledSystemIds.length === 0) {
       return { enabled: false, realms: [], systemId: null };
     }
     const systemId = realmEnabledSystemIds[0];
@@ -1412,9 +1429,15 @@ export class GatheringEngine {
     };
   }
 
-  _realmRevealMode(system) {
-    const mode = system?.gatheringRealmSettings?.revealMode;
-    return mode === 'alwaysVisible' || mode === 'onPartyTokenEntry' ? mode : 'manual';
+  /**
+   * How realm names are disclosed to players — a WORLD fact since issue 1282.
+   *
+   * Read through the shared helper rather than inline, because the old per-system read
+   * coerced a missing value to `'manual'`: a reader left pointing at the retired field would
+   * have turned every `alwaysVisible` world into a `manual` one silently, with no error.
+   */
+  _realmRevealMode() {
+    return getRealmRevealMode(this.travelStore?.get?.());
   }
 
   async _checkSceneAccess({ environment, viewer, actor }) {

@@ -2360,7 +2360,6 @@ const GATHERING_EVENTS = [
 const REALMS = [
   {
     id: 'hb-realm-verdant',
-    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     name: 'The Verdant Reach',
     description: 'Old forest, older paths.',
     enabled: true,
@@ -2368,7 +2367,6 @@ const REALMS = [
   },
   {
     id: 'hb-realm-frostmark',
-    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     name: 'Frostmark Ridge',
     description: 'Above the treeline, below the snow.',
     enabled: true,
@@ -2391,7 +2389,6 @@ const REALMS = [
 const SMITHING_REALMS = [
   {
     id: 'sm-realm-deep',
-    craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
     name: 'The Underdeep',
     description: 'Below the lowest worked gallery, where the old seams run.',
     img: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
@@ -2588,7 +2585,7 @@ function systemRules(eventVisibility) {
  * `CraftingSystemManager.initialize()` and `RecipeManager.initialize()` load and normalize them
  * through the real code paths rather than being handed pre-normalized objects.
  *
- * @returns {{systems: object[], recipes: object[], environments: object[], gatheringConfig: object, currencyConfig: object, realms: object[]}}
+ * @returns {{systems: object[], recipes: object[], environments: object[], gatheringConfig: object, currencyConfig: object, travelConfig: object, realms: object[]}}
  */
 /**
  * System-level crafting-check configuration.
@@ -3389,15 +3386,13 @@ export function buildLabContent() {
         { id: 'sm-almanac', name: 'Deepsmith Almanac' },
       ],
       tools: SMITHING_TOOLS,
-      gatheringRealms: SMITHING_REALMS,
-      // `enabled` is what switches the Travel/Realms subsystem on, and it is what makes an
-      // environment's `includedRealmIds` bind at all: with it off, `_locationBlockedReasons`
-      // short-circuits and NO environment can be realm-locked. See SMITHING_REALMS for why this
-      // is smithing's flag and not herbalism's.
+      // Participation ONLY (issue 1282): the realm library itself is the world's, seeded into
+      // `travelConfig` below. `enabled` is what switches the Travel/Realms subsystem on for this
+      // system, and it is what makes an environment's `includedRealmIds` bind at all: with it
+      // off, `_locationBlockedReasons` short-circuits and NO environment can be realm-locked.
+      // See SMITHING_REALMS for why this is smithing's flag and not herbalism's.
       gatheringRealmSettings: {
         enabled: true,
-        revealMode: 'alwaysVisible',
-        modifierVisibility: 'visible',
       },
     },
     {
@@ -3436,8 +3431,7 @@ export function buildLabContent() {
       recipeItemDefinitions: HERBALISM_RECIPE_ITEMS,
       tools: HERBALISM_TOOLS,
       characterPrerequisites: HERBALISM_PREREQUISITES,
-      gatheringRealms: REALMS,
-      gatheringRealmSettings: { revealMode: 'onDiscovery', modifierVisibility: 'visible' },
+      gatheringRealmSettings: { enabled: false },
       // Currency, switched on with the SAME unit ladder Runework carries. It is here for the
       // System Overview settings frame, which needs Character modifiers, Character prerequisites
       // and Currency Units on one page — and for the recipe editor's currency-cost requirement
@@ -3488,8 +3482,7 @@ export function buildLabContent() {
       componentCategories: componentCategoryVocabulary(ALCHEMY_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
-      gatheringRealms: [],
-      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      gatheringRealmSettings: { enabled: false },
     },
     {
       id: LAB_SYSTEM_IDS.JEWELRY,
@@ -3519,8 +3512,7 @@ export function buildLabContent() {
       componentCategories: componentCategoryVocabulary(JEWELRY_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
-      gatheringRealms: [],
-      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      gatheringRealmSettings: { enabled: false },
     },
     {
       id: LAB_SYSTEM_IDS.RUNEWORK,
@@ -3556,8 +3548,7 @@ export function buildLabContent() {
       // The SECOND system carrying a modifier library, and the first whose rows anything
       // measures — see `RUNEWORK_CHECK_MODIFIERS` for why the parity subject needed one.
       modifiers: RUNEWORK_CHECK_MODIFIERS,
-      gatheringRealms: [],
-      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      gatheringRealmSettings: { enabled: false },
       // The world's CURRENCY system, and runework carries it because nothing else does.
       // `requirements.currency.enabled` is not confined to the Currency Units card: it also
       // un-disables the recipe editor's "Add cost" control and the Tool Studio's repair-cost
@@ -3604,8 +3595,7 @@ export function buildLabContent() {
       componentCategories: componentCategoryVocabulary(TIDEWRACK_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
-      gatheringRealms: [],
-      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      gatheringRealmSettings: { enabled: false },
     },
   ];
 
@@ -3709,6 +3699,14 @@ export function buildLabContent() {
       units: CURRENCY_UNITS,
     },
     realms: [...REALMS, ...SMITHING_REALMS],
+    // The WORLD travel config (issue 1282). Realms are geography, so the library, its reveal
+    // mode and its modifier visibility live here rather than on a crafting system — which now
+    // carries `gatheringRealmSettings.enabled` alone, meaning "this system participates".
+    travelConfig: {
+      revealMode: 'alwaysVisible',
+      modifierVisibility: 'visible',
+      realms: [...REALMS, ...SMITHING_REALMS],
+    },
     components: [
       ...SMITHING_COMPONENTS,
       ...HERBALISM_COMPONENTS,

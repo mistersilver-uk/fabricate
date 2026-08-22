@@ -19,7 +19,7 @@ export const FIXTURE_REALM_ID = 'realm-verdant';
 /**
  * Build a full authoring fixture.
  *
- * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object }}
+ * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig: object }}
  */
 export function buildFullAuthoringFixture() {
   const system = {
@@ -86,21 +86,9 @@ export function buildFullAuthoringFixture() {
         onBreak: { action: 'consume', replacementComponentId: 'comp-ore' },
       },
     ],
-    gatheringRealms: [
-      {
-        id: FIXTURE_REALM_ID,
-        craftingSystemId: FIXTURE_SYSTEM_ID,
-        name: 'Verdant Wilds',
-        enabled: true,
-        sceneMappings: [
-          {
-            sceneUuid: 'Scene.verdant-map',
-            sceneRegionUuid: 'Scene.verdant-map.Region.grove',
-          },
-        ],
-      },
-    ],
-    gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+    // Realms left the crafting system in issue 1282: the library is WORLD scope and lives in
+    // `travelConfig` (below), so all a system carries now is whether it PARTICIPATES.
+    gatheringRealmSettings: { enabled: true },
     // The ONE system-level modifier library (issues 1095, 1117). THREE entries on purpose:
     // one carrying BOTH bounds and one carrying NEITHER, because `min`/`max` are
     // absence-preserving and a fixture where every entry is bounded cannot tell a
@@ -347,7 +335,33 @@ export function buildFullAuthoringFixture() {
     },
   };
 
-  return { system, recipes, environments, gatheringConfig };
+  // The WORLD travel configuration (issue 1282). Its realm is the one every realm-gated
+  // environment above cites by id, and it carries the Foundry Scene Region link nested inside
+  // the realm as `sceneMappings[]`.
+  //
+  // The mapping carries an EXPLICIT id on purpose: `normalizeTravelConfig` mints one for a
+  // mapping that arrives without, so a fixture that omitted it would produce a different id on
+  // every export and the round-trip deep-equal could never hold.
+  const travelConfig = {
+    revealMode: 'alwaysVisible',
+    modifierVisibility: 'visible',
+    realms: [
+      {
+        id: FIXTURE_REALM_ID,
+        name: 'Verdant Wilds',
+        enabled: true,
+        sceneMappings: [
+          {
+            id: 'mapping-verdant-grove',
+            sceneUuid: 'Scene.verdant-map',
+            sceneRegionUuid: 'Scene.verdant-map.Region.grove',
+          },
+        ],
+      },
+    ],
+  };
+
+  return { system, recipes, environments, gatheringConfig, travelConfig };
 }
 
 /**
@@ -400,13 +414,23 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   ['has timeOfDay vocabulary', (f) => (f.gatheringConfig.vocabularies?.timeOfDay?.length ?? 0) >= 1],
   ['has biome vocabulary', (f) => (f.gatheringConfig.vocabularies?.biomes?.length ?? 0) >= 1],
   ['has danger vocabulary', (f) => (f.gatheringConfig.vocabularies?.danger?.length ?? 0) >= 1],
-  ['has a realm', (f) => (f.system.gatheringRealms?.length ?? 0) >= 1],
+  ['has a WORLD realm', (f) => (f.travelConfig.realms?.length ?? 0) >= 1],
+  [
+    'the participating system carries the flag ALONE, with no realm library',
+    (f) =>
+      f.system.gatheringRealmSettings?.enabled === true &&
+      !Object.hasOwn(f.system, 'gatheringRealms'),
+  ],
   [
     'realm carries scene + scene-region mappings',
     (f) =>
-      f.system.gatheringRealms.some((r) =>
+      f.travelConfig.realms.some((r) =>
         (r.sceneMappings ?? []).some((m) => m.sceneUuid && m.sceneRegionUuid)
       ),
+  ],
+  [
+    'an environment is realm-gated to the world realm',
+    (f) => f.environments.some((e) => (e.includedRealmIds ?? []).includes(FIXTURE_REALM_ID)),
   ],
   [
     'a drop row targets a world item via itemUuid',

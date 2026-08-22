@@ -113,7 +113,7 @@ Players cannot change conditions.
 
 When gathering is enabled and you have not set up your own values, Fabricate provides default lists for biomes, danger, weather, and time of day.
 There is no region list any more.
-Geography is now authored as a realm under **Gathering > Travel > Realms** (see [Gathering Realms & Travel]({% link gathering-realms.md %})).
+Geography is now authored as a realm under **World > Travel > Realms** (see [Gathering Realms & Travel]({% link gathering-realms.md %})).
 Leaving a task or event match tag empty means it matches any value for that dimension.
 
 ## Gathering Rules

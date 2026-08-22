@@ -433,6 +433,14 @@ export function buildSelectedSystemViewData(
       currency: { enabled: false },
     },
 
+    // Travel & Realms participation ONLY (issue 1282). The realm library, the reveal mode and
+    // the modifier visibility are world scope, so this projection deliberately carries the one
+    // boolean the crafting system still owns — the System Settings feature tile beside Currency
+    // reads it, and a `realms` array here would be a second, always-empty source of truth.
+    gatheringRealmSettings: {
+      enabled: selectedSystem.gatheringRealmSettings?.enabled === true,
+    },
+
     craftingCheck: {
       enabled: selectedSystem.craftingCheck?.enabled === true,
       mode: selectedSystem.craftingCheck?.mode || 'passFail',
