@@ -23,6 +23,44 @@ export const EXTENSION_ROUTE_PREFIX = 'ext';
 
 const ROUTE_KEY_SEGMENTS = 3;
 
+/**
+ * The one player surface id Core names, and the only one it withholds.
+ *
+ * THE PLAYER DOWNTIME EXPERIMENTAL GATE (issue 1257), and it is TEMPORARY. The surface exists
+ * to host the premium Downtime Studio, the Studio is in no published release, and the Manager's
+ * `World > Downtime` route is already shown only to a GM who has opted into experimental
+ * features. A player window that kept rendering the companion's tabs would advertise the
+ * unreleased feature that Manager gate exists to withhold, so one setting now governs both
+ * windows. Delete this constant, the predicate below and their readers when the Studio ships;
+ * nothing here states a rule about premium surfaces or about extension seams.
+ *
+ * It is DELIBERATELY a separate constant from `WORLD_DOWNTIME_SURFACE_ID` in
+ * `managerExtensions.js`, even though both spell `downtime`. The two registries hold separate
+ * surface-id namespaces, so a companion may claim the id in one window without claiming it in
+ * the other; importing the Manager's constant here would tie two independent namespaces to one
+ * string and make a later divergence look like a typo.
+ */
+export const PLAYER_DOWNTIME_SURFACE_ID = 'downtime';
+
+/**
+ * May the player window render `surfaceId` right now?
+ *
+ * TRUE OF EVERY SURFACE BUT THE GATED ONE. This is the seam's only read of a companion id, and
+ * it is a read of one id Core names rather than an allowlist: Core still never enumerates the
+ * ids it will ACCEPT, and a companion claiming any other surface is untouched by the gate.
+ *
+ * The gate defaults to SHUT, so a caller that forgets to state it withholds an unreleased
+ * surface rather than advertising it.
+ *
+ * @param {string} surfaceId Registry surface id.
+ * @param {object} [options] Gate inputs.
+ * @param {boolean} [options.experimentalFeaturesEnabled] The world's `fabricate.experimentalFeatures` opt-in.
+ * @returns {boolean} True when the surface may be rendered.
+ */
+export function isPlayerSurfaceAvailable(surfaceId, { experimentalFeaturesEnabled = false } = {}) {
+  return surfaceId !== PLAYER_DOWNTIME_SURFACE_ID || experimentalFeaturesEnabled === true;
+}
+
 // Core's Journal tab is the only entry carrying a live count badge, and the count is a
 // value the shell pushes in. Named here rather than inferred so the rule is one constant
 // instead of a condition spread across the projection.
@@ -87,14 +125,30 @@ export function isCoreTabId(id) {
  * the View Lab's mount harness calls to build its props bag, so the lab cannot drift from
  * production by computing the snapshot differently.
  *
+ * IT IS ALSO WHERE THE EXPERIMENTAL GATE IS APPLIED, for that same reason: the snapshot is
+ * what the rail and the panel are both built from, so a surface withheld here cannot reach
+ * either of them. The gate is read from the setting at derivation time and never cached, so
+ * it takes effect on the next snapshot — the next window open, or the next registry
+ * publication — and never mid-mount. That is deliberate: resolving a gated route away under a
+ * player standing on it would run a mounted companion's cleanup and discard its work because a
+ * world setting moved. The one caller that does NOT read the snapshot is `isOfferedTab` in
+ * `SvelteFabricateApp.svelte.js`, which reads the registry directly and therefore repeats this
+ * gate itself.
+ *
  * @param {{listPlayerNavSurfaceIds: () => string[], getPlayerNavProvider: (id: string) => object|null}} registry
  *   Player extension registry.
+ * @param {object} [options] Gate inputs, as taken by {@link isPlayerSurfaceAvailable}.
+ * @param {boolean} [options.experimentalFeaturesEnabled] The world's `fabricate.experimentalFeatures` opt-in.
  * @returns {readonly Readonly<{surfaceId: string, provider: object}>[]} Frozen snapshot.
  */
-export function deriveExtensionSurfaces(registry) {
+export function deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled = false } = {}) {
   const surfaceIds = registry?.listPlayerNavSurfaceIds?.() ?? [];
   const surfaces = [];
   for (const surfaceId of surfaceIds) {
+    // A gated surface is dropped from the snapshot rather than rendered as a placeholder: the
+    // player window carries no premium signal in any state, so an absent companion and a
+    // withheld one look identical from the rail.
+    if (!isPlayerSurfaceAvailable(surfaceId, { experimentalFeaturesEnabled })) continue;
     const provider = registry?.getPlayerNavProvider?.(surfaceId) ?? null;
     // A surface id with no provider behind it cannot be rendered, and skipping it here is
     // what keeps every downstream caller free of a null check.

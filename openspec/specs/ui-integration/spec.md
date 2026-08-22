@@ -3693,16 +3693,18 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 - **What a gated companion observes is an ABSENCE.**
   `mount` is never called, so no cleanup runs and none of `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted` or `fabricate.manager.surfaceTabChanged` fire.
   `requestRemount()` called from a context retained across the gate closing cannot restore the surface, because there is no host to re-render.
-- **The gate is GM Manager scope only.**
-  The player window hosts no Downtime surface in any state — its extension seam is a separate registry with its own surface-id namespace and Core privileges none of its ids — so nothing in the player window changes, whatever this setting is set to.
+- **The gate reaches the player window too, and its player half is stated in §Player Navigation Extension, Experimental gate.**
+  The setting is world-scoped, so one GM opt-in governs both windows: while it is off, neither a GM's `World > Downtime` route nor a player's companion `downtime` tabs are shown, and a world that opts in gets both.
+  The two halves are enforced independently and their mechanics differ — the player window has no route of its own to make unreachable, no premium signal to withhold, and no route-exit guard to honour — so neither section's requirements may be read onto the other.
 
 ## Player Navigation Extension
 
 - The seam is general and keyed by surface id.
 It is not a downtime feature; Downtime is its first consumer.
 - One page-session API-v1 registry is published as `game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider)` and survives the `init` and `ready` API rebinding.
-- The registry holds at most one provider per surface id, rejects only a second provider for the same surface, and never enumerates the ids it accepts.
-Core renders every registered surface, so no surface id is privileged.
+- The registry holds at most one provider per surface id, rejects only a second provider for the same surface, and never enumerates the ids it ACCEPTS.
+Core renders every registered surface, with the single temporary exception of the `downtime` surface while the experimental gate below is shut.
+That exception is one named id Core WITHHOLDS and is not an allowlist: every other surface id is rendered on registration alone, and no id is privileged into being rendered.
 - **A surface snapshot is the frozen `{ surfaceId, provider }` set Core derives from the registry**, in the registry's own registration order, re-derived on every registration, unregistration and re-registration.
 The snapshot rather than the registry is what the player window renders, and it is the unit the fallback and fault rules below are written against.
 - **A player surface id is the registering provider's own `id`.**
@@ -3727,9 +3729,10 @@ It carries no route chrome and no header actions, because the player window has 
 - `context` is frozen, replaced rather than mutated, and carries `{ schemaVersion, surface: 'player', surfaceId, tabId, actorId, isGM, revision, requestRemount }` and no Core store, document or component.
 `actorId` is the shared Actor selection top bar's current selection or `null`; `isGM` is presentation and never an authorization gate, **and it is true for assistant GMs as well as GMs**; `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
 **A new context identity is produced when and only when one of those values changes**, so a republication that leaves a surface's values unchanged — opening the window, or any other companion registering, unregistering or re-registering — does not remount a live companion.
-- **Core applies no visibility or permission gate to a provider tab.**
-Unlike the Manager seam the player window has no GM gate, so every user who can open the window sees every registered provider's tabs.
+- **Core applies no PER-USER visibility or permission gate to a provider tab.**
+Unlike the Manager seam the player window has no GM gate, so every user who can open the window sees the same tabs as every other user: two players never see different rails.
 Any GM-only, owner-only or entitlement-scoped presentation happens inside the companion's own mount, and Core renders no per-user gating hook in v1.
+The temporary experimental gate below is not an exception to this: it is world-scoped, so it withholds its surface from every user of that world at once, or from none.
 - **The player window carries no premium signal in any state.**
 No badge, no padlocked entry, no teaser tab, no upgrade offer and no subscription call to action, whether or not a companion is installed.
 A companion tab exists only while its provider is registered; Core renders no placeholder for an absent companion, so a user without the companion installed sees no indication that the surface exists.
@@ -3767,7 +3770,32 @@ A listener's return value is ignored and nothing a listener does changes what th
 - A companion declares Fabricate in `relationships.requires`, attempts registration during its own `init`, uses one idempotent ready fallback **armed from inside `init` rather than at ESM top level**, retains exactly one unregister handle, and treats its registration attempt as a no-op after success.
 - **A provider tab is not a system feature and is not crafting-system-scoped**, so the rule that Core hides controls for disabled features does not read onto this seam.
 - The seam creates, reads and writes no record, setting, flag, actor data or world state of its own.
+It READS one — `fabricate.experimentalFeatures`, for the temporary gate below — and writes none.
 It adds no entry to the Data Storage lists below.
+
+### Experimental gate
+
+**This gate is TEMPORARY and is tied to the feature being unreleased, not to a design decision.**
+The `downtime` surface exists to host the premium Downtime Studio, the Studio is in no published release, and the Manager's own `World > Downtime` route is already withheld from a GM who has not opted in.
+A player window that kept rendering the companion's tabs would advertise the very feature that Manager gate exists to withhold, so one world setting governs both windows.
+Every requirement in this subsection is removed when the Studio releases; nothing here states a permanent rule about premium surfaces, about extension seams, or about privileging a surface id.
+
+- **The `downtime` player surface is rendered only while `fabricate.experimentalFeatures` is enabled**, and it is the only id the gate names.
+  Every other registered surface renders on registration alone, gate open or shut.
+- **A withheld surface leaves the derived surface snapshot entirely**, which is what withholds its tabs: the snapshot is what both the rail and the panel are built from.
+- **Nothing is rendered in its place.**
+  The player window carries no premium signal in any state, so a withheld surface and an absent companion are indistinguishable from the rail, and no placeholder, teaser or upgrade offer marks the difference.
+- **Its tabs are unreachable, not merely unlinked.**
+  A route key addressing a withheld surface is refused wherever Core accepts one — the window's initial tab, its programmatic tab selection, and the tab a caller opens the window on — so no path puts a player on a route the rail does not offer.
+- **The gate takes effect on the next surface snapshot: the next window open, or the next registry publication.**
+  It is not pushed into an open window, and a player standing on a companion tab when the setting changes keeps the screen they are on until then.
+  This is deliberate and has the same reason the Manager's gate leaves its open panel in place: resolving the route away the moment the setting moved would run a mounted companion's cleanup and discard its unsaved work because a world setting changed.
+  Until that snapshot the rail may still render the withheld tab it has already been given, and selecting it is refused all the same: the route tests read the gate LIVE, so a stale rail entry cannot put a player back onto a withheld surface, and the player who was already on it is the only one who sees it.
+- **Registration is never gated and never blamed.**
+  A companion registers at `ready` and cannot know a per-world setting, so the registry validates and stores exactly as it does with the gate open, `fabricate.player.navProviderRegistered` still fires, the provider keeps its unregister handle, and Fabricate raises no error, warning or notification about it.
+  The same registration renders the moment the world opts in, with no re-registration.
+- **What a gated companion observes is an ABSENCE.**
+  `mount` is never called, so no cleanup runs and none of `fabricate.player.surfaceMounted`, `fabricate.player.surfaceUnmounted` or `fabricate.player.surfaceTabChanged` fire.
 
 ## Data Storage (UI-relevant)
 

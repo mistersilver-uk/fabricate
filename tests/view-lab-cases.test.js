@@ -3505,7 +3505,7 @@ const MOUNT_REGION_ANCHORS = [
     'lab-player-provider',
     "      tab('board', 'Board', 'Downtime board and pending decisions', 'fas fa-chart-simple'),",
   ],
-  ['mount-player-app', '    extensionSurfaces: deriveExtensionSurfaces(playerExtensions),'],
+  ['mount-player-app', '    extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {'],
   ['player-settle-stores', '      if (pending.length === 0) break;'],
 ];
 
@@ -3830,7 +3830,11 @@ test('the player companion cases photograph the seam through the production regi
     /params\.playerProvider[\s\S]{0,400}registerPlayerNavProvider/,
     'the companion frames register through the production registry'
   );
-  assert.match(mountSource, /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions\)/);
+  assert.match(
+    mountSource,
+    /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions, \{\s*experimentalFeaturesEnabled: params\.experimental,/,
+    'and states the experimental gate from the param that seeds the lab world\'s own setting'
+  );
 });
 
 test('the capture runner selects surface coverage, and records that decision', () => {

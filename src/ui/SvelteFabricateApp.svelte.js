@@ -19,12 +19,32 @@ import {
   buildRouteKey,
   deriveExtensionSurfaces,
   isCoreTabId,
+  isPlayerSurfaceAvailable,
   parseRouteKey,
   resolveActiveTab,
 } from './playerNavModel.js';
+import { getSetting, SETTING_KEYS } from '../config/settings.js';
 
 const CORE_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
+
+/**
+ * The world's experimental-features opt-in, read LIVE at every gate decision.
+ *
+ * This window is the seam's Foundry-facing edge, so the setting is read here and handed to
+ * `playerNavModel.js` as a boolean, which is what keeps that module the UI-free leaf it is
+ * documented to be. It is read rather than cached because the derivations below already run on
+ * every window open and every registry publication, and a cached value would make a world whose
+ * setting changed mid-session stay wrong until reload.
+ *
+ * Read directly through `getSetting`, exactly as `SvelteCraftingSystemManagerApp` reads its own
+ * settings: every path reaching it runs after `init` has registered the setting.
+ *
+ * @returns {boolean} True when `fabricate.experimentalFeatures` is on.
+ */
+function isExperimentalFeaturesEnabled() {
+  return getSetting(SETTING_KEYS.EXPERIMENTAL_FEATURES) === true;
+}
 
 /**
  * Is `tab` a route this window can currently show?
@@ -44,6 +64,18 @@ function isOfferedTab(tab) {
   if (isCoreTabId(tab)) return CORE_TABS.has(tab);
   const route = parseRouteKey(tab);
   if (!route) return false;
+  // The experimental gate is repeated HERE rather than inherited, because this predicate is the
+  // one route test that reads the REGISTRY instead of the derived snapshot. `_selectTab`, the
+  // constructor and `static show` all reach a companion route through it, so without this read a
+  // gated surface would be missing from the rail and still reachable programmatically — unlinked
+  // rather than unreachable, which is the distinction the Manager's own gate is written against.
+  if (
+    !isPlayerSurfaceAvailable(route.surfaceId, {
+      experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
+    })
+  ) {
+    return false;
+  }
   const provider = playerExtensions.getPlayerNavProvider(route.surfaceId);
   return Boolean(provider?.tabs?.some((providerTab) => providerTab.id === route.tabId));
 }
@@ -437,7 +469,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // off a field, because a key present in `_prepareSvelteProps` is re-assigned over the
       // reactive props on every re-render, so a stale field would clobber a live snapshot.
       // `showAlchemy` above is the same pattern and the precedent.
-      extensionSurfaces: deriveExtensionSurfaces(playerExtensions),
+      extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {
+        experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
+      }),
       // The registry itself, so the mount host emits its surface hooks through the same
       // injectable edge the registry's own hooks travel on.
       playerExtensions
@@ -473,13 +507,17 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * Push a fresh companion-surface snapshot to the mounted shell (issue 1198).
    *
    * Called on every registry publication, which `publish` broadcasts on registration,
-   * unregistration and same-surface re-registration alike. The active route falls back to
+   * unregistration and same-surface re-registration alike. A publication is also when a
+   * changed `fabricate.experimentalFeatures` setting first reaches an already-open window,
+   * because the gate is read at derivation rather than pushed. The active route falls back to
    * the default Core tab when the new tab set no longer offers it — the identical shape
    * `_refreshAlchemy` already uses when Alchemy disappears, and the reason an unregistered
    * companion leaves the user on Crafting rather than on an empty panel.
    */
   _refreshExtensionSurfaces() {
-    const extensionSurfaces = deriveExtensionSurfaces(playerExtensions);
+    const extensionSurfaces = deriveExtensionSurfaces(playerExtensions, {
+      experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
+    });
     this._activeTab = resolveActiveTab(
       this._activeTab,
       offeredRoutes(extensionSurfaces),

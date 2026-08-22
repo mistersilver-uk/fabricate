@@ -1084,7 +1084,13 @@ The seam is general and keyed by surface id; it is not a downtime feature, and D
 The two seams differ in what they do, and the difference is structural rather than cosmetic.
 A **Manager** provider *replaces* one Core route's content.
 A **player** provider *adds* N tabs to the player window's navigation rail, alongside Crafting, Alchemy, Gathering, Journal and Inventory.
-Fabricate renders every registered player surface, so no surface id is privileged and Core never checks an id against a list of its own.
+Fabricate renders every registered player surface, with one temporary exception: the `downtime` surface, which is gated behind the same world setting as the Manager's Downtime route.
+No surface id is privileged into being rendered, and Fabricate never checks an id against a list of ids it will accept.
+
+> **The `downtime` surface may not be present here either.**
+> While the premium Downtime Studio is unreleased, a companion's `downtime` tabs are shown in the player window only when the world setting `fabricate.experimentalFeatures` is on, which it is **not** by default.
+> Registration is unaffected and never fails because of it.
+> See [When the player surface is absent](#when-the-player-surface-is-absent).
 
 A player surface id **is** the registering provider's own `id`.
 Fabricate's player window has no route of its own to name a surface independently, so `surfaceId` and `providerId` are always equal — in the mount context and in every hook payload.
@@ -1254,6 +1260,36 @@ Give your own root `height: 100%; min-height: 0` too.
 Skip it and your root resolves against `auto` and falls back to content height rather than filling the panel, and nothing reports it.
 If you want container queries, declare `container-type` on your own root — its inline size is the target's, so you measure the same box without Fabricate imposing containment on companions that do not want it.
 
+### When The Player Surface Is Absent
+
+A player surface Fabricate does not render is not an error, and it is not something your module can detect at registration time.
+
+Today this has one cause, and it is the same one as on the Manager side: the `downtime` surface is gated behind `fabricate.experimentalFeatures`, a **world** setting that is off by default, because the premium Downtime Studio it hosts has not been released yet.
+The gate is temporary and goes away when the Studio ships.
+It names that one surface id: register any other id and your tabs render on registration alone, whatever the setting says.
+
+**What still happens, exactly as it would with the gate open.**
+
+- `registerPlayerNavProvider(provider)` validates and stores your provider, returns your unregister function, and throws nothing.
+  A GM's world setting is not something a module registering at `ready` could know, so it is never treated as your fault: Fabricate logs no error, raises no warning, and shows no notification.
+- `fabricate.player.navProviderRegistered` fires with your surface id and tab ids.
+- The Manager title bar's `PREMIUM` badge lights, because it reports that a companion module is registered at all — a player-window-only surface lights it too.
+
+**What you observe instead is an absence.**
+
+- `mount({ target, tabId, context })` is never called, so you receive no context, no target, and no cleanup call.
+- None of `fabricate.player.surfaceMounted`, `fabricate.player.surfaceUnmounted` or `fabricate.player.surfaceTabChanged` fire for the surface.
+- Your tabs are absent from the player window's rail, and no route key addressing them can be selected.
+  The player window shows nothing in their place: it carries no premium signal in any state, so a gated surface and an uninstalled companion look identical.
+
+**When a change to the setting takes effect.**
+
+The gate is read whenever Fabricate derives its surface snapshot — when the player window opens, and on every registration, unregistration or re-registration.
+It is not pushed into an already-open window.
+A player standing on your tab when a GM turns the setting off keeps the screen they are on until the window is reopened or a registration re-derives the rail, which is deliberate: evicting them would run your cleanup and discard whatever they had in progress because a world setting moved.
+Until then that window's rail may still show your tabs, but selecting one is refused — the tab a player is already on stays put, and a move back to it is declined rather than rendering an empty panel.
+Turning the setting **on** needs no re-registration from you — the registration Fabricate has been holding renders at the next snapshot.
+
 ### Lifecycle And Failure
 
 Fabricate calls the returned cleanup exactly once, while the target is still connected, and before whatever ended the mount removes it.
@@ -1287,7 +1323,8 @@ Bringing an already-open window back to the front is not a reopen and clears not
 When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to Fabricate's default Crafting tab, so the window never renders an empty panel.
 
 The companion owns all authorization, localization, domain data, persistence, and resources it creates; Fabricate supplies only the target and the window shell.
-Note that the player window applies **no** visibility or permission gate to a provider tab: unlike the Manager, it has no GM gate, so every user who can open the window sees every registered provider's tabs.
+Note that the player window applies **no per-user** visibility or permission gate to a provider tab: unlike the Manager, it has no GM gate, so two players never see different rails.
+The one gate that exists is world-scoped and temporary, and it is described below.
 
 ### Player Hooks
 
@@ -1331,7 +1368,7 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
 | World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
 | World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default, with other presets `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
-| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces, currently the unimplemented recipe Graph placeholder in the crafting manager, disabled by default |
+| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces — the unimplemented recipe Graph placeholder in the crafting manager, the GM Manager's `World > Downtime` route, and a companion's `downtime` tabs in the player window — disabled by default |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |

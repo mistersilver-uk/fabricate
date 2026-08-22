@@ -352,7 +352,12 @@ async function mountPlayerApp(content, params) {
     // snapshot. Handing over the registry and expecting the shell to derive its own would render
     // an empty rail, because the shell subscribes to nothing by design. `deriveExtensionSurfaces`
     // is the one function production calls too, so the lab cannot drift from it.
-    extensionSurfaces: deriveExtensionSurfaces(playerExtensions),
+    // The gate the production host reads off `fabricate.experimentalFeatures` is stated from the
+    // same lab param that seeds that setting into the lab world, so a `?experimental=0` frame
+    // photographs the withheld surface rather than a world whose setting and rail disagree.
+    extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {
+      experimentalFeaturesEnabled: params.experimental,
+    }),
     // The registry itself, carried only so the mount host emits its surface hooks through the
     // same injectable edge the registry's own hooks travel on.
     playerExtensions,
