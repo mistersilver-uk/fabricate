@@ -288,7 +288,10 @@ function makeHost(registry, initialTab = DEFAULT_TAB) {
           activeTab = tab;
         },
         services: fakeServices({ selectedActorId }),
-        extensionSurfaces: deriveExtensionSurfaces(registry),
+        // The gate is stated OPEN in this suite throughout: its fixture provider claims the
+        // gated `downtime` id, and what these cases are about is how the shell renders a
+        // snapshot, not which surfaces reach one (issue 1257).
+        extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
         playerExtensions: registry,
       };
     },
@@ -632,7 +635,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       showAlchemy: false,
       onSelectTab: () => {},
       services: fakeServices(),
-      extensionSurfaces: deriveExtensionSurfaces(registry),
+      extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
       playerExtensions: registry,
     });
 
@@ -811,7 +814,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       showAlchemy: false,
       onSelectTab: () => {},
       services,
-      extensionSurfaces: deriveExtensionSurfaces(registry),
+      extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
       playerExtensions: registry,
     });
     // Reset AFTER mount: the shell's own start-up reads must not be counted as routing.

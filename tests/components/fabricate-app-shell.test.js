@@ -523,8 +523,14 @@ describe('SvelteFabricateApp shell window', () => {
       // the hook bag exists, so without the seed a companion registering during its own init
       // has no tabs on first open and, if it never re-registers, never at all.
       assert.ok(
-        body.includes('extensionSurfaces: deriveExtensionSurfaces(playerExtensions)'),
+        body.includes('extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {'),
         'the first frame props must DERIVE the snapshot'
+      );
+      // The temporary player Downtime gate (issue 1257): the snapshot is derived under the
+      // world's opt-in, so the first frame cannot advertise a withheld surface either.
+      assert.ok(
+        body.includes('experimentalFeaturesEnabled: isExperimentalFeaturesEnabled()'),
+        'and must state the experimental gate it is derived under'
       );
       assert.ok(
         !body.includes('extensionSurfaces: this._'),
@@ -556,7 +562,11 @@ describe('SvelteFabricateApp shell window', () => {
       const start = appSource.indexOf('_refreshExtensionSurfaces() {');
       assert.ok(start >= 0, '_refreshExtensionSurfaces exists');
       const body = appSource.slice(start, start + 600);
-      assert.ok(body.includes('deriveExtensionSurfaces(playerExtensions)'), 'fresh snapshot');
+      assert.ok(body.includes('deriveExtensionSurfaces(playerExtensions, {'), 'fresh snapshot');
+      assert.ok(
+        body.includes('experimentalFeaturesEnabled: isExperimentalFeaturesEnabled()'),
+        'and re-reads the experimental gate rather than caching the first frame\'s answer'
+      );
       assert.ok(body.includes('resolveActiveTab('), 'and the shared fallback rule');
       assert.ok(body.includes('this.updateProps({ extensionSurfaces'), 'pushed down reactively');
     });

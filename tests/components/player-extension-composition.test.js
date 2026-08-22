@@ -220,6 +220,94 @@ test('_selectTab refuses every route the window does not currently offer', async
   });
 });
 
+// The player Downtime experimental gate (issue 1257), asserted against the production host
+// rather than against the leaf, because the host is what reads the setting. It is TEMPORARY: the
+// case goes when the premium Downtime Studio ships and the gate with it.
+test('the downtime surface is withheld from the player window until the world opts in', async () => {
+  await withFabricateLifecycleReplay(async ({ init, loadModule }) => {
+    const releases = [];
+    try {
+      globalThis.game.fabricate = undefined;
+      await init();
+      const api = globalThis.game.fabricate.api.playerExtensions;
+      // TWO companions, and only one of them claims the gated id. A single-provider fixture
+      // cannot tell "the gated surface is withheld" apart from "the seam went dark".
+      releases.push(api.registerPlayerNavProvider(provider()));
+      releases.push(api.registerPlayerNavProvider(provider('crew-quarters')));
+
+      // The lab world boots with experimental features ON; this is the default a real world has.
+      await globalThis.game.settings.set('fabricate', 'experimentalFeatures', false);
+
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const pushed = [];
+      const headless = () =>
+        Object.assign(Object.create(SvelteFabricateApp.prototype), {
+          _activeTab: 'crafting',
+          _services: null,
+          _activeCanvasTool: null,
+          _scopedEnvironmentId: null,
+          _scopedTaskId: null,
+          _scopedActorId: null,
+          _scopedInteractableRef: null,
+          _hookIds: null,
+          _playerExtensionsUnsubscribe: null,
+          updateProps: (props) => pushed.push(props),
+        });
+
+      const app = headless();
+      assert.deepEqual(
+        app._prepareSvelteProps().extensionSurfaces.map((surface) => surface.surfaceId),
+        ['crew-quarters'],
+        'the gated surface is absent from the frame while the ungated companion still renders'
+      );
+
+      // UNREACHABLE, not merely unlinked: the rail has no entry, and the programmatic route
+      // Core offers everything else through refuses it too.
+      app._selectTab('ext:downtime:board');
+      assert.equal(app._activeTab, 'crafting', '_selectTab must refuse a gated companion route');
+      assert.deepEqual(pushed, [], 'and must push nothing to the mounted component');
+      app._selectTab('ext:crew-quarters:board');
+      assert.equal(
+        app._activeTab,
+        'ext:crew-quarters:board',
+        'while an ungated companion route is selectable exactly as it always was'
+      );
+
+      // THE STALE-RAIL CASE the spec's gate section states: a window whose snapshot was derived
+      // while the gate was OPEN keeps rendering the tab until the next snapshot, and the live
+      // route test is what stops that stale entry putting a player back on a withheld surface.
+      await globalThis.game.settings.set('fabricate', 'experimentalFeatures', true);
+      const stale = headless();
+      assert.ok(
+        stale
+          ._prepareSvelteProps()
+          .extensionSurfaces.some((surface) => surface.surfaceId === 'downtime'),
+        'the frame derived while the world had opted in offers the surface'
+      );
+      await globalThis.game.settings.set('fabricate', 'experimentalFeatures', false);
+      stale._selectTab('ext:downtime:board');
+      assert.equal(
+        stale._activeTab,
+        'crafting',
+        'and the route is refused once the gate shuts, without waiting for a fresh snapshot'
+      );
+
+      // REGISTRATION IS NEVER GATED. The provider registered while the gate was shut is still
+      // held, keeps its unregister handle, and needs no re-registration to appear.
+      await globalThis.game.settings.set('fabricate', 'experimentalFeatures', true);
+      assert.deepEqual(
+        headless()
+          ._prepareSvelteProps()
+          .extensionSurfaces.map((surface) => surface.surfaceId),
+        ['downtime', 'crew-quarters'],
+        'the same registration renders the moment the world opts in'
+      );
+    } finally {
+      for (const release of releases) release?.();
+    }
+  });
+});
+
 test('the production player window closes a mounted companion before ApplicationV2 removes its target', async () => {
   const lifecycle = await captureCloseOrdering({
     modulePath: '/src/ui/SvelteFabricateApp.svelte.js',

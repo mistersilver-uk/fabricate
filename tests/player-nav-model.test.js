@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 
 import {
   EXTENSION_ROUTE_PREFIX,
+  PLAYER_DOWNTIME_SURFACE_ID,
   buildPlayerNavTabs,
   buildRouteKey,
   deriveExtensionSurfaces,
   isCoreTabId,
+  isPlayerSurfaceAvailable,
   parseRouteKey,
   resolveActiveTab,
 } from '../src/ui/playerNavModel.js';
@@ -85,7 +87,9 @@ test('deriveExtensionSurfaces snapshots the registry in its own registration ord
   registry.publicApi.registerPlayerNavProvider(first);
   const releaseSecond = registry.publicApi.registerPlayerNavProvider(second);
 
-  const surfaces = deriveExtensionSurfaces(registry);
+  // The gate is stated OPEN throughout this case, which is about ordering and identity rather
+  // than about the gate; `downtime` is withheld by default and the case below owns that.
+  const surfaces = deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true });
   assert.deepEqual(
     surfaces.map((entry) => entry.surfaceId),
     ['downtime', 'crew-quarters']
@@ -96,9 +100,67 @@ test('deriveExtensionSurfaces snapshots the registry in its own registration ord
 
   releaseSecond();
   assert.deepEqual(
-    deriveExtensionSurfaces(registry).map((entry) => entry.surfaceId),
+    deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }).map(
+      (entry) => entry.surfaceId
+    ),
     ['downtime'],
     'the snapshot is re-derived, never mutated in place'
+  );
+});
+
+// The player Downtime experimental gate (issue 1257). It is TEMPORARY and tied to the premium
+// Downtime Studio being unreleased, so these cases go when the Studio ships — but while it is
+// shut, a player window that still offered the companion's tabs would advertise exactly the
+// feature the Manager's own gate withholds from the GM.
+test('the downtime surface is the only id the gate names, and the gate defaults to shut', () => {
+  assert.equal(PLAYER_DOWNTIME_SURFACE_ID, 'downtime');
+
+  assert.equal(isPlayerSurfaceAvailable('downtime'), false, 'stated nowhere means withheld');
+  assert.equal(isPlayerSurfaceAvailable('downtime', {}), false);
+  assert.equal(isPlayerSurfaceAvailable('downtime', { experimentalFeaturesEnabled: false }), false);
+  assert.equal(isPlayerSurfaceAvailable('downtime', { experimentalFeaturesEnabled: true }), true);
+  // Nothing but a literal `true` opens it: a truthy setting value read off a world that stored
+  // something other than a boolean must not be mistaken for an opt-in.
+  assert.equal(isPlayerSurfaceAvailable('downtime', { experimentalFeaturesEnabled: 1 }), false);
+
+  // Every OTHER surface is untouched, gate open or shut. Core still enumerates no id it will
+  // accept — this is one named id it withholds, which is a strictly narrower claim.
+  for (const gate of [{ experimentalFeaturesEnabled: false }, { experimentalFeaturesEnabled: true }])
+    for (const surfaceId of ['crew-quarters', 'downtime-tracker', 'bogus'])
+      assert.ok(isPlayerSurfaceAvailable(surfaceId, gate), `${surfaceId} is never gated`);
+});
+
+test('a withheld downtime surface leaves the snapshot entirely, and its neighbours stay', () => {
+  const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+  const downtime = surface('downtime', [{ id: 'board', label: 'B', icon: 'fas fa-b' }]).provider;
+  const crew = surface('crew-quarters', [{ id: 'roster', label: 'R', icon: 'fas fa-r' }]).provider;
+  registry.publicApi.registerPlayerNavProvider(downtime);
+  registry.publicApi.registerPlayerNavProvider(crew);
+
+  assert.deepEqual(
+    deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: false }).map(
+      (entry) => entry.surfaceId
+    ),
+    ['crew-quarters'],
+    'the gated surface is dropped from the snapshot rather than rendered as a placeholder'
+  );
+  assert.deepEqual(
+    deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }).map(
+      (entry) => entry.surfaceId
+    ),
+    ['downtime', 'crew-quarters'],
+    'and the very same registry yields it again the moment the world opts in'
+  );
+
+  // The rail is built from the snapshot, so withholding the surface withholds every route key
+  // it would have contributed — the property the whole gate rests on.
+  assert.deepEqual(
+    build({
+      extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: false }),
+    })
+      .filter((tab) => tab.isExtension)
+      .map((tab) => tab.routeKey),
+    ['ext:crew-quarters:roster']
   );
 });
 
