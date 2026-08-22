@@ -19,7 +19,7 @@ export const FIXTURE_REALM_ID = 'realm-verdant';
 /**
  * Build a full authoring fixture.
  *
- * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object }}
+ * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig: object }}
  */
 export function buildFullAuthoringFixture() {
   const system = {
@@ -61,6 +61,14 @@ export function buildFullAuthoringFixture() {
         difficulty: 1,
         essences: {},
         aliasItemUuids: [],
+        // An AUTHORED EMPTY salvage check-modifier pick (issue 1095): a real pick of ZERO,
+        // distinct from an absent one, which inherits. It is the one shape a truthiness
+        // test silently loses, and the two resolve to DIFFERENT rolls.
+        salvage: {
+          enabled: true,
+          resultGroups: [{ id: 'sg-1', name: 'Scrap', results: [] }],
+          checkModifierIds: [],
+        },
       },
     ],
     recipeItemDefinitions: [{ id: 'recipe-def-1', name: 'Recipe Sheet' }],
@@ -78,21 +86,59 @@ export function buildFullAuthoringFixture() {
         onBreak: { action: 'consume', replacementComponentId: 'comp-ore' },
       },
     ],
-    gatheringRealms: [
-      {
-        id: FIXTURE_REALM_ID,
-        craftingSystemId: FIXTURE_SYSTEM_ID,
-        name: 'Verdant Wilds',
-        enabled: true,
-        sceneMappings: [
-          {
-            sceneUuid: 'Scene.verdant-map',
-            sceneRegionUuid: 'Scene.verdant-map.Region.grove',
-          },
-        ],
-      },
+    // Realms left the crafting system in issue 1282: the library is WORLD scope and lives in
+    // `travelConfig` (below), so all a system carries now is whether it PARTICIPATES.
+    gatheringRealmSettings: { enabled: true },
+    // The ONE system-level modifier library (issues 1095, 1117). THREE entries on purpose:
+    // one carrying BOTH bounds and one carrying NEITHER, because `min`/`max` are
+    // absence-preserving and a fixture where every entry is bounded cannot tell a
+    // round-trip that DROPS the keys from one that writes them everywhere — plus the entry
+    // a gathering drop row references, which used to live in a second library in the
+    // gathering config and now lives here with the rest.
+    modifiers: [
+      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
+      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+      { id: FIXTURE_MODIFIER_ID, label: 'Skilled', expression: '@abilities.str.mod' },
     ],
-    gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+    // A NON-DEFAULT selection triple on EACH of the three activity checks. A
+    // default-valued fixture is not an oracle for an allowlist rebuild: `addAll` with an
+    // empty id set and no cap is exactly what a normalizer that emitted NOTHING produces,
+    // so a dropped key would round-trip indistinguishably.
+    craftingCheck: {
+      enabled: true,
+      simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 14 },
+      // Issue 1098. NON-DEFAULT on every activity: the read-time default is `perRecord`,
+      // so a fixture authoring it would be no oracle at all — a normalizer that dropped
+      // the key entirely would round-trip identically. The three checks deliberately
+      // carry DIFFERENT values so a normalizer emitting one activity's policy onto
+      // another (three whitelist rebuilds, one shared derivation) is visible too.
+      failureResultPolicy: 'always',
+      defaultModifierPolicy: 'bySubject',
+      defaultModifierIds: ['mod-medicine'],
+      maxModifierPicks: 2,
+    },
+    salvageCraftingCheck: {
+      enabled: true,
+      simple: { rollFormula: '1d20', dc: 12 },
+      failureResultPolicy: 'never',
+      // Salvage's failure CONSUMPTION block, persisted since 1.7.0 and — until issue
+      // 1098 — reachable from no editor and projected nowhere. Both values are the
+      // NON-DEFAULT one: `consumeComponentOnFail` defaults TRUE via `!== false`, so a
+      // dropped field is INVERTED rather than merely absent, and `breakToolsOnFail`
+      // defaults FALSE.
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
+      defaultModifierPolicy: 'highest',
+      defaultModifierIds: ['mod-medicine', 'mod-alchemy'],
+      maxModifierPicks: 1,
+    },
+    gatheringCraftingCheck: {
+      enabled: true,
+      routed: { rollFormula: '1d20', dc: 12 },
+      failureResultPolicy: 'always',
+      defaultModifierPolicy: 'bySubject',
+      defaultModifierIds: ['mod-alchemy'],
+      maxModifierPicks: 3,
+    },
   };
 
   const recipes = [
@@ -239,6 +285,10 @@ export function buildFullAuthoringFixture() {
             timeOfDay: ['day'],
             staminaCost: 2,
             toolIds: [FIXTURE_TOOL_ID],
+            // A TWO-ID check-modifier pick (issue 1095). Non-default on both axes: two
+            // ids rather than none, and a pick at all rather than inheritance — so a
+            // normalizer that dropped the key round-trips visibly differently.
+            checkModifierIds: ['mod-medicine', 'mod-alchemy'],
             dropRows: [
               {
                 id: 'row-1',
@@ -281,14 +331,37 @@ export function buildFullAuthoringFixture() {
             onBreak: { action: 'replace', replacementComponentId: 'comp-ore' },
           },
         ],
-        characterModifiers: [
-          { id: FIXTURE_MODIFIER_ID, name: 'Skilled', kind: 'bonus', value: 10 },
-        ],
       },
     },
   };
 
-  return { system, recipes, environments, gatheringConfig };
+  // The WORLD travel configuration (issue 1282). Its realm is the one every realm-gated
+  // environment above cites by id, and it carries the Foundry Scene Region link nested inside
+  // the realm as `sceneMappings[]`.
+  //
+  // The mapping carries an EXPLICIT id on purpose: `normalizeTravelConfig` mints one for a
+  // mapping that arrives without, so a fixture that omitted it would produce a different id on
+  // every export and the round-trip deep-equal could never hold.
+  const travelConfig = {
+    revealMode: 'alwaysVisible',
+    modifierVisibility: 'visible',
+    realms: [
+      {
+        id: FIXTURE_REALM_ID,
+        name: 'Verdant Wilds',
+        enabled: true,
+        sceneMappings: [
+          {
+            id: 'mapping-verdant-grove',
+            sceneUuid: 'Scene.verdant-map',
+            sceneRegionUuid: 'Scene.verdant-map.Region.grove',
+          },
+        ],
+      },
+    ],
+  };
+
+  return { system, recipes, environments, gatheringConfig, travelConfig };
 }
 
 /**
@@ -341,17 +414,95 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   ['has timeOfDay vocabulary', (f) => (f.gatheringConfig.vocabularies?.timeOfDay?.length ?? 0) >= 1],
   ['has biome vocabulary', (f) => (f.gatheringConfig.vocabularies?.biomes?.length ?? 0) >= 1],
   ['has danger vocabulary', (f) => (f.gatheringConfig.vocabularies?.danger?.length ?? 0) >= 1],
-  ['has a realm', (f) => (f.system.gatheringRealms?.length ?? 0) >= 1],
+  ['has a WORLD realm', (f) => (f.travelConfig.realms?.length ?? 0) >= 1],
+  [
+    'the participating system carries the flag ALONE, with no realm library',
+    (f) =>
+      f.system.gatheringRealmSettings?.enabled === true &&
+      !Object.hasOwn(f.system, 'gatheringRealms'),
+  ],
   [
     'realm carries scene + scene-region mappings',
     (f) =>
-      f.system.gatheringRealms.some((r) =>
+      f.travelConfig.realms.some((r) =>
         (r.sceneMappings ?? []).some((m) => m.sceneUuid && m.sceneRegionUuid)
       ),
   ],
   [
+    'an environment is realm-gated to the world realm',
+    (f) => f.environments.some((e) => (e.includedRealmIds ?? []).includes(FIXTURE_REALM_ID)),
+  ],
+  [
     'a drop row targets a world item via itemUuid',
     (f) => (slice(f).tasks ?? []).some((t) => (t.dropRows ?? []).some((row) => row.itemUuid)),
+  ],
+  // ── issues 1095/1117: the ONE system-level library and its three selections ───────
+  [
+    'system carries a modifier library with one BOUNDED and one UNBOUNDED entry',
+    (f) => {
+      const library = f.system.modifiers ?? [];
+      return (
+        library.some((entry) => Number.isFinite(entry.min) && Number.isFinite(entry.max)) &&
+        library.some((entry) => !Object.hasOwn(entry, 'min') && !Object.hasOwn(entry, 'max'))
+      );
+    },
+  ],
+  [
+    'the ONE library also carries the entry a gathering drop row references',
+    (f) =>
+      (f.system.modifiers ?? []).some((entry) => entry.id === FIXTURE_MODIFIER_ID) &&
+      !Object.hasOwn(f.gatheringConfig.systems[f.system.id] ?? {}, 'characterModifiers'),
+  ],
+  [
+    'all THREE activity checks carry a NON-DEFAULT selection triple',
+    (f) =>
+      ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'].every((key) => {
+        const check = f.system[key] ?? {};
+        return (
+          check.defaultModifierPolicy !== undefined &&
+          check.defaultModifierPolicy !== 'addAll' &&
+          (check.defaultModifierIds ?? []).length > 0 &&
+          Number.isInteger(check.maxModifierPicks)
+        );
+      }),
+  ],
+  // ── issue 1098: the failure-result policy and salvage's failure consumption ───────
+  [
+    'all THREE activity checks carry a NON-DEFAULT failureResultPolicy',
+    (f) =>
+      ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'].every((key) => {
+        const policy = (f.system[key] ?? {}).failureResultPolicy;
+        // `perRecord` is the read-time default, so it is not an oracle: a normalizer
+        // that dropped the key would produce it and this predicate would still pass.
+        return policy === 'never' || policy === 'always';
+      }),
+  ],
+  [
+    'salvage authors BOTH failure-consumption flags at their non-default values',
+    (f) => {
+      const consumption = (f.system.salvageCraftingCheck ?? {}).consumption ?? {};
+      // `consumeComponentOnFail` defaults TRUE (`!== false`), so `false` is the only
+      // value that catches a projection or normalizer dropping it; `breakToolsOnFail`
+      // defaults FALSE, so `true` is.
+      return consumption.consumeComponentOnFail === false && consumption.breakToolsOnFail === true;
+    },
+  ],
+  [
+    'a component authors an EMPTY salvage check-modifier pick',
+    (f) =>
+      f.system.components.some(
+        (component) =>
+          Array.isArray(component.salvage?.checkModifierIds) &&
+          component.salvage.checkModifierIds.length === 0
+      ),
+  ],
+  [
+    'a gathering task authors a TWO-ID check-modifier pick',
+    (f) =>
+      (slice(f).tasks ?? []).some(
+        (task) =>
+          Array.isArray(task.checkModifierIds) && task.checkModifierIds.length === 2
+      ),
   ],
 ]);
 

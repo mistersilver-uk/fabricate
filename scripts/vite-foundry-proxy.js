@@ -1,9 +1,61 @@
 import http from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
-import { join, normalize, extname } from 'node:path';
+import { join, normalize, extname, sep } from 'node:path';
 
 const FOUNDRY_ORIGIN = 'http://localhost:30000';
 const MODULE_PATH_PREFIX = '/modules/fabricate/';
+
+// The premium companion, served from its own checkout so a change to its source
+// reloads without a build. Only its ENTRY is rewritten: once that is served from
+// `/@fs/`, Vite resolves the rest of its import graph against the file's own path,
+// and `/@`-prefixed requests already fall through to Vite below.
+//
+// Dev only, and asymmetric with production: a built premium bundles its OWN Svelte
+// runtime and shares nothing with Fabricate, whereas here its source resolves
+// `svelte` from this repo's node_modules. Both are 5.56.3 today and premium mounts
+// its own root, so nothing crosses the seam either way -- but a version skew between
+// the two repos would surface here and not in a built module.
+const PREMIUM_PATH_PREFIX = '/modules/fabricate-premium/';
+const PREMIUM_ENTRY = 'scripts/main.js';
+
+/**
+ * Absolute path to premium's source directory, or null when it is not checked out.
+ *
+ * `FABRICATE_PREMIUM_PATH` points at the premium repo root; the default assumes it
+ * sits beside this one, so the common layout needs no configuration.
+ *
+ * @returns {string | null}
+ */
+export function premiumSourceRoot() {
+  const configured = process.env.FABRICATE_PREMIUM_PATH;
+  const repoRoot = configured || join(process.cwd(), '..', 'fabricate-premium');
+  const candidate = join(repoRoot, 'packages', 'fabricate-premium', 'src');
+  try {
+    return statSync(join(candidate, 'main.js')).isFile() ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Map premium's manifest-declared esmodule onto its source entry under `/@fs/`.
+ *
+ * @param {string | undefined} requestUrl
+ * @param {string | null} sourceRoot
+ * @returns {string | null}
+ */
+export function rewritePremiumModuleUrl(requestUrl, sourceRoot) {
+  if (!requestUrl || !sourceRoot) return null;
+
+  const parsed = new URL(requestUrl, FOUNDRY_ORIGIN);
+  if (!parsed.pathname.startsWith(PREMIUM_PATH_PREFIX)) return null;
+
+  const relativePath = parsed.pathname.slice(PREMIUM_PATH_PREFIX.length);
+  if (relativePath !== PREMIUM_ENTRY) return null;
+
+  const entry = join(sourceRoot, 'main.js').split(sep).join('/');
+  return `/@fs/${entry}${parsed.search}${parsed.hash}`;
+}
 
 // Static content types for repo assets served in dev (fonts + preview images).
 // The fonts matter most: `styles/fabricate.css`'s `@font-face` rules resolve to
@@ -20,7 +72,7 @@ const ASSET_CONTENT_TYPES = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
-  '.gif': 'image/gif'
+  '.gif': 'image/gif',
 };
 
 /**
@@ -32,6 +84,16 @@ export function fabricateDevProxy() {
     name: 'fabricate-foundry-proxy',
     configureServer(server) {
       const root = server.config.root;
+      const premiumRoot = premiumSourceRoot();
+      if (premiumRoot) {
+        // Vite's watcher covers the project ROOT. Premium's source is outside it and reaches
+        // the browser through `/@fs/`, so without this its files are read once, cached, and
+        // never invalidated -- edits keep serving the transform from first request, which
+        // looks exactly like a change that did not land. Adding the directory to the watcher
+        // puts those files back on the ordinary invalidate-and-HMR path.
+        server.watcher.add(premiumRoot);
+        server.config.logger.info(`  ➜  premium:  serving ${premiumRoot} with HMR`);
+      }
       // Pre-middleware: runs BEFORE Vite's internal middleware.
       // This is essential because Vite's SPA fallback would otherwise intercept
       // HTML requests looking for index.html (which doesn't exist) and 404.
@@ -41,6 +103,15 @@ export function fabricateDevProxy() {
         // maps `/modules/fabricate/assets/...` onto `/assets/...`, so the asset
         // branch below catches both the rewritten and the direct (`@font-face`
         // relative-url) forms.
+        // Premium's entry, checked first only for readability -- the two prefixes are
+        // disjoint, because "/modules/fabricate-premium/" does not start with
+        // "/modules/fabricate/" (the character after "fabricate" is "-", not "/").
+        const premiumUrl = rewritePremiumModuleUrl(req.url, premiumRoot);
+        if (premiumUrl) {
+          req.url = premiumUrl;
+          return next();
+        }
+
         const rewrittenModuleUrl = rewriteFabricateModuleUrl(req.url);
         if (rewrittenModuleUrl) {
           req.url = rewrittenModuleUrl;
@@ -74,7 +145,7 @@ export function fabricateDevProxy() {
         // Catch-all: proxy to Foundry
         proxyToFoundry(req, res);
       });
-    }
+    },
   };
 }
 
@@ -146,7 +217,7 @@ export function serveRepoAsset(req, res, root) {
     'content-length': info.size,
     // Fonts/images are content-hashed by filename in prod; in dev keep them
     // fresh so an edited asset is picked up on reload.
-    'cache-control': 'no-cache'
+    'cache-control': 'no-cache',
   });
   createReadStream(filePath).pipe(res);
   return true;
@@ -166,7 +237,7 @@ function proxyToFoundry(clientReq, clientRes) {
       port: url.port,
       path: url.pathname + url.search,
       method: clientReq.method,
-      headers
+      headers,
     },
     (proxyRes) => {
       if (isHTML && proxyRes.headers['content-type']?.includes('text/html')) {

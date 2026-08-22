@@ -325,6 +325,58 @@ Richer client-side auto-fill for multi-set / alternatives / tags / essences is a
 - May show result descriptions.
 - Non-revealed recipes must not appear for non-GM users; only their count is surfaced (`undiscoveredCount = valid − revealed`), and no non-revealed name/signature/result reaches any client field.
 
+## Summary Projection Disclosure
+
+The canonical recipe summary defined in `data-models/spec.md` § Summary Projections is a PLAYER-facing payload whenever it is built for a player audience.
+Its redaction obeys the same teaser rule the detail model obeys, and the two MUST agree: a recipe that is a teaser in the list and not in the inspector, or the reverse, is a disclosure either way round.
+
+The following are normative.
+
+- **The redaction test is the same test.**
+A summary is redacted when the viewer is not a GM AND the recipe's access reason is `teaser`, and the hidden-field list is the recipe's authored `teaserState.hiddenFields`, falling back to the documented default of ingredients, results and description.
+- **An omitted audience defaults to the REDACTING one.**
+Failing safe matters more than caller convenience: a default of GM would ship an unredacted teaser to whichever caller forgot the argument.
+- **A redacted summary carries no availability, and MUST NOT compute one.**
+Material availability is derived from the recipe's INGREDIENTS, which the default teaser configuration hides, so an availability answer on an undiscovered recipe discloses the shape of a requirement the player is not meant to see yet — refreshable once per inventory change, across a whole corpus.
+The guard belongs at the derivation, not at the write-out: blanking a computed value is equivalent for today's shape and wrong the first time a field is added beside it.
+- **Identity and grouping metadata are NOT redacted.**
+A teaser is shown to the player deliberately, so its name, image and category are the part they are meant to see; the shipped listing model records that decision for `category` already.
+`categoryLabel`, the display form of `category`, is likewise not redacted and needs no separate judgement: it is a total function of `category` and the active language, so it can disclose nothing `category` does not.
+Redacting it while leaving `category` visible would render a blank chip for a bucket the player can still filter by.
+`tags` is likewise not redacted, and that is a NEW decision rather than an inherited one — no player-facing surface has carried recipe tags before, so it does not follow from the `category` precedent.
+It is taken because a tag is GM grouping metadata of exactly the same kind as a category, because `teaserState.hiddenFields` cannot name it (the authored vocabulary is ingredients, results, description, tools and essences), and because withholding it would break the filtering a summary exists to serve.
+- **Authoring state does not cross.**
+A player-audience summary carries no GM-only field, which today means the recipe's lock state and its enabled state.
+- **Exhaustion is a player-only status.**
+A GM bypasses the knowledge gate, so a GM-audience summary MUST NOT report a recipe exhausted even when the caller supplies an exhaustion result.
+Because the browse status is a field both audiences share, honouring it for a GM would make a shared field's derivation depend on the audience, which this contract forbids.
+- **The summary does not gate visibility; the calling surface does.**
+The projection answers what a summary of THIS recipe for THIS audience is, given an access result the visibility evaluation already produced.
+It performs no cohort selection and no visibility filtering of its own, so a surface building player-audience summaries MUST build them only for recipes that evaluation made visible, and MUST pass each recipe's own access result.
+Omitting the access result yields an unredacted summary reporting the available browse status — correct for a visible recipe, and a disclosure for one that is not.
+The gate is upstream and stays there; this contract does not move it and MUST NOT be read as duplicating it.
+
+Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
+
+### Per-Recipe Detail Hydration
+
+The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-integration/spec.md` § Browse And Detail Phases).
+Splitting the read splits the gate, so the following are normative for the detail phase.
+
+- **A recipe id is not a permission.**
+The detail phase receives an id chosen by a client, so it MUST re-resolve the viewer's access for that recipe rather than trusting that a summary was built for it.
+It MUST apply every gate the summary phase applies — the system-blocked-for-recipes predicate for a non-GM, and the visibility evaluation — and MUST answer nothing rather than a redacted model when the viewer may not see the recipe.
+- **Re-evaluating is not a second candidate collection.**
+The detail phase evaluates access for ONE recipe through the same per-recipe evaluation the corpus-wide pass calls, so § One Candidate Collection Per Evaluation is unaffected: the corpus-wide pass is not repeated, and no second corpus-wide walk is introduced.
+- **Redaction is unchanged by the split.**
+A detail model for a recipe whose access reason is `teaser` is redacted exactly as before, so the row and the inspector cannot disagree about whether a recipe is undiscovered.
+- **The detail phase re-applies the `enabled` gate by the reader convention, not by mirroring the corpus query.**
+The summary phase reads the enabled corpus, so it can never project a disabled recipe; the detail phase resolves a recipe by id and MUST therefore re-apply that gate for a non-GM viewer.
+It applies the convention this field carries at every other reader — absent reads as ON, so only an explicit `false` refuses — whereas the corpus query filters on strict equality with `true`.
+The recipe model stores whatever non-`undefined` value it was given, so the two answers differ for a non-boolean `enabled` that an import or a macro can write: such a recipe is absent from the browse list yet still hydrates by id.
+That asymmetry is RECORDED rather than closed, and its direction is stated because it is the disclosing one.
+Closing it by reading an omitted `enabled` as OFF is not admissible, because that would blank the inspector for every recipe authored before the field existed.
+
 ## Knowledge Access Evaluation
 
 Input:
@@ -402,6 +454,35 @@ When a single matched instance must be mutated (increment or consume), choose:
 2. Stable actor order tie-break.
 3. Stable item order tie-break.
 
+### One Candidate Collection Per Evaluation
+
+A read pass that evaluates recipe access for MORE THAN ONE recipe evaluates them against the SAME crafting actor and component-source actors.
+The candidate collection in step 3 of the Knowledge Access Algorithm MUST therefore be derivable from one walk of those actors' inventories per pass, not one walk per recipe.
+
+The requirement is stated on the PASS, not on any one surface, and that generality is load bearing rather than stylistic.
+It binds the corpus-wide visibility pass, the player crafting listing's summary projection AND its per-row exhaustion read, the alchemy workbench's reveal decision (both its chooser summaries and its active panel), the run journal's per-run redaction, and any surface added later that asks the same question about a set of recipes.
+Naming only the corpus-wide pass left three of those collecting candidates per recipe with no per-pass value, each performing a complete inventory enumeration per recipe.
+The exhaustion read is the one most easily mistaken for exempt, because the bullet below reads as though it needs no collection at all: it needs one whenever the pass did not evaluate knowledge, which is every recipe of a `global`- or `restricted`-visibility system that still carries a recipe-item reference — the settled state of any world migrated off `item` mode.
+
+Three consequences are normative:
+
+- **The candidate walk MAY be narrowed by a prefilter, and that prefilter MUST be a superset.**
+An implementation may restrict the documents offered to the per-recipe matcher to those matching **any** of the crafting system's recipe-item definitions **union every legacy `linkedRecipeItemUuid` carried by a recipe in the pass**.
+That union is a superset of every individual recipe's match set, so the per-recipe matcher — which still decides each candidate — returns the identical set.
+Omitting the legacy leg makes the union a *subset* for un-migrated recipes and silently hides their books; the legacy leg is therefore part of the requirement, not an optimisation detail.
+- **Exhaustion MUST NOT re-collect a candidate set an access evaluation already produced.**
+A recipe's item-knowledge is exhausted when at least one matching copy is owned and every such copy has reached its own book's cap.
+Both numbers are already established by the Knowledge Access Algorithm, so a caller holding that result derives exhaustion from it.
+A result that owns no evidence — the GM bypass, which scans no inventory, or a mode that never evaluated knowledge — MUST be distinguishable from a genuine count of zero, and only the latter answers "not exhausted"; the former falls back to collecting candidates.
+- **A per-pass inventory value is ONE KIND of thing, built ONE way.**
+Every pass MUST build it through a single construction that supplies the recipe-item matcher, rather than each surface choosing which identity collaborators to supply.
+This constrains the KIND, not the instance count: a pass that legitimately builds more than one such value — a listing surface that both asks a visibility service for a corpus pass and builds its own — satisfies it, because the cost of an extra construction is `O(1)` in recipes and the hazard being removed is a value that answers a consumer wrongly, not a value that exists twice.
+The reason is a failure mode rather than tidiness: a value built without the matcher offers the per-recipe matcher every held document unfiltered, and because that matcher still decides each candidate the ANSWER is unchanged — the per-recipe walk is reinstated in full while every correctness test stays green and every inventory-read counter stays flat, because the unfiltered offer is served from a single memoised walk.
+A conformance guard for this section MUST therefore count the documents OFFERED to the per-recipe matcher, not the times an inventory was read; the latter cannot distinguish a correct pass from that reinstatement.
+
+These are read-path requirements only.
+Exact craft submission continues to revalidate against current documents before consumption, and no snapshot or prefilter is authoritative at consumption time.
+
 ## Learning Recipes
 
 ### Preconditions
@@ -443,6 +524,19 @@ Learned entries are therefore INDEPENDENT of currently-owned copies, and a surfa
 
 A UI surfacing learned knowledge MUST resolve the source display name through the recipe's **member recipe-item definition** when the copy is gone.
 The full ladder is: a still-owned copy's name, else the member definition's name rendered as "no longer owned", else the trailing uuid segment, else a "learned by crafting" statement for the `null` `sourceItemUuid` every `learnRecipeOnCraft` entry carries.
+
+### Recipe And System Id Constraint
+
+A **recipe id** is a durable-flag MAP KEY: it is interpolated into the per-actor `learnedRecipes` and `discoveryProgress` maps, which are written through a flattened `Document#update` path where every dot separates an object segment.
+A **crafting-system id** is one for the same reason (`roles.<systemId>.componentId` and its `toolId` / `recipeItemDefinitionId` siblings).
+
+Both MUST therefore satisfy `isSafeFlagKeySegment` (`/^[A-Za-z0-9_-]+$/`) and are refused **at intake**, loudly, naming the offending id: `RecipeManager.createRecipe` for a recipe and `CraftingSystemManager.createSystem` for a system.
+`foundry.utils.randomID()` always satisfies the pattern, so the constraint can only fire for an imported or hand-authored id; the compendium importer already isolates a per-recipe failure into its import report.
+Neither id is ever rewritten to make it safe — recipe books, Required Knowledge, learned entries, tools, and gathering config all reference these ids — so the only outcomes are acceptance and refusal.
+The edit paths cannot smuggle one past the guard: `updateRecipe` and `updateSystem` both pin the id to the record being updated and ignore any `id` in the payload.
+
+Refusal at intake is the **complete** fix for the nesting hazard described in Reading A Recipe-Id-Keyed Flag Map; reader-side repair is the best-effort half, for worlds that already carry such an id.
+Loading an existing world MUST NOT route through either guard — rehydration goes through `Recipe.fromJSON` and `_normalizeSystem`, never through the create paths — because retroactively refusing an id a previous version accepted would brick the affected world rather than repair it.
 
 ### Learn Prerequisite
 
@@ -615,9 +709,11 @@ It is the shared mutation behind the GM reset API and the Knowledge surface's pe
 
 - Deletion is an explicit, reload-safe `-=` flag-key removal at the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when clearing discovery, `Actor.flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into a single `Actor#update`.
 It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload (the `deleteRemovedActiveRunFlags` doctrine); a shallow `flags.fabricate.learnedRecipes.-=<id>` silently no-ops.
-- Dotted (imported) recipe ids that `expandObject` would mis-split on `.` (`isSafeFlagKeySegment` is false) route to a **two-step delete-then-write fallback**: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
+- An id routes to a **two-step delete-then-write fallback** whenever a batched `-=<id>` key would destroy anything other than that id's own entry: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
 These are two sequential awaited operations, never one order-dependent update — `mergeObject`/`_migrateDeletionKey` may process the deletion after the insertion and wipe the whole map.
-The same two-step applies to `discoveryProgress` when clearing discovery and any scoped id is dotted.
+The same two-step applies to `discoveryProgress` when clearing discovery.
+Two conditions each force it, and the second is NOT the dotted-id case: the id is not a safe flag-key segment, so `-=<id>` cannot address it; **or** another entry nests inside it, because ids `a` and `a.b` share one persisted node and `-=a` is a well-formed key that removes recipe `a.b` along with it.
+The retained map is rebuilt from the **entry view** below, never by filtering `Object.entries` of the raw store against the cleared ids — that comparison puts nested first segments on one side and recipe ids on the other, matches nothing, and writes the just-deleted entry straight back.
 A retained entry whose own id contains a dot re-splits on the step-2 rewrite exactly as the original learn write did — a known fidelity limit of dotted retained ids, not an expandObject-safe guarantee.
 - `freeLearnBudget` defaults ON for the reset/erase grains (respec/amnesia must let the actor re-learn) and is passed OFF for the recipe-deletion cleanup path.
 When on, each cleared learned entry frees one consumed learn slot against a **still-held** source copy, reading its **current** `learnScope`: `perInstance` decrements the held item's `Item.flags.fabricate.recipeItemLearning.learnedCount`; `total` decrements the `recipeItemPartyLearnPool` key (a new GM-authoritative `decrement`, symmetric with `increment`, floored at 0, non-GM degrades safely).
@@ -630,6 +726,33 @@ The off-by-default `clearDiscovery` option also clears the recipe's discovery ke
 That asymmetry is deliberate and MUST be disclosed to the GM at the point the reset grain is chosen.
 Reset-one-system clears every learned entry whose recipe belongs to the system (via `getRecipe(id).craftingSystemId`) plus its scoped `discoveryProgress`, and **leaves orphan learned keys (unresolvable recipe) in place** — they cannot be attributed to a system.
 Reset-all-systems clears every learned key **including orphans**, plus every `discoveryProgress` entry.
+
+#### Reading a recipe-id-keyed flag map
+
+`learnedRecipes` and `discoveryProgress` are both keyed by recipe id, and NEITHER is persisted as the flat `{ id: entry }` object it is written as.
+`Document#update` dot-expands the whole nested **value tree** of an `ObjectField`, so an id containing a `.` is stored as a subtree: `{ 'imported.recipe.id': entry }` persists as `{ imported: { recipe: { id: entry } } }`.
+Both supported builds do this, by different routes — V14 inside the field (`ObjectField#_cleanType` → `SchemaField.expandObject`, recursing into every nested plain object) and V13 one level up (`DataModel#updateSource` replaces `changes` with `expandObject(changes)` whenever any top-level key contains a dot, and V13's `expandObject` re-splits keys at every depth).
+Fabricate always writes the dotted `flags.fabricate.fabricate.<key>` path, so the V13 guard always fires and the persisted shape is the same on both.
+
+Every reader of either map — the recipe-deletion cascade, the deletion primitive's existence check, its budget lookup, its retained-map rebuild, the per-system and reset-all id enumerations, and the GM panel's learner index — MUST derive ids from a shared **entry-boundary** reader rather than from the map's top level.
+Reading the top level yields a dotted id's FIRST SEGMENT, which names no recipe; the cascade therefore classified it as stale and issued `-=imported`, destroying every sibling entry under that segment whose recipe still existed.
+The panel-facing learner index and the cascade MUST agree on the ids they see, or the GM surface reports learners the mutation does not act on.
+
+The reader recognises an entry by its own **marker fields** — `learnedAt` / `sourceItemUuid` for learned entries, `progress` / `fragments` / `discoveredAt` / `manuallySet` for discovery entries — so it is parameterised on the shape rather than hard-coding one map's fields.
+Two alternatives are specifically excluded.
+`foundry.utils.flattenObject` is not the inverse of the expansion: it recurses to non-object leaves, so it yields `plainid.learnedAt` rather than `plainid`, no key reads as a recipe id, and every actor's whole map is deleted on any recipe deletion.
+Longest-prefix matching against the known recipe ids cannot find an **orphan** entry, whose id is by definition absent from that set — and orphans are the cascade's only input.
+A learned entry is therefore **scalar-only** by contract: a plain-object-valued field added to one would be walked as a nested recipe id and dropped from the entry view.
+
+Reader-side repair is explicitly **best-effort**, because the id → storage mapping is not injective and some inputs lose data before any reader runs:
+
+- Learning `a` and then `a.b` is recoverable — `a`'s fields are scalars and `b` is not, so entry-shape detection separates them.
+- Learning `a.b` and then `a` is **not**: writing `a` replaces the whole node and `a.b` is gone from storage.
+- Learning `a` and then `a.learnedAt` leaves both entries addressable but destroys recipe `a`'s own `learnedAt` timestamp, which the collision overwrote.
+The reader reports `a` without a `learnedAt` rather than presenting the colliding entry as `a`'s timestamp.
+
+The invariant this establishes is that **no surviving learner's entry is destroyed**, not that a dotted id round-trips normalized.
+The complete fix is at the write boundary (see Recipe And System Id Constraint), and repair exists for worlds that already carry such an id.
 
 ### GM-Only Knowledge Reset API
 
@@ -684,9 +807,12 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
 ### Recipe Deletion
 
-- Remove corresponding learned entries from all actors.
+- Remove corresponding learned entries from the actors the deleting client may write.
+This is the same scope `destructive-changes-and-migrations/spec.md`'s Delete Recipe cascade states, and the same scope the GM surface counts characters over, so one cascade is never described by two capabilities as reaching two different sets.
 - The removal uses the explicit `-=` deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
 `cleanupLearnedRecipes` is rerouted onto that primitive, fixing the prior filtered-map `setFlag` rebuild that MERGED and therefore never actually deleted the stale keys (they resurrected on reload).
+- The stale set is derived through the entry-boundary reader (see Reading A Recipe-Id-Keyed Flag Map), so deleting one recipe removes **only** that recipe's entry.
+An actor holding entries for several recipes whose ids share a leading segment keeps every entry whose recipe still exists, and an actor with no stale entry is not written to at all.
 
 ### Visibility Mode Change
 
@@ -695,6 +821,12 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
 ## Testing Requirements
 
+- The document doubles backing these tests MUST expand the nested value tree — in the constructor seed, `setFlag`, and `update` alike — so a fixture written with a dotted id is stored in the shape Foundry really persists it in.
+Expanding only the write paths leaves the seed lying, and a double storing a dotted key verbatim reports a false pass for any code path that only exists to handle nesting.
+- Unit tests asserting a dotted id's persisted shape MUST assert it **post-reload**, against the nested storage, rather than against the update payload.
+- Unit tests that deleting one recipe forgets only its own entry, that siblings sharing a leading id segment survive, that an id which is a strict prefix of another resolves to the right entry in both deletion directions, and that the unrecoverable collisions are asserted as losses rather than silently mishandled.
+- A unit test that the panel-facing learner index counts a learner whose recipe id is dotted, agreeing with the deletion cascade.
+- Unit tests that a dotted recipe id and a dotted crafting-system id are refused at intake, and that a world already holding one still loads.
 - Unit tests for listing behaviour in `global`, `player`, and `knowledge` list modes.
 - Unit tests for matching by UUID and by `resolveSourceUuid` — covering both `_stats.compendiumSource` (v12+) and `flags.core.sourceId` (legacy fallback) independently.
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.

@@ -28,6 +28,25 @@ Useful options:
 | `--no-premium` | Skip the sibling premium config. |
 | `--json` | Print machine-readable JSON instead of a table. |
 
+## Icon catalogue
+
+`generate-icon-catalogue.mjs` regenerates `src/ui/svelte/util/foundryIconCatalogue.js` from the Font Awesome bundle a Foundry install ships.
+
+```bash
+node scripts/generate-icon-catalogue.mjs   "C:/Program Files/Foundry Virtual Tabletop/resources/app/public/fonts/fontawesome"
+```
+
+The argument is the bundled `fontawesome` directory, or the `all.min.css` inside it.
+`--check` compares against the committed file without writing, which is what to run after a Foundry upgrade to find out whether the bundle moved.
+
+The catalogue is committed rather than built because CI has no Foundry install to read.
+It describes ONE Foundry release's bundle, so rerun the generator when Foundry bumps Font Awesome: names are added between releases, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of another glyph.
+
+Two things are MEASURED rather than assumed, and both used to be guessed.
+Brands are the glyphs whose codepoint only Font Awesome's brands face carries, read from that face's `cmap`, which is why the exclusion list no longer holds a block of company names.
+The classic solid and regular faces are compared the same way; they carry an identical set of codepoints today, which is why an entry no longer records whether a regular weight exists.
+If a future bundle breaks that, the generator says so on stderr rather than emitting a header claim that has quietly stopped being true.
+
 ## Foundry Integration Smoke Test
 
 The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly
@@ -217,6 +236,216 @@ The smoke test gates releases via the `foundry-integration.yml` workflow:
 - Uploads `test-results/` as a build artifact on every run
 - Opens a GitHub issue with `foundry-smoke-failure` label on failure
 
+## Foundry performance profile
+
+`npm run test:foundry:perf` measures Fabricate at scale **inside a real Foundry**
+(issue 1073, part of the performance programme in issue 1070).
+
+It is the `perf` arm of the harness above, not a second harness: the same
+`docker-compose.foundry.yml`, the same per-worktree container identity, the same
+`up` → `run` → `down` lifecycle, the same disposable world.
+Only the thing that runs against the booted container is different —
+`foundry-perf-run.mjs` instead of `foundry-test-run.mjs`.
+
+```bash
+npm run test:foundry:perf                          # seed, measure, record
+npm run test:foundry:perf -- --arm=v13             # the same profile on Foundry 13
+node scripts/foundry-perf-run.mjs --preflight      # preconditions only; starts nothing
+node scripts/foundry-perf-run.mjs                  # against an already-running container
+```
+
+### It is opt-in, and it must stay that way
+
+The profile appears in **no** GitHub Actions workflow and in no required check.
+It needs licensed Foundry credentials and local Docker, and
+`docker-compose.foundry.yml` documents credential activation as intermittently
+flaky.
+`tests/foundry-perf-profile.test.js` asserts that no workflow invokes it, so
+wiring it into CI fails `npm test` rather than surfacing as a red required check
+on somebody else's pull request.
+
+The run also **refuses rather than fetches**.
+A missing Docker CLI, missing credentials, a Foundry image that is not already in
+the local image store, or a checkout without issue 1071's fixtures each exits 2
+with the command that fixes it — before the build, before `up`, and without
+pulling anything.
+An image pull is hundreds of megabytes and a container boot activates a licence
+against the container hostname; neither should be a side effect of asking for a
+measurement.
+
+### The two measurement classes
+
+Inherited from issue 1071's headless harness and not re-invented.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| | Class 1 | Class 2 |
+|---|---|---|
+| What | Corpus counts, rendered row counts, serialized payload bytes, hook-delivery counts, seed fidelity | Wall clock, heap, long-task durations |
+| Where | Inside the run record, for forensics | Inside the run record, `.foundry-perf/runs/` — **gitignored** |
+| Asserted | **No.** Nothing this profile produces is a CI assertion | **Never** |
+| Portable | Only within one Foundry build, game system and fixture | Meaningless off the machine that produced it |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Note the difference from issue 1071: there, class 1 is committed to
+`benchmarks/baselines/` and asserted by a drift test.
+Here it is not, and cannot be.
+A count taken inside a live Foundry is invariant only *given the Foundry build and
+the game system*, because those decide document schemas, what a `create` call
+preserves and which hooks fire.
+The committed, cross-machine baseline is the headless one; this profile is the
+instrument that tells you whether the headless model still resembles reality.
+
+**Report ratios, never absolute milliseconds.**
+`scripts/lib/foundryPerfRecord.js` refuses to compare two runs whose Node version,
+CPU model, architecture, arm, Foundry build, image, game system, browser build,
+fixture profile or fixture seed differ, naming every field that does.
+
+### What it measures
+
+Every measurement is declared in `scripts/lib/foundryPerfMeasurements.js` with its
+class and its status, and the run record reconciles the walk's output against that
+registry — so a measurement that produced nothing is reported by name rather than
+being indistinguishable from one that measured zero.
+
+Startup attribution is not a stopwatch around the `ready` hook.
+`src/utils/startupMarks.js` opens explicit `performance.mark` boundaries around
+`Fabricate.initialize()` and around three spans nested inside it — migrations,
+corpus load, and startup maintenance — so the profile reports what Fabricate cost
+rather than what the whole boot cost.
+The remainder (`initialize` minus its three children) is reported too: it is
+collaborator construction and hook registration, and a remainder that grows is a
+finding a single total would hide.
+
+Two declared measurements are **deferred**, each carrying what blocks it:
+
+- `propagation-unhydrated` — issue 1073 asks for both a hydrated and an
+  un-hydrated receiver.
+  That distinction belongs to the Documents backend issue 1088 probed; on the
+  shipped **settings** backend every world setting replicates in full to every
+  client at connect (issue 1088 Q4), so there is no un-hydrated receiver to time
+  and a number reported here would be the hydrated one under a second name.
+  Issue 1092 fills this slot.
+- `persistence-experiments` — issue 1079's prototypes do not exist yet.
+  The settings arm is measured by `definition-edit`, which is the control any
+  later prototype is compared against.
+
+### Seeding
+
+The corpus is written as **three writes, whatever its size**: one
+`fabricate.craftingSystems` setting, one `fabricate.recipes` setting, and one
+batched `Actor.createDocuments` carrying every seeded actor with its held items
+nested.
+Seeding through `createRecipe()` would be one whole-corpus save per recipe —
+quadratic, hours long, and a measurement of the defect rather than a setup for
+measuring it.
+
+The fixtures are issue 1071's, imported rather than re-generated, so the Foundry
+and headless layers measure the same corpus.
+`FOUNDRY_PERF_FIXTURE` selects one (`simple-corpus`, `held-inventory`, …).
+
+Measured against those fixtures, the three writes hold at every scale:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Fixture | Recipes | Components | Actors | `craftingSystems` bytes | `recipes` bytes | Writes |
+|---|---|---|---|---|---|---|
+| `simple-corpus` | 10,000 | 5,000 | 2 | 1,973,024 | 7,177,534 | 2 settings + 1 actor create |
+| `held-inventory` (point 0) | 6 | 5,000 | 3 | 1,973,024 | 4,183 | 2 settings + 1 actor create |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**The held-inventory axis is a series, and `FOUNDRY_PERF_INVENTORY` picks the
+point.**
+`held-inventory` varies 100 / 500 / 1,000 held stacks against the same
+5,000-component library, and a bare `fixture.inventory` is only its *first* point.
+Seeding that unconditionally would run the whole profile at 100 stacks while
+reporting it under the axis's name — the cheapest point of the axis, named after
+the axis.
+The chosen point and the series length are recorded on every run.
+
+The chosen inventory point's composition is recomputed from the translated
+payloads rather than copied from the fixture's own declaration, so a translation
+bug that dropped every flag shows up as a mix that disagrees with the fixture
+instead of being masked by the fixture restating what it intended.
+
+The seeded world is then **reloaded** before anything is timed, so the startup
+measurement is taken against the seeded corpus rather than the empty world the
+container booted into.
+
+One thing the seeder cannot assume: `_stats.compendiumSource` is core-managed, so
+Foundry may ignore a value supplied to `create`.
+If it does, every source-reference stack silently becomes an unmatched one and the
+run reports an inventory composition it does not have.
+The run therefore takes a census against the **created documents** and prints the
+drift.
+
+### Capturing a Chrome trace
+
+```bash
+FOUNDRY_PERF_TRACE=1 npm run test:foundry:perf
+```
+
+The run opens a CDP `Tracing` session over the GM page for the whole walk and
+writes the raw Chrome DevTools trace to `.foundry-perf/traces/`.
+Load it with **chrome://tracing**, or via the Performance panel's *Load profile*
+button in any Chromium DevTools.
+A trace failure never fails the run: a diagnostic aid is not worth losing a walk
+that costs a container boot to reproduce.
+
+Long tasks are captured separately and always, through a `PerformanceObserver`
+installed by `addInitScript` **before any page script runs** — an observer added
+after `game.ready` would miss the boot, which is the densest stretch of the run.
+Each task is attributed to the scenario open at the time; one landing between
+scenarios is reported as `unattributed` rather than charged to whichever ran next.
+
+### Comparing two commits
+
+```bash
+git switch <baseline-commit>
+npm run test:foundry:perf                 # writes .foundry-perf/runs/<stamp>-<sha>-<arm>-<fixture>.json
+git switch <candidate-commit>
+npm run test:foundry:perf
+```
+
+Then compare the two records with
+`assertFoundryComparable` / `compareTimings` / `compareInvariants` from
+`scripts/lib/foundryPerfRecord.js`.
+Run both on **one machine, one arm and one fixture**, back to back, and quote the
+ratio.
+A ratio is the only form that survives being pasted into an issue by someone who
+did not run it.
+
+`compareInvariants` is the half worth reading first.
+A moved class-1 value — `recipesBytes`, a row count, a hook-delivery count — is a
+fact about the code and is reported as a finding.
+A moved duration may only be a fact about the machine.
+
+### Environment
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `FOUNDRY_PERF_FIXTURE` | `simple-corpus` | Which issue-1071 scale profile to seed. |
+| `FOUNDRY_PERF_SEED` | issue 1071's default | Fixture seed; the fixture is reproducible from `{profile, seed}` alone. |
+| `FOUNDRY_PERF_INVENTORY` | `0` | Which point of a held-inventory series to seed (100 / 500 / 1,000 stacks). Ignored by corpus-axis fixtures, which have no series. |
+| `FOUNDRY_PERF_IMPORT_LIMIT` | `200` | Recipes the import scenario imports. Bounded because import is quadratic today (issue 1086). |
+| `FOUNDRY_PERF_TRACE` | unset | `1` exports a Chrome DevTools trace. |
+| `FOUNDRY_PERF_SECOND_CLIENT` | unset | `0` skips the cross-client propagation scenario. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The arm is selected the same way as everywhere else — `--arm=v13` reaches compose
+through `FOUNDRY_IMAGE` and never edits `docker-compose.foundry.yml`.
+
+### Baseline runs are a maintainer step
+
+An agent can write the profile, the seeding, the capture and this documentation.
+The baseline run itself needs licensed credentials and local Docker and must be
+performed and attested by a maintainer.
+
 ## Svelte Render Comparison
 
 `compare-svelte-render.mjs` answers one question a source diff cannot: did a change to a
@@ -259,8 +488,8 @@ Read the reported window, decide whether it matters, and pin it with a test wher
 `svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and that is
 the fast local signal.
 It is not sufficient on its own: a Vite build compiles the ENTRY GRAPH, and this repository has
-components nothing imports (`GatheringTravelView.svelte`, issue 927), whose warnings would never
-reach it.
+components nothing imports (`RowDisclosure.svelte`; the sweep was motivated by issue 927), whose
+warnings would never reach it.
 So this walks the tree directly with `lib/svelteComponentFiles.js` — the same walker
 `compare-svelte-render.mjs` uses — and compiles each component with the build's own options, read
 out of `svelte.config.js` by `lib/svelteCompilerWarnings.js`.
@@ -390,7 +619,7 @@ Salvage has its own separate mode enum and is not covered by that claim — see 
 A `window`-reach case does not carry its own written excuse.
 Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the
 known-gaps register below, which is where a reviewer can actually find them.
-There are 138 `exact` cases, 4 `window`, and 39 `beyond`, out of 181 total.
+There are 146 `exact` cases, 3 `window`, and 99 `beyond`, out of 248 total.
 
 ## Fidelity gap
 
@@ -409,7 +638,6 @@ Where the two disagree about the same view, the smoke is right.
 | A confirm or prompt dialog is real; one import path still is not | `DialogV2.confirm` and `.prompt`, transcribed from the harvested `client/applications/api/dialog.mjs`, let a case leave the dialog open (`query: { dialog: 'open' }`), press its default button (`'enter'`, the lab default), or press a named button action. This is what moved the multistep-disable confirmation, the player crafting run/roll cases, and `manager-import-report` — which uploads a real export envelope and drives the import end to end — to `exact`. `input` and `query` are not wired. `manager-import-folder-mapping` remains out of reach: its modal opens only from a drag-and-drop carrying a folder or compendium-pack payload, and the runner has no `drop` verb. |
 | Operations needing real Foundry documents | `game.fabricate` is the REAL runtime facade (`labWorld.js` installs it after `initialize()`), so service calls through it do run — that is how the import case reaches its report. What is not drivable is anything needing document or compendium behaviour past what the shim models: `Item` supports creation and uuid resolution, not the full document API. Those END states are fixture-able; the operations are not. |
 | Legacy set-level essence requirements | `RecipeManager.initialize()` migrates a stored `ingredientSet.essences` map into a first-class essence group, so the pre-migration shape cannot be reached from settings-seeded data at all. The smoke escapes it only because it authors that recipe through `createRecipe` after init. |
-| The un-stacked narrow band at 1024px | `player-crafting-progressive-stacked` cannot reach its smoke counterpart's stacked three-column layout. The counterpart shrinks past production's own `.fabricate-app { min-width: 1024px }` floor, and the lab's geometry assertion will not let a capture violate its declared box. At 1024 the grid does not stack and its stage rows overflow. That is a real product finding the live smoke never renders at that width, published as evidence of the finding rather than claimed as the counterpart's own state. |
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

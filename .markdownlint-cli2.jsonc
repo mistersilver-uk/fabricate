@@ -1,22 +1,24 @@
 {
-  // Lint every authored Markdown file; ignores below carve out generated/vendored/scratch.
+  // Lint every authored Markdown file.
   "globs": ["**/*.md"],
+  // Anything git ignores, this ignores. The glob is `**/*.md`, so without this the gate goes
+  // red on whatever a developer's own checkout happens to contain -- a scratch plan under
+  // `.air/`, a design brief, a capture's staging file, a Python virtualenv, a sibling worktree.
+  // None of it exists in CI, so the gate failed only for the person running it locally, which
+  // is the worst possible audience for a false red.
+  //
+  // This replaces a hand-maintained list that had to grow every time a new ignored directory
+  // appeared, and had already drifted: it carried entries for paths that are NOT gitignored
+  // while missing several that are.
+  "gitignore": true,
+  // The remainder, which git does NOT ignore and which therefore still need naming. Keep this
+  // list short: an entry here is a file the repository tracks and deliberately exempts.
   "ignores": [
-    "node_modules",
+    // Fixture world for the Foundry end-to-end harness; its Markdown is Foundry's, not ours.
     ".foundry-e2e",
-    "docs/_site",
-    "docs/.jekyll-cache",
-    "dist",
-    // The View Lab / screenshot publisher writes a `.pr-body.md` staging file here. Gitignored
-    // like `dist` and `tmp`, but the glob is `**/*.md`, so without this line `lint:md` goes red on
-    // any machine that has run a capture or a publish.
+    // The View Lab / screenshot publisher writes a `.pr-body.md` staging file here.
     "ui-screenshot-artifact",
-    ".worktrees",
-    ".claude/worktrees",
-    "tmp",
-    "COMPETITIVE_ANALYSIS.md",
-    "CONTENT_PACKS.md",
-    "PLAN.md",
+    // Generated from commit history by the release tooling.
     "CHANGELOG.md"
   ],
   // One-sentence-per-line rule (markdownlint-sentences-per-line, parser: "none").

@@ -36,6 +36,21 @@ import {
   VIEW_RECIPES,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+// The gate fakes are SHARED with tests/screenshot-evidence-matching.test.js rather than copied:
+// `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while `tests/**` duplication
+// counts against the new-code gate. `captureConsole` is the error-capturing variant the
+// `::error::<code>` assertions below need — the module-local `captureLog` sets
+// `console.error = () => {}` and would swallow exactly the line under test.
+import {
+  captureConsole,
+  gateCheckArgv,
+  makeGateClock,
+  makeGhFake,
+  managedScreenshotBlock,
+  runPreservingExitCode,
+  workflowRun,
+  writeGateCliInputs,
+} from './helpers/screenshot-gate-fakes.js';
 
 // A `resolveDefaultBase`-shaped git runner: `rev-parse --verify --quiet <ref>` returns
 // status 0 only for a ref in `verifiable`, else status 1. Shared so the fallback-order
@@ -297,6 +312,82 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
+  it('pins World Parties and system Travel sources to the ten truthful smoke captures', () => {
+    const worldLabels = [
+      'manager-world-travel-default-collapsed',
+      'manager-world-travel-expanded-neutral',
+      'manager-world-parties-normal',
+      'manager-world-travel-ungated',
+      'manager-world-travel-with-gathering-expanded',
+      'manager-world-travel-realms-normal',
+      'manager-world-travel-realms-stacked',
+      'manager-world-travel-map-normal',
+      'manager-world-travel-map-stacked',
+      'manager-world-travel-map-collapsed-rail',
+    ];
+    for (const label of worldLabels) {
+      assert.deepEqual(
+        VIEW_RECIPES.find((view) => view.id === label)?.smokeLabels,
+        [label],
+        `${label} must remain independently publishable`
+      );
+    }
+
+    for (const file of [
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+      'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+      'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
+      'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
+      'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
+    ]) {
+      const mappedIds = mapChangedFilesToViews([file]).map((view) => view.id);
+      for (const label of worldLabels) {
+        assert.ok(mappedIds.includes(label), `${file} must publish ${label}`);
+      }
+    }
+
+    for (const viewLabOnly of [
+      'manager-world-parties-no-selection',
+      // The World > Parties states added by issue 1182. The smoke world seeds neither an
+      // empty party list nor a fifth party, and no smoke walk types into the pane's search
+      // field or opens a travel-actor picker, so a live-smoke counterpart for any of these
+      // would be a claim about a frame the harness cannot take.
+      'manager-world-parties-empty',
+      'manager-world-parties-search-filtered',
+      'manager-world-parties-last-page',
+      'manager-world-parties-actor-picker',
+      'manager-world-travel-long-label-focus',
+    ]) {
+      assert.equal(
+        VIEW_RECIPES.some((view) => view.id === viewLabOnly),
+        false,
+        `${viewLabOnly} must not claim a live-smoke counterpart`
+      );
+    }
+
+    assert.equal(
+      VIEW_RECIPES.some((view) => view.id === 'manager-travel'),
+      false,
+      'the retired Gathering Travel evidence recipe must not survive'
+    );
+
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    assert.equal(harness.includes('#manager-gathering-nav-travel'), false);
+    assert.equal(harness.includes('manager-gathering-travel-normal'), false);
+    assert.equal(harness.includes('manager-gathering-travel-stacked'), false);
+    for (const selector of [
+      '#manager-world-nav-parties',
+      '#manager-travel-toggle',
+      '#manager-travel-nav-realms',
+      '#manager-travel-nav-map',
+    ]) {
+      assert.ok(harness.includes(selector), `the navigation walk must use ${selector}`);
+    }
+    for (const label of worldLabels) {
+      assert.ok(harness.includes(label), `the Foundry walk must capture ${label}`);
+    }
+  });
+
   it('maps the issue-767 system-details dirty frame to its own view id', () => {
     // The SystemEditView (chip) republishes BOTH the clean settings frames and the
     // dedicated dirty frame; CraftingSystemManagerRoot (the guard + lifted draft)
@@ -460,6 +551,29 @@ describe('UI PR screenshot evidence', () => {
       mapChangedFilesToViews(['src/utils/bulkSelectionModel.js']).map(view => view.id),
       [...componentBulkPanelFrames, ...recipeBulkPanelFrames],
     );
+  });
+
+  it('routes the shared bulk-DELETE card at all three studios, not the theme fallback (issue 1132)', () => {
+    // `BulkDeleteCard.svelte` sits directly under `apps/manager/`, so it matches neither
+    // studio's directory glob. Unnamed it would map to NO recipe, fall to the generic
+    // `theme-or-global-ui` set, and publish six frames of unrelated screens as the evidence for
+    // a change to the one card the three delete affordances share — while
+    // `scripts/lib/viewLabCases.js` claimed it on the delete frames. The two registries
+    // disagreeing about one file's evidence is the exact failure the enumeration exists to stop.
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
+    ]).map(view => view.id);
+
+    assert.equal(
+      views.includes('theme-or-global-ui'),
+      false,
+      'the card must map to real frames rather than falling through to the global fallback',
+    );
+    // One studio each, because a delete card that renders in three studios and republishes only
+    // two leaves the third's frame stale on exactly the change that altered it.
+    for (const id of ['manager-components-bulk-edit', 'manager-recipes-bulk-edit', 'manager-essences']) {
+      assert.ok(views.includes(id), `${id} must republish when the shared delete card changes`);
+    }
   });
 
   it('gives the recipe bulk panel its own three frames and its own trigger set (issue 1010)', () => {
@@ -1204,7 +1318,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps smoke screenshot collection available as an explicit fallback', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     withScreenshotFixtures(
       changedFileEvidenceFixtures(changedFiles),
       (root) => {
@@ -1233,7 +1347,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('requires exact-run provenance for an ordinary collected view', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     withScreenshotFixtures(changedFileEvidenceFixtures(changedFiles), (root) => {
       const result = collectScreenshotEvidence({
         changedFiles,
@@ -1269,7 +1383,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('runs the documented local producer/collect provenance path against the exact git head', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const gitHead = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
       cwd: process.cwd(),
       encoding: 'utf8',
@@ -1315,7 +1429,7 @@ describe('UI PR screenshot evidence', () => {
 
   it('validates ordinary and Tool Studio captures as one mixed exact run', () => {
     const changedFiles = [
-      'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+      'src/ui/svelte/apps/manager/EnvironmentEditView.svelte',
       'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
     ];
     const views = mapChangedFilesToViews(changedFiles);
@@ -1340,7 +1454,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('rejects failed, degraded, mismatched, stale, and wrong-target ordinary runs', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const cases = [
       // The refusal names the condition that tripped and the value it measured (issue
       // #1019). It deliberately no longer contains the old "failed or degraded smoke
@@ -1395,7 +1509,7 @@ describe('UI PR screenshot evidence', () => {
   // builder that is never reached is a builder whose absence no test can detect: the
   // mutation that established the need for this block replaced the whole throw with
   // `new Error('MUTANT …')` and this suite still returned 83 pass / 0 fail.
-  const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+  const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
 
   // One shared driver over the existing `summaryPatch` extension point, which spreads last
   // and reaches both fixture factories. Table-driven rather than a dozen copied blocks:
@@ -1611,7 +1725,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('rejects an ordinary capture without binding or truthful PNG dimensions', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const dimensionsMismatch = changedFileEvidenceFixtures(changedFiles);
     const image = Object.keys(dimensionsMismatch).find(name => name.endsWith('.png'));
     dimensionsMismatch[image] = minimalPng(799, 600);
@@ -1681,7 +1795,7 @@ describe('UI PR screenshot evidence', () => {
   it('accepts an unclipped capture that declares no geometry in the manifest', () => {
     // `screenshot()` records `options.clip?.width ?? null`, so a full-page frame — most
     // of the walk — declares null. Comparing real pixels against null was fatal.
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     // Null the DECLARED geometry only. Patching it through `capturePatch` would also
     // shrink the generated PNG, since the helper builds pixels from the same array —
     // that would test a zero-sized image, not an unclipped one.
@@ -1829,7 +1943,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('reports missing non-Tool screenshots and supports allowMissing', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const fixtures = changedFileEvidenceFixtures(changedFiles);
     for (const file of Object.keys(fixtures).filter(name => name.endsWith('.png'))) delete fixtures[file];
     withScreenshotFixtures(fixtures, (root) => {
@@ -2359,6 +2473,203 @@ describe('UI PR screenshot evidence', () => {
       assert.equal(calls.filter(args => args[0] === 'pr').length, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // ── The `check` command's flag wiring (issue 1133) ─────────────────────────────────────────
+  //
+  // The gate's own decision logic lives in `scripts/lib/screenshotEvidenceMatching.js` and is
+  // driven end to end by `tests/screenshot-evidence-matching.test.js`. What is pinned HERE is the
+  // adapter's flag surface, and above all its UNCHANGED DEFAULT: `npm run screenshots:ui:check`
+  // passes no `--await-capture`, so it must behave exactly as it did before this change — no
+  // polling, no API call, and the same message.
+
+  const CHECK_UI_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
+
+  // Both the inputs and the argument vector come from the shared gate fakes rather than being
+  // spelled out here as well: `tests/screenshot-evidence-matching.test.js` drives the same `check`
+  // command, and `tests/**` duplication counts against the SonarCloud new-code gate.
+  const writeCheckInputs = (inputs = {}) =>
+    writeGateCliInputs({ prefix: 'fabricate-ui-check-', changedFiles: CHECK_UI_FILES, ...inputs });
+
+  const checkArgs = (paths, extra = []) => gateCheckArgv(paths, { prNumber: 1133, extra });
+
+  it('check without --await-capture keeps today behaviour exactly on the failing path', async () => {
+    const paths = writeCheckInputs({ body: 'No evidence here.' });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 1);
+      assert.equal(captured.error.length, 1);
+      // Today's prose verbatim. The one difference from before this change is the `no-screenshots-
+      // section:` diagnostic prefix, which is the honest code for this condition — no producer was
+      // expected for this head, so the evidence really is owed by the author.
+      assert.match(
+        captured.error[0],
+        /^::error::no-screenshots-section: This PR changes UI files/,
+      );
+      assert.match(captured.error[0], /Add a "## Screenshots" heading to the PR body/);
+      assert.equal(gh.calls.length, 0, 'the default path must make no API call at all');
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('check without --await-capture keeps today behaviour exactly on the passing path', async () => {
+    const paths = writeCheckInputs({
+      body: '## Screenshots\n\n![a shot](https://github.test/attachments/1)\n',
+    });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.equal(captured.error.length, 0);
+      assert.equal(gh.calls.length, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('check without --await-capture keeps today behaviour exactly on a published managed block', async () => {
+    // The two cases above are the only "unchanged default" coverage there was, and NEITHER body
+    // carries a managed block — one has no evidence at all and the other a human-pasted image, which
+    // short-circuits on the outside-the-block precedence rule. So the path that actually matches
+    // published frames was asserted-but-uncovered on this invocation, and it had regressed: with no
+    // `--head-sha` the gate has no head to judge staleness against, and comparing frames against the
+    // empty default classed every one of them stale. A body a maintainer can see the screenshots in
+    // failed `no-frames-for-this-head`, quoting an empty SHA.
+    const paths = writeCheckInputs({
+      body: managedScreenshotBlock({
+        prNumber: 1133,
+        caseIds: ['manager-tool-parity-01-library-1280x720'],
+        headSha: 'e'.repeat(40),
+      }),
+    });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0, captured.error.join('\n'));
+      assert.equal(captured.error.length, 0);
+      assert.equal(gh.calls.length, 0, 'the default path must make no API call at all');
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('check honours the exempt label without --await-capture, exactly as before', async () => {
+    const paths = writeCheckInputs({ labels: ['screenshots-exempt'] });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.ok(captured.log.some(line => /screenshots-exempt/.test(line)));
+      assert.equal(gh.calls.length, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('--await-capture turns the same inputs into an awaited, matched decision', async () => {
+    // The same PR that fails above passes here, because the producer's run concludes and the body
+    // it republished carries this head's frames. This is the flag's whole point, and it is what
+    // makes the two default-path cases above a real control rather than an assertion about nothing.
+    const headSha = 'f'.repeat(40);
+    const paths = writeCheckInputs({ body: 'No evidence yet.' });
+    const published = managedScreenshotBlock({
+      prNumber: 1133,
+      caseIds: ['manager-tool-parity-01-library-1280x720'],
+      headSha,
+    });
+    const gh = makeGhFake({
+      runs: state => [workflowRun({ status: state.runListCalls === 0 ? 'in_progress' : 'completed' })],
+      body: state => (state.runListCalls >= 2 ? published : ''),
+    });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+    try {
+      let exitCode;
+      await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths, [
+            '--repo', 'misterpotts/fabricate',
+            '--head-sha', headSha,
+            '--await-capture',
+            '--capture-eligible', 'true',
+            '--capture-workflow', 'pr-screenshots.yml',
+            '--capture-timeout-minutes', '40',
+          ]),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.ok(gh.calls.some(args => args[0] === 'api'), '--await-capture must reach the module');
+      assert.equal(clock.sleepCalls, 1);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a --capture-eligible value that is neither the literal true nor false', async () => {
+    const paths = writeCheckInputs({});
+    try {
+      await assert.rejects(
+        () => captureConsole(() => main(
+          checkArgs(paths, ['--await-capture', '--capture-eligible', 'yes']),
+          { runGh: makeGhFake({}).runGh },
+        )),
+        /--capture-eligible must be the literal/,
+      );
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a --capture-timeout-minutes that is not a positive number', async () => {
+    const paths = writeCheckInputs({});
+    try {
+      await assert.rejects(
+        () => captureConsole(() => main(
+          checkArgs(paths, ['--capture-timeout-minutes', 'soon']),
+          { runGh: makeGhFake({}).runGh },
+        )),
+        /--capture-timeout-minutes must be a positive number/,
+      );
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
     }
   });
 });

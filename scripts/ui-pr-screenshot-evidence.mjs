@@ -10,6 +10,13 @@ import { spawnSync } from 'node:child_process';
 // does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
 // `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
 import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
+// The `check` gate's composed decision — await the capture run for this head, then match what it
+// published — lives in the lib for the same two reasons, plus a third: it is a LEAF that imports
+// nothing from this file. The evaluation it needs (the four predicates below) is injected as the
+// `evaluate` collaborator bundle, because importing them there would make a `lib -> script -> lib`
+// cycle and `VIEW_RECIPES` above is a top-level `Object.freeze([...])` a cyclic partial-evaluation
+// order can observe as `undefined`.
+import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -89,13 +96,19 @@ const TOOL_STUDIO_MATCHES = [
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-  // The shared bulk-edit primitives (issue 1010). They sit directly under `apps/manager/`,
-  // beside `Chip` and `Callout`, so they fall through BOTH the `components/` glob above and
-  // the `recipes/` one — a change to any of them would otherwise map to no view at all and
-  // publish nothing. Enumerated by name rather than widened to a directory glob, because
-  // `apps/manager/*.svelte` is the whole manager and would conscript these frames as the
-  // evidence for every screen in it.
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+  // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue
+  // 1132). They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall
+  // through BOTH the `components/` glob above and the `recipes/` one — a change to any of them
+  // would otherwise map to no view at all and fall to the broad `theme-or-global-ui` recipe,
+  // publishing frames that cannot show the change. Enumerated by name rather than widened to a
+  // directory glob, because `apps/manager/*.svelte` is the whole manager and would conscript
+  // these frames as the evidence for every screen in it.
+  //
+  // `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
+  // four chrome primitives, the delete card renders in all three studios, and
+  // `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
+  // registries must not disagree about what evidence a change to one file requires.
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -134,7 +147,7 @@ const BULK_EDIT_MODEL_MATCHES = [
 const RECIPES_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
 ];
 
 // A single-frame recipes-browser view: one same-named smoke label over the shared browser match
@@ -187,6 +200,21 @@ const requirementRailFrame = (id, label) => ({
   label,
   smokeLabels: [id],
   matches: REQUIREMENT_RAIL_MATCHES,
+});
+
+const WORLD_NAVIGATION_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/Gathering(Parties|Realms|MapLinks)Tab\.svelte$/,
+];
+
+// All live-smoke states are independently publishable. A multi-label recipe would collect only its
+// first filename-sorted candidate and silently discard the disclosure/child/width evidence.
+const worldNavigationFrame = (id, label) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: WORLD_NAVIGATION_MATCHES,
 });
 
 export const VIEW_RECIPES = Object.freeze([
@@ -248,13 +276,23 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
       /^src\/systems\/characterModifierPrerequisiteCopy\.js$/,
+      // The shared IconPicker and the vocabulary it lists (issue 1269). Everything those
+      // files change is visible ONLY in the open popover, and this is the one recipe whose
+      // capture clicks the trigger and takes the popover down. Absent here they matched no
+      // recipe at all, so a change to them published frames in which the picker is shut.
+      /^src\/ui\/svelte\/components\/IconPicker\.svelte$/,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
     ],
   },
   {
     id: 'manager-currency',
-    label: 'Manager currency configuration (spend strategy, units, macros)',
+    label: 'World currency configuration (spend strategy, units, macros)',
     smokeLabels: ['currency-actor-property', 'currency-macro', 'currency-actor-inventory'],
     matches: [
+      // The editor itself, world scope since issue 1278. It used to be a card inside
+      // `SystemEditView`, which is why this recipe once had no view of its own.
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/,
+      /^src\/systems\/CurrencyConfigStore\.js$/,
       /^src\/systems\/currencyProfile\.js$/,
       /^src\/systems\/CoinSpenders\.js$/,
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
@@ -520,8 +558,17 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
-      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      // `essencePreviewRow` builds the two synthetic tiles the editor's "How players see it"
+      // rail mounts, so a change to it is only visible in `manager-essence-edit-first-state`
+      // (issue 1124). Absent here it fell through to the broad fallback set and would have
+      // published frames that cannot show the change.
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|essencePreviewRow|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      // The shared bulk-delete card (issue 1132). It sits directly under `apps/manager/`, so it
+      // falls through the `essences/` glob above exactly as the bulk-edit chrome falls through
+      // the two browser globs, and the Essence Studio's own bulk-selection frame is where a
+      // change to it is visible here.
+      /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/,
     ],
   },
   {
@@ -555,15 +602,31 @@ export const VIEW_RECIPES = Object.freeze([
   toolStudioFrame('stress-immune', 'Tool Studio stress — check-driven Immune', 'manager-tool-stress-immune', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
-  {
-    id: 'manager-travel',
-    label: 'Manager travel and parties',
-    smokeLabels: ['manager-gathering-travel-normal', 'manager-gathering-travel-stacked'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTravelView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringRealmQuickList\.svelte$/,
-    ],
-  },
+  worldNavigationFrame(
+    'manager-world-travel-default-collapsed',
+    'Manager Travel — default collapsed'
+  ),
+  worldNavigationFrame(
+    'manager-world-travel-expanded-neutral',
+    'Manager Travel — expanded neutral'
+  ),
+  worldNavigationFrame('manager-world-parties-normal', 'Manager World — Parties'),
+  worldNavigationFrame('manager-world-travel-ungated', 'Manager Travel — non-participating system'),
+  worldNavigationFrame(
+    'manager-world-travel-with-gathering-expanded',
+    'Manager Travel — Gathering and Travel expanded'
+  ),
+  worldNavigationFrame('manager-world-travel-realms-normal', 'Manager Travel — Realms'),
+  worldNavigationFrame(
+    'manager-world-travel-realms-stacked',
+    'Manager Travel — Realms stacked'
+  ),
+  worldNavigationFrame('manager-world-travel-map-normal', 'Manager Travel — Map'),
+  worldNavigationFrame('manager-world-travel-map-stacked', 'Manager Travel — Map stacked'),
+  worldNavigationFrame(
+    'manager-world-travel-map-collapsed-rail',
+    'Manager Travel — Map collapsed rail'
+  ),
   {
     id: 'manager-recipes',
     label: 'Manager recipes',
@@ -1869,7 +1932,7 @@ function parseArgs(argv) {
     }
     const [rawKey, inlineValue] = arg.slice(2).split(/=(.*)/s, 2);
     const key = toCamelCase(rawKey);
-    if (key === 'allowMissing' || key === 's3') {
+    if (key === 'allowMissing' || key === 's3' || key === 'awaitCapture') {
       args[key] = inlineValue === undefined ? true : inlineValue !== 'false';
       continue;
     }
@@ -1878,7 +1941,16 @@ function parseArgs(argv) {
       continue;
     }
     const next = argv[i + 1];
-    if (!next || next.startsWith('--')) {
+    // AN EMPTY STRING IS A VALUE, not a missing one. This read `!next`, which conflated the two —
+    // and CI hands this script empty values on a path nobody chooses: when a contributor deletes
+    // their fork while the PR is open, `github.event.pull_request.head.repo` is null, so
+    // `--head-repository "$PR_HEAD_REPO"` renders as `--head-repository ''`. Parsing threw before
+    // step 1 of the gate ran, so the required `check-screenshots` job died with a bare message and
+    // no `::error::<code>` — and, because the throw preceded the exempt-label check, not even a
+    // maintainer-applied `screenshots-exempt` label could clear it. An unskippable red for a
+    // reason outside the author's control is the exact failure class this gate exists to remove.
+    // `undefined` (the flag is last) and a following `--flag` are still missing values.
+    if (next === undefined || next.startsWith('--')) {
       throw new Error(`Missing value for --${rawKey}`);
     }
     args[key] = next;
@@ -1912,6 +1984,63 @@ export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readC
   return readChangedFiles(base);
 }
 
+// The `--capture-eligible` flag carries a GitHub expression's result, and a GitHub expression
+// renders as the literal STRING `true` / `false`. `Boolean('false')` is `true`, and that bug would
+// silently push every fork PR into the wait loop — so this parses the two literals and refuses
+// anything else rather than coercing.
+function parseCaptureEligible(value) {
+  if (value === undefined || value === '') return false;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`--capture-eligible must be the literal 'true' or 'false', not '${value}'`);
+}
+
+// `--capture-timeout-minutes` pins the gate's capture deadline to `capture`'s real `timeout-minutes`
+// in `pr-screenshots.yml`. Undefined leaves the module's own exported default in force; the adapter
+// restates no bound of its own.
+function parseCaptureTimeoutMs(value) {
+  if (value === undefined || value === '') return undefined;
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error(`--capture-timeout-minutes must be a positive number of minutes, not '${value}'`);
+  }
+  return minutes * 60_000;
+}
+
+// The JSONL `{filename, patch}` stream `gh api …/pulls/{n}/files --jq '… | @json'` emits, read into
+// the patch map `mapChangedFilesToCases` narrows its case selection with. One paginated call feeds
+// both this and the filename list, so the two can never snapshot different heads.
+function readPatchMap(path) {
+  const map = {};
+  for (const line of readLines(path)) {
+    try {
+      const entry = JSON.parse(line);
+      if (entry?.filename) map[entry.filename] = entry.patch ?? '';
+    } catch {
+      // A malformed line costs frames, never evidence: an unattributable patch widens the
+      // producer's selection rather than narrowing it, so dropping it here is the safe direction.
+    }
+  }
+  return map;
+}
+
+function defaultSleep(ms) {
+  return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+
+// Apply the module's verdict. No pass/fail decision lives here — only its application, which is
+// what makes "drop the exit-code application" (a mutation that would make the gate a total no-op in
+// production) visible to a test that drives `main`.
+function reportScreenshotGateDecision(decision) {
+  const prefix = decision.code ? `${decision.code}: ` : '';
+  if (decision.exitCode !== 0) {
+    console.error(`::error::${prefix}${decision.message}`);
+    process.exitCode = decision.exitCode;
+    return;
+  }
+  console.log(decision.code ? `::notice::${prefix}${decision.message}` : decision.message);
+}
+
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
@@ -1920,6 +2049,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     resolveHeadSha = resolveScreenshotHeadSha,
     readChangedFiles,
     runGh,
+    sleep,
+    now,
     putObject,
     config,
   } = deps;
@@ -1952,36 +2083,42 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   }
 
   if (command === 'check') {
-    const changedFiles = loadChanged();
-    const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
-    const exemptLabel = args.exemptLabel || DEFAULT_EXEMPT_LABEL;
-    const labels = readLabelList(args.labels);
-
-    // A maintainer-applied label is the only exemption and wins unconditionally.
-    if (isExemptByLabel(labels, exemptLabel)) {
-      console.log(`Screenshot check skipped: '${exemptLabel}' label present.`);
-      return;
-    }
-
-    const changedFilesFailure = validateChangedFilesForCheck(changedFiles, { required: Boolean(args.changedFiles) });
-    if (changedFilesFailure) {
-      console.error(`::error::${changedFilesFailure}`);
-      process.exitCode = 1;
-      return;
-    }
-
-    if (!hasUiChanges(changedFiles)) {
-      console.log('No UI files changed - screenshot check skipped.');
-      return;
-    }
-
-    const failure = explainScreenshotEvidenceFailure(changedFiles, body, { prNumber: args.pr, exemptLabel });
-    if (failure) {
-      console.error(`::error::${failure}`);
-      process.exitCode = 1;
-    } else {
-      console.log('UI smoke screenshot evidence found.');
-    }
+    // A THIN ADAPTER, deliberately. No ordering, no re-read, no pass/fail decision and no restated
+    // bound literal may live here: all of that is `decideScreenshotGate`, where a test can see it.
+    // This supplies the collaborators from this module's own scope, maps the CLI flags onto the
+    // call, and applies the returned exit code.
+    const decision = await decideScreenshotGate({
+      runGh: runGh || defaultGhRunner,
+      sleep: sleep || defaultSleep,
+      now: now || Date.now,
+      // The cycle-avoidance seam: the REAL predicates, passed by reference.
+      evaluate: {
+        isExempt: isExemptByLabel,
+        validateChangedFiles: validateChangedFilesForCheck,
+        isArmed: hasUiChanges,
+        explainMissingEvidence: explainScreenshotEvidenceFailure,
+      },
+      changedFiles: loadChanged(),
+      changedFilesRequired: Boolean(args.changedFiles),
+      patches: args.patchesFile ? readPatchMap(args.patchesFile) : undefined,
+      body: args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '',
+      headSha: args.headSha,
+      prNumber: args.pr,
+      repo: args.repo,
+      headBranch: args.headBranch,
+      headRepository: args.headRepository,
+      // `|| undefined` so an EMPTY flag means "absent" and the module's own exported default
+      // applies, rather than `''` reaching the runs query as `workflows//runs`. Now that an empty
+      // string parses as a value (see `parseArgs`), every string flag has to say which of the two
+      // it means; the head-* three below mean "cannot narrow on this" and degrade in the module.
+      captureWorkflow: args.captureWorkflow || undefined,
+      awaitCapture: args.awaitCapture === true,
+      captureEligible: parseCaptureEligible(args.captureEligible),
+      captureTimeoutMs: parseCaptureTimeoutMs(args.captureTimeoutMinutes),
+      exemptLabel: args.exemptLabel || DEFAULT_EXEMPT_LABEL,
+      labels: readLabelList(args.labels),
+    });
+    reportScreenshotGateDecision(decision);
     return;
   }
 

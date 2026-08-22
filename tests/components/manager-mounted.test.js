@@ -20,10 +20,30 @@ import {
 } from '../helpers/toolDisplayPrecedenceCases.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
-import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { assertNoElement, setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The ONE compiled-import rewrite every mounted suite resolves its temp tree against. This
+// suite predates `createMountedComponentHarness` and still drives its own compile/mount, but a
+// second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
+// getting it wrong reports as `# cancelled`, never `# fail` (issue 1185). It is also the exact
+// near-identical `tests/**` block SonarCloud's new-code duplication gate counts.
+import { rewriteClientImports } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { getModifierExpressionSuggestions } from '../../src/config/modifierExpressionSuggestions.js';
+// The one place the "move the keyboard, then announce" delay is declared (issue 1157). The
+// bulk-selection block below waits on it rather than restating the number, so a change to the
+// rule cannot leave these tests quietly asserting the un-delayed state.
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
+import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
+import { MANAGER_HOOKS } from '../../src/config/hooks.js';
+// The shipped array transform the store publishes hydrated cards through (issue 1081). The
+// DOM guards below drive the REAL one rather than restating it, so a revert to re-wrapping
+// the same card objects turns them red. Safe to import here: the projection is a deliberate
+// leaf with no `.svelte` and no Foundry globals in its graph, and this is the test file's own
+// module scope rather than the compiled mount closure.
+import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComponentRowProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -67,10 +87,28 @@ let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
+/**
+ * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its
+ * own id in `requests` when a view asks for it (issue 1081).
+ *
+ * Non-enumerable exactly as `adminComponentRowProjection` defines it, so the spread, the
+ * `JSON.stringify` and the bulk-edit models the manager runs over these cards cannot see it.
+ *
+ * @param {object} card
+ * @param {Set<string>} requests
+ * @returns {object}
+ */
+function withHydrateSpy(card, requests) {
+  const copy = { ...card };
+  Object.defineProperty(copy, 'hydrate', {
+    enumerable: false,
+    configurable: true,
+    value: () => {
+      requests.add(copy.id);
+      return Promise.resolve(copy);
+    },
+  });
+  return copy;
 }
 
 function compileManagerRoot() {
@@ -78,6 +116,9 @@ function compileManagerRoot() {
   // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651).
   // Omitting it here HANGS every mounted manager test rather than failing one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
+  // The SHARED subject check-modifier picker (issue 1095), rendered by BOTH the salvage
+  // block in ComponentEditView and the gathering task editor.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SubjectModifierPicker.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
   // The Component Studio EDITOR's own components (issue 676). They live under
@@ -115,9 +156,28 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/${bulkPrimitive}.svelte`);
   }
+  // The three primitives issue 1096 extracted, which the checks tree now renders: the
+  // band strip on a routed Outcomes section, the row disclosure in the right rail's
+  // collapsible panels. Omitting either HANGS this suite (# cancelled), never fails it.
+  writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
+  // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
+  // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
+  writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
+  // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
+  // omitting it does not skip a branch — it fails module resolution for the whole suite.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
+  // Issue 1098: the On-failure section's failure-result policy card.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte');
+  // The two panels issue 1096 shipped as SLOTS and issue 1097 filled: the rail renders
+  // both, so omitting either HANGS this suite rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
@@ -188,8 +248,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
@@ -197,9 +260,14 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
+  // The World > Parties card tree (issue 1182). `PartyExpandedBody` imports all three of
+  // these, and this suite hand-rolls its compile list with no dependency validator, so an
+  // omission here HANGS every mounted manager test (`# cancelled`) rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyMemberRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   // The library inspector, extracted out of the root (issue 643). It lives under
@@ -216,6 +284,10 @@ function compileManagerRoot() {
   // mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  // The shared bulk-delete card (issue 1132). All three bulk-edit panels render it, and all
+  // three are in the root's static graph, so the same rule applies: omitting it HANGS every
+  // mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
   // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
   // so it is in the root's static graph too. `Callout` is the shared standing-statement
   // strip both Knowledge tabs render (issue 785); same rule, same consequence.
@@ -229,6 +301,10 @@ function compileManagerRoot() {
   // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
   // trees today, and through every other manager screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  // THE manager's labelled push-button (issue 1096). The root reaches it through the Tool
+  // Studio header and the System Overview Modifiers card, and through every other screen
+  // as the conversion proceeds.
+  writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -434,7 +510,8 @@ function compileManagerRoot() {
     'foundryBridge.js',
     'recipeItemAccessBadge.js',
     'essenceIcons.js',
-    'fontAwesomeFreeClassicIcons.js',
+    'foundryIconVocabulary.js',
+    'foundryIconCatalogue.js',
     'iconPickerPopover.js',
     'componentEditor.js',
     'chanceColorScale.js',
@@ -463,6 +540,12 @@ function compileManagerRoot() {
     // temp tree with NO dependency validator, so omitting a raw module HANGS the whole
     // suite as `# cancelled` rather than naming the missing file.
     'managerColorTokens.js',
+    // The ONE "move the keyboard, then announce" ordering rule (issue 1157). The manager
+    // root imports it for the actions that empty a bulk selection and `BulkDeleteCard`
+    // imports it for a refused write, which is precisely why it is a module and not two
+    // copies. It is an import-free leaf, so this single entry closes the graph — and this
+    // suite has NO dependency validator, so omitting it HANGS the whole file (# cancelled).
+    'announceAfterFocus.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -484,6 +567,10 @@ function compileManagerRoot() {
     'src/ui/svelte/components/stepperLabels.js',
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
+    // Recipe, Ingredient and IngredientSet all filter their payloads through the shared
+    // omitted-when-default machinery (issue 1135). Same rule as the rest of this list:
+    // omitting a transitive raw module HANGS this suite rather than failing it.
+    'src/models/reconstructibleDefaults.js',
     'src/models/IngredientSet.js',
     // IngredientSet imports the shared essence allocator (issue 917). This list is
     // hand-rolled with no validator, so omitting a transitive raw module HANGS this
@@ -556,16 +643,40 @@ function compileManagerRoot() {
     // omitting it: the suite HANGS as `# cancelled` rather than naming the missing file.
     'src/utils/browserPagination.js',
     'src/utils/routedOutcomeKeywords.js',
+    // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
+    // which outcome tiers a result-authoring control may offer.
+    'src/utils/failureResultPolicy.js',
+    // Issue 1098: adminStore's gathering-task normalizer emits `task.failureOutcome`
+    // through this shared absence-preserving attach.
+    'src/utils/gatheringFailureOutcome.js',
     'src/utils/craftingCheckExpression.js',
     // foundryBridge imports the shared rich-text-to-plain-text normalizer when it
     // resolves dropped source documents for the Tool Studio.
     'src/utils/plainTextDescription.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
+    // render an issue's sentence from it.
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The per-mode explanation the roll section opens with (issue 1096). A pure data
+    // table imported by `CheckModeCallout.svelte`, which `ChecksView` imports statically,
+    // so omitting it reports every mounted manager test as `# cancelled`.
+    'src/ui/svelte/apps/manager/checks/checkModeCallout.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    // The Checks rail GROUP model (issue 1096). The root imports it to build the four child
+    // routes, their badges and the `checks` redirect, so it is in the tree from the first
+    // render. This list has NO dependency validator: omitting it does not fail the suite,
+    // it reports all 241 mounted manager tests as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND in the hook.
+    'src/ui/svelte/apps/manager/checks/checksNav.js',
     'src/config/flags.js',
     // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
+    // so the engines and chat cards can reuse it too (issue 1119).
+    'src/models/toolDisplay.js',
     // The Essence Studio's presentation adapter (issue 1036) — the sibling of the line
     // above, and imported by five of the eight components registered in the compile loop.
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
@@ -573,9 +684,32 @@ function compileManagerRoot() {
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
+    // The runtime route-chrome channel the Manager root owns for its Downtime surface. It is
+    // a plain leaf, but the root imports it statically, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/ui/svelte/apps/manager/downtime/routeChromeChannel.js',
+    'src/ui/managerExtensions.js',
+    // The shared registry factory both extension registries are built from (issue 1198).
+    // `managerExtensions.js` imports it statically, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/ui/extensionRegistry.js',
+    // The player registry the title bar's PREMIUM badge also reads (issue 1198), plus the
+    // shared derivation leaf the player window composes its rail from. Both arrive through
+    // this suite because the A2 case registers a player-only provider.
+    'src/ui/playerExtensions.js',
+    // The public hook-name constants the registry and the Downtime host publish through
+    // (issue 1185). `managerExtensions.js` imports it, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/config/hooks.js',
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
+    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
+    // preset bundle it reads. Both are pure leaves; SystemEditView imports the first,
+    // which imports the second.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
@@ -597,7 +731,44 @@ function compileManagerRoot() {
     // `maxModifierPicks` means. This list has NO dependency validator, so
     // omitting it does not fail the suite: every mounted manager test is reported as
     // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
-    'src/systems/craftingModifierResolver.js',
+    'src/systems/checkModifierResolver.js',
+    // …and issue 1118 gave it another: the deterministic average a rolling modifier is
+    // ranked by, which is also what tells the resolver that a modifier rolls at all.
+    'src/utils/rollExpressionAverage.js',
+    // …and issue 1095 gave it a THIRD import: `resolveActiveSalvageCheckFormula` delegates
+    // to the one salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
+    'src/systems/salvageCheckUsability.js',
+    // The four subject-pick normalizers share one authoredness rule through this leaf
+    // (issue 1095); `adminStore` and `CraftingSystemManager` both import it.
+    'src/utils/checkModifierPicks.js',
+    // The rule group's attribute-name literals, hoisted out of Svelte markup so the View
+    // Lab registry guard can import rather than restate them (issue 1095). The checks card
+    // is always in the mounted manager tree, so omitting this reports every mounted manager
+    // test as `# cancelled` behind one ERR_MODULE_NOT_FOUND.
+    'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+    // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules
+    // they DRIVE rather than reimplement: `checkPreview.js` calls the same three runners
+    // the engines call and `checkOdds.js` buckets through the same classifier
+    // `runFormulaRouted` uses, so `checkRoll.js` — and the breakage-condition evaluator it
+    // evaluates triggers with, and the shared progressive-award loop — are genuinely in
+    // this root's static graph. Everything below `toolBreakageRuntime.js` is that module's
+    // own closure; the ones already listed above are not repeated.
+    'src/ui/svelte/apps/manager/checks/checkPreview.js',
+    'src/ui/svelte/apps/manager/checks/checkOdds.js',
+    'src/systems/checkRoll.js',
+    'src/utils/progressiveAward.js',
+    // The progressive PREVIEW SANDBOX derivation (issue 1097). THREE importers put it in
+    // this root's static graph: the root's own `cloneProgressiveCheck`, `ChecksView` and
+    // `ChecksRightMenu` — which is the point, since one derivation is what stops the draft
+    // clone and the persistence normalizer from disagreeing about what an order is.
+    'src/systems/progressiveCheckSandbox.js',
+    // The shared, GM-configurable player-character predicate (issue 1024). `checkPreview.js`
+    // imports it to filter the rail's "Preview as" list, so it entered this root's static
+    // graph with that filter — and this list has no dependency validator, so omitting it
+    // reports every mounted manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND
+    // rather than failing one. It imports nothing, so this entry closes the graph.
+    'src/config/playerCharacterTypes.js',
+    'src/toolBreakageRuntime.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -620,6 +791,29 @@ function navButton(labelText) {
   );
 }
 
+// ── Checks Studio navigation (issue 1096) ────────────────────────────────────────────
+//
+// The four activities stopped being TABS inside one view and became rail ROUTES, and the
+// five SECTIONS of each route are what the strip across the pane switches now. So reaching
+// a control here is two moves, not one, and both are asserted rather than optional-chained:
+// a silently missing rail child or section button would leave every assertion below reading
+// the previous screen and passing for the wrong reason.
+async function openChecksActivity(activity) {
+  const child = target.querySelector(`[data-checks-nav-item="${activity}"]`);
+  assert.ok(child, `the Checks rail should offer a ${activity} child`);
+  child.click();
+  await tick();
+  flushSync();
+}
+
+async function openChecksSection(section) {
+  const button = target.querySelector(`#checks-section-${section}`);
+  assert.ok(button, `the section strip should offer "${section}"`);
+  button.click();
+  await tick();
+  flushSync();
+}
+
 // Set a control's value and fire the input event Svelte's bind:value listens for.
 function setInputValue(element, value) {
   element.value = value;
@@ -638,6 +832,207 @@ function gatheringToggle() {
   return target.querySelector('#manager-nav-gathering + .manager-nav-toggle');
 }
 
+function worldNavItem(id) {
+  return target.querySelector(`#manager-world-nav-${id}`);
+}
+
+// The mounted harness stubs `game.i18n.localize` as `(key) => key`, which makes the root's
+// `text(key, fallback)` return the FALLBACK for everything. That is fine for behaviour, and
+// useless for copy: a component reading the WRONG key and a lang value that has drifted from
+// its fallback both pass. The Downtime route is copy-shaped work, so its suites resolve
+// against the real shipped `lang/en.json` and pin what a GM will actually read.
+const SHIPPED_LANG = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+
+const identityLocalize = (key) => key;
+
+function shippedString(key) {
+  let node = SHIPPED_LANG;
+  for (const part of key.split('.')) {
+    if (node == null || typeof node !== 'object') return key;
+    node = node[part];
+  }
+  return typeof node === 'string' ? node : key;
+}
+
+// Paired with the suite's `afterEach`, which restores the identity localizer whether the
+// test passed or threw.
+function useShippedLocalization() {
+  globalThis.game.i18n.localize = shippedString;
+}
+
+// The provider declares its OWN tab set, so `ids` is a parameter rather than a copy of
+// Core's four. `tab` decorates each generated tab, which is how the chrome cases attach
+// per-tab titles, subtitles, breadcrumbs and header actions without a second factory.
+function downtimeProvider({
+  prefix = 'Companion',
+  ids = ['tracking', 'activities', 'factions', 'settings'],
+  tab = () => ({}),
+  mount: mountProvider,
+  ...overrides
+} = {}) {
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: ids.map((id, index) => ({
+      id,
+      label: `${prefix} ${id}`,
+      accessibleName: `Open ${prefix} ${id}`,
+      tooltip: `${prefix} ${id} tools`,
+      icon: 'fas fa-star',
+      ...tab(id, index),
+    })),
+    mount: mountProvider ?? (() => undefined),
+    ...overrides,
+  };
+}
+
+async function settleDowntimeProvider() {
+  await Promise.resolve();
+  await tick();
+  await tick();
+  flushSync();
+}
+
+/**
+ * Mount the manager with the World > Downtime surface UNLOCKED (issue 1257).
+ *
+ * The route and its rail group are gated behind `fabricate.experimentalFeatures` until the
+ * premium Downtime Studio ships, and the harness's `createStore` defaults that projection to
+ * `false` — deliberately, because the Graph placeholder's own gate is asserted from the same
+ * default. So every Downtime case opts in, and it does so through ONE named helper rather
+ * than 28 copies of the same store option: the gate is then stated once, and removing it when
+ * the Studio releases is one deletion rather than a sweep.
+ *
+ * @param {Array} [calls] Store call log, as `mountManager` takes it.
+ * @param {object} [storeOptions] Store options; may override the flag to assert the gate.
+ * @param {object} [services] Injected services.
+ * @param {object} [rootProps] Extra root props, e.g. `managerExtensions`.
+ * @returns {HTMLElement} The mounted target.
+ */
+function mountDowntimeManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
+  return mountManager(
+    calls,
+    { experimentalFeaturesEnabled: true, ...storeOptions },
+    services,
+    rootProps
+  );
+}
+
+// The three reads every Downtime seam case makes, named once.
+//
+// `downtimeTabIds` is CORE-FALLBACK ONLY (issue 1213). It reads the preview's tab strip, and
+// provider mode no longer renders one: a companion's tabs are the rail's Downtime sub-items
+// and nothing else. The anti-drift invariant this pair was written for (issue 1185) — "two
+// renderings of ONE tab list, so a case that only checked one would pass through the exact
+// drift the single list exists to prevent" — therefore now applies to core-fallback alone.
+// In provider mode `downtimeRailIds()` is the ONLY rendering, so it is the one to assert, and
+// a provider-mode case that navigates must click `#manager-downtime-nav-<id>` rather than
+// `[data-downtime-tab="<id>"]`, which resolves to nothing there.
+function downtimeTabIds() {
+  return Array.from(target.querySelectorAll('[data-downtime-tab]')).map(
+    (tab) => tab.dataset.downtimeTab
+  );
+}
+
+function downtimeRailIds() {
+  return Array.from(target.querySelectorAll('[data-world-downtime-item]')).map(
+    (item) => item.dataset.worldDowntimeItem
+  );
+}
+
+function activeCompanionPanel() {
+  return target.querySelector('[data-downtime-extension-panel]');
+}
+
+const railBodyCollapsed = () =>
+  target.querySelector('.manager-body').classList.contains('is-rail-collapsed');
+const railToggleControl = () => target.querySelector('[data-manager-rail-toggle]');
+
+/**
+ * Every claim the Downtime rail lock makes about the collapse control, in one place.
+ *
+ * Named once because TWO render sites carry `[data-manager-rail-toggle]` — one per
+ * `{#if selectedSystem}` scope-card branch — and only one of them was reachable from the
+ * mounted suite before issue 1213's review. Deleting `disabled={railLockedOpen}` from the
+ * unreachable branch survived the whole suite; a shared assertion is what lets a second case
+ * mount the other branch without copying the block (which the duplication gate would fail).
+ *
+ * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
+ */
+function assertRailLockedOpen(railWrites) {
+  const toggle = railToggleControl();
+  assert.ok(!railBodyCollapsed(), 'arriving on the companion surface displays the rail expanded');
+  assert.ok(
+    Boolean(target.querySelector('[data-world-downtime-submenu]')),
+    'which is the whole point — the sub-items are the only way to the other screens'
+  );
+  assert.equal(toggle.disabled, true, 'and the collapse control is genuinely disabled');
+  assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+  assert.equal(
+    toggle.getAttribute('aria-pressed'),
+    'false',
+    'every attribute reads the DISPLAYED state, not the stored one'
+  );
+  assert.equal(
+    toggle.getAttribute('aria-label'),
+    shippedString('FABRICATE.Admin.Manager.Nav.CollapseRail')
+  );
+  assert.equal(
+    toggle.getAttribute('title'),
+    shippedString('FABRICATE.Admin.Manager.Nav.RailLockedOpen'),
+    'the title explains the lock, and it is sidebar-worded rather than the section string'
+  );
+  assert.ok(
+    Boolean(toggle.querySelector('.fa-angles-left')),
+    'the chevron points the way the control would actually move'
+  );
+  assert.deepEqual(railWrites(), [], 'and nothing about the lock writes a client preference');
+}
+
+/**
+ * Prove the lock is a rule about STATE rather than one control's attribute.
+ *
+ * The first press only proves the attribute: happy-dom suppresses handlers on a `disabled`
+ * button, so `toggleManagerRail`'s own `if (railLockedOpen) return;` is never reached. The
+ * second press strips the attribute first, which is the only path in this environment that
+ * reaches past the belt to the braces — delete the early return and this is what fails.
+ *
+ * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
+ */
+async function assertRailLockSurvivesPresses(railWrites) {
+  railToggleControl().click();
+  await tick();
+  flushSync();
+  assert.ok(!railBodyCollapsed(), 'the disabled control does not collapse the rail');
+
+  const toggle = railToggleControl();
+  toggle.removeAttribute('disabled');
+  toggle.click();
+  await tick();
+  flushSync();
+  assert.ok(
+    !railBodyCollapsed(),
+    'and the handler refuses too, so the lock is inert rather than merely styled'
+  );
+  assert.deepEqual(railWrites(), [], 'neither press writes the stored collapse preference');
+}
+
+function managerTitle() {
+  return target.querySelector('.manager-header .manager-title').textContent.trim();
+}
+
+function managerSubtitle() {
+  return target.querySelector('.manager-header .manager-subtitle').textContent.trim();
+}
+
+// World > Travel's rail group (issue 1282). The parent moved into the World section; the two
+// destination sub-items kept their ids, because neither ever named a crafting system.
+function worldTravelItem(id) {
+  return target.querySelector(
+    id === 'travel' ? '#manager-world-nav-travel' : `#manager-travel-nav-${id}`
+  );
+}
+
 // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
 // the "Crafting" parent from a non-crafting route routes straight to Recipes and
 // expands the group; the parent also carries the recipes count badge.
@@ -651,21 +1046,71 @@ function craftingSubitem(labelText) {
   );
 }
 
+// The Crafting sub-entries currently carrying BOTH halves of the active treatment
+// (issue 1151). Read as a list rather than a boolean so "exactly one, and it is the
+// redirect target" is provable — "nothing is highlighted" is half of the reported
+// dead end, and two highlighted entries would be the other failure this can catch.
+function activeCraftingSubitemIds() {
+  return Array.from(target.querySelectorAll('#manager-crafting-submenu .manager-nav-subitem'))
+    .filter(
+      (button) =>
+        button.classList.contains('is-active') && button.getAttribute('aria-current') === 'page'
+    )
+    .map((button) => button.id.replace('manager-crafting-nav-', ''));
+}
+
+// The ONE scope-switch driver for the route-reconciliation cases (issue 1151): set the
+// select, dispatch a real bubbling `change`, settle, and report the rendered route.
+// Repeating that sequence per case is precisely the near-identical block SonarCloud's
+// new-code duplication gate counts against `tests/**` exactly as it does against `src/`.
+async function switchScopeSystemTo(systemId) {
+  const scopeSelect = target.querySelector('[data-manager-scope-select]');
+  assert.ok(scopeSelect, 'the rail card exposes a system scope select');
+  scopeSelect.value = systemId;
+  scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+  await tick();
+  flushSync();
+  return target.querySelector('.fabricate-manager').dataset.managerView;
+}
+
+// The store the most recent `mountManager` built. Exposed so a case can drive a WORLD
+// SETTING CHANGE the way production does — the real `adminStore` republishes `viewState`
+// when a setting moves — rather than by remounting, which cannot reproduce a flag flipping
+// under a GM who is already standing somewhere (issue 1257).
+let mountedStore = null;
+
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
-function mountManager(calls = [], storeOptions = {}) {
+function mountManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
+  mountedStore = createStore(calls, storeOptions);
   mounted = mount(Component, {
     target,
     props: {
-      store: createStore(calls, storeOptions),
-      services: { openCurrentAdmin: () => {} },
+      store: mountedStore,
+      services: { openCurrentAdmin: () => {}, ...services },
+      ...rootProps,
     },
   });
   flushSync();
   return target;
+}
+
+/**
+ * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157).
+ *
+ * A `polite` region is queued speech and a focus change cancels queued speech, so every
+ * live region in the manager that is paired with a focus move writes its text AFTER the
+ * move — see `src/ui/svelte/util/announceAfterFocus.js`, which owns that order. The delay is
+ * IMPORTED rather than restated: a local copy of the number would silently start asserting
+ * the un-delayed state the moment the rule changed it.
+ */
+async function waitForQueuedAnnouncement() {
+  await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+  await tick();
+  flushSync();
 }
 
 // Mount the manager, route to Recipes, and open the recipe-edit route for r1.
@@ -748,12 +1193,70 @@ function applyRecipeKnowledgeMode(system, mode) {
 // (which re-reads systemDetails) preserves the currency config across an Edit click.
 // Mutates the passed systemDetails map. Kept out of createStore to hold that helper
 // under the cognitive-complexity budget.
+// Issue 1278 split currency across two scopes, so one fixture option still describes one
+// coherent setup but lands in two places: `enabled` (participation) on the crafting system, and
+// the ladder/strategy/provider/macros on the WORLD projection. Tests keep passing a single
+// `selectedCurrency` object; `worldCurrencyFrom` below reads the world half back out of it.
 function applySelectedCurrency(systemDetails, selectedCurrency) {
   if (!selectedCurrency) return;
   systemDetails.alchemy = {
     ...systemDetails.alchemy,
-    requirements: { ...systemDetails.alchemy.requirements, currency: selectedCurrency },
+    requirements: {
+      ...systemDetails.alchemy.requirements,
+      currency: { enabled: selectedCurrency.enabled === true },
+    },
   };
+}
+
+function worldCurrencyFrom(selectedCurrency) {
+  const source = selectedCurrency || {};
+  return {
+    spendStrategy: source.spendStrategy || 'actorProperty',
+    providerId: source.providerId || '',
+    macros: source.macros || { canAfford: '', increment: '', decrement: '' },
+    units: Array.isArray(source.units) ? source.units : [],
+  };
+}
+
+// Per-system crafting visibility/resolution modes (issue 1151), keyed by system id.
+// Opt-in: with no option the shared default fixture is untouched.
+//
+// These are written into `systemDetails` rather than through
+// `options.selectedSystemOverrides`, and the difference is load-bearing:
+// `applySelectedSystem` republishes `systemDetails[id]` RAW on a scope switch, while
+// the overrides only ever reach the INITIALLY selected system. A mode written the
+// second way would vanish the moment the switch under test happened, and every
+// post-switch assertion would pass vacuously. Mutates the passed map, like
+// `applySelectedCurrency` above, and is kept out of `createStore` for the same
+// cognitive-complexity reason.
+function applySystemCraftingModes(systemDetails, modesById) {
+  for (const [id, modes] of Object.entries(modesById || {})) {
+    if (systemDetails[id]) systemDetails[id] = { ...systemDetails[id], ...modes };
+  }
+}
+
+/**
+ * Fill a test's `worldRealms` override out to the shape `adminStore` actually projects.
+ *
+ * The travel inspector reads the `environments` and `parties` ARRAYS, not only their counts, so a
+ * fixture carrying counts alone makes it throw during render. That failure is not loud: Svelte
+ * unwinds and the manager falls back to the systems route, so the assertion that fires is a
+ * confusing "expected world-travel, got systems" several lines later. Normalizing here means a
+ * future override cannot reintroduce it by omission.
+ */
+function projectedWorldRealms(realms) {
+  return realms.map((realm) => ({
+    description: '',
+    img: null,
+    enabled: true,
+    secret: false,
+    biomes: [],
+    environmentCount: Array.isArray(realm.environments) ? realm.environments.length : 0,
+    partyCount: Array.isArray(realm.parties) ? realm.parties.length : 0,
+    environments: [],
+    parties: [],
+    ...realm,
+  }));
 }
 
 function createStore(calls = [], options = {}) {
@@ -828,10 +1331,26 @@ function createStore(calls = [], options = {}) {
         consumeOnFail: true,
         showAttemptHistoryToPlayers: false,
       },
-      craftingCheck: options.craftingCheck,
+      // `enabled` defaults ON in this fixture (issue 1096), and a test that supplies its own
+      // still wins. It has to be stated now because it became LOAD-BEARING: an optional
+      // check that is off collapses its route to the "turn this check on" empty state, so a
+      // fixture that left `enabled` absent would have silently stopped rendering the editor
+      // every assertion below is about. The persisted default is still `=== true` — this is
+      // a fixture choice, not a change to the normalizer.
+      craftingCheck: { enabled: true, ...(options.craftingCheck || {}) },
+      // The ONE system-level modifier library (issues 1095, 1117). It moved out of
+      // `craftingCheck` so salvage and gathering can select over the same entries, absorbed
+      // the gathering character-modifier library, and the store's projection is an
+      // ALLOWLIST — an unforwarded key here renders an empty library on every activity,
+      // which is exactly the silent state this fixture exists to make reachable.
+      modifiers: options.modifiers,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
-      salvageCraftingCheck: options.salvageCraftingCheck,
-      gatheringCraftingCheck: options.gatheringCraftingCheck,
+      salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
+      gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
+      // Travel & Realms PARTICIPATION (issue 1282). The System Settings feature tile beside
+      // Currency reads it off the selected system, exactly as the Currency tile reads
+      // `requirements.currency.enabled`.
+      gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
       features: selectedFeatures,
       // Overridable so a test can supply its own component set (the Tool display
       // precedence cases resolve `componentId` against their own fixtures); defaults to
@@ -904,7 +1423,8 @@ function createStore(calls = [], options = {}) {
       name: 'Smithing',
       description: 'Heavy equipment work',
       resolutionMode: 'routedByCheck',
-      features: {
+      gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
+      features: options.smithingFeatures || {
         gathering: false,
         itemTags: false,
         recipeCategories: true,
@@ -1152,6 +1672,7 @@ function createStore(calls = [], options = {}) {
         },
       ];
   applySelectedCurrency(systemDetails, options.selectedCurrency);
+  applySystemCraftingModes(systemDetails, options.systemCraftingModes);
   const baseSelectedSystem =
     options.noSystems || options.selected === false ? null : systemDetails.alchemy;
   const selectedSystemWithMode = applyRecipeKnowledgeMode(
@@ -1240,6 +1761,11 @@ function createStore(calls = [], options = {}) {
             featureCount: 3,
             componentCount: alchemyManagedItemOptions.length,
             recipeCount: 2,
+            // The REAL projection carries participation as a flat boolean (issue 1278): the
+            // system list is an allowlist that does not include `requirements`, so a double that
+            // omitted this would be looser than the projection it stands for — and the World >
+            // Currency subtitle counts exactly this field.
+            currencyEnabled: options.selectedCurrency?.enabled === true,
             selected: options.selected !== false,
           },
           {
@@ -1252,6 +1778,7 @@ function createStore(calls = [], options = {}) {
             featureCount: 1,
             componentCount: 6,
             recipeCount: 5,
+            currencyEnabled: false,
             selected: false,
           },
         ],
@@ -1334,6 +1861,13 @@ function createStore(calls = [], options = {}) {
       { name: 'elixirs', count: 1 },
       { name: 'potions', count: 1 },
     ],
+    // The recipe half of the Tags & Categories reference count, published as DATA by the
+    // real store (issue 1081) so the always-mounted nav badge does not have to walk the
+    // rows' detail tier for it. Left UNDEFINED by default, which is what makes the default
+    // rows' counts unchanged: an absent record means "not published", and the component
+    // falls back to walking exactly as it did before. Tests asserting on the pre-counted
+    // branch publish it, as the store does on every one of its publishes.
+    recipeTagPlaceholderCounts: options.recipeTagPlaceholderCounts,
     recipeSearchTerm: '',
     itemSearchTerm: options.itemSearchTerm || '',
     experimentalFeaturesEnabled: options.experimentalFeaturesEnabled === true,
@@ -1514,6 +2048,58 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
+    // Participation is the SELECTED SYSTEM's answer; the reveal/visibility pair beside it is
+    // the world's (issue 1282).
+    gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
+    // `memberActorUuids` is carried by the REAL projection — `adminStore` spreads the stored
+    // party before adding `memberCards` — and the card body and the page-header subtitle both
+    // read it. A double that omitted it was looser than the helper it stands for, which is
+    // exactly how a subtitle that always counted zero assigned characters would pass green.
+    worldCurrency: worldCurrencyFrom(options.selectedCurrency),
+    travelParties: options.travelParties || [
+      {
+        id: 'party-one',
+        name: 'Wayfarers',
+        enabled: true,
+        memberCount: 1,
+        memberActorUuids: ['Actor.member'],
+        memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
+        travelActorUuid: 'Actor.marker',
+        travelActor: { uuid: 'Actor.marker', name: 'Mira', img: '' },
+      },
+      {
+        id: 'party-two',
+        name: 'Night Watch',
+        enabled: false,
+        memberCount: 0,
+        memberActorUuids: [],
+        memberCards: [],
+        travelActorUuid: null,
+        travelActor: null,
+      },
+    ],
+    selectedPartyId: 'party-one',
+    actorOptions: options.actorOptions || [
+      { uuid: 'Actor.member', name: 'Mira', img: '', isPlayerCharacter: true },
+      { uuid: 'Actor.scout', name: 'Scout', img: '', isPlayerCharacter: true },
+    ],
+    partyRealmOverridesAvailable:
+      options.partyRealmOverridesAvailable ?? options.gatheringRealmsEnabled === true,
+    // The WORLD's realm library (issue 1282) — one library, whichever system is selected.
+    worldRealms: projectedWorldRealms(
+      options.worldRealms || [
+        {
+          id: 'realm-forest',
+          name: 'Green March',
+          environmentCount: 1,
+          partyCount: 1,
+          environments: [{ id: 'env-forest', name: 'Green March Woods', enabled: true }],
+          parties: [{ id: 'party-1', name: 'The Wayfarers' }],
+        },
+      ]
+    ),
+    currentSceneRegions: options.currentSceneRegions || [],
+    currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
     // The `evaluateSystemValidation` report drives the System Overview page's
     // Validation tab, its nav badge, and the system-blocker banner.
@@ -1529,6 +2115,11 @@ function createStore(calls = [], options = {}) {
     viewState.update((state) => ({
       ...state,
       selectedSystem: nextSelected,
+      // `worldRealms` is deliberately NOT re-projected here: the realm library does not change
+      // when the selected crafting system does (issue 1282).
+      gatheringRealmSettings: {
+        enabled: nextSelected?.gatheringRealmSettings?.enabled === true,
+      },
       itemCards: componentCardsFor(id),
       essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
@@ -1548,11 +2139,22 @@ function createStore(calls = [], options = {}) {
     const padded = options.extraComponentItems
       ? [...(componentItems[id] || []), ...options.extraComponentItems]
       : componentItems[id] || [];
-    const cards = padded.map((item) =>
-      options.missingComponentSource && item.id === 'c1'
-        ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
-        : item
-    );
+    const cards = padded
+      .map((item) =>
+        options.missingComponentSource && item.id === 'c1'
+          ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
+          : item
+      )
+      // Issue 1081: the real projection hands out cards carrying a NON-ENUMERABLE `hydrate()`
+      // that resolves the card's linked source document — the "Missing" verdict and the live
+      // description fallback — only when a view asks for it. Opting in records which cards
+      // the manager asked for; a fresh copy per call, because a refresh really does project
+      // fresh card objects and the request has to be re-made against them.
+      .map((item) =>
+        options.componentHydrationRequests
+          ? withHydrateSpy(item, options.componentHydrationRequests)
+          : item
+      );
     // `itemCards` is the SEARCH-FILTERED list. In production `_buildItemCards` calls
     // `CraftingSystemManager.getItems(systemId, itemSearchTerm)`, which returns the whole
     // managed list for an empty search and a name/description/uuid/tag-matched subset
@@ -1694,17 +2296,19 @@ function createStore(calls = [], options = {}) {
     toggleRequirement: (requirement, enabled) => {
       calls.push(['toggleRequirement', requirement, enabled]);
     },
-    setCurrencySpendStrategy: async (id, strategy) => {
-      calls.push(['setCurrencySpendStrategy', strategy, id]);
+    // No system id on any of these: currency is world scope since issue 1278, so the store's
+    // currency actions address the ONE world config rather than a crafting system.
+    setCurrencySpendStrategy: async (strategy) => {
+      calls.push(['setCurrencySpendStrategy', strategy]);
     },
-    setCurrencyProvider: async (id, providerId) => {
-      calls.push(['setCurrencyProvider', providerId, id]);
+    setCurrencyProvider: async (providerId) => {
+      calls.push(['setCurrencyProvider', providerId]);
     },
-    setCurrencyMacro: async (id, key, uuid) => {
-      calls.push(['setCurrencyMacro', key, uuid, id]);
+    setCurrencyMacro: async (key, uuid) => {
+      calls.push(['setCurrencyMacro', key, uuid]);
     },
-    clearCurrencyMacro: async (id, key) => {
-      calls.push(['clearCurrencyMacro', key, id]);
+    clearCurrencyMacro: async (key) => {
+      calls.push(['clearCurrencyMacro', key]);
     },
     createRecipe: () => {
       calls.push(['createRecipe']);
@@ -1745,6 +2349,32 @@ function createStore(calls = [], options = {}) {
     },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
+    // The set delete (issue 1129). `describeComponentDelete` is a SYNCHRONOUS selector the
+    // root `$derived`s the panel's impact from, so the double returns a literal rather than a
+    // promise — an async double here would render an unresolved impact and the panel would
+    // silently show zeroes.
+    describeComponentDelete: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      return (
+        options.componentDeleteImpact ?? {
+          deletable: ids.length,
+          deletableIds: ids,
+          recipesRewritten: ids.length > 0 ? 2 : 0,
+          recipesDisabled: ids.length > 0 ? 1 : 0,
+        }
+      );
+    },
+    deleteComponents: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      calls.push(['deleteComponents', ids]);
+      return (
+        options.deleteComponentsResult ?? {
+          deleted: ids.length,
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
+    },
     updateComponent: (id, updates) => {
       calls.push(['updateComponent', id, updates]);
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
@@ -1775,6 +2405,37 @@ function createStore(calls = [], options = {}) {
         return options.applyRecipeBulkEditResult;
       }
       return { updated: ids.length, recipeIds: ids };
+    },
+    // The recipe set delete (issue 1132). `describeRecipeDelete` is a SYNCHRONOUS selector
+    // the root `$derived`s the panel's impact from, exactly as its component twin above is —
+    // an async double here would render an unresolved impact and the card would silently
+    // show zeroes and disable itself.
+    describeRecipeDelete: (recipeIds) => {
+      const ids = [...(recipeIds || [])];
+      return (
+        options.recipeDeleteImpact ?? {
+          deletable: ids.length,
+          deletableIds: ids,
+          recipeItemsAffected: ids.length > 0 ? 2 : 0,
+          recipeItemIds: ids.length > 0 ? ['ri1', 'ri2'] : [],
+          learnersAffected: ids.length > 0 ? 4 : 0,
+          learnerIds: ids.length > 0 ? ['a1', 'a2', 'a3', 'a4'] : [],
+        }
+      );
+    },
+    deleteRecipes: (recipeIds) => {
+      const ids = [...(recipeIds || [])];
+      calls.push(['deleteRecipes', ids]);
+      if (options.deleteRecipesReject) return Promise.reject(new Error('delete failed'));
+      return (
+        options.deleteRecipesResult ?? {
+          deleted: ids.length,
+          recipeIds: ids,
+          recipeItemsAffected: 1,
+          recipeItemsRewritten: 1,
+          learnersAffected: 4,
+        }
+      );
     },
     // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
     // four-parameter stub records a call that looks identical whether the argument is
@@ -1809,10 +2470,25 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, essenceIds: ids };
     },
+    // `deleteEssencesReject` is the twin of `deleteRecipesReject` above, and it is what makes
+    // the essence root's `finally` disarm detectable at all: with only a result option, the
+    // rejection branch has no way in and moving the disarm back into the `try` stays green.
     deleteEssences: (essenceIds) => {
       const ids = [...(essenceIds || [])];
       calls.push(['deleteEssences', ids]);
-      return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
+      if (options.deleteEssencesReject) return Promise.reject(new Error('delete failed'));
+      // `recipesDisabled` is in the default, not just the explicit results, because the real
+      // `adminStore.deleteEssences` always returns it (issue 1144). A double that omits it is
+      // looser than production, and every toast test that does NOT pass an explicit result would
+      // then be asserting against a shape the app never produces.
+      return (
+        options.deleteEssencesResult ?? {
+          deleted: ids.length,
+          blocked: [],
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
     },
     cancelEssenceDraft: () => {
       calls.push(['cancelEssenceDraft']);
@@ -1905,6 +2581,17 @@ function createStore(calls = [], options = {}) {
     },
     saveCraftingCheckSimple: (simple) => {
       calls.push(['saveCraftingCheckSimple', simple]);
+      // A store save that REFUSES, mirroring `saveSystemDetails`/`updateEssence`. The route
+      // exit is gated on the answer, so a fixture that could only ever succeed cannot tell a
+      // guard that inspects it from one that returns `true` unconditionally.
+      return options.saveCraftingCheckSimpleResult;
+    },
+    // The Checks Studio's three-way route-exit prompt (issue 1096). It is `confirmDiscard*`
+    // like its eight siblings and returns 'save' | 'discard' | 'cancel'; `true` is the legacy
+    // discard alias the root also accepts.
+    confirmDiscardDirtyChecksDraft: (activities) => {
+      calls.push(['confirmDiscardDirtyChecksDraft', activities]);
+      return options.confirmDiscardChecksResult ?? true;
     },
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
@@ -2002,12 +2689,80 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) =>
       calls.push(['deleteGatheringVocabularyValue', ...args]),
+    // Participation is a CRAFTING SYSTEM write since issue 1282, so the double republishes BOTH
+    // projections of it: the System Settings tile reads `selectedSystem.gatheringRealmSettings`
+    // and the travel view-model carries its own copy. A double that moved only one of them would
+    // leave the tile stuck at its old state and read as a toggle that does nothing.
     setGatheringRealmsEnabled: (systemId, enabled) => {
       calls.push(['setGatheringRealmsEnabled', systemId, enabled]);
       viewState.update((state) => ({
         ...state,
-        gatheringRealmSettings: { ...(state.gatheringRealmSettings || {}), enabled },
+        gatheringRealmSettings: { ...state.gatheringRealmSettings, enabled },
+        selectedSystem: state.selectedSystem
+          ? { ...state.selectedSystem, gatheringRealmSettings: { enabled } }
+          : state.selectedSystem,
       }));
+      return true;
+    },
+    selectParty: (id) => {
+      calls.push(['selectParty', id]);
+      viewState.update((state) => ({ ...state, selectedPartyId: id }));
+      return true;
+    },
+    createParty: () => {
+      calls.push(['createParty']);
+      return true;
+    },
+    renameParty: (id, name) => {
+      calls.push(['renameParty', id, name]);
+      return true;
+    },
+    addOrMovePartyMember: (id, uuid) => {
+      calls.push(['addOrMovePartyMember', id, uuid]);
+      return true;
+    },
+    removePartyMember: (id, uuid) => {
+      calls.push(['removePartyMember', id, uuid]);
+      return true;
+    },
+    movePartyMember: (from, to, uuid) => {
+      calls.push(['movePartyMember', from, to, uuid]);
+      return true;
+    },
+    setPartyTravelActor: (id, uuid) => {
+      calls.push(['setPartyTravelActor', id, uuid]);
+      viewState.update((state) => ({
+        ...state,
+        travelParties: state.travelParties.map((party) =>
+          party.id === id
+            ? {
+                ...party,
+                travelActorUuid: uuid,
+                travelActor: { uuid, name: 'Scout', img: '' },
+              }
+            : party
+        ),
+      }));
+      return true;
+    },
+    clearPartyTravelActor: (id) => {
+      calls.push(['clearPartyTravelActor', id]);
+      return true;
+    },
+    setPartyEnabled: (id, enabled) => {
+      calls.push(['setPartyEnabled', id, enabled]);
+      return true;
+    },
+    deleteParty: (id) => {
+      calls.push(['deleteParty', id]);
+      return true;
+    },
+    setPartyRealmOverride: (id, systemId, realmIds) => {
+      calls.push(['setPartyRealmOverride', id, systemId, realmIds]);
+      return true;
+    },
+    clearPartyRealmOverride: (id, systemId) => {
+      calls.push(['clearPartyRealmOverride', id, systemId]);
       return true;
     },
     addGatheringLibraryTask: (systemId) => {
@@ -2168,7 +2923,6 @@ function createStore(calls = [], options = {}) {
       return options.deleteToolDraftResult ?? true;
     },
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
-    addToolToDraft: (...args) => calls.push(['addToolToDraft', ...args]),
     addToolFromUuidToDraft: (...args) => {
       calls.push(['addToolFromUuidToDraft', ...args]);
       return true;
@@ -2252,11 +3006,12 @@ function createStore(calls = [], options = {}) {
   };
 }
 
-// Mount the manager, open the Alchemy system editor, and settle the DOM. The currency editor
-// tests below all repeat this exact mount + "Edit Alchemy" + flush dance and differ only in the
-// `createStore` options, so it lives here instead of being inlined per test. Assigns the shared
-// `mounted`/`target` so the suite's `afterEach` tears them down. Returns the captured `calls`.
-async function mountCurrencyEditor(storeOptions) {
+// Mount the manager against a store double, click through to one page, and settle the DOM. The
+// tests below repeat this exact mount + navigate + flush dance and differ only in the
+// `createStore` options and the page they open, so it lives here instead of being inlined per
+// test. Assigns the shared `mounted`/`target` so the suite's `afterEach` tears them down.
+// Returns the captured `calls`.
+async function mountManagerRoute(storeOptions, openRoute) {
   const calls = [];
   target = document.createElement('div');
   document.body.appendChild(target);
@@ -2268,12 +3023,28 @@ async function mountCurrencyEditor(storeOptions) {
     },
   });
   flushSync();
-  target.querySelector('[aria-label="Edit Alchemy"]').click();
+  openRoute(target);
   await Promise.resolve();
   await Promise.resolve();
   await tick();
   flushSync();
   return { calls };
+}
+
+// Open the Alchemy crafting system's editor, which lands on its System Settings tab.
+async function mountSystemSettings(storeOptions) {
+  return mountManagerRoute(storeOptions, (root) =>
+    root.querySelector('[aria-label="Edit Alchemy"]').click()
+  );
+}
+
+// Open WORLD > CURRENCY, which is where the currency ladder is authored since issue 1278. It
+// used to be a card on System Settings; the route needs no selected crafting system, because
+// the config it edits is world scope.
+async function mountCurrencyEditor(storeOptions) {
+  return mountManagerRoute(storeOptions, (root) =>
+    root.querySelector('[data-world-nav-item="currency"]').click()
+  );
 }
 
 // Mount the manager and open the tabbed System Overview page for Alchemy with an
@@ -2332,7 +3103,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     globalThis.Comment = document.createComment('').constructor;
     globalThis.game = {
       i18n: {
-        localize: (key) => key,
+        localize: identityLocalize,
         format: (key) => key,
       },
     };
@@ -2412,13 +3183,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     ).default;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (mounted) {
       unmount(mounted);
       mounted = null;
     }
     target?.remove();
     target = null;
+    // Restore the identity localizer unconditionally. A test that swaps in the shipped
+    // strings and then FAILS would otherwise leak its localizer into every later test,
+    // turning one failure into a cascade that hides its own cause.
+    globalThis.game.i18n.localize = identityLocalize;
+    // Yield to a NEW event-loop turn before the next test mounts. Happy DOM memoizes
+    // `querySelector`/`querySelectorAll` results behind `WeakRef`s, and V8 keeps a WeakRef's
+    // target strongly reachable for the remainder of the job that read it
+    // (`weak_refs_keep_during_job`). Tests here run back-to-back inside one turn whenever they
+    // never await anything real, so every unmounted manager DOM tree — and, through its
+    // listeners, its whole Svelte component graph — stays pinned until some macrotask boundary
+    // finally arrives. That is retention, not a leak: it is reclaimable, but not before the
+    // suite has stacked up hundreds of trees. Without this line the file needs >2 GB of heap;
+    // with it the whole suite runs green under `--max-old-space-size=768`.
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   after(() => {
@@ -2464,6 +3249,13 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tools',
         'Checks',
         'Gathering',
+        // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
+        // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
+        'Parties',
+        // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
+        // are UNGATED, unlike Downtime.
+        'Travel',
+        'Currency',
       ]
     );
     assert.equal(
@@ -2586,15 +3378,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    // Activating the group PARENT redirects to the first available child (issue 1096), so
+    // the route id names the activity rather than the studio.
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks-crafting');
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
-        button.textContent.trim()
+      Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
+        // The rail's badge column can carry an issue count and a dirty marker beside the
+        // label, so the label is read off its own span rather than off the whole button.
+        button.querySelector('.manager-nav-label').textContent.trim()
       ),
       ['Crafting', 'Salvage', 'Gathering', 'Validation']
     );
 
-    // The Crafting tab renders a single editor (the default fixture is alchemy mode,
+    // The Crafting route renders a single editor (the default fixture is alchemy mode,
     // which authors a simple pass/fail check) — not a create-a-list surface — and its
     // docs help card sits in the right menu.
     const craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
@@ -2609,11 +3405,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a singleton check has no create action'
     );
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
-    assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
+    assert.ok(craftingHelp, 'Crafting tab shows its docs links');
+    // NOT an explainer card any more (issue 1096). The maintainer removed the
+    // `ABOUT CRAFTING CHECKS` card outright — the prototype's rail opens on a
+    // documentation / quickstart PAIR and nothing else — so what this hook now names is
+    // that pair. The links themselves are what the assertions below are really about.
     assert.ok(
-      craftingHelp.classList.contains('manager-explainer-card') &&
-        craftingHelp.classList.contains('manager-inspector-card'),
-      'help card renders through the shared explainer primitive on the shared card shell'
+      craftingHelp.classList.contains('manager-checks-rail-links'),
+      'the rail opens on the documentation/quickstart link pair'
+    );
+    assert.equal(
+      craftingHelp.querySelectorAll('a').length,
+      2,
+      'both the docs link and the Quickstart survive'
     );
     const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
@@ -2621,16 +3425,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(craftingDocs, 'crafting help card links to the crafting-checks docs page');
     assert.equal(craftingDocs.getAttribute('target'), '_blank');
     assert.equal(craftingDocs.getAttribute('rel'), 'noreferrer');
-    assert.equal(
-      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
-      null,
-      'the context menu column should be visible on the Crafting tab'
+    assert.ok(
+      !target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
+      'the context menu column should be visible on the Crafting route'
     );
 
     // Salvage is its own singleton page with its own docs link.
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('salvage');
     const salvagePanel = target.querySelector('[data-checks-panel="salvage"]');
     // Salvage (simple resolution mode by default) now renders the shared simple
     // check editor with the recipe-specific DC source hidden.
@@ -2652,16 +3453,14 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Gathering page (default fixture economy is d100) renders the read-only card
     // reflecting the d100-is-the-roll framing and links to its docs.
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
     const gatheringPanel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
       gatheringPanel.hasAttribute('data-gathering-d100-readonly'),
       'd100 gathering renders the read-only card, not an editor'
     );
     assert.equal(
-      gatheringPanel.querySelector('.manager-card-title').textContent.trim(),
+      gatheringPanel.querySelector('.manager-checks-card-title').textContent.trim(),
       'Fixed d100 roll'
     );
     assert.ok(
@@ -2678,9 +3477,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     // Validation spans the full width with no context menu.
-    target.querySelector('[data-checks-tab-button="validation"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('validation');
     const validationPanel = target.querySelector('[data-checks-panel="validation"]');
     assert.ok(validationPanel);
     // The Validation tab now renders a per-check readiness section for every
@@ -2696,21 +3493,34 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       'the crafting section lists the roll-formula readiness check'
     );
-    assert.equal(
-      target.querySelector('[data-checks-help]'),
-      null,
-      'Validation tab should not render a context menu'
+    // The Validation route DOES have a rail now (issue 1096) — but it is not the activity
+    // stack. It carries the documentation/quickstart pair and the "All checks" summary and
+    // NOTHING else: no activation toggle, no Preview-as, no simulator, no odds and no
+    // This-check digest, because none of them has a subject on a route that validates all
+    // three checks at once. It also renders no section strip.
+    assert.ok(
+      target.querySelector('[data-checks-help="validation"]'),
+      'Validation keeps the documentation pair'
     );
     assert.ok(
-      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
-      'Validation tab should collapse the context-menu column'
+      target.querySelector('[data-checks-all-checks]'),
+      'Validation renders the All-checks summary'
     );
+    for (const absent of [
+      '[data-checks-active]',
+      '[data-checks-preview-as]',
+      '[data-checks-simulator]',
+      '[data-checks-odds]',
+      '[data-checks-digest]',
+      '[data-checks-sections]',
+    ]) {
+      assert.ok(!target.querySelector(absent), `the Validation route must not render ${absent}`);
+    }
 
     // The shared manager inspector is not rendered for the Checks view.
-    assert.equal(
-      target.querySelector('.manager-body > .manager-inspector'),
-      null,
-      'Checks view owns its own context menu, so the shared inspector is skipped'
+    assert.ok(
+      !target.querySelector('.manager-body > .manager-inspector'),
+      'the Checks routes own their context menu, so the shared inspector is skipped'
     );
   });
 
@@ -2738,16 +3548,116 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
-        button.textContent.trim()
+      Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
+        button.querySelector('.manager-nav-label').textContent.trim()
       ),
       ['Crafting', 'Gathering', 'Validation'],
       'the Salvage tab is dropped when salvage is off'
     );
     assert.equal(
-      target.querySelector('[data-checks-tab-button="salvage"]'),
+      target.querySelector('[data-checks-nav-item="salvage"]'),
       null,
       'no salvage tab button renders'
+    );
+  });
+
+  it('keeps the rail’s THREE badge-column markers pairwise distinguishable (issue 1096)', async () => {
+    // A record count, an issue count and an unsaved marker share one column, and the rule is
+    // that a GM must be able to tell them apart at a glance AND a screen reader must be able
+    // to tell them apart at all. Colour alone does neither, so each is asserted on a
+    // NON-COLOUR attribute plus its accessible name.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          alchemyResolutionMode: 'simple',
+          // No salvage check at all under ROUTED salvage: the mode requires an authored
+          // formula, so salvage carries a real readiness issue and its child gets a badge.
+          salvageResolutionMode: 'routed',
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // 1. The ISSUE badge names its unit, so a bare numeral cannot be mistaken for it.
+    const salvageBadge = target.querySelector('[data-checks-nav-issues="salvage"]');
+    assert.ok(salvageBadge, 'a salvage readiness issue badges its rail child');
+    assert.match(salvageBadge.getAttribute('aria-label'), /issue/i);
+    assert.match(salvageBadge.textContent.trim(), /^\d+$/);
+
+    // 2. The parent badge restates the same unit, and is the marker a COLLAPSED rail keeps.
+    const parentBadge = target.querySelector('[data-checks-nav-issues="checks"]');
+    assert.ok(parentBadge, 'the group parent carries the total');
+    assert.match(parentBadge.getAttribute('aria-label'), /issue/i);
+
+    // 3. The RECORD count is a different attribute entirely and names no unit — which is why
+    //    the issue badge has to.
+    const recordCount = target.querySelector('.manager-nav-button .manager-nav-count');
+    assert.ok(recordCount, 'the rail still renders record-count numerals');
+    assert.ok(
+      !recordCount.hasAttribute('aria-label'),
+      'a record count is a bare numeral; it is the issue badge that must name its unit'
+    );
+
+    // 4. The DIRTY marker is a third attribute with its own name, and it is reachable only
+    //    once something is unsaved — so its absence here is part of the claim.
+    assert.ok(
+      !target.querySelector('[data-checks-nav-dirty]'),
+      'nothing is dirty yet, so no unsaved marker renders'
+    );
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 3');
+    await tick();
+    flushSync();
+    const dirtyMarker = target.querySelector('[data-checks-nav-dirty="crafting"]');
+    assert.ok(dirtyMarker, 'an unsaved crafting edit marks its own rail child');
+    assert.match(dirtyMarker.getAttribute('aria-label'), /unsaved/i);
+    assert.notEqual(
+      dirtyMarker.getAttribute('aria-label'),
+      salvageBadge.getAttribute('aria-label'),
+      'the two markers must not announce the same thing'
+    );
+    assert.notEqual(
+      dirtyMarker.className,
+      salvageBadge.className,
+      'and they must not render as the same shape'
+    );
+  });
+
+  it('gives the section strip’s warning dot a TEXT accessible name (issue 1096)', async () => {
+    // The frames show "The roll ●" — a colour-and-shape-only signal, which is no signal at
+    // all to a screen reader. The dot therefore carries a name stating the UNIT, and a
+    // section may carry a count and a dot at once without either being lost.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { alchemyResolutionMode: 'routedByCheck' }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // A routed check with no authored formula raises `noRollFormula`, which buckets to The
+    // roll — the section dot, the rail badge and the Validation route all read the same map.
+    const dot = target.querySelector('[data-checks-section-dot="roll"]');
+    assert.ok(dot, 'the roll section carries a warning dot');
+    assert.match(dot.getAttribute('aria-label'), /issue/i);
+    assert.equal(dot.getAttribute('role'), 'img', 'a decorative span announces nothing');
+
+    // A count of zero renders NO badge: five sections each wearing a `0` is chrome.
+    assert.ok(
+      !target.querySelector('[data-checks-section-count="triggers"]'),
+      'a zero count renders unbadged'
     );
   });
 
@@ -2769,9 +3679,51 @@ describe('CraftingSystemManager mounted behavior', () => {
     return calls;
   }
 
-  it('Checks: alchemy checkMode=none renders the check-mode selector at the top and the read-only "resolves without a check" notice below, no Active toggle (issue 554)', async () => {
+  it('Checks: alchemy checkMode=none is the OFF state — the turn-on empty state and a live Active toggle, not a read-only notice', async () => {
     await mountChecksWithAlchemyCheckMode('none');
-    // The none/simple/tiered selector renders at the top of the Crafting sub-tab.
+    // `none` is no longer a MODE the studio offers; it is what the Active switch writes when
+    // the GM turns the check off. So the route takes the shared off-state empty state, with
+    // the way back on inside it, exactly as an optional crafting or salvage check does.
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the crafting route renders the shared off-state panel'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-turn-on]'),
+      'and offers the turn-this-check-on button'
+    );
+    assert.equal(
+      target.querySelector('[data-alchemy-none-readonly]'),
+      null,
+      'the retired read-only notice is gone — it named a mode the selector no longer offers'
+    );
+    // The switch is LIVE and reads off, which is the whole point: a check that is off needs
+    // the control that turns it back on, not a note explaining that it cannot be turned off.
+    const toggle = target.querySelector('[data-checks-active-toggle]');
+    assert.ok(toggle, 'the Active toggle renders and is operable');
+    assert.equal(
+      target.querySelector('[data-checks-active-required]'),
+      null,
+      'and carries no "cannot be turned off" hint'
+    );
+
+    // Turning it back on stages `simple` and the authoring surface returns — the round trip
+    // an alchemy GM had no way to make at all before.
+    target.querySelector('[data-checks-turn-on]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
+      'the check-mode selector comes back'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'and the simple pass/fail editor with it'
+    );
+  });
+
+  it('Checks: the alchemy check-mode selector offers Simple and Tiered only — "No check" is not a mode', async () => {
+    await mountChecksWithAlchemyCheckMode('simple');
     const selector = target.querySelector(
       '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'
     );
@@ -2779,26 +3731,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     const selectorOptions = Array.from(
       selector.querySelectorAll('[data-crafting-alchemy-checkmode-option]')
     ).map((option) => option.getAttribute('data-crafting-alchemy-checkmode-option'));
-    for (const mode of ['none', 'simple', 'tiered']) {
-      assert.ok(selectorOptions.includes(mode), `check-mode option "${mode}" is offered`);
-    }
-    assert.ok(
-      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-none-readonly]'),
-      'None mode renders the read-only crafting notice below the selector'
-    );
-    assert.equal(
-      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
-      null,
-      'no editor in None mode'
-    );
-    assert.equal(
-      target.querySelector('[data-checks-active-toggle]'),
-      null,
-      'None mode does not offer an Active toggle'
+    assert.deepEqual(
+      selectorOptions,
+      ['simple', 'tiered'],
+      'the selector answers only what SHAPE the check is; on/off is the Active switch'
     );
   });
 
-  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and cannot be disabled (issue 554)', async () => {
+  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and CAN be disabled', async () => {
     await mountChecksWithAlchemyCheckMode('simple');
     assert.ok(
       target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
@@ -2808,14 +3748,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
       'Simple mode renders the simple pass/fail editor below the selector'
     );
-    assert.equal(
-      target.querySelector('[data-checks-active-toggle]'),
-      null,
-      'Simple mode is mandatory — no Active toggle'
-    );
     assert.ok(
+      target.querySelector('[data-checks-active-toggle]'),
+      'Simple mode is OPTIONAL — it offers a live Active toggle'
+    );
+    assert.equal(
       target.querySelector('[data-checks-active-required]'),
-      'Simple mode shows the cannot-be-disabled required hint'
+      null,
+      'and no longer claims the mode requires the check'
     );
   });
 
@@ -2832,7 +3772,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('[data-checks-active-toggle]'),
       null,
-      'Tiered mode is mandatory — no Active toggle'
+      'Tiered mode is mandatory — no operable Active toggle'
+    );
+    const locked = target.querySelector('[data-checks-active-locked]');
+    assert.ok(locked, 'it shows the locked always-on indicator instead');
+    assert.equal(
+      locked.getAttribute('data-checks-active-locked'),
+      'on',
+      'and that indicator reads ON — tiered always rolls'
     );
     assert.ok(
       target.querySelector('[data-checks-active-required]'),
@@ -2840,8 +3787,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('Checks: selecting a check-mode option persists live via setAlchemyCheckMode (issue 554)', async () => {
-    const calls = await mountChecksWithAlchemyCheckMode('none');
+  it('Checks: selecting a check-mode option STAGES it — no store write until Save checks', async () => {
+    // The lifecycle is the point. This used to call `store.setAlchemyCheckMode` straight from
+    // the radio's change handler, so the mode landed on click: no Unsaved chip, nothing for
+    // the route-exit guard to guard, and Discard could not put it back.
+    const calls = await mountChecksWithAlchemyCheckMode('simple');
     const tieredRadio = target.querySelector(
       '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode-option="tiered"] input'
     );
@@ -2851,8 +3801,57 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [],
+      'choosing a mode writes NOTHING on its own'
+    );
+    // …and the studio now reports work in hand, which is what makes Save reachable.
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged mode change');
+
+    save.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
       [['setAlchemyCheckMode', 'tiered']],
-      'choosing a mode routes through the store setAlchemyCheckMode action'
+      'and Save checks is what applies it, through the same store action as before'
+    );
+  });
+
+  it('Checks: the alchemy Active toggle stages the check OFF as checkMode none, applied by Save checks', async () => {
+    // The off state is the MODE, not `craftingCheck.enabled` — the engine ignores that flag
+    // for alchemy and dispatches on `alchemy.checkMode` alone, so writing it would have moved
+    // a switch the engine never reads.
+    const calls = await mountChecksWithAlchemyCheckMode('simple');
+    const toggle = target.querySelector('[data-checks-active-toggle]');
+    assert.ok(toggle, 'the Active toggle renders for alchemy simple');
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckActive'),
+      [],
+      'it never writes the generic craftingCheck.enabled flag'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the route immediately previews the off state from the draft'
+    );
+
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged toggle');
+    save.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'none']],
+      'and Save applies it as checkMode none'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckSimple'),
+      [],
+      'and writes no untouched slot draft alongside it — the per-slot dirty guards'
     );
   });
 
@@ -2871,6 +3870,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('on-failure');
 
     const behaviour = target.querySelector(
       '[data-checks-panel="crafting"] [data-alchemy-behaviour]'
@@ -2928,6 +3928,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('on-failure');
 
     const policy = target.querySelector(
       '[data-checks-panel="crafting"] [data-failure-consumption]'
@@ -2956,6 +3957,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckConsumption');
     assert.ok(saved, 'toggling persists through saveCraftingCheckConsumption');
     assert.deepEqual(saved[1], { consumeIngredientsOnFail: true });
+
+    // ── The prototype's own SHAPE for this screen (issue 1096) ──────────────────────
+    // Both flags are TOP-LEVEL cards. The `Failure consumption policy` card that used to
+    // wrap them was invented here — the structural parity pass reported it as an extra
+    // card, and the exemption that excused it has been overruled rather than reworded.
+    assert.ok(
+      !target.querySelector(
+        '[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'
+      ),
+      'no card wraps the two failure flags'
+    );
+    // The prototype's glyphs, not the more literal ones this screen had chosen.
+    assert.ok(
+      Boolean(
+        policy.querySelector('[data-recipe-section="failure-consume-ingredients"] i.fa-fire')
+      ),
+      'consume-on-fail wears the prototype’s fa-fire'
+    );
+    assert.ok(
+      Boolean(policy.querySelector('[data-recipe-section="failure-break-tools"] i.fa-hammer')),
+      'break-tools wears the prototype’s fa-hammer'
+    );
+    assert.ok(
+      !policy.querySelector('i.fa-fire-flame-curved, i.fa-hammer-crash'),
+      'and neither keeps the glyph the exemption used to defend'
+    );
+    // The note the prototype ends the screen with, which the removed wrapper's description
+    // was carrying — it names the two policies this screen does NOT govern.
+    const note = target.querySelector('[data-failure-salvage-note]');
+    assert.ok(Boolean(note), 'the salvage note closes the screen');
+    assert.ok(
+      Boolean(note.querySelector('i.fa-circle-info')),
+      'glyph-led, as the prototype has it'
+    );
+    assert.match(note.textContent, /Salvage failures follow their own separate policy/);
   });
 
   it('points each Checks help card at the matching documentation page', () => {
@@ -2981,45 +4017,63 @@ describe('CraftingSystemManager mounted behavior', () => {
       });
       flushSync();
 
-      const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
-      assert.ok(card, `${activeTab} menu renders a help card`);
-      assert.ok(
-        card.classList.contains('manager-explainer-card'),
-        'help card renders through the shared explainer primitive'
-      );
-      assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
-
-      // Two links is the reason `ExplainerCard` grew a link LIST (issue 883). They share
-      // one `.manager-setup-links` row and both wear the primitive's one ghost treatment,
-      // so a regression to a single-link primitive drops the Quickstart silently.
-      const linkRow = card.querySelector('.manager-setup-links');
-      assert.ok(linkRow, `${activeTab} help card renders its links as one card-link row`);
-      const linkHrefs = Array.from(linkRow.querySelectorAll('a.manager-explainer-card-docs')).map(
-        (anchor) => anchor.getAttribute('href')
+      // The DESTINATIONS are what this row is for, and they survive the explainer card's
+      // removal (issue 1096): the per-route docs page and the shared Quickstart, in that
+      // order, still both reachable from the top of the rail.
+      const linkRow = target.querySelector(`[data-checks-help="${activeTab}"]`);
+      assert.ok(linkRow, `${activeTab} menu renders its documentation link pair`);
+      const linkHrefs = Array.from(linkRow.querySelectorAll('a')).map((anchor) =>
+        anchor.getAttribute('href')
       );
       assert.deepEqual(
         linkHrefs,
         [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
-        `${activeTab} help card keeps both its docs page and the Quickstart`
+        `${activeTab} rail keeps both its docs page and the Quickstart`
       );
       for (const anchor of linkRow.querySelectorAll('a')) {
-        assert.ok(
-          anchor.classList.contains('is-ghost'),
-          'explainer links keep the primitive ghost treatment'
-        );
+        assert.equal(anchor.getAttribute('target'), '_blank');
+        assert.equal(anchor.getAttribute('rel'), 'noreferrer');
       }
 
-      // The Active card is a plain inspector card under the manager's one card-title
-      // contract — not the `.manager-kicker` micro-label this rail used to use alone.
+      // FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention, which the
+      // maintainer made the authority for this rail's structure. This block asserted the
+      // opposite (a `.manager-card-title` inside the card, no kicker anywhere) until that
+      // ruling; the assertion moves with it rather than being deleted.
+      //
+      // The ACTIVATION card is the one section with no heading at all, which is not an
+      // exception to that convention but the prototype's own reading of this card: the switch
+      // and the words `Check is on` beside it say what an `ACTIVE` kicker over a card saying
+      // `On` said twice (issue 1096, maintainer inspector comparison).
       const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
       assert.ok(activeCard, `${activeTab} menu renders its Active card`);
       assert.ok(
-        activeCard.querySelector('h3.manager-card-title'),
-        'the Active card titles itself with the shared card-title contract'
+        !activeCard.querySelector('.manager-card-title'),
+        'a card-title inside a rail card is the convention the Tool Studio replaced'
       );
       assert.ok(
-        !activeCard.querySelector('.manager-kicker'),
-        'the Active card no longer carries a second heading treatment'
+        !activeCard.previousElementSibling?.classList.contains('manager-kicker'),
+        'the activation card carries no heading: it states its own subject'
+      );
+      assert.match(
+        activeCard.textContent,
+        /Check is (on|off)/,
+        'and it reads the sentence the prototype gives the card, not a bare On/Off'
+      );
+
+      // Every OTHER section keeps the flat kicker, and now carries the prototype's leading
+      // glyph in the same row. A kicker with no glyph is the reading this replaced.
+      const digestHead = target.querySelector('[data-checks-digest]').previousElementSibling;
+      assert.ok(
+        Boolean(digestHead?.classList.contains('manager-checks-rail-head')),
+        'the digest is named by a flat heading row directly above its card'
+      );
+      assert.ok(
+        Boolean(digestHead.querySelector('.manager-checks-rail-head-icon')),
+        'and that row leads with a glyph'
+      );
+      assert.ok(
+        Boolean(digestHead.querySelector('.manager-kicker')),
+        'and still names the section with a kicker'
       );
 
       unmount(mounted);
@@ -3057,26 +4111,30 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('outcomes');
 
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks-crafting');
     assert.ok(
       target.querySelector('[data-crafting-check-editor]'),
       'routed mode shows the crafting check editor'
     );
-    assert.equal(
-      target.querySelector('.manager-checks-page'),
-      null,
+    assert.ok(
+      !target.querySelector('.manager-checks-page'),
       'the singleton placeholder page is replaced by the editor'
     );
     assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
-    // The editor is seeded from the selected system's persisted routed config
-    // (legacy `rollExpression` migrates to the shared `rollFormula` field).
-    const expressionInput = target.querySelector('[data-check-roll-formula]');
-    assert.equal(expressionInput.value, '2d6');
     const rows = target.querySelectorAll('[data-outcome-row]');
     assert.equal(rows.length, 1, 'the persisted tier is rendered');
     assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
     assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
+
+    // The formula field lives on The roll, the tier rows on Outcomes (issue 1096), so the
+    // rest of this test reads the roll section.
+    await openChecksSection('roll');
+    // The editor is seeded from the selected system's persisted routed config
+    // (legacy `rollExpression` migrates to the shared `rollFormula` field).
+    const expressionInput = target.querySelector('[data-check-roll-formula]');
+    assert.equal(expressionInput.value, '2d6');
 
     // Routed mode requires the check, so the Active card shows the required hint
     // (no on/off toggle).
@@ -3084,7 +4142,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-active="crafting"] [data-checks-active-required]'),
       'routed crafting check shows the required hint'
     );
-    assert.equal(target.querySelector('[data-checks-active-toggle]'), null);
+    assert.ok(!target.querySelector('[data-checks-active-toggle]'));
 
     // The Save button is always present, disabled until there are unsaved edits.
     const saveButtonInitial = target.querySelector('[data-checks-save]');
@@ -3273,9 +4331,8 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Switch to the Salvage sub-tab; progressive salvage reuses the crafting
     // progressive editor (formula + crits + award mode).
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('salvage');
+    await openChecksSection('outcomes');
 
     const salvageEditor = target.querySelector('[data-progressive-check-editor]');
     assert.ok(salvageEditor, 'progressive salvage shows the progressive editor');
@@ -3332,6 +4389,83 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('Checks carries the progressive PREVIEW SANDBOX through the draft and into the save', async () => {
+    // The THIRD allowlist rebuild the progressive block passes through (issue 1097). The
+    // manager's normalizer and the store's projection are graded in
+    // `tests/progressive-preview-sandbox.test.js`; what only this suite can grade — it is
+    // the only one that mounts `CraftingSystemManagerRoot` — is `cloneProgressiveCheck`,
+    // whose whitelist would otherwise hold the GM's experiment for exactly as long as the
+    // panel stayed open and then write a block without it.
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          salvageResolutionMode: 'progressive',
+          salvageCraftingCheck: {
+            enabled: true,
+            progressive: {
+              awardMode: 'equal',
+              rollFormula: '1d20',
+              preview: { difficulties: [6, 9] },
+            },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('salvage');
+
+    const field = target.querySelector('[data-checks-preview-difficulties]');
+    assert.ok(field, 'the sandbox field renders on a progressive route');
+    assert.equal(
+      field.value,
+      '6, 9',
+      'the DRAFT clone carried the persisted order; a whitelist that dropped it reads empty'
+    );
+
+    // THE FIELD KEEPS THE GM'S OWN TEXT, and only a ROUND TRIP can show it. The stored
+    // datum is `number[]`, so echoing it back would delete a trailing separator and a
+    // half-typed word from under the cursor. The input below is the one that discriminates:
+    // it BOTH adds a number (so the order upstream really changes, and the resync runs) AND
+    // carries noise that stores as nothing (so a resync would rewrite the field).
+    setInputValue(field, '6, 9, 14, x');
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-checks-preview-difficulties]').value,
+      '6, 9, 14, x',
+      'the half-typed entry survived the order it just wrote upstream'
+    );
+
+    setInputValue(field, '14, 6, -2');
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.equal(saveButton.disabled, false, 'a sandbox edit is a real unsaved change');
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+
+    const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
+    assert.ok(saved, 'Save routes the sandbox through the salvage progressive seam');
+    assert.deepEqual(
+      saved[1].preview.difficulties,
+      [14, 6, -2],
+      'order preserved and unsorted, negatives kept — the experiment is the GM’s'
+    );
+    assert.equal(saved[1].rollFormula, '1d20', 'and the rest of the block rode along');
+  });
+
   it('Checks Gathering tab in d100 economy mode renders the read-only card and no editor', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -3348,9 +4482,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
@@ -3401,9 +4533,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
+    await openChecksSection('outcomes');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
@@ -3485,9 +4616,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     const editor = panel.querySelector('[data-crafting-check-editor]');
@@ -3545,11 +4674,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-checks-active-required]'), null);
     assert.equal(target.querySelector('[data-crafting-check-editor]'), null);
 
+    // IT STAGES rather than persisting on click. Every Active switch in the studio now goes
+    // through the shared stage → `Save checks` → applied lifecycle, so one affordance does not
+    // mean two different things depending on which route the GM is standing on.
     toggle.click();
     await tick();
     flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckActive'),
+      [],
+      'the click alone writes nothing'
+    );
+
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged switch');
+    save.click();
+    await tick();
+    flushSync();
     const toggled = calls.find((call) => call[0] === 'saveCraftingCheckActive');
-    assert.ok(toggled, 'toggling Active persists through the store');
+    assert.ok(toggled, 'and Save checks is what persists it');
     assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
@@ -3581,7 +4724,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // unified trigger editor (replacing the old per-die crit table).
     assert.equal(target.querySelector('[data-check-roll-formula]').value, '2d6+1d4');
     assert.equal(target.querySelector('[data-check-dc]').value, '14');
-    assert.ok(target.querySelector('[data-threshold-mode]'), 'comparison select renders');
+    assert.ok(target.querySelector('[data-threshold-mode]'), 'the comparison control renders');
     assert.ok(target.querySelector('[data-check-triggers]'), 'the unified trigger editor renders');
     assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
     // Relative checks expose recipe tiers (DC overrides); fixed checks do not.
@@ -3590,13 +4733,23 @@ describe('CraftingSystemManager mounted behavior', () => {
       'relative mode shows the recipe tiers card'
     );
 
-    // Column labels live in the table header, not on every row. Under toolSpecific
-    // authority (the default here) the per-outcome Break tools column is hidden.
-    assert.deepEqual(
-      [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
-        .map((cell) => cell.textContent.trim())
-        .filter(Boolean),
-      ['Name', 'DC ±', 'Outcome']
+    // NO COLUMN HEADER ROW (issue 1096). The tier list is the prototype's flex list, not a
+    // subgrid table: every control on the row states its own subject through its accessible
+    // name, so a header row of three words was a second, weaker copy of that. What replaces
+    // the assertion is the naming it was standing in for.
+    assert.equal(
+      target.querySelector('.manager-checks-outcome-head'),
+      null,
+      'the tier list carries no column-header row'
+    );
+    assert.ok(
+      Boolean(target.querySelector('.manager-checks-tier-list')),
+      'tiers render as the prototype flex list'
+    );
+    assert.equal(
+      target.querySelector('[data-outcome-name]').getAttribute('aria-label'),
+      'Name',
+      'the name field names itself'
     );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
     assert.equal(
@@ -3610,36 +4763,55 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(row.getAttribute('data-outcome-id'), 'a1b2c3d4ef');
     assert.ok(!row.textContent.includes('a1b2c3'), 'the secret id is not displayed');
 
-    // State controls are red/green pills, not raw checkboxes, and flip on click.
+    // A SEGMENTED TOGGLE, not a pill that swaps its own label on click (issue 1096). The
+    // pill showed only the state the tier was IN, so a GM could not tell whether the word
+    // was a reading or the verb that would change it. Both options are on screen now, and
+    // the lit one is the current state.
     const successToggle = target.querySelector('[data-outcome-success]');
-    assert.equal(successToggle.tagName, 'BUTTON');
     assert.ok(
-      successToggle.classList.contains('manager-checks-state-pill'),
-      'the state control is a coloured pill button'
+      successToggle.classList.contains('manager-segmented'),
+      'the outcome control is the shared segmented track'
     );
-    assert.equal(target.querySelector('[data-outcome-success] input'), null, 'no default checkbox');
+    assert.deepEqual(
+      [...successToggle.querySelectorAll('.manager-segment-label')].map((el) =>
+        el.textContent.trim()
+      ),
+      ['Success', 'Failure'],
+      'both outcomes are visible, not just the current one'
+    );
+    const litSegment = successToggle.querySelector('.manager-segment.is-active');
     assert.ok(
-      successToggle.textContent.includes('Failure'),
-      'the pill shows the state value (Failure), not Off'
+      litSegment.textContent.includes('Failure'),
+      'the lit segment is the tier’s current state'
     );
-    assert.ok(
-      successToggle.classList.contains('is-negative'),
-      'the failure state is the red/negative pill'
-    );
+    assert.ok(litSegment.classList.contains('is-danger'), 'the failure segment takes the red tint');
     // The per-outcome break-tools pill is hidden under toolSpecific authority.
     assert.equal(
       target.querySelector('[data-outcome-break]'),
       null,
       'the per-outcome break column is hidden under toolSpecific'
     );
-    successToggle.click();
-    assert.equal(emitted.at(-1).relativeOutcomes[0].success, true, 'clicking flips success state');
+    // The radio, not the label: `SegmentedControl` renders real radios and commits on their
+    // `change`, which is what makes the track keyboard-operable.
+    const successRadio = successToggle.querySelector(
+      '[data-outcome-success-option="success"] input'
+    );
+    successRadio.checked = true;
+    successRadio.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert.equal(
+      emitted.at(-1).relativeOutcomes[0].success,
+      true,
+      'choosing the Success segment flips the tier'
+    );
 
     // The type selector reuses the resolution radio-option styling.
     target.querySelector('[data-check-type-option="fixed"] input').click();
     assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
 
-    target.querySelector('[data-add-outcome]').click();
+    // The card's ONE add control, the dashed one at the foot of the list. The head carried a
+    // second `[data-add-outcome]` doing the same thing; it was removed on the maintainer's
+    // instruction, so this asserts through the control that survived.
+    target.querySelector('[data-add-outcome-tier]').click();
     assert.equal(emitted.at(-1).relativeOutcomes.length, 2, 'adding appends a relative tier');
     assert.ok(emitted.at(-1).relativeOutcomes.at(-1).id, 'a new tier is given a generated id');
 
@@ -3651,6 +4823,81 @@ describe('CraftingSystemManager mounted behavior', () => {
       'editing relative tiers never touches the independent fixed tiers'
     );
   });
+
+  // ── The ZERO state must offer the way out of itself (issue 1097 follow-up) ─────────────
+  //
+  // Reported from a live build on alchemy at `checkMode: 'tiered'`, and NOT alchemy-specific:
+  // this is the routed editor for every routed check, and every one of them starts empty. The
+  // add control was the last child of `.manager-checks-tier-list`, which renders only in the
+  // `{:else}` branch — so a check with no tiers showed the sentence "No outcome tiers yet. Add
+  // the tiers this check routes results into." with nothing on screen to press.
+  //
+  // The case above cannot see this and never could: it mounts a check that ALREADY has a
+  // relative tier, which is the state that worked. Emptiness is the whole subject here.
+  for (const [type, key] of [
+    ['relative', 'relativeOutcomes'],
+    ['fixed', 'fixedOutcomes'],
+  ]) {
+    it(`crafting check editor (${type}): the add control is reachable with ZERO outcome tiers`, () => {
+      const emitted = [];
+      const value = {
+        type,
+        rollFormula: '1d20',
+        dc: 12,
+        thresholdMode: 'meet',
+        tiers: [],
+        checkBreakage: { triggers: [] },
+        relativeOutcomes: [],
+        fixedOutcomes: [],
+      };
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(CraftingCheckEditorComponent, {
+        target,
+        props: { value, onChange: (next) => emitted.push(next) },
+      });
+      flushSync();
+
+      assert.ok(
+        Boolean(target.querySelector('[data-outcomes-empty]')),
+        'the empty state states the absence'
+      );
+      assert.equal(
+        target.querySelector('.manager-checks-tier-list'),
+        null,
+        'and there is no list, which is exactly what used to take the add control with it'
+      );
+      const add = target.querySelector('[data-add-outcome-tier]');
+      assert.ok(
+        Boolean(add),
+        'an instruction to add tiers must come with the control that adds one'
+      );
+      // ...and the zero state says NOTHING ELSE. Both of these rendered unconditionally and
+      // both are false with no tiers: the strip cannot resolve an empty set, so it fell back
+      // to "these tiers leave a gap or overlap" about tiers that do not exist, and the hint
+      // invited a GM to drag a band edge on a strip that has no edges. Asserted by ABSENCE
+      // because presence is what shipped — a test that only checked the empty sentence and the
+      // add control passed with both lies on screen beside them.
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip]'),
+        null,
+        'a strip with no bands claims a gap or overlap between tiers that do not exist'
+      );
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip-hint]'),
+        null,
+        'and the drag hint names an affordance the zero state does not offer'
+      );
+
+      add.click();
+      flushSync();
+      assert.equal(
+        emitted.at(-1)[key].length,
+        1,
+        `pressing it authors the first ${type} tier, so the dead end is genuinely open`
+      );
+    });
+  }
 
   it('crafting check editor (fixed): bounds the value range and flags overlapping tiers', () => {
     const value = {
@@ -3682,7 +4929,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the editor no longer renders inline validation messages'
     );
     assert.equal(
-      target.querySelectorAll('.manager-checks-outcome-row.is-invalid').length,
+      target.querySelectorAll('.manager-checks-tier-row.is-invalid').length,
       2,
       'both overlapping tiers still get the per-row invalid highlight'
     );
@@ -3763,24 +5010,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-simple-check-editor]'));
     // DC + comparison sit on the formula line.
     assert.equal(target.querySelector('[data-check-dc]').value, '12');
-    assert.equal(target.querySelector('[data-threshold-mode]').value, 'meet');
+    // The comparison is a SEGMENTED CONTROL now (issue 1096), not a <select>: two options is
+    // not a list to open, and both readings are on screen with the one in force lit.
+    assert.ok(
+      target.querySelector('[data-threshold-mode-option="meet"]').classList.contains('is-active'),
+      'the meet-or-exceed segment is the lit one'
+    );
 
     // The old crit table is replaced by the always-rendered unified trigger editor.
     assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
     const triggers = target.querySelector('[data-check-triggers]');
     assert.ok(triggers, 'the unified trigger editor renders');
     assert.equal(triggers.querySelectorAll('[data-trigger]').length, 2, 'both triggers render');
-    // Under toolSpecific authority the outcome toggle is available but the break pill is not.
-    const c2 = triggers.querySelector('[data-trigger="c2"]');
+    // Under toolSpecific authority the outcome toggle is available but the break card is not.
+    const c2 = openTrigger(triggers, 'c2');
     assert.ok(
       c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger shows the Automatic success segment selected'
     );
-    assert.equal(
-      triggers.querySelector('[data-trigger-break]'),
-      null,
-      'no break pill under toolSpecific'
-    );
+    assert.ok(!triggers.querySelector('[data-trigger-break]'), 'no break card under toolSpecific');
 
     // Choosing a segment emits the new outcome.
     chooseSegment(c2, 'data-trigger-outcome', 'none');
@@ -3884,7 +5132,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Formula field is shared, but the DC + comparison are hidden (no threshold).
     assert.ok(target.querySelector('[data-check-roll-formula]'), 'the formula field renders');
     assert.equal(target.querySelector('[data-check-dc]'), null, 'no DC field');
-    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison select');
+    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison control');
     // No DC-source radios, recipe tiers, or macro drop zone.
     assert.equal(target.querySelector('[data-dc-mode-option]'), null);
     assert.equal(target.querySelector('[data-tier-name]'), null);
@@ -3894,7 +5142,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // outcome toggle is relabelled award-all/award-none rather than success/failure.
     const triggers = target.querySelector('[data-check-triggers]');
     assert.ok(triggers, 'the unified trigger editor renders');
-    const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
+    const c1Triggers = openTrigger(triggers, 'c1');
     assert.ok(
       c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger selects the award-all segment'
@@ -3910,12 +5158,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       optionLabels.some((label) => label.includes('Award none')),
       'failure reads "Award none"'
     );
-    // Default toolSpecific authority hides the per-trigger break pill.
-    assert.equal(
-      triggers.querySelector('[data-trigger-break]'),
-      null,
-      'no break pill under toolSpecific'
-    );
+    // Default toolSpecific authority hides the per-trigger break card.
+    assert.ok(!triggers.querySelector('[data-trigger-break]'), 'no break card under toolSpecific');
 
     // The award-mode selector renders, defaults to equal, and emits the chosen mode.
     const awardCard = target.querySelector('[data-award-mode]');
@@ -3973,6 +5217,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     radio.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     flushSync();
     return radio;
+  }
+
+  // A trigger's controls sit behind a disclosure (issue 1096): a check with three triggers
+  // used to draw three full editors, taller than the pane. Open the one under test first.
+  function openTrigger(root, id) {
+    const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+    assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
+    disclosure.click();
+    flushSync();
+    const card = root.querySelector(`[data-trigger="${id}"]`);
+    assert.ok(
+      Boolean(card.querySelector(`[data-trigger-body="${id}"]`)),
+      `the head of trigger ${id} opens its body`
+    );
+    return card;
+  }
+
+  /** Open the FIRST trigger a container renders, for cases that do not name one. */
+  function openFirstTrigger(root) {
+    const first = root.querySelector('[data-trigger]');
+    assert.ok(Boolean(first), 'at least one trigger renders');
+    return openTrigger(root, first.getAttribute('data-trigger'));
   }
 
   const breakageTriggers = {
@@ -4050,21 +5316,20 @@ describe('CraftingSystemManager mounted behavior', () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'toolSpecific');
       const triggers = target.querySelector('[data-check-triggers]');
       assert.ok(triggers, 'the unified trigger editor renders under toolSpecific authority');
+      const card = openFirstTrigger(triggers);
       // The outcome toggle is always available (forcing works under both authorities).
       assert.ok(
-        triggers.querySelector('[data-trigger-outcome]'),
+        card.querySelector('[data-trigger-outcome]'),
         'the outcome toggle renders under toolSpecific'
       );
-      // The break-tools pill is gated off under toolSpecific.
-      assert.equal(
-        triggers.querySelector('[data-trigger-break]'),
-        null,
-        'the per-trigger break pill is hidden under toolSpecific'
+      // The break-tools card is gated off under toolSpecific.
+      assert.ok(
+        !card.querySelector('[data-trigger-break]'),
+        'the per-trigger break card is hidden under toolSpecific'
       );
       // The free-text label input is gone entirely.
-      assert.equal(
-        triggers.querySelector('[data-breakage-trigger-label]'),
-        null,
+      assert.ok(
+        !triggers.querySelector('[data-breakage-trigger-label]'),
         'no trigger label input remains'
       );
     });
@@ -4073,13 +5338,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'checkDriven');
       const triggers = target.querySelector('[data-check-triggers]');
       assert.ok(triggers, 'the unified trigger editor renders under checkDriven authority');
+      const card = openFirstTrigger(triggers);
       assert.ok(
-        triggers.querySelector('[data-trigger-outcome]'),
+        card.querySelector('[data-trigger-outcome]'),
         'the outcome toggle renders under checkDriven'
       );
       assert.ok(
-        triggers.querySelector('[data-trigger-break]'),
-        'the per-trigger break pill renders under checkDriven'
+        card.querySelector('[data-trigger-break]'),
+        'the per-trigger break card renders under checkDriven'
       );
     });
   }
@@ -4132,15 +5398,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a new trigger breaks tools by default under checkDriven'
     );
 
-    // The existing trigger's break pill renders (checkDriven) and toggles breakTools.
-    const breakPill = target.querySelector('[data-trigger="c1"] [data-trigger-break]');
-    assert.ok(breakPill, 'the break pill renders under checkDriven');
-    breakPill.click();
+    // The existing trigger's break card renders (checkDriven) and its switch toggles breakTools.
+    const breakSwitch = openTrigger(target, 'c1').querySelector('[data-trigger-break]');
+    assert.ok(breakSwitch, 'the break card renders under checkDriven');
+    breakSwitch.click();
     flushSync();
     assert.equal(
       emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').breakTools,
       false,
-      'clicking the break pill toggles breakTools off'
+      'clicking the break switch toggles breakTools off'
     );
   });
 
@@ -4163,7 +5429,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
       'checkDriven'
     );
-    const tierTrigger = target.querySelector('[data-trigger="t1"]');
+    const tierTrigger = openTrigger(target, 't1');
     const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
     const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
     assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
@@ -4183,35 +5449,55 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  function mountChecksView(props) {
+  // `activity` is a PROP now (issue 1096): the four activities became rail routes, so the
+  // view no longer owns which one is open. `section` selects one of the five sections the
+  // strip switches between, and it is clicked rather than passed because the strip is what
+  // owns that state — a test that set it directly would stop noticing if the strip broke.
+  function mountChecksView(props, section = '') {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ChecksViewComponent, {
       target,
-      props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue, ...props },
+      props: {
+        activity: 'crafting',
+        resolutionMode: 'simple',
+        craftingCheckSimple: simpleBreakageValue,
+        ...props,
+      },
     });
+    flushSync();
+    if (section) selectChecksSection(section);
+  }
+
+  function selectChecksSection(section) {
+    const button = target.querySelector(`#checks-section-${section}`);
+    assert.ok(button, `the section strip should offer "${section}"`);
+    button.click();
     flushSync();
   }
 
   it('checks view: a checkDriven crafting editor shows the break pill; the gathering tab is hidden when gathering is off', () => {
-    mountChecksView({
-      breakageAuthority: 'checkDriven',
-      features: { gathering: false },
-      gatheringResolutionMode: 'routed',
-      gatheringCheckRouted: routedBreakageValue,
-    });
-    // Crafting (always on) honours the system authority and shows the break pill.
+    mountChecksView(
+      {
+        breakageAuthority: 'checkDriven',
+        features: { gathering: false },
+        gatheringResolutionMode: 'routed',
+        gatheringCheckRouted: routedBreakageValue,
+      },
+      'triggers'
+    );
+    // Crafting (always on) honours the system authority and shows the break card.
     const craftingTriggers = target.querySelector('[data-check-triggers]');
     assert.ok(craftingTriggers, 'crafting editor renders the unified triggers');
     assert.ok(
-      craftingTriggers.querySelector('[data-trigger-break]'),
-      'crafting break pill renders under checkDriven authority'
+      openFirstTrigger(craftingTriggers).querySelector('[data-trigger-break]'),
+      'crafting break card renders under checkDriven authority'
     );
 
     // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
     // all (so there is no disabled gathering editor to reach).
     assert.equal(
-      target.querySelector('[data-checks-tab-button="gathering"]'),
+      target.querySelector('[data-checks-nav-item="gathering"]'),
       null,
       'the gathering tab is hidden when the gathering feature is off'
     );
@@ -4224,50 +5510,68 @@ describe('CraftingSystemManager mounted behavior', () => {
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
     });
-    const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
-    assert.ok(gatheringTab, 'the gathering tab renders when gathering is enabled');
-    gatheringTab.click();
-    flushSync();
+    // The feature GATE moved out of this view and into the rail model (issue 1096), so the
+    // question "is gathering offered" is asked of `buildChecksNavItems` — asserted directly
+    // in `tests/checks-nav.test.js` — and what remains for the view is that it renders the
+    // gathering route when the router hands it one.
+    // `assert.ok(!el)`, never `assert.equal(el, null)`: on failure `node:assert` serialises
+    // the actual value to build its diff and walks a mounted happy-dom element's circular
+    // tree until the heap dies, which surfaces as a cancelled suite with no message.
+    assert.ok(
+      !target.querySelector('[data-checks-nav-item="gathering"]'),
+      'the four activities are rail children now; this view renders one of them'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountChecksView({
+      activity: 'gathering',
+      breakageAuthority: 'toolSpecific',
+      features: { gathering: true },
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedBreakageValue,
+    });
     assert.ok(
       target.querySelector('[data-checks-panel="gathering"]'),
-      'the gathering panel is shown when the tab is selected'
+      'the gathering panel renders when the router opens the gathering route'
     );
   });
 
-  it('checks view: the crafting-modifier catalogue card renders when the check is usable and emits edits (issue 770)', () => {
+  it('checks view: the modifier card renders when the check is usable and emits SELECTION edits (issues 770, 1117)', () => {
     const patches = [];
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'highest',
-      craftingDefaultModifierIds: ['med'],
-      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'highest',
+        craftingDefaultModifierIds: ['med'],
+        onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+      },
+      'modifiers'
+    );
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
-    assert.ok(card, 'the catalogue card renders in the crafting stack when a formula is authored');
+    assert.ok(card, 'the modifier card renders in the crafting stack when a formula is authored');
+    // THE RULE GRID IS ITS OWN CARD since issue 1096's parity round — `How they combine` is a
+    // sibling studio card rather than an uppercase kicker inside the library card — so the grid
+    // is reached from the panel, not from `card`.
+    const ruleCard = target.querySelector('[data-crafting-modifier-policy-card]');
+    assert.ok(ruleCard, 'the combination rule renders as its own card beside the library');
     // The policy radio-cards reflect the passed default policy.
     assert.equal(
-      card.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
+      ruleCard.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
       true,
       'the default policy is pinned on the radio-cards'
     );
-    // Adding a modifier emits a checkModifiers patch (whole-array replace).
-    card.querySelector('[data-crafting-modifier-add]').click();
-    flushSync();
-    assert.ok(
-      patches.some((p) => Array.isArray(p.checkModifiers) && p.checkModifiers.length === 2),
-      'add emits a two-entry checkModifiers patch'
-    );
     // Switching policy emits a defaultModifierPolicy patch.
-    card.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
+    ruleCard.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
     flushSync();
     assert.ok(
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
     );
     // The Phase-2 "Player picks" policy renders as a fourth radio and emits (issue 770 P2).
-    const playerPicksOption = card.querySelector(
+    const playerPicksOption = ruleCard.querySelector(
       '[data-crafting-modifier-policy-option="playerPicks"] input'
     );
     assert.ok(playerPicksOption, 'the playerPicks policy radio renders');
@@ -4277,56 +5581,55 @@ describe('CraftingSystemManager mounted behavior', () => {
       patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
       'selecting playerPicks emits defaultModifierPolicy'
     );
-    // The expression field drops the leading `@` for display and restores it on write,
-    // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
-    const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');
+    // NO ENTRY AUTHORING, ON ANY ACTIVITY (issue 1117). The library is authored once, in
+    // System settings › Modifiers; every patch this card can emit is a selection patch, and
+    // the deep link is what replaces the editor.
+    for (const editorHook of [
+      '[data-crafting-modifier-add]',
+      '[data-crafting-modifier-field="expression"]',
+      '[data-crafting-modifier-field="icon"]',
+      '[data-crafting-modifier-remove]',
+    ]) {
+      assert.ok(!card.querySelector(editorHook), `${editorHook} is authoring, not selection`);
+    }
+    assert.ok(
+      Boolean(card.querySelector('[data-crafting-modifier-edit-link]')),
+      'the deep link to the one authoring surface renders instead'
+    );
+    // The entry is READ OUT instead — identity and expression, so the GM can tell which
+    // entry a checkbox is about without leaving the screen.
     assert.equal(
-      expression.value,
-      'abilities.med.mod',
-      'the expression editor hides the leading @'
+      card.querySelector('[data-crafting-modifier-readonly="label"]').textContent.trim(),
+      'Medicine'
     );
-    expression.value = 'abilities.arc.mod';
-    expression.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
+    assert.equal(
+      card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
+      '@abilities.med.mod'
+    );
+    // The eligibility state is authored PER ROW (issue 1095), and since issue 1096's parity
+    // round the PILL IS THAT CONTROL: one `aria-pressed` toggle button at the row's right end,
+    // where there used to be a `SelectionCheckbox` with an inert `StatusPill` beside it on a
+    // second line. Turning the pre-selected entry off emits an empty defaultModifierIds patch.
+    const eligibility = card.querySelector('[data-crafting-modifier-eligibility="med"]');
+    assert.ok(eligibility, 'each catalogue row carries its own eligibility control');
+    assert.equal(eligibility.tagName, 'BUTTON', 'the accessible CONTROL is the pill itself');
+    assert.equal(
+      eligibility.getAttribute('aria-pressed'),
+      'true',
+      'the eligible entry reads as on'
+    );
+    // Nothing interactive NESTS: an interactive control inside an interactive one lands DOM the
+    // browser did not build as authored, and a half-finished conversion is exactly how a stray
+    // checkbox would survive inside the pill.
     assert.ok(
-      patches.some(
-        (p) =>
-          Array.isArray(p.checkModifiers) &&
-          p.checkModifiers[0]?.expression === '@abilities.arc.mod'
-      ),
-      'editing the expression re-adds the @ sigil for a roll-data path'
+      !eligibility.querySelector('input, button, a'),
+      'the pill contains no second control — it IS the control'
     );
-    // A function/compound expression is stored VERBATIM — no spurious leading @ that
-    // would make the resolver read `@min` as an unknown roll-data key (contributes 0).
-    expression.value = 'min(@abilities.med.mod,@abilities.int.mod)';
-    expression.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.ok(
-      patches.some(
-        (p) =>
-          Array.isArray(p.checkModifiers) &&
-          p.checkModifiers[0]?.expression === 'min(@abilities.med.mod,@abilities.int.mod)'
-      ),
-      'a function-leading expression is stored without a corrupting @ prefix'
-    );
-    // The icon field renders the shared IconPicker trigger (not a raw class input).
-    assert.ok(
-      card.querySelector('[data-crafting-modifier-field="icon"] .essence-icon-picker-trigger'),
-      'the modifier row uses the searchable IconPicker for its icon'
-    );
-    // The default set renders as cancellable pills; removing the pre-selected one emits
-    // an empty defaultModifierIds patch.
-    const defaults = card.querySelector('[data-modifier-pill-select="crafting-modifier-defaults"]');
-    assert.ok(defaults, 'the default set uses the shared pill multi-select');
-    assert.ok(
-      defaults.querySelector('[data-modifier-pill="med"]'),
-      'the default modifier renders as a pill'
-    );
-    defaults.querySelector('[data-modifier-pill-remove="med"]').click();
+    eligibility.click();
     flushSync();
     assert.ok(
       patches.some((p) => Array.isArray(p.defaultModifierIds) && p.defaultModifierIds.length === 0),
-      'removing a default pill emits an empty defaultModifierIds set'
+      'switching an entry off emits an empty defaultModifierIds set'
     );
   });
 
@@ -4340,11 +5643,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       {
         props: { resolutionMode: 'routedByCheck', craftingCheck: routedBreakageValue },
         attr: 'data-check-type-option',
+        section: 'outcomes',
         values: ['relative', 'fixed'],
       },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue },
         attr: 'data-dc-mode-option',
+        section: 'roll',
         values: ['static', 'dynamic'],
       },
       {
@@ -4353,16 +5658,20 @@ describe('CraftingSystemManager mounted behavior', () => {
           craftingCheckProgressive: { rollFormula: '1d20', awardMode: 'equal' },
         },
         attr: 'data-award-mode-option',
+        section: 'outcomes',
         values: ['equal', 'partial', 'exceed'],
       },
       {
-        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'none' },
+        // `simple`, not `none`: `routeIsOff` answers from `alchemyCheckMode` directly, so a
+        // `none` fixture renders the turn-on panel and finds no options at all here.
+        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'simple' },
         attr: 'data-crafting-alchemy-checkmode-option',
-        values: ['none', 'simple', 'tiered'],
+        section: 'roll',
+        values: ['simple', 'tiered'],
       },
     ];
     for (const group of groups) {
-      mountChecksView(group.props);
+      mountChecksView(group.props, group.section);
       const options = [...target.querySelectorAll(`[${group.attr}]`)];
       assert.deepEqual(
         options.map((option) => option.getAttribute(group.attr)),
@@ -4389,24 +5698,30 @@ describe('CraftingSystemManager mounted behavior', () => {
   // `npm test`, so re-plumbing the group through a different primitive could drop an
   // attribute with no unit failure at all.
   //
-  // `byRecipe` is in the list: it is a first-class COMBINATION RULE ("Recipe picks"),
+  // `bySubject` is in the list: it is a first-class COMBINATION RULE, labelled "By recipe"
   // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
   // and the two selecting rules on the bottom one.
   it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'byRecipe',
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'bySubject',
+      },
+      'modifiers'
+    );
+    // SCOPED TO THE RULE CARD, not the library card: issue 1096's parity round split
+    // `How they combine` out into its own studio card, and the capture registry's selectors
+    // were re-pointed with it.
     const group = target.querySelector(
-      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
+      '[data-crafting-modifier-policy-card] [data-crafting-modifier-policy]'
     );
     assert.ok(Boolean(group), 'the group still resolves by [data-crafting-modifier-policy]');
     const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
     assert.deepEqual(
       options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
-      ['addAll', 'highest', 'byRecipe', 'playerPicks'],
+      ['addAll', 'highest', 'bySubject', 'playerPicks'],
       'every option carries the per-option hook, in authoring order'
     );
     for (const option of options) {
@@ -4421,7 +5736,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
     }
     assert.equal(
-      target.querySelector('[data-crafting-modifier-policy-option="byRecipe"] input').checked,
+      target.querySelector('[data-crafting-modifier-policy-option="bySubject"] input').checked,
       true,
       'the passed rule is pinned on the radio-cards'
     );
@@ -4444,19 +5759,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     const props = {
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     };
     // A cap on a selection nobody makes is a control with no effect, so the two
     // non-selecting rules do not render it at all.
     for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 });
+      mountChecksView(
+        { ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 },
+        'modifiers'
+      );
       assert.ok(
         !target.querySelector('[data-crafting-modifier-max-picks]'),
         `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
       );
     }
-    for (const craftingDefaultModifierPolicy of ['byRecipe', 'playerPicks']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null });
+    for (const craftingDefaultModifierPolicy of ['bySubject', 'playerPicks']) {
+      mountChecksView(
+        { ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null },
+        'modifiers'
+      );
       const field = target.querySelector('[data-crafting-modifier-max-picks]');
       assert.ok(
         Boolean(field),
@@ -4487,14 +5808,17 @@ describe('CraftingSystemManager mounted behavior', () => {
   // field through this card, so the patch it emits was only ever exercised by a capture run.
   it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
     const patches = [];
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'playerPicks',
-      craftingMaxModifierPicks: 3,
-      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: 3,
+        onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+      },
+      'modifiers'
+    );
     const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
     assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
     input.value = '';
@@ -4510,13 +5834,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'playerPicks',
-      craftingMaxModifierPicks: 1,
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: 1,
+      },
+      'modifiers'
+    );
     const field = target.querySelector('[data-crafting-modifier-max-picks]');
     assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
     assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
@@ -4524,13 +5851,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // truncates nothing: the field routes through `resolveMaxModifierPicks`, so `0` and
     // `-2` both come back as the blank unlimited state.
     for (const junk of [0, -2, 2.5]) {
-      mountChecksView({
-        resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-        craftingDefaultModifierPolicy: 'playerPicks',
-        craftingMaxModifierPicks: junk,
-      });
+      mountChecksView(
+        {
+          resolutionMode: 'simple',
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
+          modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+          craftingDefaultModifierPolicy: 'playerPicks',
+          craftingMaxModifierPicks: junk,
+        },
+        'modifiers'
+      );
       assert.equal(
         target
           .querySelector('[data-crafting-modifier-max-picks]')
@@ -4549,11 +5879,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
     // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
     // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      },
+      'modifiers'
+    );
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
     const notice = card.querySelector('[data-crafting-modifier-inert]');
@@ -4573,7 +5906,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // some incidental difference in the check.
   it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
     const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
-    mountChecksView({ ...props, craftingCheckModifiers: [] });
+    mountChecksView({ ...props, modifiers: [] }, 'modifiers');
     assert.ok(
       Boolean(target.querySelector('[data-crafting-modifier-empty]')),
       'the empty catalogue renders its empty state'
@@ -4587,10 +5920,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = null;
     target.remove();
     // Same cause, one modifier: the notice appears and still names the cause.
-    mountChecksView({
-      ...props,
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    });
+    mountChecksView(
+      {
+        ...props,
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      },
+      'modifiers'
+    );
     const notice = target.querySelector('[data-crafting-modifier-inert]');
     assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
     assert.equal(
@@ -4609,23 +5945,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Every case below carries a non-empty catalogue: the notice is gated on one, so an
     // empty catalogue would make all the assertions read the same silent card.
     const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+    // ALCHEMY `none` NO LONGER APPEARS HERE. It used to be this test's `noCheck` case — the
+    // one crafting configuration that reached it — but it is now the OFF state of an optional
+    // check, so its route collapses to the shared turn-on panel and renders no Modifiers
+    // section to carry a notice. That is asserted below rather than dropped silently, because
+    // "the notice moved" and "the notice stopped rendering" are different facts.
     for (const { props, cause } of [
-      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
-      // rollFormula ternary had no case for it and reported the simple slot's formula.
-      {
-        props: {
-          resolutionMode: 'alchemy',
-          alchemyCheckMode: 'none',
-          craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        },
-        cause: 'noCheck',
-      },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
         cause: 'noFormula',
       },
     ]) {
-      mountChecksView({ ...props, craftingCheckModifiers: catalogue });
+      mountChecksView({ ...props, modifiers: catalogue }, 'modifiers');
       const notice = target.querySelector('[data-crafting-modifier-inert]');
       assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
       assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
@@ -4635,24 +5966,82 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
     // …and an ORDINARY authored formula — the exact input that used to raise
     // `noPlaceholder` — shows no notice at all.
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: catalogue,
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: catalogue,
+      },
+      'modifiers'
+    );
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
       'an authored formula is never inert: the modifiers are appended to it'
     );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // The alchemy OFF route: no Modifiers section at all, so no inert notice — the same
+    // treatment any other optional check that has been switched off already gets.
+    mountChecksView(
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'none',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: catalogue,
+      },
+      'roll'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'a switched-off alchemy check collapses to the turn-on panel'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'and carries no inert-modifier notice, because it renders no Modifiers section'
+    );
+  });
+
+  // Gathering d100 is the one activity+mode where "this resolution mode rolls no check" is
+  // FALSE: the d100 rolled against each drop's chance IS the check. What it lacks is a seam
+  // to add modifiers to. It reported `noCheck` — telling the GM the mode rolls nothing and
+  // to switch to one that rolls, when the two gathering modes that take modifiers are the
+  // ones rendered disabled. Both halves below fail against that component.
+  it('checks view: gathering d100 names the missing MODIFIER SUPPORT, not a missing check', () => {
+    mountChecksView(
+      {
+        activity: 'gathering',
+        features: { gathering: true },
+        gatheringResolutionMode: 'd100',
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        gatheringDefaultModifierIds: ['med'],
+      },
+      'modifiers'
+    );
+    const notice = target.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'a selection that reaches no roll is still reported');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noModifierSupport',
+      'the cause is the absent modifier seam, not an absent check'
+    );
+    assert.ok(
+      !/rolls no check/i.test(notice.textContent),
+      'the d100 IS this mode’s check, so the sentence must not deny that it rolls one'
+    );
   });
 
   it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      // No `craftingDefaultModifierPolicy` at all — the never-authored state.
-    });
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        // No `craftingDefaultModifierPolicy` at all — the never-authored state.
+      },
+      'modifiers'
+    );
     const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
       (option) => option.querySelector('input').checked
     );
@@ -4664,38 +6053,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  // What the default set IS depends on the rule, and the three readings are materially
-  // different decisions — the whole eligible set nobody narrows, the fallback a recipe
-  // inherits until it picks its own, or the menu the player chooses from at roll time.
+  // What marking an entry MEANS depends on the rule, and the readings are materially different
+  // decisions — the whole set nobody narrows, the set compared for a maximum, or the menu
+  // offered to whoever the rule defers to. Issue 1096's parity round moved this sentence into
+  // the card's DESCRIPTION slot and took the prototype's own wording for it, so the probes
+  // below are its new sentences; the property under test is unchanged.
   it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
     const introText = (craftingDefaultModifierPolicy) => {
-      mountChecksView({
-        resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        craftingCheckModifiers: [
-          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
-        ],
-        craftingDefaultModifierPolicy,
-      });
-      const heading = target.querySelector('#manager-crafting-modifier-defaults-label');
-      const text = heading.nextElementSibling.textContent;
+      mountChecksView(
+        {
+          resolutionMode: 'simple',
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
+          modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+          craftingDefaultModifierPolicy,
+        },
+        'modifiers'
+      );
+      const text = target.querySelector('#manager-crafting-modifier-eligibility-intro').textContent;
       unmount(mounted);
       mounted = null;
       target.remove();
       return text;
     };
     assert.ok(
-      introText('byRecipe').includes('Overview tab'),
-      'under Recipe picks the GM is told where a recipe picks its own set'
+      introText('bySubject').includes('the recipe may choose from'),
+      'under By recipe the sentence names the RECORD that does the choosing'
     );
     assert.ok(
-      introText('playerPicks').includes('roll time'),
-      'under Player picks the default set is the menu offered at roll time'
+      introText('playerPicks').includes('the player may choose from'),
+      'under Player picks it names the PLAYER — the same sentence, a different chooser'
+    );
+    assert.ok(
+      introText('highest').includes('only the largest of them is added'),
+      'under Highest it states the reduction, because marking an entry enters it into a comparison'
     );
     for (const locked of ['addAll', 'highest']) {
       assert.ok(
-        !introText(locked).includes('Overview tab'),
-        `at ${locked} nobody narrows the set, so the sentence must not promise a control that is not there`
+        !introText(locked).includes('may choose from'),
+        `at ${locked} nobody chooses, so the sentence must not promise a control that is not there`
       );
     }
   });
@@ -4705,7 +6100,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // stepping is a per-trigger effect now, and it is no longer relative-only.
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
     assert.ok(
-      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      openTrigger(target, 'c1').querySelector('[data-trigger-tier-step]'),
       'a relative routed check offers the per-trigger tier step'
     );
 
@@ -4719,31 +6114,40 @@ describe('CraftingSystemManager mounted behavior', () => {
       'toolSpecific'
     );
     assert.ok(
-      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      openTrigger(target, 'c1').querySelector('[data-trigger-tier-step]'),
       'a FIXED routed check offers it too — stepping is no longer type-scoped'
     );
   });
 
   it('offers tier stepping on routed crafting, salvage AND gathering', () => {
     // The old toggle was absent for gathering entirely; the per-trigger effect is not.
-    mountChecksView({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedBreakageValue,
-      salvageResolutionMode: 'routed',
-      salvageCheckRouted: routedBreakageValue,
-      gatheringResolutionMode: 'routed',
-      gatheringCheckRouted: routedBreakageValue,
-      features: { salvage: true, gathering: true },
-    });
-    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-trigger-tier-step]'));
-
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-trigger-tier-step]'));
-
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="gathering"] [data-trigger-tier-step]'));
+    // One ROUTE at a time now (issue 1096): the view renders the activity the router hands
+    // it, so the three activities are three mounts rather than three clicks. The claim is
+    // unchanged — every one of them offers the per-trigger tier step.
+    for (const activity of ['crafting', 'salvage', 'gathering']) {
+      mountChecksView(
+        {
+          activity,
+          resolutionMode: 'routedByCheck',
+          craftingCheck: routedBreakageValue,
+          salvageResolutionMode: 'routed',
+          salvageCheckRouted: routedBreakageValue,
+          gatheringResolutionMode: 'routed',
+          gatheringCheckRouted: routedBreakageValue,
+          features: { salvage: true, gathering: true },
+        },
+        'triggers'
+      );
+      assert.ok(
+        openFirstTrigger(
+          target.querySelector(`[data-checks-panel="${activity}"] [data-check-triggers]`)
+        ).querySelector('[data-trigger-tier-step]'),
+        `${activity} offers the per-trigger tier step`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
   });
 
   it('carries an authored tierStep through the root draft and into the Save payload', async () => {
@@ -4779,8 +6183,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('triggers');
 
-    const card = target.querySelector('[data-trigger="c1"]');
+    const card = openTrigger(target, 'c1');
     assert.ok(
       card.querySelector('[data-trigger-tier-step-mode="target"]').classList.contains('is-active'),
       'cloneCheckBreakage reads the persisted tierStep back into the draft'
@@ -5339,7 +6744,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    assert.deepEqual(navLabels, []);
+    // 'Parties', 'Travel' and 'Currency': all three World entries are ungated — Travel because
+    // realms are world geography and have to be authorable before any system opts in (issue
+    // 1282). The Downtime group is experimental-gated (issue 1257) and this fixture leaves
+    // `fabricate.experimentalFeatures` at its default off.
+    assert.deepEqual(navLabels, ['Parties', 'Travel', 'Currency']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -5434,7 +6843,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
       ),
-      ['System Overview', 'Crafting', 'Components', 'Tags & Categories', 'Tools', 'Checks']
+      [
+        'System Overview',
+        'Crafting',
+        'Components',
+        'Tags & Categories',
+        'Tools',
+        'Checks',
+        // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
+        // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
+        'Parties',
+        // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
+        // are UNGATED, unlike Downtime.
+        'Travel',
+        'Currency',
+      ]
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -5536,6 +6959,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
       'true'
     );
+    // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
+    // this route was reached by opening Recipes, and navigating AWAY from a group no longer
+    // slams it shut behind the GM. `craftingMenuExpanded = isCraftingRoute` used to force it
+    // closed here, discarding a choice the GM had deliberately made.
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
@@ -5543,6 +6970,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       [
         'System Overview',
         'Crafting',
+        'Recipes',
+        'Books & Scrolls',
+        'Knowledge',
+        'Settings',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -5550,6 +6981,10 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Checks',
         'Gathering',
         'Graph',
+        'Parties',
+        'Travel',
+        'Currency',
+        'Downtime',
       ]
     );
     assert.ok(target.textContent.includes('System library'));
@@ -6121,7 +7556,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   //
   // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
   // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
-  // nothing mounted the ROOT against a system carrying a `byRecipe` rule and a
+  // nothing mounted the ROOT against a system carrying a `bySubject` rule and a
   // `maxModifierPicks` cap, so both forwards were deletable green. Dropping
   // `craftingModifierPolicy={…}` from the RecipeEditView call site lets the prop fall to
   // its `= 'addAll'` default and EVERY recipe loses its picker; dropping
@@ -6131,6 +7566,14 @@ describe('CraftingSystemManager mounted behavior', () => {
   //
   // Every case asserts BOTH ends, so a fixture that never reached the surface at all
   // cannot pass by rendering nothing.
+  // The catalogue is SYSTEM-level since issue 1095, so the fixture is a PAIR: the entries
+  // go on the system and only the selection triple stays on `craftingCheck`. Both halves
+  // are forwarded together by `modifierRuleSystem` below, because a catalogue with no
+  // selection and a selection with no catalogue each render an empty card.
+  const MODIFIER_CATALOGUE = [
+    { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+    { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+  ];
   const modifierRuleSystemCheck = (defaultModifierPolicy, maxModifierPicks) => ({
     simple: {
       rollFormula: '1d20 + 4',
@@ -6139,21 +7582,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       dcMode: 'static',
       tiers: [],
     },
-    checkModifiers: [
-      { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
-      { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
-    ],
     defaultModifierIds: ['med'],
     defaultModifierPolicy,
     ...(maxModifierPicks === undefined ? {} : { maxModifierPicks }),
   });
+  const modifierRuleSystem = (defaultModifierPolicy, maxModifierPicks) => ({
+    modifiers: MODIFIER_CATALOGUE,
+    craftingCheck: modifierRuleSystemCheck(defaultModifierPolicy, maxModifierPicks),
+  });
 
   it('root: the Checks card’s rule radio tracks the SYSTEM’s defaultModifierPolicy (issue 1055)', async () => {
-    for (const policy of ['highest', 'byRecipe', 'playerPicks']) {
-      mountManager([], { craftingCheck: modifierRuleSystemCheck(policy) });
+    for (const policy of ['highest', 'bySubject', 'playerPicks']) {
+      mountManager([], modifierRuleSystem(policy));
       navButton('Checks').click();
       await tick();
       flushSync();
+      await openChecksSection('modifiers');
       const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')]
         .filter((option) => option.querySelector('input').checked)
         .map((option) => option.getAttribute('data-crafting-modifier-policy-option'));
@@ -6174,10 +7618,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       [2, '2'],
       [undefined, 'unlimited'],
     ]) {
-      mountManager([], { craftingCheck: modifierRuleSystemCheck('byRecipe', maxModifierPicks) });
+      mountManager([], modifierRuleSystem('bySubject', maxModifierPicks));
       navButton('Checks').click();
       await tick();
       flushSync();
+      await openChecksSection('modifiers');
       assert.equal(
         target
           .querySelector('[data-crafting-modifier-max-picks]')
@@ -6192,16 +7637,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  it('root: only a byRecipe system’s recipe editor offers the modifier picker (issue 1055)', async () => {
+  it('root: only a bySubject system’s recipe editor offers the modifier picker (issue 1055)', async () => {
     for (const [policy, picker] of [
-      ['byRecipe', true],
+      ['bySubject', true],
       ['addAll', false],
       ['highest', false],
       ['playerPicks', false],
     ]) {
-      const editor = await openRecipeEditor([], {
-        craftingCheck: modifierRuleSystemCheck(policy),
-      });
+      const editor = await openRecipeEditor([], modifierRuleSystem(policy));
       assert.equal(
         Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
         picker,
@@ -6227,7 +7670,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('root: the recipe picker’s cap hint tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
     // Custom set + a cap of 1, so the picker is at its cap and reports `reached`.
     const editor = await openRecipeEditor([], {
-      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      ...modifierRuleSystem('bySubject', 1),
       recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
     });
     assert.equal(
@@ -6244,7 +7687,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // …and an unbounded system states no cap at all.
     const unbounded = await openRecipeEditor([], {
-      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      ...modifierRuleSystem('bySubject'),
       recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
     });
     assert.ok(
@@ -6258,7 +7701,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   //
   // Two capture cases assert a `:has()` / `:not(:has())` RELATIONSHIP between hooks the
   // tests above only ever assert one at a time — that the catalogue card CONTAINS both the
-  // restored `byRecipe` card and the cap field's unlimited reading, and that the recipe
+  // restored `bySubject` card and the cap field's unlimited reading, and that the recipe
   // picker contains a pill row and NO cap sentence. A selector can fail on the relationship
   // while every individual hook is present and correct, and the only thing that ran it was
   // a capture job needing harvested Foundry chrome.
@@ -6275,13 +7718,14 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-checks-crafting-modifiers');
-    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks') });
+    mountManager([], modifierRuleSystem('playerPicks'));
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('modifiers');
     assert.ok(
       Boolean(target.querySelector(selector)),
-      'a selecting rule with no cap must put BOTH the byRecipe option and the unlimited cap ' +
+      'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +
         'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
         'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
     );
@@ -6292,7 +7736,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // The negative control, and the state the capture job actually hit: the hooks are all
     // present, the nesting is right, and the cap simply reads a bound instead of unlimited.
-    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks', 1) });
+    mountManager([], modifierRuleSystem('playerPicks', 1));
     navButton('Checks').click();
     await tick();
     flushSync();
@@ -6307,7 +7751,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
     const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
     const unbounded = await openRecipeEditor([], {
-      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      ...modifierRuleSystem('bySubject'),
       recipeOverrides: custom,
     });
     assert.ok(
@@ -6324,7 +7768,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // pill row are present either way; the standing cap sentence is what the `:not(:has(…))`
     // half refuses, so a system that acquired a cap nobody authored fails here and only here.
     const bounded = await openRecipeEditor([], {
-      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      ...modifierRuleSystem('bySubject', 1),
       recipeOverrides: custom,
     });
     assert.ok(
@@ -6335,6 +7779,219 @@ describe('CraftingSystemManager mounted behavior', () => {
       !bounded.querySelector(selector),
       'a system carrying a cap states it standing, so this case cannot publish that frame'
     );
+  });
+
+  // The four World > Parties capture cases (issue 1182). Each asserts a RELATIONSHIP — two
+  // cards inside one list, a last card without a first, a popover with title/count metadata,
+  // no unlink footer, and an option meta line — and one bad `expectSelector` fails the capture job WHOLE
+  // and publishes nothing, so each is run here against the real rendered DOM before it can
+  // cost twenty minutes of a job that needs harvested Foundry chrome. Every one carries its
+  // negative control: the state the pane is in BEFORE the case's steps, which is the frame
+  // that would otherwise be published under the case's name.
+  //
+  // The party fixture MIRRORS `tests/view-lab/world/labWorld.js` — same ids, same names, same
+  // enabled flags, same travel actors — because a selector proved against a different world
+  // proves nothing about the frame.
+  const LAB_MIRROR_ACTORS = [
+    {
+      uuid: 'Actor.lab-actor-brenna',
+      name: 'Brenna Karrunsdottir',
+      img: '',
+      isPlayerCharacter: true,
+    },
+    { uuid: 'Actor.lab-actor-idrin', name: 'Idrin Ashfall', img: '', isPlayerCharacter: true },
+    { uuid: 'Actor.lab-actor-vosk', name: 'Vosk', img: '', isPlayerCharacter: true },
+    // The vehicle. Not a player character, so neither picker offers it — unless it is
+    // already this party's travel actor, which is the one case that overrides the filter.
+    { uuid: 'Actor.lab-actor-wagon', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+  ];
+  const labMirrorParty = (id, name, enabled, memberUuids, travelActorUuid) => ({
+    id,
+    name,
+    enabled,
+    memberCount: memberUuids.length,
+    memberActorUuids: memberUuids,
+    memberCards: memberUuids.map((uuid) => ({
+      uuid,
+      // `?? uuid` rather than a bare `.name`: this fixture is built at DESCRIBE-BODY scope
+      // inside a describe holding 301 `it()`s, so a mirror that drifts out of
+      // `LAB_MIRROR_ACTORS` would throw while the body runs, deregister all 301, and still
+      // summarise `# fail 0` — the same shape that hid a failure in
+      // `player-character-actor-types.test.js` on this branch. Falling back to the uuid keeps
+      // drift visible as an ordinary assertion failure in the one test that reads the name.
+      name: LAB_MIRROR_ACTORS.find((actor) => actor.uuid === uuid)?.name ?? uuid,
+      img: '',
+      stale: false,
+    })),
+    travelActorUuid,
+    travelActor: travelActorUuid
+      ? LAB_MIRROR_ACTORS.find((actor) => actor.uuid === travelActorUuid)
+      : null,
+  });
+  const characters = LAB_MIRROR_ACTORS.slice(0, 3).map((actor) => actor.uuid);
+  const LAB_MIRROR_PARTIES = [
+    labMirrorParty('lab-party', 'The Ashfall Company', true, characters, 'Actor.lab-actor-vosk'),
+    labMirrorParty('lab-party-long-haul', 'The Long Haul', true, [], 'Actor.lab-actor-wagon'),
+    labMirrorParty(
+      'lab-party-emberwatch',
+      'Emberwatch Foragers',
+      false,
+      characters.slice(0, 2),
+      'Actor.lab-actor-brenna'
+    ),
+    labMirrorParty('lab-party-second-kiln', 'Second Kiln Crew', false, [], null),
+    labMirrorParty(
+      'lab-party-wagonwright',
+      'The Wagonwright Circle',
+      false,
+      characters.slice(2),
+      null
+    ),
+  ];
+
+  async function openLabMirrorParties(travelParties = LAB_MIRROR_PARTIES) {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      travelParties,
+      actorOptions: LAB_MIRROR_ACTORS,
+    });
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  it('root: the World Parties capture cases satisfy their own selectors (issue 1182)', async () => {
+    // Empty, with its negative control first: the populated pane. This case's selector is
+    // a bare presence check, so without the control it could not fail on a pane that
+    // rendered the no-parties panel over a full card list — the frame it must never publish.
+    const empty = labCaseSelector('manager-world-parties-empty');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(empty),
+      'five seeded parties must not also render the no-parties panel'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    await openLabMirrorParties([]);
+    assert.ok(
+      Boolean(target.querySelector(empty)),
+      'the no-parties pane must render the SHARED EmptyState primitive, not a bespoke panel'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Search, with its negative control first: unfiltered, those two cards are the second and
+    // the fifth of five at a page size of four, so they are never siblings in one list.
+    const filtered = labCaseSelector('manager-world-parties-search-filtered');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(filtered),
+      'unfiltered, the last-page card is not on the page at all — so an unfiltered frame ' +
+        'cannot be published under the filtered case'
+    );
+    // The term is READ FROM THE CASE's own step, not restated: a restated copy would keep
+    // passing after the case it mirrors started typing something else.
+    const searchStep = VIEW_LAB_CASES.find(
+      (entry) => entry.id === 'manager-world-parties-search-filtered'
+    ).steps.at(-1);
+    assert.equal(searchStep.selector, '.manager-travel-parties-query');
+    setInputValue(target.querySelector(searchStep.selector), searchStep.fill);
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(filtered)),
+      'searching "wagon" must leave exactly the party named for it and the one whose TRAVEL ' +
+        'ACTOR is named for it — the widened filter domain this case exists to photograph'
+    );
+    assert.equal(
+      target.querySelector('[data-manager-party-match-count]').textContent.trim(),
+      '2 of 5'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Last page.
+    const lastPage = labCaseSelector('manager-world-parties-last-page');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(lastPage),
+      'page one holds the first card, which the case refuses'
+    );
+    target.querySelector('.manager-travel-parties [data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(lastPage)),
+      'five records at a page size of three put the trailing two on page two'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Travel-actor picker. `SearchablePopover` portals into the nearest `.fabricate-manager`,
+    // which the mounted root renders inside `target`, so the case's selector runs verbatim.
+    const picker = labCaseSelector('manager-world-parties-actor-picker');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(picker),
+      'the closed picker is the frame this case must not be able to publish'
+    );
+    target.querySelector('[data-manager-party-actor-trigger="lab-party"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(picker)),
+      'the open picker must carry its title/count metadata and an option meta line while ' +
+        'omitting the picker unlink footer; the persistent on-screen unlink button remains ' +
+        'the linked party action that surfaces a composite-uniqueness collision before the pick fails'
+    );
+  });
+
+  it('returns to the first page and the top of the party scroller when the page size changes', async () => {
+    await openLabMirrorParties();
+    const parties = target.querySelector('.manager-travel-parties');
+    const scroller = parties.querySelector('.manager-travel-parties-content');
+    const pagination = parties.querySelector('[data-manager-party-pagination]');
+
+    parties.querySelector('[data-pagination-next]').click();
+    scroller.scrollTop = 160;
+    await tick();
+    flushSync();
+    assert.equal(
+      pagination.querySelector('[data-pagination-page]').textContent.trim(),
+      'Page 2 of 2',
+      'precondition: the last party is on the later default-size page'
+    );
+    assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
+
+    const pageSize = pagination.querySelector('[data-pagination-size]');
+    pageSize.value = '6';
+    pageSize.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.equal(
+      pagination.querySelector('[data-pagination-page]').textContent.trim(),
+      'Page 1 of 1',
+      'a page-size mutation always returns the party list to its first page'
+    );
+    // The load-bearing half. The walk left the pane on page TWO, which does not hold
+    // `lab-party`, so this card can only be back on screen because the index reset — a
+    // pane that kept `pageIndex = 1` at the new size would render an empty second page.
+    assert.ok(
+      Boolean(parties.querySelector('[data-manager-travel-party-id="lab-party"]')),
+      'the first-page party is rendered again'
+    );
+    assert.equal(scroller.scrollTop, 0, 'the party scroller returns to its top');
   });
 
   it('stages editor edits without persisting until the header Save is pressed', async () => {
@@ -6997,6 +8654,191 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // ── The armed set delete, end to end (issue 1129) ──────────────────────────────────
+  //
+  // The panel-level suite proves the CARD behaves; this proves the ROOT wires it — that the
+  // impact reaches the panel, that the two clicks reach the store, and above all that the
+  // armed token does not survive a change to the set it was armed for.
+
+  function componentDeleteButton() {
+    return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
+  }
+
+  it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
+    await openComponentsBrowser();
+
+    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance.
+    assert.ok(
+      Boolean(target.querySelector('[data-component-action="delete"]')),
+      'the single-component inspector offers Delete'
+    );
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      !target.querySelector('[data-component-action="delete"]'),
+      'the inspector — and its Delete — is replaced'
+    );
+    assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
+    assert.match(
+      target.querySelector('[data-component-bulk-impact-row="recipes"]').textContent,
+      /2 recipes will be rewritten/,
+      'the impact the store computed reaches the panel'
+    );
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+    const write = calls.find((call) => call[0] === 'deleteComponents');
+    assert.deepEqual(write?.[1], ['c1', 'c2'], 'the second click deletes the selection');
+  });
+
+  it('DISARMS when the selection changes underneath the armed control', async () => {
+    // An arm is a statement about a SPECIFIC set. If the set moves, the impact sentence the
+    // GM read before arming is no longer the impact of confirming, so the second click must
+    // not still be a confirmation.
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    tickComponentRow('c2');
+
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'growing the selection disarms the pending delete'
+    );
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the next click re-arms rather than writing'
+    );
+  });
+
+  it('clears the selection after a successful delete, returning the rail to the inspector', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      'the write happened'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
+    );
+  });
+
+  // The post-delete toast is the ONLY feedback that survives the panel unmounting, on the
+  // same terms as the apply toast above. Both cases below install `ui.notifications` per
+  // test and remove it again, matching `applyBulkEditOverRows`.
+  async function deleteSelectedRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser(calls, options);
+      for (const id of ids) tickComponentRow(id);
+      componentDeleteButton().click();
+      flushSync();
+      componentDeleteButton().click();
+      await tick();
+      flushSync();
+      return { messages, calls };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports the DISABLED recipes in the toast, the most consequential outcome', async () => {
+    // Components deleted and recipes rewritten are administrative; recipes disabled is the
+    // one the GM's players feel. It was the number the toast did not carry.
+    const { messages } = await deleteSelectedRows(['c1', 'c2'], {
+      deleteComponentsResult: { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 component(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 component(s) and rewrote 2 recipe(s).']);
+  });
+
+  it('reports NO success and keeps the selection when the write deleted nothing', async () => {
+    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
+    // write, after raising its own error toast. A bare `if (!result)` guard let that through
+    // as success: the selection cleared and the GM read "Deleted 0 component(s)" underneath
+    // the error, with the rows still in the library.
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+
+    // …AND THE GM WHO CANNOT SEE THE TOAST IS TOLD (issue 1157, review round). Confirming
+    // disabled the control, which put focus on `<body>` and emptied the card's region, so
+    // this panel's refused delete was silent AND placeless — the recipe twin had shipped
+    // both halves and this one had shipped neither.
+    await waitForQueuedAnnouncement();
+    assert.equal(
+      target.querySelector('[data-component-bulk-delete-announce]').textContent.trim(),
+      'Nothing was deleted. The selection is unchanged.'
+    );
+    // `assert.ok` over a boolean, never `assert.equal` over two nodes: on failure
+    // `node:assert` serialises the actual value and walks a mounted happy-dom element's
+    // circular tree until the heap dies, which surfaces as `# cancelled` with no message.
+    assert.ok(
+      document.activeElement === componentDeleteButton(),
+      'and the keyboard is back on the control that was pressed'
+    );
+  });
+
   it('applies every staged axis in ONE set-apply write, then resets the selection and the draft', async () => {
     const calls = [];
     await openComponentsBrowser(calls);
@@ -7248,8 +9090,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
 
     assert.deepEqual(messages, [
-      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. '
-        + "1 recipe couldn't be enabled yet.",
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. ' +
+        "1 recipe couldn't be enabled yet.",
     ]);
   });
 
@@ -7283,6 +9125,370 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
 
     assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
+  });
+
+  // ── Issue 1132: the recipe set delete, end to end ─────────────────────────────────
+  //
+  // The panel suite proves the card is WIRED and the card suite proves it BEHAVES; this is
+  // the only place the ROOT's three additions can be proved at all — the second effect, the
+  // failure path and the busy flag. Each of the three is invisible to every other suite.
+
+  async function openRecipesBrowser(calls = [], options = {}) {
+    mountManager(calls, options);
+    craftingParent().click();
+    await tick();
+    flushSync();
+  }
+
+  function tickRecipeRow(id) {
+    target.querySelector(`[data-recipe-select="${id}"]`).click();
+    flushSync();
+  }
+
+  function recipeDeleteButton() {
+    return target.querySelector('[data-recipe-bulk-delete-card] .manager-button.is-danger');
+  }
+
+  it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
+    // The gap this issue closes, stated as the sequence a GM performs: Delete lived ONLY on
+    // the single-recipe inspector, so ticking the rows you wanted rid of hid it.
+    await openRecipesBrowser();
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-action="delete"]')),
+      'the single-recipe inspector offers Delete'
+    );
+
+    tickRecipeRow('r1');
+
+    assert.ok(
+      !target.querySelector('[data-recipe-action="delete"]'),
+      'the inspector — and its Delete — is replaced'
+    );
+    assert.ok(recipeDeleteButton(), 'but the panel now carries its own set delete');
+    assert.match(
+      target.querySelector('[data-recipe-bulk-impact-row="items"]').textContent,
+      /Will be removed from 2 books & scrolls/,
+      'the impact the store computed reaches the panel'
+    );
+    assert.match(
+      target.querySelector('[data-recipe-bulk-impact-row="learners"]').textContent,
+      /Will be forgotten by 4 characters/
+    );
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const calls = [];
+    await openRecipesBrowser(calls);
+    tickRecipeRow('r1');
+    tickRecipeRow('r2');
+
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteRecipes'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'true');
+
+    recipeDeleteButton().click();
+    await tick();
+    flushSync();
+    const write = calls.find((call) => call[0] === 'deleteRecipes');
+    assert.deepEqual(write?.[1], ['r1', 'r2'], 'the second click deletes the selection');
+  });
+
+  it('DISARMS when the selection changes underneath the armed control', async () => {
+    // The second effect. An arm is a statement about a SPECIFIC set: once the set moves, the
+    // impact sentence the GM read before arming is no longer the impact of confirming.
+    //
+    // WHAT THIS DOES NOT PROVE, said plainly so nobody reads more into it. It does not
+    // distinguish the effect's `Set` dependency from a `count` one: keying the effect on
+    // `recipeBulkSelectionCount` instead leaves this test GREEN, verified by mutation. That
+    // is not a hole in the test — no reachable control produces an equal-sized new set
+    // (untick-then-tick is two flushes, the browser's phantom prune assigns only when the
+    // size differs, and `Select all N results` is hidden once everything is selected), so
+    // there is no such case to write. The Set dependency is keyed on the reactive unit the
+    // state is; see the effect's own comment.
+    const calls = [];
+    await openRecipesBrowser(calls);
+    tickRecipeRow('r1');
+
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'true');
+
+    tickRecipeRow('r1');
+    tickRecipeRow('r2');
+
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'swapping the selection disarms the pending delete'
+    );
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteRecipes'),
+      false,
+      'the next click re-arms rather than writing'
+    );
+  });
+
+  it('keeps a staged bulk-edit draft across a NON-EMPTY selection change', async () => {
+    // THE REGRESSION THE SECOND EFFECT EXISTS TO AVOID. The shipped effect discards the
+    // staged draft when the selection EMPTIES, deliberately — the panel is unmounted at that
+    // point, so it is the only place the discard can honestly happen. Retargeting THAT
+    // effect to the Set identity, rather than adding a second one, would discard a staged
+    // draft on every selection change and undo issue 1010's whole staging model.
+    await openRecipesBrowser();
+    tickRecipeRow('r1');
+
+    const stageDisable = () =>
+      target
+        .querySelector('[data-recipe-bulk-status-option="disable"] input')
+        .dispatchEvent(new window.Event('change', { bubbles: true }));
+    const applyEnabled = () => !target.querySelector('[data-recipe-bulk-apply]').disabled;
+
+    stageDisable();
+    flushSync();
+    assert.equal(applyEnabled(), true, 'pre-condition: the draft really is staged');
+
+    tickRecipeRow('r2');
+
+    assert.equal(
+      applyEnabled(),
+      true,
+      'growing the selection must not throw away what the GM staged'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'while the arm — which IS a statement about a specific set — is still dropped'
+    );
+  });
+
+  async function deleteSelectedRecipeRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openRecipesBrowser(calls, options);
+      for (const id of ids) tickRecipeRow(id);
+      recipeDeleteButton().click();
+      flushSync();
+      recipeDeleteButton().click();
+      await tick();
+      flushSync();
+      return { messages, calls };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('clears the selection after a successful delete and reports every non-zero outcome', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsAffected: 1,
+        recipeItemsRewritten: 1,
+        learnersAffected: 4,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 recipe(s), removed them from 1 of your books & scrolls, and 4 character(s) forgot them.',
+    ]);
+    assert.ok(
+      !target.querySelector('[data-recipe-bulk-delete-card]'),
+      'the rail returns to the single-recipe inspector'
+    );
+  });
+
+  it('drops the clauses whose outcome was zero rather than reporting a nought', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 1,
+        recipeIds: ['r1'],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 recipe(s).']);
+  });
+
+  it('names the learners alone when NO book contained them', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 3,
+      },
+    });
+
+    assert.deepEqual(messages, ['Deleted 2 recipe(s); 3 character(s) forgot them.']);
+  });
+
+  // THE LEGACY-BASIS SHAPE, AND THE NUMBER THE TOAST MUST READ. Under the legacy basis
+  // membership lives on the recipe and dies with it, so the write rewrites NO definition —
+  // `recipeItemsRewritten: 0` — while the books genuinely stop containing the recipes. The
+  // toast used to read the rewritten figure, so the card said "Will be removed from 1 book
+  // or scroll" and the toast then dropped the clause entirely, making the operation look as
+  // though it had done less than it promised (issue 1132, review round).
+  it('reports the recipe items the CARD promised, not the definitions the write rewrote', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsAffected: 1,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 recipe(s) and removed them from 1 of your books & scrolls.',
+    ]);
+  });
+
+  it('returns the card to IDLE and keeps the selection when the write is refused', async () => {
+    // FAILURE IS NOT SILENT, and this path is reachable rather than theoretical: a GM whose
+    // `SETTINGS_MODIFY` has been revoked passes the client-side `_assertGM` gate and is then
+    // refused by the server. The store raises the error toast; the root must not announce a
+    // success on top of it, must not throw the selection away, and must not leave a spinner.
+    const { messages } = await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 0,
+        recipeIds: [],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'the arm is spent — a still-armed button would delete on the next single click'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-busy'),
+      'false',
+      'and the busy face is cleared, not left as a stuck spinner over a live selection'
+    );
+  });
+
+  // ── The impact is re-derived on a REPUBLISH, not only on a selection change ───────
+  //
+  // Everything `describeRecipeDelete` consults is invisible to the rune graph: the selected
+  // system id is a `svelte/store` read, the system comes out of a plain Map and the learner
+  // index is a plain `let`. So the selection was the derivation's only trigger, and the
+  // concrete drift was reachable inside this very panel — select three recipes, stage "add to
+  // Book X", Apply (the selection survives), and the card still stated the pre-apply book
+  // count while the confirm pruned the post-apply one (issue 1132, review round).
+  it('re-derives the impact when the store republishes underneath a live selection', async () => {
+    const calls = [];
+    const storeOptions = {
+      recipeDeleteImpact: {
+        deletable: 1,
+        deletableIds: ['r1'],
+        recipeItemsAffected: 2,
+        recipeItemIds: ['ri1', 'ri2'],
+        learnersAffected: 0,
+        learnerIds: [],
+      },
+    };
+    const store = createStore(calls, storeOptions);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    tickRecipeRow('r1');
+
+    const itemsRow = () => target.querySelector('[data-recipe-bulk-impact-row="items"]');
+    assert.match(itemsRow().textContent, /2 books & scrolls/, 'pre-condition');
+
+    // The world moves under the card and the store republishes, exactly as `refresh()` does.
+    // The SELECTION is untouched, which is the whole point.
+    storeOptions.recipeDeleteImpact = {
+      deletable: 1,
+      deletableIds: ['r1'],
+      recipeItemsAffected: 1,
+      recipeItemIds: ['ri1'],
+      learnersAffected: 0,
+      learnerIds: [],
+    };
+    store.viewState.update((state) => ({ ...state }));
+    await tick();
+    flushSync();
+
+    assert.match(
+      itemsRow().textContent,
+      /1 book or scroll/,
+      'the card states what the write would do NOW, not what it would have done when the row was ticked'
+    );
+  });
+
+  // ── The refused delete is ANNOUNCED, not just toasted (issue 1132, review round) ──
+  //
+  // Confirming disables the control, which moves focus to `document.body` and empties the
+  // card's live region. On the refused or no-op path the card is still mounted with the
+  // selection intact, so an assistive-technology user was left on `<body>` beside a
+  // re-enabled button with nothing said: the store's Foundry toast is not a live region this
+  // module controls, and nothing distinguished "deleted" from "refused".
+  it('announces the reached-nothing outcome through the card live region and re-arms nothing', async () => {
+    // The zero result is returned on BOTH a concurrent no-op and a refused write (the store
+    // cannot tell them apart from here), and the store's own toast for the former says
+    // nothing failed — so the region must not claim a failure either (issue 1132, review
+    // round 2).
+    await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 0,
+        recipeIds: [],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    const region = target.querySelector('[data-recipe-bulk-delete-announce]');
+    assert.ok(Boolean(region), 'the card is still mounted, so the region is there to speak');
+    // The sentence is QUEUED BEHIND the focus restore (issue 1157): the card returns the
+    // keyboard to the re-enabled control first, because a focus change cancels pending polite
+    // speech, and only then writes the text.
+    await waitForQueuedAnnouncement();
+    assert.match(region.textContent, /Nothing was deleted\. The selection is unchanged\./);
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
+  });
+
+  it('clears the busy flag even when the action REJECTS, so the card cannot stick', async () => {
+    // The store catches its own write failures, so a rejection reaching the root means the
+    // failure was elsewhere — and a `finally`-less handler would leave `recipeBulkDeleting`
+    // true forever, disabling the control the GM needs in order to try again.
+    const { messages } = await deleteSelectedRecipeRows(['r1'], { deleteRecipesReject: true });
+
+    assert.deepEqual(messages, []);
+    assert.equal(recipeDeleteButton().getAttribute('data-busy'), 'false');
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
+    assert.equal(recipeDeleteButton().disabled, false, 'and the control is live again');
   });
 
   // Creating a crafting system already SELECTED it in the store, but the GM was left on
@@ -7369,7 +9575,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     tickComponentRow('c2');
     assert.ok(
       Boolean(target.querySelector('[data-component-bulk-difficulty]')),
-      'and so does the panel\'s progressive DC section'
+      "and so does the panel's progressive DC section"
     );
 
     target.querySelector('[data-component-bulk-essences-staged]').click();
@@ -8521,7 +10727,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'setCategoryIcon'),
-      ['setCategoryIcon', 'potions', 'fas fa-flask-vial'],
+      ['setCategoryIcon', 'potions', 'fas fa-vial'],
       'choosing an option commits immediately — no separate save step'
     );
     assert.equal(
@@ -8583,7 +10789,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'addCategory'),
-      ['addCategory', 'Elixirs', 'fas fa-flask-vial'],
+      ['addCategory', 'Elixirs', 'fas fa-vial'],
       'the picked icon rides along with the new category'
     );
   });
@@ -8910,7 +11116,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'inspector should not show an edit action while already editing'
     );
     // The editor opens on IDENTITY and the shell's rail carries the live preview.
-    assert.equal(target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel, 'identity');
+    assert.equal(
+      target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel,
+      'identity'
+    );
     assert.ok(
       target.querySelector('.manager-inspector [data-essence-behavior-preview]'),
       'the editor rail is the live behaviour preview'
@@ -8947,9 +11156,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'Rain',
       'the live preview follows the draft'
     );
@@ -9044,9 +11251,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'New essence draft'
     );
     assert.equal(
@@ -9059,9 +11264,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'Air'
     );
 
@@ -9074,13 +11277,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'none'
     );
     assert.equal(
-      target.querySelectorAll('[data-manager-essence-colour] [data-manager-color-token].is-selected')
-        .length,
+      target.querySelectorAll(
+        '[data-manager-essence-colour] [data-manager-color-token].is-selected'
+      ).length,
       0,
       'no preset claims to be the current choice while none is authored'
     );
     assert.ok(
-      target.querySelector('[data-manager-essence-colour] [data-manager-color-none]')
+      target
+        .querySelector('[data-manager-essence-colour] [data-manager-color-none]')
         .classList.contains('is-selected'),
       'the No-colour cell is the one marked, and it is the only route back to unset'
     );
@@ -9208,22 +11413,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-essence-select="water"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-essence-bulk-panel]'), 'the bulk panel replaces the inspector');
+    assert.ok(
+      target.querySelector('[data-essence-bulk-panel]'),
+      'the bulk panel replaces the inspector'
+    );
     assert.ok(
       !target.querySelector('[data-essence-browser-inspector]'),
       'and the single-essence inspector is gone while a selection exists'
     );
 
-    const impactText = (row) =>
-      target.querySelector(`[data-essence-bulk-impact-row="${row}"]`).textContent.trim();
+    const impactRow = (row) => target.querySelector(`[data-essence-bulk-impact-row="${row}"]`);
+    const impactText = (row) => impactRow(row).textContent.trim();
     assert.ok(impactText('essences').startsWith('1'), '1 deletable essence');
-    assert.ok(impactText('components').startsWith('0'), 'carried by no components');
+    // Carried by no components, so the shared card omits the row entirely rather than stating a
+    // nought (issue 1132). Asserted as ABSENCE: the old `startsWith('0')` form would now THROW
+    // on a null dereference rather than fail, and a throwing control is the one whose cheapest
+    // repair is deletion.
+    assert.ok(!impactRow('components'), 'carried by no components, so nothing is said about them');
     assert.ok(impactText('recipes').startsWith('1'), 'and rewriting 1 recipe');
-    assert.match(
-      impactText('components'),
-      /selected essences/,
-      'and the line says WHICH set it counts, since it counts the whole selection'
-    );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),
       'no member is ever blocked — deletion is warned, not blocked'
@@ -9236,16 +11443,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(impactText('essences').startsWith('2'), 'the carried member is deletable too');
     assert.ok(impactText('recipes').startsWith('2'), 'r1 and r2, unioned rather than summed');
+    // And the row RETURNS the moment the count is non-zero, which is what stops the absence
+    // assertion above passing for a row that was simply removed.
     assert.ok(
       impactText('components').startsWith('1'),
       'and its CARRIER is reported as impact, unioned over the whole selection'
+    );
+    assert.match(
+      impactText('components'),
+      /selected essences/,
+      'and the line says WHICH set it counts, since it counts the whole selection'
     );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),
       'still nothing is blocked — the carried essence deletes like any other'
     );
 
-    const deleteButton = target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+    const deleteButton = target.querySelector(
+      '[data-essence-bulk-delete-card] .manager-button.is-danger'
+    );
     assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
     deleteButton.click();
     await tick();
@@ -9255,9 +11471,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'the FIRST click only arms — nothing is written'
     );
-    target
-      .querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger')
-      .click();
+    target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger').click();
     await tick();
     await tick();
     flushSync();
@@ -9268,6 +11482,119 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['earth', 'water'],
       'and it deletes EVERY selected member, carried or not'
     );
+  });
+
+  // ── The essence root's two no-write exits (issue 1132, review round) ──────────────
+  //
+  // Both guards were CORRECTED for the essence path by this change and both shipped with
+  // ZERO coverage: the component twin is gated by its own zero-result case and the recipe
+  // twin by a zero result and a rejection, while `deleteEssencesResult` was exposed by the
+  // store double and supplied by nothing in the suite. Reverting
+  // `Number(result?.deleted) || 0; if (deleted === 0)` to `if (!result)`, and moving
+  // `essenceBulkDeleteArmed = false` out of the `finally` and back into the `try`, were both
+  // green mutations. A fix the suite cannot see is not closed.
+  async function deleteSelectedEssenceRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store: createStore(calls, options), services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      navButton('Essences').click();
+      await tick();
+      flushSync();
+      for (const id of ids) {
+        target.querySelector(`[data-essence-select="${id}"]`).click();
+        await tick();
+        flushSync();
+      }
+      const button = () =>
+        target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+      button().click();
+      await tick();
+      flushSync();
+      button().click();
+      await tick();
+      await tick();
+      flushSync();
+      return { messages, calls, button };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  // Issue 1144 — the essence toast did not carry `recipesDisabled` at all before this fix.
+  // Mirrors 'reports the DISABLED recipes in the toast, the most consequential outcome' and
+  // 'drops the disable clause entirely when nothing was disabled' from the component suite.
+  it('reports the DISABLED recipes in the essence toast, the most consequential outcome', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 1 essence(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely from the essence toast when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 essence(s) and rewrote 2 recipe(s).']);
+  });
+
+  it('reports NO essence success and keeps the selection when the write deleted nothing', async () => {
+    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
+    // write, after raising its own error toast. A bare `if (!result)` guard lets that through
+    // as success: the selection clears and the GM reads "Deleted 0 essence(s)" underneath the
+    // error, with the rows still in the library.
+    const { messages, button } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 0, blocked: [], recipesUpdated: 0 },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
+    assert.ok(
+      Boolean(target.querySelector('[data-essence-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      button().getAttribute('data-armed'),
+      'false',
+      'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+
+    // The twin of the component assertion (issue 1157, review round): the card survives this
+    // path, so it is the one surface that can say the delete reached nothing.
+    await waitForQueuedAnnouncement();
+    assert.equal(
+      target.querySelector('[data-essence-bulk-delete-announce]').textContent.trim(),
+      'Nothing was deleted. The selection is unchanged.'
+    );
+    assert.ok(
+      document.activeElement === button(),
+      'and the keyboard is back on the control that was pressed'
+    );
+  });
+
+  it('clears the essence arm even when the action REJECTS, so the card cannot stick', async () => {
+    // The disarm has to live in the `finally`: in the `try`, after the await, a rejection
+    // skips it and leaves an ARMED button that deletes on the next single click.
+    const { messages, button } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesReject: true,
+    });
+
+    assert.deepEqual(messages, []);
+    assert.equal(button().getAttribute('data-armed'), 'false');
+    assert.equal(button().getAttribute('data-busy'), 'false');
+    assert.equal(button().disabled, false, 'and the control is live again');
   });
 
   it('applies a staged essence bulk edit with falsy-but-real axes', async () => {
@@ -9365,10 +11692,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-essence-on-craft-empty]'),
       'both gates off renders an explanatory empty state, not an empty tab'
     );
-    assert.ok(
-      !target.querySelector('[data-essence-section="macro"]'),
-      'and no macro card at all'
-    );
+    assert.ok(!target.querySelector('[data-essence-section="macro"]'), 'and no macro card at all');
 
     target.querySelector('[data-essence-tab="identity"]').click();
     await tick();
@@ -10176,6 +12500,166 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // ── Crafting route reconciliation across a scope switch (issue 1151) ──────────────
+  //
+  // The reported dead end: the rail drops the mode-conditional entry the newly selected
+  // system does not offer, while the router keeps rendering the route it owned. The GM
+  // is left on a surface the system cannot use, with no rail entry highlighted and no
+  // way back to it. Every case below drives a REAL `change` on the scope select through
+  // the one shared `switchScopeSystemTo` helper and reads the reconciled route.
+  //
+  // The two fixture systems carry their modes through `systemCraftingModes`, which
+  // writes into `systemDetails` per id — the switch republishes that map, so the mode
+  // under test survives the very navigation the case is about.
+  const RESTRICTED_SIMPLE = { visibilityMode: 'restricted', resolutionMode: 'simple' };
+  const KNOWLEDGE_SIMPLE = { visibilityMode: 'knowledge', resolutionMode: 'simple' };
+  const GLOBAL_ALCHEMY = { visibilityMode: 'global', resolutionMode: 'alchemy' };
+  const KNOWLEDGE_TO_RESTRICTED = { alchemy: KNOWLEDGE_SIMPLE, smithing: RESTRICTED_SIMPLE };
+
+  // Mount with per-system modes, open the Crafting group, and route to one submenu
+  // entry, asserting it exists first: a silently missing entry would leave every
+  // assertion afterwards reading the previous screen and passing for the wrong reason.
+  async function openCraftingEntry(calls, systemCraftingModes, label, storeOptions = {}) {
+    mountManager(calls, {
+      experimentalFeaturesEnabled: true,
+      systemCraftingModes,
+      ...storeOptions,
+    });
+    craftingParent().click();
+    await tick();
+    flushSync();
+    const entry = craftingSubitem(label);
+    assert.ok(entry, `the Crafting submenu offers "${label}" for the selected system`);
+    entry.click();
+    await tick();
+    flushSync();
+    return target.querySelector('.fabricate-manager').dataset.managerView;
+  }
+
+  // The shared arrangement for the three `recipe-item-edit` cases: a knowledge-mode
+  // system whose sibling is restricted, routed into the editor for `ri1`.
+  async function openRecipeItemEditorForSwitch(calls, storeOptions = {}) {
+    await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Books & Scrolls', {
+      recipeItemDefinitions: booksScrollsFixtures,
+      ...storeOptions,
+    });
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await tick();
+    flushSync();
+    return target.querySelector('.fabricate-manager').dataset.managerView;
+  }
+
+  // Make the open recipe-item draft dirty through its enabled toggle.
+  async function dirtyOpenRecipeItem() {
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await tick();
+    flushSync();
+  }
+
+  it('reconciles Access onto the new system’s Books & Scrolls on a scope switch', async () => {
+    const calls = [];
+    const start = await openCraftingEntry(
+      calls,
+      { alchemy: RESTRICTED_SIMPLE, smithing: KNOWLEDGE_SIMPLE },
+      'Access'
+    );
+    assert.equal(start, 'access');
+
+    assert.equal(
+      await switchScopeSystemTo('smithing'),
+      'books-scrolls',
+      'a knowledge-mode system offers no Access entry, so the router must not keep rendering it'
+    );
+    assert.deepEqual(
+      activeCraftingSubitemIds(),
+      ['books-scrolls'],
+      'exactly one Crafting sub-entry is highlighted, and it is the redirect target'
+    );
+  });
+
+  it('reconciles Books & Scrolls onto the new system’s Access on a scope switch', async () => {
+    const calls = [];
+    const start = await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Books & Scrolls');
+    assert.equal(start, 'books-scrolls');
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
+  });
+
+  it('reconciles a recipe-item editor onto Access, never a Books & Scrolls the system lacks', async () => {
+    const calls = [];
+    assert.equal(await openRecipeItemEditorForSwitch(calls), 'recipe-item-edit');
+
+    // `recipe-item-edit` is owned by Books & Scrolls, so it collapses onto its parent:
+    // the scope change maps it to `books-scrolls`, which the restricted system does not
+    // offer either, and the router resolves that system's own first conditional entry.
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
+  });
+
+  it('reconciles onto Knowledge when the new system is global + alchemy', async () => {
+    // The settled edge case, asserted at the mounted level because it is the ONLY cell
+    // whose answer depends on `resolutionMode` reaching `buildCraftingNavItems` through
+    // `craftingNavArgs`: every other cell resolves the same target either way, so a bag
+    // that dropped `resolutionMode` would pass every other assertion here.
+    const calls = [];
+    const start = await openCraftingEntry(
+      calls,
+      { alchemy: RESTRICTED_SIMPLE, smithing: GLOBAL_ALCHEMY },
+      'Access'
+    );
+    assert.equal(start, 'access');
+
+    assert.equal(
+      await switchScopeSystemTo('smithing'),
+      'knowledge',
+      'a global alchemy system DOES offer a mode-conditional entry, so Recipes would be wrong'
+    );
+    assert.deepEqual(activeCraftingSubitemIds(), ['knowledge']);
+  });
+
+  it('leaves an always-present Crafting route alone across a scope switch', async () => {
+    // The negative control: `recipes` is unconditional, so the clause must not fire.
+    const calls = [];
+    const start = await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Recipes');
+    assert.equal(start, 'recipes');
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'recipes');
+    assert.deepEqual(activeCraftingSubitemIds(), ['recipes']);
+  });
+
+  it('still guards a dirty recipe-item editor before reconciling (cancel keeps it open)', async () => {
+    // The route-exit guard is not weakened by the read-time normalization, and this is
+    // the case the issue calls doubly exposed: the guard runs on `books-scrolls` BEFORE
+    // `selectSystem`, so cancelling aborts the switch entirely and no redirect fires.
+    const calls = [];
+    await openRecipeItemEditorForSwitch(calls, { confirmDiscardRecipeItemResult: 'cancel' });
+    await dirtyOpenRecipeItem();
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'recipe-item-edit');
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'the recipe-item discard confirmation is consulted before the system switch'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'selectSystem' && call[1] === 'smithing'),
+      'cancelling the discard aborts the system switch, so no reconciliation happens'
+    );
+  });
+
+  it('lands a discarded dirty recipe-item editor on the new system’s Access', async () => {
+    const calls = [];
+    await openRecipeItemEditorForSwitch(calls, { confirmDiscardRecipeItemResult: 'discard' });
+    await dirtyOpenRecipeItem();
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'the discard confirmation still runs on the way out'
+    );
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
+  });
+
   it('shows the Books & Scrolls empty state when the system has no recipe items', async () => {
     const calls = [];
     await openBooksScrolls(calls, { recipeItemDefinitions: [] });
@@ -10218,7 +12702,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       true
     );
     // The parent count is the sum of records (environments + tasks + events), not
-    // the subitem count. Travel is hidden by default (Travel & Realms toggle off).
+    // the subitem count. Travel is not among them: it is a WORLD entry (issue 1282).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
@@ -10765,7 +13249,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     inspectorRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(inspectorRateInput.value, '9', 'blur restores the model value, it does not commit empty');
+    assert.equal(
+      inspectorRateInput.value,
+      '9',
+      'blur restores the model value, it does not commit empty'
+    );
     let refreshedInspectorRateInput = selectedDropInspector.querySelector(
       '[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
     );
@@ -11154,12 +13642,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
     assert.equal(target.querySelector('[data-gathering-vocabulary-panel="regions"]'), null);
     assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
-    // The Travel & Realms toggle card hosts the subsystem flag.
-    assert.ok(target.querySelector('[data-gathering-realm-toggle-panel]'));
-    assert.ok(target.querySelector('[data-gathering-realm-toggle]'));
+    // The Travel & Realms toggle LEFT this tab for a System Settings feature tile beside
+    // Currency (issue 1282), because participation in a world-scope subsystem is the same kind
+    // of statement Currency's toggle makes.
+    assert.ok(!target.querySelector('[data-gathering-realm-toggle-panel]'));
+    assert.ok(!target.querySelector('[data-gathering-realm-toggle]'));
     assert.ok(target.textContent.includes('Times of day'));
     assert.ok(target.textContent.includes('Weather conditions'));
-    assert.ok(target.textContent.includes('Travel & Realms'));
+    assert.equal(target.textContent.includes('Travel & Realms'), false);
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(
       target.textContent.includes(
@@ -11576,7 +14066,2236 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
-  it('flips the Travel & Realms toggle (aria-pressed) and reveals the Travel nav item', async () => {
+  it('renders permanent World Parties, Travel and Currency entries', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringRealmsEnabled: true,
+          // The World nav's Downtime entry is experimental-gated (issue 1257), and this case
+          // asserts the whole World group, so it opts in.
+          experimentalFeaturesEnabled: true,
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(world, 'World always renders');
+    assert.equal(world.querySelector('#manager-world-heading').textContent.trim(), 'WORLD');
+    assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
+    assert.deepEqual(
+      Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
+      // Parties, Travel and Currency are all permanent World entries (issues 1182, 1278, 1282);
+      // Downtime is the experimental-gated one.
+      [
+        'manager-world-nav-parties',
+        'manager-world-nav-travel',
+        'manager-world-nav-currency',
+        'manager-world-nav-downtime',
+      ]
+    );
+    assert.ok(worldNavItem('parties').querySelector('.fa-users'));
+    assert.ok(worldNavItem('downtime').querySelector('.fa-hourglass-half'));
+    assert.ok(worldTravelItem('travel').querySelector('.fa-route'));
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
+    );
+    assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(
+      worldTravelItem('travel').querySelector('.manager-nav-label').textContent.trim(),
+      'Travel'
+    );
+    // The realm count rides the parent, as the party count rides Parties and the coin count
+    // rides Currency — one number per World entry, naming what it holds.
+    assert.equal(
+      worldTravelItem('travel').querySelector('.manager-nav-count').textContent.trim(),
+      '1'
+    );
+    assert.equal(
+      worldTravelItem('travel').getAttribute('aria-controls'),
+      'manager-travel-submenu'
+    );
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
+
+    target.querySelector('#manager-travel-toggle').click();
+    await tick();
+    flushSync();
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    assert.equal(
+      target.querySelector('#manager-travel-toggle').getAttribute('aria-controls'),
+      'manager-travel-submenu'
+    );
+    assert.ok(target.querySelector('[data-world-travel-submenu]'));
+    assert.ok(worldTravelItem('realms').querySelector('.fa-mountain-sun'));
+    assert.ok(worldTravelItem('map').querySelector('.fa-map-location-dot'));
+    worldTravelItem('realms').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'world-travel',
+      'the Realms destination commits the World Travel route'
+    );
+    assert.equal(target.querySelectorAll('.fabricate-manager').length, 1);
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
+    assert.equal(
+      target.querySelector('[data-travel-panel="realms"]').getAttribute('role'),
+      'region'
+    );
+    assert.equal(
+      target.querySelector('[data-travel-panel="realms"]').getAttribute('aria-labelledby'),
+      'manager-travel-nav-realms'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Realms'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Realm actions'
+    );
+    // The INSPECTOR, not just the panel. World > Travel renders its own `manager-main`, but its
+    // detail pane is a branch of the chain nested inside the shared inspector aside — so a route
+    // missing from that chain's outer condition makes the branch unreachable and the aside falls
+    // through to nothing. The failure is silent: the route commits, the panel renders, and only
+    // the detail pane is absent, which is why every assertion above stayed green through it.
+    assert.equal(
+      target.querySelector('.manager-travel-inspector')?.getAttribute('aria-label'),
+      'Selected realm',
+      'the Realms route must render its detail pane, not only its list panel'
+    );
+    worldTravelItem('map').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Map Region Links'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Map region link actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-travel-inspector')?.getAttribute('aria-label'),
+      'Selected map region link',
+      'and the Map Region Links route must render its own detail pane too'
+    );
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+    assert.equal(
+      target.querySelectorAll('[aria-current="page"]').length,
+      1,
+      'only the concrete destination is current'
+    );
+    assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
+    assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    assert.ok(
+      !target.querySelector('[id^="travel-tab-"]'),
+      'the retired horizontal tabs are absent'
+    );
+  });
+
+  it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
+    const calls = [];
+    const registry = createManagerExtensionsRegistry();
+    const originalLocalize = globalThis.game.i18n.localize;
+    const localized = new Map([
+      ['FABRICATE.Admin.Manager.World.Downtime.Tablist', 'Localized downtime sections'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Brand', 'Localized Fabricate Premium'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label', 'Localized tracking'],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.AccessibleName',
+        'Open localized tracking preview',
+      ],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Tooltip',
+        'Localized tracking tooltip',
+      ],
+    ]);
+    globalThis.game.i18n.localize = (key) => localized.get(key) ?? originalLocalize(key);
+    mountDowntimeManager(calls, {}, {}, { managerExtensions: registry });
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-downtime');
+    // world-downtime is a two-column route: the `{#if}` that renders the inspector
+    // excludes it, and `styles/fabricate.css` releases its column to match. Those are
+    // one decision expressed twice, so drop the guard and this (empty) aside wraps to
+    // an implicit grid row under the preview — which `expectNoHorizontalOverflow` in
+    // the View Lab cases cannot see, because a stray ROW costs no horizontal width.
+    // assert.ok(!el) rather than assert.equal(el, null): on failure, assert.equal
+    // tries to build an inline diff of a happy-dom element — a circular, whole-subtree
+    // graph — and dies with an unmessaged heap OOM. Same detection, readable failure.
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
+      'world-downtime renders no inspector aside — the guard and the released CSS column stay in step'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.',
+      'the world-downtime subtitle branch survives beside the counted World Parties one'
+    );
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
+    assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
+    const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
+    assert.deepEqual(
+      tabs.map((tab) => tab.dataset.downtimeTab),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      tabs.map((tab) => tab.getAttribute('tabindex')),
+      ['0', '-1', '-1', '-1']
+    );
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+    assert.equal(tabs[0].getAttribute('aria-controls'), 'world-downtime-panel-tracking');
+    assert.equal(tabs[0].getAttribute('aria-label'), 'Open localized tracking preview');
+    assert.equal(
+      target.querySelector('[data-downtime-tablist]').getAttribute('aria-label'),
+      'Localized downtime sections'
+    );
+    assert.match(target.querySelector('.downtime-premium').textContent, /Localized Fabricate Premium/);
+    assert.equal(
+      tabs[0].getAttribute('aria-describedby'),
+      'world-downtime-tooltip-tracking'
+    );
+    assert.equal(
+      target.querySelector('#world-downtime-tooltip-tracking').textContent.trim(),
+      'Localized tracking tooltip'
+    );
+    assert.equal(
+      target.querySelectorAll('[role="tabpanel"][id^="world-downtime-panel-"]').length,
+      4,
+      'every tab owns a stable panel IDREF even while inactive'
+    );
+    assert.equal(
+      target.querySelector('[data-downtime-connected-studio]')?.nextElementSibling,
+      target.querySelector('[data-downtime-tablist]'),
+      'the fallback keeps the prototype connected-studio card immediately above its tabs'
+    );
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await tick();
+    flushSync();
+    const activitiesTab = target.querySelector('[data-downtime-tab="activities"]');
+    assert.equal(document.activeElement, activitiesTab);
+    assert.equal(activitiesTab.getAttribute('aria-selected'), 'true');
+
+    activitiesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    const settingsTab = target.querySelector('[data-downtime-tab="settings"]');
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+
+    settingsTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
+    const cta = target.querySelector('.downtime-cta');
+    assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(cta.target, '_blank');
+    assert.equal(cta.rel, 'noopener noreferrer');
+    assert.deepEqual(calls, [], 'the Core preview and tab interactions call no store write seam');
+    globalThis.game.i18n.localize = originalLocalize;
+  });
+
+  // The maintainer's own report was "all of the sub-tabs are missing": the design nests the
+  // same four previews under the rail's Downtime entry, each carrying a premium padlock, and
+  // Core rendered only the strip inside the panel. These assertions pin the rail treatment,
+  // and that BOTH triggers — a rail child and a studio-card button — drive one navigation.
+  it('nests four locked Downtime previews in the rail and drives one navigation from either trigger', async () => {
+    useShippedLocalization();
+    const calls = [];
+    mountDowntimeManager(calls, {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+
+    assert.ok(
+      !target.querySelector('[data-world-downtime-submenu]'),
+      'the group stays collapsed until the route is entered, like the Travel group'
+    );
+    const parent = worldNavItem('downtime');
+    assert.equal(
+      parent.getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'the rail entry carries the premium tooltip the design puts on it'
+    );
+    assert.equal(parent.getAttribute('aria-controls'), 'manager-downtime-submenu');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      parent.querySelector('[data-world-nav-premium]').textContent.trim(),
+      'PREMIUM',
+      'the premium mark is a WORD, not an icon a sighted reader loses'
+    );
+    assert.ok(
+      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
+      'the badge rides the count class so the collapsed 56px rail hides it with the rest'
+    );
+
+    parent.click();
+    await settleRouteExit();
+
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    const subitems = Array.from(target.querySelectorAll('[data-world-downtime-item]'));
+    assert.deepEqual(
+      subitems.map((item) => item.dataset.worldDowntimeItem),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.id),
+      [
+        'manager-downtime-nav-tracking',
+        'manager-downtime-nav-activities',
+        'manager-downtime-nav-factions',
+        'manager-downtime-nav-settings',
+      ]
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.querySelector('.manager-nav-label').textContent.trim()),
+      ['Tracking', 'Activities', 'Factions', 'Settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('title')),
+      [
+        'Preview Downtime Tracking · Fabricate Premium',
+        'Preview Downtime Activities · Fabricate Premium',
+        'Preview Factions & Reputation · Fabricate Premium',
+        'Preview Downtime Settings · Fabricate Premium',
+      ]
+    );
+    assert.ok(
+      subitems.every((item) => Boolean(item.querySelector('[data-world-downtime-lock] .fa-lock'))),
+      'every child carries the premium padlock'
+    );
+    // CORE-FALLBACK IS UNTOUCHED by the provider-mode naming (issue 1213). Core's preview keeps
+    // its tab strip, which is where its accessible names and keyboard-visible tooltips already
+    // live, so the rail sub-item states no `aria-label` here and keeps its visible label as its
+    // accessible name.
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('aria-label')),
+      [null, null, null, null],
+      'no aria-label overrides the visible label in Core preview mode'
+    );
+    assert.ok(
+      subitems.every((item) => item.tagName === 'BUTTON' && !item.disabled),
+      'the padlock marks a premium preview on a WORKING control, never a disabled one'
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('aria-current')),
+      ['true', null, null, null]
+    );
+    assert.equal(
+      target.querySelectorAll('[aria-current="page"]').length,
+      1,
+      'the route is current once — the children mark themselves within the set, not as pages'
+    );
+
+    const callout = target.querySelector('[data-world-downtime-callout]');
+    assert.match(callout.textContent, /PREMIUM PREVIEW/);
+    assert.match(
+      callout.textContent,
+      /Open any Downtime page to preview how Fabricate Premium can help you run downtime\./
+    );
+
+    const unlock = target.querySelector('[data-downtime-unlock]');
+    assert.equal(unlock.textContent.trim(), 'Unlock with Premium');
+    assert.equal(unlock.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(unlock.target, '_blank');
+    assert.equal(unlock.rel, 'noopener noreferrer');
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Downtime actions',
+      'un-suppressing the actions block for this route is what makes that label reachable'
+    );
+
+    // Trigger one: the rail child.
+    target.querySelector('[data-world-downtime-item="factions"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-downtime-tab="factions"]').getAttribute('aria-selected'),
+      'true',
+      'the panel strip follows the rail'
+    );
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="factions"]').getAttribute('aria-current'),
+      'true'
+    );
+    assert.ok(Boolean(target.querySelector('[data-downtime-panel="factions"]:not([hidden])')));
+
+    // Trigger two: the studio-card button, which must reach the same state.
+    target.querySelector('[data-downtime-tab="settings"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="settings"]').getAttribute('aria-current'),
+      'true',
+      'the rail follows the card — two triggers, one navigation'
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-world-downtime-item]')).map((item) =>
+        item.getAttribute('aria-current')
+      ),
+      [null, null, null, 'true']
+    );
+    assert.deepEqual(calls, [], 'the rail preview navigation calls no store write seam');
+  });
+
+  it('titles the Downtime route after the preview on screen, in the header and the breadcrumb', async () => {
+    useShippedLocalization();
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const title = () => target.querySelector('.manager-header .manager-title').textContent.trim();
+    const subtitle = () =>
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim();
+    const leafCrumb = () => target.querySelector('[data-breadcrumb-downtime-tab]');
+
+    assert.equal(
+      target.querySelector('[data-breadcrumb-world]').textContent.trim(),
+      'World',
+      'the crumb is Title Case: the rail micro-label is the string authored in caps, not this'
+    );
+    assert.equal(title(), 'Downtime tracking');
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.'
+    );
+    assert.equal(leafCrumb().textContent.trim(), 'Tracking');
+    assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, 'tracking');
+
+    for (const [tabId, expectedTitle, expectedCrumb] of [
+      ['activities', 'Downtime activities', 'Activities'],
+      ['factions', 'Factions & reputation', 'Factions'],
+      ['settings', 'Downtime settings', 'Settings'],
+    ]) {
+      target.querySelector(`[data-world-downtime-item="${tabId}"]`).click();
+      await settleRouteExit();
+      assert.equal(title(), expectedTitle, `${tabId} retitles the page`);
+      assert.equal(leafCrumb().textContent.trim(), expectedCrumb, `${tabId} retitles the crumb`);
+      assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, tabId);
+      assert.match(subtitle(), /^Fabricate Premium · /, `${tabId} keeps the branded subtitle`);
+    }
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Set campaign-wide rules that keep every activity consistent.'
+    );
+  });
+
+  it('renders every Downtime board row as thing, detail and reading, with its closing notes', async () => {
+    useShippedLocalization();
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const panel = (tabId) => target.querySelector(`[data-downtime-panel="${tabId}"]`);
+    const rowsOf = (tabId) =>
+      Array.from(panel(tabId).querySelectorAll('[data-downtime-board-row]')).map((row) => [
+        row.querySelector('.downtime-board-row-primary').textContent.trim(),
+        row.querySelector('.downtime-board-row-secondary').textContent.trim(),
+        row.querySelector('.downtime-board-row-value').textContent.trim(),
+      ]);
+
+    assert.deepEqual(rowsOf('tracking'), [
+      ['Ilyra Vance', 'Master of Ravens', '60%'],
+      ['Rebuild the Blackfeather Tavern', 'Shared project · 3 contributors', '17 / 42 days'],
+      ['Player choice waiting', 'Work a Profession is ready to resolve', 'ACTION'],
+    ]);
+    assert.deepEqual(rowsOf('settings'), [
+      ['World time drives progress', 'Calendar advances credit active work', 'ON'],
+      ['Players may self-initiate', 'Assigned activities can begin in the player app', 'ON'],
+      ['Solo activities per character', 'Separate limit for group projects', '1'],
+    ]);
+    // U+2212 MINUS SIGN, not a hyphen — the design's own codepoint for a negative standing.
+    assert.equal(rowsOf('factions')[2][2], '−28');
+
+    assert.ok(
+      !panel('tracking').querySelector('[data-downtime-board-row] .fa-lock'),
+      'a row shows its reading, not a padlock — the board locks once, in its PREVIEW badge'
+    );
+    assert.equal(
+      panel('tracking').querySelectorAll('.downtime-board .fa-lock').length,
+      1,
+      'exactly one padlock on the board'
+    );
+
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'The Blackfeather Company · live campaign view'
+    );
+    assert.equal(
+      panel('activities').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'Reusable definitions · ready to assign',
+      'the board subtitle is per tab, not a single shared line'
+    );
+    assert.match(
+      panel('tracking').querySelector('[data-downtime-board-note]').textContent,
+      /With Premium, this view responds to your players’ actions, advances with world time, grants rewards and stays connected to the rest of Fabricate\./
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-cta-note]').textContent.trim(),
+      'Subscribe to unlock Downtime Studio for your campaign and download Fabricate Premium.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-benefits-note]').textContent.trim(),
+      'Unlock this workflow with Fabricate Premium'
+    );
+    assert.match(
+      panel('tracking').querySelector('.downtime-preview-note').textContent,
+      /Its campaign controls unlock with Fabricate Premium\./,
+      'the preview note keeps the sentence that says what unlocking gets you'
+    );
+    assert.equal(
+      panel('factions').querySelector('.downtime-hero-copy h2').textContent.trim(),
+      'Let downtime reshape the balance of power.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('.downtime-benefits article p').textContent.trim(),
+      'See active, paused, pending and attention-needed work for every character at a glance.'
+    );
+
+    // The tint travels with the SLOT, not the glyph: `fa-house-chimney` is ember on
+    // Tracking and vitality on Activities, so a per-glyph rule would flatten one of them.
+    assert.deepEqual(
+      Array.from(panel('tracking').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['tag', 'ember', 'warning']
+    );
+    assert.deepEqual(
+      Array.from(panel('activities').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['ember', 'tag', 'vitality']
+    );
+    assert.ok(
+      Boolean(
+        panel('tracking').querySelector('.downtime-board-row-icon.is-tint-ember .fa-house-chimney')
+      ),
+      'the tint class rides the tile wrapper so the glyph inherits it'
+    );
+    assert.ok(
+      Boolean(
+        panel('activities').querySelector(
+          '.downtime-board-row-icon.is-tint-vitality .fa-house-chimney'
+        )
+      ),
+      'the same glyph carries a different tint on another tab'
+    );
+    assert.deepEqual(
+      Array.from(panel('settings').querySelectorAll('.downtime-feature-icon')).map((icon) =>
+        Array.from(icon.classList).find((name) => name.startsWith('is-tint-'))
+      ),
+      ['is-tint-accent', 'is-tint-info', 'is-tint-warning', 'is-tint-vitality']
+    );
+  });
+
+  it('updates an open Downtime host and cleans each companion mount exactly once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanups = [];
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const extension = downtimeProvider({
+      mount({ target: mountTarget, tabId }) {
+        mountTarget.textContent = `Mounted ${tabId}`;
+        return () => cleanups.push(tabId);
+      },
+    });
+    const unregister = registry.publicApi.registerWorldNavProvider(extension);
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('Companion tracking'), target.innerHTML);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted tracking/
+    );
+    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip: with no
+    // strip in provider mode the strip padlock cannot exist, so asserting its absence could
+    // not fail (issue 1213). The rail padlock is rendered in both modes' markup and gated on
+    // `downtimeCoreFallback`, so its absence is a real claim about this mode.
+    assert.ok(
+      !target.querySelector('[data-world-downtime-lock]'),
+      'an installed companion never inherits the Core fallback lock treatment'
+    );
+
+    target.querySelector('#manager-downtime-nav-activities').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(cleanups, ['tracking']);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted activities/
+    );
+
+    const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
+    mountedPanel.focus();
+    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    unregister();
+    await settleDowntimeProvider();
+    assert.deepEqual(cleanups, ['tracking', 'activities']);
+    assert.ok(target.querySelector('[data-downtime-panel="activities"]'));
+    assert.equal(
+      document.activeElement,
+      target.querySelector('[data-downtime-tab="activities"]'),
+      'provider removal returns a focused companion panel to its active Core tab'
+    );
+  });
+
+  // The OTHER direction, and the one issue 1213 breaks (the test above covers deregister,
+  // which still resolves because the `{#if coreFallback}` branch still renders the strip).
+  // Registering a provider removes the strip, so `#world-downtime-tab-<id>` — the id the
+  // recovery used to ask for unconditionally — resolves to nothing, optional chaining
+  // swallows it, and focus silently drops to `<body>`. The rail sub-item is not a descendant
+  // of the host's own `shell`, so no id scheme on the rail could have fixed it either.
+  it('recovers focus onto the companion panel when a provider registers under a focused Core tab', async () => {
+    const registry = createManagerExtensionsRegistry();
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const coreTab = target.querySelector('[data-downtime-tab="tracking"]');
+    coreTab.focus();
+    assert.ok(
+      document.activeElement === coreTab,
+      'pre-condition: focus is inside the host, on the Core tab the swap is about to remove'
+    );
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+    await settleDowntimeProvider();
+
+    const region = target.querySelector('#world-downtime-panel-tracking');
+    assert.ok(Boolean(region), 'the companion panel region replaced the Core preview panel');
+    assert.ok(
+      document.activeElement === region,
+      'focus lands on the named region, not on the document body'
+    );
+  });
+
+  // Issue 1213, decision 3. Removing the strip strands a GM at a 56px rail: `.manager-nav-submenu`
+  // is `display: none` there, so with no strip the number of reachable tab switchers is zero —
+  // and `display: none` takes them out of the accessibility tree too, so it is a keyboard and
+  // screen-reader dead end rather than a pointer inconvenience.
+  it('locks the rail open in provider mode only, and never writes the stored collapse preference', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const settingWrites = [];
+    mountDowntimeManager(
+      [],
+      {},
+      {
+        getSetting: (key) => key === 'managerRailCollapsed',
+        setSetting: (key, value) => settingWrites.push([key, value]),
+      },
+      { managerExtensions: registry }
+    );
+
+    const railWrites = () => settingWrites.filter(([key]) => key === 'managerRailCollapsed');
+
+    assert.ok(railBodyCollapsed(), 'pre-condition: this GM stored a collapsed rail');
+
+    // MODE-scoped, half one: a provider registered while the GM is elsewhere locks nothing.
+    const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+    assert.ok(railBodyCollapsed(), 'a companion on another route leaves the rail alone');
+    assert.equal(railToggleControl().disabled, false);
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assertRailLockedOpen(railWrites);
+    await assertRailLockSurvivesPresses(railWrites);
+
+    // MODE-scoped, half two: Core's fallback keeps its strip, so it is never stranded and
+    // keeps its collapsible rail — on this very route.
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(railBodyCollapsed(), 'losing the companion returns the route to the stored collapse');
+    assert.equal(railToggleControl().disabled, false);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.ok(railBodyCollapsed(), 'and the stored preference survived the whole visit');
+    assert.deepEqual(railWrites(), []);
+  });
+
+  // THE SECOND RENDER SITE (issue 1213 review). `[data-manager-rail-toggle]` is written twice,
+  // once per `{#if selectedSystem}` scope-card branch, and every mounted case above renders the
+  // first: the store fixture always carries a selected system. Deleting the lock attributes
+  // from the `{:else}` branch therefore survived the whole suite, leaving the same dead control
+  // issue 1185 was about, one branch over — on a state this route explicitly supports and has
+  // its own test for. `noSystems: true` is what renders that branch.
+  it('locks the rail open on the companion route with no crafting system selected', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const settingWrites = [];
+    registry.publicApi.registerWorldNavProvider(downtimeProvider({ ids: ['board'] }));
+    mountDowntimeManager(
+      [],
+      { noSystems: true },
+      {
+        getSetting: (key) => key === 'managerRailCollapsed',
+        setSetting: (key, value) => settingWrites.push([key, value]),
+      },
+      { managerExtensions: registry }
+    );
+    const railWrites = () => settingWrites.filter(([key]) => key === 'managerRailCollapsed');
+
+    assert.ok(
+      Boolean(target.querySelector('.manager-scope-card .manager-title')),
+      'pre-condition: this is the no-system scope card, the branch the other cases never render'
+    );
+    assert.ok(railBodyCollapsed(), 'pre-condition: this GM stored a collapsed rail');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assertRailLockedOpen(railWrites);
+    await assertRailLockSurvivesPresses(railWrites);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.ok(railBodyCollapsed(), 'and leaving the route restores the stored collapse here too');
+    assert.deepEqual(railWrites(), []);
+  });
+
+  // Issue 1213 — the one real cost of deleting the tab strip. Measured at a 1330x900 Manager the
+  // Downtime sub-items render below the nav scrollport, so the route's first visible state
+  // offered no visible screen switcher at all. They stay reachable by scrolling, so this is not
+  // stranding; it is one scroll, and Core does it.
+  it('scrolls the active Downtime sub-item into view on entering the companion route', async () => {
+    const scrolled = [];
+    const original = globalThis.Element.prototype.scrollIntoView;
+    globalThis.Element.prototype.scrollIntoView = function record(options) {
+      scrolled.push([this.id, options]);
+    };
+    try {
+      const registry = createManagerExtensionsRegistry();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+      );
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+      assert.deepEqual(scrolled, [], 'nothing is revealed while the GM is on another route');
+
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        scrolled,
+        [['manager-downtime-nav-ledger', { block: 'nearest' }]],
+        'entering the route reveals the active sub-item, by the smallest scroll that does it'
+      );
+
+      target.querySelector('#manager-downtime-nav-crew').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        scrolled.at(-1),
+        ['manager-downtime-nav-crew', { block: 'nearest' }],
+        'and switching screen follows the switcher'
+      );
+      // There was an assertion here that a further settle does not re-scroll, claiming to gate
+      // the `revealedDowntimeNavId` guard in the effect. It could not fail: deleting that guard
+      // left this suite at 374/374. Removed rather than left standing, on the same principle
+      // that removed a surviving grid-track assertion in the layout suite — an assertion that
+      // cannot fail reads as coverage and is not. The guard is defensive; see its comment.
+    } finally {
+      globalThis.Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  // Core's preview owns the top of its own panel, so it needs no reveal — and doing it anyway
+  // would move the rail on a route where nothing was ever out of reach.
+  it('does not scroll the rail on the Core preview route', async () => {
+    const scrolled = [];
+    const original = globalThis.Element.prototype.scrollIntoView;
+    globalThis.Element.prototype.scrollIntoView = function record() {
+      scrolled.push(this.id);
+    };
+    try {
+      mountDowntimeManager([]);
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      assert.deepEqual(scrolled, [], 'core-fallback keeps its strip at the top of the panel');
+    } finally {
+      globalThis.Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
+  // slot is empty and the rail chip is the loud gold sell; once a companion registers, the
+  // loud signal moves to the title bar and the rail chip steps down to a quiet marker, so
+  // the same word is only ever shouted in one place.
+  it('moves the premium signal to the title bar when a companion registers', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+
+    const titlebarPremium = () => target.querySelector('[data-manager-titlebar-premium]');
+    const railChip = () => target.querySelector('[data-world-nav-premium]');
+    const downtimeTitle = () => worldNavItem('downtime').getAttribute('title');
+
+    assert.ok(!titlebarPremium(), 'the free module carries no premium badge in the title bar');
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-system]'),
+      'and the crafting-system badge the rail already duplicates is gone from both states'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.ok(
+      !railChip().classList.contains('is-installed'),
+      'the rail chip keeps its prominent treatment while Core is previewing the surface'
+    );
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+
+    const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+
+    assert.equal(titlebarPremium().textContent.trim(), 'PREMIUM');
+    assert.equal(
+      titlebarPremium().getAttribute('aria-label'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.equal(
+      titlebarPremium().getAttribute('title'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.ok(
+      titlebarPremium().classList.contains('manager-titlebar-badge'),
+      'the badge reuses the shared gold treatment rather than stating a second colour pair'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'installed');
+    assert.ok(railChip().classList.contains('is-installed'), 'and the rail chip mutes');
+    assert.equal(
+      railChip().textContent.trim(),
+      'PREMIUM',
+      'muted is not removed: the rail still names which route premium provides'
+    );
+    assert.equal(
+      downtimeTitle(),
+      'Downtime Studio is unlocked by Fabricate Premium',
+      'and the row stops offering to unlock what is already unlocked'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(!titlebarPremium(), 'removing the companion takes the title-bar signal with it');
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+  });
+
+  // The badge is a claim about the MODULE, not about Core's Downtime route. A companion that
+  // claims a surface Core has never heard of is still installed and still working, so it must
+  // light the same badge — while Core, which still owns Downtime, keeps selling it there.
+  it('lights the title-bar premium badge for a surface Core does not host', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
+    await settleDowntimeProvider();
+
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      'PREMIUM',
+      'an unrecognised companion surface still proves the premium module is installed'
+    );
+    assert.equal(
+      target.querySelector('[data-world-nav-premium]').dataset.worldNavPremiumState,
+      'preview',
+      'but Core still holds the Downtime route, so its rail chip keeps the upgrade sell'
+    );
+    assert.equal(
+      worldNavItem('downtime').getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'and the Downtime tooltip still describes the route it actually renders'
+    );
+  });
+
+  // Issue 1198, maintainer decision A2. The badge reports the MODULE, so it must not be keyed
+  // on one REGISTRY either: a companion whose only surface is a PLAYER-window one is just as
+  // installed and just as working. This is the case that would silently pass if `T7` widened
+  // nothing, because the manager registry alone already lights the badge in every other case.
+  it('lights the title-bar premium badge for a companion registered ONLY in the player registry', async () => {
+    useShippedLocalization();
+    const playerExtensions = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    mountDowntimeManager(
+      [],
+      {},
+      {},
+      { managerExtensions: createManagerExtensionsRegistry(), playerExtensions }
+    );
+
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-premium]'),
+      'the free module still carries no badge'
+    );
+
+    const unregister = playerExtensions.publicApi.registerPlayerNavProvider({
+      apiVersion: 1,
+      id: 'downtime',
+      tabs: [{ id: 'board', label: 'Downtime board', icon: 'fas fa-clock' }],
+      mount: () => undefined,
+    });
+    await settleDowntimeProvider();
+
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      'PREMIUM',
+      'a player-window-only companion still proves the premium module is installed'
+    );
+    assert.equal(
+      target.querySelector('[data-world-nav-premium]').dataset.worldNavPremiumState,
+      'preview',
+      'but Core still holds the Downtime route, so its rail chip keeps the upgrade sell'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-premium]'),
+      'and removing the only companion takes the badge with it'
+    );
+  });
+
+  it('contains mount faults, rejects invalid cleanup returns, and recovers with replacement tabs', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      const unregisterBroken = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Broken',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial broken content';
+            throw new Error('mount exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Broken tracking'));
+      assert.ok(!target.textContent.includes('partial broken content'));
+
+      unregisterBroken();
+      const unregisterInvalid = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Invalid',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial invalid content';
+            return { dispose: true };
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Invalid tracking'));
+      assert.ok(!target.textContent.includes('partial invalid content'));
+
+      unregisterInvalid();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Recovered',
+          coreFallback: true,
+          mount({ target: mountTarget, tabId }) {
+            mountTarget.textContent = `Recovered ${tabId}`;
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.match(target.textContent, /Recovered tracking/);
+      assert.match(target.textContent, /Recovered activities/);
+      // Again the RAIL padlock: the strip one is unrenderable in provider mode, so its absence
+      // would prove nothing about whether a `coreFallback` field on a provider was honoured.
+      assert.ok(
+        !target.querySelector('[data-world-downtime-lock]'),
+        'a companion cannot opt into Core-only fallback behavior with coreFallback'
+      );
+      assert.equal(errors.length, 2);
+      assert.match(errors[0][0], /provider mount failed/);
+      assert.match(errors[1][0], /provider mount failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('continues to fallback after a cleanup throws and reports the fault once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      const unregister = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          mount: () => () => {
+            throw new Error('cleanup exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+
+      unregister();
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.equal(errors.length, 1, 'cleanup is attempted and reported exactly once');
+      assert.match(errors[0][0], /provider cleanup failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('runs companion cleanup while its target is connected on route exit and manager destruction', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanupConnections = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(cleanupConnections, [true], 'route exit cleans before removing the target');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounted.disposeDowntimeProviderBeforeRemoval();
+    unmount(mounted);
+    mounted = null;
+    assert.deepEqual(
+      cleanupConnections,
+      [true, true],
+      'manager destruction cleans exactly once while the target remains connected'
+    );
+  });
+
+  it('renders a provider-declared tab set of any size in the rail, and renders no tab strip', async () => {
+    const registry = createManagerExtensionsRegistry();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.deepEqual(
+      downtimeRailIds(),
+      ['ledger', 'crew'],
+      'the rail renders the provider set, in the provider order'
+    );
+    // Issue 1213 — the strip is Core's preview navigation and is not rendered over a
+    // companion's screens, so a provider's tab set is drawn EXACTLY ONCE.
+    assert.deepEqual(
+      downtimeTabIds(),
+      [],
+      'a companion navigates from the rail alone: no second rendering of its own tab list'
+    );
+    assert.ok(
+      !target.querySelector('[data-downtime-tablist]'),
+      'and no orphan tablist survives the strip'
+    );
+    const region = target.querySelector('#world-downtime-panel-ledger');
+    assert.equal(region.getAttribute('role'), 'region', 'a tabpanel with no tablist is an orphan');
+    assert.equal(
+      region.getAttribute('tabindex'),
+      '-1',
+      'programmatically focusable for provider-swap recovery, but not a tab stop that scrolls nothing'
+    );
+    // WHERE EACH REQUIRED TAB FIELD LANDS, and the two are deliberately DIFFERENT elements
+    // (issue 1213). With no strip the rail sub-item is the only control naming the screen, so
+    // it consumes `accessibleName` and `tooltip` — otherwise Core would validate both, throw
+    // if a provider omitted either, and then discard them.
+    const railItem = target.querySelector('#manager-downtime-nav-ledger');
+    assert.equal(
+      railItem.getAttribute('aria-label'),
+      'Open Guild ledger',
+      'accessibleName names the rail sub-item, replacing its visible label'
+    );
+    assert.equal(
+      railItem.getAttribute('title'),
+      'Guild ledger tools',
+      'and tooltip is that sub-item native tooltip'
+    );
+    // The REGION is named by the screen, not by the action that opens it. Pointing this at the
+    // button would make the landmark inherit the button's whole accessible name and announce
+    // "Open Guild ledger, region"; it points at the label span, which holds "Guild ledger".
+    const labelSpan = railItem.querySelector('.manager-nav-label');
+    assert.equal(labelSpan.id, 'manager-downtime-nav-label-ledger');
+    assert.equal(
+      region.getAttribute('aria-labelledby'),
+      labelSpan.id,
+      'the panel takes its name from the rail label, not from the rail button'
+    );
+    assert.notEqual(
+      region.getAttribute('aria-labelledby'),
+      railItem.id,
+      'because the button name is an instruction and a landmark name is a screen'
+    );
+    assert.equal(
+      labelSpan.textContent.trim(),
+      'Guild ledger',
+      'so the region resolves to the visible screen name'
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-world-downtime-item] .manager-nav-label')).map(
+        (label) => label.textContent.trim()
+      ),
+      ['Guild ledger', 'Guild crew'],
+      'a companion label is already localized and is NOT run through Core lang resolution'
+    );
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'an initial tab the provider does not declare falls back to its first tab, not an empty panel'
+    );
+    assert.ok(
+      !target.querySelector('[data-world-downtime-lock]'),
+      'nothing is padlocked when a companion owns the surface'
+    );
+    assert.ok(
+      !target.querySelector('[data-world-downtime-callout]'),
+      'the premium rail note advertises CORE preview and must not sit under companion screens'
+    );
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'the rail child still drives the provider tab it names'
+    );
+  });
+
+  it('dresses the route in per-tab provider chrome and provider header actions', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const selected = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        prefix: 'Guild',
+        ids: ['ledger', 'crew'],
+        tab: (id) => ({
+          title: `${id} title`,
+          subtitle: `${id} subtitle`,
+          breadcrumb: `${id} crumb`,
+          actionsLabel: `${id} actions`,
+          actions:
+            id === 'ledger'
+              ? [
+                  {
+                    id: 'post',
+                    label: 'Post entry',
+                    icon: 'fas fa-pen',
+                    primary: true,
+                    onSelect: (context) => selected.push(context),
+                  },
+                ]
+              : [{ id: 'guide', label: 'Guild guide', href: 'https://example.test/guide' }],
+        }),
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(managerTitle(), 'ledger title');
+    assert.equal(managerSubtitle(), 'ledger subtitle');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'ledger crumb',
+      'the leaf crumb names the tab, so it belongs to whoever owns the tab'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'ledger actions'
+    );
+    assert.ok(
+      !target.querySelector('[data-downtime-unlock]'),
+      'the Unlock with Premium pill is Core copy about Core, never shown over companion screens'
+    );
+
+    const post = target.querySelector('[data-manager-header-action="post"]');
+    assert.equal(post.tagName, 'BUTTON');
+    assert.ok(post.classList.contains('is-primary'));
+    assert.ok(Boolean(post.querySelector('.fa-pen')), 'an action renders its own icon');
+    post.click();
+    assert.equal(selected.length, 1, 'onSelect runs on click');
+    assert.equal(selected[0].actionId, 'post');
+    assert.equal(selected[0].tabId, 'ledger', 'an action is told which tab invoked it');
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title', 'chrome is per tab, and follows the rail item');
+    assert.equal(managerSubtitle(), 'crew subtitle');
+    const guide = target.querySelector('[data-manager-header-action="guide"]');
+    assert.equal(guide.tagName, 'A');
+    assert.equal(guide.getAttribute('href'), 'https://example.test/guide');
+    assert.equal(guide.getAttribute('target'), '_blank');
+    assert.equal(guide.getAttribute('rel'), 'noopener noreferrer');
+    assert.ok(
+      !target.querySelector('[data-manager-header-action="post"]'),
+      'the previous tab actions are replaced, not accumulated'
+    );
+  });
+
+  // The chrome fixture every runtime-channel case below drills into, named once. It is one
+  // object rather than a per-test literal because it is the shape the seam promises — a
+  // companion editor's identity, its staged-changes chip and Core's own Back/Delete/Save trio
+  // — and three near-identical copies of it is exactly what the duplication gate counts.
+  const COMPANION_EDITOR_CHROME = Object.freeze({
+    title: 'Marn the Quartermaster',
+    subtitle: 'Crew member · two projects in flight',
+    breadcrumb: 'Marn',
+    actionsLabel: 'Crew member actions',
+    image: 'icons/commodities/treasure/token-gold-gem.webp',
+    status: { label: 'Unsaved' },
+    actions: Object.freeze([
+      {
+        id: 'back',
+        label: 'Back to crew',
+        tone: 'ghost',
+        icon: 'fas fa-arrow-left',
+        onSelect: () => {},
+      },
+      { id: 'delete', label: 'Delete', tone: 'danger', icon: 'fas fa-trash', onSelect: () => {} },
+      { id: 'save', label: 'Save', tone: 'primary', disabled: true, onSelect: () => {} },
+    ]),
+  });
+
+  // The provider every runtime-channel case registers: two tabs, both fully dressed at
+  // registration, recording each mount context so a case can drive the channel and — more
+  // importantly — count the mounts.
+  function chromeChannelProvider(mounts) {
+    return downtimeProvider({
+      prefix: 'Guild',
+      ids: ['ledger', 'crew'],
+      tab: (id) => ({
+        title: `${id} title`,
+        subtitle: `${id} subtitle`,
+        breadcrumb: `${id} crumb`,
+        actionsLabel: `${id} actions`,
+        actions: [{ id: 'new', label: 'New entry', primary: true, onSelect: () => {} }],
+      }),
+      mount: ({ context }) => {
+        mounts.push(context);
+      },
+    });
+  }
+
+  const headerAction = (id) => target.querySelector(`[data-manager-header-action="${id}"]`);
+
+  it('dresses the route from a live companion, through Core’s own header primitives', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    assert.equal(managerTitle(), 'ledger title', 'the registered chrome still lands first');
+    assert.ok(
+      !target.querySelector('[data-downtime-chrome-heading]'),
+      'and a route with no runtime artwork keeps the plain heading it has always had'
+    );
+
+    // The companion drills into its own editor and dresses CORE'S header for it.
+    assert.equal(mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME), true);
+    await settleDowntimeProvider();
+
+    assert.equal(
+      mounts.length,
+      1,
+      'THE WHOLE POINT: new chrome, same mount — the editor state the header describes survives'
+    );
+    assert.equal(managerTitle(), 'Marn the Quartermaster');
+    assert.equal(managerSubtitle(), 'Crew member · two projects in flight');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'Marn',
+      'the leaf crumb follows the drill-down, not the tab it started on'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Crew member actions'
+    );
+
+    // ARTWORK, through the recipe editor's own identity block rather than a companion-only one.
+    const heading = target.querySelector('[data-downtime-chrome-heading]');
+    assert.ok(Boolean(heading), 'a drill-down renders the identity heading Core editors render');
+    assert.ok(
+      heading.classList.contains('manager-recipe-edit-heading'),
+      'and reuses the shipped class, so it cannot drift away from the editors it matches'
+    );
+    const medallion = heading.querySelector('[data-medallion]');
+    assert.equal(medallion.dataset.medallion, 'image');
+    assert.equal(
+      medallion.querySelector('img').getAttribute('src'),
+      'icons/commodities/treasure/token-gold-gem.webp'
+    );
+
+    // The staged-changes chip is the manager's ONE chip, in the tone every Core editor uses.
+    const status = target.querySelector('[data-downtime-chrome-status]');
+    assert.ok(status.classList.contains('manager-chip'), 'a lookalike would be a second chip');
+    assert.ok(status.classList.contains('is-warning'));
+    assert.ok(status.classList.contains('is-truncated'), 'and truncates like Core’s own');
+    assert.equal(status.textContent.trim(), 'Unsaved');
+    assert.equal(
+      status.getAttribute('title'),
+      'Unsaved',
+      'Core renders the string it is given — localization stays the companion’s'
+    );
+
+    // Core's own Back / Delete / Save treatments, reachable through the seam at last.
+    assert.ok(headerAction('back').classList.contains('is-ghost'));
+    assert.ok(Boolean(headerAction('back').querySelector('.fa-arrow-left')));
+    assert.ok(headerAction('delete').classList.contains('is-danger'));
+    assert.ok(Boolean(headerAction('delete').querySelector('.fa-trash')));
+    assert.ok(headerAction('save').classList.contains('is-primary'));
+    assert.equal(headerAction('save').disabled, true, 'a Save that cannot save renders disabled');
+    assert.ok(
+      !headerAction('new'),
+      'the tab’s registered actions are replaced by the drill-down’s, never accumulated'
+    );
+
+    // UNSETTING falls back to what the tab registered, with no second call and no remount.
+    assert.equal(mounts[0].setRouteChrome(null), true);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'ledger title');
+    assert.equal(managerSubtitle(), 'ledger subtitle');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'ledger crumb'
+    );
+    assert.ok(!target.querySelector('[data-downtime-chrome-heading]'), 'the artwork goes with it');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+    assert.ok(Boolean(headerAction('new')), 'and the tab’s own actions come back');
+    assert.equal(mounts.length, 1, 'unsetting is not a remount either');
+  });
+
+  it('scopes runtime chrome to the mount that stated it, and refuses a malformed update', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'Marn the Quartermaster');
+
+    // A tab switch ends the mount, so the chrome describing its editor ends with it. Arriving
+    // on `crew` still wearing `Marn` would describe state the remount has already discarded.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 2);
+    assert.equal(managerTitle(), 'crew title');
+    assert.ok(!target.querySelector('[data-downtime-chrome-heading]'));
+
+    // …and the retired mount cannot repaint the screen the GM has moved on to.
+    assert.equal(mounts[0].setRouteChrome({ title: 'Back from the dead' }), false);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title');
+
+    // A malformed update is refused at the seam, with a message, changing nothing — and the
+    // Manager stays entirely on its feet, which a thrown error escaping into Core would not.
+    assert.throws(
+      () => mounts[1].setRouteChrome({ title: 'Crew', subtitel: 'oops' }),
+      /does not accept "subtitel"/
+    );
+    assert.throws(
+      () => mounts[1].setRouteChrome({ status: { label: 'Unsaved', tone: 'urgent' } }),
+      /status tone must be one of/
+    );
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title', 'a refused update leaves the header as it was');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'and the surface is still mounted rather than faulted back to Core’s preview'
+    );
+
+    // Leaving the route ends the mount too, so Core's own preview never wears companion copy.
+    mounts[1].setRouteChrome(COMPANION_EDITOR_CHROME);
+    await settleDowntimeProvider();
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    // Asserted as the REFUSAL rather than as a header reading, because a route the GM has left
+    // renders no Downtime header to read: with the mount left open, this context would still be
+    // accepted and would repaint the route the moment the GM came back to it.
+    assert.equal(
+      mounts[1].setRouteChrome({ title: 'Still here' }),
+      false,
+      'leaving the route ends the mount, so its context can no longer write chrome at all'
+    );
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(managerTitle(), 'crew title', 'returning to the route starts from the tab again');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+  });
+
+  it('offers the rail sub-item of the tab already on screen to the companion', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    const events = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    const stop = mounts[0].onRouteReselect(() => events.push('pop'));
+
+    // The click that used to do nothing at all. It is DISTINGUISHABLE from a first mount: the
+    // mount count does not move, so a companion pops one level rather than re-initialising.
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop'], 'the rail click reaches the companion');
+    assert.equal(mounts.length, 1, 'and is a re-activation, not a remount');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'it keeps working — this is not a one-shot');
+
+    // A DIFFERENT sub-item is still a navigation, and must not be reported as a re-activation.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'navigating away is not a re-activation');
+    assert.equal(mounts.length, 2, 'it is a mount, which is the other half of the distinction');
+
+    // The handler died with its mount, so the new one hears nothing it did not ask for.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'a new mount inherits no listeners');
+
+    stop();
+    stop();
+    const laterMount = mounts[1];
+    laterMount.onRouteReselect(() => events.push('crew'));
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop', 'crew']);
+  });
+
+  it('contains a throwing re-activation handler and keeps Core’s own click behaviour', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounts[0].onRouteReselect(() => {
+      throw new Error('companion exploded');
+    });
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      assert.doesNotThrow(() => target.querySelector('#manager-downtime-nav-ledger').click());
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(errors.length, 1);
+    assert.match(errors[0][0], /Downtime route re-activation handler failed/);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'the rail still works and the surface is still the companion’s'
+    );
+  });
+
+  // The mounted-companion fixture every navigation-guard case opens with: a two-tab provider
+  // holding the route, with its first mount's context in hand. Named once because six cases
+  // start from it, and six copies of the same five lines is exactly the near-identical block
+  // the duplication gate counts against `tests/**`.
+  async function mountGuardedCompanion() {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    return mounts;
+  }
+
+  const managerRoute = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+  it('lets a companion with unsaved work refuse a tab switch and a route exit', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // A TAB SWITCH. Before this seam the companion could prompt on the controls it owns and on
+    // a rail re-activation, and had no say at all here: the panel was disposed and its draft
+    // went with it.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab'], 'the guard is told which kind of navigation it is refusing');
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'the GM stays on the screen holding the unsaved work'
+    );
+    assert.equal(mounts.length, 1, 'and the mount that owns it is never torn down');
+
+    // A ROUTE EXIT, for a Core route that has nothing to do with Downtime.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'route'], 'leaving the route reports as a route exit');
+    assert.equal(managerRoute(), 'world-downtime', 'the GM is still on the companion’s route');
+    assert.equal(mounts.length, 1);
+    assert.ok(Boolean(activeCompanionPanel()), 'and its panel was never disposed');
+  });
+
+  it('gets out of the way the moment the companion allows', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    let allow = false;
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return allow;
+    });
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    allow = true;
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'tab']);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'an allowed navigation is the navigation that shipped, unchanged'
+    );
+    assert.equal(mounts.length, 2, 'and the destination tab mounts normally');
+
+    // The guard died with the mount that registered it, so the new screen answers for itself.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'tab'], 'a new mount inherits no guard');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  it('waits for a companion’s own dialog before deciding', async () => {
+    const mounts = await mountGuardedCompanion();
+    let answer;
+    mounts[0].onBeforeNavigate(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        })
+    );
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime', 'nothing moves while the GM is being asked');
+
+    // A SECOND navigation arriving mid-dialog resolves from the same answer rather than
+    // stacking a second prompt on the first.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    answer(false);
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime', 'the GM keeps their unsaved work');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1);
+  });
+
+  /**
+   * THE COMPATIBILITY GUARANTEE at the Manager level.
+   *
+   * A companion that never calls `onBeforeNavigate` — which is every companion shipped before
+   * this seam, and every future one that has nothing to guard — must navigate exactly as it
+   * did: no prompt, no veto, no changed mount lifecycle. The channel's own suite pins the half
+   * that cannot be seen from here, that Core is handed `undefined` rather than `true` and so
+   * takes its original branch with no added `await`.
+   */
+  it('asks nothing at all of a companion that registered no guard', async () => {
+    const mounts = await mountGuardedCompanion();
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
+    assert.equal(mounts.length, 2);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime');
+    assert.equal(mounts.length, 3, 'every navigation completed, exactly as it did before');
+  });
+
+  it('never asks about a rail click that leaves the screen it is on', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // The PARENT Downtime rail item, clicked while the route is already open. It states no
+    // destination tab, so it navigates nowhere — and a guard that fired here would prompt the
+    // GM about abandoning work they are not being asked to abandon.
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 're-entering the route the GM is already on is not a navigation');
+
+    // Neither is re-activating the sub-item already on screen: that is `onRouteReselect`, and
+    // whether the companion's unsaved work should block its own pop is its question, inside it.
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'and neither is a re-activation of the tab already showing');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1);
+  });
+
+  it('drops a navigation guard when its mount ends, and when the companion unsubscribes', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    const stop = mounts[0].onBeforeNavigate(() => {
+      asked.push('ledger');
+      return false;
+    });
+
+    stop();
+    stop();
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'an unsubscribed guard is not consulted, and stopping twice is safe');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
+
+    // The retired mount's context cannot register a new guard over the mount that replaced it.
+    const staleStop = mounts[0].onBeforeNavigate(() => {
+      asked.push('stale');
+      return false;
+    });
+    assert.equal(typeof staleStop, 'function');
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'a retired context registers nothing');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  /**
+   * A COMPANION DEFECT MUST NEVER TRAP THE GM.
+   *
+   * A guard that throws is reported and the navigation proceeds. The opposite ruling would let
+   * one broken companion leave the GM on a route they cannot leave, in a window they cannot
+   * close, recoverable only by reloading Foundry — and it would do so silently, because a
+   * throwing guard is precisely the module least likely to be watching its own console.
+   */
+  it('contains a throwing navigation guard and lets the GM leave', async () => {
+    const mounts = await mountGuardedCompanion();
+    mounts[0].onBeforeNavigate(() => {
+      throw new Error('companion exploded');
+    });
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      assert.doesNotThrow(() => worldNavItem('parties').click());
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(errors.length, 1);
+    assert.match(errors[0][0], /Downtime navigation guard failed/);
+    assert.equal(managerRoute(), 'world', 'the GM is not stranded by a companion’s bug');
+  });
+
+  it('re-points the route when a provider re-registers with a different tab set', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const unregisterFirst = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'First', ids: ['alpha', 'beta'] })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    target.querySelector('#manager-downtime-nav-beta').click();
+    await settleDowntimeProvider();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'beta');
+
+    unregisterFirst();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Second', ids: ['gamma', 'delta', 'epsilon'] })
+    );
+    await settleDowntimeProvider();
+    assert.deepEqual(downtimeRailIds(), ['gamma', 'delta', 'epsilon']);
+    assert.deepEqual(downtimeTabIds(), [], 'and still no second rendering of the new set');
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'gamma',
+      'an active tab the new set drops falls back to the first tab rather than rendering nothing'
+    );
+    assert.equal(
+      managerTitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Title'),
+      'a replacement that declares no chrome gets Core naming the ROUTE, never the old tab'
+    );
+    assert.equal(
+      managerSubtitle(),
+      '',
+      'Core preview marketing copy never sits under a companion screen that declared none'
+    );
+  });
+
+  it('restores Core preview parity when the last provider is removed', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const unregisterProvider = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.deepEqual(downtimeRailIds(), ['ledger', 'crew']);
+    assert.deepEqual(downtimeTabIds(), [], 'the companion holds the surface, so Core draws no strip');
+
+    unregisterProvider();
+    await settleDowntimeProvider();
+    assert.deepEqual(downtimeTabIds(), ['tracking', 'activities', 'factions', 'settings']);
+    assert.deepEqual(downtimeRailIds(), ['tracking', 'activities', 'factions', 'settings']);
+    assert.equal(
+      target.querySelector('[data-downtime-panel]:not([hidden])').dataset.downtimePanel,
+      'tracking'
+    );
+    assert.equal(
+      managerTitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Preview.Tracking.Title')
+    );
+    assert.equal(
+      managerSubtitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Preview.Tracking.Subtitle')
+    );
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label')
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Actions')
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-downtime-unlock]')),
+      'Core reclaims its own Unlock with Premium action'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-world-downtime-lock] .fa-lock').length,
+      4,
+      'every Core rail child is padlocked again'
+    );
+    assert.ok(Boolean(target.querySelector('[data-world-downtime-callout]')));
+  });
+
+  it('supplies a frozen mount context and remounts when a companion requests it', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const contexts = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['board'],
+        mount: ({ context }) => {
+          contexts.push(context);
+        },
+      })
+    );
+    globalThis.game.user = { isGM: true };
+    try {
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      assert.equal(contexts.length, 1);
+      const [context] = contexts;
+      assert.ok(Object.isFrozen(context), 'the context is frozen, so it cannot be written back');
+      assert.deepEqual(Object.keys(context).sort(), [
+        'craftingSystemId',
+        'isGM',
+        // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable
+        // fields: the context stays frozen and its identity — which is what the host keys a
+        // remount on — never moves when a companion restates its chrome.
+        'onBeforeNavigate',
+        'onRouteReselect',
+        'requestRemount',
+        'revision',
+        'route',
+        'schemaVersion',
+        'setRouteChrome',
+        'surface',
+        'surfaceId',
+        'tabId',
+      ]);
+      assert.equal(typeof context.setRouteChrome, 'function');
+      assert.equal(typeof context.onRouteReselect, 'function');
+      assert.equal(typeof context.onBeforeNavigate, 'function');
+      assert.equal(context.schemaVersion, 1);
+      assert.equal(context.surface, 'manager');
+      assert.equal(context.surfaceId, 'downtime');
+      assert.equal(context.route, 'world-downtime');
+      assert.equal(context.tabId, 'board');
+      assert.equal(context.craftingSystemId, 'alchemy');
+      assert.equal(context.isGM, true);
+      assert.equal(context.revision, 0);
+
+      context.requestRemount();
+      await settleDowntimeProvider();
+      assert.equal(contexts.length, 2, 'requestRemount re-runs mount for the active tab');
+      assert.equal(contexts[1].revision, 1);
+      assert.notEqual(contexts[1], context, 'each mount receives a fresh frozen context');
+    } finally {
+      delete globalThis.game.user;
+    }
+  });
+
+  it('reports a null crafting system on the Downtime route when none is selected', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const contexts = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['board'],
+        mount: ({ context }) => {
+          contexts.push(context);
+        },
+      })
+    );
+    mountDowntimeManager([], { noSystems: true }, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(contexts.length, 1, 'the route stays reachable with no crafting system selected');
+    assert.equal(contexts[0].craftingSystemId, null);
+    assert.equal(contexts[0].isGM, false, 'isGM reads the live Foundry user, defaulting closed');
+  });
+
+  it('publishes observational route hooks for mount, tab change and unmount', async () => {
+    const hooks = [];
+    const registry = createManagerExtensionsRegistry({
+      emitHook: (name, payload) => hooks.push([name, payload]),
+    });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.deepEqual(hooks.map(([name]) => name), [MANAGER_HOOKS.SURFACE_MOUNTED]);
+    assert.deepEqual(hooks[0][1], {
+      schemaVersion: 1,
+      surfaceId: 'downtime',
+      route: 'world-downtime',
+      tabId: 'tracking',
+      providerId: null,
+      coreFallback: true,
+    });
+
+    target.querySelector('[data-downtime-tab="factions"]').click();
+    await settleDowntimeProvider();
+    assert.equal(hooks[1][0], MANAGER_HOOKS.SURFACE_TAB_CHANGED);
+    assert.equal(hooks[1][1].previousTabId, 'tracking');
+    assert.equal(hooks[1][1].tabId, 'factions');
+
+    const unregister = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ ids: ['factions', 'ledger'] })
+    );
+    await settleDowntimeProvider();
+    assert.deepEqual(
+      hooks.slice(2).map(([name]) => name),
+      [MANAGER_HOOKS.NAV_PROVIDER_REGISTERED],
+      'adopting a provider that still declares the active tab moves no tab'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    const unmountEvent = hooks.find(([name]) => name === MANAGER_HOOKS.SURFACE_UNMOUNTED);
+    assert.ok(Boolean(unmountEvent), 'leaving the route publishes the unmount hook');
+    assert.equal(unmountEvent[1].tabId, 'factions');
+    assert.equal(unmountEvent[1].coreFallback, true);
+  });
+
+  // -- The World > Downtime experimental gate (issue 1257) ------------------------------
+  //
+  // The route hosts the unreleased premium Downtime Studio, so until that ships it is visible
+  // and reachable only behind `fabricate.experimentalFeatures`. These cases own the gate
+  // itself; every other Downtime case in this file opens it through `mountDowntimeManager`.
+
+  // Everything the rail renders for Downtime, as one list, so the hidden and shown cases are
+  // literally the same claim with opposite polarity rather than two hand-kept lists that could
+  // drift into asserting different subsets.
+  const DOWNTIME_RAIL_PARTS = [
+    ['[data-world-downtime-section]', 'the group'],
+    ['#manager-world-nav-downtime', 'the parent row'],
+    ['#manager-downtime-toggle', 'the disclosure toggle'],
+    ['.manager-nav-premium', 'the PREMIUM badge'],
+  ];
+
+  function assertDowntimeRailAbsent() {
+    for (const [selector, label] of DOWNTIME_RAIL_PARTS) {
+      assert.ok(!target.querySelector(selector), `${label} must not render behind a shut gate`);
+    }
+    // The submenu, its padlocks and the premium callout are children of the group, so they go
+    // with it; asserted anyway, because "it is a child today" is the sort of fact a later
+    // refactor moves without noticing.
+    assert.ok(!target.querySelector('[data-world-downtime-submenu]'), 'no submenu');
+    assert.ok(!target.querySelector('[data-world-downtime-lock]'), 'no padlocks');
+    assert.ok(!target.querySelector('[data-world-downtime-callout]'), 'no premium callout');
+  }
+
+  it('hides the whole Downtime group behind a shut gate, and leaves World Parties alone', () => {
+    mountManager([], { experimentalFeaturesEnabled: false });
+
+    assertDowntimeRailAbsent();
+    assert.ok(
+      Boolean(target.querySelector('#manager-world-nav-parties')),
+      'Parties is not gated — it is the permanent World entry the gated route redirects to'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-world-nav-section]')),
+      'and the World section itself still renders, with a member left in it'
+    );
+  });
+
+  it('renders the whole Downtime group once the GM opts in', () => {
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+
+    for (const [selector, label] of DOWNTIME_RAIL_PARTS) {
+      assert.ok(Boolean(target.querySelector(selector)), `${label} renders behind an open gate`);
+    }
+    // Opened by the parent click, which is what proves the toggle and submenu are the shipped
+    // ones rather than empty shells the negative case above could pass against vacuously.
+    worldNavItem('downtime').click();
+    flushSync();
+    assert.equal(downtimeRailIds().length, 4, 'and the four Core previews are its children');
+    assert.ok(Boolean(target.querySelector('[data-world-downtime-callout]')));
+  });
+
+  it('leaves the gated Manager with no control that reaches the Downtime route', async () => {
+    mountManager([], { experimentalFeaturesEnabled: false });
+
+    for (const control of Array.from(target.querySelectorAll('[data-world-nav-item]'))) {
+      control.click();
+      await settleRouteExit();
+      assert.notEqual(
+        managerRoute(),
+        'world-downtime',
+        `activating ${control.dataset.worldNavItem} must not reach a gated route`
+      );
+    }
+    assertDowntimeRailAbsent();
+  });
+
+  /**
+   * Turn the world setting off underneath the mounted Manager.
+   *
+   * The real `adminStore` republishes `viewState` when a setting moves, so this is the shape
+   * production has — NOT a remount, which could not reproduce a flag flipping under a GM who
+   * is already standing somewhere.
+   *
+   * @param {boolean} enabled The new value of `fabricate.experimentalFeatures`.
+   */
+  async function setExperimentalFeatures(enabled) {
+    mountedStore.viewState.update((state) => ({
+      ...state,
+      experimentalFeaturesEnabled: enabled,
+    }));
+    await settleRouteExit();
+  }
+
+  /**
+   * Put a companion on the Downtime route with the gate open, recording its lifecycle.
+   *
+   * @param {object} [options] Fixture inputs.
+   * @param {object} [options.registry] Registry to register into.
+   * @returns {Promise<{mounts: object[], cleanups: number[]}>} Mount contexts and cleanup log.
+   */
+  async function standOnCompanionDowntime({ registry = createManagerExtensionsRegistry() } = {}) {
+    const mounts = [];
+    const cleanups = [];
+    const unregister = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['ledger', 'crew'],
+        mount({ target: mountTarget, tabId, context }) {
+          mountTarget.textContent = `Mounted ${tabId}`;
+          mounts.push(context);
+          return () => cleanups.push(tabId);
+        },
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1, 'the companion holds the route before the gate moves');
+    return { mounts, cleanups, unregister };
+  }
+
+  /**
+   * THE SETTING MOVING UNDER A STANDING GM MUST NOT TOUCH THE PANEL (issue 1257).
+   *
+   * The gate is read by the rail group and the two route entries, and DELIBERATELY not by
+   * `normalizedActiveView`. That omission is the whole of this behaviour: `currentView` is a
+   * `$derived`, so a gate read in the normalizer would resolve the route away in the same flush
+   * the setting moved in, unmount the extension host, and run a mounted companion's cleanup —
+   * destroying unsaved work without ever consulting the `onBeforeNavigate` guard that every
+   * other exit from this route honours. A GM's in-progress edit is not ours to discard because a
+   * setting changed, so the panel stays put and the GM leaves it by an ordinary guarded exit.
+   *
+   * This case is a REGRESSION FENCE around that omission. Reintroducing the gate read in the
+   * normalizer — which looks like tightening the gate — turns it red.
+   */
+  it('leaves an open companion panel alone when the setting moves under it', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // THE POSITIVE CONTROL, and the case is worthless without it. "The guard was not consulted"
+    // reads identically to "no guard was ever registered", and `onBeforeNavigate` returns a silent
+    // no-op unsubscribe when it is called from a context whose mount is not live — so prove the
+    // guard is live, and refusing, BEFORE asserting anything about what does or does not reach it.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['route'], 'an ordinary rail exit consults the guard');
+    assert.equal(managerRoute(), 'world-downtime', 'and its refusal holds the GM on the route');
+    asked.length = 0;
+
+    await setExperimentalFeatures(false);
+
+    assert.equal(managerRoute(), 'world-downtime', 'the open route is not yanked out from under it');
+    assert.ok(Boolean(activeCompanionPanel()), 'the companion panel is still on screen');
+    assert.deepEqual(cleanups, [], 'nothing was torn down, so no unsaved work was discarded');
+    assert.deepEqual(asked, [], 'and nothing prompted either — this is not a navigation at all');
+    assertDowntimeRailAbsent();
+
+    // THE WAY OUT IS UNCHANGED. The rail entry is gone, so the GM leaves by any other control,
+    // and that is the ordinary guarded exit it always was — guard consulted, refusal honoured.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['route'], 'the next navigation still consults the same live guard');
+    assert.equal(managerRoute(), 'world-downtime', 'and still honours its refusal');
+    assert.deepEqual(cleanups, []);
+  });
+
+  it('lets the GM leave the de-gated route for good once the companion allows it', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    let allow = false;
+    mounts[0].onBeforeNavigate(() => allow);
+
+    await setExperimentalFeatures(false);
+    assert.equal(managerRoute(), 'world-downtime');
+
+    allow = true;
+    worldNavItem('parties').click();
+    await settleRouteExit();
+
+    assert.equal(managerRoute(), 'world', 'the GM leaves through the exit they chose');
+    assert.deepEqual(cleanups, ['ledger'], 'and the companion is disposed exactly once, on the way');
+    assertDowntimeRailAbsent();
+
+    // AND CANNOT RETURN. The rail entry is gone and both entries refuse, which is what makes the
+    // route unreachable without the normalizer having to police a token nothing can produce.
+    assert.ok(!target.querySelector('[data-world-downtime-item]'), 'no sub-item survives to click');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  it('accepts a provider registered while gated without blaming the module, and never mounts it', async () => {
+    const hooks = [];
+    const registry = createManagerExtensionsRegistry({
+      emitHook: (name, payload) => hooks.push([name, payload]),
+    });
+    mountManager([], { experimentalFeaturesEnabled: false }, {}, { managerExtensions: registry });
+
+    const mounts = [];
+    const errors = [];
+    const warnings = [];
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.error = (...args) => errors.push(args);
+    console.warn = (...args) => warnings.push(args);
+    let unregister;
+    try {
+      // A companion registers at `ready` and cannot know this GM's setting, so registration
+      // must behave exactly as it does with the gate open.
+      assert.doesNotThrow(() => {
+        unregister = registry.publicApi.registerWorldNavProvider(
+          downtimeProvider({
+            mount({ context }) {
+              mounts.push(context);
+            },
+          })
+        );
+      }, 'registration is a page-session concern and never consults a per-world setting');
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+      console.warn = originalWarn;
+    }
+
+    assert.deepEqual(errors, [], 'nothing is logged as if the module were at fault');
+    assert.deepEqual(warnings, []);
+    assert.deepEqual(
+      hooks.map(([name]) => name),
+      [MANAGER_HOOKS.NAV_PROVIDER_REGISTERED],
+      'the registration hook still fires, and no surface lifecycle hook does'
+    );
+    assert.equal(typeof unregister, 'function', 'and the companion keeps its unregister handle');
+    assert.deepEqual(mounts, [], 'what it observes is an ABSENCE: mount is simply never called');
+    assert.ok(!target.querySelector('[data-world-downtime-host]'), 'no host is rendered');
+    assertDowntimeRailAbsent();
+  });
+
+  it('cannot be resurrected by requestRemount from a context retained across the gate', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    const retained = mounts[0];
+
+    // Close the gate, then leave the panel the ordinary way — the gate does not evict a standing
+    // GM, so reaching the state this case is about takes both steps.
+    await setExperimentalFeatures(false);
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world');
+    assert.deepEqual(cleanups, ['ledger'], 'the mount ended on the way out');
+
+    // A companion may hold its context past the mount that minted it — a pending promise, a
+    // stray data listener — and `requestRemount()` is the one context method whose whole job is
+    // to bring a surface back. It must not bring back a surface the gate has removed.
+    assert.doesNotThrow(() => retained.requestRemount());
+    await settleRouteExit();
+
+    assert.equal(managerRoute(), 'world', 'the GM is not dragged back onto a gated route');
+    assert.ok(!target.querySelector('[data-world-downtime-host]'), 'and no host is re-rendered');
+    assert.deepEqual(mounts.length, 1, 'the companion is not mounted a second time');
+    assert.deepEqual(cleanups, ['ledger'], 'nor disposed a second time');
+    assertDowntimeRailAbsent();
+  });
+
+  it('places permanent World navigation after every selected-system entry, including Graph', () => {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      experimentalFeaturesEnabled: true,
+    });
+
+    const navChildren = Array.from(target.querySelector('.manager-nav').children);
+    const graph = navChildren.find((item) => item.textContent.includes('Graph'));
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(graph, 'the experimental Graph placeholder is visible in this ordering fixture');
+    assert.ok(
+      navChildren.indexOf(world) > navChildren.indexOf(graph),
+      'World follows every selected-system entry, including Graph'
+    );
+  });
+
+  it('keeps either active World Travel child selected when the parent is activated', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+    worldTravelItem('travel').click();
+    await tick();
+    flushSync();
+
+    for (const childId of ['realms', 'map']) {
+      worldTravelItem(childId).click();
+      await tick();
+      flushSync();
+      worldTravelItem('travel').click();
+      await tick();
+      flushSync();
+
+      assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(worldTravelItem(childId).getAttribute('aria-current'), 'page');
+      assert.equal(
+        target.querySelectorAll('#manager-travel-submenu [aria-current="page"]').length,
+        1
+      );
+    }
+  });
+
+  it('keeps World controls named and reachable in the persisted 56px rail', () => {
+    mountManager(
+      [],
+      { gatheringRealmsEnabled: true },
+      { getSetting: (key) => key === 'managerRailCollapsed' }
+    );
+
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(worldTravelItem('travel').getAttribute('aria-label'), 'Travel');
+    assert.equal(worldNavItem('parties').tagName, 'BUTTON');
+    assert.equal(worldTravelItem('travel').tagName, 'BUTTON');
+  });
+
+  it('keeps a World Travel child reachable after collapsing and re-expanding the rail', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    const railToggle = target.querySelector('[data-manager-rail-toggle]');
+    railToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    target.querySelector('[data-manager-rail-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(!target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    worldTravelItem('travel').click();
+    await tick();
+    flushSync();
+    assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    worldTravelItem('realms').click();
+    await settleRouteExit();
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-travel-panel="realms"]'));
+  });
+
+  // Issue 1282: the toggle states PARTICIPATION, so it lives on System Settings beside
+  // Currency and gates nothing about the World > Travel route, which is always reachable.
+  it('flips Travel & Realms from the System Settings tile while World Travel stays put', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -11586,17 +16305,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
+    assert.ok(worldTravelItem('travel'), 'World Travel is present before any system opts in');
+    assert.equal(
+      target.querySelector('[data-gathering-realm-toggle]'),
+      null,
+      'the toggle is not on the systems library route'
+    );
 
-    // Travel is hidden while the toggle is off.
-    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden by default');
-    const toggle = target.querySelector('[data-gathering-realm-toggle]');
-    assert.ok(toggle, 'realm toggle card renders on the settings tab');
+    navButton('System Overview').click();
+    await settleRouteExit();
+
+    const tile = target.querySelector('[data-feature-key="gatheringRealms"]');
+    assert.ok(tile, 'the feature tile renders beside Currency');
+    assert.ok(
+      target.querySelector('[data-feature-key="currency"]'),
+      'and the Currency tile it is modelled on is its neighbour'
+    );
+    const toggle = tile.querySelector('[data-gathering-realm-toggle]');
+    assert.ok(toggle, 'the tile carries the toggle');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle starts unpressed');
 
     toggle.click();
@@ -11615,62 +16341,396 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true',
       'toggle reflects the new pressed state'
     );
-    // Enabling the flag reveals the Travel nav item.
-    assert.ok(
-      gatheringSubitem('Travel'),
-      'Travel nav item appears once Travel & Realms is enabled'
-    );
+    assert.ok(worldTravelItem('travel'), 'and World Travel is unaffected either way');
+    assert.ok(!gatheringSubitem('Travel'), 'Travel is not nested inside Gathering');
   });
 
-  it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
+  // The route used to evaporate under the GM when the selected system's toggle went off, which
+  // is the fallback this replaced (issue 1282). Realms are world geography: the page they are
+  // authored on cannot depend on which crafting system happens to be selected.
+  it('keeps World Travel on screen when the selected system opts out of Travel & Realms', async () => {
     const calls = [];
+    const store = createStore(calls, { gatheringRealmsEnabled: true });
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
-      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+      props: { store, services: { openCurrentAdmin: () => {} } },
     });
     flushSync();
 
-    navButton('Gathering').click();
+    worldTravelItem('travel').click();
+    await settleRouteExit();
+    assert.equal(worldTravelItem('realms').getAttribute('aria-current'), 'page');
+
+    store.viewState.update((state) => ({
+      ...state,
+      gatheringRealmSettings: { ...state.gatheringRealmSettings, enabled: false },
+    }));
     await tick();
     flushSync();
 
-    // Enable the subsystem, then route to the Travel tab.
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
-    await tick();
-    flushSync();
-    gatheringSubitem('Travel').click();
-    await tick();
-    flushSync();
-    assert.ok(
-      gatheringSubitem('Travel')?.getAttribute('aria-current') === 'page',
-      'Travel tab is active'
+    assert.ok(target.querySelector('[data-world-nav-section]'), 'World remains available');
+    assert.ok(worldTravelItem('travel'), 'World Travel stays put');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
+    assert.ok(target.querySelector('[data-travel-panel="realms"]'));
+  });
+
+  // Realms became WORLD geography in issue 1282, so the library is the same library whichever
+  // crafting system is selected. Before it, a GM running two systems authored the same valley
+  // twice and the two copies could disagree.
+  it('keeps the realm library and the party list global across a scope switch', async () => {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      worldRealms: [
+        { id: 'realm-forest', name: 'Green March', enabled: true },
+        { id: 'realm-forge', name: 'Forge Quarter', enabled: true },
+      ],
+      smithingFeatures: { gathering: true, salvage: true },
+    });
+    worldTravelItem('travel').click();
+    await settleRouteExit();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
+    assert.ok(target.textContent.includes('Green March'));
+    assert.ok(target.textContent.includes('Forge Quarter'));
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
     );
 
-    // Disabling the flag must drop the stale Travel tab back to Environments, not
-    // leave the manager stranded on a hidden tab. Re-enter Settings to flip it off
-    // (the Travel surface has no toggle).
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
+    assert.equal(await switchScopeSystemTo('smithing'), 'world-travel');
+    assert.ok(target.textContent.includes('Green March'));
+    assert.ok(target.textContent.includes('Forge Quarter'));
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
+    );
+  });
+
+  it('keeps active World Parties when Gathering or its selected system vanishes', async () => {
+    for (const fallback of ['gathering-off', 'selection-cleared']) {
+      const store = createStore([], { gatheringRealmsEnabled: true });
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      worldNavItem('parties').click();
+      await tick();
+      flushSync();
+
+      store.viewState.update((state) => ({
+        ...state,
+        canShowEnvironmentsTab: false,
+        selectedSystem:
+          fallback === 'selection-cleared'
+            ? null
+            : {
+                ...state.selectedSystem,
+                features: { ...state.selectedSystem.features, gathering: false },
+              },
+        systems: state.systems.map((system) => ({
+          ...system,
+          selected: fallback !== 'selection-cleared' && system.id === 'alchemy',
+        })),
+      }));
+      await tick();
+      flushSync();
+
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
+      assert.ok(target.querySelector('[data-world-nav-section]'));
+      assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+      assert.equal(target.querySelector('[data-party-realm-override-unavailable]') !== null, true);
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('presents and operates World Parties without a selected system while withholding overrides', async () => {
+    const calls = [];
+    mountManager(calls, { noSystems: true });
+    worldNavItem('parties').click();
     await tick();
     flushSync();
 
-    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden again');
-    // The active tab is no longer Travel; Settings remains the current selection.
-    const activeSubitem = Array.from(target.querySelectorAll('.manager-nav-subitem')).find(
-      (item) => item.getAttribute('aria-current') === 'page'
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
+    assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'World Parties'
     );
-    assert.notEqual(
-      activeSubitem?.textContent.trim(),
-      'Travel',
-      'stale Travel tab is not the active tab'
+    const worldHeading = target.querySelector('.manager-main .manager-section-header');
+    assert.equal(
+      worldHeading.querySelector('.manager-kicker').textContent.trim(),
+      'WORLD / every system'
     );
+    assert.equal(worldHeading.querySelector('.manager-title').textContent.trim(), 'World Parties');
+    assert.match(
+      worldHeading.querySelector('.manager-subtitle').textContent,
+      /shared across every crafting system/
+    );
+    // The PAGE header carries the computed census. It is a different element from the
+    // section heading above, and the regex there matches both strings, so this one is
+    // pinned exactly or the count could drift unnoticed.
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      '2 parties · 1 enabled · 1 of 2 characters assigned'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'World party actions'
+    );
+    assert.equal(target.querySelector('.manager-travel-inspector'), null, 'no Parties inspector');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.worldTravelTab,
+      'parties',
+      'the full-width layout is scoped to the World Parties route'
+    );
+    const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    assert.equal(createButton.disabled, false);
+    assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
+    assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);
+    assert.equal(target.textContent.includes('No current realm set for this system.'), false);
+
+    // Every card renders its own controls in the full-width pane; no party selection or
+    // inspector echo is needed to reach this CRUD walk.
+    assert.equal(target.querySelector('.manager-party-enable-toggle'), null);
+
+    createButton.click();
+    const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
+
+    const nameInput = secondCard.querySelector('[data-manager-party-name-field]');
+    setInputValue(nameInput, 'Nightwardens');
+    nameInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+
+    secondCard.querySelector('[data-manager-party-add-open="party-two"]').click();
+    await tick();
+    flushSync();
+    const scoutCandidate = secondCard.querySelector('[data-manager-party-candidate="Actor.scout"]');
+    assert.ok(scoutCandidate, 'the no-selection party card exposes the global actor roster');
+    scoutCandidate.click();
+
+    dispatchDrop(secondCard.querySelector('[data-manager-party-travel-actor="party-two"]'), {
+      type: 'Actor',
+      uuid: 'Actor.scout',
+    });
+    await tick();
+    flushSync();
+    // The gate opens only once the drop lands a travel actor (req 4): before it, the pill
+    // is `aria-disabled` and explains itself rather than being `disabled` and unreachable.
+    const enableButton = secondCard.querySelector('[data-manager-party-enable="party-two"]');
+    assert.equal(enableButton.getAttribute('aria-disabled'), null);
+    enableButton.click();
+    secondCard.querySelector('[data-manager-party-delete="party-two"]').click();
+
+    assert.deepEqual(
+      calls.filter((call) =>
+        [
+          'createParty',
+          'renameParty',
+          'addOrMovePartyMember',
+          'setPartyTravelActor',
+          'setPartyEnabled',
+          'deleteParty',
+        ].includes(call[0])
+      ),
+      [
+        ['createParty'],
+        ['renameParty', 'party-two', 'Nightwardens'],
+        ['addOrMovePartyMember', 'party-two', 'Actor.scout'],
+        ['setPartyTravelActor', 'party-two', 'Actor.scout'],
+        ['setPartyEnabled', 'party-two', true],
+        ['deleteParty', 'party-two'],
+      ]
+    );
+    assert.equal(
+      calls.some((call) => ['setPartyRealmOverride', 'clearPartyRealmOverride'].includes(call[0])),
+      false,
+      'no-selection Party CRUD must not write a system override'
+    );
+  });
+
+  it('counts a multi-party character once and counts only enabled parties in the World Parties subtitle', async () => {
+    mountManager([], {
+      noSystems: true,
+      // Mira is in BOTH parties; Vale is a member of the disabled one only; Wagon is a
+      // travel actor and not a player character, so it is outside both the numerator and
+      // the denominator — counting it would render "3 of 2 characters assigned".
+      travelParties: [
+        {
+          id: 'party-one',
+          name: 'Wayfarers',
+          enabled: true,
+          memberCount: 1,
+          memberActorUuids: ['Actor.member'],
+          memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
+          travelActorUuid: 'Actor.wagon',
+          travelActor: { uuid: 'Actor.wagon', name: 'The Wagon', img: '' },
+        },
+        {
+          id: 'party-two',
+          name: 'Night Watch',
+          enabled: false,
+          memberCount: 2,
+          memberActorUuids: ['Actor.member', 'Actor.vale'],
+          memberCards: [
+            { uuid: 'Actor.member', name: 'Mira', img: '', stale: false },
+            { uuid: 'Actor.vale', name: 'Vale', img: '', stale: false },
+          ],
+          travelActorUuid: null,
+          travelActor: null,
+        },
+      ],
+      actorOptions: [
+        { uuid: 'Actor.member', name: 'Mira', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.vale', name: 'Vale', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.wagon', name: 'The Wagon', img: '', isPlayerCharacter: false },
+      ],
+    });
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      '2 parties · 1 enabled · 2 of 2 characters assigned'
+    );
+  });
+
+  it('routes a World Parties store validation failure to the card that caused it', async () => {
+    const store = createStore([], { noSystems: true });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    // The pane records the card that issued the failing mutation, so the rejection has to be
+    // provoked from a card rather than injected: `_travelErrorState` carries no party id.
+    const firstCard = target.querySelector('[data-manager-travel-party-id="party-one"]');
+    firstCard.querySelector('[data-manager-party-add-open="party-one"]').click();
+    await tick();
+    flushSync();
+    firstCard.querySelector('[data-manager-party-candidate="Actor.scout"]').click();
+    await tick();
+    flushSync();
+
+    store.viewState.update((state) => ({
+      ...state,
+      travelError: 'Scout is already in an enabled party.',
+      travelFieldErrors: { members: 'Scout is already in an enabled party.' },
+    }));
+    await tick();
+    flushSync();
+
+    const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
+    const errors = Array.from(firstCard.querySelectorAll('.manager-party-field-error'));
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].textContent.trim(), 'Scout is already in an enabled party.');
+    assert.equal(
+      firstCard.querySelector('[data-manager-party-member-rows]').getAttribute('aria-describedby'),
+      errors[0].id,
+      'the message is associated with the member list that produced it'
+    );
+    assert.equal(secondCard.querySelector('.manager-party-field-error'), null);
+    // A field error whose card is on the page suppresses the pane-level summary, so the GM
+    // reads it once and in context.
+    assert.equal(target.querySelector('[data-manager-party-summary-error]'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+  });
+
+  it('renders a context-free World Parties rejection once above the card list', async () => {
+    const store = createStore([], { noSystems: true });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    // `setPartyEnabled` passes no field context, and req 5 can reject an enable the
+    // travel-actor gate allowed, so the enable control is never the only feedback surface.
+    store.viewState.update((state) => ({
+      ...state,
+      travelError: 'Mira is already in an enabled party.',
+      travelFieldErrors: {},
+    }));
+    await tick();
+    flushSync();
+
+    const summaries = target.querySelectorAll('[data-manager-party-summary-error]');
+    assert.equal(summaries.length, 1);
+    assert.equal(summaries[0].textContent.trim(), 'Mira is already in an enabled party.');
+    assert.equal(target.querySelector('.manager-party-field-error'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+  });
+
+  it('keeps active World Travel when Gathering or the selected system vanishes', async () => {
+    for (const fallback of ['gathering-off', 'selection-cleared']) {
+      const store = createStore([], { gatheringRealmsEnabled: true });
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      worldTravelItem('travel').click();
+      await tick();
+      flushSync();
+
+      store.viewState.update((state) => ({
+        ...state,
+        canShowEnvironmentsTab: false,
+        selectedSystem:
+          fallback === 'selection-cleared'
+            ? null
+            : {
+                ...state.selectedSystem,
+                features: { ...state.selectedSystem.features, gathering: false },
+              },
+        systems: state.systems.map((system) => ({
+          ...system,
+          selected: fallback !== 'selection-cleared' && system.id === 'alchemy',
+        })),
+      }));
+      await tick();
+      flushSync();
+
+      // A world route, so neither a gathering-off system nor a cleared selection can evict it.
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-travel');
+      assert.ok(worldTravelItem('travel'));
+      assert.ok(target.querySelector('[data-world-nav-section]'));
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -15133,7 +20193,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the Salvage feature toggle and routes its change', async () => {
-    const { calls } = await mountCurrencyEditor();
+    const { calls } = await mountSystemSettings();
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage feature toggle renders in System Settings');
     // The default fixture has salvage on, so toggling sends false.
@@ -15147,7 +20207,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('hides the salvage resolution-mode card when the salvage feature is off (toggle stays available)', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -15171,7 +20231,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('gives every feature tile an icon chip whose state class tracks the feature', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -15208,7 +20268,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('flips the feature chip state class when the feature toggles', async () => {
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -15221,7 +20281,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon').classList;
     assert.ok(chipClasses().contains('is-off'), 'the salvage chip starts off');
 
-    await mountCurrencyEditor({
+    await mountSystemSettings({
       selectedFeatures: {
         essences: true,
         itemTags: true,
@@ -15247,7 +20307,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const strategy = target.querySelector('[data-system-currency-strategy-select]');
+    const strategy = target.querySelector('[data-world-currency-strategy-select]');
     assert.ok(strategy, 'spend-strategy select should render');
     const optionValues = [...strategy.querySelectorAll('option')].map((option) => option.value);
     assert.deepEqual(
@@ -15257,7 +20317,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // The single shared strategy hint reflects the selected strategy.
     assert.ok(
-      target.querySelector('[data-system-currency-strategy-hint]'),
+      target.querySelector('[data-world-currency-strategy-hint]'),
       'a strategy hint should render'
     );
     strategy.value = 'macro';
@@ -15278,22 +20338,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const macroRow = target.querySelector('[data-system-currency-macros]');
+    const macroRow = target.querySelector('[data-world-currency-macros]');
     assert.ok(macroRow, 'macro zones container should render');
     // The three drop zones share one single-row container.
     assert.ok(
       macroRow.classList.contains('manager-currency-macro-row'),
       'the three macro drop zones should share the single-row container'
     );
-    const dropzones = macroRow.querySelectorAll('[data-system-currency-macro-dropzone]');
+    const dropzones = macroRow.querySelectorAll('[data-world-currency-macro-dropzone]');
     assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     assert.equal(
-      target.querySelectorAll('[data-system-currency-macro-dropzone]').length,
+      target.querySelectorAll('[data-world-currency-macro-dropzone]').length,
       3,
       'all three drop zones live inside the single-row container'
     );
     // The removed nested inventory-mode select must not render.
-    assert.equal(target.querySelector('[data-system-currency-inventory-mode-select]'), null);
+    assert.equal(target.querySelector('[data-world-currency-inventory-mode-select]'), null);
   });
 
   it('gives each empty macro drop zone a field-specific accessible name', async () => {
@@ -15307,7 +20367,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const dropzones = [...target.querySelectorAll('[data-system-currency-macro-dropzone]')];
+    const dropzones = [...target.querySelectorAll('[data-world-currency-macro-dropzone]')];
     assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
     const labels = dropzones.map((zone) => zone.getAttribute('aria-label'));
     // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
@@ -15343,17 +20403,17 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // No provider select is offered; the no-provider callout renders instead.
     assert.equal(
-      target.querySelector('[data-system-currency-provider-select]'),
+      target.querySelector('[data-world-currency-provider-select]'),
       null,
       'no provider select should render for a no-provider system'
     );
     assert.ok(
-      target.querySelector('[data-system-currency-no-provider]'),
+      target.querySelector('[data-world-currency-no-provider]'),
       'the no-provider callout should appear, steering the GM to the macro strategy'
     );
     // The removed inventory-mode select must not render.
     assert.equal(
-      target.querySelector('[data-system-currency-inventory-mode-select]'),
+      target.querySelector('[data-world-currency-inventory-mode-select]'),
       null,
       'the nested inventory-mode select should be gone'
     );
@@ -15395,7 +20455,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Expand the gp unit's editor.
     const card = target.querySelector('.manager-currency-unit-card');
     card
-      .querySelector('[data-system-currency-unit="gp"] [aria-label="Edit currency unit"]')
+      .querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]')
       .click();
     await tick();
     flushSync();
@@ -15413,12 +20473,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no add-sub-unit builder in macro mode'
     );
     assert.equal(
-      card.querySelectorAll('[data-system-currency-subunit]').length,
+      card.querySelectorAll('[data-world-currency-subunit]').length,
       0,
       'no sub-unit chips in macro mode'
     );
     assert.ok(
-      card.querySelector('[data-system-currency-unit-macro-note]'),
+      card.querySelector('[data-world-currency-unit-macro-note]'),
       'macro-conversion hint should render'
     );
   });
@@ -15444,7 +20504,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const card = target.querySelector('.manager-currency-unit-card');
     card
       .querySelector(
-        `[data-system-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`
+        `[data-world-currency-unit="${expandUnitId}"] [aria-label="Edit currency unit"]`
       )
       .click();
     await tick();
@@ -15587,7 +20647,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // The provider-managed callout renders and the Add/Seed header actions are hidden.
     assert.ok(
-      target.querySelector('[data-system-currency-provider-managed]'),
+      target.querySelector('[data-world-currency-provider-managed]'),
       'provider-managed callout should render'
     );
     assert.equal(
@@ -15599,7 +20659,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // Units render read-only: no pen/edit, delete, or remove controls, no editable amount inputs.
     const card = target.querySelector('.manager-currency-unit-card');
-    assert.ok(card.querySelector('[data-system-currency-unit="gp"]'), 'gp unit should render');
+    assert.ok(card.querySelector('[data-world-currency-unit="gp"]'), 'gp unit should render');
     assert.equal(
       card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button')
         .length,
@@ -15619,27 +20679,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Provider read-only units present label / abbreviation / denomination as static field/value
     // pairs and render NO sub-unit chips.
     assert.equal(
-      card.querySelectorAll('[data-system-currency-subunit]').length,
+      card.querySelectorAll('[data-world-currency-subunit]').length,
       0,
       'no sub-unit chips in provider read-only mode'
     );
-    const gpUnit = card.querySelector('[data-system-currency-unit="gp"]');
+    const gpUnit = card.querySelector('[data-world-currency-unit="gp"]');
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-readonly-label]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-readonly-label]').textContent.trim(),
       'Gold'
     );
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-abbreviation]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-abbreviation]').textContent.trim(),
       'gp'
     );
     assert.equal(
-      gpUnit.querySelector('[data-system-currency-denomination]').textContent.trim(),
+      gpUnit.querySelector('[data-world-currency-denomination]').textContent.trim(),
       'gp'
     );
   });
 
   it('renders the currency feature toggle in Optional features and routes its change', async () => {
-    const { calls } = await mountCurrencyEditor({
+    const { calls } = await mountSystemSettings({
       selectedCurrency: {
         enabled: false,
         spendStrategy: 'actorProperty',
@@ -15668,7 +20728,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('renders the time-requirements feature toggle in Optional features and routes its change (issue 714)', async () => {
-    const { calls } = await mountCurrencyEditor({
+    const { calls } = await mountSystemSettings({
       selectedCurrency: {
         enabled: false,
         spendStrategy: 'actorProperty',
@@ -15701,44 +20761,103 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('hides the Currency Units card when currency is disabled and shows it when enabled', async () => {
-    await mountCurrencyEditor({
-      selectedCurrency: {
-        enabled: false,
-        spendStrategy: 'actorProperty',
-        providerId: '',
-        macros: { canAfford: '', increment: '', decrement: '' },
-        units: [],
-      },
-    });
-    assert.equal(
-      target.querySelector('[data-system-currency-units]'),
-      null,
-      'Currency Units card should be hidden when currency is disabled'
-    );
-    // The toggle tile still renders even with the card hidden.
-    assert.ok(
-      target.querySelector('[data-feature-key="currency"]'),
-      'currency toggle tile should still render'
-    );
-
-    // Tear down before re-mounting with currency enabled.
-    if (mounted) unmount(mounted);
-    if (target?.parentNode) target.remove();
-
+  it('counts PARTICIPATING systems in the World Currency subtitle (issue 1278)', async () => {
+    // The affordance exists to stop a GM misdiagnosing an unadopted ladder as a broken one, so a
+    // count that is always zero asserts the false half of that diagnosis to every GM. It reads
+    // the projected `currencyEnabled` flag; reaching for `requirements.currency.enabled` on this
+    // list silently yields undefined, because the projection is an allowlist without it.
     await mountCurrencyEditor({
       selectedCurrency: {
         enabled: true,
         spendStrategy: 'actorProperty',
         providerId: '',
         macros: { canAfford: '', increment: '', decrement: '' },
-        units: [],
+        units: [{ id: 'gp', label: 'Gold' }],
       },
     });
-    assert.ok(
-      target.querySelector('[data-system-currency-units]'),
-      'Currency Units card should render when currency is enabled'
+
+    const subtitle = target.querySelector('.manager-subtitle')?.textContent ?? '';
+    assert.match(subtitle, /1 coin/, `the unit count is stated: ${subtitle}`);
+    assert.match(subtitle, /used by 1 of 2/, `one of the two fixture systems opts in: ${subtitle}`);
+  });
+
+  it('says the ladder is empty rather than counting zero coins', async () => {
+    await mountCurrencyEditor();
+
+    const subtitle = target.querySelector('.manager-subtitle')?.textContent ?? '';
+    assert.match(subtitle, /No coins yet/, subtitle);
+  });
+
+  it('offers NO crafting-system actions on the World Currency page (issue 1278)', async () => {
+    // The page-header actions fall through to Import / Export / Create for any route without a
+    // branch of its own. Those act on CRAFTING SYSTEMS, so on a route that has no selected system
+    // "Create" would create one and "Export" would sit permanently disabled. The route's own two
+    // actions live on the card header, where the provider read-only gating that hides them is.
+    await mountCurrencyEditor();
+
+    assertNoElement(
+      target,
+      '.manager-header-actions',
+      'the currency page must not offer crafting-system actions'
     );
+    assert.ok(
+      [...target.querySelectorAll('button')].some((button) =>
+        button.textContent.includes('Add currency unit')
+      ),
+      'its own actions still render, on the card'
+    );
+  });
+
+  it('renders World Currency full width, with no inspector aside (issue 1278)', async () => {
+    // The shell's shared `.manager-inspector` falls through to a generic "Select a system" panel
+    // for any route it is not explicitly excluded from. Omitting this route from that exclusion
+    // list gave the currency editor a permanent 300px column of unrelated content beside it — on
+    // a page that has no selected system at all.
+    await mountCurrencyEditor();
+
+    assert.ok(target.querySelector('[data-world-currency-page]'), 'the route rendered');
+    assertNoElement(
+      target,
+      '.manager-body > .manager-inspector',
+      'World Currency is full width, like World Parties'
+    );
+  });
+
+  it('keeps the World Currency ladder ungated by any system\u2019s participation toggle (issue 1278)', async () => {
+    // Currency is WORLD scope now. The ladder is authored once, for the whole world, and a
+    // crafting system's `requirements.currency.enabled` decides only whether THAT system
+    // participates. Gating this page on participation would be a chicken-and-egg lock-out: a
+    // GM could never author the coins that a system has to enable in order to show them.
+    for (const enabled of [false, true]) {
+      await mountCurrencyEditor({
+        selectedCurrency: {
+          enabled,
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: { canAfford: '', increment: '', decrement: '' },
+          units: [],
+        },
+      });
+
+      assert.ok(
+        target.querySelector('[data-world-currency-units]'),
+        `the Currency Units card should render with the system toggle ${enabled ? 'on' : 'off'}`
+      );
+      // The participation toggle stays on System Settings, where the per-system decision is
+      // made; it is deliberately absent from the world page.
+      assertNoElement(
+        target,
+        '[data-feature-key="currency"]',
+        'the per-system currency toggle tile does not belong on the world page'
+      );
+
+      if (mounted) {
+        unmount(mounted);
+        mounted = null;
+      }
+      target?.remove();
+      target = null;
+    }
   });
 
   it('rolls back system edit controls when existing store callbacks reject changes', async () => {
@@ -16246,6 +21365,106 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
+  // Every destination this guard walks is a WORLD route since issue 1282 — Parties, Downtime
+  // and the Travel realms child alike — so the expected view is a flat lookup rather than the
+  // nested ternary the per-system Travel route needed.
+  const WORLD_EXIT_DESTINATION_VIEWS = Object.freeze({
+    parties: 'world',
+    downtime: 'world-downtime',
+    realms: 'world-travel',
+    map: 'world-travel',
+  });
+
+  async function attemptDirtyGatheringWorldExit(kind, outcome, destination) {
+    const calls = [];
+    const title = kind === 'task' ? 'Task' : 'Event';
+    const storeOptions = {
+      gatheringRealmsEnabled: true,
+      // The `downtime` destination below is experimental-gated (issue 1257).
+      experimentalFeaturesEnabled: true,
+      [`confirmDiscardGathering${title}Result`]: outcome.action,
+    };
+    if (outcome.saveResult === false) {
+      storeOptions[`updateGatheringLibrary${title}Result`] = false;
+    }
+    if (outcome.rejectSave) {
+      storeOptions[`updateGatheringLibrary${title}Reject`] = true;
+    }
+    if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
+    else await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    if (!['parties', 'downtime'].includes(destination)) {
+      target.querySelector('#manager-travel-toggle').click();
+      await tick();
+      flushSync();
+      assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(
+        calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+        false,
+        `${kind} ${outcome.name} disclosure must not consume the dirty-route guard`
+      );
+    }
+
+    const activateDestination = async () => {
+      (['parties', 'downtime'].includes(destination)
+        ? worldNavItem(destination)
+        : worldTravelItem(destination)
+      ).click();
+      await settleRouteExit();
+    };
+    if (outcome.rejectSave) await withSilencedConsoleError(activateDestination);
+    else await activateDestination();
+
+    const expectedView = outcome.proceeds
+      ? WORLD_EXIT_DESTINATION_VIEWS[destination]
+      : `gathering-${kind}-edit`;
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      expectedView,
+      `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
+    );
+    assert.equal(
+      (['parties', 'downtime'].includes(destination)
+        ? worldNavItem(destination)
+        : worldTravelItem(destination)
+      ).getAttribute('aria-current'),
+      outcome.proceeds ? 'page' : null,
+      `${kind} ${outcome.name} ${destination} must not leave a hidden active navigation control`
+    );
+    assert.ok(
+      calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+      `${kind} ${outcome.name} routes through its dirty-exit confirmation`
+    );
+    const saveCalls = calls.filter((call) => call[0] === `updateGatheringLibrary${title}`);
+    assert.equal(
+      saveCalls.length > 0,
+      outcome.action === 'save',
+      `${kind} ${outcome.name} ${outcome.action === 'save' ? 'does' : 'does not'} save`
+    );
+  }
+
+  it('guards dirty gathering task and event exits through World Parties, Downtime, and a Travel child', async () => {
+    const outcomes = [
+      { name: 'cancel', action: 'cancel', proceeds: false },
+      { name: 'save false', action: 'save', saveResult: false, proceeds: false },
+      { name: 'rejected save', action: 'save', rejectSave: true, proceeds: false },
+      { name: 'successful save', action: 'save', proceeds: true },
+      { name: 'discard', action: 'discard', proceeds: true },
+    ];
+
+    for (const destination of ['parties', 'downtime', 'realms']) {
+      for (const kind of ['task', 'event']) {
+        for (const outcome of outcomes) {
+          await attemptDirtyGatheringWorldExit(kind, outcome, destination);
+          unmount(mounted);
+          mounted = null;
+          target.remove();
+          target = null;
+        }
+      }
+    }
+  });
+
   async function openDirtyRecipeItemEditor(calls, storeOptions) {
     Object.assign(storeOptions, {
       experimentalFeaturesEnabled: true,
@@ -16331,7 +21550,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     await clickHeaderSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-task-edit'
+    );
     assertSaveErrorRendered('[data-gathering-task-save-error]');
 
     storeOptions.updateGatheringLibraryTaskResult = true;
@@ -16348,7 +21570,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openDirtyGatheringTaskEditor(calls, storeOptions);
 
     await withSilencedConsoleError(clickHeaderSave);
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-task-edit'
+    );
     assertSaveErrorRendered('[data-gathering-task-save-error]');
 
     storeOptions.updateGatheringLibraryTaskReject = false;
@@ -16451,7 +21676,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     await clickRecipeItemSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemResult = true;
@@ -16469,7 +21697,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openDirtyRecipeItemEditor(calls, storeOptions);
 
     await clickRecipeItemSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemReject = false;
@@ -16488,5 +21719,2205 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('re-announces a recipe-item save that fails the same way twice', async () => {
     await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
     await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);
+  });
+
+  // ── Issue 1096, revision 2: the seven behaviours whose mutations SURVIVED ─────────────
+  //
+  // Everything below was written because a full-suite mutation of the code it covers left
+  // the suite green. That is the standard each of these is held to: revert the line and one
+  // NAMED test here goes red. They are grouped in one block because they share the same
+  // mount-and-route setup, not because they are one concern.
+
+  // Drain the route-exit cascade. It is a chain of promise-returning guards and the Save
+  // branch adds several more `await`s inside the store call, so a fixed handful of
+  // `Promise.resolve()`s is not enough for every branch — and a too-short drain would make
+  // "the GM stayed put" pass for a route exit that simply had not finished yet. The
+  // navigate-away positive control below is what proves this drain is long enough.
+  async function settleRouteExit() {
+    for (let i = 0; i < 24; i += 1) await Promise.resolve();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+  }
+
+  async function mountChecks(calls = [], storeOptions = {}) {
+    mountManager(calls, storeOptions);
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  /**
+   * The routed crafting system these Checks cases share, in its two arms. `rollFormula: ''`
+   * is the BROKEN one — it raises `noRollFormula`, which is what gives the Validation route a
+   * deep-linkable row — and `'1d20'` the clean one. Hoisted because four cases carried
+   * byte-identical copies of it, and a fixture restated once per case is a fixture that can
+   * silently stop being the same fixture.
+   */
+  const routedCraftingOptions = (rollFormula) => ({
+    alchemyResolutionMode: 'routedByCheck',
+    craftingCheck: {
+      enabled: true,
+      routed: {
+        rollFormula,
+        type: 'relative',
+        relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+      },
+    },
+  });
+
+  it('evaluates the check the ENGINE rolls, for the one mode the two mappings disagreed on', async () => {
+    // ALCHEMY + TIERED. The route renders the ROUTED editor (its own derivation reads
+    // `alchemy.checkMode`), so the routed draft is the one a GM edits — but the rail badge
+    // picked the SIMPLE draft from a second mapping while evaluating it under ROUTED rules.
+    // The fixture makes the two answers differ: the routed draft has an unnamed, non-success
+    // tier (two criticals), the simple draft is clean.
+    await mountChecks([], {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'tiered', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: {
+        enabled: true,
+        simple: { rollFormula: '1d20', dc: 12 },
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: '', success: false, dc: 0 }],
+        },
+      },
+    });
+
+    const badge = target.querySelector('[data-checks-nav-issues="crafting"]');
+    assert.ok(badge, 'the routed draft is broken, so the rail child is badged');
+    assert.equal(badge.textContent.trim(), '2', 'unnamed tier + no success tier');
+
+    // And the Validation route reports exactly the same two, from the same pass. The
+    // invariant this whole studio is built on is that these can never disagree.
+    await openChecksActivity('validation');
+    const reported = [
+      ...target.querySelectorAll(
+        '[data-checks-validation-section="crafting"] [data-issue-severity="critical"]'
+      ),
+    ].map((row) => row.getAttribute('data-issue'));
+    assert.deepEqual(reported.sort(), ['noSuccessOutcome', 'unnamedOutcome']);
+  });
+
+  it('marks and SAVES an alchemy-tiered edit, which lands on the routed draft', async () => {
+    // The same disagreement, on the other side: dirty tracking and Save dispatched through
+    // the mapping that said `simple`, so an edit to the routed draft the GM can actually make
+    // was never marked unsaved and never written.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'tiered', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: {
+        enabled: true,
+        simple: { rollFormula: '1d20', dc: 12 },
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 4');
+    await tick();
+    flushSync();
+
+    assert.ok(
+      target.querySelector('[data-checks-nav-dirty="crafting"]'),
+      'the edit marks the crafting child unsaved'
+    );
+    target.querySelector('[data-checks-save]').click();
+    await tick();
+    flushSync();
+    const written = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
+    assert.ok(written, 'Save writes the ROUTED slot, which is what alchemy-tiered rolls');
+    assert.equal(written[1].rollFormula, '1d20 + 4');
+    assert.ok(
+      !calls.some((call) => call[0] === 'saveCraftingCheckSimple'),
+      'and never the simple slot, which this mode does not roll'
+    );
+  });
+
+  it('raises NO readiness issue on a crafting mode that rolls no check at all', async () => {
+    // Alchemy `none`. The coerced reading demanded a roll formula, so the rail carried a
+    // permanent "1 issue" badge that no control on the route could clear — the route renders
+    // no formula field at all.
+    await mountChecks([], {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '', dc: 12 } },
+    });
+    assert.ok(
+      !target.querySelector('[data-checks-nav-issues="crafting"]'),
+      'a mode that rolls nothing has no formula to be missing'
+    );
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'and the route says so, with no formula field to clear a badge with'
+    );
+    assert.ok(
+      !target.querySelector('[data-checks-section-dot="roll"]'),
+      'so The roll carries no dot either'
+    );
+  });
+
+  it('states a result for a Validation group with neither a tick nor an issue', async () => {
+    // Gathering in `d100` with no eligible modifiers evaluates to nothing at all, and an
+    // unfiltered map drew a `GATHERING CHECK` heading with a rule under it and nothing else.
+    await mountChecks([], { gatheringResolutionMode: 'd100' });
+    await openChecksActivity('validation');
+    const group = target.querySelector('[data-checks-validation-section="gathering"]');
+    assert.ok(group, 'gathering is still evaluated and still has a group');
+    const rows = group.querySelectorAll('.manager-recipe-val-row');
+    assert.equal(rows.length, 1, 'exactly one row, not an empty heading');
+    assert.ok(
+      group.querySelector('[data-checks-no-issues="gathering"]'),
+      'and that row is the stated "no issues" result'
+    );
+    assert.match(rows[0].textContent, /No issues detected/i);
+  });
+
+  it('honours a REPEATED deep link to a section the GM has since left', async () => {
+    // The latch was on the section VALUE, so the second request equalled it and was
+    // swallowed: deep-link to `roll`, click Triggers, deep-link to `roll` again, and the GM
+    // landed on Triggers. Cross-activity deep-linking makes that the ordinary path.
+    await mountChecks([], routedCraftingOptions(''));
+    await openChecksActivity('validation');
+
+    const deepLink = () => {
+      const row = target.querySelector(
+        '[data-checks-validation-section="crafting"] [data-issue="noRollFormula"]'
+      );
+      assert.ok(row, 'the missing formula is reported and deep-linkable');
+      row.querySelector('.manager-recipe-val-view').click();
+    };
+
+    deepLink();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      'true',
+      'the first deep link opens The roll'
+    );
+
+    await openChecksSection('triggers');
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
+      'true'
+    );
+
+    await openChecksActivity('validation');
+    deepLink();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      'true',
+      'and so does the SECOND, for the same section'
+    );
+  });
+
+  it('reads the locked activation state in the SAME words the live switch uses', async () => {
+    // ONE vocabulary across both slots, and it is the CARD's. The two readings were `Check is
+    // on` and `On`, which is two vocabularies for one state side by side; they were unified on
+    // `On` and are now unified on the prototype's own sentence, because the heading that used
+    // to name this section is gone and the card has to say what it is (issue 1096). The
+    // property under test is unchanged: the locked reading is the live switch's own word.
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const live = target.querySelector('[data-checks-active-toggle] .manager-status-toggle-label');
+    assert.ok(Boolean(live), 'a simple crafting check offers the live switch');
+    const liveReading = live.textContent.trim();
+    assert.equal(liveReading, 'Check is on', 'the live switch reads the card sentence');
+
+    // routedByCheck REQUIRES its check, so the same slot renders the locked indicator.
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+    const locked = target.querySelector('[data-checks-active-locked]');
+    assert.ok(Boolean(locked), 'a mandatory check renders the locked indicator instead');
+    assert.ok(
+      !target.querySelector('[data-checks-active-toggle]'),
+      'and the two never render together, so this really is the same slot'
+    );
+    assert.equal(
+      locked.querySelector('.manager-status-toggle-label').textContent.trim(),
+      liveReading,
+      'the locked reading is the live switch’s own word'
+    );
+    // The locked MEANING still reaches assistive tech, which is why the reading can drop it.
+    assert.match(locked.getAttribute('aria-label'), /Check is on — locked by the resolution mode/);
+  });
+
+  it('opens the section a digest row describes, and offers nothing to press on an absence', async () => {
+    // The digest rows grew the prototype's trailing chevron, and a chevron that goes nowhere is
+    // worse than no chevron: it advertises a destination the row does not have. So the row IS
+    // the deep link — the same one the Validation issues use — and a row that reports an
+    // ABSENCE is not a link at all (issue 1096).
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+
+    // ONE card of rows, not one card per row. Direct children, so a row re-wrapped in its own
+    // card fails here rather than passing on a selector that finds it at any depth.
+    const digest = target.querySelector('[data-checks-digest]');
+    const rows = [...digest.children];
+    assert.ok(rows.length >= 2, 'the digest states more than one fact');
+    assert.ok(
+      rows.every((row) => row.classList.contains('manager-checks-rail-row')),
+      'every direct child of the digest card is a row, so the card is not a stack of cards'
+    );
+
+    const triggers = target.querySelector('[data-checks-digest-row="triggers"]');
+    assert.equal(triggers.tagName, 'BUTTON', 'a row with a destination is pressable');
+    assert.ok(
+      Boolean(triggers.querySelector('.manager-checks-rail-row-chevron')),
+      'and carries the chevron that says so'
+    );
+    triggers.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
+      'true',
+      'pressing the triggers row opens the Triggers section'
+    );
+
+    // The same rail with the check switched OFF: one row, stating an absence, going nowhere.
+    await mountChecks([], {
+      alchemyResolutionMode: 'simple',
+      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+    const off = target.querySelector('[data-checks-digest-row="off"]');
+    assert.ok(Boolean(off), 'an off check states why the digest is empty');
+    assert.equal(off.tagName, 'DIV', 'and states it without offering anything to press');
+    assert.ok(
+      !off.querySelector('.manager-checks-rail-row-chevron'),
+      'so it carries no chevron either'
+    );
+  });
+
+  it('offers only formula tokens the active world can resolve', async () => {
+    // `@ingredients` resolved against NOTHING. A GM clicked the chip, it wrote
+    // `… + @ingredients` into the roll formula, and the check was broken by the control that
+    // offered it — a one-click path to a broken check, which is worse than no chip. It sat in
+    // a hard-coded list beside `@prof` and `@level`, two more dnd5e-shaped guesses in a
+    // system-agnostic module that nothing had ever proved either.
+    //
+    // The row is derived from the world now, through the same preset bundles the modifier
+    // chips read, so this asserts the DERIVATION rather than a replacement literal list: a
+    // chip may only offer an expression the product would itself author for this system.
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+    const chips = [...target.querySelectorAll('[data-check-formula-token]')];
+    assert.ok(chips.length > 0, 'the formula field offers quick-add chips');
+    const offered = chips.map((chip) => chip.getAttribute('data-check-formula-token'));
+    assert.ok(
+      !offered.includes('@ingredients'),
+      `@ingredients resolves against nothing and must never be offered again: ${offered.join(', ')}`
+    );
+
+    // Every offered term is one the shipped derivation produces for this world. That is what
+    // makes the assertion above a property rather than one blocked string: a new invented
+    // token fails here even though it is not `@ingredients`.
+    const allowed = new Set(
+      getModifierExpressionSuggestions(game.system?.id || '').map(
+        (suggestion) => suggestion.expression
+      )
+    );
+    for (const token of offered) {
+      assert.ok(allowed.has(token), `"${token}" is not a term this world's presets produce`);
+    }
+  });
+
+  it('names the domain the odds panel ACTUALLY enumerated, never a die it merely mentions', async () => {
+    // The prototype's `CHANCE PER OUTCOME` heading carries `all 20 faces` hard right. It is a
+    // fact about the space the histogram beneath it walked, so it is derived rather than
+    // stated — a fixed "20" beside a 2d6 check would be a claim about a check that does not
+    // roll a d20.
+    //
+    // IT READS THE PANEL, NOT THE FORMULA (issue 1097). This assertion used to expect
+    // `all 6 faces` for `2d6 + @prof`, off a regex that finds the first `NdS` in the AUTHORED
+    // string. That was the only derivation available while the panel was a slot; now that the
+    // panel is real it ABSTAINS on `2d6` — eleven outcomes on a triangular distribution are
+    // not six uniform faces — and prints "chances are listed for a single die only". A
+    // heading reading `all 6 faces` directly above that sentence is a contradiction on one
+    // screen, which is the exact defect class this change exists to remove. The regex is kept
+    // as the fallback for a rail mounted without a view-model and is unreachable here.
+    await mountChecks([], routedCraftingOptions('1d20 + @prof'));
+    await openChecksActivity('crafting');
+    // This suite installs no dice engine, so the enumerator refuses every formula here for
+    // want of one. That is exactly the condition the arms below measure, and the POSITIVE
+    // arm — a real d20 check whose heading reads `all 20 faces` — is asserted in
+    // `tests/components/check-preview-mounted.test.js`, which does install one.
+    for (const formula of ['1d20 + @prof', '2d6 + @prof', '@prof']) {
+      await mountChecks([], routedCraftingOptions(formula));
+      await openChecksActivity('crafting');
+      assert.ok(
+        target.querySelector('[data-checks-odds-state="not-enumerable"]'),
+        `${formula}: the panel abstains without a dice engine`
+      );
+      assert.ok(
+        !target.querySelector('[data-checks-odds-domain]'),
+        `${formula}: and the heading names no domain the panel did not walk — not even for the d20 the regex fallback would have found`
+      );
+    }
+  });
+
+  it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
+    // The rail read the AUTHORED tokens straight out of the system, and the three subsystems
+    // spell one concept three ways — so the card printed `routedByCheck` on the crafting row
+    // directly above `routed` on the salvage row, two camelCase identifiers for one mode,
+    // while the window header two panels away said "Routed by check".
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+
+    // The rail row renders its second line — the mode + formula — in its own detail span.
+    const detailOf = (id) =>
+      target.querySelector(`[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`)
+        ?.textContent || '';
+    const card = target.querySelector('[data-checks-all-checks]');
+    assert.ok(Boolean(card), 'the Validation rail renders the All checks card');
+    const cardText = card.textContent;
+
+    // The GM-facing name, on BOTH rows, and it is the SAME words for the same mode.
+    assert.match(
+      cardText,
+      /Routed by check/,
+      'the routed modes are named as the pickers name them'
+    );
+    assert.ok(
+      !/routedByCheck/.test(cardText),
+      `no internal identifier reaches the card:\n${cardText}`
+    );
+    assert.ok(
+      !/\brouted\b/.test(cardText),
+      `and the salvage row does not print its raw token either:\n${cardText}`
+    );
+    assert.match(detailOf('crafting'), /Routed by check/, 'the crafting row names its mode');
+    assert.match(detailOf('salvage'), /Routed by check/, 'and the salvage row the same one');
+  });
+
+  it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
+    // The mirror defect, which is why the latch cannot simply be removed: a request treated
+    // as a standing instruction drags the strip back on every recomputation.
+    //
+    // THE PROBE HAS TO CHANGE THE ACTIVITY, not just the section. Under Svelte 5's
+    // fine-grained reactivity the adoption effect reads `activity`, `requestedSection`,
+    // `requestedSectionNonce`, `adoptedSectionNonce` and `sections` — it never reads
+    // `activeSection`, so a section click writes a value the effect does not depend on and
+    // the effect does not re-run at all. An earlier version of this test clicked two further
+    // sections and asserted the strip stayed put; that is true whether or not the latch
+    // works, and breaking the latch (`requestedSectionNonce !== adoptedSectionNonce` →
+    // a constant) left the suite green. A rail click to another activity DOES re-run it,
+    // and `checksActiveSection` on the root is never cleared, so the standing request is
+    // still there to be wrongly re-applied.
+    await mountChecks([], {
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: false, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    target
+      .querySelector('[data-checks-validation-section="salvage"] [data-issue="noSuccessOutcome"]')
+      .querySelector('.manager-recipe-val-view')
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
+      'true',
+      'the deep link opens Outcomes on salvage'
+    );
+
+    // The GM moves off the requested section, then leaves the activity entirely.
+    await openChecksSection('triggers');
+    await openChecksActivity('crafting');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting',
+      'the rail click changed route, so the adoption effect really did re-run'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
+      'true',
+      'the GM stays where they clicked'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
+      'false',
+      'and the honoured request does not re-apply itself on the new activity'
+    );
+  });
+
+  it('deep-links to the owning ACTIVITY as well as the section', async () => {
+    // Both halves of `onOpenActivity`, driven from the Validation route. Dropping either the
+    // `setView` or the section left the other looking correct.
+    //
+    // The fixture picks an issue that buckets to OUTCOMES, not to the roll: `roll` is the
+    // section the strip opens on by default, so a deep link that dropped the section entirely
+    // would still land there and the assertion would prove nothing.
+    await mountChecks([], {
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: false, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    target
+      .querySelector('[data-checks-validation-section="salvage"] [data-issue="noSuccessOutcome"]')
+      .querySelector('.manager-recipe-val-view')
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-salvage',
+      'the route follows the issue to its owning activity'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
+      'true',
+      'and the section it names is the one that opens — not the default'
+    );
+  });
+
+  it('explains the open section’s warning dot IN the panel', async () => {
+    // The dot's legend (DN8). Without it the only route to the sentence is to leave for
+    // Validation and deep-link back.
+    await mountChecks([], routedCraftingOptions(''));
+    await openChecksActivity('crafting');
+    const callout = target.querySelector('[data-checks-section-callout="noRollFormula"]');
+    assert.ok(callout, 'the roll section explains its own dot');
+    assert.match(callout.textContent, /no roll formula/i);
+    assert.equal(
+      callout.getAttribute('data-callout-tone'),
+      'info',
+      'a non-blocking issue is guidance, not a hazard'
+    );
+    // A section with no issue of its own carries none.
+    await openChecksSection('triggers');
+    assert.ok(
+      !target.querySelector('[data-checks-section-callout]'),
+      'Triggers owns no open issue here, so it states nothing'
+    );
+  });
+
+  it('renders the full activity rail stack, so the Validation absence assertions mean something', async () => {
+    // The four rail hooks were asserted ABSENT on Validation and nowhere else, so renaming
+    // all four out of existence satisfied the negative loop and the suite stayed green.
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    for (const present of [
+      // `data-checks-rail` is the View Lab's `manager-checks-stacked-floor` wait selector.
+      // A rename fails the capture job WHOLE, publishing nothing while `check-screenshots`
+      // stays green on stale frames — so it is pinned here, not only in the case registry.
+      '[data-checks-rail="crafting"]',
+      '[data-checks-active="crafting"]',
+      '[data-checks-preview-as]',
+      '[data-checks-simulator]',
+      '[data-checks-odds]',
+      '[data-checks-digest]',
+      '[data-checks-sections]',
+    ]) {
+      assert.ok(target.querySelector(present), `an activity route renders ${present}`);
+    }
+    // Preview-as was a PRE-ROLL SLOT under issue 1096 — a stated sentence and no control —
+    // because two enabled-looking selects reading "No actors" / "No records" would have
+    // invited a choice nothing consumed. Issue 1097 supplies the thing behind them, so the
+    // assertion inverts rather than relaxes: BOTH selectors are real, and the actor one
+    // carries the explicit "No actor" option the readout's unresolved warning depends on.
+    const previewAs = target.querySelector('[data-checks-preview-as]');
+    const actorPicker = previewAs.querySelector('[data-checks-preview-actor]');
+    const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
+    assert.ok(actorPicker, 'the actor picker is a real control now that a simulator reads it');
+    assert.ok(recordSelect, 'so is the record selector');
+    // The actor control is a `SearchablePopover` rather than a `<select>` (the issue 1097
+    // follow-up): the list is filtered to player characters and searched, because a world's
+    // actor directory is mostly bestiary. Its options exist only while it is open, so what
+    // is pinned from here is that the hook lands on the TRIGGER — the View Lab's five checks
+    // simulator cases open it through exactly this selector, and a hook that moved to a
+    // wrapper would fail the capture job whole while every mounted query still resolved.
+    assert.equal(actorPicker.tagName, 'BUTTON', 'the hook is on the popover trigger itself');
+    assert.match(
+      actorPicker.textContent,
+      /No actor/,
+      '"No actor" is an explicit resting selection, not an absence'
+    );
+  });
+
+  it('keeps the gathering d100 route on its own explanation, not the check-OFF empty state', async () => {
+    // The D-2 predicate. `optional` means `mode === 'd100'` on gathering — the one mode with
+    // no toggle at all — so reading `optional && !enabled` collapsed the d100 route to "turn
+    // this check on" for a check nobody can turn on, and took the shipped explanation away.
+    await mountChecks([], {
+      gatheringResolutionMode: 'd100',
+      gatheringCraftingCheck: { enabled: false },
+    });
+    await openChecksActivity('gathering');
+    assert.ok(
+      !target.querySelector('[data-checks-off-empty]'),
+      'a mode with no toggle is INERT, never "switched off"'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-d100-readonly]'),
+      'the d100 explanation is what renders'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-locked="on"]'),
+      'and the rail states the locked reading rather than removing the switch'
+    );
+
+    // The positive half, so the assertion above is discriminating: an activity that DOES have
+    // a live toggle, switched off, still collapses to the empty state.
+    await mountChecks([], {
+      alchemyResolutionMode: 'simple',
+      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-off-empty]'),
+      'an optional check the GM switched off does collapse'
+    );
+    assert.ok(target.querySelector('[data-checks-turn-on]'), 'with the way back on in the panel');
+  });
+
+  it('prompts on leaving a dirty Checks route, and discards when the prompt says so', async () => {
+    const calls = [];
+    await mountChecks(calls, { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    // Moving BETWEEN Checks children never prompts — the drafts live above the route.
+    await openChecksActivity('salvage');
+    assert.ok(
+      !calls.some((call) => call[0] === 'confirmDiscardDirtyChecksDraft'),
+      'a sibling Checks route preserves the draft silently'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'leaving the studio with an unsaved edit prompts');
+    // Lowercase because the localization fake returns the key, so the root's `text()` falls
+    // back to the activity id. The point of the assertion is that the prompt is TOLD which
+    // activities are dirty, not how the label is cased.
+    assert.deepEqual(prompt[1], ['crafting'], 'and NAMES the dirty activity');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'components',
+      'discard lets navigation proceed'
+    );
+  });
+
+  it('saves a staged alchemy check-ON together with the formula authored beside it', async () => {
+    // THE LOAD-BEARING CLAIM of the staged check mode. `craftingCheckMode` resolves the slot
+    // from the DRAFT alchemy mode; resolving it from the persisted one instead made this
+    // exact visit lose work. Turning the check on leaves the persisted mode at `none`, which
+    // resolves to slot `null`, so the simple draft never read dirty and Save wrote the mode
+    // while silently dropping the formula the GM had just typed.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-turn-on]').click();
+    await tick();
+    flushSync();
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 5');
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'simple']],
+      'the staged mode lands'
+    );
+    const simple = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+    assert.ok(simple, 'and so does the formula staged in the same visit');
+    assert.equal(simple[1].rollFormula, '1d20 + 5');
+  });
+
+  it('discards a staged alchemy check-mode change along with the other drafts', async () => {
+    // The other defect the staging fixes: the mode persisted on click, so the Discard branch
+    // of the exit prompt reset every OTHER draft and left this one applied.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'simple', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'a staged mode change is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['crafting'], 'and names crafting as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [],
+      'discarding writes NOTHING — the whole point of staging it'
+    );
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'and the check is back ON when the studio is reopened'
+    );
+  });
+
+  it('stages the SALVAGE Active switch too, and Discard puts it back', async () => {
+    // The follow-up half of the staging work. Alchemy's switch staged first because its off
+    // state is a check mode; that left one affordance on two lifecycles — staged on an alchemy
+    // crafting route, write-through everywhere else. A GM flipping Active on Salvage got no
+    // Unsaved chip, a disabled Save, and a Discard that could not undo it.
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+
+    const toggle = target.querySelector(
+      '[data-checks-active="salvage"] [data-checks-active-toggle]'
+    );
+    assert.ok(toggle, 'the salvage Active switch renders in simple mode');
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'flipping it writes nothing on its own'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="salvage"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'and it is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['salvage'], 'naming salvage as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'discarding writes nothing'
+    );
+  });
+
+  it('applies a staged salvage Active switch through Save checks, without rewriting its formula', async () => {
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+    target.querySelector('[data-checks-active="salvage"] [data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [['saveSalvageCheckActive', false]],
+      'Save applies the staged switch'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckSimple'),
+      [],
+      'and the per-slot dirty guard keeps it from rewriting an untouched formula block'
+    );
+  });
+
+  it('stays on the Checks route when a Save-on-navigate does not land', async () => {
+    // `finishChecksRouteExit` returned `true` unconditionally after awaiting the save, so a
+    // refused write navigated away from work nothing had persisted. The essence and
+    // system-details guards gate on `result !== false`; this one now does too.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'simple',
+      confirmDiscardChecksResult: 'save',
+      saveCraftingCheckSimpleResult: false,
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    navButton('Components').click();
+    await settleRouteExit();
+    assert.ok(
+      calls.some((call) => call[0] === 'saveCraftingCheckSimple'),
+      'the save is attempted'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting',
+      'a refused save keeps the GM on the studio'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-nav-dirty="crafting"]'),
+      'and the activity is still marked unsaved, because the baseline was not moved'
+    );
+  });
+
+  it('navigates away when the Save-on-navigate DOES land', async () => {
+    // The positive control for the gate above: without it, "always false" would pass.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'simple',
+      confirmDiscardChecksResult: 'save',
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const written = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+    assert.ok(written, 'the save is attempted');
+    assert.equal(written[1].rollFormula, '1d20 + 7');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+  });
+
+  it('gives every outcome band its OWN colour, and keys the strip from the tier rows', async () => {
+    // Deriving the fill from the `success` flag alone painted Standard and Masterwork
+    // identically on a five-tier check — per-band identity is the whole reason this control
+    // refuses the full-track gradient exemption, and two of five bands indistinguishable is
+    // not per-band identity. The ramp walks five tones by POSITION IN VALUE ORDER across the
+    // whole list, so a five-tier check spends the ramp exactly once, end to end.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [
+            { id: 'ruined', name: 'Ruined', success: false, dc: -10 },
+            { id: 'flawed', name: 'Flawed', success: false, dc: -5 },
+            { id: 'standard', name: 'Standard', success: true, dc: 0 },
+            { id: 'fine', name: 'Fine', success: true, dc: 5 },
+            { id: 'masterwork', name: 'Masterwork', success: true, dc: 10 },
+          ],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+
+    const styleOf = (band) => band.getAttribute('style') || '';
+    const drawn = [...target.querySelectorAll('[data-band-strip-band]')];
+    const bands = drawn.map((band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(styleOf(band))?.[1]);
+    const inks = drawn.map((band) => /--fab-band-strip-ink:\s*([^;]+)/.exec(styleOf(band))?.[1]);
+    assert.equal(bands.length, 5, 'five authored tiers draw five bands');
+    assert.equal(new Set(bands).size, 5, `five DISTINCT fills, got ${bands.join(' | ')}`);
+    // The ramp itself, named tone by tone in value order, because "five distinct fills" alone
+    // would pass just as well for five arbitrary colours in an arbitrary order — and the order
+    // is the claim: the strip has to read left-to-right as escalating.
+    assert.deepEqual(
+      bands.map((fill) => /var\(--fab-([\w-]+)\)/.exec(fill)?.[1]),
+      ['danger', 'warning', 'success', 'info', 'accent'],
+      `the ramp walks its five tones in value order, got ${bands.join(' | ')}`
+    );
+    // Each band inks its own name. One ink for the whole strip is what held the previous ramp
+    // under a single luminance ceiling, so a band that loses its ink loses the headroom too.
+    assert.deepEqual(
+      inks,
+      [
+        'var(--fab-danger-text)',
+        'var(--fab-warning-text)',
+        'var(--fab-success-text)',
+        'var(--fab-info-text)',
+        'var(--fab-accent-text)',
+      ],
+      `every band carries its own tone's ink, got ${inks.join(' | ')}`
+    );
+
+    // The KEY: each tier row wears its own band's tone, at FULL STRENGTH rather than as the
+    // band's mixed fill, or the ramp is a pattern with no legend and no way to tell which row
+    // moved which band.
+    const swatch = (id) =>
+      target.querySelector(`[data-outcome-swatch="${id}"]`)?.getAttribute('style') || '';
+    assert.ok(swatch('ruined').startsWith('--fab-outcome-swatch:'), 'the swatch carries a fill');
+    for (const [index, id] of ['ruined', 'flawed', 'standard', 'fine', 'masterwork'].entries()) {
+      const tone = /var\(--fab-([\w-]+)\)/.exec(bands[index])?.[1];
+      assert.equal(
+        swatch(id),
+        `--fab-outcome-swatch: var(--fab-${tone});`,
+        `the ${id} row wears its own band's tone undiluted`
+      );
+    }
+  });
+
+  it('spends the whole ramp on a THREE-tier check, so it still reads as escalating', async () => {
+    // The three-tier case is where ranking inside each semantic family went wrong: the single
+    // failure tier was a family of one and took that family's strongest tone, so the strip ran
+    // mid, dark, light — the darkest band in the MIDDLE and the failure lighter than the first
+    // success. Walking one ramp across the whole list is the fix, and it is only visible at a
+    // count where the two rules disagree.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [
+            { id: 'ruined', name: 'Ruined', success: false, dc: -5 },
+            { id: 'standard', name: 'Standard', success: true, dc: 0 },
+            { id: 'masterwork', name: 'Masterwork', success: true, dc: 5 },
+          ],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+
+    const bands = [...target.querySelectorAll('[data-band-strip-band]')].map(
+      (band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style') || '')?.[1]
+    );
+    assert.deepEqual(
+      bands.map((fill) => /var\(--fab-([\w-]+)\)/.exec(fill)?.[1]),
+      ['danger', 'success', 'accent'],
+      `three tiers take the ramp's two ends and its middle, got ${bands.join(' | ')}`
+    );
+  });
+
+  it('drives the section strip from Home and End as well as the arrows', async () => {
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const press = (id, key) => {
+      const button = target.querySelector(`#checks-section-${id}`);
+      assert.ok(button, `the strip offers ${id}`);
+      button.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
+    };
+    const selected = () =>
+      [...target.querySelectorAll('[data-checks-section-button]')].find(
+        (button) => button.getAttribute('aria-selected') === 'true'
+      )?.dataset.checksSectionButton;
+
+    await openChecksSection('triggers');
+    press('triggers', 'End');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'on-failure', 'End goes to the last section');
+
+    press('on-failure', 'Home');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'roll', 'and Home back to the first');
+
+    // …and the arrows still work, so the two additions did not replace them.
+    press('roll', 'ArrowRight');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'outcomes');
+  });
+
+  it('points only the SELECTED tab at a panel, because only its panel exists', async () => {
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const tabs = [...target.querySelectorAll('[data-checks-section-button]')];
+    assert.ok(tabs.length >= 5, 'the strip renders its sections');
+    const controlled = tabs.filter((tab) => tab.hasAttribute('aria-controls'));
+    assert.equal(controlled.length, 1, 'exactly one tab carries aria-controls');
+    assert.equal(controlled[0].getAttribute('aria-selected'), 'true', 'and it is the selected one');
+    const panelId = controlled[0].getAttribute('aria-controls');
+    assert.ok(
+      target.querySelector(`#${panelId}`),
+      `aria-controls must name a node that exists, got ${panelId}`
+    );
+    // The other four reference nothing rather than an id that resolves to nothing: an IDREF
+    // to nowhere is reported as a broken relationship, not as "not currently shown".
+    for (const tab of tabs.filter((candidate) => candidate !== controlled[0])) {
+      assert.ok(
+        !tab.hasAttribute('aria-controls'),
+        `${tab.dataset.checksSectionButton} names none`
+      );
+    }
+  });
+
+  it('gives every labelled rail marker a role, so the name is actually exposed', async () => {
+    // ARIA-in-HTML forbids `aria-label` on a generic element: a bare `<span aria-label>` has
+    // no role to hang the name on, so the name is simply not exposed. The sibling dirty
+    // marker already had `role="img"`; the two issue badges did not.
+    await mountChecks([], { alchemyResolutionMode: 'routedByCheck' });
+    for (const selector of [
+      '[data-checks-nav-issues="checks"]',
+      '[data-checks-nav-issues="crafting"]',
+    ]) {
+      const badge = target.querySelector(selector);
+      assert.ok(badge, `${selector} renders for a check with an open issue`);
+      assert.equal(badge.tagName, 'SPAN');
+      assert.ok(badge.hasAttribute('aria-label'), `${selector} carries a name`);
+      assert.equal(badge.getAttribute('role'), 'img', `${selector} carries a role to expose it`);
+    }
+    // Proven against the sibling that already got this right, so the rule is stated once.
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 1');
+    await tick();
+    flushSync();
+    const dirty = target.querySelector('[data-checks-nav-dirty="crafting"]');
+    assert.equal(dirty.getAttribute('role'), 'img');
+  });
+
+  // ── Issue 1157: emptying a bulk selection ─────────────────────────────────────────
+  //
+  // Every action that empties a bulk selection unmounts the panel it was performed from, and
+  // with it the control that was pressed. Focus fell to `document.body` and nothing was said,
+  // on all three studios, for Clear as well as for delete.
+  //
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the manager-level live region and the focus hop can be proved at all: both belong to the
+  // root precisely because every panel-level suite's component is gone by the time they act.
+  //
+  // ONE TABLE, NOT THREE COPIED BLOCKS. The defect was identical on the three studios, so a
+  // per-studio suite would be three chances to fix two of them — and three near-identical
+  // blocks are what the SonarCloud duplication gate fails on besides.
+  describe('emptying a bulk selection announces it and re-homes the keyboard', () => {
+    //
+    // `stage` is per-studio because the AXES are: the two studios with a category select
+    // stage through it, and the Essence Studio, which has none, stages its status radio.
+    // Everything else here is one hook name per studio.
+    const BULK_STUDIOS = [
+      {
+        name: 'Essence',
+        route: () => navButton('Essences'),
+        rows: ['water', 'earth'],
+        rowAttr: 'data-essence-select',
+        toolbar: 'data-essence-toolbar',
+        pageBox: 'data-essence-select-all-page',
+        toolbarClear: 'data-essence-clear-selection',
+        panelClear: 'data-essence-bulk-clear',
+        panel: 'data-essence-bulk-panel',
+        deleteCard: 'data-essence-bulk-delete-card',
+        apply: 'data-essence-bulk-apply',
+        stage: () =>
+          target.querySelector('[data-essence-bulk-status-option="disable"] input').click(),
+        applyResultOption: 'applyEssenceBulkEditResult',
+        applied: 'Updated 2 essences.',
+        appliedNone: 'No essences needed changing.',
+      },
+      {
+        name: 'Component',
+        route: () => navButton('Components'),
+        rows: ['c1', 'c2'],
+        rowAttr: 'data-component-select',
+        toolbar: 'data-component-toolbar',
+        pageBox: 'data-component-select-all-page',
+        toolbarClear: 'data-component-clear-selection',
+        panelClear: 'data-component-bulk-clear',
+        panel: 'data-component-bulk-panel',
+        deleteCard: 'data-component-bulk-delete-card',
+        apply: 'data-component-bulk-apply',
+        stage: () => stageFirstCategory('data-component-bulk-category'),
+        applyResultOption: 'applyComponentBulkEditResult',
+        applied: 'Applied bulk changes to 2 components.',
+        appliedNone: 'No components needed changing.',
+      },
+      {
+        name: 'Recipe',
+        route: () => craftingParent(),
+        rows: ['r1', 'r2'],
+        rowAttr: 'data-recipe-select',
+        toolbar: 'data-recipe-toolbar',
+        pageBox: 'data-recipe-select-all-page',
+        toolbarClear: 'data-recipe-clear-selection',
+        panelClear: 'data-recipe-bulk-clear',
+        panel: 'data-recipe-bulk-panel',
+        deleteCard: 'data-recipe-bulk-delete-card',
+        apply: 'data-recipe-bulk-apply',
+        stage: () => stageFirstCategory('data-recipe-bulk-category'),
+        applyResultOption: 'applyRecipeBulkEditResult',
+        applied: 'Applied bulk changes to 2 recipes.',
+        appliedNone: 'No recipes needed changing.',
+      },
+    ];
+
+    /** Stage the first real option of a bulk category select, so Apply becomes live. */
+    function stageFirstCategory(attribute) {
+      const select = target.querySelector(`[${attribute}]`);
+      const option = Array.from(select.options).find((candidate) => candidate.value);
+      assert.ok(
+        Boolean(option),
+        `[${attribute}] offers nothing but "leave unchanged", so nothing can be staged through it`
+      );
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const REGION = '[data-manager-bulk-selection-announce]';
+
+    /**
+     * What holds focus, as a SHORT STRING.
+     *
+     * Never the node: `node:assert` serialises the actual value to build its diff, and
+     * walking a mounted happy-dom element's circular tree kills the heap — a failing
+     * assertion surfaces as a `# cancelled` suite with no message.
+     *
+     * `detached` is reported apart from `document.body` because the two engines disagree
+     * about which one a removed focused node produces, and BOTH are the failure this block
+     * exists to catch.
+     */
+    function focusHolder(studio) {
+      const active = document.activeElement;
+      if (!active || active === document.body) return 'document.body';
+      if (active.isConnected === false) return 'detached';
+      if (active.hasAttribute?.(studio.toolbar)) return 'studio toolbar';
+      if (active.hasAttribute?.(studio.pageBox)) return 'page-selection box';
+      if (active.classList?.contains?.('manager-nav-button')) return 'nav rail';
+      return 'somewhere else';
+    }
+
+    function regionNode() {
+      return target.querySelector(REGION);
+    }
+
+    function announcement() {
+      const region = regionNode();
+      return region ? region.textContent.trim() : null;
+    }
+
+    // The focus hop is deferred a microtask past Svelte's own flush — the same ordering
+    // `RecipeBulkEditPanel.focusAfterRerender` relies on — so an assertion made synchronously
+    // after the click would read the pre-hop `document.activeElement` and pass or fail for
+    // the wrong reason.
+    async function settle() {
+      await tick();
+      flushSync();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    /**
+     * `settle()`, plus the wait for the sentence that is QUEUED BEHIND THE FOCUS UTTERANCE.
+     *
+     * A `polite` region is queued speech and a focus change cancels queued speech, so the
+     * announcement is deliberately written after the hop rather than before it — see
+     * `src/ui/svelte/util/announceAfterFocus.js`, which owns that order for the root and for
+     * `BulkDeleteCard` alike. The delay is IMPORTED rather than restated here: a local copy of
+     * the number would silently start asserting the un-delayed state the moment it changed.
+     */
+    async function settleAnnouncement() {
+      await settle();
+      await waitForQueuedAnnouncement();
+      await settle();
+    }
+
+    async function openStudio(studio, calls = [], options = {}) {
+      mountManager(calls, options);
+      studio.route().click();
+      await settle();
+    }
+
+    async function selectRows(studio) {
+      for (const id of studio.rows) {
+        target.querySelector(`[${studio.rowAttr}="${id}"]`).click();
+        await settle();
+      }
+      assert.ok(
+        Boolean(target.querySelector(`[${studio.panel}]`)),
+        `pre-condition: ${studio.name} Studio shows its bulk panel over the selection`
+      );
+    }
+
+    /** Press the studio's Apply, capturing the completion toast. */
+    async function applySelection(studio) {
+      const messages = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+      try {
+        const apply = target.querySelector(`[${studio.apply}]`);
+        assert.equal(apply.disabled, false, 'pre-condition: something is staged, so Apply is live');
+        apply.click();
+        await settle();
+        await settle();
+        return messages;
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    }
+
+    /** Arm and confirm the studio's set delete, capturing the completion toast. */
+    async function deleteSelection(studio) {
+      const messages = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+      try {
+        const button = () =>
+          target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
+        button().click();
+        await settle();
+        button().click();
+        await settle();
+        await settle();
+        return messages;
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    }
+
+    it('renders ONE live region for the whole manager, and renders it EMPTY', async () => {
+      mountManager();
+
+      const regions = target.querySelectorAll(REGION);
+      assert.equal(regions.length, 1, 'exactly one manager-level region');
+      assert.equal(regions[0].getAttribute('aria-live'), 'polite');
+      assert.equal(regions[0].getAttribute('aria-atomic'), 'true');
+      // A region inserted into the DOM together with its text is not announced by most
+      // screen readers, so it has to exist first and be empty until something is said.
+      assert.equal(announcement(), '', 'and it says nothing until an action does');
+    });
+
+    for (const studio of BULK_STUDIOS) {
+      it(`${studio.name} Studio: the toolbar Clear announces and lands on the studio toolbar`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        assert.notEqual(
+          focusHolder(studio),
+          'studio toolbar',
+          'anti-vacuity: focus is not already on the target this test claims it moves to'
+        );
+
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settle();
+
+        // ── THE ORDER, WHICH IS NOT THE OBVIOUS ONE (review round) ──────────────────
+        // The keyboard moves FIRST and the region is still EMPTY when it lands. A `polite`
+        // announcement is queued speech and NVDA and JAWS both cancel queued speech on a
+        // focus change, so writing the sentence first — which is what the first cut did —
+        // is an announcement the GM may never hear: the original silence, hidden behind a
+        // focus hop that works. No engine in this repo runs a screen reader, so the
+        // utterance is not observable here; the ORDER is, and this is it.
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.equal(announcement(), '', 'nothing is queued in front of the focus utterance');
+
+        await settleAnnouncement();
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'and the panel really did unmount, which is what dropped the focus in the first place'
+        );
+      });
+
+      // ── THE TARGET IS INERT, AND THAT IS THE POINT (review round) ─────────────────
+      // The hop first went to the toolbar's page-selection box — a real
+      // `<input type="checkbox">` whose `onchange` selects every rendered row. A GM who
+      // clicked Clear with the mouse and then pressed the space bar to scroll would have
+      // silently re-selected the whole page, with no visible focus ring, because the box's
+      // only ring is `:focus-visible` and Chrome does not match it for programmatic focus
+      // after a pointer interaction.
+      //
+      // The space bar is asserted as what it IS on a focused control: a click. On the
+      // `<section>` it is nothing; on the checkbox it was the whole page back.
+      it(`${studio.name} Studio: the hop target cannot be operated by the space bar`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        assert.equal(focusHolder(studio), 'studio toolbar');
+
+        const landed = document.activeElement;
+        assert.equal(landed.tagName, 'SECTION', 'a landmark, not a control');
+        assert.equal(landed.getAttribute('tabindex'), '-1', 'focusable, but never a tab stop');
+        assert.ok(
+          Boolean(landed.getAttribute('aria-label')),
+          'and it is NAMED, which is what the GM hears instead of a control they might operate'
+        );
+
+        landed.click();
+        await settle();
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'pressing space where the GM was left does NOT re-select the page'
+        );
+      });
+
+      it(`${studio.name} Studio: the panel header Clear does exactly the same`, async () => {
+        // The panel header's `Clear selection` and the toolbar's `Clear` are ONE action by
+        // two routes. Fixing one and not the other is what leaves a third pattern behind.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        target.querySelector(`[${studio.panelClear}]`).click();
+        await settleAnnouncement();
+
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.equal(focusHolder(studio), 'studio toolbar');
+      });
+
+      // ── APPLY (review round) ─────────────────────────────────────────────────────
+      // Apply is the third action that empties the selection, and it shipped in the first
+      // cut with no coverage at all on any studio — while two of the three apply message
+      // expressions were being rewritten. It is asserted here on the same terms as the
+      // delete: the sentence the GM reads and the sentence the GM hears are the SAME one,
+      // so a studio that re-words its toast cannot leave the screen-reader user on a stale
+      // copy of the old one.
+      it(`${studio.name} Studio: a successful Apply announces its completion sentence`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+        studio.stage();
+        await settle();
+
+        const messages = await applySelection(studio);
+
+        assert.deepEqual(messages, [studio.applied], 'the apply really did complete and report');
+        await settleAnnouncement();
+        assert.equal(announcement(), messages[0]);
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'the panel that held Apply is gone, which is what dropped the focus'
+        );
+      });
+
+      // A write that legitimately changed nothing — every selected row already matched the
+      // staged values — is not a failure, and "Updated 0 essences." was reachable and being
+      // SPOKEN as the sole outcome of a successful action. Each studio states the zero case
+      // in its own words.
+      it(`${studio.name} Studio: an Apply that changed nothing says so, rather than reporting 0`, async () => {
+        await openStudio(studio, [], { [studio.applyResultOption]: { updated: 0 } });
+        await selectRows(studio);
+        studio.stage();
+        await settle();
+
+        const messages = await applySelection(studio);
+
+        assert.deepEqual(messages, [studio.appliedNone]);
+        await settleAnnouncement();
+        assert.equal(announcement(), studio.appliedNone);
+        assert.equal(focusHolder(studio), 'studio toolbar');
+      });
+
+      it(`${studio.name} Studio: a successful set delete announces the completion sentence`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const messages = await deleteSelection(studio);
+
+        assert.equal(messages.length, 1, 'the delete really did complete and report');
+        await settleAnnouncement();
+        // The two audiences are told the SAME thing, asserted as an identity rather than as
+        // three hardcoded sentences: a studio that re-words its toast cannot leave the
+        // screen-reader user on a stale copy of the old one.
+        assert.equal(announcement(), messages[0]);
+        assert.match(
+          announcement(),
+          /^Deleted /,
+          'and it is the completion sentence, not "Selection cleared."'
+        );
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.deleteCard}]`),
+          'the card that used to own the only region is gone, which is the whole problem'
+        );
+      });
+
+      it(`${studio.name} Studio: an identical second announcement REPLACES the region's node`, async () => {
+        // Re-inserting identical text announces nothing the second time, and clearing a
+        // selection twice running is an ordinary gesture. The child node is keyed on the
+        // announcement object so each one is a genuine insertion rather than a rewrite —
+        // asserted as node IDENTITY, because the text is identical by construction.
+        await openStudio(studio);
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        const first = regionNode().firstElementChild;
+        assert.ok(Boolean(first), 'the announcement renders its own child node');
+
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        const second = regionNode().firstElementChild;
+
+        assert.equal(announcement(), 'Selection cleared.', 'the same sentence, twice');
+        assert.ok(
+          Boolean(second) && second !== first,
+          'and a NEW node carries it, so the region is inserted into rather than rewritten'
+        );
+      });
+
+      it(`${studio.name} Studio: focus the GM moved themselves is left alone`, async () => {
+        // The folded-in half of the issue. A GM who tabs away while an awaited write is in
+        // flight must not be yanked back by its result. The nav rail is used as the place
+        // they went because every studio has one and it is real product markup.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const elsewhere = target.querySelector('.manager-nav-button');
+        elsewhere.focus();
+        assert.equal(focusHolder(studio), 'nav rail', 'pre-condition: the GM is elsewhere');
+
+        await deleteSelection(studio);
+        await settleAnnouncement();
+
+        assert.match(announcement(), /^Deleted /, 'the outcome is still announced');
+        assert.equal(
+          focusHolder(studio),
+          'nav rail',
+          'but the keyboard is left where the GM put it'
+        );
+      });
+    }
+  });
+
+  // ── Rail group expand / collapse (issue 1185) ──────────────────────────────────────────
+  //
+  // The maintainer's report was that the rail's disclosure groups "sometimes refuse to
+  // minimize". "Sometimes" was two defects wearing one face, and both are behavioural rather
+  // than visual, so every case below drives the real controls and reads the rendered rail:
+  //
+  //   * four groups ran an auto-open effect that READ ITS OWN FLAG to guard itself, so a
+  //     collapse changed the effect's own dependency, re-ran it, passed the now-false guard
+  //     and forced the group straight back open;
+  //   * Crafting had the mirror defect — `craftingMenuExpanded = isCraftingRoute` never read
+  //     its own flag, so a collapse stuck, but LEAVING the category force-closed a group the
+  //     GM had deliberately opened.
+  //
+  // The rule these pin is the maintainer's: every group collapses in any state, whatever the
+  // others are doing, EXCEPT while one of its own rail sub-items is the current view.
+  describe('rail group expansion is independent, sticky, and locked only by an active sub-tab', () => {
+    // The five groups, each with the disclosure that opens it, the submenu that proves it is
+    // open, and the navigation that lands on one of its own sub-items. Written once so a case
+    // asserts "every group", not "the four I remembered" — the Downtime group in particular is
+    // provider-driven, and nothing in the rule may key off a tab id.
+    const RAIL_GROUPS = [
+      {
+        id: 'crafting',
+        label: 'Crafting',
+        toggle: '#manager-nav-crafting + .manager-nav-toggle',
+        submenu: '#manager-crafting-submenu',
+        childView: 'recipes',
+        enterChild: () => navButton('Crafting').click(),
+      },
+      {
+        id: 'checks',
+        label: 'Checks',
+        toggle: '#manager-nav-checks + .manager-nav-toggle',
+        submenu: '#manager-checks-submenu',
+        childView: 'checks-crafting',
+        enterChild: () => navButton('Checks').click(),
+      },
+      {
+        id: 'gathering',
+        label: 'Gathering',
+        toggle: '#manager-nav-gathering + .manager-nav-toggle',
+        submenu: '#manager-gathering-submenu',
+        childView: 'environments',
+        enterChild: () => navButton('Gathering').click(),
+      },
+      {
+        id: 'worldTravel',
+        label: 'Travel',
+        toggle: '#manager-travel-toggle',
+        submenu: '#manager-travel-submenu',
+        childView: 'world-travel',
+        enterChild: () => worldTravelItem('travel').click(),
+      },
+      {
+        id: 'worldDowntime',
+        label: 'Downtime',
+        toggle: '#manager-downtime-toggle',
+        submenu: '#manager-downtime-submenu',
+        childView: 'world-downtime',
+        enterChild: () => worldNavItem('downtime').click(),
+      },
+    ];
+
+    // Every rail navigation here passes `confirmRouteExit`, which is promise-shaped on some
+    // branches, so a bare `tick()` would let "the group stayed open" pass for a route change
+    // that simply had not landed yet.
+    async function settleRail() {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    }
+
+    function railToggle(group) {
+      const toggle = target.querySelector(group.toggle);
+      assert.ok(Boolean(toggle), `the ${group.label} group should render a disclosure control`);
+      return toggle;
+    }
+
+    function isExpanded(group) {
+      return Boolean(target.querySelector(group.submenu));
+    }
+
+    function expandedGroupIds() {
+      return RAIL_GROUPS.filter(isExpanded).map((group) => group.id);
+    }
+
+    function currentManagerView() {
+      return target.querySelector('.fabricate-manager').dataset.managerView;
+    }
+
+    function mountRail(rootProps = {}) {
+      // `experimentalFeaturesEnabled` unlocks the World > Downtime group (issue 1257),
+      // which is one of the five groups this suite's disclosure contract covers.
+      mountManager(
+        [],
+        { gatheringRealmsEnabled: true, experimentalFeaturesEnabled: true },
+        {},
+        rootProps
+      );
+      assert.equal(currentManagerView(), 'systems', 'the rail starts on a route inside no group');
+      assert.deepEqual(expandedGroupIds(), [], 'and with every group collapsed');
+    }
+
+    it('collapses any group while the others stay expanded, and the collapse sticks', async () => {
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+      }
+      assert.deepEqual(
+        expandedGroupIds(),
+        RAIL_GROUPS.map((group) => group.id),
+        'all five open together — the groups are independent, not an accordion'
+      );
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+        // A second settle: the re-assert loop closed and reopened the group within one flush,
+        // so an assertion taken immediately after the click could read the intermediate state.
+        await settleRail();
+        assert.deepEqual(
+          expandedGroupIds(),
+          RAIL_GROUPS.filter((other) => other !== group).map((other) => other.id),
+          `${group.label} collapses while its four expanded siblings are untouched`
+        );
+        railToggle(group).click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} re-opens from the same control`);
+      }
+
+      // The Tool Studio is the case a route-derived force got wrong on a route that is not
+      // even the group's own: `|| isToolStudioRoute` pinned Crafting open on a screen the
+      // Crafting submenu does not offer, and left that chevron inert. Entering it still opens
+      // the group — its breadcrumb reads "<system> › Crafting › Tools" — but as intent, so the
+      // disclosure keeps working.
+      const crafting = RAIL_GROUPS[0];
+      railToggle(crafting).click();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'pre-condition: Crafting is collapsed before Tools opens');
+
+      navButton('Tools').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tools');
+      assert.ok(isExpanded(crafting), 'the Tool Studio opens the Crafting group it sits under');
+      assert.equal(
+        railToggle(crafting).disabled,
+        false,
+        'Tools is not a Crafting sub-item, so it must not lock the group'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'and the group collapses over the Tool Studio');
+    });
+
+    it('locks a group open while one of its own sub-items is the current view, and says why', async () => {
+      useShippedLocalization();
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        group.enterChild();
+        await settleRail();
+        assert.equal(currentManagerView(), group.childView, `${group.label} routed to its child`);
+
+        const toggle = railToggle(group);
+        assert.equal(toggle.disabled, true, `${group.label} reports its disclosure as disabled`);
+        assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+        assert.equal(
+          toggle.getAttribute('title'),
+          'This section stays open while you are on one of its pages.',
+          'the control explains the constraint rather than silently swallowing the click'
+        );
+
+        toggle.click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} does not collapse out from under its view`);
+
+        for (const other of RAIL_GROUPS.filter((candidate) => candidate !== group)) {
+          const otherToggle = railToggle(other);
+          assert.equal(
+            otherToggle.disabled,
+            false,
+            `${other.label} stays collapsible while ${group.label} is locked`
+          );
+          assert.equal(otherToggle.getAttribute('title'), null);
+        }
+      }
+    });
+
+    it('leaves a group exactly as the GM left it when the route moves elsewhere', async () => {
+      mountRail();
+      const checks = RAIL_GROUPS[1];
+
+      // Left EXPANDED. Entering a sub-item records the intent as well as taking the lock, so
+      // the group the GM opened by walking into it survives walking back out.
+      navButton('Checks').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'checks-crafting');
+      assert.ok(isExpanded(checks));
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(isExpanded(checks), 'leaving a group does not slam it shut behind the GM');
+      assert.equal(
+        railToggle(checks).disabled,
+        false,
+        'and the disclosure is live again the moment the lock releases'
+      );
+
+      // Left COLLAPSED. The same group, collapsed off-route, is still collapsed after a move —
+      // the direction `craftingMenuExpanded = isCraftingRoute` used to get right and the four
+      // re-asserting effects used to get wrong.
+      railToggle(checks).click();
+      await settleRail();
+      assert.ok(!isExpanded(checks));
+
+      navButton('Tags & Categories').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tags');
+      assert.ok(!isExpanded(checks), 'a collapse survives navigation too');
+    });
+
+    // An editor detail route belongs to the group whose sub-item opened it: `recipe-edit` is
+    // reached from Recipes and is read as part of Recipes, so it locks Crafting exactly as a
+    // rendered rail entry does. That makes all five groups uniform — Gathering already locked
+    // throughout `environment-edit` / `gathering-task-edit` / `gathering-event-edit`, and
+    // Crafting and Checks were the outliers that released the group when an editor opened.
+    //
+    // The tail then walks the auto-open effect: leaving the editor re-enters `recipes` by
+    // assigning `activeView`, a route into the group that writes no expansion intent of its
+    // own, so without that effect the group would snap shut on the NEXT navigation away.
+    it('stays locked inside its own editor detail route, and outlives the lock on return', async () => {
+      await openRecipeEditor([]);
+      assert.equal(currentManagerView(), 'recipe-edit');
+
+      const crafting = RAIL_GROUPS[0];
+      assert.ok(isExpanded(crafting), 'the editor inherits the group opened by Recipes');
+      assert.equal(
+        railToggle(crafting).disabled,
+        true,
+        'an editor detail route is a sub-tab, so it locks its own group open'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(isExpanded(crafting), 'and the locked group does not collapse over the editor');
+
+      const back = Array.from(target.querySelectorAll('.manager-header-actions button')).find(
+        (button) => button.textContent.includes('Back to recipes')
+      );
+      assert.ok(Boolean(back), 'the recipe editor offers Back to recipes');
+      back.click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'recipes');
+      assert.ok(isExpanded(crafting), 'entering a sub-item keeps its group open');
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(
+        isExpanded(crafting),
+        'and records the intent, so the group outlives the lock releasing'
+      );
+    });
+
+    // The Downtime group's children come from whichever provider holds the surface, so its
+    // collapse behaviour must be identical for a companion's tab set and for Core's four.
+    it('gives a provider-supplied Downtime tab set the same collapse behaviour as Core', async () => {
+      const registry = createManagerExtensionsRegistry();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew', 'writs'] })
+      );
+      mountRail({ managerExtensions: registry });
+      const downtime = RAIL_GROUPS[4];
+
+      railToggle(downtime).click();
+      await settleRail();
+      assert.deepEqual(
+        downtimeRailIds(),
+        ['ledger', 'crew', 'writs'],
+        'the rail renders the provider set, not Core preview tabs'
+      );
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'a provider-driven group collapses like any other');
+
+      worldNavItem('downtime').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world-downtime');
+      assert.equal(
+        railToggle(downtime).disabled,
+        true,
+        'and locks open on its own route exactly as Core does'
+      );
+
+      worldNavItem('parties').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world');
+      assert.ok(isExpanded(downtime), 'leaving it does not close it');
+      assert.equal(railToggle(downtime).disabled, false);
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'and the collapse sticks off-route');
+    });
+  });
+
+  // ── The selected and edited component card hydrate too (issue 1081) ──────────────────
+  //
+  // A component card arrives cheap and resolves its linked source document — the "Missing"
+  // verdict and the live description fallback — only when a view asks it to.
+  // `ComponentsBrowserView` asks for the page it renders, and that is the ONLY ask in the
+  // application. But the inspector's selection and the editor's subject are both resolved
+  // from the WHOLE cohort rather than from that page, so without an ask here they render the
+  // pre-hydration reading permanently: "No description has been added." for a
+  // compendium-linked component whose prose lives on its source document, which is the
+  // regression issue 676 filed and issue 800 preserved, and an accent "Linked" pill telling
+  // the GM a dangling link is healthy.
+  describe('component hydration reaches the selected and edited card (issue 1081)', () => {
+    /** 30 cards in their own category, so they fill page 1 and push the stored-first card off it. */
+    const AETHER_LIBRARY = Array.from({ length: 30 }, (_, index) => ({
+      id: `x${String(index + 1).padStart(2, '0')}`,
+      name: `Aether ${String(index + 1).padStart(2, '0')}`,
+      img: 'icons/svg/item-bag.svg',
+      description: '',
+      category: 'Aether',
+      tags: [],
+      essences: [],
+      registeredItemUuidDisplay: '',
+      hasRegisteredItemUuid: false,
+      sourceOrigin: 'unknown',
+      sourceOriginLabel: 'Unknown',
+      sourceMissing: false,
+      showTags: true,
+      showEssences: true,
+    }));
+
+    function mountManager(storeOptions) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore([], storeOptions),
+          services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+        },
+      });
+      flushSync();
+      return target;
+    }
+
+    function renderedComponentIds() {
+      return Array.from(target.querySelectorAll('[data-component-id]')).map(
+        (row) => row.dataset.componentId
+      );
+    }
+
+    it('asks the OFF-PAGE default selection to hydrate, and no other off-page card', async () => {
+      const requests = new Set();
+      mountManager({
+        extraComponentItems: AETHER_LIBRARY,
+        componentHydrationRequests: requests,
+      });
+      navButton('Components').click();
+      await tick();
+      flushSync();
+
+      // The fixture's point: `selectedComponentId` starts empty, so the inspector falls back
+      // to `itemCards[0]` — the manager's STORED order — while the browser renders the
+      // name-sorted, category-major page 1. On any library past one page those are different
+      // cards, which is why the default selection is off-page from the moment the studio opens.
+      const rendered = renderedComponentIds();
+      assert.equal(rendered.length, 25, 'page 1 holds 25 rows');
+      assert.equal(rendered.includes('c1'), false, 'and the stored-first card is NOT among them');
+
+      assert.equal(
+        requests.has('c1'),
+        true,
+        'the off-page default selection was asked to hydrate — the inspector renders it, so ' +
+          'nothing else in the application will ask'
+      );
+      // The negative half, in the same fixture against the same spy: an off-page card that is
+      // NOT the selection costs nothing. Without it, a cohort-wide hydrate would satisfy the
+      // assertion above and defeat the page scoping entirely.
+      assert.equal(
+        requests.has('c2'),
+        false,
+        'an off-page card that is not selected is not asked'
+      );
+      for (const id of rendered) {
+        assert.equal(requests.has(id), true, `the rendered row ${id} was asked`);
+      }
+    });
+
+    it('asks the EDITED card to hydrate on a route that never mounts the browser', async () => {
+      const requests = new Set();
+      mountManager({ componentHydrationRequests: requests });
+
+      // The essence-usage thumbnail routes straight into `component-edit`, so the components
+      // browser — the application's only other ask — is never mounted on this path at all.
+      navButton('Essences').click();
+      await tick();
+      flushSync();
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'pre-condition: the components browser is not mounted on the Essences route'
+      );
+
+      requests.clear();
+      target.querySelector('.manager-essence-usage-item').click();
+      flushSync();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        'component-edit',
+        'pre-condition: the thumbnail routed into the component editor'
+      );
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'and the editor route still does not mount the browser, so its page effect cannot ' +
+          'be what performs the ask below'
+      );
+      assert.equal(
+        requests.has('c1'),
+        true,
+        'the edited card was asked to hydrate — otherwise the identity strip shows the stale ' +
+          'stored image, "Linked Compendium" for an unresolved source, and an em dash for a ' +
+          'description that lives on the source document'
+      );
+    });
+
+    // The gathering task editor's component picker paginates the SAME `itemCards`, and it
+    // renders the very "No description has been added." fallback that an un-hydrated
+    // compendium-linked component produces. It never mounts the components browser, so
+    // without its own ask a GM who comes straight here sees that fallback permanently. This
+    // is a regression THIS change would otherwise cause on a gathering surface, so the repair
+    // is scoped to that picker's own page and nothing else about gathering moves.
+    it('asks the gathering task picker page to hydrate, on a route with no components browser', async () => {
+      const requests = new Set();
+      mountManager({ componentHydrationRequests: requests });
+
+      gatheringToggle().click();
+      await tick();
+      flushSync();
+      gatheringSubitem('Tasks').click();
+      await tick();
+      flushSync();
+      target
+        .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+        .click();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        'gathering-task-edit',
+        'pre-condition: the task editor is open'
+      );
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'pre-condition: the components browser is not mounted on this route'
+      );
+      const picked = Array.from(
+        target.querySelectorAll('[data-gathering-component-card]')
+      ).map((node) => node.dataset.gatheringComponentCard);
+      assert.ok(picked.includes('c2'), 'pre-condition: the picker rendered the second component');
+
+      // `c2` is never the inspector's selection and never the editor's subject, so the picker
+      // is the only thing in this tree that can have asked for it.
+      assert.equal(
+        requests.has('c2'),
+        true,
+        'the picker asked its own rendered page to hydrate'
+      );
+    });
+  });
+
+  // ── A hydrated card actually REACHES the screen (issue 1081) ─────────────────────────
+  //
+  // Every other assertion about hydration in this repo is a spy: it proves `hydrate()` was
+  // CALLED. All of them stay green while the answer never reaches a pixel, because the card
+  // fills itself IN PLACE and the store publishes through a `writable`, which does not proxy
+  // — so Svelte compares by `===` at `selectedComponent`, at the browser model, and at the
+  // keyed `{#each}`, and a card whose identity did not move stops at the first of them.
+  //
+  // These read the DOM, and they use the SAME fixture for the pre-hydration reading, which
+  // is the control: the "before" strings are what a defect leaves on the screen for ever,
+  // not for a beat. The republish is driven through the shipped
+  // `republishHydratedItemCards`, so reverting it to a re-wrap of the same objects turns
+  // these red.
+  //
+  // Do NOT restate this against a `$state` fixture. `$state` deep-proxies, so a fresh proxy
+  // has fresh per-property sources and the defect disappears; production does not proxy.
+  describe('a hydrated component card reaches the rendered surfaces (issue 1081)', () => {
+    /** The resolution `hydrate()` produces for a linked component whose document is gone. */
+    const RESOLVED = Object.freeze({
+      description: 'Prose from the source document',
+      hasDescription: true,
+      sourceMissing: true,
+      sourceOrigin: 'missing',
+      sourceOriginLabel: 'Missing',
+    });
+
+    /**
+     * A card in the shape the real projection hands out for a compendium-linked component
+     * with NO stored description: the un-hydrated reading, plus the non-enumerable `hydrate`
+     * seam. Its promise is settled by the returned `fill`, so the test controls exactly when
+     * the resolution lands and can read the DOM on both sides of it.
+     */
+    function makeLinkedCard(onHydrated) {
+      const card = {
+        id: 'linked-1',
+        name: 'Aether Salt',
+        img: 'icons/svg/item-bag.svg',
+        description: '',
+        hasDescription: false,
+        category: 'general',
+        tags: [],
+        essences: [],
+        salvageSummary: null,
+        registeredItemUuidDisplay: 'Compendium.pack.Item.source-1',
+        hasRegisteredItemUuid: true,
+        sourceMissing: false,
+        sourceOrigin: 'compendium',
+        sourceOriginLabel: 'Linked Compendium',
+        showTags: true,
+        showEssences: true,
+      };
+      let settle;
+      const pending = new Promise((resolve) => {
+        settle = resolve;
+      });
+      Object.defineProperty(card, 'hydrate', {
+        enumerable: false,
+        configurable: true,
+        writable: true,
+        value: () => pending,
+      });
+      return {
+        card,
+        // Exactly what the projection's `resolve()` does, in exactly that order.
+        fill: () => {
+          Object.assign(card, RESOLVED);
+          onHydrated(card);
+          settle(card);
+        },
+      };
+    }
+
+    /** The store's coalesced republish, over the shipped array transform. */
+    function republisher(store) {
+      const hydrated = new Set();
+      let scheduled = false;
+      return (card) => {
+        hydrated.add(card);
+        if (scheduled) return;
+        scheduled = true;
+        queueMicrotask(() => {
+          scheduled = false;
+          const batch = new Set(hydrated);
+          hydrated.clear();
+          store.viewState.update((state) => ({
+            ...state,
+            itemCards: republishHydratedItemCards(state.itemCards, batch),
+          }));
+        });
+      };
+    }
+
+    async function openComponentStudioWithLinkedCard() {
+      const store = createStore([], {});
+      const { card, fill } = makeLinkedCard(republisher(store));
+      store.viewState.update((state) => ({ ...state, itemCards: [card] }));
+
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {}, onDropItem: () => {} } },
+      });
+      flushSync();
+      navButton('Components').click();
+      await tick();
+      flushSync();
+      return { fill };
+    }
+
+    const inspectorDescription = () =>
+      target.querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
+        .textContent.trim();
+    const inspectorPillTone = () =>
+      target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
+    const rowDescription = () =>
+      target
+        .querySelector('[data-component-id="linked-1"] .manager-system-description')
+        .textContent.trim();
+
+    it('replaces the inspector prose and flips the source pill from Linked to Missing', async () => {
+      const { fill } = await openComponentStudioWithLinkedCard();
+
+      // CONTROL, same fixture: the pre-hydration reading. This is the regression issue 676
+      // filed and issue 800 preserved, and an accent pill telling the GM a dangling link is
+      // healthy — so these three strings are what a broken republish leaves on screen.
+      assert.equal(
+        inspectorDescription(),
+        'No description has been added.',
+        'pre-condition: the un-hydrated card has no prose to show'
+      );
+      assert.equal(inspectorPillTone(), 'accent', 'pre-condition: it reads as a healthy link');
+      assert.ok(
+        !target.querySelector('[data-component-source-missing]'),
+        'pre-condition: and offers no remediation paragraph'
+      );
+
+      fill();
+      await tick();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        inspectorDescription(),
+        RESOLVED.description,
+        'the resolved prose REACHES the inspector — a fill the GM never sees is the whole ' +
+          'defect, and every spy in this repo stays green through it'
+      );
+      assert.equal(
+        inspectorPillTone(),
+        'warning',
+        'and the pill flips to the amber Missing tone, so a deleted source document is not ' +
+          'reported as a healthy link'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-component-source-missing]')),
+        'and the remediation paragraph renders'
+      );
+    });
+
+    it('replaces the browser row prose too, through the keyed each and the row props', async () => {
+      const { fill } = await openComponentStudioWithLinkedCard();
+
+      assert.equal(
+        rowDescription(),
+        'No description',
+        'pre-condition: the row shows its own (shorter) empty-description fallback'
+      );
+
+      fill();
+      await tick();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        rowDescription(),
+        RESOLVED.description,
+        'the row updates as well — the keyed `{#each}` compares the ITEM by `===`, so a card ' +
+          'filled in place and handed back is invisible to it'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-component-id="linked-1"]')),
+        'and the row is the same key, so nothing remounted'
+      );
+    });
+  });
+
+  // ── The nav badge reads the pre-counted tag placeholders (issue 1081) ────────────────
+  //
+  // The Tags & Categories count badge is a SIBLING of the view switch, so it re-derives on
+  // every render of the manager in every view. Counting recipe tag placeholders in the
+  // component reads `ingredientSets` and `steps` off each projected row, and those are
+  // DETAIL-tier fields sharing one memoized producer whose first read deep-clones the whole
+  // recipe body — so an always-mounted badge materialised the entire library before first
+  // paint. The store publishes the count as data instead.
+  //
+  // Both legs are stated here because the threading has a destructive failure mode as well
+  // as a slow one: `VocabularyPanel` deletes a row reading `0 references` in ONE CLICK with
+  // no confirm strip, and a tag referenced only by a recipe ingredient placeholder is
+  // exactly the population that reads that way when the count goes missing.
+  describe('the Tags & Categories badge reads pre-counted placeholders (issue 1081)', () => {
+    /**
+     * A projected recipe row whose detail-tier fields are COUNTING getters.
+     *
+     * They are the two fields `countRecipeTagPlaceholders` walks, and on a real row reading
+     * either one builds the whole detail bundle. A row that simply carried the arrays could
+     * not tell a pre-counted read from a walk.
+     */
+    function countingRecipeRow(reads) {
+      const ingredientSets = [
+        {
+          id: 'set-any-herb',
+          name: 'Any herb',
+          ingredientGroups: [
+            {
+              id: 'group-any-herb',
+              options: [{ match: { type: 'tags', tags: ['herb'] }, quantity: 1 }],
+            },
+          ],
+        },
+      ];
+      const row = {
+        id: 'r-placeholder',
+        name: 'Any Herb Tincture',
+        img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
+        description: 'Accepts any herb.',
+        category: 'potions',
+        enabled: true,
+        locked: false,
+        isSimple: true,
+        structureLabel: 'Simple',
+        stepCount: 1,
+        resultGroupCount: 1,
+        ingredientCount: 1,
+        toolCount: 0,
+        requirementsPreview: [],
+        visibilitySummary: 'All players',
+        ingredients: new Array(1),
+        tools: [],
+      };
+      for (const [field, value] of [
+        ['ingredientSets', ingredientSets],
+        ['steps', []],
+      ]) {
+        Object.defineProperty(row, field, {
+          enumerable: true,
+          configurable: true,
+          get() {
+            reads[field] += 1;
+            return value;
+          },
+        });
+      }
+      return row;
+    }
+
+    it('renders the reference without reading the detail tier, and CAN read it', async () => {
+      const reads = { ingredientSets: 0, steps: 0 };
+      const row = countingRecipeRow(reads);
+      mountManager([], {
+        recipes: [row],
+        // As the real store publishes it, on every one of its publishes: `herb` is named by
+        // one recipe placeholder and by no component in this fixture.
+        recipeTagPlaceholderCounts: { herb: 1 },
+      });
+
+      // THE PERF LEG. The badge has already rendered — it is a sibling of every view — and
+      // this route is not the Recipe Studio, so nothing here has any business touching a
+      // recipe's detail tier.
+      assert.equal(
+        target.querySelectorAll('[data-tag-id]').length,
+        0,
+        'pre-condition: the Tags & Categories screen is not the mounted route'
+      );
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 0, steps: 0 },
+        'the always-mounted badge answered from the published record and walked nothing'
+      );
+
+      // THE CORRECTNESS LEG, same fixture. `herb` is referenced ONLY as a recipe ingredient
+      // tag-placeholder. Reading it as unused would render the Unused chip and make it
+      // deletable in one click with no confirm strip, breaking ingredient matching in every
+      // recipe whose placeholder named it.
+      navButton('Tags & Categories').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-vocabulary-tab="tag"]').click();
+      await tick();
+      flushSync();
+
+      const herbRow = target.querySelector('[data-tag-id="herb"]');
+      assert.ok(Boolean(herbRow), 'pre-condition: the tag tab lists `herb`');
+      assert.ok(
+        !herbRow.querySelector('.manager-vocabulary-chip-unused'),
+        'a tag used only as a recipe ingredient placeholder is NOT unused'
+      );
+      assert.match(
+        herbRow.textContent,
+        /1 reference/,
+        'and the row reports that one reference'
+      );
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 0, steps: 0 },
+        'reaching the screen that renders the number still walked nothing'
+      );
+
+      // POSITIVE CONTROL, same fixture and the same counters: the getters are live, so the
+      // zeros above are a measurement rather than two fields nothing could ever have read.
+      void row.ingredientSets;
+      void row.steps;
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 1, steps: 1 },
+        'the counters CAN go up — reading either field is what does it'
+      );
+    });
   });
 });

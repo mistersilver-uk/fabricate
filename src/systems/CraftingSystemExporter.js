@@ -7,7 +7,9 @@ import { migrateExportPayload } from '../migration/migrateExportPayload.js';
 
 import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
+  assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
+  assembleTravelAuthoringBundle,
 } from './authoringExport.js';
 import {
   rebindCopyContainerIds,
@@ -31,6 +33,8 @@ const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
  * @param {string} fabricateVersion - Current module version string
  * @param {object[]} [gatheringEnvironments=[]] - FULL global environment array (all systems)
  * @param {object} [gatheringConfig={}] - FULL `gatheringConfig` setting object
+ * @param {object} [currencyConfig={}] - FULL `currencyConfig` world setting
+ * @param {object} [travelConfig={}] - FULL `travelConfig` world setting
  * @returns {object} Export envelope ready for JSON.stringify
  */
 export function buildExportPayload(
@@ -38,7 +42,14 @@ export function buildExportPayload(
   recipes,
   fabricateVersion,
   gatheringEnvironments = [],
-  gatheringConfig = {}
+  gatheringConfig = {},
+  // The world currency configuration (issue 1278). Defaulted so every existing call site keeps
+  // working; an export produced without it simply carries an empty ladder.
+  currencyConfig = {},
+  // The world travel configuration (issue 1282): the realm library plus its two scalars.
+  // Defaulted for the same reason, with the same consequence — an export produced without it
+  // carries an empty library, and every realm-gated environment in it lands unresolvable.
+  travelConfig = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -46,8 +57,9 @@ export function buildExportPayload(
 
   const systemId = system.id;
 
-  // Deep-clone system and strip transitional aliases to keep export clean
-  const exportSystem = stripTransitionalAliases(structuredClone(system));
+  // Deep-clone system, strip transitional aliases, and strip the Checks Studio's
+  // progressive PREVIEW SANDBOX, which is authoring scratch rather than authoring data.
+  const exportSystem = stripPreviewSandbox(stripTransitionalAliases(structuredClone(system)));
 
   // Replace craftingSystemId with placeholder so imports can rebind
   const exportRecipes = recipes.map((recipe) => {
@@ -71,6 +83,8 @@ export function buildExportPayload(
     recipes: exportRecipes,
     gatheringEnvironments: bundle.gatheringEnvironments,
     gatheringConfig: bundle.gatheringConfig,
+    currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
+    travelConfig: assembleTravelAuthoringBundle(travelConfig),
   };
 }
 
@@ -110,29 +124,40 @@ export function validateImportData(rawData) {
     errors.push('"gatheringConfig" field must be an object');
   }
 
+  // Travel authoring bundle shape (present after migration, issue 1282).
+  if (
+    data.travelConfig !== undefined &&
+    (typeof data.travelConfig !== 'object' || Array.isArray(data.travelConfig))
+  ) {
+    errors.push('"travelConfig" field must be an object');
+  }
+
   // System checks
   if (!data.system || typeof data.system !== 'object') {
     errors.push('Missing required "system" field');
+  } else if (!data.system.name || typeof data.system.name !== 'string') {
+    errors.push('System is missing a "name" field');
+  }
+
+  // Realms ride the ENVELOPE since issue 1282, not the system. A malformed legacy value is
+  // checked against the RAW payload rather than the migrated one, because the upcast has
+  // already hoisted (and, for a non-array, discarded) `system.gatheringRealms` by the time we
+  // look at `data`. Accept the legacy `gatheringRegions` key on read (pre-1.1.0-migration
+  // exports) so an old export still validates under the canonical name.
+  const legacySystemRealms = rawData.system?.gatheringRealms ?? rawData.system?.gatheringRegions;
+  if (legacySystemRealms !== undefined && !Array.isArray(legacySystemRealms)) {
+    errors.push('System "gatheringRealms" field must be an array');
+  }
+
+  // Each realm should carry a name (warning, not a hard error, so a hand-trimmed export still
+  // imports).
+  const realms = data.travelConfig?.realms;
+  if (realms !== undefined && !Array.isArray(realms)) {
+    errors.push('"travelConfig.realms" field must be an array');
   } else {
-    if (!data.system.name || typeof data.system.name !== 'string') {
-      errors.push('System is missing a "name" field');
-    }
-    // Gathering realms ride along with the system. If present they must be an
-    // array; each realm should carry a name (warning, not a hard error, so a
-    // hand-trimmed export still imports). Accept the legacy `gatheringRegions`
-    // key on read (pre-1.1.0-migration exports) so an old export still validates.
-    const gatheringRealms = data.system.gatheringRealms ?? data.system.gatheringRegions;
-    if (gatheringRealms !== undefined) {
-      if (Array.isArray(gatheringRealms)) {
-        for (const [i, realm] of gatheringRealms.entries()) {
-          if (realm && typeof realm === 'object' && !realm.name) {
-            warnings.push(
-              `Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`
-            );
-          }
-        }
-      } else {
-        errors.push('System "gatheringRealms" field must be an array');
+    for (const [i, realm] of (realms ?? []).entries()) {
+      if (realm && typeof realm === 'object' && !realm.name) {
+        warnings.push(`Gathering realm at index ${i} (id: ${realm.id || 'unknown'}) has no name`);
       }
     }
   }
@@ -179,7 +204,37 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.gatheringConfig)
       : { system: {}, shared: {} };
 
-  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig };
+  // The WORLD currency ladder (issue 1278). It rides the envelope rather than the system, so
+  // unlike every other slice above there is nothing on `system` to fall back on: drop it here
+  // and `CompendiumImporter._persistCurrencyConfig` receives `undefined` and returns
+  // immediately, which lands every imported currency cost in the destination world as an
+  // unresolvable unit id. Deliberately NOT rebound under `copy` mode: unit ids are world scope,
+  // shared by every crafting system, and the merge already lets the destination win a collision.
+  const currencyConfig =
+    data.currencyConfig && typeof data.currencyConfig === 'object'
+      ? structuredClone(data.currencyConfig)
+      : {};
+
+  // The WORLD realm library (issue 1282), carried for exactly the reason the ladder above is:
+  // it rides the envelope rather than the system, so there is nothing on `system` to fall back
+  // on. Drop it here and `CompendiumImporter._persistTravelConfig` receives `undefined` and
+  // returns immediately, landing every realm-gated environment in the destination world citing
+  // realm ids that name nothing. Deliberately NOT rebound under `copy` mode: realm ids are
+  // world scope, shared by every crafting system that opts in, and the merge already lets the
+  // destination win a collision — rebinding would fork the world's own geography per copy.
+  const travelConfig =
+    data.travelConfig && typeof data.travelConfig === 'object'
+      ? structuredClone(data.travelConfig)
+      : {};
+
+  const prepared = {
+    system,
+    recipes,
+    gatheringEnvironments,
+    gatheringConfig,
+    currencyConfig,
+    travelConfig,
+  };
 
   if (mode === 'copy') {
     delete system.id;
@@ -261,5 +316,33 @@ function stripTransitionalAliases(system) {
     }
   }
 
+  return system;
+}
+
+/** Every check block that can carry a progressive sub-object (issue 1097). */
+const PROGRESSIVE_CHECK_KEYS = ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'];
+
+/**
+ * Remove the Checks Studio's progressive PREVIEW SANDBOX from an export.
+ *
+ * `progressive.preview.difficulties` is the ordered list a GM types into the odds histogram
+ * to see what a check would award. It is an experiment on one authoring screen, not a
+ * property of the system: no runtime path reads it and no readiness rule validates it. A
+ * value shipped inside a distributed system reads to the recipient as configuration they are
+ * expected to understand, which is exactly the misreading this strip prevents — and it is
+ * the same call the `runtimeStateIncluded: false` boundary already makes about every other
+ * piece of non-authoring state.
+ *
+ * ABSENCE-PRESERVING in the other direction too: it deletes the key rather than emptying it,
+ * so an import cannot tell an exported experiment from one that was never run.
+ *
+ * @param {object} system The cloned export system.
+ * @returns {object} The same object, sandbox removed.
+ */
+function stripPreviewSandbox(system) {
+  for (const key of PROGRESSIVE_CHECK_KEYS) {
+    const progressive = system?.[key]?.progressive;
+    if (progressive && typeof progressive === 'object') delete progressive.preview;
+  }
   return system;
 }

@@ -15,6 +15,10 @@ import { flushSync, mount } from 'svelte';
 import { APP_CHROME } from '../../scripts/lib/foundryChromeSpec.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
 import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
+import {
+  findLabInjectedContentWidthLosses,
+  measureWithoutLabStyles,
+} from './labInjectedLayoutGuard.js';
 import { buildLabWorld } from './world/labWorld.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -22,6 +26,45 @@ const ERROR_ATTRIBUTE = 'data-view-lab-error';
 
 /** The two roles `shim.setViewer` understands. An unknown `viewer=` falls back to the default. */
 const VIEWER_ROLES = new Set(['gm', 'player']);
+
+const LONG_DOWNTIME_LOCALIZATION = Object.freeze({
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label':
+    'Campaign-wide tracking and pending decisions',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.AccessibleName':
+    'Open campaign-wide tracking and pending decisions',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Tooltip':
+    'Preview campaign-wide tracking and pending decisions in Fabricate Premium',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Activities.Label':
+    'Reusable individual and collaborative activities',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Activities.AccessibleName':
+    'Open reusable individual and collaborative activities',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Activities.Tooltip':
+    'Preview reusable individual and collaborative activities in Fabricate Premium',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Factions.Label':
+    'Faction relationships, obligations and consequences',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Factions.AccessibleName':
+    'Open faction relationships, obligations and consequences',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Factions.Tooltip':
+    'Preview faction relationships, obligations and consequences in Fabricate Premium',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Settings.Label':
+    'Campaign calendar, permissions and resolution settings',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Settings.AccessibleName':
+    'Open campaign calendar, permissions and resolution settings',
+  'FABRICATE.Admin.Manager.World.Downtime.Tabs.Settings.Tooltip':
+    'Preview campaign calendar, permissions and resolution settings in Fabricate Premium',
+});
+
+function applyLongDowntimeLocalization(world) {
+  if (!world) return;
+  const shippedLocalize = world.localize;
+  const localize = (key) => LONG_DOWNTIME_LOCALIZATION[key] ?? shippedLocalize(key);
+  world.localize = localize;
+  world.i18n.localize = localize;
+  world.i18n.format = (key, data = {}) =>
+    localize(key).replace(/\{(\w+)\}/g, (whole, token) =>
+      Object.hasOwn(data, token) ? String(data[token]) : whole
+    );
+}
 
 /**
  * Kill animations, transitions, the caret, and smooth scrolling document-wide.
@@ -64,6 +107,7 @@ function installDeterminismStyles() {
     */
   `;
   document.head.appendChild(style);
+  return style;
 }
 
 function readParams() {
@@ -87,6 +131,41 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    // World Parties is the one Manager route that remains operable with no selected system.
+    // Clearing through the real admin store after construction reaches that state without
+    // weakening production's persisted-selection normalization.
+    clearSystem: params.get('clearSystem') === '1',
+    // Seed an EMPTY party list, for the World > Parties empty state. It takes no
+    // post-construction store call the way `clearSystem` does: the pane's empty state is a
+    // function of the persisted `gatheringParties` setting, so the fixture seeds `[]` and
+    // the real store reads it exactly as it reads a populated one.
+    noParties: params.get('noParties') === '1',
+    // Evidence-only localization stress. It changes no shipped string and exists solely so the
+    // named long-label frame cannot collapse to the ordinary stacked Map frame.
+    longTravelLabels: params.get('longTravelLabels') === '1',
+    longDowntimeLabels: params.get('longDowntimeLabels') === '1',
+    // Register a stand-in companion World-nav provider before the manager mounts, so the
+    // frames can photograph the PREMIUM-INSTALLED chrome: the title bar's gold badge and the
+    // rail's muted Downtime chip. Nothing shipped changes — the provider lives here, and the
+    // registry it registers with is the production one the manager app hands to the root.
+    downtimeProvider: params.get('downtimeProvider') === '1',
+    // view-lab-region:player-extension-params
+    // Register a stand-in companion PLAYER navigation provider before the player app mounts, so
+    // the frames can photograph a companion tab in the nav rail and its panel beneath the Actor
+    // selection top bar (issue 1198). Nothing shipped changes: the provider lives in this file
+    // and registers with the production page-session registry the player app itself reads.
+    //
+    // These three params are their own attributed REGION. Only the player window can render what
+    // they produce, and `scripts/lib/viewLabCases.js` keys `ATTRIBUTED_LAB_INPUTS` on that fact —
+    // so a hunk confined to this block selects the player frames instead of the whole corpus.
+    playerProvider: params.get('playerProvider') === '1',
+    // Make that provider's mount throw, for Core's own fault state.
+    playerProviderFault: params.get('playerProviderFault') === '1',
+    // Evidence-only label stress for the rail's truncation rule. A provider's `label` is FINAL
+    // display text rendered verbatim, so the stress belongs on the provider rather than on the
+    // localizer Core's own five tab labels read.
+    longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // view-lab-region:end
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
@@ -131,13 +210,116 @@ function borrowInstance(AppClass, fields) {
   return Object.assign(Object.create(AppClass.prototype), fields);
 }
 
+// view-lab-region:lab-player-provider
+/**
+ * The exact report Core makes when it contains a player companion's mount fault.
+ *
+ * Written once and matched by PREFIX, because the shipped host appends the thrown error. See
+ * `mountPlayerApp` for why the fault frame swallows this one message and nothing else.
+ */
+const EXPECTED_PLAYER_FAULT_REPORT = 'Fabricate | Player extension mount failed:';
+
+/**
+ * A stand-in companion PLAYER navigation provider, for the companion-surface frames.
+ *
+ * It declares its OWN tab ids on purpose, and never a copy of Core's five: the seam's whole
+ * claim is that a provider tab id can never collide with a Core one, so a lab provider that
+ * borrowed `crafting` or `journal` would photograph the one case that proves least.
+ *
+ * `label` is final display text — Core renders a provider's label verbatim and localizes only
+ * its own — so the long-label variant stresses the rail's truncation rule from here rather
+ * than through the localizer.
+ *
+ * @param {object} [options] Which variant to build.
+ * @param {boolean} [options.fault] Throw from `mount`, for Core's fault state.
+ * @param {boolean} [options.longLabels] Use the worst-case labels the rail must truncate.
+ * @returns {object} An API-v1 player navigation provider.
+ */
+function labPlayerProvider({ fault = false, longLabels = false } = {}) {
+  const tab = (id, short, long, icon) => {
+    const label = longLabels ? long : short;
+    return {
+      id,
+      label,
+      // An `aria-label` REPLACES the accessible name, so it must contain the visible label text
+      // or Label-in-Name breaks for speech-input users. Composed from the label for that reason.
+      accessibleName: `Open ${label}`,
+      tooltip: `${label} · Downtime Studio`,
+      icon,
+    };
+  };
+
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: [
+      tab('board', 'Board', 'Downtime board and pending decisions', 'fas fa-chart-simple'),
+      tab('projects', 'Projects', 'Commissions, projects and standing orders', 'fas fa-list-check'),
+      tab('ledger', 'Ledger', 'Ledger of every character’s downtime', 'fas fa-scroll'),
+    ],
+    mount({ target: mountTarget, tabId, context }) {
+      if (fault) throw new Error('view lab: the stand-in player companion failed to mount');
+      const panel = mountTarget.ownerDocument.createElement('div');
+      panel.style.padding = '20px';
+      const heading = mountTarget.ownerDocument.createElement('h2');
+      heading.textContent = `Downtime Studio — ${tabId}`;
+      const body = mountTarget.ownerDocument.createElement('p');
+      // Drawn from the frozen mount context, so the frame shows that the context reached the
+      // companion rather than merely that something mounted.
+      body.textContent = `Companion content for actor ${context.actorId ?? 'none selected'}.`;
+      panel.append(heading, body);
+      mountTarget.append(panel);
+      return () => panel.remove();
+    },
+  };
+}
+// view-lab-region:end
+
+// view-lab-region:mount-player-app
 async function mountPlayerApp(content, params) {
-  const [{ SvelteFabricateApp }, { default: FabricateAppRoot }, { isAlchemyTabAvailable }] =
-    await Promise.all([
-      import('../../src/ui/SvelteFabricateApp.svelte.js'),
-      import('../../src/ui/svelte/apps/FabricateAppRoot.svelte'),
-      import('../../src/ui/svelte/util/alchemyTabAvailability.js'),
-    ]);
+  const [
+    { SvelteFabricateApp },
+    { default: FabricateAppRoot },
+    { isAlchemyTabAvailable },
+    { playerExtensions },
+    { deriveExtensionSurfaces },
+  ] = await Promise.all([
+    import('../../src/ui/SvelteFabricateApp.svelte.js'),
+    import('../../src/ui/svelte/apps/FabricateAppRoot.svelte'),
+    import('../../src/ui/svelte/util/alchemyTabAvailability.js'),
+    import('../../src/ui/playerExtensions.js'),
+    import('../../src/ui/playerNavModel.js'),
+  ]);
+
+  // Core CONTAINS a companion mount fault by REPORTING it, so the fault frame's own subject
+  // produces a `console.error` — and the capture driver fails any frame that logs one. The
+  // narrowest honest answer is here rather than in that gate: this page swallows exactly the one
+  // message the frame is evidence FOR, only when a case asked for a fault, and forwards every
+  // other report untouched, so any second or unrelated error still fails the render. Widening the
+  // driver's gate instead would relax it for every frame in the corpus — and editing the driver
+  // at all would select every frame in the corpus for capture, which is the cost this file's own
+  // region attribution exists to avoid.
+  //
+  // Nothing here stands in for the assertion: the case's `expectSelector` names Core's fault
+  // stamp, which is rendered only from the shell's faulted-provider branch, so a frame whose
+  // fault never fired fails the capture rather than publishing a healthy panel under its name.
+  if (params.playerProviderFault) {
+    const reportedError = console.error.bind(console);
+    console.error = (...args) => {
+      if (typeof args[0] === 'string' && args[0].startsWith(EXPECTED_PLAYER_FAULT_REPORT)) return;
+      reportedError(...args);
+    };
+  }
+
+  // Registered BEFORE the props bag is built, because the snapshot below is derived once and
+  // this borrowed instance has no subscription to refresh it. The registry is the production
+  // page-session singleton — the same module instance `SvelteFabricateApp` imports — so this is
+  // the real registration path and not a lab-shaped imitation of one.
+  if (params.playerProvider) {
+    playerExtensions.publicApi.registerPlayerNavProvider(
+      labPlayerProvider({ fault: params.playerProviderFault, longLabels: params.longPlayerLabels })
+    );
+  }
 
   const activeTab = params.tab ?? 'crafting';
   const app = borrowInstance(SvelteFabricateApp, {
@@ -163,9 +345,185 @@ async function mountPlayerApp(content, params) {
     scopedEnvironmentId: null,
     scopedTaskId: null,
     scopedActorId: null,
+    // DERIVED, and not `playerExtensions` alone. The player window's single subscriber is the
+    // APPLICATION (`SvelteFabricateApp._prepareSvelteProps` seeds this and `_registerHooks`
+    // refreshes it), and this file borrows the instance from the prototype and hand-writes the
+    // props bag — so nothing here runs `_registerHooks()` and nothing else would compute the
+    // snapshot. Handing over the registry and expecting the shell to derive its own would render
+    // an empty rail, because the shell subscribes to nothing by design. `deriveExtensionSurfaces`
+    // is the one function production calls too, so the lab cannot drift from it.
+    // The gate the production host reads off `fabricate.experimentalFeatures` is stated from the
+    // same lab param that seeds that setting into the lab world, so a `?experimental=0` frame
+    // photographs the withheld surface rather than a world whose setting and rail disagree.
+    extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {
+      experimentalFeaturesEnabled: params.experimental,
+    }),
+    // The registry itself, carried only so the mount host emits its surface hooks through the
+    // same injectable edge the registry's own hooks travel on.
+    playerExtensions,
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
   return { instance, services, props };
+}
+// view-lab-region:end
+
+/**
+ * A stand-in companion Downtime provider, for the premium-installed frames.
+ *
+ * It declares its OWN tab ids on purpose: Core must give an arbitrary tab set exactly the
+ * treatment it gives its own four, so a lab provider that copied Core's ids would photograph
+ * the one case that proves least.
+ *
+ * @returns {object} An API-v1 World navigation provider.
+ */
+function labDowntimeProvider() {
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: [
+      {
+        id: 'ledger',
+        label: 'Ledger',
+        accessibleName: 'Open the downtime ledger',
+        tooltip: 'Every character’s downtime, in one ledger',
+        icon: 'fas fa-scroll',
+        title: 'Downtime ledger',
+        subtitle: 'Downtime Studio · Every character’s work, in one place.',
+        breadcrumb: 'Ledger',
+      },
+      {
+        id: 'crew',
+        label: 'Crew',
+        accessibleName: 'Open the downtime crew roster',
+        tooltip: 'Who is working on what',
+        icon: 'fas fa-users-gear',
+      },
+      {
+        id: 'writs',
+        label: 'Writs',
+        accessibleName: 'Open downtime writs',
+        tooltip: 'Standing orders and commissions',
+        icon: 'fas fa-file-signature',
+      },
+    ],
+    // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
+    // about and the frame has to be able to show it. The old stand-in mounted a short padded
+    // div, which renders identically in a 689px target and a 528px one — so the frame could
+    // not distinguish the panel handing over its whole height from the panel not doing so.
+    //
+    // Full height, its own inset, a VISIBLE EDGE and its own scroller between a pinned header
+    // and a pinned footer: the footer sitting on the bottom edge is the part that is only
+    // reachable when the target really is the pane's whole content box.
+    mount({ target: mountTarget, tabId, context }) {
+      const doc = mountTarget.ownerDocument;
+      const element = (tag, cssText, textContent) => {
+        const node = doc.createElement(tag);
+        node.style.cssText = cssText;
+        if (textContent !== undefined) node.textContent = textContent;
+        return node;
+      };
+
+      // THE DRILL-DOWN, and the only reason this stand-in has an interactive control at all.
+      // A companion that owns its layout was already photographable; a companion driving
+      // CORE'S header was not, and a frame of the resting list screen cannot distinguish a
+      // seam that carries runtime chrome from one that does not. So the lab reaches the state:
+      // pressing this restates the whole route chrome — artwork, title, subtitle, leaf crumb,
+      // the staged-changes chip and Core's own ghost/danger/primary trio — with no remount,
+      // and registers the re-activation handler that pops back out of it.
+      const openEditor = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        'Open Marn the Quartermaster'
+      );
+      openEditor.type = 'button';
+      // `setAttribute` with the literal hook, not `dataset.labCompanionDrilldown`: the case
+      // registry's selector guard greps the source for the hook a selector names, and a
+      // camel-cased `dataset` write leaves that literal nowhere in the file — so the guard
+      // could never fail on a rename of the very hook a capture step depends on.
+      openEditor.setAttribute('data-lab-companion-drilldown', '');
+      const closeEditor = () => context?.setRouteChrome?.(null);
+      openEditor.addEventListener('click', () => {
+        context?.setRouteChrome?.({
+          title: 'Marn the Quartermaster',
+          subtitle: 'Crew member · two projects in flight',
+          breadcrumb: 'Marn',
+          actionsLabel: 'Crew member actions',
+          // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
+          // here, and the harness treats a console error during render as a failure -- so a
+          // core icon would fail the capture rather than merely render a broken medallion.
+          image: 'assets/img/fabricate-logo.jpg',
+          status: { label: 'Unsaved' },
+          actions: [
+            {
+              id: 'lab-back',
+              label: 'Back to crew',
+              tone: 'ghost',
+              icon: 'fas fa-arrow-left',
+              onSelect: closeEditor,
+            },
+            {
+              id: 'lab-delete',
+              label: 'Delete',
+              tone: 'danger',
+              icon: 'fas fa-trash',
+              onSelect: () => {},
+            },
+            {
+              // NOT `closeEditor`. The case asserts this control accepts a real click, and the
+              // harness does that by clicking it and then re-reading the element it clicked. A
+              // handler that tears down the chrome takes the button with it, so the re-read
+              // waits for a locator that will never resolve again. Saving should not pop the
+              // route anyway -- only Back does.
+              id: 'lab-save',
+              label: 'Save crew member',
+              tone: 'primary',
+              icon: 'fas fa-save',
+              onSelect: () => {},
+            },
+          ],
+        });
+        // Item 1: the rail sub-item for the tab already on screen pops one level rather than
+        // doing nothing, which is a behaviour only a live mount can supply.
+        context?.onRouteReselect?.(closeEditor);
+      });
+
+      const panel = element(
+        'div',
+        'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
+          'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
+          'background:var(--fab-bg-2)'
+      );
+      panel.append(
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
+      );
+      panel.append(openEditor);
+      const scroller = element(
+        'div',
+        'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'
+      );
+      scroller.dataset.labCompanionScroll = '';
+      for (let row = 1; row <= 16; row += 1) {
+        scroller.append(
+          element(
+            'p',
+            'flex:0 0 auto;margin:0;padding:10px 12px;border-radius:8px;background:var(--fab-bg-1)',
+            `Standing order ${row} — the companion owns this scroller, not Core.`
+          )
+        );
+      }
+      panel.append(scroller);
+      panel.append(
+        element(
+          'p',
+          'flex:0 0 auto;margin:0;color:var(--fab-text-subtle);font-size:11px',
+          'Pinned footer — on the panel’s bottom edge only if the target is full height.'
+        )
+      );
+      mountTarget.append(panel);
+      return () => panel.remove();
+    },
+  };
 }
 
 async function mountManagerApp(content, params) {
@@ -185,6 +543,10 @@ async function mountManagerApp(content, params) {
   });
   const props = app._prepareSvelteProps();
   const services = props.services;
+  if (params.downtimeProvider) {
+    props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
+  }
+  if (params.clearSystem) await props.store.selectSystem('');
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
 }
@@ -211,10 +573,23 @@ async function settle(roots, services = null) {
     await new Promise((resolve) => setTimeout(resolve, 40));
   }
 
+  // view-lab-region:player-settle-stores
   // Wait for the STORES, not just the DOM. A store that is still loading renders its empty state,
   // which is quiet in exactly the same way a finished render is — so DOM stillness alone let the
   // journal capture "No active runs" while three were on their way in. Each player store exposes
   // `loading`, and most also `loadedOnce`; a store that has neither is skipped rather than waited on.
+  //
+  // RE-DERIVED against a companion-surface frame (issue 1198) and it verifiably needs no new
+  // entry. A companion panel is mounted SYNCHRONOUSLY from `PlayerExtensionHost`'s mount effect —
+  // an asynchronous `mount` is rejected at registration — so it is fully drawn before this pass
+  // begins, and it introduces no store of its own: the seam creates, reads and writes no record,
+  // setting or flag. The six names below still matter on such a frame because `ActorSelectTopBar`
+  // renders above EVERY tab and the shell keeps the Journal badge fresh while its tab is closed.
+  //
+  // This block is also its own attributed REGION, and player-only readership is a fact rather
+  // than an assumption: it waits on six names (`journal`, `crafting`, `inventory`, `alchemy`,
+  // `craftingSources`, `actorBar`) that the player service bag declares and the Manager's
+  // `_buildServices()` does not declare at all, so `watched` is empty for every manager frame.
   if (services) {
     const watched = ['journal', 'crafting', 'inventory', 'alchemy', 'craftingSources', 'actorBar']
       .map((name) => services[name])
@@ -230,6 +605,7 @@ async function settle(roots, services = null) {
     }
     flushSync();
   }
+  // view-lab-region:end
 
   await new Promise((resolve) => {
     let quietTimer = null;
@@ -341,7 +717,7 @@ async function assertChromeFontsLoaded() {
 }
 
 /**
- * Fail the render when a lab-injected style has resized an element's content box.
+ * Measure content widths that can be compared with the same render minus lab styles.
  *
  * The determinism styles above are the lab's own, and they are the one thing in the page that
  * production does not have — so when one of them changes layout, the frame lies and nothing else
@@ -349,47 +725,50 @@ async function assertChromeFontsLoaded() {
  * for months: it reserves gutter space on any scroll container, `overflow: hidden` makes one, and
  * so every clipping element rendered ~10px narrower than its own box.
  *
- * The invariant is arithmetic and holds for any element that is not scrolling: content width ==
- * border width - padding - border. A reserved gutter breaks it, and nothing legitimate does.
- * Elements that genuinely scroll are exempt, because a real scrollbar breaks it too — and that is
- * production behaviour, not a lab artefact.
- *
  * @param {HTMLElement} frame The application frame.
- * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ * @returns {Array<{element: Element, boxWidth: number, clientWidth: number}>} Measurements.
  */
-function assertNoLabInducedClipping(frame) {
-  const offenders = [];
-  for (const element of frame.querySelectorAll('*')) {
+function measureContentWidths(frame) {
+  return [...frame.querySelectorAll('*')].flatMap((element) => {
     const style = getComputedStyle(element);
     const box = element.getBoundingClientRect();
-    if (box.width === 0) continue;
-    // `clientWidth` is defined only for elements that generate a CSS box with client geometry.
-    // A non-replaced INLINE box — every `span`, `strong`, `em` — reports 0, which read as "loses
-    // its whole width" and failed 106 of 150 frames the first time this guard ran.
-    if (style.display.startsWith('inline') && style.display !== 'inline-block') continue;
-    // A real scrollbar legitimately eats content width; only non-scrolling elements are pinned.
-    if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
-      continue;
+    // Inline text nodes report no client geometry, so their zero width is not layout evidence.
+    if (
+      box.width === 0 ||
+      (style.display.startsWith('inline') && style.display !== 'inline-block')
+    ) {
+      return [];
     }
-    const chrome =
-      Number.parseFloat(style.paddingLeft) +
-      Number.parseFloat(style.paddingRight) +
-      Number.parseFloat(style.borderLeftWidth) +
-      Number.parseFloat(style.borderRightWidth);
-    const expected = style.boxSizing === 'border-box' ? box.width - chrome : box.width;
-    const lost = expected - element.clientWidth;
-    // 1px of tolerance for sub-pixel rounding; a reserved gutter is an order of magnitude larger.
-    if (lost > 1) {
-      offenders.push(
-        `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
-          `loses ${lost.toFixed(1)}px of content width (box ${box.width.toFixed(1)}, client ${element.clientWidth})`
-      );
-    }
-  }
+    return [{ element, boxWidth: box.width, clientWidth: element.clientWidth }];
+  });
+}
+
+/**
+ * Fail only when the View Lab's own stylesheet, rather than production CSS, shrinks content.
+ *
+ * @param {HTMLElement} frame The application frame.
+ * @param {HTMLStyleElement} determinismStyle The View Lab's own stylesheet.
+ * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ */
+function assertNoLabInducedClipping(frame, determinismStyle) {
+  const withLab = measureContentWidths(frame);
+  const sheet = determinismStyle.sheet;
+  if (!sheet) throw new Error('view lab: determinism stylesheet did not create a CSS stylesheet');
+
+  const withoutLab = measureWithoutLabStyles(sheet, () => measureContentWidths(frame));
+
+  const offenders = findLabInjectedContentWidthLosses(withLab, withoutLab);
   if (offenders.length > 0) {
     throw new Error(
       'view lab: a lab-injected style is resizing content boxes, so this frame would not depict ' +
-        `production layout:\n  ${offenders.slice(0, 8).join('\n  ')}` +
+        `production layout:\n  ${offenders
+          .slice(0, 8)
+          .map(
+            ({ element, boxWidth, clientWidth, lost }) =>
+              `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
+              `loses ${lost.toFixed(1)}px of content width (box ${boxWidth.toFixed(1)}, client ${clientWidth})`
+          )
+          .join('\n  ')}` +
         (offenders.length > 8 ? `\n  ... and ${offenders.length - 8} more` : '')
     );
   }
@@ -410,14 +789,18 @@ async function boot() {
   const params = readParams();
   if (!APP_CHROME[params.appId]) throw new Error(`unknown app: ${params.appId}`);
 
-  installDeterminismStyles();
+  const determinismStyle = installDeterminismStyles();
 
   const world = params.chromeOnly
     ? null
     : await buildLabWorld({
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
+        clearSystem: params.clearSystem,
+        noParties: params.noParties,
+        longTravelLabels: params.longTravelLabels,
       });
+  if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 
@@ -449,7 +832,7 @@ async function boot() {
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.
-    assertNoLabInducedClipping(built.frame);
+    assertNoLabInducedClipping(built.frame, determinismStyle);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));

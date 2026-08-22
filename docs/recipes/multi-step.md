@@ -11,7 +11,8 @@ nav_order: 4
 > Requires the Multi-Step Recipes feature to be enabled on the crafting system.
 
 Multi-step recipes chain several steps that must be completed in sequence.
-Each step can have its own ingredients, required tools, results, time requirements, and currency requirements.
+Each step can have its own ingredients, required tools, results, and time requirements.
+An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 
 ---
 

@@ -6,9 +6,9 @@
   populated 3-column layout.
 
   The grid is cloned from GatheringView: a container-query 3-column layout
-  (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column below 900px of
-  app width. Left column = active runs + history; centre = the selected run's
-  detail; right column (mockup order) = about this run → what to expect →
+  (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column when its
+  content box is 960px or narrower. Left column = active runs + history; centre =
+  the selected run's detail; right column (mockup order) = about this run → what to expect →
   recent results → tips. World-time guidance lives in the Tips card.
 
   This view HOSTS the re-fetch effects (so the store stays Foundry-global-free):
@@ -159,9 +159,11 @@
     color: var(--fab-text);
   }
 
-  /* Below the combined three-column minimum the grid reflows into a single
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable.
+     Below the combined three-column minimum the grid reflows into a single
      vertical stack so the view stays usable on a narrow window. */
-  @container fabricate-journal (max-width: 900px) {
+  @container fabricate-journal (max-width: 960px) {
     .journal-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);
@@ -170,8 +172,18 @@
       overflow-y: auto;
     }
 
-    .journal-view-column {
+    /* The desktop rules below share their selectors. Keep the narrow declarations
+       more specific so the 220px minimum and left-header visibility survive the
+       normal `min-height: 0` / `overflow: hidden` flex defaults. */
+    .journal-view-grid .journal-view-column {
       min-height: 220px;
+    }
+
+    /* The stacked grid owns vertical scrolling. The desktop left pane clips its
+       two equal-height list bodies, but retaining that clip here can hide the
+       first list header beneath the player bar before either body scrolls. */
+    .journal-view-grid .journal-view-column-left {
+      overflow: visible;
     }
   }
 

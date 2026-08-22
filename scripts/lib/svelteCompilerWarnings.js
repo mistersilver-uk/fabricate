@@ -11,7 +11,7 @@
  *
  *   - `svelte.config.js`'s `onwarn` hook, which fails `npm run build` on a warning. Fast, and
  *     the one an author trips locally — but a Vite build compiles only the ENTRY GRAPH, so a
- *     warning in a component nothing imports (`GatheringTravelView.svelte`, issue 927) never
+ *     warning in a component nothing imports (`RowDisclosure.svelte` today; issue 927) never
  *     reaches it.
  *   - `scripts/check-svelte-warnings.mjs`, the graph-independent sweep over every component
  *     under `src/`. Exhaustive, and therefore the authoritative one — but only while it

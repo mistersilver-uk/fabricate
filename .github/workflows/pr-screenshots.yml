@@ -31,10 +31,24 @@ on:
     # checkout of untrusted head code — with Foundry credentials and AWS keys in scope here, it is
     # a straightforward arbitrary-code-execution vector on a public repository.
     # `edited` is deliberately absent. Publishing rewrites the PR body, which itself fires `edited`
-    # — listening for it would make this job retrigger its own output indefinitely. The trade is
-    # that `check-screenshots` in `ci.yml` may read the body before this job has written it and go
-    # red once; the body edit then fires the `edited` event `ci.yml` DOES listen for, and the
-    # re-run sees the published block. Red-then-green, not stuck-red.
+    # — listening for it would make this job retrigger its own output indefinitely.
+    #
+    # This used to record a self-healing story that does not hold: that a first-push red in
+    # `check-screenshots` cleared itself because the publish step's body edit fired the `edited`
+    # event `ci.yml` DOES listen for. It cannot. The publish step edits the body with a `GH_TOKEN`
+    # set from `github.token` — the default `GITHUB_TOKEN` — and GitHub does not create workflow
+    # runs from events raised by that token, so the compensating `edited` run is never dispatched.
+    # Confirmed against PR #1131's real history: its head has exactly ONE `ci.yml` run,
+    # and that run is `run_attempt: 2`, a human clicking re-run. No `edited`-event run exists for
+    # that head at all. That was the issue's "passes on a manual re-run, with no change to the
+    # branch".
+    #
+    # The actual contract now (issue 1133): `check-screenshots` AWAITS this job's conclusion for the
+    # same head SHA before it decides, and then re-reads the body this job wrote rather than a copy
+    # fetched before it. It also matches what was published — each frame's head SHA and View Lab
+    # case id come from its published S3 key — so waiting cannot be satisfied by a frame left over
+    # from the previous head. Nothing in THIS job changed: it neither knows nor cares that it is
+    # being waited on.
     types: [opened, synchronize, reopened]
 
 concurrency:
@@ -95,11 +109,12 @@ jobs:
           # lines and 406s beyond it, which under `bash -e` kills the step before selection runs.
           #
           # Each entry's `patch` comes along for the ride, because the selector uses it: a change
-          # confined to case-object literals in `viewLabCases.js` selects those cases instead of all
-          # of them, which is the difference between a two-minute capture and a twenty-minute one.
-          # The library never reads git itself — it is a pure function of what this step hands it —
-          # and it widens back to the full corpus for any patch it cannot verify, so a `patch` the
-          # API omits (it drops them for very large diffs) costs frames, never evidence.
+          # confined to case-object literals in `viewLabCases.js` selects those cases instead of
+          # surface coverage, which is the difference between a two-minute capture and a
+          # four-minute one. The library never reads git itself — it is a pure function of what
+          # this step hands it — and it widens back to surface coverage (one frame of every route
+          # and tab the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
+          # them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
           SELECTION=$(node -e '
@@ -126,8 +141,8 @@ jobs:
           fi
           # `check-screenshots` arms on exactly the same predicate (`isUiFile` over the changed
           # set). When it is unarmed there is no gate for these frames to satisfy, so rendering and
-          # publishing them is pure cost — ~20 minutes on a lab-infrastructure PR that changes no
-          # render file at all, this one included.
+          # publishing them is pure cost — a surface-coverage capture on a lab-infrastructure PR
+          # that changes no render file at all, this one included.
           #
           # The saving is deliberately taken on the RENDER and PUBLISH steps only, not by zeroing
           # `ids`. Everything before them still runs: the chrome harvest, the committed-provenance

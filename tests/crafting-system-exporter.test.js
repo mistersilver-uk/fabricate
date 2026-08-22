@@ -30,6 +30,7 @@ const {
   prepareForImport,
   makeExportFilename
 } = await import('../src/systems/CraftingSystemExporter.js');
+const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -413,7 +414,12 @@ test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1
 
 test('buildExportPayload: writes the explicit schemaVersion + runtimeStateIncluded markers', () => {
   const payload = buildExportPayload(makeSystem(), [], '1.0.0');
-  assert.equal(payload.schemaVersion, 2);
+  // 4 since issue 1282 added the world `travelConfig` slice to the envelope (3 was #1278's
+  // `currencyConfig`).
+  assert.equal(payload.schemaVersion, 4);
+  assert.ok(payload.currencyConfig && typeof payload.currencyConfig === 'object');
+  assert.ok(payload.travelConfig && typeof payload.travelConfig === 'object');
+  assert.ok(Array.isArray(payload.travelConfig.realms));
   assert.equal(payload.runtimeStateIncluded, false);
   assert.ok(Array.isArray(payload.gatheringEnvironments));
   assert.ok(payload.gatheringConfig && typeof payload.gatheringConfig === 'object');
@@ -468,8 +474,11 @@ test('validateImportData: upcasts a legacy payload then accepts it (no schemaVer
 });
 
 test('validateImportData: rejects a non-array gatheringEnvironments', () => {
+  // Pinned to the CURRENT schema deliberately: a lower version routes through the upcast,
+  // which defaults a malformed `gatheringEnvironments` to `[]` and would repair the very
+  // field this test asserts is rejected.
   const result = validateImportData({
-    schemaVersion: 2,
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     fabricateVersion: '1.0.0',
     system: { name: 'X' },
     gatheringEnvironments: { not: 'array' }

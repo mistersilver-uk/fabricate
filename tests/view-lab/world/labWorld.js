@@ -21,12 +21,8 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import {
-  buildLabBlindRunSecret,
-  buildLabRunStates,
-  installLabRunStates,
-} from './labRunStates.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
+import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
+import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
@@ -35,9 +31,20 @@ const FABRICATE_NAMESPACE = 'fabricate';
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
+function seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
+  // Membership, component sources and the remembered crafting actor are all PLAYER-CHARACTER
+  // concerns. They were blanket `actors.map(...)` calls, which is safe only while every actor
+  // in the world is a character — and the World > Parties evidence needs one that is not
+  // (`lab-actor-wagon`, a vehicle). A blanket map would have enrolled it as a member of the
+  // enabled `lab-party`, colliding with its role as the second enabled party's travel actor
+  // under `GatheringPartyStore`'s composite-uniqueness invariant, and would have persisted a
+  // wagon as a crafting component source. The lab writes the raw settings map and validation
+  // runs only in `_persist`, so neither would have thrown: an impossible world would have
+  // rendered and published as evidence.
+  const characterActors = actors.filter((actor) => actor.type === 'character');
+  const uuidOf = (id) => actors.find((actor) => actor.id === id)?.uuid ?? null;
 
   // With the smoke seed enabled the lab's own three systems would sit ALONGSIDE the smoke's, which
   // is not a 1:1 comparison - the system library would show seven rows where the smoke shows its
@@ -46,35 +53,97 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
   put('recipes', content.recipes);
   put('gatheringEnvironments', content.environments);
   put('gatheringConfig', content.gatheringConfig);
-  put('gatheringParties', [
-    {
-      id: 'lab-party',
-      name: 'The Ashfall Company',
-      // No `craftingSystemId`. Parties are world-level and cross-system by design
-      // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
-      // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
-      // It also read as a CONTRADICTION of the frame it feeds: `manager-gathering-travel-normal`
-      // photographs this herbalism-named party on SMITHING's Travel tab, which is correct precisely
-      // because the scoping is not real.
-      // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
-      // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
-      // `travelActorUuid: null`, so every field normalised away and the Travel tab rendered
-      // "Disabled · 0 members" — the ninth instance of the same defect class on this branch: a
-      // shape production does not read, degrading to a default that looks like a rendered state.
-      enabled: true,
-      memberActorUuids: actors.map((actor) => actor.uuid),
-      // A party cannot enable without one. The mule carries the load, which is also why he holds
-      // the multi-source stock the crafting frames draw from.
-      travelActorUuid: actors[2]?.uuid ?? actors[0].uuid,
-    },
-  ]);
+  // The world currency ladder (issue 1278). World scope, like `gatheringConfig`: a crafting
+  // system carries only `requirements.currency.enabled`, so without this the World > Currency
+  // page photographs an empty card and every currency cost renders as a raw unit id.
+  put('currencyConfig', content.currencyConfig);
+  // The world travel config (issue 1282). World scope for the same reason the currency ladder
+  // is: a crafting system carries only `gatheringRealmSettings.enabled`, so without this the
+  // World > Travel page photographs an empty realm list and every realm-gated environment
+  // resolves against nothing.
+  put('travelConfig', content.travelConfig);
+  // FIVE parties, and every one of them earns its place in the World > Parties card list:
+  // the pane is paged at four, searchable once more than one exists, and draws its enable
+  // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in
+  // that state. One party photographed none of it.
+  //
+  // The set is legal under `GatheringPartyStore._validateList`, which is checked here because
+  // the lab does NOT check it: the settings map is written raw and validation runs only in
+  // `_persist`. A travel actor is not required to enable, and an actor uuid
+  // may associate with at most ONE enabled party as member or travel actor;
+  // disabled parties are skipped entirely (`:280`), so they may reuse any actor freely.
+  //
+  //   - `lab-party` — enabled; the three characters; Vosk as travel actor. Content unchanged.
+  //   - `lab-party-long-haul` — enabled, ZERO members, travel actor the vehicle. Its only
+  //     association is the wagon, which no enabled party claims, and it is what makes the
+  //     picker's documented "every world actor" candidate set visible in a frame.
+  //   - three DISABLED parties: one with members, one with neither members nor a travel actor
+  //     (the enable gate closed and the unlinked tile, the two states the prototype has no
+  //     equivalent of), and one named so a literal search for "wagon" matches exactly two of
+  //     the five — this one by NAME and `lab-party-long-haul` by its TRAVEL ACTOR's name,
+  //     which is what the widened filter added and what a name-only filter cannot fake.
+  put(
+    'gatheringParties',
+    noParties
+      ? []
+      : [
+          {
+            id: 'lab-party',
+            name: 'The Ashfall Company',
+            // No `craftingSystemId`. Parties are world-level and cross-system by design
+            // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
+            // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
+            // It also read as a CONTRADICTION of the frame it feeds: `manager-world-parties-normal`
+            // photographs this herbalism-named party on the system-independent World → Parties path,
+            // correct precisely because the scoping is not real.
+            // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
+            // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
+            // `travelActorUuid: null`, so every field normalised away and World → Parties rendered
+            // "Disabled · 0 members" — the ninth instance of the same defect class on this branch: a
+            // shape production does not read, degrading to a default that looks like a rendered state.
+            enabled: true,
+            memberActorUuids: characterActors.map((actor) => actor.uuid),
+            // A party cannot enable without one. The mule carries the load, which is also why he holds
+            // the multi-source stock the crafting frames draw from.
+            travelActorUuid: characterActors[2]?.uuid ?? characterActors[0].uuid,
+          },
+          {
+            id: 'lab-party-long-haul',
+            name: 'The Long Haul',
+            enabled: true,
+            memberActorUuids: [],
+            travelActorUuid: uuidOf('lab-actor-wagon'),
+          },
+          {
+            id: 'lab-party-emberwatch',
+            name: 'Emberwatch Foragers',
+            enabled: false,
+            memberActorUuids: characterActors.slice(0, 2).map((actor) => actor.uuid),
+            travelActorUuid: characterActors[0]?.uuid ?? null,
+          },
+          {
+            id: 'lab-party-second-kiln',
+            name: 'Second Kiln Crew',
+            enabled: false,
+            memberActorUuids: [],
+            travelActorUuid: null,
+          },
+          {
+            id: 'lab-party-wagonwright',
+            name: 'The Wagonwright Circle',
+            enabled: false,
+            memberActorUuids: characterActors.slice(2).map((actor) => actor.uuid),
+            travelActorUuid: null,
+          },
+        ]
+  );
   // Selection preferences, so the player app opens on a populated actor and system rather than on
   // an empty-state prompt that says nothing about the UI.
-  put('lastCraftingActor', actors[0].id);
-  put('lastGatheringActor', actors[0].id);
+  put('lastCraftingActor', characterActors[0].id);
+  put('lastGatheringActor', characterActors[0].id);
   put(
     'lastComponentSources',
-    actors.map((actor) => actor.id)
+    characterActors.map((actor) => actor.id)
   );
   put('lastManagedCraftingSystem', managedSystemId ?? LAB_SYSTEM_IDS.SMITHING);
   put('lastAlchemySystem', LAB_SYSTEM_IDS.ALCHEMY);
@@ -94,25 +163,56 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
  *
  * @param {object} [options] Options.
  * @param {number} [options.seed] Determinism seed.
+ * @param {boolean} [options.noParties] Seed an EMPTY party list. Unlike `clearSystem` this
+ *   needs no post-construction store call: the pane's empty state is a function of the
+ *   persisted setting, so seeding `[]` is both the shortest path and the truthful one.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
   seed = 20_260_601,
   managedSystemId = null,
   experimentalFeatures = true,
+  clearSystem = false,
+  longTravelLabels = false,
+  noParties = false,
 } = {}) {
   const content = buildLabContent();
+  // A real Manager refresh resolves an empty selection to the first available crafting system.
+  // The dedicated World Parties no-selection case therefore needs the truthful world state that
+  // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
+  if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
-  const localize = await createLocalizer();
+  const shippedLocalize = await createLocalizer();
+  const localize = (key) =>
+    longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
+      ? 'Map Region Links Across the Active Scene'
+      : shippedLocalize(key);
 
   const world = {
     seed,
     content,
-    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
+    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties),
     documents,
     actorList: actors,
-    scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],
+    scenes: [
+      {
+        id: 'lab-scene',
+        uuid: 'Scene.lab-map',
+        name: 'The Verdant Reach',
+        background: {
+          src: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
+        },
+        regions: [
+          {
+            id: 'deep-gate',
+            uuid: 'Scene.lab-map.Region.deep-gate',
+            name: 'Deep Gate Approach',
+            color: '#8b6f47',
+          },
+        ],
+      },
+    ],
     worldTime: LAB_WORLD_TIME,
     i18n: toI18nStub(localize),
     localize,

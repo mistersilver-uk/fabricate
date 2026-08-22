@@ -87,10 +87,11 @@
  * script's default base — is frequently absent there.
  */
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveExecutable } from './lib/resolveExecutable.js';
 import { compileComponent } from './lib/svelteCompilerWarnings.js';
 import { listSvelteComponents, toRepositoryPaths } from './lib/svelteComponentFiles.js';
 
@@ -155,68 +156,17 @@ function parseArgs(argv) {
 }
 
 /**
- * The suffixes that make a file executable on this platform.
- *
- * On Windows an executable is `<name><PATHEXT entry>`, and the list is ordered — `.EXE` before
- * `.CMD` — so a directory holding both resolves the way the OS itself would. Elsewhere the bare
- * name is the whole story.
- */
-function executableExtensions() {
-  if (process.platform !== 'win32') return [''];
-  return (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean);
-}
-
-/** True when `candidate` is a file this process could execute. */
-function isExecutableFile(candidate) {
-  if (!statSync(candidate, { throwIfNoEntry: false })?.isFile()) return false;
-  // Windows has no execute bit — `accessSync(X_OK)` there answers for readability instead, so the
-  // PATHEXT match above is the real test.
-  if (process.platform === 'win32') return true;
-  try {
-    accessSync(candidate, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * The absolute path of a command, found by walking `PATH` here rather than leaving the lookup to
- * the OS at spawn time.
- *
- * Passing a bare `'git'` to `execFileSync` delegates resolution to `PATH` as it stands when the
- * child is spawned, which is SonarCloud's `javascript:S4036` ("make sure the PATH variable only
- * contains fixed, unwriteable directories"): whatever `git` that search lands on runs with this
- * process's privileges, and a writable or relative `PATH` entry earlier in the list wins. Doing
- * the walk here fixes the executable for the whole run and lets it be checked first — relative
- * entries (`.`, `bin`, the classic hijack vector) are skipped outright, which the OS search would
- * happily honour.
- *
- * Failure throws rather than returning null: a run that cannot find git cannot compare anything,
- * and the top-level handler turns that into exit 2 with git's absence named, instead of the
- * misleading "base ref does not resolve" the old swallowed spawn produced.
- */
-function resolveExecutable(command) {
-  const extensions = executableExtensions();
-  for (const entry of (process.env.PATH ?? '').split(path.delimiter)) {
-    const directory = entry.replaceAll(/^"|"$/g, '');
-    if (!directory || !path.isAbsolute(directory)) continue;
-    for (const extension of extensions) {
-      const candidate = path.join(directory, command + extension);
-      if (isExecutableFile(candidate)) return candidate;
-    }
-  }
-  throw new Error(`could not find "${command}" in any absolute PATH directory`);
-}
-
-/**
  * The two git reads this script needs, bound to one absolute git executable resolved up front.
  *
  * Both spawn through `execFile`, never a shell: `^` and `{}` are shell metacharacters and nothing
  * here is quoted, and an MSYS shell additionally rewrites the `<ref>:<path>` argument on Windows.
  */
 function createGitCommands() {
+  // Fatal here, unlike in the benchmark envelope: a run that cannot find git cannot compare
+  // anything, and the top-level handler turns this into exit 2 with git's absence named, instead
+  // of the misleading "base ref does not resolve" a swallowed spawn produced.
   const git = resolveExecutable('git');
+  if (!git) throw new Error('could not find "git" in any absolute PATH directory');
   // `maxBuffer` defaults to `execFileSync`'s own documented default, so a caller that does not
   // care states nothing and gets exactly what a bare call would have given it.
   const read = (args, maxBuffer = 1024 * 1024) => {

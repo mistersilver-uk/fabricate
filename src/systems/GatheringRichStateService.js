@@ -1,3 +1,6 @@
+import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
+import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
+
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
@@ -121,7 +124,6 @@ const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
 const LEGACY_STAMINA_REGEN_POLICY_MAP = Object.freeze({ elapsedTime: 'overTime' });
 const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
-const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -354,8 +356,15 @@ export class GatheringRichStateService {
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
+    // Modifiers are now system-owned (issue 1117), exactly as tools are below: the ONE
+    // authored library is `system.modifiers`, populated by
+    // `CraftingSystemManager._normalizeSystem`, and it serves the check modifiers on all
+    // three activities AND these d100 drop/event/stamina references. The gathering
+    // config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
+    // merges it up and retires the key), and no read-alias is kept for it — a silent
+    // fallback would make the relocation unobservable.
     const libraryCharacterModifiers = new Map();
-    for (const entry of normalizeList(libraries.characterModifiers)) {
+    for (const entry of normalizeList(this._systemModifierLibrary(system, systemId))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
@@ -1511,6 +1520,25 @@ export class GatheringRichStateService {
       // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
       // resolution, but must stay carried so that path is not broken on arrival.
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
+      // THE TASK'S OWN CHECK-MODIFIER PICK (issue 1095) MUST SURVIVE COMPOSITION.
+      // `normalizeLibraryTask` above and `_normalizeGatheringTask` (adminStore) are the two
+      // mirrored LIBRARY normalizers, but this literal is a THIRD whitelist rebuild and it
+      // is the one the ENGINE sees: `composeEnvironment` → `_findStartTask` →
+      // `_resolveStartContext` hands this object to `buildCheckModifierContext(system,
+      // 'gathering', task)`, which reads `task.checkModifierIds`. Omitting the key here made
+      // `readSubjectModifierIds` find nothing, so every composed task INHERITED the default
+      // set and `bySubject` could never work on gathering at all — with both library
+      // normalizers correct and the pick intact on disk.
+      //
+      // Same absence-preserving attach as the two normalizers, for the same reason: an
+      // authored EMPTY array is a real pick of zero and must not collapse back to inherit.
+      ...authoredCheckModifierIds(normalized.checkModifierIds),
+      // THE FAILURE OUTCOME MUST REACH THE ENGINE, not merely disk (issue 1098, CF8).
+      // `GatheringEngine._applyFailureFeedback` reads `task.failureOutcome ?? null` off
+      // THIS object, so emitting it from the two library normalizers alone would leave the
+      // field correct on disk and dead at roll time — the exact third-mirror failure
+      // `checkModifierIds` above records.
+      ...authoredFailureOutcome(normalized.failureOutcome),
       // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
       // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
       // so this plumbing is deliberately dormant until routed resolution ships.
@@ -1687,17 +1715,39 @@ export class GatheringRichStateService {
    * @param {object} payload
    * @returns {Map<string, object>}
    */
-  _modifierLibrary({ environment = null, systemId = null } = {}) {
+  _modifierLibrary({ environment = null, system = null, systemId = null } = {}) {
     if (
       environment?.__libraryCharacterModifiers instanceof Map &&
       environment.__libraryCharacterModifiers.size > 0
     ) {
       return environment.__libraryCharacterModifiers;
     }
-    const entries =
-      this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]
-        ?.characterModifiers || [];
+    const entries = this._systemModifierLibrary(
+      system,
+      systemId || environment?.craftingSystemId || ''
+    );
     return new Map(entries.map((entry) => [String(entry.id), entry]));
+  }
+
+  /**
+   * The ONE authored modifier library for a crafting system (issue 1117).
+   *
+   * Prefers the normalized system the caller already holds and falls back to a live
+   * registry lookup by id, the identical two-step the tool library uses in
+   * {@link composeEnvironment} — a caller that has the system must not pay for a global
+   * lookup, and one that only has an id (stamina regen has no environment and no system)
+   * must still resolve.
+   *
+   * @param {object|null} system The normalized crafting system, when the caller has it.
+   * @param {string} systemId Its id, used for the registry fallback.
+   * @returns {Array<object>} The library entries, possibly empty.
+   */
+  _systemModifierLibrary(system, systemId) {
+    if (Array.isArray(system?.modifiers)) return system.modifiers;
+    const resolved = globalThis.game?.fabricate
+      ?.getCraftingSystemManager?.()
+      ?.getSystem?.(String(systemId || ''));
+    return Array.isArray(resolved?.modifiers) ? resolved.modifiers : [];
   }
 
   /**
@@ -1717,6 +1767,7 @@ export class GatheringRichStateService {
     if (references.length === 0) return Math.max(0, Math.round(base));
     const library = this._modifierLibrary({
       environment,
+      system,
       systemId: system?.id || environment?.craftingSystemId,
     });
     let total = base;
@@ -1894,9 +1945,9 @@ function normalizeGatheringConfig(raw = {}) {
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       events: normalizeList(config?.events).map(normalizeEvent),
-      characterModifiers: normalizeList(config?.characterModifiers)
-        .map((entry) => normalizeCharacterModifierLibraryEntry(entry))
-        .filter(Boolean),
+      // `characterModifiers` is DELIBERATELY not emitted (issue 1117): the modifier
+      // library moved onto the crafting system as `system.modifiers`. This is an allowlist
+      // rebuild, so not emitting the key is what retires it from every world that saves.
       economy: normalizeGatheringEconomy(config?.economy),
     };
   }
@@ -1992,6 +2043,23 @@ function normalizeLibraryTask(task = {}) {
       ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     nodes: normalizeNodeConfig(task.nodes),
+    // This task's own check-modifier pick (issue 1095) — the GATHERING analogue of
+    // `Recipe.craftingModifier.modifierIds`, consulted only under the `bySubject`
+    // combination rule. Attached ONLY when authored: an authored EMPTY array is a real
+    // pick of zero, distinct from an absent one which inherits
+    // `gatheringCraftingCheck.defaultModifierIds`.
+    //
+    // THIS NORMALIZER IS ONE OF A MIRRORED PAIR. `_normalizeGatheringTask` in
+    // src/ui/svelte/stores/adminStore.js is the other, and BOTH are whitelist rebuilds, so
+    // a key emitted here and not there is dropped the moment a task is saved through the
+    // manager draft path — and vice versa. The shared `authoredCheckModifierIds` attach is
+    // what keeps the two from drifting on the subtle half (authoredness is decided by
+    // `Array.isArray` at entry, never by the filtered length).
+    ...authoredCheckModifierIds(task.checkModifierIds),
+    // The task's text/macro failure feedback (issue 1098, CF8). Emitted by NO gathering-task
+    // rebuild before that issue, so a GM-authored value was dropped on the next save — and
+    // `_libraryTaskToRuntimeTask` above must emit it too, or it never reaches the engine.
+    ...authoredFailureOutcome(task.failureOutcome),
     // Per-task routed-check DC override (issue 904): replaces the routed check's
     // own dc at gather time when set. Guard null/''/undefined explicitly before
     // `Number()` so re-normalizing a null stays null (Number(null) is 0, which
@@ -2160,29 +2228,6 @@ function applyEventDropRateAdjustment(event, environment) {
   const adjustments = dropRateAdjustmentMap(environment?.eventDropRateAdjustments);
   const adjustment = adjustments[id] || 0;
   return applyDropRateAdjustment(event, adjustment);
-}
-
-/**
- * Normalize a per-system character modifier library entry. Returns null when
- * the entry lacks a resolvable id or an expression (an entry that cannot
- * resolve to a number is dropped).
- *
- * @param {object} entry Raw library entry.
- * @returns {object|null} Normalized entry or null when invalid.
- */
-function normalizeCharacterModifierLibraryEntry(entry = {}) {
-  if (!entry || typeof entry !== 'object') return null;
-  const id = stringOrFallback(entry.id, '');
-  if (!id) return null;
-  const expression = stringOrFallback(entry.expression, '');
-  if (!expression) return null;
-  return {
-    id,
-    label: stringOrFallback(entry.label, id),
-    icon: stringOrFallback(entry.icon, 'fa-solid fa-user'),
-    expression,
-    isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || ''),
-  };
 }
 
 /**

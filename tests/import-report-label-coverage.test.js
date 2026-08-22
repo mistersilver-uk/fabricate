@@ -87,7 +87,11 @@ function everyReferencePayload() {
       recipeItemDefinitions: [
         { id: 'b1', name: 'Tome of Brewing', recipeIds: ['ghost-membership'] },
       ],
-      gatheringRealms: [
+    },
+    // Realms ride the ENVELOPE since issue 1282, so the scene + scene-region descriptors are
+    // reachable only from the world travel config.
+    travelConfig: {
+      realms: [
         {
           id: 'r1',
           name: 'Verdant',

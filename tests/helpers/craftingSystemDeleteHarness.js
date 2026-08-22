@@ -57,6 +57,29 @@ export function fakeRecipeManager(recipes = defaultRecipes()) {
   };
 }
 
+/**
+ * A `game.settings` stand-in backed by a real `Map`.
+ *
+ * The harness previously answered every setting with `''`, which meant a preference cleanup
+ * could not tell an unset key from a stale one. A real store keeps these suites asserting
+ * that a system deletion still prunes.
+ *
+ * @returns {{store: Map<string, unknown>, accessors: object}}
+ */
+export function settingsStore() {
+  const store = new Map();
+  return {
+    store,
+    accessors: {
+      get: (_namespace, key) => store.get(key) ?? '',
+      set: async (_namespace, key, value) => {
+        store.set(key, value);
+        return value;
+      },
+    },
+  };
+}
+
 export function fakeEnvironmentStore(calls) {
   return {
     async cleanupByCraftingSystem(systemId) {

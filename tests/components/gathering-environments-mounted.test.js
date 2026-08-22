@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -15,11 +16,6 @@ let GatheringView;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
 
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
@@ -136,6 +132,13 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
     writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
 
+    // GatheringView routes its crafting-data subscription through the invalidation-domain
+    // taxonomy (issue 1078 part B1). The module imports nothing, so this one entry closes the
+    // graph; omitting it HANGS this suite (# cancelled) rather than failing it.
+    const invalidationDomainsDestination = join(tempRoot, 'src/systems/invalidationDomains.js');
+    mkdirSync(dirname(invalidationDomainsDestination), { recursive: true });
+    writeFileSync(invalidationDomainsDestination, readFileSync(resolve(repoRoot, 'src/systems/invalidationDomains.js'), 'utf8'));
+
     // GatheringTaskDetail + GatheringView share the blocked-reason localizer.
     const blockedReasonsDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
@@ -146,6 +149,10 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // GatheringView now renders the center-column detail tree; compile it too so
     // the compiled view can resolve its imports at mount time.
+    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
+    // primitive `ui-integration/spec.md` names. A hand-rolled harness that omits it HANGS
+    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
+    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');

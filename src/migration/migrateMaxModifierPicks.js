@@ -7,7 +7,7 @@
  * `playerPicks` meant "the player picks EXACTLY ONE modifier": the roll prompt was a radio
  * group and the non-interactive fallback was `max(...)`. Issue 1055 generalizes both to a
  * bounded multi-pick governed by the new `craftingCheck.maxModifierPicks`, and
- * `resolveMaxModifierPicks` (`craftingModifierResolver.js`) reads an ABSENT cap as
+ * `resolveMaxModifierPicks` (`checkModifierResolver.js`) reads an ABSENT cap as
  * UNLIMITED. Every system already on `playerPicks` carries no cap — the field did not
  * exist when it was authored — so without this stamp the upgrade would silently widen
  * every one of those systems from "pick one" to "pick everything", and their
@@ -19,16 +19,21 @@
  *
  * - `addAll` and `highest` do not select at all, so a cap means nothing to them and
  *   stamping one would only leak a bound into any later switch to a selecting rule.
- * - `byRecipe` ("Recipe picks") is the other selecting rule, but its historical behaviour
+ * - `byRecipe` (now `bySubject`) is the other selecting rule, but its historical behaviour
  *   was NOT single-pick: a recipe already on disk may legitimately have picked several
- *   modifiers, and `resolveEligibleModifierIds` TRUNCATES a recipe's pick to the cap. A
+ *   modifiers, and `resolveEligibleModifierIds` TRUNCATES a subject's pick to the cap. A
  *   stamp of 1 here would therefore silently discard picks the GM authored. Unlimited is
  *   the only value that preserves them, and a GM who wants a bound can set one.
  *
- * `byRecipe` is NOT mapped or retired at either level. It is a first-class combination
- * rule again — the recipe author selecting at recipe-edit time, the parallel of the player
- * selecting at roll time — so a persisted `byRecipe` is valid data that must survive
- * untouched.
+ * `byRecipe` is not mapped or retired BY THIS MIGRATION, at either level — and that was the
+ * correct call for THIS release. The rule was first-class then and had no
+ * activity-independent name, so a persisted `byRecipe` was valid data that had to survive
+ * untouched. **`1.22.0` deliberately supersedes that**: once salvage and gathering select
+ * over the same catalogue the rule's label stopped being "Recipe picks", so
+ * `migrateSystemCheckModifierCatalogue` rewrites the token to `bySubject` and
+ * `normalizeModifierPolicy` accepts the old spelling as a never-re-emitted read alias. This
+ * migration still leaves it alone: rewriting it here as well would make the `1.20.0` and
+ * `1.22.0` gates answer differently about the same field, and this one runs first.
  *
  * THE STAMP IS CONDITIONAL ON PURPOSE — do not "simplify" it into an unconditional write.
  * An authored cap always wins, for two reasons. It makes the migration idempotent under
@@ -73,7 +78,7 @@
 import {
   normalizeModifierPolicy,
   resolveMaxModifierPicks,
-} from '../systems/craftingModifierResolver.js';
+} from '../systems/checkModifierResolver.js';
 
 /** The one combination rule whose historical behaviour was a bound of exactly one pick. */
 const HISTORICALLY_SINGLE_PICK_POLICY = 'playerPicks';
@@ -98,10 +103,13 @@ function _isPlainObject(value) {
  *
  * IT DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK — this omission is a decision, not an
  * oversight (the same call `migrateRetireProgressiveAllowPlayerReorder` makes, for the same
- * reason: no storage churn for zero observable change). The modifier catalogue
- * `checkModifiers` lives INSIDE `craftingCheck`, so a system with no check block has no
- * catalogue, hence no modifiers to pick from and no cap to observe; it also cannot be on
- * `playerPicks`, since that rule is persisted in the very block that is missing.
+ * reason: no storage churn for zero observable change). At THIS point in the ladder the
+ * modifier catalogue `checkModifiers` still lives INSIDE `craftingCheck` (`1.22.0` is what
+ * moves it to the system level), so a system with no check block has no catalogue, hence no
+ * modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since
+ * that rule is persisted in the very block that is missing. The reasoning survives the move
+ * unchanged, and `1.22.0` follows it for salvage and gathering for the same reason: an
+ * absent selection normalizes to `addAll` with an empty id set, which is a no-op.
  *
  * Both reads go through the resolver rather than re-deriving its rules here, so the
  * migration and the engine cannot disagree about which rules exist or about what an absent

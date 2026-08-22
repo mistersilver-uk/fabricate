@@ -24,8 +24,8 @@ export class GatheringPartyValidationError extends Error {
  * may associate with at most one ENABLED party in total (as a member, as the
  * travel actor, or both — and when both, the same party). Disabled parties never
  * count toward this invariant, and stale actor/system/realm references are
- * preserved verbatim for GM repair. Enabling a party requires exactly one travel
- * actor; the invariant runs across the whole list at every save boundary.
+ * preserved verbatim for GM repair. A travel actor is NOT a precondition of enabling
+ * (see `_validateList`); the invariant runs across the whole list at every save boundary.
  *
  * Mutators stamp `updatedAt`/`updatedByUserId` on override writes (including the
  * `mode: 'none'` clear, which still stamps and empties `realmIds`). `moveMember`
@@ -163,35 +163,28 @@ export class GatheringPartyStore {
     return this._mutateParty(partyId, (party) => ({ ...party, enabled: enabled === true }));
   }
 
-  async setCurrentRealmOverride(partyId, systemId, realmIds = []) {
-    const sysId = stringOrEmpty(systemId);
+  /** Place the party in one or more world realms. No `systemId`: a party is in ONE place. */
+  async setCurrentRealmOverride(partyId, realmIds = []) {
     const ids = normalizeIdList(realmIds);
     return this._mutateParty(partyId, (party) => ({
       ...party,
-      currentRealmOverrides: {
-        ...party.currentRealmOverrides,
-        [sysId]: {
-          mode: 'manual',
-          realmIds: ids,
-          updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId()),
-        },
+      currentRealmOverride: {
+        mode: 'manual',
+        realmIds: ids,
+        updatedAt: this.now(),
+        updatedByUserId: stringOrEmpty(this.getUserId()),
       },
     }));
   }
 
-  async clearCurrentRealmOverride(partyId, systemId) {
-    const sysId = stringOrEmpty(systemId);
+  async clearCurrentRealmOverride(partyId) {
     return this._mutateParty(partyId, (party) => ({
       ...party,
-      currentRealmOverrides: {
-        ...party.currentRealmOverrides,
-        [sysId]: {
-          mode: 'none',
-          realmIds: [],
-          updatedAt: this.now(),
-          updatedByUserId: stringOrEmpty(this.getUserId()),
-        },
+      currentRealmOverride: {
+        mode: 'none',
+        realmIds: [],
+        updatedAt: this.now(),
+        updatedByUserId: stringOrEmpty(this.getUserId()),
       },
     }));
   }
@@ -245,8 +238,8 @@ export class GatheringPartyStore {
       enabled: data?.enabled === true,
       memberActorUuids: normalizeIdList(data?.memberActorUuids),
       travelActorUuid: optionalString(data?.travelActorUuid),
-      currentRealmOverrides: normalizeOverrides(
-        data?.currentRealmOverrides ?? data?.currentRegionOverrides
+      currentRealmOverride: normalizeOverride(
+        data?.currentRealmOverride ?? data?.currentRealmOverrides ?? data?.currentRegionOverrides
       ),
     };
   }
@@ -267,12 +260,28 @@ export class GatheringPartyStore {
       if (count > 1) errors.push(`Duplicate party id "${id}"`);
     }
 
-    // Enabled parties require exactly one travel actor.
-    for (const party of parties) {
-      if (party.enabled && !party.travelActorUuid) {
-        errors.push(`Party "${party.name}" cannot be enabled without a travel actor`);
-      }
-    }
+    // A travel actor is NOT a precondition of enabling. It was, and the gate cost more
+    // than it bought: a party with no travel actor senses no scene regions, so
+    // `resolveCurrentRealms` already resolves it to `unresolved` (Current Realm
+    // Resolution req 3) and its members gather exactly as an actor in NO party at all
+    // does — `GatheringLocationService.resolveForActor` returns the same unresolved
+    // shape for both.
+    //
+    // NOT "as they would with realms disabled", which is a different and stronger claim
+    // that is false: with realms enabled, `evaluateLocationAvailability` answers an
+    // unresolved realm against an environment declaring `includedRealmIds` with
+    // `available: false, reasons: ['NO_CURRENT_REALM']` (`gatheringLocation.js:91-101`),
+    // whereas realms disabled makes every environment ungated. So enabling such a party
+    // does have a consequence — inclusion-gated environments stay out of reach for its
+    // members — and that consequence is exactly the one they already had with no party.
+    //
+    // The gate turned a legitimate configuration into an unreachable one: downtime
+    // parties exist to group characters without ever standing on a map. Realm gating is
+    // opted into by assigning a travel actor, not a tax on grouping characters at all.
+    //
+    // The composite-uniqueness invariant below is unaffected: it reasons over the actors
+    // an enabled party ASSOCIATES, and a party with no travel actor simply associates one
+    // fewer.
 
     // Composite uniqueness invariant across ENABLED parties: an actor uuid may
     // associate with at most one enabled party (member, travel actor, or both).
@@ -293,12 +302,9 @@ export class GatheringPartyStore {
 
     // Override mode vocab.
     for (const party of parties) {
-      for (const [systemId, override] of Object.entries(party.currentRealmOverrides)) {
-        if (!OVERRIDE_MODES.has(override.mode)) {
-          errors.push(
-            `Party "${party.name}" override for system "${systemId}" has invalid mode "${override.mode}"`
-          );
-        }
+      const override = party.currentRealmOverride;
+      if (override && !OVERRIDE_MODES.has(override.mode)) {
+        errors.push(`Party "${party.name}" override has invalid mode "${override.mode}"`);
       }
     }
 
@@ -306,20 +312,49 @@ export class GatheringPartyStore {
   }
 }
 
-function normalizeOverrides(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const result = {};
-  for (const [systemId, override] of Object.entries(value)) {
-    const key = stringOrEmpty(systemId);
-    if (!key || !override || typeof override !== 'object') continue;
-    result[key] = {
-      mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
-      realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
-      updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
-      updatedByUserId: stringOrEmpty(override.updatedByUserId),
-    };
+/**
+ * Normalize a party's ONE current-realm override (issue 1282).
+ *
+ * It used to be a map keyed by crafting system, because realms were per-system. A party is one
+ * set of tokens standing in one place, so with world realms that key had no referent — "where
+ * is the party, according to system A" is not a question with an answer.
+ *
+ * Legacy read: a stored map is collapsed to its most recently updated entry, preferring one
+ * that actually places the party over one that merely records the GM clearing it. The 1.27.0
+ * migration performs the same collapse on disk; this handles a party read before it runs.
+ */
+function normalizeOverride(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const single = (override) => ({
+    mode: OVERRIDE_MODES.has(override.mode) ? override.mode : 'none',
+    realmIds: normalizeIdList(override.realmIds ?? override.regionIds),
+    updatedAt: Number.isFinite(Number(override.updatedAt)) ? Number(override.updatedAt) : 0,
+    updatedByUserId: stringOrEmpty(override.updatedByUserId),
+  });
+
+  // Already the singular shape.
+  if (value.mode !== undefined || value.realmIds !== undefined || value.regionIds !== undefined) {
+    return single(value);
   }
-  return result;
+
+  const entries = Object.values(value).filter(
+    (entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+  );
+  if (entries.length === 0) return null;
+  const placed = entries.filter(
+    (entry) =>
+      entry.mode === 'manual' &&
+      Array.isArray(entry.realmIds ?? entry.regionIds) &&
+      (entry.realmIds ?? entry.regionIds).length > 0
+  );
+  const candidates = placed.length > 0 ? placed : entries;
+  const winner = candidates.reduce(
+    (best, entry) =>
+      !best || Number(entry.updatedAt || 0) > Number(best.updatedAt || 0) ? entry : best,
+    null
+  );
+  return winner ? single(winner) : null;
 }
 
 function cloneJson(value) {

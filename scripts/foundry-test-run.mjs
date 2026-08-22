@@ -505,6 +505,73 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
+/**
+ * Select one of the open Checks activity route's five sections (issue 1096).
+ *
+ * The strip is `The roll / Outcomes / Triggers / Modifiers / On failure`, and ONE section's
+ * content is in the DOM at a time — so a control that used to sit further down one scrolling
+ * activity page (the trigger card, the failure-consumption policy, the check-modifier
+ * catalogue) is reached by selecting the section that OWNS it, not by scrolling to it.
+ *
+ * The wait is on the strip reporting the selection rather than on whatever the section
+ * contains: the strip is what owns which section renders, so a caller's own next assertion
+ * stays the thing that fails when the content is missing.
+ *
+ * The strip is a tab strip, so it is addressed by its `data-` hook the way every other tab
+ * strip in this walk is; the rail sub-items above are addressed by id, the way every other
+ * rail group in this walk is. Both hooks are shipped for this harness.
+ * @param {import('playwright').Page} page
+ * @param {string} section
+ */
+async function openChecksSection(page, section) {
+  const button = page
+    .locator(`.fabricate-manager [data-checks-section-button="${section}"]`)
+    .first();
+  await button.waitFor({ state: 'visible', timeout: 5_000 });
+  await button.click();
+  await page
+    .locator(`.fabricate-manager [data-checks-section-button="${section}"][aria-selected="true"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
+/**
+ * Open a Checks Studio ACTIVITY route, and optionally one of its sections (issue 1096).
+ *
+ * Checks used to be one rail button holding four `data-checks-tab-button` tabs. Those four are
+ * now rail ROUTES under an expandable Checks group, and the tab strip they lived in is gone
+ * from the product — so every walk that reaches a checks surface navigates the group.
+ *
+ * The parent click is part of the navigation rather than a nicety: the submenu is only in the
+ * DOM while the group is expanded, and a freshly mounted manager renders it collapsed.
+ * Activating the parent expands the group AND routes to its first available child, so the
+ * sub-item click that follows is what selects the activity — the same two-step shape
+ * `openManagerCraftingSection` uses for the Crafting group.
+ *
+ * Pass `section` for an activity route; omit it for Validation, which renders no strip. Naming
+ * the landing section is worth doing even when it is the default one: the strip keeps its
+ * selection across route changes, so an unnamed section makes a frame depend on wherever an
+ * earlier step in the same manager session happened to leave it.
+ * @param {import('playwright').Page} page
+ * @param {string} activity crafting | salvage | gathering | validation
+ * @param {string} [section]
+ */
+async function openChecksActivity(page, activity, section = '') {
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
+  await navItem.waitFor({ state: 'visible', timeout: 5_000 });
+  await navItem.click();
+  await page
+    .locator('.fabricate-manager [data-checks-editor]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await page
+    .locator(`.fabricate-manager [data-checks-panel="${activity}"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  if (section) await openChecksSection(page, section);
+}
+
 // Return to the recipes browser (via the Crafting group) and open the named
 // recipe's editor, waiting for the recipe-edit route. Consolidates the
 // "return then open recipe X" sequence the recipe-editor captures repeat.
@@ -1473,6 +1540,8 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-task-layout',
       '.manager-travel-view',
       '.manager-travel-parties-row',
+      '.manager-travel-realms-row',
+      '.manager-map-link-row',
       '.manager-party-member-row',
       '.manager-fact'
     ];
@@ -1515,6 +1584,8 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-knowledge-copy-row'
       || metric.selector === '.manager-knowledge-learned-row'
       || metric.selector === '.manager-travel-parties-row'
+      || metric.selector === '.manager-travel-realms-row'
+      || metric.selector === '.manager-map-link-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
@@ -3874,7 +3945,18 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(benchId, {
       resolutionMode: 'alchemy',
       enabled: true,
-      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+      // `checkMode: 'simple'` is LOAD-BEARING for the manager alchemy-settings capture, not
+      // decoration. The capture photographs the Alchemy behaviour card, which `ChecksView`
+      // renders only inside the crafting route's ON FAILURE section. An alchemy system whose
+      // `alchemy.checkMode` is `none` reads as `routeIsOff`, and an off route collapses the
+      // section strip to `roll` alone — so with the default mode neither the section button the
+      // capture clicks nor the card it frames can ever render, and the step times out.
+      alchemy: {
+        checkMode: 'simple',
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false
+      }
     });
     const benchMap = {
       'Smoke Bench Reagent': await registerComponent(benchId, productByName['Smoke Bench Reagent']),
@@ -5963,9 +6045,10 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
   }
 
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
-  await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('[data-checks-tab-button="crafting"]').first().click();
+  // The trigger editor is the crafting route's TRIGGERS section (issue 1096). It used to be
+  // one card further down the crafting tab's single scrolling page; now only the selected
+  // section renders, so the section is navigated to rather than scrolled to.
+  await openChecksActivity(page, 'crafting', 'triggers');
   // Tier stepping is a per-trigger EFFECT (issue 975), not the check-wide
   // natural-stepping toggle this walk used to round-trip, so exercising it
   // means AUTHORING a trigger. Add one, drive its tier-step row, then remove it: the
@@ -6980,6 +7063,22 @@ async function main() {
       const craftingSetup = await page.evaluate(async ({ gathererUserId, crafterId, travelMemberId }) => {
         const csm = game.fabricate.getCraftingSystemManager();
 
+        // The WORLD currency ladder (issue 1278). One config for the whole world, which is what
+        // World > Currency edits and what every currency-enabled system spends against; a
+        // crafting system carries only `requirements.currency.enabled`. Seeded here rather than
+        // on the system so the recipe editor's currency-cost row has a unit to target — its
+        // `canAddCost` gate reads the world's units, not the system's.
+        await game.settings.set('fabricate', 'currencyConfig', {
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: { canAfford: '', increment: '', decrement: '' },
+          units: [
+            { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [] },
+            { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
+          ]
+        });
+        await game.fabricate.getCurrencyConfigStore?.()?.load?.();
+
         // Create the crafting system
         const system = await csm.createSystem({
           name: 'Arcane Forge',
@@ -7130,7 +7229,6 @@ async function main() {
               ]
             }
           },
-          // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
           // Two authored recipe categories, so the library's group-by-category treatment
           // is exercised with MORE THAN ONE group. A single "General" bucket proves
@@ -7143,14 +7241,11 @@ async function main() {
           // discarded and this fixture had zero authored categories for as long as the
           // seed has existed, leaving issue 643's grouping treatment unexercised.
           categories: ['Alchemy', 'Smithing'],
+          // Participation only. The unit LADDER is world scope since issue 1278 and is seeded
+          // as the `currencyConfig` world setting below, which is what gives the currency-cost
+          // requirement row a unit to target.
           requirements: {
-            currency: {
-              enabled: true,
-              units: [
-                { id: 'gp', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins' },
-                { id: 'sp', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins' }
-              ]
-            }
+            currency: { enabled: true }
           },
           // Two character prerequisites so the System Settings Character
           // Prerequisites list renders populated for the issue-768 list-ergonomics
@@ -7702,13 +7797,6 @@ async function main() {
               vocabularies: {
                 regions: { values: ['northreach'] }
               },
-              // Two character modifiers so the System Settings Character Modifiers
-              // list renders populated for the issue-768 list-ergonomics evidence
-              // (icon picker, section collapse, copy-to-prerequisites).
-              characterModifiers: [
-                { id: 'smoke-mod-herbalism', label: 'Herbalism Training', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' },
-                { id: 'smoke-mod-survival', label: 'Wilderness Survival', icon: 'fa-solid fa-campground', expression: '@skills.survival.value' }
-              ],
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Forage Wild Herbs',
@@ -7763,11 +7851,25 @@ async function main() {
           }
         });
 
-        // Tools are SYSTEM-OWNED (the `craftingSystems` setting) — the Tools
-        // manager and the gathering tool gate read getSystem(id).tools, not
-        // gatheringConfig. Mirror the canonical persist so the manager Tools view
-        // renders and tool-blocked tasks resolve their requirement.
+        // Modifiers and Tools are SYSTEM-OWNED (the `craftingSystems` setting). Persist both
+        // through the canonical manager update after the Gathering fixture exists: the System
+        // Settings list reads `getSystem(id).modifiers`, while the Tools view and gathering tool
+        // gate read `getSystem(id).tools`.
         await csm.updateSystem(systemId, {
+          modifiers: [
+            {
+              id: 'smoke-mod-herbalism',
+              label: 'Herbalism Training',
+              icon: 'fa-solid fa-leaf',
+              expression: '@skills.nature.value'
+            },
+            {
+              id: 'smoke-mod-survival',
+              label: 'Wilderness Survival',
+              icon: 'fa-solid fa-campground',
+              expression: '@skills.survival.value'
+            }
+          ],
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
 
@@ -8358,7 +8460,7 @@ async function main() {
         // instead of the empty setup-checklist state. Seeding must precede the
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
-        await page.evaluate(async ({ sysId, crafterId, travelMemberId }) => {
+        await page.evaluate(async ({ sysId, crafterId, travelMemberId, sceneId, regionId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
@@ -8373,23 +8475,35 @@ async function main() {
           if (!crafter) {
             throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
-          // Travel & Realms is disabled by default (#286). Enable it on this
-          // system before the manager opens so the Travel nav item is visible
-          // for the capture step.
-          await realmStore.updateRealmSettings(sysId, { enabled: true });
+          // Travel & Realms is disabled by default (#286). Participation is a CRAFTING
+          // SYSTEM flag since #1282 — the realm library itself is world scope — so this is a
+          // system write, not a realm-store one. Enable it before the manager opens so the
+          // environment realm controls and the party override are live for the captures.
+          const systemManager = game.fabricate.getCraftingSystemManager?.();
+          await systemManager?.updateSystem?.(sysId, { gatheringRealmSettings: { enabled: true } });
           for (const party of partyStore.list()) {
             await partyStore.delete(party.id);
           }
-          const existingRealm = realmStore.listBySystem(sysId)
+          const existingRealm = realmStore.list()
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
-            || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+            || await realmStore.create({ name: 'Northreach Vale', enabled: true });
+          const scene = game.scenes.get(sceneId);
+          const sceneRegion = scene?.regions?.get(regionId);
+          if (!scene || !sceneRegion) {
+            throw new Error('Smoke Travel map Region fixture is unavailable.');
+          }
+          // ONE write (#1282): `setSceneRegionLink` strips the region from every realm and
+          // attaches it to this one, so the old read-modify-write loop cannot lose an update.
+          await realmStore.setSceneRegionLink(sceneRegion.uuid, realm.id, {
+            sceneUuid: scene.uuid
+          });
           const party = await partyStore.create({ name: 'The Vale Wardens' });
           await partyStore.addMember(party.id, crafter.uuid);
           if (travelMember) await partyStore.addMember(party.id, travelMember.uuid);
           await partyStore.setTravelActor(party.id, crafter.uuid);
           await partyStore.setEnabled(party.id, true);
-          await partyStore.setCurrentRealmOverride(party.id, sysId, [realm.id]);
+          await partyStore.setCurrentRealmOverride(party.id, [realm.id]);
 
           // Realm-lock evidence (#294): a second realm the party is NOT in, plus
           // an environment that REQUIRES it. The player Gathering tab then shows a
@@ -8398,8 +8512,8 @@ async function main() {
           // with no party — either way the card locks). Idempotent across reruns.
           const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
           if (environmentStore) {
-            const hiddenVale = realmStore.listBySystem(sysId).find(r => r.name === 'Hidden Vale')
-              || await realmStore.create(sysId, { name: 'Hidden Vale', enabled: true });
+            const hiddenVale = realmStore.list().find(r => r.name === 'Hidden Vale')
+              || await realmStore.create({ name: 'Hidden Vale', enabled: true });
             const existingEnvs = (typeof environmentStore.listBySystem === 'function')
               ? (environmentStore.listBySystem(sysId) || [])
               : [];
@@ -8423,8 +8537,11 @@ async function main() {
         }, {
           sysId: craftingSetup.systemId,
           crafterId: cleanup.crafterId,
-          travelMemberId: cleanup.travelMemberId
+          travelMemberId: cleanup.travelMemberId,
+          sceneId: craftingSetup.interactable.sceneId,
+          regionId: craftingSetup.interactable.regionId
         });
+        await activateSceneAndAwaitCanvasReady(page, craftingSetup.interactable.sceneId);
         await page.evaluate(async () => {
           globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
@@ -8515,29 +8632,30 @@ async function main() {
           .catch(() => {});
 
         // --- Settings-list ergonomics (issue 768) ---
-        // The seeded system carries two Character Modifiers, two Character
+        // The seeded system carries two Modifiers, two Character
         // Prerequisites and two Currency Units. Capture the three lists together
         // proving the three increment-1 features: (a) the shared IconPicker open on
         // a modifier (icon-picker parity), (b) a whole-section collapse on the
         // Currency Units card, and (c) the row-level copy buttons on the summary
         // rows. Reset afterwards so the Currency captures below start expanded.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
-        const modifierCard = page.locator('.fabricate-manager [data-system-character-modifiers]').first();
+        const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRows = modifierCard.locator('[data-system-modifier]');
+        await modifierRows.nth(1).waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRowCount = await modifierRows.count();
+        if (modifierRowCount !== 2) {
+          throw new Error(
+            `System Settings modifier fixture expected 2 rendered rows, found ${modifierRowCount}.`
+          );
+        }
         await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(200);
 
-        // Collapse the Currency Units section to demonstrate whole-section collapse.
-        const currencyCollapseToggle = page.locator('.fabricate-manager [data-section-collapse="currency"]').first();
-        if (await currencyCollapseToggle.count() > 0) {
-          await currencyCollapseToggle.click();
-          await page.waitForTimeout(150);
-        }
-
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
-        const firstModifierRow = modifierCard.locator('[data-system-character-modifier]').first();
-        await firstModifierRow.locator('[data-toggle-character-modifier]').first().click();
+        const firstModifierRow = modifierRows.first();
+        await firstModifierRow.locator('[data-toggle-modifier]').first().click();
         await page.waitForTimeout(150);
         const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
         if (await modifierIconTrigger.count() > 0) {
@@ -8547,8 +8665,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-lists');
 
-        // Reset: close the editor (also dismisses the IconPicker popover) and
-        // re-expand the Currency Units section for the currency captures below.
+        // Reset: close the editor, which also dismisses the IconPicker popover.
         const modifierDone = firstModifierRow
           .locator('.manager-character-modifier-editor button:has-text("Done")')
           .first();
@@ -8556,24 +8673,18 @@ async function main() {
           await modifierDone.click().catch(() => {});
           await page.waitForTimeout(150);
         }
-        if (await page.locator('.fabricate-manager [data-system-currency-units].is-section-collapsed').count() > 0) {
-          await page.locator('.fabricate-manager [data-section-collapse="currency"]').first().click();
-          await page.waitForTimeout(150);
-        }
 
-        // --- Currency configuration (#393) ---
-        // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
-        // unit ladder, then capture each spend strategy. The smoke world is dnd5e, so the
-        // actorInventory branch shows the no-provider callout (the pf2e provider grid needs
-        // a pf2e world, which the e2e fixtures do not ship).
+        // --- World currency configuration (#393, rehomed by #1278) ---
+        // The ladder is WORLD scope now, so this walks to World > Currency rather than a
+        // crafting system's Settings tab, and needs no participation toggle to get there: the
+        // page is ungated precisely so a GM can author the coins BEFORE any system enables
+        // them. Seed the dnd5e (actorProperty) ladder, then capture each spend strategy. The
+        // smoke world is dnd5e, so the actorInventory branch shows the no-provider callout
+        // (the pf2e provider grid needs a pf2e world, which the e2e fixtures do not ship).
         await setManagerWindowSize(page, { width: 1280, height: 900 });
-        const currencyToggle = page.locator('.fabricate-manager [data-system-currency-toggle]').first();
-        await currencyToggle.waitFor({ state: 'visible', timeout: 5_000 });
-        await currencyToggle.scrollIntoViewIfNeeded();
-        if (await page.locator('.fabricate-manager [data-system-currency-units]').count() === 0) {
-          await currencyToggle.click();
-        }
-        const currencyCard = page.locator('.fabricate-manager [data-system-currency-units]').first();
+        await page.locator('.fabricate-manager #manager-world-nav-currency').first().click();
+        await page.waitForTimeout(300);
+        const currencyCard = page.locator('.fabricate-manager [data-world-currency-units]').first();
         await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });
         const currencySeed = currencyCard.locator('button:has-text("Seed presets")').first();
         if (await currencySeed.count() > 0) {
@@ -8583,7 +8694,7 @@ async function main() {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
           });
         }
-        await currencyCard.locator('[data-system-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await currencyCard.locator('[data-world-currency-unit]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // Scroll the Currency Units card to the top of the manager's scroll area, then capture
         // the WHOLE normal-sized GM window (nav rail, header, context panel + the card) so the
         // feature is shown in context rather than as a cropped element.
@@ -8595,18 +8706,19 @@ async function main() {
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-property');
 
-        const currencyStrategy = page.locator('.fabricate-manager [data-system-currency-strategy-select]').first();
+        const currencyStrategy = page.locator('.fabricate-manager [data-world-currency-strategy-select]').first();
         await currencyStrategy.selectOption('macro');
-        await page.locator('.fabricate-manager [data-system-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-world-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-macro');
 
         await currencyStrategy.selectOption('actorInventory');
-        await page.locator('.fabricate-manager [data-system-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-world-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-inventory');
 
-        // Leave the persisted smoke system on the default strategy.
+        // Leave the persisted world on the default strategy. The walk does not navigate back:
+        // the next section opens its own manager route (`openManagerCraftingSection`).
         await currencyStrategy.selectOption('actorProperty');
         await page.waitForTimeout(300);
 
@@ -9636,9 +9748,10 @@ async function main() {
         await page.evaluate(async () => {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
-        await page.locator('.fabricate-manager [data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager [data-checks-tab-button="gathering"]').first().click();
+        // `roll` NAMED rather than taken by default (issue 1096): it is the route's landing
+        // section and the one the View Lab case for this same label publishes, and naming it
+        // keeps the frame the same picture whatever an earlier checks visit selected.
+        await openChecksActivity(page, 'gathering', 'roll');
         await page.locator('.fabricate-manager [data-checks-panel="gathering"] [data-crafting-check-editor]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'checks gathering editor');
@@ -9656,11 +9769,12 @@ async function main() {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
 
-        // Checks → Validation tab (#485): the per-check readiness checklist plus
+        // Checks → Validation route (#485): the per-check readiness checklist plus
         // severity-grouped issues for the in-play subsystem checks. With the economy
         // back to d100 the gathering check is omitted, so the rollup frames the
-        // crafting and salvage check sections.
-        await page.locator('.fabricate-manager [data-checks-tab-button="validation"]').first().click();
+        // crafting and salvage check sections. No section argument: Validation is the one
+        // route with no section strip — it is a rollup of the other three.
+        await openChecksActivity(page, 'validation');
         await page.locator('.fabricate-manager [data-checks-panel="validation"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-checks-validation-section="crafting"]').first()
@@ -9670,18 +9784,23 @@ async function main() {
         await screenshot(page, 'manager-checks-validation');
         process.stdout.write('  D0: checks validation tab screenshotted\n');
 
-        // Checks → Crafting tab, scrolled to the failure-consumption controls
+        // Checks → Crafting route, at the failure-consumption controls
         // (issue #752 — evidence for #736's #712 half). The smoke system resolves
-        // routedByCheck, so the crafting tab renders the routed CraftingCheckEditor;
-        // its failure-consumption controls land at the bottom of that editor after
-        // #712 rebases, so scroll the editor's last section into view before the
-        // capture. Guarded so a hiccup records a failed step, not an abort.
+        // routedByCheck, so the crafting route renders the routed CraftingCheckEditor;
+        // its failure-consumption controls are the ON FAILURE section (issue 1096).
+        // Guarded so a hiccup records a failed step, not an abort.
         try {
-          await page.locator('.fabricate-manager [data-checks-tab-button="crafting"]').first().click();
+          // Land on `roll` FIRST and assert the editor there, then move to the section that
+          // owns the consumption card. The order is deliberate: the routed editor renders
+          // none of its own cards under `on-failure`, so its wrapper is present but empty
+          // there — asserting it visible on arrival is only meaningful on a section the
+          // editor actually draws into.
+          await openChecksActivity(page, 'crafting', 'roll');
           const craftingCheckEditor = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
             .first();
           await craftingCheckEditor.waitFor({ state: 'visible', timeout: 5_000 });
+          await openChecksSection(page, 'on-failure');
           // Issue 712's failure-consumption card is a SIBLING of the check editor
           // inside the crafting panel, so anchor on it directly when present and
           // fall back to the editor's last section on builds that predate it.
@@ -9709,9 +9828,13 @@ async function main() {
         // shows the redesigned rows — IconPicker + label + the `@`-adorned expression
         // field — plus the four-option rule group and the pick-cap field that the two
         // SELECTING rules reveal, in its blank "Unlimited" state. A DEDICATED frame (not
-        // the failure-consumption one above, which the same tab scrolls elsewhere for) so
-        // both cards get exact, un-cropped evidence.
+        // the failure-consumption one above, which the same route selects another section
+        // for) so both cards get exact, un-cropped evidence.
         try {
+          // The catalogue card is the crafting route's MODIFIERS section (issue 1096) — it
+          // used to be the last card on the same scrolling page as the consumption policy,
+          // which is why the frame above no longer leaves it merely below the fold.
+          await openChecksSection(page, 'modifiers');
           const modifierCard = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
@@ -10062,30 +10185,127 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-event-editor-normal');
 
-        // Travel route (#257): clicks the gathering Travel subitem and screenshots
-        // the party/region management surface. The subitem is targeted by id so
-        // adding it as a 5th gathering nav item does not shift any pinned .nth()
-        // selector. Captures a default-width and a narrow-width shot, mirroring
-        // the stacked-capture pattern used by the gathering task editor above.
+        // World Parties plus World Travel (#1179, moved to world scope by #1282): the Travel
+        // disclosure starts collapsed. Capture each disclosure/selection state through its
+        // stable navigation id.
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
-        await page.locator('.fabricate-manager .manager-travel-view').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="false"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel collapsed by default',
+          label: 'manager-world-travel-default-collapsed'
+        });
+
+        await page.locator('.fabricate-manager #manager-travel-toggle').first().click();
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="true"]')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel expanded neutral',
+          label: 'manager-world-travel-expanded-neutral'
+        });
+
+        const gatheringToggle = page.locator(
+          '.fabricate-manager .manager-nav-toggle[aria-controls="manager-gathering-submenu"]'
+        ).first();
+        const gatheringSubmenu = page.locator('.fabricate-manager #manager-gathering-submenu').first();
+        const gatheringWasExpanded = await gatheringSubmenu.isVisible();
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'visible', timeout: 5_000 });
+        }
+        await captureStableManagerView(page, {
+          layout: 'Gathering and World Travel expanded together',
+          label: 'manager-world-travel-with-gathering-expanded'
+        });
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'hidden', timeout: 5_000 });
+        }
+
+        await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'gathering travel normal',
-          label: 'manager-gathering-travel-normal'
+          layout: 'World Parties normal',
+          label: 'manager-world-parties-normal'
         });
 
+        await page.locator('.fabricate-manager #manager-travel-nav-realms').first().click();
+        await page.locator('.fabricate-manager [data-travel-panel="realms"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel Realms normal',
+          label: 'manager-world-travel-realms-normal'
+        });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
-          layout: 'gathering travel stacked',
-          label: 'manager-gathering-travel-stacked',
+          layout: 'World Travel Realms stacked',
+          label: 'manager-world-travel-realms-stacked',
+          settleMs: 250
+        });
+
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        const mapDestination = page.locator('.fabricate-manager #manager-travel-nav-map').first();
+        // The View Lab long-label-focus case owns native Space activation and focus-visible
+        // evidence for this exact control. Use a targeted pointer transition here so the live
+        // Foundry capture isolates populated Map content from keyboard-focus timing.
+        await mapDestination.click();
+        await page.locator('.fabricate-manager [data-travel-panel="map"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager [data-manager-map-region-uuid]:has-text("Fabricate Forage Node")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager .manager-travel-inspector' +
+          '[aria-label="Selected map region link"]:has-text("Northreach Vale")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel Map Region Links normal',
+          label: 'manager-world-travel-map-normal'
+        });
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'World Travel Map Region Links stacked',
+          label: 'manager-world-travel-map-stacked',
           settleMs: 250
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel Map Region Links collapsed rail',
+          label: 'manager-world-travel-map-collapsed-rail'
+        });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // World > Travel is UNGATED as of #1282: realms are world geography, so the entry
+        // stays put when the selected system opts OUT of Travel & Realms. This capture is what
+        // proves that — it used to prove the opposite, that the selected-system group vanished.
+        try {
+          await page.evaluate(async (systemId) => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.setGatheringRealmsEnabled?.(
+              systemId,
+              false
+            );
+          }, craftingSetup.systemId);
+          await page.locator('.fabricate-manager #manager-world-nav-travel')
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'World Travel present for a non-participating system',
+            label: 'manager-world-travel-ungated'
+          });
+        } finally {
+          await page.evaluate(async (systemId) => {
+            const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+            await store?.setGatheringRealmsEnabled?.(systemId, true);
+            await store?.selectSystem?.(systemId);
+          }, craftingSetup.systemId);
+        }
 
         // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
         // the gathering Settings tab hosts the d100 Gathering Rules (reward / event
@@ -10949,7 +11169,12 @@ async function main() {
             // alchemy-mode system — capture there when the card exists so the
             // frame demonstrates the flags; fall back to the settings surface
             // on builds that predate the card.
-            await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+            //
+            // They are the crafting route's ON FAILURE section (issue 1096). The route's
+            // landing section shows the alchemy check-mode selector instead, and the card
+            // probe below is a soft `count()` guard — so without the section click this
+            // capture would degrade silently to a frame of the wrong card rather than fail.
+            await openChecksActivity(page, 'crafting', 'on-failure');
             await settleManagerNav(page);
             const alchemyBehaviourCard = page
               .locator('.fabricate-manager [data-alchemy-behaviour]')

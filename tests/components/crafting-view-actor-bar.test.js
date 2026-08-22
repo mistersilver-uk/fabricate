@@ -66,11 +66,15 @@ function makeServices() {
             actor: { id: 'actor-x', name: 'Hero' },
             componentSourceIds: ['actor-x'],
             worldTime: 0,
-            recipes: [recipe()],
+            summaries: [recipe()],
+            total: 1,
             counts: { available: 1, total: 1 }
           }
-        : { selectedActorId: null, actor: null, componentSourceIds: [], worldTime: 0, recipes: [], counts: { available: 0, total: 0 } };
-    }
+        : { selectedActorId: null, actor: null, componentSourceIds: [], worldTime: 0, summaries: [], total: 0, counts: { available: 0, total: 0 } };
+    },
+    // The DETAIL phase seam (issue 1075): the store hydrates the selected recipe's rich
+    // model on demand. The fixture recipe is already a rich model, so it serves both.
+    hydrateCraftingRecipe: ({ recipeId } = {}) => (recipeId === recipe().id ? recipe() : null)
   };
   return { services, calls, settings };
 }

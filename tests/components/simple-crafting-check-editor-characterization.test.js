@@ -43,6 +43,22 @@ const harness = createMountedComponentHarness({
     'src/utils/macroReference.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
+    // The formula field's quick-add chips are DERIVED from the active world rather than
+    // hard-coded (issue 1096), so the tree now imports the derivation and its preset
+    // bundles. Manifest only: no assertion below moved.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
+    // The shared copy helpers. `CheckDifficultyCard` interpolates the activity's record
+    // noun into its two DC-source sentences through `interpolate` (issue 1096). Manifest
+    // only: no assertion below moved.
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The deterministic roll-expression reducer. The formula card reads the `avg` of the
+    // authored formula from it (issue 1096). Manifest only.
+    'src/utils/rollExpressionAverage.js',
+    // A trigger's own summary and the common-trigger presets (issue 1096), both pure and
+    // both imported by `CheckTriggers.svelte`. Manifest only.
+    'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -51,8 +67,27 @@ const harness = createMountedComponentHarness({
     // The shared numeric stepper the DC, tier-DC and trigger fields are built on
     // (issue 1050). Omitting it HANGS this suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared icon fact row, which joined this tree when issue 1096 gave the simple
+    // check its Outcomes section (the two-outcome pass/fail statement). ONLY the dependency
+    // manifest changed for it: no assertion below was added, edited, weakened, skipped or
+    // deleted — this suite's whole value is that it did not move while the tree around it
+    // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
+    // the omission into a failure here rather than a hung suite.
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    // The shared button primitive: the recipe-tier list and the trigger list are both
+    // extended by its `dashed` role now (issue 1096). Manifest only.
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+    // An issue 1097 addition, and ONLY the dependency manifest: the simple check's Outcomes
+    // section gained the two-band `ThresholdBandStrip` (its single boundary IS the DC). No
+    // assertion below moved — this suite's whole value is that it did not.
+    'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
+    // The shared status card: a trigger's break-tools effect is its own bordered card now
+    // (issue 1096). Manifest only.
+    'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
   ],

@@ -50,6 +50,27 @@ function labRunIds() {
   );
 }
 
+/**
+ * Every modifier-library entry id the lab world declares.
+ *
+ * READ FROM THE AUTHORED SHAPE, not from `system.modifiers`. The fixture authors the library
+ * where the pre-`1.23.0` world carried it — `craftingCheck.checkModifiers` — and the lab boot
+ * runs every migration over it, so the key the DOM is eventually built from does not exist in
+ * `buildLabContent()` at all. Deriving from `system.modifiers` produced an EMPTY set, which
+ * then rejected every id a case legitimately names.
+ *
+ * @returns {string[]}
+ */
+function modifierLibraryIds() {
+  return content.systems.flatMap((system) =>
+    [
+      ...(system.modifiers ?? []),
+      ...(system.checkModifiers ?? []),
+      ...(system.craftingCheck?.checkModifiers ?? []),
+    ].map((entry) => entry.id)
+  );
+}
+
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
@@ -72,6 +93,12 @@ const IDENTITY_SOURCES = {
   // would otherwise surface only in a capture run.
   'data-recipe-select': new Set(content.recipes.map((entry) => entry.id)),
   'data-system-id': new Set(content.systems.map((entry) => entry.id)),
+  // The system Modifiers card's per-entry row and its roll note (issue 1118). Both pin a
+  // library entry id, and `manager-system-edit-modifier-rolls` opens one by id in its steps and
+  // asserts the note by id in its `expectSelector` — so a renamed entry would break the case in
+  // two places and be caught by neither until a capture run.
+  'data-system-modifier': new Set(modifierLibraryIds()),
+  'data-system-modifier-roll-note': new Set(modifierLibraryIds()),
   // The essence browser's bulk selection control (issue 1036) — the exact mirror of
   // `data-component-select` and `data-recipe-select` above. The essence bulk-edit case pins
   // fixture ids in its row ticks, so a rename would otherwise surface only in a capture run.

@@ -142,6 +142,22 @@ function createMockServices(overrides = {}) {
       sys.essences = sys.essenceDefinitions.map((d) => d.id);
       return true;
     },
+    // The cascading recipe delete every GM-initiated delete routes through (issue 1132) —
+    // the studio singular included, which is why this double reaches the recipe manager's
+    // leaf rather than deleting from `recipes` itself.
+    deleteRecipes: async (systemId, recipeIds) => {
+      const ids = Array.from(recipeIds || [], String).filter((id) =>
+        recipes.some((r) => r.id === id)
+      );
+      for (const id of ids) await mockRecipeManager.deleteRecipe(id);
+      return {
+        deleted: ids.length,
+        recipeIds: ids,
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      };
+    },
   };
 
   const mockRecipeManager = {
@@ -408,32 +424,61 @@ describe('createAdminStore', () => {
       // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.modifiers = [
+        { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
+        { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+      ];
       sys.craftingCheck = {
         mode: 'passFail',
         simple: { rollFormula: '1d20 + 4' },
-        checkModifiers: [
-          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
-          { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
-        ],
         defaultModifierPolicy: 'highest',
         defaultModifierIds: ['med'],
       };
+      sys.salvageCraftingCheck = {
+        defaultModifierPolicy: 'bySubject',
+        defaultModifierIds: ['alch'],
+        maxModifierPicks: 2,
+      };
+      sys.gatheringCraftingCheck = {
+        defaultModifierPolicy: 'playerPicks',
+        defaultModifierIds: ['med', 'alch'],
+      };
       const store = createAdminStore(services);
       await store.refresh();
-      const check = get(store.viewState).selectedSystem.craftingCheck;
+      const selected = get(store.viewState).selectedSystem;
+      const check = selected.craftingCheck;
 
+      // The library is a SYSTEM-level key since issue 1095 and is named `modifiers` since
+      // issue 1117; it is projected there and nowhere else.
       assert.deepEqual(
-        check.checkModifiers.map((modifier) => modifier.id),
+        selected.modifiers.map((modifier) => modifier.id),
         ['med', 'alch'],
-        'the catalogue surfaces through the projection allowlist'
+        'the library surfaces through the projection allowlist, at the system level'
       );
       assert.notEqual(
-        check.checkModifiers[0],
-        sys.craftingCheck.checkModifiers[0],
-        'catalogue entries are cloned, not shared with the live system'
+        selected.modifiers[0],
+        sys.modifiers[0],
+        'library entries are cloned, not shared with the live system'
       );
+      // The BOUNDS survive the projection too. Without them the read-only chip on salvage
+      // and gathering renders nothing and the crafting steppers read blank — an
+      // absence-preserving field is exactly the kind an allowlist drops unnoticed.
+      assert.equal(selected.modifiers[0].min, -1);
+      assert.equal(selected.modifiers[0].max, 5);
+      assert.equal(Object.hasOwn(selected.modifiers[1], 'min'), false);
+
       assert.equal(check.defaultModifierPolicy, 'highest');
       assert.deepEqual(check.defaultModifierIds, ['med']);
+      // …and the two NEW selection triples, which had no projection at all before.
+      assert.equal(selected.salvageCraftingCheck.defaultModifierPolicy, 'bySubject');
+      assert.deepEqual(selected.salvageCraftingCheck.defaultModifierIds, ['alch']);
+      assert.equal(selected.salvageCraftingCheck.maxModifierPicks, 2);
+      assert.equal(selected.gatheringCraftingCheck.defaultModifierPolicy, 'playerPicks');
+      assert.deepEqual(selected.gatheringCraftingCheck.defaultModifierIds, ['med', 'alch']);
+      // Every activity gets an inert cause; gathering reads `noCheck` because `d100` is
+      // the only mode a GM can select today (issue 1095, decision 8).
+      assert.equal(selected.salvageCraftingCheck.modifierFormulaInertCause, 'noFormula');
+      assert.equal(selected.gatheringCraftingCheck.modifierFormulaInertCause, 'noCheck');
     });
 
     it('projects every policy the manager accepts, including playerPicks (issue 855)', async () => {
@@ -451,13 +496,19 @@ describe('createAdminStore', () => {
         return get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy;
       };
 
-      // All FOUR rules, `byRecipe` included (issue 1055): it is a first-class rule with
-      // its own radio-card again, so a projection that translated it away would recreate
-      // this very defect — the GM clicks "Recipe picks" and the card re-renders on
-      // "Add all".
-      for (const policy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+      // All FOUR rules, `bySubject` included (issue 1055): it is a first-class rule with
+      // its own radio-card, so a projection that translated it away would recreate this
+      // very defect — the GM clicks "By recipe" and the card re-renders on "Add all".
+      for (const policy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
         assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
       }
+      // The pre-1095 spelling is READ and rewritten on the way out (issue 1095), so a
+      // world that has not yet run the `1.22.0` migration still selects the right card.
+      assert.equal(
+        await projectPolicy('byRecipe'),
+        'bySubject',
+        'the legacy token projects as the rule it aliases, never as the unknown-value default'
+      );
       assert.equal(await projectPolicy('bogus'), 'addAll', 'an unknown policy still falls back');
       assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
     });
@@ -508,7 +559,7 @@ describe('createAdminStore', () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       const store = createAdminStore(services);
-      for (const defaultModifierPolicy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+      for (const defaultModifierPolicy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
         sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy };
         await store.refresh();
         const check = get(store.viewState).selectedSystem.craftingCheck;
@@ -566,11 +617,12 @@ describe('createAdminStore', () => {
       );
     });
 
-    it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
-      // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
-      // that failed to spread `...existing` would drop every sibling check field. Capture
-      // the persisted payload and assert the siblings survive AND that a dropped catalogue
-      // entry does not resurrect (whole-array replace, not merge).
+    it('saveCraftingCheckModifiers preserves sibling check fields and never writes the library (issue 770 persistence trap)', async () => {
+      // updateSystem shallow-merges only the top level, so a selection patch that failed to
+      // spread `...existing` would drop every sibling check field. Capture the persisted
+      // payload and assert the siblings survive AND that the shared library is untouched:
+      // since issue 1117 this saver has no library half at all, and the ONE authoring
+      // surface writes it through `updateSystem({ modifiers })` instead.
       let updateArgs = null;
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -580,13 +632,13 @@ describe('createAdminStore', () => {
         routed: { type: 'relative', rollFormula: '1d20' },
         progressive: { rollFormula: '2d6' },
         consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
-        checkModifiers: [
-          { id: 'med', label: 'Medicine', expression: '@med' },
-          { id: 'alch', label: 'Alchemy', expression: '@alch' },
-        ],
         defaultModifierPolicy: 'addAll',
         defaultModifierIds: ['med', 'alch'],
       };
+      sys.modifiers = [
+        { id: 'med', label: 'Medicine', expression: '@med' },
+        { id: 'alch', label: 'Alchemy', expression: '@alch' },
+      ];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -598,10 +650,11 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      // A checkModifiers-only patch (the shallow-spread footgun surface): drop 'alch'.
-      await store.saveCraftingCheckModifiers({
-        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-      });
+      // The patch the card actually emits when a GM unticks a row: the id leaves THIS
+      // activity's default set and nothing else changes. That is the shallow-spread footgun
+      // surface — the nested half must spread `existing` or every sibling check field
+      // vanishes and the normalizer re-defaults it.
+      await store.saveCraftingCheckModifiers({ defaultModifierIds: ['med'] });
 
       const persisted = updateArgs.updates.craftingCheck;
       // Every sibling check field survives the nested write (would vanish without ...existing).
@@ -613,14 +666,177 @@ describe('createAdminStore', () => {
         consumeIngredientsOnFail: false,
         breakToolsOnFail: true,
       });
-      // The catalogue array is REPLACED whole — 'alch' does not resurrect.
-      assert.deepEqual(
-        persisted.checkModifiers.map((modifier) => modifier.id),
-        ['med'],
-        'the whole checkModifiers array is replaced, not merged'
+      assert.deepEqual(persisted.defaultModifierIds, ['med'], 'the unticked id leaves the set');
+      // A sibling modifier field NOT in the patch is preserved from existing.
+      assert.equal(persisted.defaultModifierPolicy, 'addAll');
+
+      // THE LIBRARY IS UNREACHABLE FROM HERE (issue 1117). A patch that names it is simply
+      // merged into the activity's check block as an unknown key the normalizer drops — it
+      // does NOT become a second write path to the shared array.
+      await store.saveCraftingCheckModifiers({
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+      });
+      assert.equal(
+        Object.hasOwn(updateArgs.updates, 'modifiers'),
+        false,
+        'the Checks saver has no library half; one authoring surface owns that array'
       );
-      // A sibling modifier field not in the patch is preserved from existing.
-      assert.deepEqual(persisted.defaultModifierIds, ['med', 'alch']);
+      await store.refresh();
+      assert.deepEqual(
+        get(store.viewState).selectedSystem.modifiers.map((entry) => entry.id),
+        ['med', 'alch'],
+        'and the authored library is intact'
+      );
+    });
+
+    // The two NEW savers (issue 1095). Each writes its OWN activity block, and each must
+    // spread `existing` for the reason the crafting one does: `updateSystem` shallow-merges
+    // only the top level, so a naive `{ salvageCraftingCheck: { defaultModifierIds } }`
+    // drops every sibling slot and the normalizer re-defaults them. Asserted by a
+    // SIBLING'S SURVIVAL, never by reading the saver.
+    for (const [activity, saver, key] of [
+      ['salvage', 'saveSalvageCheckModifiers', 'salvageCraftingCheck'],
+      ['gathering', 'saveGatheringCheckModifiers', 'gatheringCraftingCheck'],
+    ]) {
+      it(`${saver} preserves the activity's sibling check fields`, async () => {
+        let updates = null;
+        const services = createMockServices();
+        const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+        sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+        sys[key] = {
+          enabled: true,
+          routed: { type: 'relative', rollFormula: '1d20 + 3' },
+          progressive: { rollFormula: '2d6' },
+          defaultModifierPolicy: 'addAll',
+          defaultModifierIds: [],
+        };
+        const origManager = services.getCraftingSystemManager();
+        services.getCraftingSystemManager = () => ({
+          ...origManager,
+          updateSystem: async (id, next) => {
+            updates = next;
+            await origManager.updateSystem(id, next);
+          },
+        });
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+
+        await store[saver]({ defaultModifierPolicy: 'highest', defaultModifierIds: ['med'] });
+
+        const persisted = updates[key];
+        assert.equal(persisted.defaultModifierPolicy, 'highest');
+        assert.deepEqual(persisted.defaultModifierIds, ['med']);
+        assert.equal(persisted.enabled, true, `${activity}: the enabled flag survives`);
+        assert.equal(persisted.routed.rollFormula, '1d20 + 3', 'the routed slot survives');
+        assert.equal(persisted.progressive.rollFormula, '2d6', 'the progressive slot survives');
+        assert.equal(
+          Object.hasOwn(updates, 'modifiers'),
+          false,
+          'a selection-only patch does not rewrite the shared library'
+        );
+      });
+    }
+
+    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117). Every library op goes through
+    // `updateSystem({ modifiers })` — a TOP-LEVEL key, so the array is replaced wholesale and
+    // removing an entry persists with no `-=` deletion — and touches no activity selection,
+    // so it cannot re-default a rule it was never asked about.
+    it('addSystemModifier and deleteSystemModifier write the library at the SYSTEM level, alone', async () => {
+      const calls = [];
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy: 'highest' };
+      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 }];
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, next) => {
+          calls.push(next);
+          await origManager.updateSystem(id, next);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const added = await store.addSystemModifier('sys1', { id: 'alch', label: 'Alchemy' });
+      assert.equal(added.id, 'alch');
+      assert.deepEqual(
+        calls.at(-1).modifiers.map((entry) => entry.id),
+        ['med', 'alch'],
+        'the whole array is written, appended in order'
+      );
+      assert.equal(
+        Object.hasOwn(calls.at(-1), 'craftingCheck'),
+        false,
+        'a library write touches no activity selection'
+      );
+
+      assert.equal(await store.deleteSystemModifier('sys1', 'med'), true);
+      assert.deepEqual(
+        calls.at(-1).modifiers.map((entry) => entry.id),
+        ['alch'],
+        'the removal persists as a whole-array replace'
+      );
+
+      await store.refresh();
+      const selected = get(store.viewState).selectedSystem;
+      assert.deepEqual(selected.modifiers.map((entry) => entry.id), ['alch']);
+      assert.equal(
+        selected.craftingCheck.defaultModifierPolicy,
+        'highest',
+        'and the crafting rule survives the round trip rather than being re-defaulted'
+      );
+    });
+
+    // A no-op op writes NOTHING. `addSystemModifier` refuses a duplicate id and
+    // `deleteSystemModifier` refuses an id the library does not carry; without those
+    // guards each would re-persist and re-project the whole system for a request that
+    // changes nothing.
+    it('refuses a duplicate add and an unknown delete without writing', async () => {
+      const calls = [];
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, next) => {
+          calls.push(next);
+          await origManager.updateSystem(id, next);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.addSystemModifier('sys1', { id: 'med' }), null);
+      assert.equal(await store.deleteSystemModifier('sys1', 'ghost'), false);
+      assert.equal(await store.updateSystemModifier('sys1', 'ghost', { label: 'X' }), false);
+      assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
+    });
+
+    // The empty-`update` early return. Without it a patch naming nothing still calls
+    // `updateSystem({})`, which re-normalizes and re-persists the whole system and then
+    // re-projects it through `refresh()` — a write, a settings round trip and a store churn
+    // for a request that named nothing. Deleting the guard was green.
+    it('writes NOTHING for a patch that carries neither the catalogue nor a selection', async () => {
+      const calls = [];
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, next) => {
+          calls.push(next);
+          await origManager.updateSystem(id, next);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.saveCraftingCheckModifiers({});
+      await store.saveSalvageCheckModifiers({});
+      await store.saveGatheringCheckModifiers({});
+
+      assert.deepEqual(calls, [], 'an empty patch is a no-op, not a full-system rewrite');
     });
 
     // A `maxModifierPicks: null` is a real VALUE in that patch, not an omission (issue
@@ -633,7 +849,7 @@ describe('createAdminStore', () => {
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = {
         mode: 'passFail',
-        defaultModifierPolicy: 'byRecipe',
+        defaultModifierPolicy: 'bySubject',
         maxModifierPicks: 3,
       };
       const origManager = services.getCraftingSystemManager();
@@ -652,7 +868,7 @@ describe('createAdminStore', () => {
       assert.equal(persisted.maxModifierPicks, null, 'the cleared cap reaches the write');
       assert.equal(
         persisted.defaultModifierPolicy,
-        'byRecipe',
+        'bySubject',
         'and the sibling rule is preserved by the same spread'
       );
       // …and a numeric cap still writes through, so the null above is the clear rather
@@ -1131,6 +1347,47 @@ describe('createAdminStore', () => {
       assert.ok(confirmCalled, 'should call confirmDialog');
       const remaining = systemManager.getSystems();
       assert.ok(!remaining.some((s) => s.id === 'sys1'), 'sys1 should be deleted');
+    });
+
+    it('deleteSystem asks in a titled window with a Delete button, all localized', async () => {
+      // The most destructive action in the app, and until issue 1154 it asked for that
+      // with hardcoded English in an untitled window whose confirm button read the
+      // generic *Yes* — `DialogV2.confirm` merges `yes` over a default with `mergeObject`,
+      // which iterates `Object.keys(other)`, and a function has none.
+      //
+      // The mock's `localize` is `(key) => key`, so asserting the KEY asserts that the
+      // string is localized at all — a literal would come back as the literal. Only a
+      // SUPPLIED label is asserted: the core default is "Yes" on V13.351 and "COMMON.Yes"
+      // on V14.365, so pinning a default would pin a build.
+      let options = null;
+      const services = createMockServices({
+        confirmDialog: async (bag) => {
+          options = bag;
+          return true;
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteSystem('sys1');
+
+      assert.equal(options.title, 'FABRICATE.Admin.Manager.DeleteSystemConfirm.Title');
+      assert.ok(
+        options.content.includes('FABRICATE.Admin.Manager.DeleteSystemConfirm.Content'),
+        'the body names the system through a key, not a hardcoded English sentence'
+      );
+      assert.ok(
+        options.content.includes('FABRICATE.Admin.Manager.DeleteSystemConfirm.Consequences'),
+        'and so does the cascade warning'
+      );
+      assert.equal(options.yes.label, 'FABRICATE.Admin.Manager.Delete');
+      assert.equal(typeof options.yes.callback, 'function');
+      assert.equal(typeof options.no, 'object', 'no is an object, never a bare function');
+      assert.equal(options.no.callback(), false);
+      assert.equal(
+        Object.hasOwn(options, 'buttons'),
+        false,
+        'a confirm never carries a buttons array — DialogV2.confirm unshifts into it'
+      );
     });
 
     it('deleteSystem does nothing when confirm is declined', async () => {
@@ -2247,45 +2504,103 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('recipe list operations', () => {
-    it('deleteRecipe shows confirm and calls recipeManager.deleteRecipe', async () => {
+    // The studio singular routes through `CraftingSystemManager.deleteRecipes`, not
+    // `RecipeManager.deleteRecipe` (issue 1132): the leaf does not cascade the recipe-item
+    // membership prune, so a singular delete that called it directly would leave the very
+    // dangling ids the set delete exists to stop leaving. Asserting the SET form is the
+    // whole point of this test — an assertion on the leaf passes either way, since the
+    // cascading body calls it too.
+    it('deleteRecipe shows confirm and routes through the cascading set delete', async () => {
       let confirmCalled = false;
-      let deletedId = null;
+      let setCall = null;
       const services = createMockServices({
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
         },
       });
-      const origManager = services.getRecipeManager();
-      services.getRecipeManager = () => ({
-        ...origManager,
-        deleteRecipe: async (id) => {
-          deletedId = id;
-          await origManager.deleteRecipe(id);
+      const origSystemManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origSystemManager,
+        deleteRecipes: async (systemId, recipeIds, options) => {
+          setCall = { systemId, recipeIds: [...recipeIds], options };
+          return await origSystemManager.deleteRecipes(systemId, recipeIds, options);
         },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.deleteRecipe('r1');
       assert.ok(confirmCalled, 'should call confirmDialog');
-      assert.equal(deletedId, 'r1');
+      assert.deepEqual(setCall?.recipeIds, ['r1']);
+      assert.equal(setCall?.systemId, 'sys1');
+      assert.equal(
+        services.getRecipeManager().getRecipe('r1'),
+        null,
+        'the recipe is gone from the map'
+      );
+    });
+
+    // Both defects were SHIPPED, and neither is visible without reading the options object:
+    // `services.confirmDialog` calls `DialogV2.confirm` WITHOUT `normalizeDialogOptions`, so
+    // nothing maps a top-level `title` onto `window.title` and `ApplicationV2` rendered an
+    // empty title bar; and `DialogV2.confirm` merges `yes` over a default carrying
+    // `label: "COMMON.Yes"`, so a bare `yes: () => true` contributes no own enumerable keys
+    // and the confirm button on a DESTRUCTIVE dialog read the generic *Yes*.
+    it('deleteRecipe passes the title at window.title and a labelled confirm button', async () => {
+      let options = null;
+      const services = createMockServices({
+        confirmDialog: async (opts) => {
+          options = opts;
+          return false;
+        },
+        localize: (key, data) =>
+          key === 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Title'
+            ? `Delete ${data?.name}?`
+            : key === 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Confirm'
+              ? 'Delete'
+              : key,
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteRecipe('r1');
+
+      assert.equal(options?.window?.title, 'Delete Recipe One?', 'the title lands at window.title');
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(options, 'title'),
+        false,
+        'no top-level title, which nothing reads'
+      );
+      assert.equal(options?.yes?.label, 'Delete', 'the confirm button carries its own label');
+      assert.equal(typeof options?.yes?.callback, 'function', 'and keeps its callback');
+      assert.equal(
+        typeof options?.yes,
+        'object',
+        'a bare function would contribute no own enumerable keys to the merge'
+      );
     });
 
     it('deleteRecipe does nothing when confirm declined', async () => {
-      let deletedId = null;
+      let setCall = null;
       const services = createMockServices({
         confirmDialog: async () => false,
       });
-      const origManager = services.getRecipeManager();
-      services.getRecipeManager = () => ({
-        ...origManager,
-        deleteRecipe: async (id) => {
-          deletedId = id;
+      const origSystemManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origSystemManager,
+        deleteRecipes: async (systemId, recipeIds) => {
+          setCall = { systemId, recipeIds };
+          return {
+            deleted: 0,
+            recipeIds: [],
+            recipeItemsAffected: 0,
+            recipeItemsRewritten: 0,
+            learnersAffected: 0,
+          };
         },
       });
       const store = createAdminStore(services);
       await store.deleteRecipe('r1');
-      assert.equal(deletedId, null, 'should not delete when declined');
+      assert.equal(setCall, null, 'should not delete when declined');
     });
 
     it('duplicateRecipe clones recipe with (Copy) suffix', async () => {
@@ -3030,6 +3345,310 @@ describe('createAdminStore', () => {
       assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
     });
 
+    // ── Issue 1156: the singular delete dialog omits a stated-zero consequence, per
+    // consequence — the component sibling of the recipe dialog's #1152 fix. ─────────────────
+
+    /** A recipe referencing `componentIds` as ingredient options and `resultId` as its result. */
+    function componentRecipe(id, { componentIds = [], resultId = 'output' } = {}) {
+      return {
+        id,
+        craftingSystemId: 'sys1',
+        enabled: true,
+        ingredientSets: [
+          {
+            id: `${id}-set`,
+            ingredientGroups: [
+              { id: `${id}-group`, options: componentIds.map((c) => ({ componentId: c })) },
+            ],
+          },
+        ],
+        resultGroups: [{ id: `${id}-rg`, results: [{ componentId: resultId }] }],
+        toJSON() {
+          return { ...this };
+        },
+      };
+    }
+
+    function servicesWithComponentAndRecipes(items, recipes) {
+      const localizations = [];
+      const services = createMockServices({
+        localize: (key, data) => {
+          localizations.push({ key, data });
+          return key;
+        },
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) sys.items = items;
+      services.getRecipeManager = () => ({
+        getRecipes: (filter) =>
+          filter?.craftingSystemId
+            ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId)
+            : recipes,
+        getRecipe: (id) => recipes.find((r) => r.id === id) || null,
+        updateRecipe: async () => {},
+      });
+      return { services, localizations };
+    }
+
+    it('deleteComponent selects the plain branch when no recipe references it', async () => {
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        []
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const plain = localizations.find(
+        (call) => call.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentPlain'
+      );
+      assert.ok(plain, 'the plain branch is localized when there is nothing to state');
+      assert.deepEqual(plain.data, { name: 'Iron', recipes: 0, disabled: 0 });
+    });
+
+    it('deleteComponent selects the recipes-only branch when the rewritten recipe stays craftable', async () => {
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        [componentRecipe('r1', { componentIds: ['iron', 'tin'] })]
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const call = localizations.find(
+        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentRecipes'
+      );
+      assert.ok(call, 'the recipes-only branch is localized');
+      assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 0 });
+      assert.equal(
+        localizations.some(
+          (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.Content'
+        ),
+        false,
+        'the combined branch is never reached when nothing is disabled'
+      );
+    });
+
+    it('deleteComponent selects the combined branch when a recipe is disabled', async () => {
+      // `iron` is the recipe's ONLY ingredient option AND its only result, so stripping it
+      // leaves the recipe with no ingredient sets and no results — `recipeLostItsShape` clamps
+      // it to disabled.
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        [componentRecipe('r1', { componentIds: ['iron'], resultId: 'iron' })]
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const call = localizations.find(
+        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentDisabledOne'
+      );
+      assert.ok(call, 'the combined branch with singular disabled is localized');
+      assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 1 });
+    });
+
+    // ── The set delete (issue 1129) ──────────────────────────────────────────────
+    //
+    // The store half is a passthrough with NO confirmDialog: the panel arms beside an impact
+    // statement, which carries strictly more information than a modal. A dialog here would
+    // make the arm a second gate rather than the gate.
+
+    it('deleteComponents routes the whole set through the BATCHED manager primitive', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Herb' }),
+          makeItem({ id: 'comp-2', name: 'Root' }),
+        ];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 3, recipesDisabled: 1 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1', 'comp-2']);
+
+      assert.deepEqual(batchArgs, { sysId: 'sys1', ids: ['comp-1', 'comp-2'] });
+      assert.deepEqual(result, { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 });
+    });
+
+    it('deleteComponents raises NO confirm dialog — the panel already armed', async () => {
+      let confirmCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => ({ deleted: 1, recipesUpdated: 0, recipesDisabled: 0 }),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1']);
+
+      assert.equal(confirmCalled, false, 'confirmation is the caller-side arm, not a modal');
+    });
+
+    it('deleteComponents drops ids that name no component in the system', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1', 'ghost']);
+
+      assert.deepEqual(batchArgs.ids, ['comp-1'], 'an unresolved id never reaches the write');
+    });
+
+    it('deleteComponents is a no-op for an empty selection', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          called = true;
+          return { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents([]);
+
+      assert.equal(called, false);
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('deleteComponents reports a failed write rather than throwing at the panel', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          throw new Error('nope');
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1']);
+
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('describeComponentDelete resolves ids against the system before counting', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // A ghost id must not inflate the number the GM is shown.
+      assert.equal(store.describeComponentDelete(['comp-1', 'ghost']).deletable, 1);
+      assert.equal(store.describeComponentDelete(['ghost']).deletable, 0);
+      assert.equal(store.describeComponentDelete([]).deletable, 0);
+    });
+
+    it('describeComponentDelete returns the zero impact rather than throwing', async () => {
+      // It is called from a `$derived` in the manager root on EVERY selection change, so it
+      // runs on the render path. A throw here does not surface as a failed action — it takes
+      // the whole component browser down. So all four inputs that can be absent are pinned by
+      // OUTCOME here: whatever is missing, the caller gets the zero impact and not an
+      // exception.
+      //
+      // They are NOT four separate lines of coverage, and saying they were would overstate
+      // them. Only case 3 is load-bearing on the line it names: drop the optional call on
+      // `getRecipeManager` and this test fails. The other three are BACKSTOPPED, and deleting
+      // the guard each one names changes nothing, because `_getManagedItems` answers `[]` for
+      // an absent system and `describeComponentDeleteImpact` coerces a non-array:
+      //
+      //  - cases 1 and 2 both fall through to the later `resolved.length === 0` return
+      //    instead of stopping at `if (!sysId)` / `if (!system)`;
+      //  - case 4 survives the loss of `_selectedSystemRecipes`'s `|| []`, because
+      //    `Array.isArray(recipes) ? recipes : []` inside the describer already covers it.
+      //
+      // They are kept anyway, as render-path OUTCOME pins rather than as proof that any
+      // individual guard is necessary: the contract is that the caller gets the zero impact,
+      // whichever line delivers it, so a change that removes a backstop is caught here even
+      // though removing a redundant guard is not.
+      const services = createMockServices();
+      const zero = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
+
+      // 1. No system selected at all.
+      const unselected = createAdminStore(services);
+      assert.deepEqual(unselected.describeComponentDelete(['comp-1']), zero);
+
+      // 2. A selected id naming no system.
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({ ...origManager, getSystem: () => null });
+      const missingSystem = createAdminStore(services);
+      await missingSystem.selectSystem('sys1');
+      assert.deepEqual(missingSystem.describeComponentDelete(['comp-1']), zero);
+
+      // 3 and 4. A recipe manager that is absent, and one whose recipe list is missing. Both
+      // reach `describeComponentDeleteImpact`, which is where an unguarded `recipes.length`
+      // would throw. Swapped in AFTER `selectSystem`, because the store's own refresh needs a
+      // working recipe manager to get this far and this test is about the describer, not
+      // about a store that never loaded.
+      const recipeless = createMockServices();
+      const recipelessSystem = recipeless.getCraftingSystemManager().getSystem('sys1');
+      recipelessSystem.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+      delete recipelessSystem.items;
+      const degrading = createAdminStore(recipeless);
+      await degrading.selectSystem('sys1');
+
+      recipeless.getRecipeManager = null;
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'no recipe manager still yields a countable component impact'
+      );
+
+      recipeless.getRecipeManager = () => ({ getRecipes: () => undefined });
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'a recipe manager returning no list yields the same countable impact, not a throw'
+      );
+    });
+
     it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -3547,257 +4166,6 @@ describe('createAdminStore', () => {
       });
     });
 
-    it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
-      const { store, currency, updateArgs } = await setupCurrencyStore();
-      const created = await store.addCurrencyUnit('sys1', {
-        id: 'gp',
-        label: 'Gold',
-        abbreviation: 'gp',
-        icon: 'fa-solid fa-coins',
-        actorPath: 'system.currency.gp',
-      });
-      assert.equal(created.id, 'gp');
-      await store.updateCurrencyUnit('sys1', 'gp', {
-        label: 'Gold pieces',
-        actorPath: 'system.currency.gp.value',
-      });
-      assert.ok(updateArgs() !== null);
-      assert.equal(currency().units[0].id, 'gp');
-      assert.equal(currency().units[0].label, 'Gold pieces');
-      assert.equal(currency().units[0].actorPath, 'system.currency.gp.value');
-      assert.equal('provider' in currency(), false);
-    });
-
-    it('currency sub-unit actions add, update, and remove denomination breakdowns', async () => {
-      const { store, currency, updateArgs } = await setupCurrencyStore({
-        randomID: (() => {
-          const ids = ['cp', 'sp'];
-          let index = 0;
-          return () => ids[index++] || `id-${index}`;
-        })(),
-      });
-      await store.addCurrencyUnit('sys1', {
-        id: 'cp',
-        label: 'Copper',
-        abbreviation: 'cp',
-        actorPath: 'system.currency.cp',
-      });
-      await store.addCurrencyUnit('sys1', {
-        id: 'sp',
-        label: 'Silver',
-        abbreviation: 'sp',
-        actorPath: 'system.currency.sp',
-      });
-      await store.addCurrencySubUnit('sys1', 'sp', 'cp');
-      await store.updateCurrencySubUnit('sys1', 'sp', 'cp', 10);
-      assert.ok(updateArgs() !== null);
-      let silver = currency().units.find((unit) => unit.id === 'sp');
-      assert.deepEqual(silver.contains, [{ unitId: 'cp', amount: 10 }]);
-
-      await store.deleteCurrencySubUnit('sys1', 'sp', 'cp');
-      silver = currency().units.find((unit) => unit.id === 'sp');
-      assert.deepEqual(silver.contains, []);
-    });
-
-    it('seedCurrencyUnitPresets adds dnd5e units idempotently', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
-      const first = await store.seedCurrencyUnitPresets('sys1');
-      const second = await store.seedCurrencyUnitPresets('sys1');
-      assert.equal(first.unsupported, false);
-      assert.equal(first.added.length, 5);
-      assert.equal(second.added.length, 0);
-      assert.equal(second.skipped.length, 5);
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'gp'),
-        true
-      );
-    });
-
-    it('seedCurrencyUnitPresets sets actorInventory spend strategy for pf2e worlds', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      const result = await store.seedCurrencyUnitPresets('sys1');
-      assert.equal(result.unsupported, false);
-      assert.equal(currency().spendStrategy, 'actorInventory');
-      const gp = currency().units.find((unit) => unit.id === 'gp');
-      assert.equal(gp.denomination, 'gp');
-    });
-
-    it('seedCurrencyUnitPresets seeds the actorInventory strategy for pf2e worlds', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.seedCurrencyUnitPresets('sys1');
-      assert.equal('inventoryMode' in currency(), false);
-      assert.equal(currency().spendStrategy, 'actorInventory');
-      assert.equal(currency().providerId, 'pf2e-inventory');
-      // The actorInventory strategy is provider-owned, so the seeded units are the canonical ladder.
-      assert.deepEqual(
-        currency().units.map((unit) => unit.id),
-        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
-      );
-      assert.deepEqual(
-        currency().units.map((unit) => unit.denomination),
-        PF2E_CURRENCY_PRESETS.map((unit) => unit.denomination)
-      );
-    });
-
-    it('setCurrencySpendStrategy persists and defaults providerId for pf2e actorInventory', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      assert.equal(currency().spendStrategy, 'actorInventory');
-      assert.equal(currency().providerId, 'pf2e-inventory');
-    });
-
-    it('setCurrencySpendStrategy persists the macro strategy and preserves providerId', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencySpendStrategy('sys1', 'macro');
-      assert.equal(currency().spendStrategy, 'macro');
-      assert.equal('inventoryMode' in currency(), false);
-      // providerId is inert under macro but is preserved across the switch.
-      assert.equal(currency().providerId, 'pf2e-inventory');
-      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      assert.equal(currency().providerId, 'pf2e-inventory');
-    });
-
-    it('setCurrencySpendStrategy("actorInventory") syncs units to the provider canonical ladder', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      // Seed a user-managed unit first, then switching to actorInventory overwrites it.
-      await store.addCurrencyUnit('sys1', {
-        id: 'junk',
-        label: 'Junk',
-        actorPath: 'system.currency.junk',
-      });
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      const units = currency().units;
-      assert.deepEqual(
-        units.map((unit) => unit.id),
-        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
-      );
-      assert.deepEqual(
-        units.map((unit) => unit.denomination),
-        PF2E_CURRENCY_PRESETS.map((unit) => unit.denomination)
-      );
-      assert.equal(
-        units.some((unit) => unit.id === 'junk'),
-        false,
-        'user-managed unit should be overwritten by canonical ladder'
-      );
-    });
-
-    it('setCurrencyProvider syncs canonical units while under the actorInventory strategy', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      assert.deepEqual(
-        currency().units.map((unit) => unit.id),
-        PF2E_CURRENCY_PRESETS.map((unit) => unit.id)
-      );
-    });
-
-    it('switching to actorProperty or macro leaves user-managed units untouched', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'pf2e' });
-      await store.addCurrencyUnit('sys1', {
-        id: 'mine',
-        label: 'Mine',
-        actorPath: 'system.currency.mine',
-      });
-      // macro strategy keeps the user's units.
-      await store.setCurrencySpendStrategy('sys1', 'macro');
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'mine'),
-        true
-      );
-      // actorProperty strategy keeps the user's units too.
-      await store.setCurrencySpendStrategy('sys1', 'actorProperty');
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'mine'),
-        true
-      );
-      // setCurrencyProvider outside the actorInventory strategy does not touch the user's units.
-      await store.setCurrencyProvider('sys1', 'pf2e-inventory');
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'mine'),
-        true
-      );
-    });
-
-    it('actorInventory in a no-provider system (dnd5e) leaves configured units untouched', async () => {
-      // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
-      // getProviderCanonicalUnits('') is empty. The actorInventory strategy must NOT wipe the GM's
-      // units in that case.
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
-      await store.addCurrencyUnit('sys1', {
-        id: 'gp',
-        label: 'Gold',
-        actorPath: 'system.currency.gp',
-      });
-      await store.setCurrencySpendStrategy('sys1', 'actorInventory');
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'gp'),
-        true,
-        'no-provider system must not have its configured units wiped by the actorInventory strategy'
-      );
-      // setCurrencyProvider with an empty/unknown provider id also preserves the units.
-      await store.setCurrencyProvider('sys1', '');
-      assert.equal(
-        currency().units.some((unit) => unit.id === 'gp'),
-        true,
-        'selecting an empty provider id must not wipe configured units'
-      );
-    });
-
-    it('setCurrencyMacro and clearCurrencyMacro persist per-key macro UUIDs', async () => {
-      const { store, currency } = await setupCurrencyStore();
-      await store.setCurrencyMacro('sys1', 'canAfford', 'Macro.can');
-      assert.equal(currency().macros.canAfford, 'Macro.can');
-      await store.setCurrencyMacro('sys1', 'decrement', 'Macro.dec');
-      assert.equal(currency().macros.decrement, 'Macro.dec');
-      await store.clearCurrencyMacro('sys1', 'canAfford');
-      assert.equal(currency().macros.canAfford, '');
-      assert.equal(currency().macros.decrement, 'Macro.dec');
-    });
-
-    it('seedCurrencyUnitPresets does not overwrite a user-edited seeded unit', async () => {
-      const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
-      await store.seedCurrencyUnitPresets('sys1');
-      await store.updateCurrencyUnit('sys1', 'gp', {
-        label: 'Custom Gold',
-        actorPath: 'system.currency.gp.value',
-      });
-      const second = await store.seedCurrencyUnitPresets('sys1');
-      assert.equal(second.added.length, 0);
-      const units = currency().units;
-      const gold = units.find((unit) => unit.id === 'gp');
-      assert.equal(gold.label, 'Custom Gold');
-      assert.equal(gold.actorPath, 'system.currency.gp.value');
-      // No duplicate gp unit was introduced by the second seed.
-      assert.equal(units.filter((unit) => unit.id === 'gp').length, 1);
-    });
-
-    it("deleteCurrencyUnit removes the unit and strips it from other units' sub-units", async () => {
-      const { store, currency } = await setupCurrencyStore();
-      await store.addCurrencyUnit('sys1', {
-        id: 'cp',
-        label: 'Copper',
-        abbreviation: 'cp',
-        actorPath: 'system.currency.cp',
-      });
-      await store.addCurrencyUnit('sys1', {
-        id: 'sp',
-        label: 'Silver',
-        abbreviation: 'sp',
-        actorPath: 'system.currency.sp',
-      });
-      await store.addCurrencySubUnit('sys1', 'sp', 'cp', 10);
-      await store.deleteCurrencyUnit('sys1', 'cp');
-      const units = currency().units;
-      assert.equal(
-        units.some((unit) => unit.id === 'cp'),
-        false
-      );
-      const silver = units.find((unit) => unit.id === 'sp');
-      assert.deepEqual(silver.contains, []);
-    });
-
     it('saveAlchemyConfig persists canonical alchemy settings', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -4015,6 +4383,8 @@ describe('createAdminStore', () => {
         'exportSystem',
         'importSystem',
         'deleteComponent',
+        'deleteComponents',
+        'describeComponentDelete',
         'updateComponent',
         'setRecipeSearch',
         'setItemSearch',
@@ -6254,23 +6624,25 @@ describe('createAdminStore', () => {
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
+      // The library a drop-row reference points INTO is SYSTEM-owned (issue 1117); the
+      // gathering config carries only the tasks and events that reference it.
+      sys.modifiers = [
+        {
+          id: 'strength',
+          label: 'Strength',
+          icon: 'fa-solid fa-dumbbell',
+          expression: '@abilities.str.mod',
+        },
+        {
+          id: 'dexterity',
+          label: 'Dexterity',
+          icon: 'fa-solid fa-running',
+          expression: '@abilities.dex.mod',
+        },
+      ];
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            characterModifiers: [
-              {
-                id: 'strength',
-                label: 'Strength',
-                icon: 'fa-solid fa-dumbbell',
-                expression: '@abilities.str.mod',
-              },
-              {
-                id: 'dexterity',
-                label: 'Dexterity',
-                icon: 'fa-solid fa-running',
-                expression: '@abilities.dex.mod',
-              },
-            ],
             tasks: [
               {
                 id: 'task-iron',
@@ -7213,18 +7585,29 @@ describe('createAdminStore', () => {
       delete sys.items;
 
       const originalFromUuid = globalThis.fromUuid;
-      globalThis.fromUuid = async () => liveDoc;
+      const sourceLookups = [];
+      globalThis.fromUuid = async (uuid) => {
+        sourceLookups.push(uuid);
+        return liveDoc;
+      };
       try {
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
-        return { card: get(store.viewState).itemCards[0], enrichCalls };
+        // The store projects every card CHEAPLY and the browser hydrates the page it
+        // renders (issue 1081), so the linked-source half — the live description fallback
+        // and the "Missing" verdict — resolves on `hydrate()`, not on refresh. This suite
+        // drives the store with no view, so it plays the browser's part explicitly. The
+        // card fills IN PLACE, which is why the same object is returned.
+        const card = get(store.viewState).itemCards[0];
+        await card?.hydrate?.();
+        return { card, enrichCalls, sourceLookups };
       } finally {
         globalThis.fromUuid = originalFromUuid;
       }
     }
 
     it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
-      const { card, enrichCalls } = await itemCardFor(
+      const { card, enrichCalls, sourceLookups } = await itemCardFor(
         {
           id: 'comp-stored',
           name: 'Alchemist’s Supplies',
@@ -7234,6 +7617,15 @@ describe('createAdminStore', () => {
         { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
       );
 
+      // POSITIVE CONTROL, same fixture, same seam, and load-bearing since issue 1081 made the
+      // resolution on-demand: an un-hydrated card ALREADY carries the stored description and
+      // has already made zero enrich calls, so without proving that hydration actually ran,
+      // both assertions below are satisfied by a card that never resolved anything.
+      assert.deepEqual(
+        sourceLookups,
+        ['Compendium.dnd5e.equipment24.Item.supplies'],
+        'the card really did hydrate — it resolved its linked source document exactly once'
+      );
       assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
       assert.equal(
         enrichCalls.length,
@@ -7389,6 +7781,11 @@ describe('createAdminStore', () => {
      * counter, create the store, and run `body` with a `count()` reader and a
      * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
      * seam swap is written once (Sonar new-code duplication).
+     *
+     * `hydrateAll()` plays the browser's part (issue 1081): the store projects every card
+     * cheaply and the view hydrates the page it renders, so a suite with no view has to say
+     * which cards it is looking at. These tests are about the MEMO — what a second look at
+     * an unchanged component costs — so they look at all of them.
      */
     async function withMemoStore(components, servicesOverrides, body) {
       const services = createMockServices(servicesOverrides);
@@ -7403,10 +7800,14 @@ describe('createAdminStore', () => {
       };
       try {
         const store = createAdminStore(services);
+        const hydrateAll = () =>
+          Promise.all(get(store.viewState).itemCards.map((card) => card?.hydrate?.()));
         await store.selectSystem('sys1');
+        await hydrateAll();
         return await body({
           store,
           sys,
+          hydrateAll,
           count: () => calls,
           reset: () => {
             calls = 0;
@@ -7426,9 +7827,9 @@ describe('createAdminStore', () => {
           description: '',
         })
       );
-      await withMemoStore(components, undefined, async ({ store, sys, count, reset }) => {
-        // Baseline: every one of the 75 components forces a source resolution.
-        assert.ok(count() >= 75, `initial selectSystem resolves all components (got ${count()})`);
+      await withMemoStore(components, undefined, async ({ store, sys, count, reset, hydrateAll }) => {
+        // Baseline: looking at all 75 components forces 75 source resolutions.
+        assert.ok(count() >= 75, `hydrating all 75 components resolves each (got ${count()})`);
 
         // Mutate exactly ONE component (new object, same id, changed name).
         reset();
@@ -7436,12 +7837,29 @@ describe('createAdminStore', () => {
           i === 0 ? makeItem({ ...item, name: 'Component 0 EDITED' }) : item
         );
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 1, 'only the edited component re-resolves — not O(all)');
 
         // A no-op refresh (nothing changed) hits the cache for every card.
         reset();
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 0, 'an unchanged same-system refresh resolves nothing');
+
+        // PAGE SCOPE (issue 1081): the refresh itself resolves nothing at all, so a GM who
+        // never scrolls past page 1 never pays for the other 50.
+        reset();
+        sys.components = sys.components.map((item, i) =>
+          i === 1 ? makeItem({ ...item, name: 'Component 1 EDITED' }) : item
+        );
+        await store.refresh();
+        assert.equal(count(), 0, 'a refresh with nothing on screen resolves nothing');
+        await Promise.all(
+          get(store.viewState)
+            .itemCards.slice(0, 25)
+            .map((card) => card.hydrate())
+        );
+        assert.equal(count(), 1, 'and one page of hydration resolves only what changed on it');
       });
     });
 
@@ -7899,5 +8317,404 @@ describe('createAdminStore — gathering economy', () => {
     };
     store.refreshGatheringConfig();
     assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The FAILURE-RESULT POLICY and salvage's failure CONSUMPTION (issue 1098)
+//
+// `_buildSelectedSystemViewData` is a hand-built ALLOWLIST: a field omitted there is
+// INVISIBLE to the UI however correctly the normalizer and the write path behave. These
+// tests drive the REAL projection and the REAL savers, because that is the only place the
+// omission shows up.
+// ---------------------------------------------------------------------------
+
+describe('createAdminStore — failure-result policy (issue 1098)', () => {
+  /** Project a raw system through the real store and read one activity's check back. */
+  async function projectChecks(mutate) {
+    const services = createMockServices();
+    const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+    mutate(sys);
+    const store = createAdminStore(services);
+    await store.refresh();
+    return get(store.viewState).selectedSystem;
+  }
+
+  it('projects failureResultPolicy on ALL THREE activity checks, at non-default values', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail', failureResultPolicy: 'always' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'never' };
+      sys.gatheringCraftingCheck = { failureResultPolicy: 'always' };
+    });
+
+    // Each is a DIFFERENT value from its neighbour, so a projection reading one activity's
+    // policy onto another is visible rather than accidentally correct.
+    assert.equal(selected.craftingCheck.failureResultPolicy, 'always');
+    assert.equal(selected.salvageCraftingCheck.failureResultPolicy, 'never');
+    assert.equal(selected.gatheringCraftingCheck.failureResultPolicy, 'always');
+  });
+
+  it('projects an absent or unrecognized policy as the read-time default', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'sometimes' };
+      sys.gatheringCraftingCheck = {};
+    });
+
+    for (const key of ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck']) {
+      assert.equal(selected[key].failureResultPolicy, 'perRecord', key);
+    }
+  });
+
+  // Salvage's consumption block was persisted since 1.7.0 and projected NOWHERE, which is
+  // why the Salvage On-failure section could not exist. Both of its defaults are traps.
+  it('projects salvage consumption, mirroring BOTH of the normalizer trap defaults', async () => {
+    // `consumeComponentOnFail` defaults TRUE via `!== false`, so dropping it INVERTS an
+    // authored `false` rather than merely losing it — a default-valued fixture is no oracle.
+    const authored = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
+      };
+    });
+    assert.equal(authored.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
+    assert.equal(authored.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+
+    // Absence reads as the default-ON, which is the state most systems are in.
+    const absent = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: {} };
+    });
+    assert.equal(absent.salvageCraftingCheck.consumption.consumeComponentOnFail, true);
+    assert.equal(absent.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  it('reads breakToolsOnFail NEW-THEN-LEGACY, so a pre-1.7.0 system is not flipped ON→OFF', async () => {
+    // A system authored before the 1.7.0 rename carries ONLY `consumeCatalystsOnFail`. A
+    // projection reading the new key alone would render the toggle OFF, and the first save
+    // from that screen would persist the GM's setting as OFF — silently, and for a setting
+    // they never touched.
+    const legacyOnly = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: { consumeCatalystsOnFail: true } };
+    });
+    assert.equal(
+      legacyOnly.salvageCraftingCheck.consumption.breakToolsOnFail,
+      true,
+      'the legacy alias is honoured by the projection exactly as by the normalizer'
+    );
+
+    // …and an explicit NEW-key value wins over the legacy one, in both directions.
+    const bothKeys = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { breakToolsOnFail: false, consumeCatalystsOnFail: true },
+      };
+    });
+    assert.equal(bothKeys.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  /** Capture the `updateSystem` payload a saver writes. */
+  async function captureSave(run) {
+    let updateArgs = null;
+    const services = createMockServices();
+    // Seed a sibling on every check block. The saver has to carry it through
+    // `updateSystem`'s shallow top-level merge, and a fixture with nothing beside the
+    // policy could not tell a spread saver from one that replaced the whole block.
+    const raw = services._getSystemsMutable().find((s2) => s2.id === 'sys1');
+    raw.craftingCheck = { ...(raw.craftingCheck || {}), enabled: true };
+    raw.salvageCraftingCheck = {
+      enabled: true,
+      consumption: { consumeComponentOnFail: false },
+    };
+    raw.gatheringCraftingCheck = { enabled: true };
+    const origManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...origManager,
+      updateSystem: async (id, updates) => {
+        updateArgs = { id, updates };
+        await origManager.updateSystem(id, updates);
+      },
+    });
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+    await run(store);
+    return updateArgs;
+  }
+
+  it('each activity saver writes its OWN check block and preserves every sibling', async () => {
+    // `updateSystem` shallow-merges the TOP level only, so a saver that did not spread
+    // `existing` would drop every sibling of the policy and the normalizer would then
+    // re-default them — silent data loss, and the reason this is asserted on a SIBLING
+    // rather than by reading the saver.
+    const cases = [
+      ['craftingCheck', (store) => store.saveCraftingCheckFailureResultPolicy('always')],
+      ['salvageCraftingCheck', (store) => store.saveSalvageCheckFailureResultPolicy('always')],
+      ['gatheringCraftingCheck', (store) => store.saveGatheringCheckFailureResultPolicy('never')],
+    ];
+    for (const [key, run] of cases) {
+      const args = await captureSave(run);
+      assert.ok(args, `${key}: the saver wrote`);
+      assert.ok(args.updates[key], `${key}: it wrote its own block`);
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'failureResultPolicy'),
+        `${key}: carrying the policy`
+      );
+      // The sibling every check block has. Its survival is what proves `existing` was spread.
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'enabled'),
+        `${key}: and every sibling of the policy survives the shallow merge`
+      );
+    }
+  });
+
+  it('an unrecognized policy is normalized by the saver rather than persisted', async () => {
+    const args = await captureSave((store) => store.saveCraftingCheckFailureResultPolicy('bogus'));
+    assert.equal(args.updates.craftingCheck.failureResultPolicy, 'perRecord');
+  });
+
+  it('the salvage consumption saver spreads the block AND its nested sub-object', async () => {
+    const args = await captureSave((store) =>
+      store.saveSalvageCheckConsumption({ breakToolsOnFail: true })
+    );
+    assert.equal(args.updates.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+    // The UNTOUCHED flag has to survive too: it defaults TRUE, so losing it would present
+    // as an inversion the next time the normalizer read the block.
+    assert.ok(
+      Object.hasOwn(args.updates.salvageCraftingCheck.consumption, 'consumeComponentOnFail'),
+      'the sibling consumption flag is carried, not re-defaulted'
+    );
+    assert.ok(Object.hasOwn(args.updates.salvageCraftingCheck, 'enabled'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1081 — the store's half of the page-scoped component browser
+// ---------------------------------------------------------------------------
+
+describe('adminStore item-card hydration and cohort fetching (issue 1081)', () => {
+  /** Seed `sys1` with `count` compendium-linked components carrying no stored description. */
+  function seedLinkedComponents(services, count) {
+    const sys = services.getCraftingSystemManager().getSystem('sys1');
+    sys.components = Array.from({ length: count }, (_, index) =>
+      makeItem({
+        id: `comp-${index}`,
+        name: `Component ${index}`,
+        description: '',
+        registeredItemUuid: `Compendium.pack.Item.source-${index}`,
+      })
+    );
+    delete sys.items;
+    return sys;
+  }
+
+  /**
+   * A card fills itself IN PLACE, which Svelte cannot see — and a NEW ARRAY of the SAME
+   * objects does not fix that.
+   *
+   * This store publishes through a `writable`, which does not proxy, so every hop between
+   * the published array and a rendered string compares by `===`: `selectedComponent` and
+   * `componentForEdit` re-run `find(...)` and return the identical object, the browser
+   * model's filter/sort/paginate chain slices and spreads without cloning, and a keyed
+   * `{#each}` reconciling an unchanged item does not update the row. The array identity gets
+   * the readers to look; only the CARD identity makes them see anything different. Publishing
+   * the same object back to all three surfaces does not keep them from diverging — it keeps
+   * them wrong together, on the pre-hydration reading, permanently.
+   *
+   * Only the cards that reported a fill are replaced, and the untouched pair below is the
+   * control for that: swapping an un-hydrated card would strand its eventual in-place fill on
+   * an object nothing publishes any more.
+   */
+  it('republishes each HYDRATED card as a new object, leaving un-hydrated cards alone', async () => {
+    const services = createMockServices();
+    seedLinkedComponents(services, 5);
+
+    const originalFromUuid = globalThis.fromUuid;
+    globalThis.fromUuid = async () => ({ system: { description: { value: 'Live prose' } } });
+    try {
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      let publishes = 0;
+      const unsubscribe = store.viewState.subscribe(() => {
+        publishes += 1;
+      });
+      publishes = 0; // discard `subscribe`'s immediate replay of the current value
+
+      const before = get(store.viewState).itemCards;
+      assert.equal(before.length, 5);
+      assert.equal(before[0].description, '', 'pre-condition: the cards arrive un-hydrated');
+
+      // A PAGE, not the cohort: two cards are deliberately never asked.
+      await Promise.all(before.slice(0, 3).map((card) => card.hydrate()));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      unsubscribe();
+
+      const after = get(store.viewState).itemCards;
+      assert.ok(
+        after !== before,
+        'the store hands out a NEW array, so every reader of `itemCards` re-runs'
+      );
+      for (const index of [0, 1, 2]) {
+        assert.ok(
+          after[index] !== before[index],
+          `card ${index} hydrated, so it is republished as a NEW object — a card whose ` +
+            'identity did not move is invisible to every `===` comparison between here and ' +
+            'the rendered row, inspector and editor'
+        );
+        assert.equal(after[index].id, before[index].id, 'and its `{#each}` key does not move');
+        assert.equal(after[index].description, 'Live prose', 'the resolved reading is published');
+      }
+      // SAME-FIXTURE CONTROL: identity is replaced for the cards that filled, not for every
+      // card in the array, so this is a targeted swap rather than a blanket re-clone.
+      for (const index of [3, 4]) {
+        assert.equal(
+          after[index],
+          before[index],
+          `card ${index} was never asked to hydrate, so it is published unchanged — its fill, ` +
+            'if it is ever asked for, lands on the object that is still published'
+        );
+      }
+      assert.equal(
+        typeof after[0].hydrate,
+        'function',
+        'the replacement carries the NON-ENUMERABLE `hydrate` seam across, so a later ask is ' +
+          'still answered (and answered from the memo)'
+      );
+      assert.equal(
+        Object.keys(after[0]).includes('hydrate'),
+        false,
+        'and it is still non-enumerable, so spread, JSON and the bulk-edit models cannot see it'
+      );
+      assert.equal(
+        publishes,
+        1,
+        'three cards resolving on three separate microtasks coalesce into ONE republish; ' +
+          'without the coalescing a page turn re-runs every reader 25 times'
+      );
+    } finally {
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  /**
+   * The recipe half of the Tags & Categories reference count is published as DATA, and the
+   * count has to accompany the rows it describes in every state the store publishes — not
+   * merely arrive by the time the refresh settles.
+   *
+   * The stake is destructive rather than cosmetic. `VocabularyPanel` gates its confirm strip
+   * on the row's `totalUsage`: a tag reading `0 references` renders the `Unused` chip and is
+   * deleted on ONE CLICK with no confirmation. A tag that is referenced only as a recipe
+   * ingredient tag-placeholder — exactly the population issue 689 exists to count — reads
+   * that way the moment this record goes missing or empty while the recipes are published,
+   * and deleting it breaks ingredient matching in every recipe whose placeholder named it.
+   *
+   * Asserted over the whole publish SEQUENCE for that reason: a snapshot taken after the
+   * refresh settles cannot see a phase that published rows without their counts.
+   */
+  it('publishes tag-placeholder counts alongside the recipes in every published state', async () => {
+    const services = createMockServices();
+    const originalRecipeManager = services.getRecipeManager();
+    const placeholderRecipe = makeRecipe({
+      id: 'r-placeholder',
+      name: 'Any Herb Tincture',
+      craftingSystemId: 'sys1',
+      ingredientSets: [
+        {
+          id: 'set-any-herb',
+          name: 'Any herb',
+          ingredientGroups: [
+            {
+              id: 'group-any-herb',
+              // The placeholder shape: it names TAGS rather than a component, so no
+              // component-level count can stand in for it.
+              options: [{ match: { type: 'tags', tags: ['Herb', 'moon'] }, quantity: 1 }],
+            },
+          ],
+        },
+      ],
+    });
+    services.getRecipeManager = () => ({
+      ...originalRecipeManager,
+      getRecipes: (filter) =>
+        [placeholderRecipe].filter(
+          (recipe) =>
+            !filter?.craftingSystemId || recipe.craftingSystemId === filter.craftingSystemId
+        ),
+    });
+
+    const store = createAdminStore(services);
+    const published = [];
+    const unsubscribe = store.viewState.subscribe((state) => {
+      published.push({
+        recipeCount: (state.recipes || []).length,
+        counts: state.recipeTagPlaceholderCounts,
+      });
+    });
+    try {
+      await store.selectSystem('sys1');
+      await store.refresh();
+    } finally {
+      unsubscribe();
+    }
+
+    const withRecipes = published.filter((entry) => entry.recipeCount > 0);
+    assert.ok(
+      withRecipes.length >= 2,
+      'PRE-CONDITION: the cohort really was published, by both `selectSystem` and `refresh` ' +
+        '— a run that published no recipes would satisfy the rule below vacuously'
+    );
+    for (const entry of withRecipes) {
+      assert.deepEqual(
+        entry.counts,
+        { herb: 1, moon: 1 },
+        'every state that carries the recipes carries their placeholder counts, lowercased ' +
+          'and one per named tag — an empty record here reads as "no references" and offers ' +
+          'the tag for one-click deletion'
+      );
+    }
+    assert.deepEqual(
+      get(store.viewState).recipeTagPlaceholderCounts,
+      { herb: 1, moon: 1 },
+      'and the settled state agrees'
+    );
+  });
+
+  /**
+   * The roster the essence cards are built from is THREADED into the row projection rather
+   * than re-fetched there, so a 10,000-recipe library is not copied an extra time per GM
+   * refresh. `buildRecipeList`'s own half of that contract is pinned directly in
+   * `admin-projection-modules.test.js` (a supplied roster performs zero fetches, an omitted
+   * one performs exactly one); this pins that the STORE actually supplies it.
+   *
+   * An exact budget rather than a bound, because the quantity is a per-refresh fetch count
+   * and every one of them copies the whole library. The three are the system list's per-system
+   * `recipeCount`, this cohort fetch, and the validation report — dropping the threading adds
+   * a fourth, and any newly added cohort read has to move this number deliberately.
+   */
+  it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
+    const services = createMockServices();
+    const realRecipeManager = services.getRecipeManager();
+    let cohortFetches = 0;
+    services.getRecipeManager = () => ({
+      ...realRecipeManager,
+      getRecipes: (filter) => {
+        if (filter?.craftingSystemId) cohortFetches += 1;
+        return realRecipeManager.getRecipes(filter);
+      },
+    });
+
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+
+    cohortFetches = 0;
+    await store.refresh();
+    assert.equal(
+      cohortFetches,
+      3,
+      'one GM refresh reads the system recipe cohort three times, and the row projection is ' +
+        'not one of them: it projects from the array the refresh already holds'
+    );
+
+    // POSITIVE CONTROL, same fixture, same counter: the counter is live and the budget is
+    // per-refresh rather than a one-off.
+    await store.refresh();
+    assert.equal(cohortFetches, 6, 'the counter CAN go up — by exactly one refresh worth');
   });
 });

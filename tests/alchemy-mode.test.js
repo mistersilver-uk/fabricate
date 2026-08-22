@@ -269,7 +269,12 @@ test('CraftingSystemManager: loading persisted data with cauldron mode produces 
   assert.equal(system.alchemy.learnOnCraft, true);
 });
 
-test('CraftingSystemManager accepts legacy gatheringRegions/gatheringRegionSettings keys on read (pre-1.1.0 import)', () => {
+test('CraftingSystemManager keeps only the participation flag from a legacy travel block (pre-1.1.0 import)', () => {
+  // Since issue 1282 the realm library, its reveal mode and its modifier visibility are WORLD
+  // scope, so this allowlist rebuild deliberately drops all three: the 1.27.0 migration lifts
+  // them into `travelConfig`, and the first save after it is what removes the stale copy.
+  // The legacy `gatheringRegionSettings` key is still read, so a pre-1.1.0 export whose systems
+  // load before the startup migration runs still keeps its participation answer.
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const system = manager._normalizeSystem({
     id: 'legacy-realm-sys',
@@ -277,10 +282,13 @@ test('CraftingSystemManager accepts legacy gatheringRegions/gatheringRegionSetti
     gatheringRegions: [{ id: 'r1', craftingSystemId: 'legacy-realm-sys', name: 'Verdant', enabled: true }],
     gatheringRegionSettings: { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }
   });
-  assert.equal(system.gatheringRealms.length, 1, 'legacy gatheringRegions read as gatheringRealms');
-  assert.equal(system.gatheringRealms[0].name, 'Verdant');
-  assert.equal(system.gatheringRealmSettings.enabled, true, 'legacy gatheringRegionSettings read as gatheringRealmSettings');
-  assert.equal(system.gatheringRealmSettings.revealMode, 'alwaysVisible');
+  assert.equal(system.gatheringRealms, undefined, 'the realm library never lands back on a system');
+  assert.equal(system.gatheringRegions, undefined);
+  assert.deepEqual(
+    system.gatheringRealmSettings,
+    { enabled: true },
+    'legacy gatheringRegionSettings is read for participation, and for nothing else'
+  );
 });
 
 // ============================================================================

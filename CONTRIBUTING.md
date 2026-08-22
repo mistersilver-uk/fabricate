@@ -527,7 +527,7 @@ The silent way back is the other one, and the one `tests/prettier-svelte-scope.t
 Svelte compiler warnings fail the build as of issue 924, which found seven of them passing unnoticed.
 Five were real accessibility defects; one was a `css_unused_selector` that was not dead code at all but a focus ring the compiler was emitting COMMENTED OUT, so the ring had never applied in a shipped build; the seventh was a `state_referenced_locally` in `GatheringEnvironmentList.svelte`, a deliberate one-time seed now said so with `untrack()` rather than suppressed.
 The gate has two halves.
-`onwarn` in `svelte.config.js` throws, so `npm run build` fails; that is the fast local signal, but a Vite build compiles only the entry graph and cannot see a component nothing imports (`GatheringTravelView.svelte`, issue 927).
+`onwarn` in `svelte.config.js` throws, so `npm run build` fails; that is the fast local signal, but a Vite build compiles only the entry graph and cannot see a component nothing imports (`RowDisclosure.svelte` is one today; issue 927 is where the gap was found).
 `npm run lint:svelte:warnings` (`scripts/check-svelte-warnings.mjs`) sweeps every `src/**/*.svelte` regardless of reachability and is the step CI runs, so it is the authoritative half.
 Both take their compiler options from `svelte.config.js` through `scripts/lib/svelteCompilerWarnings.js`, which is what makes a disagreement between them diagnostic: it can only be graph reachability, never drift in `compilerOptions`.
 Read that qualifier literally.
@@ -596,17 +596,25 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 181 cases: 138 `exact`, 4 `window`, 39 `beyond`.
+As of this writing the registry holds 248 cases: 146 `exact`, 3 `window`, 99 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects every publishable case, because a shared fixture can alter any frame at once.
-Three inputs narrow that default.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 36 of the 248 publishable cases.
+A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
+It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
+A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
+Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
+Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
+Five inputs narrow below coverage.
 A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
+A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
+A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
-The two case-registry and actor-fixture narrowings locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers, and every location the content recurs at must agree on the same cases before the narrowing is used.
-A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the whole-corpus default.
-So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored unambiguously.
+The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
+So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
+Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
 `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
@@ -888,8 +896,8 @@ Hit list seen historically:
 - `.manager-environment-edit-view.is-placeholder` and `.manager-environment-placeholder-card` — gone since the real composition editor replaced the placeholder.
 - "Return to environments" button text — renamed to "Back to environments" and rewired through `confirmRouteExit`.
 - `.manager-environment-details-band` — CSS rule survived in `styles/fabricate.css`, but the Svelte usage was removed; the harness kept waiting on it.
-- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from the retired `GatheringTravelView`.
-The live Travel tab renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
+- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from a retired combined Travel view.
+World > Parties renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
 
 **Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.
 Prefer running `npm run test:foundry` locally at least once on UI-touching PRs.
@@ -929,7 +937,8 @@ If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
 
 UI changes must include screenshot evidence in the PR body.
 The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it.
-The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading — including a drag-and-dropped GitHub attachment — satisfies the check.
+A frame the View Lab capture job published automatically must additionally match this PR's own head commit and one of the changed views, and the check now waits for that job to conclude before deciding — see "CI behavior" below.
+The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading that a person put there directly — including a drag-and-dropped GitHub attachment — still satisfies the check outright, with no matching applied.
 
 ### When it applies
 
@@ -1021,7 +1030,10 @@ Smoke fixture data should use Foundry core or dnd5e non-SVG raster icon paths di
 ### CI behavior
 
 CI runs only the lightweight `check` (no smoke run on the runner).
-It reads the live PR body, changed files, and labels, then passes when the body has a **Screenshots** heading whose section contains at least one image.
+For a same-repository PR, it first awaits the `capture` job in `pr-screenshots.yml` for this PR's own head SHA, because that job is the automatic producer of screenshot evidence and used to publish its frames only after this check had already decided, reddening a PR's first push through no fault of the change.
+A fork PR has no such producer to wait for — `pr-screenshots.yml` never runs on untrusted head code — so the check decides immediately on whatever the body already carries, which is also the only path open to a fork's author.
+It likewise decides immediately, without waiting, whenever the body already carries evidence sufficient to satisfy the gate for this head.
+Once it has waited (or decided it need not), it re-reads the live PR body, the changed files, and the labels, then passes when the body has a **Screenshots** heading whose section contains at least one image that satisfies the rules below.
 
 - The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
 - The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.
@@ -1029,6 +1041,15 @@ It reads the live PR body, changed files, and labels, then passes when the body 
 GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
 - An image with no Screenshots heading, or a Screenshots heading with no image, does not pass.
 There is **no `SCREENSHOTS_NEEDED:` text bypass**.
+
+An image the View Lab capture job published automatically only counts when it sits inside that job's own managed block in the PR body (`<!-- fabricate:screenshots:start -->` … `<!-- fabricate:screenshots:end -->`).
+Its case id and head SHA, read back from its published S3 URL (`<prefix>/<pr>/<head-sha>/<caseId>.png`), must match this PR's current head and one of the changed views.
+An image in a Screenshots section that is NOT inside that managed block satisfies the check outright, with no matching applied — that is what keeps the maintainer-pasted path and the fork path working, since a drag-and-dropped GitHub attachment carries no case id and no head SHA.
+
+A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, `capture-did-not-conclude`, or `pull-request-read-failed`.
+The last of these fires when the check cannot re-read the live PR body after the producer concludes, for example on a rate limit or a transient error from the API.
+It is deliberately distinct from `capture-published-nothing`, because an unread body is not evidence that the producer published nothing.
+Reporting it under that code would send the reader to debug the producer, when the actual problem is the check's own re-read failing.
 
 The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply.
 An agent must never apply it.
@@ -1308,7 +1329,7 @@ A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days i
 (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots).
-The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label.
+The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label, and it now also fails closed when the automatically published frames belong to a stale head or match none of the PR's changed views.
 
 ## Release pipeline
 

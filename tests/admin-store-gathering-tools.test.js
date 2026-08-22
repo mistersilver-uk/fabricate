@@ -390,12 +390,12 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(get(store.viewState).toolsDraftDirty, false);
     });
 
-    it('addToolToDraft flips dirty and selects + expands the new tool', async () => {
+    it('createToolDraft flips dirty and selects + expands the new tool', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       assert.ok(added && added.id);
       const state = get(store.viewState);
       assert.equal(state.toolsDraft.length, 1);
@@ -405,12 +405,12 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(state.toolsDraftExpandedToolId, added.id);
     });
 
-    it('addToolToDraft accepts an initial component mapping', async () => {
+    it('createToolDraft accepts an initial component mapping', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft({ componentId: 'comp-pickaxe' });
+      const added = store.createToolDraft({ componentId: 'comp-pickaxe' });
       assert.ok(added && added.id);
       const state = get(store.viewState);
       assert.equal(state.toolsDraft[0].componentId, 'comp-pickaxe');
@@ -425,7 +425,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       store.updateToolInDraft(added.id, { label: 'Iron Pickaxe' });
       const draft = get(store.viewState).toolsDraft;
       assert.equal(draft[0].label, 'Iron Pickaxe');
@@ -438,7 +438,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       store.updateToolInDraft(added.id, { componentId: 'comp-axe', label: 'Iron Pickaxe' });
       const saved = await store.saveToolsDraft();
       assert.equal(saved, true);
@@ -455,7 +455,7 @@ describe('adminStore library tools (system-owned)', () => {
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
       // User clicks "Add tool" but never assigns a component (invalid + blank).
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       assert.equal(
         store.validateToolDraft(added.id).valid,
         false,
@@ -476,7 +476,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const valid = store.addToolToDraft();
+      const valid = store.createToolDraft();
       store.updateToolInDraft(valid.id, { componentId: 'comp-axe', label: 'Iron Pickaxe' });
       const replacement = store.createToolDraft({ componentId: 'comp-pick' });
       const state = get(store.viewState);
@@ -490,7 +490,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       // Edited (named) but still missing the required component: NOT blank, so it
       // must block the save rather than being silently discarded.
       store.updateToolInDraft(added.id, { label: 'Unfinished Tool' });
@@ -540,7 +540,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      store.addToolToDraft();
+      store.createToolDraft();
       store.cancelToolsDraft();
       const state = get(store.viewState);
       assert.equal(state.toolsDraft, null);
@@ -554,7 +554,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       // A non-blank invalid tool (edited but missing the required component). A
       // genuinely-invalid tool still blocks the save and sets the error state;
       // only blank, unmodified new drafts are discarded cleanly (issue 297).
@@ -572,7 +572,7 @@ describe('adminStore library tools (system-owned)', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
-      const added = store.addToolToDraft();
+      const added = store.createToolDraft();
       await store.deleteToolFromDraft(added.id);
       const state = get(store.viewState);
       assert.equal(state.toolsDraft.length, 0);

@@ -40,6 +40,27 @@
  * it, or making its listing note unreachable all leave this file 11/11 green — measured, which is
  * why those tests exist.
  */
+
+/**
+ * Issue 1168: this file's runtime is governed by the `--test-timeout` on the `test` script in
+ * `package.json`, and CANNOT be narrowed to just this file with a `describe`/`it` `{ timeout }`
+ * option — that was tried and measured to not work, not assumed. `node:test` wraps every file
+ * passed to the CLI in an implicit test whose own deadline is inherited from `--test-timeout`;
+ * inheritance only flows DOWNWARD (a child adopts its parent's timeout as its own default), never
+ * upward as an override. A `{ timeout: 300000 }` on the describe below, on the slow `it` inside
+ * it, or on a describe wrapping this whole file's content, all still got cancelled at the CLI's
+ * shorter value in testing, reported as `not ok 1 - <filepath>` rather than by the name of
+ * whichever inner node supposedly owned the longer budget — the same shape the original bug
+ * report showed. So the 300000 lives on the `test` script itself, applying to all files, not just
+ * this one.
+ *
+ * The corpus-wide `format:check` invocation below (`inspects the real component corpus, not a
+ * reconstruction of it`) is the reason: measured at ~7.5s run alone on an idle machine, ~17.8s as
+ * part of a full idle `npm test`, and up to 128.1s under the kind of concurrent load this repo's
+ * lane gates actually produce (2-3 other full `npm test` runs in flight at once) — well past the
+ * previous 60000ms cap, which is exactly what turned a slow-but-healthy run into a `# cancelled 1`
+ * that read as a flake. Narrowing this back down "to tidy it" reintroduces that.
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -100,6 +121,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundryChromeCache.js',
   'scripts/lib/foundryChromeSpec.js',
   'scripts/lib/viewLabCases.js',
+  'scripts/lib/viewLabLayoutAssertion.js',
   'scripts/view-lab-chrome.mjs',
   'scripts/view-lab-screenshots.mjs',
   'scripts/lib/viewLabIndex.js',
@@ -107,6 +129,56 @@ const GATE_TARGETS = [
   'scripts/lib/foundrySmokeArms.js',
   'scripts/lib/foundryBrowserBoot.js',
   'scripts/foundry-version-assert.mjs',
+  // The screen-agnostic visual-parity harness (issue 1096). It replaced a single
+  // prototype-specific extractor: the prototype, its region map and its fixture are
+  // development-time artefacts under `tmp/` and are not in the tree at all.
+  'scripts/visual-parity/extract.mjs',
+  'scripts/visual-parity/compare.mjs',
+  // The STRUCTURAL pass, which is what lets the harness see absence at all: a comparison
+  // of computed styles can only ever measure regions that exist on both sides.
+  'scripts/visual-parity/inventory.mjs',
+  // The PAGE-SIDE runtime: every routine that runs inside the measured document, as real
+  // code. It used to cross into the page as source strings reconstituted with `new Function`.
+  'scripts/visual-parity/lib/page-runtime.js',
+  'scripts/visual-parity/lib/schema.js',
+  'scripts/visual-parity/lib/inventory.js',
+  // The ONE live subject both passes measure, and the View Lab boot behind it.
+  'scripts/visual-parity/lib/subject.js',
+  // The deterministic performance harness (issue 1071). The three libraries carry all the
+  // reusable behaviour — the two `.mjs` entry points export nothing, because
+  // `unicorn/no-exports-in-scripts` forbids a CLI from also being a module.
+  // The PATH-walking executable resolver, extracted out of compare-svelte-render.mjs so the
+  // benchmark envelope can share it instead of copying a security-sensitive helper.
+  'scripts/lib/resolveExecutable.js',
+  'scripts/lib/benchmarkBaselines.js',
+  'scripts/lib/benchmarkEnvelope.js',
+  'scripts/lib/benchmarkStats.js',
+  'scripts/lib/benchmarkRunner.js',
+  'scripts/benchmark-performance.mjs',
+  'scripts/benchmark-compare.mjs',
+  // The Foundry performance profile (issue 1073): the pure derivations it depends on — the
+  // measurement registry, the seeding transform, the preconditions, the run record and the
+  // browser-side capture summarizers — plus the scenarios and the runner itself.
+  'scripts/lib/foundryPerfMeasurements.js',
+  'scripts/lib/foundryPerfSeed.js',
+  'scripts/lib/foundryPerfPreflight.js',
+  'scripts/lib/foundryPerfRecord.js',
+  'scripts/lib/foundryPerfCapture.js',
+  'scripts/lib/foundryPerfScenarios.js',
+  'scripts/foundry-perf-run.mjs',
+  'scripts/visual-parity/lib/view-lab.js',
+  // The screenshot-evidence matcher (issue 1133): the pure derivation that decides which
+  // published frames answer a PR's changed files, shared by the evidence gate and its workflow.
+  'scripts/lib/screenshotEvidenceMatching.js',
+  // The icon-catalogue generator and its bundle reader (issue 1269). Run by a maintainer against a
+  // Foundry install rather than by CI, which has none, so nothing else would ever format them. The
+  // FA6/FA7 compatibility layer, the smoke-arm bundle expectations and the companion probe (PR
+  // #1276) share the same maintainer-only entry point, so they are pinned together.
+  'scripts/lib/fontAwesomeBundle.js',
+  'scripts/lib/fontAwesomeCompatibility.js',
+  'scripts/lib/fontAwesomeSmokeExpectations.js',
+  'scripts/foundry-icon-bundle-assert.mjs',
+  'scripts/generate-icon-catalogue.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

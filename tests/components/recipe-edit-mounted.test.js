@@ -35,6 +35,9 @@ const RAW_MODULES = [
   'src/ui/svelte/util/recipeCurrency.js',
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
+  // Recipe, Ingredient and IngredientSet all filter their payloads through the shared
+  // omitted-when-default machinery (issue 1135).
+  'src/models/reconstructibleDefaults.js',
   'src/models/IngredientSet.js',
   // IngredientSet imports the shared essence allocator (issue 917); the harness's
   // dependency validator throws a named "add it to rawModules" error without it.
@@ -48,6 +51,9 @@ const RAW_MODULES = [
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
+  // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
+  // which outcome tiers a result-authoring control may offer.
+  'src/utils/failureResultPolicy.js',
   'src/config/flags.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
@@ -66,13 +72,20 @@ const RAW_MODULES = [
   // the same module. This harness DOES validate its dependency graph, so omitting it
   // throws a named "add it to rawModules" error rather than hanging — unlike the manager
   // harness, whose inline list has no validator.
-  'src/systems/craftingModifierResolver.js',
+  'src/systems/checkModifierResolver.js',
   // …and issue 1094 gave that resolver its first two imports: it appends the resolved
   // scalar through `toolCheckBonus.js` and reads the retirement shim from
   // `craftingCheckExpression.js`. Both are import-free leaves, so these two entries close
   // the graph the validator walks.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // …and issue 1118 a FOURTH: the resolver ranks a rolling modifier by the deterministic
+  // average this import-free leaf computes.
+  'src/utils/rollExpressionAverage.js',
+  // …and issue 1095 a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
+  // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
+  'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
@@ -508,7 +521,7 @@ describe('RecipeEditView (mounted)', () => {
     //
     // Retargeted for issue 1055: a recipe persists a PICK and nothing else. There is no
     // rule select on this tab at all — a recipe chooses WHICH modifiers apply, never HOW
-    // they combine — and the picker exists only under the system's `byRecipe` rule.
+    // they combine — and the picker exists only under the system's `bySubject` rule.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
@@ -518,7 +531,7 @@ describe('RecipeEditView (mounted)', () => {
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
-        craftingModifierPolicy: 'byRecipe',
+        craftingModifierPolicy: 'bySubject',
       })
     );
     assert.ok(
@@ -532,7 +545,7 @@ describe('RecipeEditView (mounted)', () => {
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
-    assert.ok(picker, 'the eligible-modifier picker shows under the byRecipe rule');
+    assert.ok(picker, 'the eligible-modifier picker shows under the bySubject rule');
     assert.ok(
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
@@ -574,13 +587,13 @@ describe('RecipeEditView (mounted)', () => {
         { id: 'alch', label: 'Alchemy' },
       ],
       craftingModifierDefaultIds: ['med', 'alch'],
-      craftingModifierPolicy: 'byRecipe',
+      craftingModifierPolicy: 'bySubject',
       ...overrides,
     });
 
-  it('renders the modifier picker under byRecipe ONLY, and no banner under the rest (issue 1055)', async () => {
+  it('renders the modifier picker under bySubject ONLY, and no banner under the rest (issue 1055)', async () => {
     for (const [policy, picker] of [
-      ['byRecipe', true],
+      ['bySubject', true],
       ['addAll', false],
       ['highest', false],
       ['playerPicks', false],
@@ -598,7 +611,7 @@ describe('RecipeEditView (mounted)', () => {
         `rule ${String(policy)}: a recipe never authors the combination rule`
       );
       // The rejected design put a neutral "the system decides" banner on every recipe of
-      // every system that never delegated. It is gone: under a non-`byRecipe` rule this
+      // every system that never delegated. It is gone: under a non-`bySubject` rule this
       // tab renders NOTHING about check modifiers rather than a standing notice.
       assert.ok(
         !target.querySelector('[data-recipe-modifier-banner]'),
@@ -855,7 +868,7 @@ describe('RecipeEditView (mounted)', () => {
 
   it('hides the crafting-modifier picker when the system has no catalogue (issue 770)', async () => {
     const target = await editHarness.mount(
-      identityProps({ craftingModifierPolicy: 'byRecipe', craftingModifierOptions: [] })
+      identityProps({ craftingModifierPolicy: 'bySubject', craftingModifierOptions: [] })
     );
     assert.ok(
       !target.querySelector('[data-recipe-crafting-modifier-picker]'),
@@ -1343,7 +1356,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('check mode: empty routing hint distinguishes no tiers from no success tiers', async () => {
+  it('check mode: empty routing hint distinguishes THREE states, not two', async () => {
     const groups = [{ id: 'grp-a', name: 'Group A', checkOutcomeIds: [], results: [] }];
 
     // No tiers authored at all → "define tiers first".
@@ -1363,20 +1376,44 @@ describe('RecipeEditView (mounted)', () => {
     );
     editHarness.remount();
 
-    // Tiers exist but none is a Success → success-filtered options empty, distinct hint.
-    const noSuccess = await mountResultGroups(groups, {
+    // Tiers exist, none can be offered, and the FAILURE-RESULT POLICY forbids failure
+    // results (issue 1098) → the third hint, which names BOTH remedies. "Mark one as
+    // Success" alone is half the story here: allowing failed checks to produce is the
+    // other, and it is the one a GM authoring a ruined-output recipe actually wants.
+    const forbiddenPolicy = await mountResultGroups(groups, {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: [],
         routedOutcomeTiersDefined: true,
+        routedFailureResultsAllowed: false,
       },
     });
     assert.match(
-      noSuccess.target.querySelector(
+      forbiddenPolicy.target.querySelector(
+        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
+      ).textContent,
+      /produces nothing on a failed check/,
+      'with failure-only tiers under a forbidding policy, the hint names the policy too'
+    );
+    editHarness.remount();
+
+    // The same two inputs under a PERMITTING policy keep the original sentence: the
+    // policy is not the obstacle there, so naming it would send the GM to a setting that
+    // is already correct.
+    const permittingPolicy = await mountResultGroups(groups, {
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: [],
+        routedOutcomeTiersDefined: true,
+        routedFailureResultsAllowed: true,
+      },
+    });
+    assert.match(
+      permittingPolicy.target.querySelector(
         '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
       ).textContent,
       /marked as a Success/,
-      'with failure-only tiers, the hint points to marking a tier as Success'
+      'under a permitting policy the original success-tier hint stands'
     );
     editHarness.remount();
   });

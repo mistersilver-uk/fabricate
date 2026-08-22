@@ -13,17 +13,30 @@
   import EmptyState from './EmptyState.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import { dragDrop } from '../../actions/dragDrop.js';
-  import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
+  import RollDataExpressionInput from './RollDataExpressionInput.svelte';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import CharacterPrerequisitesCard from './system/CharacterPrerequisitesCard.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
+  // `stripExpressionSigil` is NOT imported any more: the summary row reads the stored
+  // expression back verbatim now that the field no longer supplies the `@`. The helper itself
+  // is untouched — the prerequisite copy path still derives a `path` from an expression
+  // through it, which is a different question from how a list reads.
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
-    stripExpressionSigil,
   } from '../../../../systems/characterModifierPrerequisiteCopy.js';
+  import {
+    isRollExpression,
+    resolveModifierBounds,
+  } from '../../../../systems/checkModifierResolver.js';
+  import {
+    appendModifierExpressionTerm,
+    getModifierExpressionSuggestions,
+  } from '../../../../config/modifierExpressionSuggestions.js';
 
   let {
     selectedSystem = null,
@@ -64,13 +77,28 @@
     // registers as a change (the `requestedTabNonce` idiom above).
     reseedNonce = 0,
     onToggleFeature = async () => true,
-    characterModifierLibrary = [],
-    characterModifierPresetsSupported = false,
-    onAddCharacterModifier = async () => null,
-    onUpdateCharacterModifier = async () => {},
-    onDeleteCharacterModifier = async () => {},
-    onReorderCharacterModifier = async () => {},
-    onSeedCharacterModifierPresets = async () => {},
+    // The ONE authored modifier library for this system (issue 1117). It absorbed the
+    // check-modifier catalogue that used to be authored on the Checks screen, so this
+    // section is now the only surface that adds, edits, reorders or deletes an entry, and
+    // it renders for EVERY system rather than only a gathering-enabled one — a check
+    // modifier has nothing to do with the gathering feature flag.
+    modifierLibrary = [],
+    modifierPresetsSupported = false,
+    // The active Foundry game system id (`game.system.id`). Drives the SYSTEM-SPECIFIC half
+    // of the expression suggestion chips: a roll-data path is only meaningful in the world
+    // that defines it, so an unknown id yields the agnostic chips alone rather than a
+    // `dnd5e` row offered to a world that has no `@abilities`.
+    foundrySystemId = '',
+    onAddModifier = async () => null,
+    onUpdateModifier = async () => {},
+    onDeleteModifier = async () => {},
+    onReorderModifier = async () => {},
+    onSeedModifierPresets = async () => {},
+    // Bumped by the parent to deep-link into this section — the Checks screen's read-only
+    // modifier card links here, and a link that lands on a collapsed section the GM then
+    // has to find is not a deep link. A nonce for the `requestedTabNonce` reason: the same
+    // request has to re-apply.
+    requestedSectionNonce = 0,
     characterPrerequisiteLibrary = [],
     characterPrerequisitePresetsSupported = false,
     onAddCharacterPrerequisite = async () => null,
@@ -78,25 +106,13 @@
     onDeleteCharacterPrerequisite = async () => {},
     onReorderCharacterPrerequisite = async () => {},
     onSeedCharacterPrerequisitePresets = async () => {},
-    currencyUnits = [],
-    currencyPresetsSupported = false,
-    currencySpendStrategy = 'actorProperty',
-    currencyProviderId = '',
-    currencyMacros = { canAfford: '', increment: '', decrement: '' },
-    currencyProviderOptions = [],
-    onAddCurrencyUnit = async () => null,
-    onUpdateCurrencyUnit = async () => {},
-    onDeleteCurrencyUnit = async () => {},
-    onReorderCurrencyUnit = async () => {},
-    onAddCurrencySubUnit = async () => {},
-    onUpdateCurrencySubUnit = async () => {},
-    onDeleteCurrencySubUnit = async () => {},
-    onSeedCurrencyPresets = async () => {},
-    onSetCurrencySpendStrategy = async () => {},
-    onSetCurrencyProvider = async () => {},
-    onSetCurrencyMacro = async () => {},
-    onClearCurrencyMacro = async () => {},
+    // Currency's only remaining surface here is the participation toggle (issue 1278). The ladder,
+    // spend strategy, provider and macro set are world scope and are authored under World > Currency.
     onToggleCurrency = async () => {},
+    // Travel & Realms' only surface here is the participation toggle (issue 1282). The realm
+    // library, its reveal mode and its modifier visibility are world scope and are authored
+    // under World > Travel.
+    onToggleGatheringRealms = async () => {},
     onToggleTime = async () => {},
   } = $props();
 
@@ -126,133 +142,10 @@
   ]);
   const tabBadges = $derived({ validation: validationBadges });
 
-  const CURRENCY_SPEND_STRATEGY_OPTIONS = [
-    {
-      value: 'actorProperty',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorProperty',
-      fallback: 'Actor data path',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorPropertyHint',
-      hintFallback: 'Read and spend coins at a flat actor data path (e.g. dnd5e currency).',
-    },
-    {
-      value: 'actorInventory',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventory',
-      fallback: 'Actor inventory',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyActorInventoryHint',
-      hintFallback:
-        'Use a preconfigured provider that reads and spends coins from the actor inventory (e.g. pf2e).',
-    },
-    {
-      value: 'macro',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyMacro',
-      fallback: 'Macro',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyMacroHint',
-      hintFallback:
-        'Drive currency with your own macros; the macro receives the actor and does whatever it needs.',
-    },
-  ];
-  const CURRENCY_MACRO_FIELDS = [
-    {
-      key: 'canAfford',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAfford',
-      labelFallback: 'Can afford macro',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroCanAffordHint',
-      hintFallback:
-        'Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.',
-    },
-    {
-      key: 'increment',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrement',
-      labelFallback: 'Increment macro',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrementHint',
-      hintFallback: 'Reserved for a future refund flow — configured now but not yet invoked.',
-    },
-    {
-      key: 'decrement',
-      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrement',
-      labelFallback: 'Decrement macro',
-      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrementHint',
-      hintFallback: 'Runs after a successful craft to spend the currency cost.',
-    },
-  ];
-
-  // Resolve each configured macro UUID to a { name, img, missing } display, mirroring the
-  // RecipeContextRail/EnvironmentSummaryInspector linked-document pattern.
-  let currencyMacroDocs = $state({});
-
-  function setCurrencyMacroDoc(key, doc) {
-    currencyMacroDocs = { ...currencyMacroDocs, [key]: doc };
-  }
-
-  // Kick off async resolution for one macro field; returns the synchronous placeholder. The
-  // async branches each live in their own callback so this helper stays shallow.
-  function resolveMacroFieldDoc(key, uuid, isCancelled) {
-    const placeholder = { uuid, name: '', img: '', missing: false };
-    if (typeof globalThis.fromUuid !== 'function') {
-      return { ...placeholder, missing: true };
-    }
-    Promise.resolve(globalThis.fromUuid(uuid))
-      .then((doc) => {
-        if (isCancelled()) return;
-        setCurrencyMacroDoc(
-          key,
-          doc
-            ? { uuid, name: String(doc.name || ''), img: String(doc.img || ''), missing: false }
-            : { ...placeholder, missing: true }
-        );
-      })
-      .catch(() => {
-        if (!isCancelled()) setCurrencyMacroDoc(key, { ...placeholder, missing: true });
-      });
-    return placeholder;
-  }
-
-  $effect(() => {
-    const macros = currencyMacros || {};
-    const next = {};
-    let cancelled = false;
-    const isCancelled = () => cancelled;
-    for (const field of CURRENCY_MACRO_FIELDS) {
-      const uuid = String(macros[field.key] || '').trim();
-      if (uuid) next[field.key] = resolveMacroFieldDoc(field.key, uuid, isCancelled);
-    }
-    currencyMacroDocs = next;
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  function currencyMacroDisplay(key) {
-    return currencyMacroDocs[key] || null;
-  }
-
-  // Each empty macro drop zone needs a field-specific accessible name; otherwise the three zones
-  // (canAfford/increment/decrement) expose an identical "Drag a macro here to link it." label and
-  // are indistinguishable to assistive tech. Compose the visible field label with the drop hint.
-  function currencyMacroDropZoneLabel(field) {
-    const fieldLabel = text(field.labelKey, field.labelFallback);
-    const composed = localize('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel', {
-      field: fieldLabel,
-    });
-    if (composed && composed !== 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel') {
-      return composed;
-    }
-    return `${fieldLabel}: ${text('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropHint', 'Drag a macro here to link it.')}`;
-  }
-
-  async function handleCurrencyMacroDrop(key, data) {
-    const { uuid, type } = resolveDropData(data);
-    if (type !== 'Macro' || !uuid) return;
-    await onSetCurrencyMacro(key, uuid);
-  }
-
-  let characterModifierEditingId = $state('');
-  let currencyExpandedUnitId = $state('');
-  let currencySubUnitSelections = $state({});
-  const ROLL_EXPRESSION_PATTERN_UI = /\bd\d|[*/()]/;
+  let modifierEditingId = $state('');
 
   // Whole-section collapse (issue 768) — a session-local Set keyed by section name
-  // ('modifiers' | 'prerequisites' | 'currency'), mirroring ComponentsBrowserView's
+  // ('modifiers' | 'prerequisites'), mirroring ComponentsBrowserView's
   // `collapsedCategories`. In-memory only: preserved across store refresh, reset on
   // system switch, NEVER persisted. Distinct from the prerequisites card's per-item
   // accordion (`openId`) — this is a section-level wrapper. Collapse is opt-IN: a
@@ -363,22 +256,56 @@
   }
 
   async function handleCopyPrerequisiteToModifier(entry) {
-    const created = await onAddCharacterModifier(mapPrerequisiteToModifier(entry));
+    const created = await onAddModifier(mapPrerequisiteToModifier(entry));
     if (!created?.id) return;
     expandSection('modifiers');
-    characterModifierEditingId = created.id;
+    modifierEditingId = created.id;
     announceCopy(entry?.name);
-    await revealCopiedEntry(`[data-system-character-modifier="${created.id}"]`);
+    await revealCopiedEntry(`[data-system-modifier="${created.id}"]`);
   }
 
-  const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
+  // The Checks screen's read-only modifier card links here. Expanding the section and
+  // scrolling it into view is the whole of the deep link: without it the GM arrives on a
+  // long Settings tab with the section they asked for possibly collapsed and certainly
+  // off-screen, which is a navigation that lands nowhere in particular.
+  let appliedSectionNonce = $state(-1);
+  $effect(() => {
+    if (requestedSectionNonce === appliedSectionNonce) return;
+    appliedSectionNonce = requestedSectionNonce;
+    if (requestedSectionNonce <= 0) return;
+    activeTab = 'settings';
+    expandSection('modifiers');
+    void revealCopiedEntry('[data-system-modifiers]');
+  });
+
+  // The bounds field labels, derived once: `stepperLabels` composes the two adjunct names
+  // from the input's own name, so the three must come from one string rather than three
+  // call-site literals that could drift.
+  const modifierMinLabel = $derived(text('FABRICATE.Admin.Manager.Modifiers.Min', 'Minimum'));
+  const modifierMaxLabel = $derived(text('FABRICATE.Admin.Manager.Modifiers.Max', 'Maximum'));
+  const modifierUnboundedLabel = $derived(
+    text('FABRICATE.Admin.Manager.Modifiers.BoundsUnbounded', 'Unbounded')
+  );
+  // A `$derived` rather than a template `{@const}`: the Modifiers section is no longer
+  // wrapped in an `{#if}`, and `{@const}` is only legal as the immediate child of a block.
+  const modifiersCollapsed = $derived(isSectionCollapsed('modifiers'));
   const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
+  // Travel & Realms is meaningful only to a gathering system: everything the toggle governs —
+  // location-gated environment access, the environment realm controls, party realm overrides —
+  // is a gathering affordance. It moved here from the Gathering Settings tab (issue 1282),
+  // which carried the same gate implicitly.
+  const gatheringFeatureEnabled = $derived(selectedSystem?.features?.gathering === true);
+  const gatheringRealmsEnabled = $derived(selectedSystem?.gatheringRealmSettings?.enabled === true);
   // Time requirements default ON (issue 714): an absent flag reads as enabled, so only
   // an explicit GM opt-out (`enabled === false`) turns the toggle off.
   const timeRequirementsEnabled = $derived(selectedSystem?.requirements?.time?.enabled !== false);
 
   async function handleToggleCurrency() {
     await onToggleCurrency(!currencyEnabled);
+  }
+
+  async function handleToggleGatheringRealms() {
+    await onToggleGatheringRealms(!gatheringRealmsEnabled);
   }
 
   async function handleToggleTime() {
@@ -388,155 +315,102 @@
   // A system with no registered provider has nothing to drive the actorInventory strategy: the
   // resolved provider id is empty and its canonical ladder is empty. The store guards against
   // wiping the GM's units, and the editor surfaces a steer-to-macro callout in that case.
-  const currencyHasProviders = $derived(currencyProviderOptions.length > 0);
 
-  // Show the provider select only under the actorInventory strategy on a system that ships a
-  // provider; otherwise the actorInventory branch renders the no-provider callout.
-  const currencyShowProviderBranch = $derived(
-    currencySpendStrategy === 'actorInventory' && currencyHasProviders
-  );
-
-  // Under the actorInventory strategy the selected provider owns the denomination ladder, so
-  // currency units are provider-managed and read-only — editing them would desync the engine's
-  // affordability/baseValue math from the system's real coin values. A no-provider system is never
-  // read-only because its units stay GM-owned.
-  const currencyUnitsReadOnly = $derived(currencyShowProviderBranch);
-
-  // Under the macro strategy the configured macros own all conversion via unit abbreviations, so a
-  // unit's `contains` breakdown is unused. The per-unit editor collapses to label/abbreviation/icon
-  // and the whole sub-unit section (heading, add control, chips, warnings) is removed. Sub-units
-  // only drive the engine under actorProperty (their `contains` feeds base-value and change-making).
-  const currencyMacroMode = $derived(currencySpendStrategy === 'macro');
-
-  function currencyProviderLabel() {
-    const match = currencyProviderOptions.find((option) => option.id === currencyProviderId);
-    return match?.label || text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider');
+  // Asked of the SHARED predicate (issue 1117), not of a local pattern. Two patterns lived
+  // in the repo while two libraries did, and they were complementary rather than
+  // duplicates — one matched `1d6` and missed `d20`, the other the reverse — so one library
+  // with two readers would have disagreed about whether the same entry rolls. The
+  // normalizer derives `isRollExpression` from the same function, so the chip below and the
+  // persisted flag can never differ.
+  function modifierIsRoll(entry) {
+    return Boolean(entry?.expression) && isRollExpression(entry.expression);
   }
 
-  function currencyProviderManagedHint() {
-    return localize('FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedHint', {
-      provider: currencyProviderLabel(),
-    });
+  // The read-only bounds chip, e.g. `-1 to +5`. Signed on BOTH ends: a modifier is a signed
+  // contribution, so a bare `5` reads as a value rather than as a bonus. The two
+  // half-bounded readings are separate sentences because "at most" and "at least" are not
+  // the same promise, and an unbounded entry renders no chip rather than the word
+  // "unbounded" on every row of a library that mostly is.
+  function modifierBoundsChip(entry) {
+    const { min, max } = resolveModifierBounds(entry);
+    if (min === null && max === null) return '';
+    const signed = (value) => (value < 0 ? `${value}` : `+${value}`);
+    if (min !== null && max !== null) return `${signed(min)} to ${signed(max)}`;
+    if (max !== null) {
+      return `${text('FABRICATE.Admin.Manager.Modifiers.BoundsAtMost', 'At most')} ${signed(max)}`;
+    }
+    return `${text('FABRICATE.Admin.Manager.Modifiers.BoundsAtLeast', 'At least')} ${signed(min)}`;
   }
 
-  // The strategy select renders one shared hint that reflects the selected strategy, so the GM
-  // sees the actor-data-path / actor-inventory / macro guidance inline as they switch.
-  function currencySpendStrategyHint() {
-    const option =
-      CURRENCY_SPEND_STRATEGY_OPTIONS.find((entry) => entry.value === currencySpendStrategy) ||
-      CURRENCY_SPEND_STRATEGY_OPTIONS[0];
-    return text(option.hintKey, option.hintFallback);
-  }
-
-  function characterModifierIsRoll(entry) {
-    return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
+  // Which BLOCKING bounds fault this entry has, or `''`. Both make the entry contribute 0 to
+  // a check until repaired, matching the refuse posture gathering's drop modifiers already
+  // take; the Checks Validation section reports the same two facts as
+  // `modifierBoundsInverted` / `modifierBoundsUnsafe`, both `critical`. TWO CAUSES, TWO
+  // SENTENCES: "your minimum is above your maximum" and "this number cannot appear in a roll
+  // formula" need different repairs, and `1e21` is not an inversion.
+  function modifierBoundsFault(entry) {
+    const bounds = resolveModifierBounds(entry);
+    if (bounds.inverted) return 'inverted';
+    return bounds.unsafe ? 'unsafe' : '';
   }
 
   // The collapsed summary row shows the expression with its leading `@` sigil
   // stripped for a cleaner inline read (the raw `@`-prefixed value stays in the
   // editor's Expression field — only the DISPLAY strips it).
-  function characterModifierExpressionDisplay(entry) {
-    return stripExpressionSigil(entry?.expression);
+  // VERBATIM, sigil included. It stripped the leading `@` while the editor below rendered that
+  // sigil as a separate cap, so the list and the field agreed. The field is a plain input now
+  // (maintainer ruling) and the GM writes the `@` themselves, so a list that hides it would be
+  // showing a value nobody typed — and hiding, on the one screen that teaches the requirement,
+  // exactly the character the requirement is about.
+  //
+  // `stripExpressionSigil` itself is untouched: the prerequisite copy path derives a `path`
+  // from an expression through it, and that transform is unrelated to how a list reads.
+  function modifierExpressionDisplay(entry) {
+    return String(entry?.expression ?? '').trim();
   }
 
-  async function handleAddCharacterModifier() {
-    const entry = await onAddCharacterModifier();
-    if (entry?.id) characterModifierEditingId = entry.id;
+  async function handleAddModifier() {
+    const entry = await onAddModifier();
+    if (entry?.id) modifierEditingId = entry.id;
   }
 
-  async function handleDeleteCharacterModifier(modifierId) {
-    await onDeleteCharacterModifier(modifierId);
-    if (characterModifierEditingId === modifierId) characterModifierEditingId = '';
+  async function handleDeleteModifier(modifierId) {
+    await onDeleteModifier(modifierId);
+    if (modifierEditingId === modifierId) modifierEditingId = '';
   }
 
-  async function handleAddCurrencyUnit() {
-    const unit = await onAddCurrencyUnit();
-    if (unit?.id) currencyExpandedUnitId = unit.id;
+  // `Stepper` reports a clamped number, or `null` when an `allowUnset` field is cleared.
+  // `null` is written as an EXPLICIT key rather than dropped, because absence IS the
+  // "unbounded" value: clearing the field has to be able to REMOVE an existing bound, and a
+  // patch that omitted the key would leave the old one in place. The normalizer attaches the
+  // key only for a finite number, so a `null` round-trips to key-absent.
+  function handleModifierBound(modifierId, key, next) {
+    onUpdateModifier(modifierId, { [key]: next });
   }
 
-  async function handleDeleteCurrencyUnit(unitId) {
-    await onDeleteCurrencyUnit(unitId);
-    if (currencyExpandedUnitId === unitId) currencyExpandedUnitId = '';
-  }
+  // The expression field's roll-data suggestion chips (issue 1096). Derived from the ACTIVE
+  // world rather than written out here — see `modifierExpressionSuggestions.js` for why a
+  // hard-coded row would be wrong in every system but one.
+  const modifierExpressionSuggestions = $derived(getModifierExpressionSuggestions(foundrySystemId));
 
-  function currencyUnitLabel(unitId) {
-    const unit = currencyUnits.find((entry) => entry.id === unitId);
-    return unit?.label || unit?.abbreviation || unitId;
+  // Appending, not replacing: the chips build up a compound expression. The caret is left at
+  // the end of the field the GM is editing so the next keystroke continues the expression
+  // instead of landing wherever focus happened to be — a chip that silently steals focus to
+  // nowhere is worse than no chip. The DOM lookup is scoped to the clicked chip's OWN editor
+  // body, so an open second row is never touched.
+  async function handleModifierSuggestion(event, entry, term) {
+    const input = event.currentTarget
+      ?.closest('[data-system-modifier-editor]')
+      ?.querySelector('[data-system-modifier-field="expression"]');
+    await onUpdateModifier(entry.id, {
+      expression: appendModifierExpressionTerm(entry.expression, term),
+    });
+    await tick();
+    if (!input) return;
+    input.focus();
+    const caret = input.value.length;
+    input.setSelectionRange?.(caret, caret);
   }
-
-  function currencyUnitIcon(unitId) {
-    const unit = currencyUnits.find((entry) => entry.id === unitId);
-    return unit?.icon || 'fa-solid fa-coins';
-  }
-
-  // Mirror of canAddCurrencySubUnit in src/systems/currencyProfile.js: a unit (plus everything it
-  // transitively contains) reachable from the parent and from the child must be disjoint, or adding
-  // the edge would give the parent two conversion paths to some node.
-  function currencyReachableUnitIds(startUnitId) {
-    // Function-local graph-walk scratch, discarded when the function returns.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const reachable = new Set();
-    const stack = [startUnitId];
-    while (stack.length > 0) {
-      const currentId = stack.pop();
-      if (!currentId || reachable.has(currentId)) continue;
-      reachable.add(currentId);
-      const unit = currencyUnits.find((entry) => entry.id === currentId);
-      for (const contained of unit?.contains || []) {
-        stack.push(contained.unitId);
-      }
-    }
-    return reachable;
-  }
-
-  function currencyCanAddSubUnit(parentUnitId, subUnitId) {
-    if (!parentUnitId || !subUnitId || parentUnitId === subUnitId) return false;
-    const parent = currencyUnits.find((entry) => entry.id === parentUnitId);
-    const child = currencyUnits.find((entry) => entry.id === subUnitId);
-    if (!parent || !child) return false;
-    const parentReachable = currencyReachableUnitIds(parentUnitId);
-    const childReachable = currencyReachableUnitIds(subUnitId);
-    for (const id of childReachable) {
-      if (parentReachable.has(id)) return false;
-    }
-    return true;
-  }
-
-  function currencyUnitSubUnitOptions(unitId) {
-    return currencyUnits
-      .filter((entry) => currencyCanAddSubUnit(unitId, entry.id))
-      .map((entry) => ({
-        id: entry.id,
-        label: entry.label || entry.id,
-        abbreviation: entry.abbreviation || '',
-      }));
-  }
-
-  function currencySelectedSubUnit(unitId) {
-    const options = currencyUnitSubUnitOptions(unitId);
-    const selected = currencySubUnitSelections[unitId] || '';
-    return options.some((option) => option.id === selected) ? selected : options[0]?.id || '';
-  }
-
-  function updateCurrencySubUnitSelection(unitId, value) {
-    currencySubUnitSelections = { ...currencySubUnitSelections, [unitId]: value };
-  }
-
-  async function handleAddCurrencySubUnit(unitId) {
-    const subUnitId = currencySelectedSubUnit(unitId);
-    if (!subUnitId) return;
-    await onAddCurrencySubUnit(unitId, subUnitId);
-    updateCurrencySubUnitSelection(unitId, '');
-  }
-
-  $effect(() => {
-    if (
-      currencyExpandedUnitId &&
-      !currencyUnits.some((unit) => unit.id === currencyExpandedUnitId)
-    ) {
-      currencyExpandedUnitId = '';
-    }
-  });
 
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
@@ -986,309 +860,522 @@
                       <small
                         >{text(
                           'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency',
-                          'Enables step currency requirements and the currency configuration for this system.'
+                          "Lets this system's recipes charge the world's currency. Configure the coins under World > Currency."
                         )}</small
                       >
                     </div>
                   </div>
+                  {#if gatheringFeatureEnabled}
+                    <div class="manager-feature-tile" data-feature-key="gatheringRealms">
+                      <span
+                        class={`manager-feature-tile-icon ${gatheringRealmsEnabled ? 'is-on' : 'is-off'}`}
+                        aria-hidden="true"><i class="fas fa-route"></i></span
+                      >
+                      <div class="manager-feature-tile-body">
+                        <div class="manager-feature-tile-head">
+                          <strong
+                            >{text(
+                              'FABRICATE.Admin.Manager.Feature.GatheringRealms',
+                              'Travel & Realms'
+                            )}</strong
+                          >
+                          <button
+                            type="button"
+                            class={`manager-status-toggle ${gatheringRealmsEnabled ? 'is-on' : 'is-off'}`}
+                            aria-pressed={gatheringRealmsEnabled}
+                            aria-label={text(
+                              'FABRICATE.Admin.Manager.Feature.GatheringRealms',
+                              'Travel & Realms'
+                            )}
+                            data-gathering-realm-toggle
+                            onclick={handleToggleGatheringRealms}
+                          >
+                            <span class="manager-status-toggle-track" aria-hidden="true"
+                              ><span class="manager-status-toggle-knob"></span></span
+                            >
+                            <span class="manager-status-toggle-label"
+                              >{gatheringRealmsEnabled
+                                ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                                : text(
+                                    'FABRICATE.Admin.Manager.SystemEdit.FeatureOff',
+                                    'Off'
+                                  )}</span
+                            >
+                          </button>
+                        </div>
+                        <small
+                          >{text(
+                            'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.GatheringRealms',
+                            "Gates this system's environments on where the party is, and gives them realm controls. Realms themselves are authored under World > Travel and shared by every system that turns this on."
+                          )}</small
+                        >
+                      </div>
+                    </div>
+                  {/if}
                 </div>
               </section>
 
-              {#if gatheringEnabled}
-                {@const modifiersCollapsed = isSectionCollapsed('modifiers')}
-                <section
-                  class="manager-edit-card manager-character-modifier-card"
-                  class:is-section-collapsed={modifiersCollapsed}
-                  data-system-character-modifiers
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title',
-                    'Character modifiers'
-                  )}
-                >
-                  <header class="manager-character-modifier-card-header">
-                    <button
-                      type="button"
-                      class="manager-section-collapse-toggle"
-                      aria-expanded={!modifiersCollapsed}
-                      aria-controls="manager-section-body-modifiers"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
-                        'Collapse or expand this section'
-                      )}
-                      data-section-collapse="modifiers"
-                      onclick={() => toggleSectionCollapsed('modifiers')}
-                    >
-                      <i
-                        class={`fa-solid ${modifiersCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`}
-                        aria-hidden="true"
-                      ></i>
-                    </button>
-                    <div class="manager-character-modifier-card-header-copy">
-                      <h3 class="manager-card-title">
-                        <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title',
-                          'Character modifiers'
-                        )}
-                      </h3>
-                      <p class="manager-muted">
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Hint',
-                          "Define reusable actor-driven modifiers for this system's d100 gathering rows and events."
-                        )}
-                      </p>
-                    </div>
-                    <div class="manager-character-modifier-card-header-actions">
-                      <button
-                        type="button"
-                        class="manager-button is-primary"
-                        onclick={handleAddCharacterModifier}
-                      >
-                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Add',
-                          'Add character modifier'
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        class="manager-button"
-                        disabled={!characterModifierPresetsSupported}
-                        data-tooltip={!characterModifierPresetsSupported
-                          ? text(
-                              'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.SeedPresetsUnsupported',
-                              'Preset seeding is only available for dnd5e or pf2e worlds.'
-                            )
-                          : null}
-                        onclick={onSeedCharacterModifierPresets}
-                      >
-                        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.SeedPresets',
-                          'Seed presets'
-                        )}
-                      </button>
-                    </div>
-                  </header>
-                  {#if !modifiersCollapsed}
-                    <div id="manager-section-body-modifiers" class="manager-section-body">
-                      {#if characterModifierLibrary.length === 0}
-                        <EmptyState
-                          compact
-                          icon="fas fa-sliders"
-                          title={text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty',
-                            'No character modifiers yet.'
-                          )}
-                        />
-                      {:else}
-                        <ul class="manager-character-modifier-list">
-                          {#each characterModifierLibrary as entry, index (entry.id)}
-                            {@const modifierOpen = characterModifierEditingId === entry.id}
-                            {@const modifierExpression = characterModifierExpressionDisplay(entry)}
-                            <li
-                              class="manager-modifier-item"
-                              class:is-open={modifierOpen}
-                              data-system-character-modifier={entry.id}
-                            >
-                              <div class="manager-modifier-header">
-                                <button
-                                  type="button"
-                                  class="manager-modifier-summary"
-                                  aria-expanded={modifierOpen}
-                                  aria-controls={`character-modifier-body-${entry.id}`}
-                                  data-toggle-character-modifier
-                                  onclick={() =>
-                                    (characterModifierEditingId = modifierOpen ? '' : entry.id)}
-                                >
-                                  <i
-                                    class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`}
-                                    aria-hidden="true"
-                                  ></i>
-                                  <span class="manager-modifier-icon"
-                                    ><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"
-                                    ></i></span
-                                  >
-                                  <span class="manager-modifier-label">{entry.label}</span>
-                                  {#if characterModifierIsRoll(entry)}
-                                    <Chip class="manager-character-modifier-roll-tag"
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag',
-                                        'Roll'
-                                      )}</Chip
-                                    >
-                                  {/if}
-                                  {#if modifierExpression}
-                                    <span
-                                      class="manager-modifier-expression"
-                                      data-character-modifier-expression
-                                    >
-                                      <i class="fa-solid fa-arrow-right-long" aria-hidden="true"
-                                      ></i>
-                                      {modifierExpression}
-                                    </span>
-                                  {/if}
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                    'Move up'
-                                  )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                    'Move up'
-                                  )}
-                                  data-move-modifier-up={entry.id}
-                                  disabled={index === 0}
-                                  onclick={() =>
-                                    reorderList(
-                                      onReorderCharacterModifier,
-                                      index,
-                                      -1,
-                                      entry.label,
-                                      characterModifierLibrary.length
-                                    )}
-                                >
-                                  <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                    'Move down'
-                                  )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                    'Move down'
-                                  )}
-                                  data-move-modifier-down={entry.id}
-                                  disabled={index === characterModifierLibrary.length - 1}
-                                  onclick={() =>
-                                    reorderList(
-                                      onReorderCharacterModifier,
-                                      index,
-                                      1,
-                                      entry.label,
-                                      characterModifierLibrary.length
-                                    )}
-                                >
-                                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
-                                    'Copy to prerequisites'
-                                  )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
-                                    'Copy to prerequisites'
-                                  )}
-                                  data-copy-to-prerequisite={entry.id}
-                                  onclick={() => handleCopyModifierToPrerequisite(entry)}
-                                >
-                                  <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button is-danger"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete',
-                                    'Delete character modifier'
-                                  )}
-                                  onclick={() => handleDeleteCharacterModifier(entry.id)}
-                                >
-                                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                                </button>
-                              </div>
+              <!-- ── The ONE modifier library (issue 1117) ──────────────────────────────
+                   Until this change a system authored modifiers TWICE: here, gated on the
+                   gathering feature, and again on the Checks screen. The two shapes were
+                   near-identical and the split was an accident of where each feature landed
+                   rather than a distinction in the domain, so they merged. This section is
+                   now the only surface that adds, edits, reorders, seeds or deletes an
+                   entry, and the Checks screen selects over what is authored here.
 
-                              {#if modifierOpen}
-                                <div
-                                  class="manager-modifier-body manager-character-modifier-editor"
-                                  id={`character-modifier-body-${entry.id}`}
+                   IT IS NOT GATED ON GATHERING. The old gate was correct while the library
+                   only fed d100 drop rows; a check modifier feeds a crafting or salvage
+                   roll, so gating the only authoring surface on an unrelated feature flag
+                   would make those unauthorable. -->
+              <section
+                class="manager-edit-card manager-character-modifier-card"
+                class:is-section-collapsed={modifiersCollapsed}
+                data-system-modifiers
+                aria-label={text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+              >
+                <header class="manager-character-modifier-card-header">
+                  <button
+                    type="button"
+                    class="manager-section-collapse-toggle"
+                    aria-expanded={!modifiersCollapsed}
+                    aria-controls="manager-section-body-modifiers"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
+                      'Collapse or expand this section'
+                    )}
+                    data-section-collapse="modifiers"
+                    onclick={() => toggleSectionCollapsed('modifiers')}
+                  >
+                    <i
+                      class={`fa-solid ${modifiersCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`}
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                  <div class="manager-character-modifier-card-header-copy">
+                    <h3 class="manager-card-title">
+                      <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+                    </h3>
+                    <p class="manager-muted">
+                      {text(
+                        'FABRICATE.Admin.Manager.Modifiers.Hint',
+                        'Reusable actor-driven modifiers for this system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.'
+                      )}
+                    </p>
+                  </div>
+                  <!-- Both header verbs go through the shared primitive (issue 1096). `Add
+                       modifier` keeps its primary role; `Seed presets` stays NEUTRAL, which
+                       is what its bare `manager-button` already rendered — this change fixes
+                       the sites that carried no role by mistake, not the ones that are
+                       deliberately quiet. -->
+                  <div class="manager-character-modifier-card-header-actions">
+                    <ManagerButton role="primary" onclick={handleAddModifier}>
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.Add', 'Add modifier')}
+                    </ManagerButton>
+                    <ManagerButton
+                      disabled={!modifierPresetsSupported}
+                      data-tooltip={!modifierPresetsSupported
+                        ? text(
+                            'FABRICATE.Admin.Manager.Modifiers.SeedPresetsUnsupported',
+                            'Preset seeding is only available for dnd5e or pf2e worlds.'
+                          )
+                        : null}
+                      onclick={onSeedModifierPresets}
+                    >
+                      <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.SeedPresets', 'Seed presets')}
+                    </ManagerButton>
+                  </div>
+                </header>
+                {#if !modifiersCollapsed}
+                  <div id="manager-section-body-modifiers" class="manager-section-body">
+                    {#if modifierLibrary.length === 0}
+                      <EmptyState
+                        compact
+                        icon="fas fa-sliders"
+                        title={text('FABRICATE.Admin.Manager.Modifiers.Empty', 'No modifiers yet.')}
+                      />
+                    {:else}
+                      <ul class="manager-character-modifier-list">
+                        {#each modifierLibrary as entry, index (entry.id)}
+                          {@const modifierOpen = modifierEditingId === entry.id}
+                          {@const modifierExpression = modifierExpressionDisplay(entry)}
+                          {@const boundsChip = modifierBoundsChip(entry)}
+                          {@const boundsFault = modifierBoundsFault(entry)}
+                          <li
+                            class="manager-modifier-item"
+                            class:is-open={modifierOpen}
+                            data-system-modifier={entry.id}
+                          >
+                            <div class="manager-modifier-header">
+                              <button
+                                type="button"
+                                class="manager-modifier-summary"
+                                aria-expanded={modifierOpen}
+                                aria-controls={`system-modifier-body-${entry.id}`}
+                                data-toggle-modifier
+                                onclick={() => (modifierEditingId = modifierOpen ? '' : entry.id)}
+                              >
+                                <i
+                                  class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`}
+                                  aria-hidden="true"
+                                ></i>
+                                <span class="manager-modifier-icon"
+                                  ><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"
+                                  ></i></span
                                 >
-                                  <div class="manager-modifier-name-row">
-                                    <div class="manager-field manager-modifier-icon-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon',
-                                          'Icon'
-                                        )}</span
-                                      >
-                                      <IconPicker
-                                        value={entry.icon || 'fa-solid fa-user'}
-                                        buttonTitle={text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ChangeIcon',
-                                          'Change icon'
-                                        )}
-                                        onChange={(iconClass) =>
-                                          onUpdateCharacterModifier(entry.id, { icon: iconClass })}
-                                      />
-                                    </div>
-                                    <label class="manager-field manager-modifier-label-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label',
-                                          'Label'
-                                        )}</span
-                                      >
-                                      <input
-                                        type="text"
-                                        value={entry.label}
-                                        oninput={(event) =>
-                                          onUpdateCharacterModifier(entry.id, {
-                                            label: event.currentTarget.value,
-                                          })}
-                                      />
-                                    </label>
-                                  </div>
-                                  <label class="manager-field">
+                                <span class="manager-modifier-label">{entry.label}</span>
+                                {#if modifierIsRoll(entry)}
+                                  <Chip class="manager-character-modifier-roll-tag"
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.RollTag',
+                                      'Roll'
+                                    )}</Chip
+                                  >
+                                {/if}
+                                {#if boundsChip}
+                                  <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
+                                    >{boundsChip}</Chip
+                                  >
+                                {/if}
+                                {#if modifierExpression}
+                                  <span
+                                    class="manager-modifier-expression"
+                                    data-modifier-expression
+                                  >
+                                    <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                                    {modifierExpression}
+                                  </span>
+                                {/if}
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
+                                  'Move up'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
+                                  'Move up'
+                                )}
+                                data-move-modifier-up={entry.id}
+                                disabled={index === 0}
+                                onclick={() =>
+                                  reorderList(
+                                    onReorderModifier,
+                                    index,
+                                    -1,
+                                    entry.label,
+                                    modifierLibrary.length
+                                  )}
+                              >
+                                <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
+                                  'Move down'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
+                                  'Move down'
+                                )}
+                                data-move-modifier-down={entry.id}
+                                disabled={index === modifierLibrary.length - 1}
+                                onclick={() =>
+                                  reorderList(
+                                    onReorderModifier,
+                                    index,
+                                    1,
+                                    entry.label,
+                                    modifierLibrary.length
+                                  )}
+                              >
+                                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
+                                  'Copy to prerequisites'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
+                                  'Copy to prerequisites'
+                                )}
+                                data-copy-to-prerequisite={entry.id}
+                                onclick={() => handleCopyModifierToPrerequisite(entry)}
+                              >
+                                <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button is-danger"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.Modifiers.Delete',
+                                  'Delete modifier'
+                                )}
+                                onclick={() => handleDeleteModifier(entry.id)}
+                              >
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                              </button>
+                            </div>
+
+                            {#if boundsFault}
+                              <!-- Reported on the COLLAPSED row too, not only inside the open
+                                   editor: an entry that contributes nothing is a fault the GM
+                                   has to be able to see while scanning the list, and the
+                                   Checks Validation section reports the same two ids. -->
+                              <p
+                                class="manager-modifier-bounds-error"
+                                role="note"
+                                data-system-modifier-bounds-invalid={entry.id}
+                                data-system-modifier-bounds-cause={boundsFault}
+                              >
+                                {#if boundsFault === 'inverted'}
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsInverted',
+                                    'This modifier’s minimum is above its maximum, so it contributes nothing at all until you fix the two values.'
+                                  )}
+                                {:else}
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsUnsafe',
+                                    'This modifier’s bound is too large or too small to appear in a roll formula, so it contributes nothing until you fix it.'
+                                  )}
+                                {/if}
+                              </p>
+                            {/if}
+
+                            {#if modifierOpen}
+                              <div
+                                class="manager-modifier-body manager-character-modifier-editor"
+                                id={`system-modifier-body-${entry.id}`}
+                                data-system-modifier-editor={entry.id}
+                              >
+                                <!-- Icon, label, minimum and maximum on ONE line, ahead of the
+                                     expression (issue 1096, maintainer round). The four are the
+                                     entry's short scalars; the expression is the one field whose
+                                     content is long, so it gets the full width below them rather
+                                     than competing with three neighbours for it. The row wraps
+                                     at narrow manager widths — the bounds pair wraps as a UNIT,
+                                     because a min separated from its max reads as two unrelated
+                                     fields. -->
+                                <div class="manager-modifier-name-row">
+                                  <div class="manager-field manager-modifier-icon-field">
                                     <span
                                       >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
-                                        'Expression'
+                                        'FABRICATE.Admin.Manager.Modifiers.Icon',
+                                        'Icon'
+                                      )}</span
+                                    >
+                                    <IconPicker
+                                      value={entry.icon || 'fa-solid fa-user'}
+                                      buttonTitle={text(
+                                        'FABRICATE.Admin.Manager.Modifiers.ChangeIcon',
+                                        'Change icon'
+                                      )}
+                                      onChange={(iconClass) =>
+                                        onUpdateModifier(entry.id, { icon: iconClass })}
+                                    />
+                                  </div>
+                                  <label class="manager-field manager-modifier-label-field">
+                                    <span
+                                      >{text(
+                                        'FABRICATE.Admin.Manager.Modifiers.Label',
+                                        'Label'
                                       )}</span
                                     >
                                     <input
                                       type="text"
-                                      value={entry.expression}
+                                      data-system-modifier-field="label"
+                                      value={entry.label}
                                       oninput={(event) =>
-                                        onUpdateCharacterModifier(entry.id, {
-                                          expression: event.currentTarget.value,
+                                        onUpdateModifier(entry.id, {
+                                          label: event.currentTarget.value,
                                         })}
                                     />
                                   </label>
-                                  <div class="manager-character-modifier-actions">
-                                    <button
-                                      type="button"
-                                      class="manager-button"
-                                      onclick={() => (characterModifierEditingId = '')}
-                                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
-                                    >
-                                    <button
-                                      type="button"
-                                      class="manager-button is-danger"
-                                      onclick={() => handleDeleteCharacterModifier(entry.id)}
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete',
-                                        'Delete character modifier'
-                                      )}</button
-                                    >
+                                  <!-- The bounds pair rides the SAME line as icon and label
+                                       since issue 1096. It keeps its own wrapper — and its own
+                                       `data-system-modifier-bounds` hook — so the two steppers
+                                       stay one flex item and wrap together, and so the View Lab
+                                       case that anchors on that hook still resolves. -->
+                                  <div
+                                    class="manager-modifier-bounds-row"
+                                    data-system-modifier-bounds={entry.id}
+                                  >
+                                    <div class="manager-field manager-modifier-bound-field">
+                                      <span class="manager-recipe-micro-label"
+                                        >{modifierMinLabel}</span
+                                      >
+                                      <Stepper
+                                        value={resolveModifierBounds(entry).min}
+                                        allowUnset
+                                        fill
+                                        placeholder={modifierUnboundedLabel}
+                                        {...stepperLabels(modifierMinLabel)}
+                                        inputProps={{ 'data-system-modifier-field': 'min' }}
+                                        onChange={(next) =>
+                                          handleModifierBound(entry.id, 'min', next)}
+                                      />
+                                    </div>
+                                    <div class="manager-field manager-modifier-bound-field">
+                                      <span class="manager-recipe-micro-label"
+                                        >{modifierMaxLabel}</span
+                                      >
+                                      <Stepper
+                                        value={resolveModifierBounds(entry).max}
+                                        allowUnset
+                                        fill
+                                        placeholder={modifierUnboundedLabel}
+                                        {...stepperLabels(modifierMaxLabel)}
+                                        inputProps={{ 'data-system-modifier-field': 'max' }}
+                                        onChange={(next) =>
+                                          handleModifierBound(entry.id, 'max', next)}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                              {/if}
-                            </li>
-                          {/each}
-                        </ul>
-                      {/if}
-                    </div>
-                  {/if}
-                </section>
-              {/if}
+                                <!-- The bounds hint sits DIRECTLY under the bounds it explains
+                                     (issue 1096, maintainer round). Below the expression and its
+                                     suggestion chips it read as a note about the expression,
+                                     which is the one thing it says nothing about. -->
+                                <p class="manager-muted manager-modifier-bounds-hint">
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsHint',
+                                    'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
+                                  )}
+                                </p>
+                                <label class="manager-field">
+                                  <span
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.Expression',
+                                      'Expression'
+                                    )}</span
+                                  >
+                                  <!-- A PLAIN input: no `@` cap, no stripping, no re-prepending
+                                       (maintainer ruling). The affix was written when an
+                                       expression was always a roll-data path; dice made it
+                                       wrong, because a cap that prepends `@` to whatever is
+                                       typed turns `1d4` into `@1d4`. The adaptive compromise
+                                       that shipped — cap present only while the value is a
+                                       single `@`-path — restructures the field as the GM
+                                       types, and the ruling is against it.
+
+                                       So the leading `@` is now the GM's to write, and the
+                                       PLACEHOLDER has to teach that: it read
+                                       `abilities.med.mod`, which modelled an expression that
+                                       would not resolve. -->
+                                  <RollDataExpressionInput
+                                    dataField="system-modifier"
+                                    inputAttrs={{ 'data-system-modifier-field': 'expression' }}
+                                    value={entry.expression}
+                                    placeholder="@abilities.med.mod"
+                                    sigil={false}
+                                    onChange={(expression) =>
+                                      onUpdateModifier(entry.id, { expression })}
+                                  />
+                                  <small class="manager-muted" data-system-modifier-expression-hint>
+                                    {text(
+                                      'FABRICATE.Admin.Manager.Modifiers.ExpressionHint',
+                                      'A character-data path needs its leading @ — for example @abilities.med.mod. A number or a dice expression does not: write 2 or 1d4 as-is.'
+                                    )}
+                                  </small>
+                                </label>
+                                {#if modifierExpressionSuggestions.length > 0}
+                                  <!-- Roll-data suggestion chips (issue 1096). Each APPENDS its
+                                       term to the expression above rather than replacing it, so
+                                       a GM builds `@abilities.wis.mod + 1d4` by clicking twice.
+                                       The system-specific chips come from the active world's
+                                       preset bundle — the same derivation `Seed presets` uses —
+                                       so a chip can never offer a path this world does not
+                                       define. -->
+                                  <div
+                                    class="manager-modifier-expression-suggestions"
+                                    data-system-modifier-suggestions={entry.id}
+                                    aria-label={text(
+                                      'FABRICATE.Admin.Manager.Modifiers.SuggestionsLabel',
+                                      'Add a term to this expression'
+                                    )}
+                                  >
+                                    {#each modifierExpressionSuggestions as suggestion (suggestion.id)}
+                                      <button
+                                        type="button"
+                                        class="manager-tag-suggestion manager-modifier-expression-suggestion"
+                                        data-system-modifier-suggestion={suggestion.id}
+                                        title={suggestion.label}
+                                        onclick={(event) =>
+                                          handleModifierSuggestion(
+                                            event,
+                                            entry,
+                                            suggestion.expression
+                                          )}
+                                      >
+                                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                        <span>{suggestion.expression}</span>
+                                      </button>
+                                    {/each}
+                                  </div>
+                                {/if}
+                                {#if modifierIsRoll(entry)}
+                                  <!-- A roll-shaped expression is legal EVERYWHERE (issue
+                                       1118): a drop row applies its result and a check
+                                       appends the dice to its formula. The note stays because
+                                       two consequences are worth stating where the expression
+                                       is authored — the dice are rolled once with the check
+                                       and shown on the card, and a competing rule ranks this
+                                       entry by its average. It carries the shared muted
+                                       note class rather than the fault class the two BLOCKING
+                                       bounds problems use, because nothing here is wrong. -->
+                                  <p
+                                    class="manager-muted"
+                                    role="note"
+                                    data-system-modifier-roll-note={entry.id}
+                                  >
+                                    {text(
+                                      'FABRICATE.Admin.Manager.Modifiers.RollNote',
+                                      'This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average.'
+                                    )}
+                                  </p>
+                                {/if}
+                                <!-- THE REPORTED DEFECT (issue 1096). Both verbs carried a BARE
+                                     `manager-button`: `Delete modifier` was painted as a
+                                     neutral action while the identical verb in the Tool Studio
+                                     is danger, and neither matched the studio's label scale.
+                                     The roles are copied from `ToolEditView`'s header — its
+                                     `Delete` is `danger` and its `Back to tools` is `ghost` —
+                                     rather than chosen here. -->
+                                <div class="manager-character-modifier-actions">
+                                  <ManagerButton
+                                    role="ghost"
+                                    data-system-modifier-done={entry.id}
+                                    onclick={() => (modifierEditingId = '')}
+                                    >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
+                                  >
+                                  <ManagerButton
+                                    role="danger"
+                                    data-system-modifier-delete={entry.id}
+                                    onclick={() => handleDeleteModifier(entry.id)}
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.Delete',
+                                      'Delete modifier'
+                                    )}</ManagerButton
+                                  >
+                                </div>
+                              </div>
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {/if}
+              </section>
 
               <CharacterPrerequisitesCard
                 library={characterPrerequisiteLibrary}
@@ -1303,704 +1390,10 @@
                 onSeedPresets={onSeedCharacterPrerequisitePresets}
                 collapsed={isSectionCollapsed('prerequisites')}
                 onToggleCollapsed={() => toggleSectionCollapsed('prerequisites')}
-                onCopyToModifier={gatheringEnabled ? handleCopyPrerequisiteToModifier : null}
+                onCopyToModifier={handleCopyPrerequisiteToModifier}
                 requestOpenId={prereqRequestOpenId}
                 requestOpenNonce={prereqRequestOpenNonce}
               />
-
-              {#if currencyEnabled}
-                {@const currencyCollapsed = isSectionCollapsed('currency')}
-                <section
-                  class="manager-edit-card manager-currency-unit-card"
-                  class:is-section-collapsed={currencyCollapsed}
-                  data-system-currency-units
-                  aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}
-                >
-                  <header class="manager-character-modifier-card-header">
-                    <button
-                      type="button"
-                      class="manager-section-collapse-toggle"
-                      aria-expanded={!currencyCollapsed}
-                      aria-controls="manager-section-body-currency"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
-                        'Collapse or expand this section'
-                      )}
-                      data-section-collapse="currency"
-                      onclick={() => toggleSectionCollapsed('currency')}
-                    >
-                      <i
-                        class={`fa-solid ${currencyCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`}
-                        aria-hidden="true"
-                      ></i>
-                    </button>
-                    <div class="manager-character-modifier-card-header-copy">
-                      <h3 class="manager-card-title">
-                        <i class="fa-solid fa-coins" aria-hidden="true"></i>
-                        {text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}
-                      </h3>
-                      <p class="manager-muted">
-                        {text(
-                          'FABRICATE.Admin.Manager.CurrencyUnits.Hint',
-                          'Define actor currency paths and denomination breakdowns for this crafting system.'
-                        )}
-                      </p>
-                    </div>
-                    {#if !currencyUnitsReadOnly}
-                      <div class="manager-character-modifier-card-header-actions">
-                        <button
-                          type="button"
-                          class="manager-button is-primary"
-                          onclick={handleAddCurrencyUnit}
-                        >
-                          <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-                        </button>
-                        <button
-                          type="button"
-                          class="manager-button"
-                          disabled={!currencyPresetsSupported}
-                          data-tooltip={!currencyPresetsSupported
-                            ? text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.SeedPresetsUnsupported',
-                                'Preset seeding is only available for dnd5e or pf2e worlds.'
-                              )
-                            : null}
-                          onclick={onSeedCurrencyPresets}
-                        >
-                          <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                          {text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets',
-                            'Seed presets'
-                          )}
-                        </button>
-                      </div>
-                    {/if}
-                  </header>
-
-                  {#if !currencyCollapsed}
-                    <div id="manager-section-body-currency" class="manager-section-body">
-                      <div class="manager-currency-strategy" data-system-currency-strategy>
-                        <label class="manager-field">
-                          <span
-                            >{text(
-                              'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy',
-                              'Spend strategy'
-                            )}</span
-                          >
-                          <select
-                            value={currencySpendStrategy}
-                            data-system-currency-strategy-select
-                            onchange={(event) =>
-                              onSetCurrencySpendStrategy(event.currentTarget.value)}
-                          >
-                            {#each CURRENCY_SPEND_STRATEGY_OPTIONS as option (option.value)}
-                              <option value={option.value}
-                                >{text(option.labelKey, option.fallback)}</option
-                              >
-                            {/each}
-                          </select>
-                          <small data-system-currency-strategy-hint
-                            >{currencySpendStrategyHint()}</small
-                          >
-                        </label>
-
-                        {#if currencyShowProviderBranch}
-                          <label class="manager-field">
-                            <span
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.Provider',
-                                'Provider'
-                              )}</span
-                            >
-                            <select
-                              value={currencyProviderId}
-                              data-system-currency-provider-select
-                              onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
-                            >
-                              {#each currencyProviderOptions as option (option.id)}
-                                <option value={option.id}>{option.label}</option>
-                              {/each}
-                            </select>
-                            <small
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
-                                'A preconfigured adapter that reads and spends coins from the actor inventory.'
-                              )}</small
-                            >
-                          </label>
-                        {:else if currencySpendStrategy === 'actorInventory'}
-                          <div class="manager-field">
-                            <span
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.Provider',
-                                'Provider'
-                              )}</span
-                            >
-                            <div
-                              class="manager-currency-subunit-warning manager-environment-comp-callout"
-                              role="note"
-                              data-system-currency-no-provider
-                            >
-                              <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.CurrencyUnits.NoProviders',
-                                  'No preconfigured providers for this system — use the Macro strategy instead.'
-                                )}</span
-                              >
-                            </div>
-                          </div>
-                        {:else if currencyMacroMode}
-                          <div
-                            class="manager-currency-macro-zones manager-currency-macro-row"
-                            data-system-currency-macros
-                          >
-                            {#each CURRENCY_MACRO_FIELDS as field (field.key)}
-                              {@const macroDoc = currencyMacroDisplay(field.key)}
-                              <div class="manager-field manager-currency-macro-field">
-                                <span>{text(field.labelKey, field.labelFallback)}</span>
-                                {#if macroDoc}
-                                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                                  <div
-                                    class="manager-environment-scene-linked"
-                                    data-system-currency-macro={field.key}
-                                    role="group"
-                                    aria-label={text(field.labelKey, field.labelFallback)}
-                                    title={text(
-                                      'FABRICATE.Admin.Manager.CurrencyUnits.MacroReplaceHint',
-                                      'Drop a macro to replace it, or right-click to unlink.'
-                                    )}
-                                    use:dragDrop={{
-                                      onDrop: (data) => handleCurrencyMacroDrop(field.key, data),
-                                      activeClass: 'is-drop-active',
-                                    }}
-                                    oncontextmenu={(event) => {
-                                      event.preventDefault();
-                                      onClearCurrencyMacro(field.key);
-                                    }}
-                                    onmousedown={(event) => {
-                                      if (event.button === 2) {
-                                        event.preventDefault();
-                                        onClearCurrencyMacro(field.key);
-                                      }
-                                    }}
-                                  >
-                                    {#if macroDoc.missing}
-                                      <span
-                                        class="manager-environment-scene-thumb is-placeholder"
-                                        aria-hidden="true"
-                                        ><i class="fas fa-triangle-exclamation"></i></span
-                                      >
-                                      <span
-                                        class="manager-environment-scene-name manager-muted"
-                                        data-system-currency-macro-missing
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.MacroMissing',
-                                          'Macro unresolved'
-                                        )}</span
-                                      >
-                                    {:else}
-                                      {#if macroDoc.img}
-                                        <img
-                                          class="manager-environment-scene-thumb"
-                                          src={macroDoc.img}
-                                          alt=""
-                                        />
-                                      {:else}
-                                        <span
-                                          class="manager-environment-scene-thumb is-placeholder"
-                                          aria-hidden="true"><i class="fas fa-scroll"></i></span
-                                        >
-                                      {/if}
-                                      <span class="manager-environment-scene-name"
-                                        >{macroDoc.name || macroDoc.uuid}</span
-                                      >
-                                    {/if}
-                                    <button
-                                      type="button"
-                                      class="manager-icon-button is-danger"
-                                      aria-label={text(
-                                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
-                                        'Unlink macro'
-                                      )}
-                                      title={text(
-                                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
-                                        'Unlink macro'
-                                      )}
-                                      onclick={(event) => {
-                                        event.stopPropagation();
-                                        onClearCurrencyMacro(field.key);
-                                      }}
-                                      ><i class="fas fa-link-slash" aria-hidden="true"></i></button
-                                    >
-                                  </div>
-                                {:else}
-                                  <div
-                                    class="manager-component-source-drop-zone manager-currency-macro-drop-zone"
-                                    data-system-currency-macro-dropzone={field.key}
-                                    role="group"
-                                    aria-label={currencyMacroDropZoneLabel(field)}
-                                    use:dragDrop={{
-                                      onDrop: (data) => handleCurrencyMacroDrop(field.key, data),
-                                      activeClass: 'is-drop-active',
-                                    }}
-                                  >
-                                    <i class="fas fa-scroll" aria-hidden="true"></i>
-                                    <span
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroDropHint',
-                                        'Drag a macro here to link it.'
-                                      )}</span
-                                    >
-                                  </div>
-                                {/if}
-                                <small>{text(field.hintKey, field.hintFallback)}</small>
-                              </div>
-                            {/each}
-                          </div>
-                        {/if}
-                      </div>
-
-                      {#if currencyUnitsReadOnly}
-                        <div
-                          class="manager-currency-subunit-warning manager-environment-comp-callout manager-currency-provider-managed-callout"
-                          role="note"
-                          data-system-currency-provider-managed
-                        >
-                          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                          <div class="manager-currency-provider-managed-copy">
-                            <strong
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
-                                'Provider-managed denominations'
-                              )}</strong
-                            >
-                            <span>{currencyProviderManagedHint()}</span>
-                          </div>
-                        </div>
-                        {#if currencyUnits.length === 0}
-                          <EmptyState
-                            compact
-                            icon="fas fa-coins"
-                            title={text(
-                              'FABRICATE.Admin.Manager.CurrencyUnits.Empty',
-                              'No currency units yet.'
-                            )}
-                          />
-                        {:else}
-                          <ul
-                            class="manager-character-modifier-list manager-currency-provider-managed-list manager-currency-provider-managed-grid"
-                          >
-                            {#each currencyUnits as unit (unit.id)}
-                              <li
-                                class="manager-character-modifier-row"
-                                data-system-currency-unit={unit.id}
-                              >
-                                <div class="manager-currency-provider-managed-summary">
-                                  <span class="manager-character-modifier-icon"
-                                    ><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"
-                                    ></i></span
-                                  >
-                                  <div class="manager-currency-readonly-fields">
-                                    <div class="manager-currency-readonly-field">
-                                      <span class="manager-currency-readonly-label"
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Label',
-                                          'Label'
-                                        )}</span
-                                      >
-                                      <span
-                                        class="manager-currency-readonly-value"
-                                        data-system-currency-readonly-label
-                                        >{unit.label || unit.id}</span
-                                      >
-                                    </div>
-                                    <div class="manager-currency-readonly-field">
-                                      <span class="manager-currency-readonly-label"
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation',
-                                          'Abbreviation'
-                                        )}</span
-                                      >
-                                      <span
-                                        class="manager-currency-readonly-value"
-                                        data-system-currency-abbreviation
-                                        >{unit.abbreviation || '—'}</span
-                                      >
-                                    </div>
-                                    <div class="manager-currency-readonly-field">
-                                      <span class="manager-currency-readonly-label"
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Denomination',
-                                          'Coin denomination'
-                                        )}</span
-                                      >
-                                      <span
-                                        class="manager-currency-readonly-value"
-                                        data-system-currency-denomination
-                                        >{unit.denomination || unit.id}</span
-                                      >
-                                    </div>
-                                  </div>
-                                </div>
-                              </li>
-                            {/each}
-                          </ul>
-                        {/if}
-                      {:else if currencyUnits.length === 0}
-                        <EmptyState
-                          compact
-                          icon="fas fa-coins"
-                          title={text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.Empty',
-                            'No currency units yet.'
-                          )}
-                        />
-                      {:else}
-                        <ul class="manager-character-modifier-list">
-                          {#each currencyUnits as unit, index (unit.id)}
-                            {@const expanded = currencyExpandedUnitId === unit.id}
-                            {@const subUnitOptions = currencyUnitSubUnitOptions(unit.id)}
-                            <li
-                              class="manager-character-modifier-row"
-                              data-system-currency-unit={unit.id}
-                            >
-                              {#if expanded}
-                                <div class="manager-character-modifier-editor">
-                                  <div class="manager-edit-grid manager-currency-edit-grid">
-                                    <label class="manager-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Label',
-                                          'Label'
-                                        )}</span
-                                      >
-                                      <input
-                                        type="text"
-                                        value={unit.label}
-                                        oninput={(event) =>
-                                          onUpdateCurrencyUnit(unit.id, {
-                                            label: event.currentTarget.value,
-                                          })}
-                                      />
-                                    </label>
-                                    <label class="manager-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation',
-                                          'Abbreviation'
-                                        )}</span
-                                      >
-                                      <input
-                                        type="text"
-                                        value={unit.abbreviation}
-                                        oninput={(event) =>
-                                          onUpdateCurrencyUnit(unit.id, {
-                                            abbreviation: event.currentTarget.value,
-                                          })}
-                                      />
-                                    </label>
-                                    <div class="manager-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.Icon',
-                                          'Icon'
-                                        )}</span
-                                      >
-                                      <IconPicker
-                                        value={unit.icon || 'fa-solid fa-coins'}
-                                        buttonTitle={text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.ChangeIcon',
-                                          'Change icon'
-                                        )}
-                                        onChange={(iconClass) =>
-                                          onUpdateCurrencyUnit(unit.id, { icon: iconClass })}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {#if currencyMacroMode}
-                                    <small
-                                      class="manager-currency-macro-note"
-                                      role="note"
-                                      data-system-currency-unit-macro-note
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint',
-                                        'Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.'
-                                      )}</small
-                                    >
-                                  {:else}
-                                    <div class="manager-edit-grid manager-currency-detail-grid">
-                                      <label class="manager-field">
-                                        <span
-                                          >{text(
-                                            'FABRICATE.Admin.Manager.CurrencyUnits.ActorPath',
-                                            'Actor data path'
-                                          )}</span
-                                        >
-                                        <input
-                                          type="text"
-                                          value={unit.actorPath}
-                                          placeholder="system.currency.gp"
-                                          oninput={(event) =>
-                                            onUpdateCurrencyUnit(unit.id, {
-                                              actorPath: event.currentTarget.value,
-                                            })}
-                                        />
-                                      </label>
-                                      {#if subUnitOptions.length > 0}
-                                        <div class="manager-currency-subunit-builder">
-                                          <label class="manager-field">
-                                            <span
-                                              >{text(
-                                                'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
-                                                'Add sub-unit'
-                                              )}</span
-                                            >
-                                            <select
-                                              value={currencySelectedSubUnit(unit.id)}
-                                              onchange={(event) =>
-                                                updateCurrencySubUnitSelection(
-                                                  unit.id,
-                                                  event.currentTarget.value
-                                                )}
-                                            >
-                                              {#each subUnitOptions as option (option.id)}
-                                                <option value={option.id}
-                                                  >{option.label}{option.abbreviation
-                                                    ? ` (${option.abbreviation})`
-                                                    : ''}</option
-                                                >
-                                              {/each}
-                                            </select>
-                                          </label>
-                                          <button
-                                            type="button"
-                                            class="manager-icon-button"
-                                            aria-label={text(
-                                              'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
-                                              'Add sub-unit'
-                                            )}
-                                            onclick={() => handleAddCurrencySubUnit(unit.id)}
-                                          >
-                                            <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                                          </button>
-                                        </div>
-                                      {:else}
-                                        <div class="manager-field">
-                                          <span
-                                            >{text(
-                                              'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
-                                              'Add sub-unit'
-                                            )}</span
-                                          >
-                                          <div class="manager-currency-subunit-warning" role="note">
-                                            <i
-                                              class="fa-solid fa-triangle-exclamation"
-                                              aria-hidden="true"
-                                            ></i>
-                                            {#if currencyUnits.length <= 1}
-                                              <span
-                                                >{text(
-                                                  'FABRICATE.Admin.Manager.CurrencyUnits.NoOtherUnits',
-                                                  'Add another currency unit before defining a breakdown.'
-                                                )}</span
-                                              >
-                                            {:else}
-                                              <span
-                                                >{text(
-                                                  'FABRICATE.Admin.Manager.CurrencyUnits.NoEligibleSubUnits',
-                                                  'No eligible sub-units — every other unit already breaks down into this one.'
-                                                )}</span
-                                              >
-                                            {/if}
-                                          </div>
-                                        </div>
-                                      {/if}
-                                    </div>
-
-                                    <div class="manager-currency-subunit-section">
-                                      <p
-                                        class="manager-card-title manager-currency-subunit-heading"
-                                      >
-                                        {text(
-                                          'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
-                                          'Sub-units'
-                                        )}
-                                      </p>
-                                      {#if (unit.contains || []).length > 0}
-                                        <div
-                                          class="manager-availability-pill-row"
-                                          aria-label={text(
-                                            'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
-                                            'Sub-units'
-                                          )}
-                                        >
-                                          {#each unit.contains as contained (contained.unitId)}
-                                            <span
-                                              class="manager-availability-pill is-currency"
-                                              data-system-currency-subunit={contained.unitId}
-                                            >
-                                              <i
-                                                class={currencyUnitIcon(contained.unitId)}
-                                                aria-hidden="true"
-                                              ></i>
-                                              <span>{currencyUnitLabel(contained.unitId)}</span>
-                                              <input
-                                                type="number"
-                                                min="1"
-                                                step="1"
-                                                class="manager-availability-pill-amount"
-                                                value={contained.amount}
-                                                aria-label={`${currencyUnitLabel(contained.unitId)} ${text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount').toLowerCase()}`}
-                                                oninput={(event) =>
-                                                  onUpdateCurrencySubUnit(
-                                                    unit.id,
-                                                    contained.unitId,
-                                                    event.currentTarget.value
-                                                  )}
-                                              />
-                                              <button
-                                                type="button"
-                                                class="manager-availability-remove"
-                                                aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`}
-                                                onclick={() =>
-                                                  onDeleteCurrencySubUnit(
-                                                    unit.id,
-                                                    contained.unitId
-                                                  )}
-                                              >
-                                                <i class="fas fa-xmark" aria-hidden="true"></i>
-                                              </button>
-                                            </span>
-                                          {/each}
-                                        </div>
-                                      {:else}
-                                        <p class="manager-muted">
-                                          {text(
-                                            'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
-                                            'This unit is a base denomination.'
-                                          )}
-                                        </p>
-                                      {/if}
-                                    </div>
-                                  {/if}
-
-                                  <div class="manager-character-modifier-actions">
-                                    <button
-                                      type="button"
-                                      class="manager-button"
-                                      onclick={() => (currencyExpandedUnitId = '')}
-                                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
-                                    >
-                                    <button
-                                      type="button"
-                                      class="manager-button is-danger"
-                                      onclick={() => handleDeleteCurrencyUnit(unit.id)}
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
-                                        'Delete currency unit'
-                                      )}</button
-                                    >
-                                  </div>
-                                </div>
-                              {:else}
-                                <div class="manager-character-modifier-summary">
-                                  <span class="manager-character-modifier-icon"
-                                    ><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"
-                                    ></i></span
-                                  >
-                                  <span class="manager-character-modifier-label"
-                                    >{unit.label || unit.id}</span
-                                  >
-                                  <Chip
-                                    >{(unit.contains || []).length}
-                                    {text(
-                                      'FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount',
-                                      'sub-units'
-                                    )}</Chip
-                                  >
-                                  <button
-                                    type="button"
-                                    class="manager-icon-button"
-                                    aria-label={text(
-                                      'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                      'Move up'
-                                    )}
-                                    data-tooltip={text(
-                                      'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                      'Move up'
-                                    )}
-                                    data-move-currency-up={unit.id}
-                                    disabled={index === 0}
-                                    onclick={() =>
-                                      reorderList(
-                                        onReorderCurrencyUnit,
-                                        index,
-                                        -1,
-                                        unit.label || unit.id,
-                                        currencyUnits.length
-                                      )}
-                                  >
-                                    <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    class="manager-icon-button"
-                                    aria-label={text(
-                                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                      'Move down'
-                                    )}
-                                    data-tooltip={text(
-                                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                      'Move down'
-                                    )}
-                                    data-move-currency-down={unit.id}
-                                    disabled={index === currencyUnits.length - 1}
-                                    onclick={() =>
-                                      reorderList(
-                                        onReorderCurrencyUnit,
-                                        index,
-                                        1,
-                                        unit.label || unit.id,
-                                        currencyUnits.length
-                                      )}
-                                  >
-                                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    class="manager-icon-button"
-                                    aria-label={text(
-                                      'FABRICATE.Admin.Manager.CurrencyUnits.Edit',
-                                      'Edit currency unit'
-                                    )}
-                                    onclick={() => (currencyExpandedUnitId = unit.id)}
-                                  >
-                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    class="manager-icon-button is-danger"
-                                    aria-label={text(
-                                      'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
-                                      'Delete currency unit'
-                                    )}
-                                    onclick={() => handleDeleteCurrencyUnit(unit.id)}
-                                  >
-                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                                  </button>
-                                </div>
-                              {/if}
-                            </li>
-                          {/each}
-                        </ul>
-                      {/if}
-                    </div>
-                  {/if}
-                </section>
-              {/if}
             </form>
           </main>
         {:else if activeTab === 'validation'}

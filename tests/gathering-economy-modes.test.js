@@ -679,11 +679,15 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
 });
 
 describe('gathering economy — cost modifiers and flag gating', () => {
+  // The modifier library is SYSTEM-owned (issue 1117), so the fixture declares it once here
+  // and hands it to `_effectiveStaminaCost` through the `system` argument that method
+  // already takes — the gathering config carries no library at all any more.
+  const COST_LIBRARY = [{ id: 'str', label: 'Str', expression: '@abilities.str.mod' }];
+  const costSystem = { id: SYSTEM, modifiers: COST_LIBRARY };
   function costConfig(mode = 'stamina') {
     return {
       systems: {
         [SYSTEM]: {
-          characterModifiers: [{ id: 'str', label: 'Str', expression: '@abilities.str.mod' }],
           economy: economyForMode(mode)
         }
       }
@@ -694,7 +698,6 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     return {
       systems: {
         [SYSTEM]: {
-          characterModifiers: [{ id: 'str', label: 'Str', expression: '@abilities.str.mod' }],
           economy: { stamina: { enabled: true }, nodes: { enabled: true } }
         }
       }
@@ -726,14 +729,14 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 3 });
     const env = environment();
     const cheaper = await service._effectiveStaminaCost({
-      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      actor: makeFakeActor(), system: costSystem, environment: env,
       task: task({ staminaCostModifiers: [{ modifierId: 'str', operator: '-', min: 0, max: 4 }] })
     });
     assert.equal(cheaper, 2); // 5 - 3
 
     const { service: free } = makeRichState({ config: costConfig(), evaluateExpression: () => 99 });
     const floored = await free._effectiveStaminaCost({
-      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      actor: makeFakeActor(), system: costSystem, environment: env,
       task: task({ staminaCostModifiers: [{ modifierId: 'str', operator: '-' }] })
     });
     assert.equal(floored, 0); // never negative
@@ -745,7 +748,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const { service } = makeRichState({ config: costConfig(), evaluateExpression: () => 5 });
     const env = environment();
     const cost = await service._effectiveStaminaCost({
-      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      actor: makeFakeActor(), system: costSystem, environment: env,
       task: task({ staminaCost: 10, staminaCostModifiers: [{ modifierId: 'str', operator: '-', mode: 'multiplicative' }] })
     });
     assert.equal(cost, 5); // 10 - 5 (additive), NOT 10 * 0.95 = 9.5
@@ -757,7 +760,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const { service } = makeRichState({ config, evaluateExpression: () => 5 });
     const env = environment();
     const cost = await service._effectiveStaminaCost({
-      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env,
+      actor: makeFakeActor(), system: costSystem, environment: env,
       task: task({ staminaCost: 10, staminaCostModifiers: [{ modifierId: 'str', operator: '-' }] })
     });
     assert.equal(cost, 5); // additive 10 - 5, the system multiplicative default does not apply to stamina
@@ -769,15 +772,15 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const taskWithMod = task({ staminaCost: 6, staminaCostModifiers: [{ modifierId: 'str', operator: '-' }] });
 
     const cost = await service.listingStaminaCost({
-      actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: taskWithMod
+      actor: makeFakeActor(), system: costSystem, environment: env, task: taskWithMod
     });
     assert.equal(cost, 4); // 6 - 2 (the base would be 6)
 
     // No actor still resolves (modifier evaluates), but a non-stamina system or a
     // zero-cost task yields null (nothing to refine).
     const { service: nodesMode } = makeRichState({ config: costConfig('nodes'), evaluateExpression: () => 2 });
-    assert.equal(await nodesMode.listingStaminaCost({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: taskWithMod }), null);
-    assert.equal(await service.listingStaminaCost({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: task({ staminaCost: 0 }) }), null);
+    assert.equal(await nodesMode.listingStaminaCost({ actor: makeFakeActor(), system: costSystem, environment: env, task: taskWithMod }), null);
+    assert.equal(await service.listingStaminaCost({ actor: makeFakeActor(), system: costSystem, environment: env, task: task({ staminaCost: 0 }) }), null);
   });
 
   it('blocks on insufficient stamina only when stamina is enabled, and the gate equals the spend', async () => {
@@ -786,15 +789,15 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const actor = makeFakeActor();
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 3, max: 10 });
 
-    const blocked = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: task() });
+    const blocked = await service.evaluateStart({ actor, system: costSystem, environment: env, task: task() });
     assert.equal(blocked.blockedReasons.some(r => r.code === 'STAMINA_BLOCKED'), true);
     assert.equal(blocked.evidence.stamina.cost, 5);
 
     // Top up so the attempt passes, then commit and confirm exactly the cost is spent.
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 10 });
-    const ok = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: task() });
+    const ok = await service.evaluateStart({ actor, system: costSystem, environment: env, task: task() });
     assert.equal(ok.blockedReasons.length, 0);
-    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: task(), outcome: { status: 'succeeded' } });
+    await service.commitAcceptedAttempt({ actor, system: costSystem, environment: env, task: task(), outcome: { status: 'succeeded' } });
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 3);
   });
 
@@ -803,10 +806,10 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const env = environment();
     const actor = makeFakeActor();
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 1, max: 10 });
-    const result = await service.evaluateStart({ actor, system: { id: SYSTEM }, environment: env, task: task() });
+    const result = await service.evaluateStart({ actor, system: costSystem, environment: env, task: task() });
     assert.equal(result.blockedReasons.length, 0);
     assert.equal(result.evidence.stamina, null);
-    await service.commitAcceptedAttempt({ actor, system: { id: SYSTEM }, environment: env, task: task(), outcome: { status: 'succeeded' } });
+    await service.commitAcceptedAttempt({ actor, system: costSystem, environment: env, task: task(), outcome: { status: 'succeeded' } });
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 1); // untouched
   });
 
@@ -823,7 +826,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, max: 10 });
 
     const evidence = await service.commitAcceptedAttempt({
-      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+      actor, system: costSystem, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
     });
     // Stamina spent, node pool untouched (no nodeRuntime write).
     assert.equal(evidence.stamina.spent, 5);
@@ -837,7 +840,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 7, max: 10 });
 
     const evidence = await service.commitAcceptedAttempt({
-      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+      actor, system: costSystem, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
     });
     // Node depleted, stamina untouched.
     assert.equal(evidence.node.remaining, 2);
@@ -852,7 +855,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
 
     // Both gates evaluate: a depleted node blocks AND stamina evidence is populated.
     const depletedGate = await service.evaluateStart({
-      actor, system: { id: SYSTEM }, environment: env,
+      actor, system: costSystem, environment: env,
       task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
     });
     assert.equal(depletedGate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
@@ -860,7 +863,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
 
     // An accepted attempt against an available node both decrements it and spends stamina (anti-dogpiling).
     const evidence = await service.commitAcceptedAttempt({
-      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+      actor, system: costSystem, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
     });
     assert.equal(env.nodeRuntime['task-1'].current, 2, 'node pool decremented by one');
     assert.equal(evidence.node.remaining, 2);
@@ -875,7 +878,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 2, max: 10 });
 
     const gate = await service.evaluateStart({
-      actor, system: { id: SYSTEM }, environment: env,
+      actor, system: costSystem, environment: env,
       task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
     });
     assert.equal(gate.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true, 'node gate blocks');
@@ -888,7 +891,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 10, max: 10 });
 
     const gate = await service.evaluateStart({
-      actor, system: { id: SYSTEM }, environment: env,
+      actor, system: costSystem, environment: env,
       task: nodeStaminaTask({ nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } })
     });
     assert.equal(gate.blockedReasons.length, 0);
@@ -896,7 +899,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     assert.equal(gate.evidence.nodes, null);
 
     const evidence = await service.commitAcceptedAttempt({
-      actor, system: { id: SYSTEM }, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
+      actor, system: costSystem, environment: env, task: nodeStaminaTask(), outcome: { status: 'succeeded' }
     });
     assert.equal(evidence.node, null);
     assert.equal(evidence.stamina, null);
@@ -909,10 +912,10 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     const env = environment();
     const depleted = task({ staminaCost: 0, nodes: { enabled: true, max: 2, current: 0, depletionTiming: 'onStart', respawn: { policy: 'manual' } } });
 
-    const player = await service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: depleted, viewer: { isGM: false } });
+    const player = await service.evaluateStart({ actor: makeFakeActor(), system: costSystem, environment: env, task: depleted, viewer: { isGM: false } });
     assert.equal(player.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true);
 
-    const gm = await service.evaluateStart({ actor: makeFakeActor(), system: { id: SYSTEM }, environment: env, task: depleted, viewer: { isGM: true } });
+    const gm = await service.evaluateStart({ actor: makeFakeActor(), system: costSystem, environment: env, task: depleted, viewer: { isGM: true } });
     assert.equal(gm.blockedReasons.some(r => r.code === 'NODE_DEPLETED'), true, 'GMs are now gated by the economy too');
   });
 
@@ -923,7 +926,7 @@ describe('gathering economy — cost modifiers and flag gating', () => {
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 8, max: 10 });
 
     const evidence = await service.commitAcceptedAttempt({
-      actor, system: { id: SYSTEM }, environment: env, task: task(), outcome: { status: 'succeeded' }, viewer: { isGM: true }
+      actor, system: costSystem, environment: env, task: task(), outcome: { status: 'succeeded' }, viewer: { isGM: true }
     });
     assert.equal(evidence.stamina.spent, 5);
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 3); // 8 - 5, GM included

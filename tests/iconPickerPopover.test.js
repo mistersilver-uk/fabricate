@@ -76,3 +76,74 @@ test('icon picker popover width shrinks to fit very small viewports', () => {
   assert.equal(layout.width, 208);
   assert.equal(layout.left, 16);
 });
+
+// --- Whole-row flooring (issue 1280) ----------------------------------------------------
+// The popover's max height comes from the viewport, so the space left for the list after the
+// search field and the popover's padding is an arbitrary number of pixels. Filling it slices the
+// last row in half against the popover's bottom padding, which reads as a rendering fault rather
+// than as "more below". These pin the floor, and pin that a caller which measures nothing keeps
+// the previous behaviour rather than getting a guessed height.
+
+const TRIGGER = { top: 120, bottom: 152, left: 220, right: 420, width: 200, height: 32 };
+const VIEWPORT = { width: 1280, height: 900 };
+// A 38px row and a 6px gap between rows; 12px popover padding top and bottom, an 8px flex gap,
+// and a 35px search field.
+const METRICS = { rowPitch: 44, rowGap: 6, chromeHeight: 67 };
+
+test('the list height is null when the caller measured no rows', () => {
+  const layout = computeIconPickerPopoverLayout(TRIGGER, VIEWPORT);
+
+  assert.equal(
+    layout.listMaxHeight,
+    null,
+    'a caller that cannot measure a row must keep the previous fill behaviour'
+  );
+  assert.equal(layout.maxHeight, 380, 'and the popover itself is unaffected');
+});
+
+test('the list height floors to whole rows, carrying one fewer gap than rows', () => {
+  const layout = computeIconPickerPopoverLayout(TRIGGER, VIEWPORT, METRICS);
+  const available = layout.maxHeight - METRICS.chromeHeight;
+
+  assert.equal(layout.listMaxHeight, 302, '7 rows: 7 * 44 - 6');
+  assert.equal(
+    (layout.listMaxHeight + METRICS.rowGap) % METRICS.rowPitch,
+    0,
+    'the height must be an exact number of pitches'
+  );
+  assert.ok(
+    layout.listMaxHeight <= available,
+    `flooring must never exceed the space available (${layout.listMaxHeight} > ${available})`
+  );
+});
+
+test('the list keeps ONE row when the popover is too short for even one', () => {
+  // Refusing to render the list at all would be a worse answer than a cramped one: the caller
+  // cannot open a picker with no options in it.
+  const layout = computeIconPickerPopoverLayout(TRIGGER, { width: 1280, height: 210 }, METRICS);
+
+  assert.equal(layout.listMaxHeight, 38, 'one row, minus its absent trailing gap');
+});
+
+test('a zero or absent row pitch is treated as "not measured", not as a division by zero', () => {
+  for (const rowPitch of [0, -10, Number.NaN, undefined]) {
+    const layout = computeIconPickerPopoverLayout(TRIGGER, VIEWPORT, { ...METRICS, rowPitch });
+    assert.equal(layout.listMaxHeight, null, `rowPitch ${String(rowPitch)} should not floor`);
+  }
+});
+
+test('the flooring rides both placements, since either can be the short one', () => {
+  // A trigger near the bottom flips the popover above it; the list still must not slice a row.
+  const flipped = computeIconPickerPopoverLayout(
+    { top: 820, bottom: 852, left: 220, right: 420, width: 200, height: 32 },
+    VIEWPORT,
+    METRICS
+  );
+
+  assert.equal(flipped.placement, 'top');
+  assert.equal(
+    (flipped.listMaxHeight + METRICS.rowGap) % METRICS.rowPitch,
+    0,
+    'a flipped popover floors too'
+  );
+});

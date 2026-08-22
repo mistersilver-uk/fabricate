@@ -27,9 +27,12 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-bulk-panel-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -40,6 +43,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    // The shared bulk-delete card (issue 1132). The panel renders its delete block through it,
+    // so it is a STATIC import of the component under test; omitting it HANGS this suite as
+    // `# cancelled` rather than failing it.
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
@@ -111,8 +118,9 @@ function props(rows, extra = {}) {
   };
 }
 
-const impactRow = (root, name) =>
-  root.querySelector(`[data-essence-bulk-impact-row="${name}"]`).textContent.trim();
+const impactRowEl = (root, name) => root.querySelector(`[data-essence-bulk-impact-row="${name}"]`);
+
+const impactRow = (root, name) => impactRowEl(root, name).textContent.trim();
 
 const deleteButton = (root) =>
   root.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
@@ -153,10 +161,24 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
       'comp-a…comp-d, comp-b unioned once — a SUM would say 5'
     );
 
-    // Negative control: a selection carried by nothing reports zero carriers, so the union
+    // Negative control: a selection carried by nothing reports NO carriers, so the union
     // above cannot be satisfied by a number that is simply always non-zero.
+    //
+    // Asserted as the row's ABSENCE, not as a rendered "0" (issue 1132). The shared card omits
+    // a consequence row whose count is zero, so the row this control used to read is gone —
+    // and because the old helper dereferenced `.textContent`, the control would have THROWN
+    // rather than failed, whose cheapest repair is deleting it. Absence is exactly as strong a
+    // negative control as a rendered nought, and it gates the new gating behaviour too.
     await harness.setProps(props([SELECTION[2], SELECTION[3]]));
-    assert.match(impactRow(root, 'components'), /^0\b/);
+    assert.ok(
+      !impactRowEl(root, 'components'),
+      'a zero-carrier selection states nothing about carriers, rather than stating a nought'
+    );
+    assert.match(
+      impactRow(root, 'essences'),
+      /^2\b/,
+      'while the SUBJECT row still renders — a card that states nothing has lost the pairing the arm depends on'
+    );
     harness.remount();
   });
 
@@ -272,7 +294,16 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
       '4 components carry one or more of the selected essences.'
     );
     assert.equal(impactRow(root, 'recipes'), '3 recipes will be rewritten.');
-    assert.match(deleteButton(root).getAttribute('aria-label'), /^Delete 4 essence definitions$/);
+    // WCAG 2.5.3 Label in Name (issue 1132): the idle name is now the visible label verbatim.
+    // It shipped as "Delete 4 essence definitions" beside a button reading "Delete 4 essences",
+    // so a speech-input user could not activate the idle face of a destructive control. The
+    // word "definitions" moved into the impact row above, where the count already lives.
+    assert.equal(deleteButton(root).getAttribute('aria-label'), 'Delete 4 essences');
+    assert.equal(
+      deleteButton(root).querySelector('span').textContent.trim(),
+      'Delete 4 essences',
+      'and the two faces are the same string, so the relation cannot drift'
+    );
     harness.remount();
   });
 
@@ -285,7 +316,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
     const root = await harness.mount(props(ONE_OF_EACH, { deleteArmed: true }));
     assert.equal(
       deleteButton(root).getAttribute('aria-label'),
-      'Confirm deleting 1 essence definition(s) and rewriting 1 recipe(s)'
+      'Confirm delete — 1 essence definition(s) will be deleted and 1 recipe(s) rewritten'
     );
     harness.remount();
   });
@@ -294,7 +325,23 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
     const root = await harness.mount(props(SELECTION, { deleteArmed: true }));
     assert.equal(
       deleteButton(root).getAttribute('aria-label'),
-      'Confirm deleting 4 essence definition(s) and rewriting 3 recipe(s)'
+      'Confirm delete — 4 essence definition(s) will be deleted and 3 recipe(s) rewritten'
+    );
+    harness.remount();
+  });
+
+  it('the ARMED name opens with the armed visible label (WCAG 2.5.3)', async () => {
+    // It shipped as "Confirm deleting 4 essence definition(s)…", which does not CONTAIN
+    // "Confirm delete", so the armed half of a destructive two-step control was unactivatable
+    // by voice — the one state where being unable to speak the name is most consequential.
+    const root = await harness.mount(props(SELECTION, { deleteArmed: true }));
+    const button = deleteButton(root);
+    const visible = button.querySelector('span').textContent.trim();
+
+    assert.equal(visible, 'Confirm delete');
+    assert.ok(
+      button.getAttribute('aria-label').startsWith(visible),
+      `"${button.getAttribute('aria-label')}" must open with "${visible}"`
     );
     harness.remount();
   });
@@ -353,7 +400,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     assert.equal(button.getAttribute('type'), 'button', 'and never submits a host form');
     assert.match(
       button.getAttribute('aria-label'),
-      /4 essence definitions/,
+      /4 essences/,
       'the consequence sentence is on the control, not only in the panel body'
     );
     harness.remount();
@@ -362,16 +409,21 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
   it('sits inside the delete card that scopes it to the inspector-action label size', async () => {
     // happy-dom cannot compute the cascade (see essence-studio-fidelity.test.js for the
     // source-level font-size pin), but it CAN prove the structural half of that fix: the
-    // button the scoped `.manager-essence-bulk-delete :global(.manager-button)` rule
-    // targets is actually a descendant of that card, in both the idle and armed states.
+    // button the scoped `.fab-bulk-delete-card :global(.manager-button)` rule targets is
+    // actually a descendant of that card, in both the idle and armed states.
+    //
+    // The class is the SHARED primitive's now (issue 1132), not the essence panel's. That is
+    // the whole hazard the retarget exists for: the rule and the class moved together, and a
+    // studio still asserting on `manager-essence-bulk-delete` would be asserting that a
+    // selector matching nothing still matches the button.
     const root = await harness.mount(props(SELECTION));
     assert.ok(
-      deleteButton(root).closest('.manager-essence-bulk-delete'),
+      deleteButton(root).closest('.fab-bulk-delete-card'),
       'the idle delete button is inside the scoped card'
     );
     await harness.setProps(props(SELECTION, { deleteArmed: true }));
     assert.ok(
-      deleteButton(root).closest('.manager-essence-bulk-delete'),
+      deleteButton(root).closest('.fab-bulk-delete-card'),
       'the armed confirm button stays inside it too'
     );
     harness.remount();

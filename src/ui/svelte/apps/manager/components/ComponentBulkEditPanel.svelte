@@ -14,9 +14,35 @@
   chrome (issue 1010). What remains here is what is genuinely about COMPONENTS: the
   category, tag, essence and progressive-DC axes.
 
-  Consequence, accepted and recorded: unlink, delete and copy-source-UUID live ONLY in
+  Consequence, accepted and recorded: unlink and copy-source-UUID live ONLY in
   `ComponentBrowserInspector`, so ticking one box hides them until the selection clears.
-  `Clear selection` is the documented escape and is the first control in the header.
+  `Clear selection` is the documented escape and is the first control in the header. DELETE is
+  no longer in that list — issue 1129 gave the panel its own set delete, because the swap was
+  making the one DESTRUCTIVE affordance harder to reach the moment a GM selected the rows they
+  wanted rid of. Unlink and copy-source stay out: neither is destructive, and neither has an
+  impact worth stating, which is what the arm below is paired with.
+
+  ── THE BULK DELETE IS ARMED, AND IT IS PAIRED WITH AN IMPACT STATEMENT ───────────
+  `AGENTS.md` reserves `confirmDialog` for bulk actions EXCEPT where the panel states the
+  impact of the pending action in view before the control is armed. This card does, so it
+  arms. Do not substitute a `confirmDialog`, and do not remove the impact list and leave the
+  arm — the carve-out is the pair, not the button.
+
+  The card is the shared `BulkDeleteCard` primitive (issue 1132), which is where the pairing,
+  the description association, the live region, the zero-row gate, the busy face and the
+  scoped CSS now live. The `data-component-bulk-*` hook names survive the move as `*Attr`
+  overrides, so the mounted suites, the smoke selectors and the View Lab cases are untouched.
+  What is left here is what is about COMPONENTS: the four sentences and the impact prop.
+
+  The pairing is also wired for assistive tech rather than left to proximity: the impact list
+  carries an id and is the button's `aria-describedby`, and arming — which changes the
+  button's label and name UNDER FOCUS, where a name change is not reliably announced — is
+  announced through its own polite live region.
+
+  A count of ZERO is omitted rather than rendered. The components row always renders; the
+  recipe rows appear only when they have something to say, so the commonest selection of all
+  (components no recipe names) states one fact instead of one fact and two noughts. That rule
+  is the primitive's now, expressed as a `count` on each consequence row.
 
   ── NOTHING IS WRITTEN UNTIL APPLY ────────────────────────────────────────────────
   Every control stages into a draft the CALLER owns; the browser rows do not change while
@@ -61,8 +87,21 @@
    - draft / onDraftChange(next): the staged edit, owned by the caller.
    - applying: an in-flight apply; the panel goes inert rather than double-writing.
    - onClearSelection() / onApply().
+   - deleting: an in-flight delete; inert on the same terms as `applying`.
+   - deleteArmed: whether the set delete holds its armed token. The OWNER clears it on any
+     change to the selection — an arm is a statement about a SPECIFIC set.
+   - deleteImpact: `describeComponentDeleteImpact(...)` output, supplied by the owner rather
+     than derived here. See the note beside `impact` for why this one number cannot come from
+     the rows.
+   - deleteOutcome: an OPTIONAL sentence announcing what a finished delete did when it left
+     this panel mounted — a refused or no-op write (issue 1157). The card's own live region is
+     the only place that outcome can be spoken, because on the success path the card is gone;
+     without it a refused delete leaves the GM on `<body>` with nothing said but a Foundry
+     toast, which is not a live region. The owner clears it as it arms.
+   - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
+  import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import Chip from '../Chip.svelte';
   import Callout from '../Callout.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
@@ -98,9 +137,16 @@
     selectedCards = [],
     draft = createComponentBulkDraft(),
     applying = false,
+    deleting = false,
+    deleteArmed = false,
+    deleteImpact = null,
+    deleteOutcome = '',
     onDraftChange = () => {},
     onClearSelection = () => {},
     onApply = () => {},
+    onArmDelete = () => {},
+    onDisarmDelete = () => {},
+    onDelete = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -123,7 +169,21 @@
   );
   const essencesStaged = $derived(draft?.essencesStaged === true);
   const difficultyStaged = $derived(draft?.difficultyStaged === true);
-  const canApply = $derived(bulkDraftHasChanges(draft) && applying !== true);
+  const inert = $derived(applying === true || deleting === true);
+  const canApply = $derived(bulkDraftHasChanges(draft) && !inert);
+
+  // The delete impact arrives as a PROP rather than being computed here — the deliberate
+  // deviation from `EssenceBulkEditPanel`, which derives its own from the selected rows.
+  // "How many recipes will be disabled" cannot be answered per row: whether a recipe survives
+  // depends on the WHOLE selection, since two selected components may be the only two options
+  // of one ingredient group. It needs recipe bodies, which belong in the store rather than in
+  // a Svelte prop. See `adminStore.describeComponentDelete`.
+  const impact = $derived({
+    deletable: Number(deleteImpact?.deletable) || 0,
+    deletableIds: Array.isArray(deleteImpact?.deletableIds) ? deleteImpact.deletableIds : [],
+    recipesRewritten: Number(deleteImpact?.recipesRewritten) || 0,
+    recipesDisabled: Number(deleteImpact?.recipesDisabled) || 0,
+  });
 
   // Declaration order is the system's own vocabulary order, as the editor's grid and the
   // prototype both show it — no re-sort, so the two essence surfaces read the same.
@@ -170,6 +230,111 @@
           count,
         })
   );
+
+  // The delete labels use the same `…One` sibling-key ternary the rest of this panel already
+  // uses, so the impact statement never says "1 recipes will be rewritten".
+  const deleteLabel = $derived(
+    impact.deletable === 1
+      ? text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteOne', 'Delete 1 component')
+      : format('FABRICATE.Admin.Manager.Component.BulkEdit.Delete', 'Delete {count} components', {
+          count: impact.deletable,
+        })
+  );
+  const impactComponentsLabel = $derived(
+    impact.deletable === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactComponentsOne',
+          '1 component will be deleted.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactComponents',
+          '{count} components will be deleted.',
+          { count: impact.deletable }
+        )
+  );
+  const impactRecipesLabel = $derived(
+    impact.recipesRewritten === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactRecipesOne',
+          '1 recipe will be rewritten.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactRecipes',
+          '{count} recipes will be rewritten.',
+          { count: impact.recipesRewritten }
+        )
+  );
+  // Names the TRANSITION, not a state. `recipesDisabled` counts only recipes that are
+  // enabled TODAY and will become disabled — an already-disabled recipe is excluded by
+  // design, because the number warns about craftability the GM is about to lose rather than
+  // restating what was already off. "N of those recipes will be left uncraftable and
+  // disabled" read as a statement about the resulting state, under which an already-disabled
+  // recipe belongs in the count and its absence looks like an undercount.
+  const impactDisabledLabel = $derived(
+    impact.recipesDisabled === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactDisabledOne',
+          '1 of those recipes is enabled today and will be disabled.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactDisabled',
+          '{count} of those recipes are enabled today and will be disabled.',
+          { count: impact.recipesDisabled }
+        )
+  );
+  const deleteAriaLabel = $derived(
+    impact.deletable === 1
+      ? text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteAriaOne', 'Delete 1 component')
+      : format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteAria',
+          'Delete {count} components',
+          {
+            count: impact.deletable,
+          }
+        )
+  );
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
+  // speech-input user can activate the control by saying what they can read. The armed
+  // button reads `Confirm delete`, so the name opens with that exact string and the counts
+  // follow it — "Confirm deleting 3 component(s)…" does not contain "Confirm delete" and
+  // was therefore unactivatable by voice. The idle pair needs no such reordering: its
+  // `…DeleteAria*` sibling is the visible label verbatim.
+  //
+  // It ENDS with the irreversibility, and that is not decoration (issue 1132, review round).
+  // The name a screen-reader user hears on the armed face is the only place the permanence
+  // of a component delete is stated at all — this panel carries no standing hint — and the
+  // string was a bare count fragment with no full stop while the recipe pair — the only one
+  // of the three that stated it — ended "This cannot be undone." Component now matches it;
+  // essence remains the one outlier, deliberately left alone (issue 1132, review round 2).
+  // Deleting components is no less permanent than either.
+  const deleteArmedAriaLabel = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
+      'Confirm delete — {count} component(s) and {recipes} recipe(s) affected. This cannot be undone.',
+      { count: impact.deletable, recipes: impact.recipesRewritten }
+    )
+  );
+  // Arming changes the button's LABEL and its accessible name while it holds focus, and a
+  // name change under focus is not reliably announced. So the state change is announced in
+  // its own polite region instead. It empties on disarm, which is also what makes a
+  // RE-arm announce: the region's text has to change to be spoken.
+  const deleteArmedAnnouncement = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteArmedAnnouncement',
+      'Delete armed. Activate again to delete {count} component(s) and rewrite {recipes} recipe(s).',
+      { count: impact.deletable, recipes: impact.recipesRewritten }
+    )
+  );
+  // Four sentences, four different questions, and the last three are gated on their own count
+  // by the card. The subject row carries no `count`, so it always renders: it is the statement
+  // of what the button does, and a card that states nothing has lost the pairing the arm
+  // depends on. `disabled` is the SUBSET of `recipes`, so the two are gated independently —
+  // rewriting recipes without disabling any is the ordinary outcome.
+  const deleteImpactRows = $derived([
+    { key: 'components', text: impactComponentsLabel },
+    { key: 'recipes', text: impactRecipesLabel, count: impact.recipesRewritten },
+    { key: 'disabled', text: impactDisabledLabel, count: impact.recipesDisabled },
+  ]);
   // `Unchanged`, NOT "Leave unchanged". This label sits on a `<button>` whose activation
   // ARMS the axis, so an imperative reading ("leave unchanged") names the opposite of what
   // pressing it does — a GM who wants essences untouched would click it and stage the
@@ -500,6 +665,55 @@
   {/if}
 </BulkEditPanelShell>
 
+<!--
+  The DELETE block sits below the shell rather than inside it: the shell's Apply is the
+  panel's primary action, and a destructive action inside the same card would read as a
+  second way of applying the staged edit. The Essence Studio's card is the twin.
+-->
+<!--
+  Stated BEFORE the action is armed, and recomputed from the selection because the impact prop
+  is re-derived by the owner whenever the selected set changes.
+
+  `recipes rewritten` is a count of DISTINCT recipes, never a per-component sum — a recipe
+  naming two selected components is rewritten once — and `disabled` is the SUBSET of those left
+  with no ingredient sets or no results. `describeComponentDeleteImpact` owns that arithmetic
+  and counts through the very functions the delete executes through; this component only
+  renders it.
+
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
+  needs to tell an in-flight write apart from an inert one to render the third face at all.
+  `applying` still inerts the control, because a staged apply and a delete must not race.
+-->
+<BulkDeleteCard
+  token="delete-components"
+  heading={text(
+    'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteHeading',
+    'Delete selected components'
+  )}
+  rows={deleteImpactRows}
+  idleLabel={deleteLabel}
+  armedLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirm', 'Confirm delete')}
+  busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
+  idleAriaLabel={deleteAriaLabel}
+  armedAriaLabel={deleteArmedAriaLabel}
+  armedAnnouncement={deleteArmedAnnouncement}
+  disarmedAnnouncement={text(
+    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+    'Delete cancelled. Nothing was deleted.'
+  )}
+  outcomeAnnouncement={deleteOutcome}
+  armed={deleteArmed === true}
+  busy={deleting === true}
+  disabled={impact.deletable === 0 || applying === true}
+  cardAttr="data-component-bulk-delete-card"
+  impactAttr="data-component-bulk-impact"
+  rowAttr="data-component-bulk-impact-row"
+  announceAttr="data-component-bulk-delete-announce"
+  onArm={onArmDelete}
+  onDisarm={onDisarmDelete}
+  onConfirm={() => onDelete(impact.deletableIds)}
+/>
+
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
      `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
@@ -546,4 +760,18 @@
     font-size: 0.62rem;
     line-height: 1.3;
   }
+
+  /* The delete card's three rules used to be a deliberate SECOND COPY of the Essence Studio's
+     identical blocks, kept rather than extracted in issue 1129 with the note that "a shared
+     `BulkDeleteCard` component is the honest extraction, but it reshapes two shipped studios
+     and belongs to its own change". That change is issue 1132, and the rules moved to
+     `BulkDeleteCard.svelte` with the markup they style.
+
+     They could not be left behind. Svelte scoping is per component, so the moment that
+     `<section>` rendered from the primitive these selectors matched nothing and the rendered
+     result would have been the issue 1036 defect back in every studio at once. Nor did they go
+     to `styles/fabricate.css`, for the reason 1129 already recorded: a global rule re-routes
+     every future edit to the broad `theme-or-global-ui` recipe in
+     `scripts/ui-pr-screenshot-evidence.mjs`, which is what the block comment at the top of this
+     `<style>` exists to prevent. */
 </style>

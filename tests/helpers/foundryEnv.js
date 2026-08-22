@@ -5,6 +5,9 @@
  * returns the mutable bits tests assert against. Centralising it keeps the per-test boilerplate from
  * being duplicated across suites.
  */
+import { FABRICATE_SETTINGS_NAMESPACE } from '../../src/config/settings.js';
+import { isWorldScopedSettingKey, settingPermissionError } from './settings.js';
+
 let idSeq = 0;
 
 /**
@@ -39,11 +42,31 @@ export function installFoundryUtilsEnv() {
 /**
  * @param {object} [options]
  * @param {object} [options.craftingSystemManager] - exposed via game.fabricate.getCraftingSystemManager
- * @returns {{ notifications: string[], settings: Map<string, unknown> }}
+ * @param {object[]} [options.actors] - seeds `game.actors`, for suites that assert on an
+ *   actor-flag pass.
+ * @param {boolean} [options.canModifySettings=true] - when `false`, `game.settings.set`
+ *   REFUSES every world-scoped key exactly as Foundry's server does, while
+ *   `game.user.isGM` stays `true`. That pair is the real, reachable configuration: the
+ *   client-side `_assertGM` gate is `game.user.isGM`, while `SETTINGS_MODIFY` is separately
+ *   revocable from assistant GMs, so a manager can pass its own gate and still have the
+ *   write rejected. Every persistence fake in this suite is otherwise omnipotent — a
+ *   `Map.set` that cannot say no — which makes a whole defect class structurally invisible.
+ *   The scope table is read from the REAL setting definitions via `isWorldScopedSettingKey`,
+ *   so it cannot drift from `src/config/settings.js`.
+ * @param {string} [options.userName='Assistant'] - name in the refusal message.
+ * @returns {{ notifications: string[], settings: Map<string, unknown>,
+ *   writes: Array<{key: string, value: unknown}>, refused: string[] }}
  */
-export function installFoundryEnv({ craftingSystemManager } = {}) {
+export function installFoundryEnv({
+  craftingSystemManager,
+  actors = [],
+  canModifySettings = true,
+  userName = 'Assistant',
+} = {}) {
   const notifications = [];
   const settings = new Map();
+  const writes = [];
+  const refused = [];
 
   const fabricate = craftingSystemManager
     ? { getCraftingSystemManager: () => craftingSystemManager }
@@ -63,13 +86,18 @@ export function installFoundryEnv({ craftingSystemManager } = {}) {
   };
 
   globalThis.game = {
-    user: { isGM: true },
-    actors: [],
+    user: { isGM: true, name: userName },
+    actors,
     fabricate,
     settings: {
       get: (_namespace, key) => settings.get(key),
       set: async (_namespace, key, value) => {
+        if (!canModifySettings && isWorldScopedSettingKey(key)) {
+          refused.push(String(key));
+          throw settingPermissionError(userName, `${FABRICATE_SETTINGS_NAMESPACE}.${key}`);
+        }
         settings.set(key, value);
+        writes.push({ key, value });
         return value;
       },
     },
@@ -83,5 +111,5 @@ export function installFoundryEnv({ craftingSystemManager } = {}) {
     },
   };
 
-  return { notifications, settings };
+  return { notifications, settings, writes, refused };
 }

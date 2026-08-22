@@ -1,10 +1,12 @@
 import { ingredientSetToolsAreActive } from '../systems/toolCheckBonus.js';
+import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
-import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
+import { GENERAL_RECIPE_CATEGORY, normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
+import { isEmptyArray, isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 import { Result } from './Result.js';
 
 /**
@@ -14,6 +16,134 @@ import { Result } from './Result.js';
  * @type {string}
  */
 export const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
+
+/**
+ * The teaser fields hidden by default when a recipe carries no authored teaser block.
+ * One source of truth for `_normalizeTeaser`'s two fallbacks AND for the serialization
+ * default below, so a change to the default cannot silently make `toJSON` omit a teaser
+ * the constructor would rebuild differently.
+ * @type {string[]}
+ */
+const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
+
+/**
+ * Whether a normalized teaser block is byte-for-byte the one `_normalizeTeaser` builds
+ * for a recipe that has never had a teaser authored.
+ * @param {unknown} teaser
+ * @returns {boolean}
+ */
+function isDefaultTeaser(teaser) {
+  return (
+    teaser?.enabled === true &&
+    teaser.revealThreshold === 100 &&
+    teaser.teaserDescription === '' &&
+    Array.isArray(teaser.hiddenFields) &&
+    teaser.hiddenFields.length === DEFAULT_TEASER_HIDDEN_FIELDS.length &&
+    teaser.hiddenFields.every((field, index) => field === DEFAULT_TEASER_HIDDEN_FIELDS[index])
+  );
+}
+
+/**
+ * Serialized recipe fields the `Recipe` constructor rebuilds to EXACTLY this value when the
+ * key is absent, so emitting them is pure payload weight (issue 1087).
+ *
+ * Every recipe is written whole on every mutation and replicated to every client, so the
+ * always-emitted defaults were repeated once per recipe in every world setting write, every
+ * socket replication, and both `JSON.stringify` passes of `RecipeManager.reload()`'s change
+ * comparison. Omission is a WRITE-side change only: absence and the default already mean the
+ * same thing on read, which is what makes it safe.
+ *
+ * **This is a hand-maintained mirror of the constructor**, so it is guarded mechanically by
+ * `tests/recipe-serialization-payload.test.js`: every key here must be a key `toJSON` can
+ * emit, must actually be omitted for a fully-defaulted recipe, and a defaulted recipe must
+ * round-trip deep-equal through `fromJSON(toJSON(r))`. Adding a key whose constructor default
+ * does not match its predicate fails that suite rather than silently rewriting stored data.
+ *
+ * Deliberately ABSENT from this table:
+ * - `complex`, because an absent flag is DERIVED (`_deriveComplex`) rather than defaulted, so
+ *   omitting `complex: false` can reconstruct as `true`.
+ * - `metadata`, because an absent block is rebuilt with `Date.now()` timestamps and the
+ *   current user's name, which is not the value that was omitted.
+ * - `id`, `name`, `ingredientSets` and `resultGroups`, which are the recipe's identity and
+ *   its authored shape; an absent `id` mints a new one.
+ *
+ * @type {Record<string, (value: unknown) => boolean>}
+ */
+export const RECIPE_OMITTED_WHEN_DEFAULT = {
+  description: (value) => value === '',
+  img: (value) => value === DEFAULT_RECIPE_IMAGE,
+  category: (value) => value === GENERAL_RECIPE_CATEGORY,
+  craftingSystemId: isNull,
+  system: (value) => value === 'all',
+  tags: isEmptyArray,
+  // `allowPlayerResultReorder: true` is omittable and `enabled: true` is NOT, and the
+  // difference is not about the model — both default true on absence — but about who reads
+  // the SERIALIZED payload. Absence is already a live on-disk state for this one: nothing
+  // ever seeded it (issue 651 deliberately declined to migrate it in), so every reader had
+  // to handle an absent key from the day it existed, and all of them ask `!== false`.
+  // `SignatureValidator.validateSystem` instead scopes its alchemy-collision scan with a
+  // truthy `recipe?.enabled` over payloads that `_assertNoAlchemySignatureCollisions` and
+  // `collectAlchemySignatureBlockers` hand it straight from `toJSON()`, so omitting an
+  // enabled recipe's `enabled` would empty that scan and silently retire the save-block.
+  allowPlayerResultReorder: (value) => value === true,
+  locked: (value) => value === false,
+  recipeItemId: isNull,
+  linkedRecipeItemUuid: isNull,
+  visibility: isNull,
+  // Both grant lists empty is the only omittable shape, and it is the only one that can
+  // co-exist with an omitted key: `_normalizeAccess` seeds `playerIds` from the legacy
+  // `visibility.allowedUserIds`, so a recipe whose legacy list held anything readable
+  // already reports a NON-empty grant here and is emitted.
+  access: (value) => value?.characterIds?.length === 0 && value?.playerIds?.length === 0,
+  steps: isEmptyArray,
+  toolIds: isEmptyArray,
+  timeRequirement: isNull,
+  isVariable: (value) => value === false,
+  transferEffects: (value) => value === false,
+  outcomeRouting: isNull,
+  resultSelection: isNull,
+  checkTierId: isNull,
+  minSuccessOutcomeId: isNull,
+  craftingModifier: isNull,
+  currencyCost: isNull,
+  teaser: isDefaultTeaser,
+  importSource: isNull,
+};
+
+/**
+ * Drop every key of a serialized recipe whose value is the one the constructor rebuilds from
+ * absence, preserving the emitted key order.
+ * @param {Record<string, unknown>} payload
+ * @returns {Record<string, unknown>}
+ */
+const omitRecipeDefaults = (payload) =>
+  omitReconstructibleDefaults(payload, RECIPE_OMITTED_WHEN_DEFAULT);
+
+/**
+ * Serialize ONE result group — the recipe-level and step-level emitters share this so the
+ * two cannot disagree about the group payload.
+ *
+ * `role` and `checkOutcomeIds` are both emitted only when they carry information, as
+ * conditional spreads over the canonical key order (issue 1135). `checkOutcomeIds: []` is
+ * the value `_normalizeResultGroups` rebuilds from absence, and its only two arbiters —
+ * `ResolutionModeService`'s routed-group filters — treat an omitted key and `[]` identically.
+ *
+ * `results` tolerates a plain object as well as a `Result`, because the step emitter is
+ * handed step copies that a caller may have rewritten in place.
+ *
+ * @param {object} group
+ * @returns {Record<string, unknown>}
+ */
+function serializeResultGroup(group) {
+  const checkOutcomeIds = Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [];
+  return {
+    id: group.id,
+    name: group.name,
+    ...(group.role === 'failure' && { role: 'failure' }),
+    ...(checkOutcomeIds.length > 0 && { checkOutcomeIds }),
+    results: (group.results || []).map((result) => (result.toJSON ? result.toJSON() : result)),
+  };
+}
 
 /**
  * Represents a crafting recipe
@@ -97,7 +227,7 @@ export class Recipe {
         ? data.minSuccessOutcomeId.trim()
         : null;
     // The recipe author's PICK of crafting-check modifiers (issues 770, 1055), honoured
-    // only under the system's `byRecipe` ("Recipe picks") combination rule. Absent → the
+    // only under the system's `bySubject` combination rule. Absent → the
     // recipe inherits the system's default eligible modifier ids. Present → names the
     // eligible id subset reduced to the scalar appended to the check roll. It carries
     // NO rule: a recipe chooses WHICH modifiers apply, never HOW they combine, so the
@@ -138,7 +268,7 @@ export class Recipe {
    * **A rule is never persisted here.** Older data may carry a `policy` key from the era
    * when a recipe could override the system's combination rule; it is DROPPED on the way
    * in, so it cannot round-trip back out through `toJSON`. The system owns the rule
-   * outright — `resolveModifierPolicy` (`craftingModifierResolver.js`) reads only
+   * outright — `resolveModifierPolicy` (`checkModifierResolver.js`) reads only
    * `craftingCheck.defaultModifierPolicy` — and dropping the key here keeps the stored
    * shape from implying an override the resolver would never honour.
    *
@@ -151,9 +281,18 @@ export class Recipe {
    * length would flip malformed import data from *inherit* to *none*, which is the
    * unsafe direction.
    *
-   * Kept ids are non-empty strings, de-duplicated in order; catalogue membership is NOT
-   * checked here (the resolver drops unknown ids against the live system catalogue, and
-   * truncates the survivors to `craftingCheck.maxModifierPicks`).
+   * Kept ids are TRIMMED, non-empty strings, de-duplicated in order; catalogue membership
+   * is NOT checked here (the resolver drops unknown ids against the live system catalogue,
+   * and truncates the survivors to `craftingCheck.maxModifierPicks`).
+   *
+   * THE MEMBER COERCION IS THE SHARED ONE (issue 1095). `authoredCheckModifierIds`
+   * (`src/utils/checkModifierPicks.js`) is what `Component.salvage.checkModifierIds` and
+   * `GatheringTask.checkModifierIds` normalize through, and this used to be a local filter
+   * that agreed with it on everything EXCEPT trimming: it rejected a whitespace-only id but
+   * kept `' med '` verbatim, so the same authored id matched its catalogue entry on salvage
+   * and gathering and was dropped as unknown on crafting. One id rule for three subjects, or
+   * the three subjects disagree about what an id IS. The `key` argument is why that helper
+   * takes one: the recipe keeps its own `modifierIds` spelling inside `craftingModifier`.
    *
    * @param {unknown} craftingModifier
    * @returns {{ modifierIds: string[] } | null}
@@ -162,18 +301,11 @@ export class Recipe {
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
     // The authored-ness of the set is decided HERE, before any filtering.
-    const authoredIds = Array.isArray(craftingModifier.modifierIds);
     // No authored id set → nothing picked, so inherit. A legacy `policy` alongside is not
     // a reason to keep the block: it is not honoured, so a block holding only a policy
     // carries no information.
-    if (!authoredIds) return null;
-    const seen = new Set();
-    const modifierIds = craftingModifier.modifierIds.filter((id) => {
-      if (typeof id !== 'string' || id.trim() === '' || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-    return { modifierIds };
+    if (!Array.isArray(craftingModifier.modifierIds)) return null;
+    return authoredCheckModifierIds(craftingModifier.modifierIds, 'modifierIds');
   }
 
   /**
@@ -529,8 +661,19 @@ export class Recipe {
     }
   }
 
+  /**
+   * Serialize to the canonical persisted recipe shape.
+   *
+   * TWO THINGS ARE DELIBERATELY NOT HERE (issue 1087). The flat top-level `results` alias is
+   * no longer emitted — it duplicated `resultGroups[].results` wholesale and was 10% of a
+   * representative payload — and every field whose value is the one the constructor rebuilds
+   * from absence is dropped by `omitReconstructibleDefaults`. Neither is a read-side change:
+   * `Recipe` still accepts the alias forever (see `_normalizeResultGroups`) and still defaults
+   * every omitted key to exactly the value that was omitted.
+   * @returns {Record<string, unknown>}
+   */
   toJSON() {
-    return {
+    return omitRecipeDefaults({
       id: this.id,
       name: this.name,
       description: this.description,
@@ -553,29 +696,13 @@ export class Recipe {
       steps: this.steps.map((step) => ({
         ...step,
         ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
-        resultGroups: (step.resultGroups || []).map((group) => ({
-          id: group.id,
-          name: group.name,
-          ...(group.role === 'failure' && { role: 'failure' }),
-          checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
-          results: (group.results || []).map((result) =>
-            result.toJSON ? result.toJSON() : result
-          ),
-        })),
+        resultGroups: (step.resultGroups || []).map(serializeResultGroup),
         toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : [],
       })),
       ingredientSets: this.ingredientSets.map((s) => s.toJSON()),
-      resultGroups: this.resultGroups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        ...(group.role === 'failure' && { role: 'failure' }),
-        checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
-        results: group.results.map((r) => r.toJSON()),
-      })),
+      resultGroups: this.resultGroups.map(serializeResultGroup),
       toolIds: [...this.toolIds],
       timeRequirement: this.timeRequirement,
-      // Legacy alias retained for compatibility with older consumers.
-      results: this.results.map((r) => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
@@ -587,7 +714,7 @@ export class Recipe {
       teaser: this.teaser,
       metadata: this.metadata,
       importSource: this.importSource,
-    };
+    });
   }
 
   static fromJSON(data) {
@@ -705,6 +832,17 @@ export class Recipe {
       }));
     }
 
+    // PERMANENT INBOUND SHIM — do not remove with a "the alias is gone" cleanup.
+    //
+    // `toJSON` stopped EMITTING the flat top-level `results` alias (issue 1087),
+    // and that is a write-side change only. Every world saved before it, every crafting
+    // system exported before it, and every third-party payload authored against it still
+    // carries the alias as its only result data, and none of them is reachable to migrate.
+    // Reading it is therefore not a migration window that closes: retiring THIS is a
+    // different decision from retiring the emission, and it is not one issue 1087 took.
+    //
+    // Each legacy flat result becomes its own single-result group, which is what the alias
+    // meant before result groups existed.
     const legacyResults = Array.isArray(data.results) ? data.results : [];
     return legacyResults.map((r, idx) => {
       const result = r instanceof Result ? r : Result.fromJSON(r);
@@ -834,7 +972,7 @@ export class Recipe {
     if (!teaser || typeof teaser !== 'object') {
       return {
         enabled: true,
-        hiddenFields: ['ingredients', 'results', 'description'],
+        hiddenFields: [...DEFAULT_TEASER_HIDDEN_FIELDS],
         revealThreshold: 100,
         teaserDescription: '',
       };
@@ -844,7 +982,7 @@ export class Recipe {
       enabled: teaser.enabled !== false,
       hiddenFields: Array.isArray(teaser.hiddenFields)
         ? teaser.hiddenFields.filter((f) => VALID_FIELDS.includes(f))
-        : ['ingredients', 'results', 'description'],
+        : [...DEFAULT_TEASER_HIDDEN_FIELDS],
       revealThreshold: Math.min(100, Math.max(0, Number(teaser.revealThreshold) || 100)),
       teaserDescription: String(teaser.teaserDescription || '').trim(),
     };

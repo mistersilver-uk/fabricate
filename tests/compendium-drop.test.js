@@ -366,6 +366,133 @@ test('addItemsFromPack — throws for unknown packId', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Issue 1086: bulk import write amplification.
+//
+// `save()` replaces the WHOLE `craftingSystems` world setting, so a per-item save
+// makes a bulk import quadratic in corpus size. These are counter assertions, not
+// timings: the defect is algorithmic, so the invariant is the number of corpus
+// writes, and it must not grow with the number of imported items.
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace a manager's `save` with a counting stub that also records what the corpus
+ * held at each write, so a test can assert both HOW MANY writes a path issued and
+ * WHAT the flush actually carried.
+ */
+function countCorpusWrites(mgr, systemId) {
+  const record = { calls: 0, componentNamesAtLastWrite: [] };
+  mgr.save = async () => {
+    record.calls += 1;
+    record.componentNamesAtLastWrite = (mgr.getSystem(systemId)?.components || []).map(c => c.name);
+  };
+  return record;
+}
+
+/** A mock pack of `count` distinct Item documents named `Item 1`…`Item N`. */
+function mockPackOfItems(packId, count) {
+  const documents = Array.from({ length: count }, (_, index) => ({
+    id: `item-${index + 1}`,
+    documentName: 'Item',
+    name: `Item ${index + 1}`,
+    img: `item-${index + 1}.png`
+  }));
+  _mockPacks.set(packId, { getDocuments: async () => documents });
+  return documents;
+}
+
+test('addItemsFromPack — issues ONE corpus write for the whole batch, whatever the item count', async () => {
+  const small = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+  const smallWrites = countCorpusWrites(small, 'sys1');
+  mockPackOfItems('world.batch-small', 3);
+  const smallResult = await small.addItemsFromPack('sys1', 'world.batch-small');
+
+  const large = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+  const largeWrites = countCorpusWrites(large, 'sys1');
+  mockPackOfItems('world.batch-large', 30);
+  const largeResult = await large.addItemsFromPack('sys1', 'world.batch-large');
+
+  assert.equal(smallResult.added, 3, 'the small batch must actually import its items');
+  assert.equal(largeResult.added, 30, 'the large batch must actually import its items');
+  assert.equal(smallWrites.calls, 1, 'a 3-item import writes the corpus once');
+  assert.equal(largeWrites.calls, 1, 'a 30-item import writes the corpus once');
+  assert.equal(
+    largeWrites.calls,
+    smallWrites.calls,
+    'the corpus write count must be independent of the number of imported items'
+  );
+  assert.equal(
+    largeWrites.componentNamesAtLastWrite.length,
+    30,
+    'the single write must carry every imported component, not just the last one'
+  );
+});
+
+test('addItemFromUuid — a single-item caller still writes per call (positive control for the batch counter)', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+  const writes = countCorpusWrites(mgr, 'sys1');
+
+  for (const uuid of ['Item.one', 'Item.two', 'Item.three', 'Item.four']) {
+    await mgr.addItemFromUuid('sys1', uuid);
+  }
+
+  // The counter DOES move with item count when nothing batches the writes: this is
+  // what makes the `calls === 1` above a statement about batching rather than an
+  // artefact of a stub that never increments.
+  assert.equal(writes.calls, 4, 'each single-item import persists immediately, one write each');
+  assert.equal(mgr.getSystem('sys1').components.length, 4);
+});
+
+test('addItemsFromPack — an all-skipped re-drop writes the corpus zero times', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      { id: 'comp-1', name: 'Item 1', registeredItemUuid: 'Compendium.world.batch-redrop.item-1' },
+      { id: 'comp-2', name: 'Item 2', registeredItemUuid: 'Compendium.world.batch-redrop.item-2' }
+    ]
+  }]);
+  const writes = countCorpusWrites(mgr, 'sys1');
+  mockPackOfItems('world.batch-redrop', 2);
+
+  const result = await mgr.addItemsFromPack('sys1', 'world.batch-redrop');
+
+  assert.equal(result.skipped, 2);
+  assert.equal(writes.calls, 0, 'nothing changed in the corpus, so nothing is written');
+});
+
+test('addItemsFromPack — a mid-batch failure flushes the items already imported and still throws', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+  const writes = countCorpusWrites(mgr, 'sys1');
+  const documents = mockPackOfItems('world.batch-fails', 5);
+
+  // The fourth document resolves to an Actor, which `addItemFromUuid` rejects. The pack
+  // filter cannot see this: it screens the pack's own documents, while the manager
+  // re-resolves each uuid through `fromUuid`.
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.world.batch-fails.item-4') {
+      return { documentName: 'Actor', name: 'Not an item' };
+    }
+    return documents.find(doc => `Compendium.world.batch-fails.${doc.id}` === uuid) ?? null;
+  };
+
+  await assert.rejects(
+    () => mgr.addItemsFromPack('sys1', 'world.batch-fails'),
+    /Cannot add non-Item document/,
+    'the failure must still surface to the caller'
+  );
+
+  globalThis.fromUuid = async () => null;
+
+  assert.equal(writes.calls, 1, 'the partial batch is flushed by exactly one write');
+  assert.deepEqual(
+    writes.componentNamesAtLastWrite,
+    ['Item 1', 'Item 2', 'Item 3'],
+    'the successes preceding the failure must be persisted, not lost'
+  );
+  assert.equal(mgr.getSystem('sys1').components.length, 3);
+});
+
+// ---------------------------------------------------------------------------
 // Defect 1: Source-ID-aware overwrite
 // ---------------------------------------------------------------------------
 

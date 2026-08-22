@@ -1,3 +1,5 @@
+import { normalizeConfirmOptions } from './svelte/util/foundryBridge.js';
+
 export function getDragEventData(event) {
   // Strategy 1: Foundry v13+ API (evaluated at call time, not module load time)
   const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;
@@ -16,10 +18,26 @@ export function getDragEventData(event) {
   return null;
 }
 
+/**
+ * A yes/no confirmation, through the shared confirm-shape mapping to `DialogV2.confirm`.
+ *
+ * `normalizeConfirmOptions` (`svelte/util/foundryBridge.js`, one definition for both
+ * confirm seams) is what makes a top-level `title` reach the title bar and a function
+ * `yes`/`no` reach the merged button; its docblock carries the Foundry facts and the
+ * reason this is NOT routed through `normalizeDialogOptions` below. Issue 1132 found the
+ * defect on the recipe delete, issue 1154 closed it centrally for every call site.
+ *
+ * ONE thing this cannot do for you: the affirmative LABEL. `DialogV2.confirm` defaults it
+ * to `"Yes"` (V13.351) or `"COMMON.Yes"` (V14.365), which is not what a destructive
+ * confirm should ask, so every such caller passes its own localized `yes.label`.
+ *
+ * @param {object} options
+ * @returns {Promise<boolean>}
+ */
 export async function confirmDialog(options) {
   const DialogV2 = foundry.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;
-  return DialogV2.confirm(options);
+  return DialogV2.confirm(normalizeConfirmOptions(options));
 }
 
 function normalizeDialogOptions(options = {}) {

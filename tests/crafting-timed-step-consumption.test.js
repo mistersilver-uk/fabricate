@@ -201,12 +201,16 @@ function buildRecipeManager({ ingredientSet, canCraft = true, missing = null }) 
   };
 }
 
-function setupGame(system, worldTime = 1000) {
+// `worldCurrency` is the issue-1278 world currency configuration. It is optional because most
+// tests in this file never touch currency; the ones that do pass the ladder they authored, which
+// no longer rides on the crafting system.
+function setupGame(system, worldTime = 1000, worldCurrency = null) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: (id) => (id === system.id ? system : null) }),
       getResolutionModeService: () => null,
       getRecipeVisibilityService: () => null,
+      ...(worldCurrency ? { getCurrencyConfigStore: () => ({ get: () => worldCurrency }) } : {}),
     },
     user: { id: 'user-gm', isGM: true },
     time: { worldTime },
@@ -1117,6 +1121,7 @@ const {
   TWO_TERMINAL_CURRENCY_UNITS,
   makeCurrencyCraftingSystem,
   makeDelegatingCoinSpender,
+  makeWorldCurrencyConfig,
 } = await import('./helpers/currency-spend-fixtures.js');
 
 // Drive a timed craft's START phase with a real currency profile and a delegating
@@ -1135,10 +1140,9 @@ async function startTimedCurrencyCraft({
 }) {
   const system = makeCurrencyCraftingSystem({
     id: 'sys-currency-settlement',
-    units,
     components: [{ id: 'wood', name: 'Wood' }],
   });
-  setupGame(system, 1000);
+  setupGame(system, 1000, makeWorldCurrencyConfig({ units }));
 
   const wood = new FakeItem('wood', 'Wood', 5);
   const sourceActor = new FakeActor('Source', [wood]);

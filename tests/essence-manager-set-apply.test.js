@@ -55,6 +55,7 @@ globalThis.Hooks = { callAll: () => {} };
 console.debug = () => {};
 
 const { Recipe } = await import('../src/models/Recipe.js');
+const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeActivationError } = await import('../src/systems/RecipeActivationError.js');
@@ -395,6 +396,8 @@ test('1036/15: the same input through the SET form completes and persists too', 
     essenceIds: ['fire', 'water'],
     recipesUpdated: 2,
     // The set form multiplies the abort: one bad recipe took the whole selection with it.
+    // Only r1 loses its shape — r2 keeps a surviving component ingredient group.
+    recipesDisabled: 1,
   });
   assert.deepEqual(
     recipeManager.recipes.get('r1').toJSON().ingredientSets,
@@ -402,9 +405,13 @@ test('1036/15: the same input through the SET form completes and persists too', 
     'the essence-only set was dropped for the set form too'
   );
   assert.deepEqual(
-    Object.keys(recipeManager.recipes.get('r2').toJSON().ingredientSets[0].essences),
+    Object.keys(recipeManager.recipes.get('r2').toJSON().ingredientSets[0].essences || {}),
     [],
     'and the ordinary per-set map recipe was rewritten in the same pass'
+  );
+  assert.ok(
+    !('essences' in recipeManager.recipes.get('r2').toJSON().ingredientSets[0]),
+    'an emptied legacy map is omitted rather than written back as {} (issue 1135)'
   );
   assert.equal(countWrites('craftingSystems'), 1);
   assert.equal(countWrites('recipes'), 1);
@@ -444,16 +451,31 @@ test('1036: a SURVIVING set does not RESURRECT the deleted essence through the s
 
   const set = recipeManager.recipes.get('r1').toJSON().ingredientSets[0];
   assert.deepEqual(set.ingredientGroups, [], 'the essence-only group is gone and stays gone');
-  assert.deepEqual(set.ingredients, [], 'the flat mirror went with it');
+  // Since issue 1135 the mirror is not written at all, which is a STRONGER guarantee than
+  // the `[]` this used to assert: there is nothing left for the constructor to rebuild a
+  // group from. The hydrated set proves the mirror is empty where it still exists.
+  assert.ok(!('ingredients' in set), 'the flat mirror went with it');
+  assert.deepEqual(
+    recipeManager.recipes.get('r1').ingredientSets[0].ingredients,
+    [],
+    'and the in-memory mirror derives nothing from the emptied groups'
+  );
   assert.deepEqual(set.essences, { water: 1 }, 'and the set survives on its remaining requirement');
 });
 
-test('1036: the flat mirror is DERIVED from the stripped groups, never filtered in place', async () => {
+test('1036/1135: the stale flat mirror is DROPPED for a grouped set, never filtered in place', async () => {
   // A group whose essence option is stripped but which still carries a component option
-  // must surface THAT option in `ingredients` — which is what `IngredientSet` itself
-  // would derive. Asserted on `_stripEssenceFromSets` directly because the `Recipe`
-  // round-trip re-derives the mirror whenever the groups are non-empty, and would
-  // therefore hide a wrong answer here.
+  // must never leave `ingredients` naming the deleted essence. This used to be settled by
+  // RECOMPUTING the mirror from the surviving groups; since issue 1135 `toJSON` does not
+  // emit the alias at all. Recomputing it here would not reach disk — `updateRecipe` rebuilds
+  // via `Recipe.fromJSON` and persists `toJSON()` — but it would leave the intermediate patch
+  // carrying a second ingredient authority per set, the issue-1036 hazard. Dropping it is the
+  // stronger answer, because `IngredientSet` derives the mirror from the stripped groups on
+  // read — which the second assertion proves, and which is the property the original test
+  // was really after.
+  //
+  // Asserted on `_stripEssenceFromSets` directly because the `Recipe` round-trip re-derives
+  // the mirror whenever the groups are non-empty, and would therefore hide a wrong answer.
   const { manager } = makeFixture({ essenceDefinitions: [makeEssence({ id: 'fire' })] });
 
   const [stripped] = manager._stripEssenceFromSets(
@@ -475,10 +497,14 @@ test('1036: the flat mirror is DERIVED from the stripped groups, never filtered 
     'fire'
   );
 
+  assert.ok(
+    !('ingredients' in stripped),
+    'the stale mirror naming the deleted essence is gone from the payload'
+  );
   assert.deepEqual(
-    stripped.ingredients.map((ingredient) => ingredient.match?.type),
+    IngredientSet.fromJSON(stripped).ingredients.map((ingredient) => ingredient.match?.type),
     ['component'],
-    'the mirror names the surviving component option, not the deleted essence and not nothing'
+    'and the derived mirror names the surviving component option, not the deleted essence'
   );
 });
 
@@ -538,6 +564,8 @@ test('1036/16: a NON-ALCHEMY bulk delete of 3 essences across 2 shared recipes i
     deleted: 3,
     essenceIds: ['fire', 'water', 'air'],
     recipesUpdated: 2,
+    // Both recipes keep a surviving component ingredient group, so neither loses its shape.
+    recipesDisabled: 0,
   });
   assert.equal(countWrites('craftingSystems'), 1, 'ONE craftingSystems write');
   assert.equal(countWrites('recipes'), 1, 'ONE recipes write — not one per rewritten recipe');
@@ -554,7 +582,7 @@ test('1036/16: a NON-ALCHEMY bulk delete of 3 essences across 2 shared recipes i
   );
   for (const id of ['r1', 'r2']) {
     assert.deepEqual(
-      Object.keys(recipeManager.recipes.get(id).toJSON().ingredientSets[0].essences),
+      Object.keys(recipeManager.recipes.get(id).toJSON().ingredientSets[0].essences || {}),
       [],
       `${id} was rewritten once and lost every deleted essence`
     );
@@ -576,6 +604,42 @@ test('1036/16 negative control: the un-batched per-essence shape exceeds that bo
   assert.ok(
     countWrites('recipes') > 1,
     'and more than one recipes write, each a full replace plus a client-wide hook'
+  );
+});
+
+// Issue 1144 — `deleteEssences` mirrors `deleteComponents`'s `recipesDisabled` count: an
+// enabled->disabled TRANSITION, not the resulting disabled state. A recipe that was already
+// disabled before the delete is clamped along with the rest but must NOT inflate the count,
+// or a GM re-running a delete against an already-shaky library would be warned about recipes
+// it cannot possibly still be disabling.
+test('1036/1144: deleteEssences counts the enabled->disabled TRANSITION, not already-disabled recipes', async () => {
+  const { manager, recipeManager } = makeFixture({
+    essenceDefinitions: [makeEssence({ id: 'fire' })],
+    recipes: [
+      recipeRequiringOnlyEssence('r-already-disabled', 'fire', { enabled: false }),
+      recipeRequiringOnlyEssence('r-newly-disabled', 'fire', { enabled: true }),
+      recipeRequiring('r-survives', { fire: 1 }, { enabled: true }),
+    ],
+  });
+
+  const result = await manager.deleteEssences(SYSTEM_ID, ['fire']);
+
+  assert.equal(
+    result.recipesDisabled,
+    1,
+    'only the recipe actually taken from enabled to disabled is counted'
+  );
+  assert.equal(result.recipesUpdated, 3, 'all three referencing recipes were rewritten');
+  assert.equal(
+    recipeManager.recipes.get('r-already-disabled').enabled,
+    false,
+    'the already-disabled recipe is still clamped, just not counted'
+  );
+  assert.equal(recipeManager.recipes.get('r-newly-disabled').enabled, false);
+  assert.equal(
+    recipeManager.recipes.get('r-survives').enabled,
+    true,
+    'a recipe keeping a surviving component requirement is not disabled at all'
   );
 });
 
@@ -603,11 +667,13 @@ test('1036: deleteEssences ignores unknown ids and is a no-op for an empty selec
     deleted: 0,
     essenceIds: [],
     recipesUpdated: 0,
+    recipesDisabled: 0,
   });
   assert.deepEqual(await manager.deleteEssences(SYSTEM_ID, []), {
     deleted: 0,
     essenceIds: [],
     recipesUpdated: 0,
+    recipesDisabled: 0,
   });
   assert.equal(settingWrites.length, 0, 'neither issued a world write');
 });

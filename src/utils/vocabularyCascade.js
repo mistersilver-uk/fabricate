@@ -134,7 +134,16 @@ function stripTagFromIngredientSet(set, target) {
   const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
   if (groups.length > 0) {
     const next = stripTagFromGroups(groups, target);
-    return next ? { ...set, ingredientGroups: next } : null;
+    if (!next) return null;
+    // The `...set` spread used to carry a STALE flat mirror through unchanged, so a tag
+    // cascade left the retired `ingredients` alias still naming the tag it had just
+    // removed. `toJSON` no longer emits that alias (issue 1135) and `IngredientSet`
+    // derives it from the groups on read, so DROP it rather than recompute it. Only a set
+    // that HAS groups reaches here, which is why no flat-authored set can lose its only
+    // ingredient data to this branch.
+    const rewritten = { ...set, ingredientGroups: next };
+    delete rewritten.ingredients;
+    return rewritten;
   }
   const ingredients = stripTagFromRefs(set?.ingredients, target);
   return ingredients ? { ...set, ingredients } : null;

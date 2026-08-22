@@ -3,6 +3,13 @@
 // loads the stylesheet via module.json's "styles" field instead.
 import '../styles/fabricate.css';
 
+import {
+  TOOL_IMAGE_SENTINEL,
+  linkedComponentFor,
+  resolveToolDisplayImage,
+  resolveToolDisplayName,
+} from './models/toolDisplay.js';
+import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
@@ -13,11 +20,12 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
+import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
-import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIdsForSystem } from './systems/gatheringRealmDiscovery.js';
+import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIds } from './systems/gatheringRealmDiscovery.js';
 import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
-import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
+import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
@@ -33,6 +41,7 @@ import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, prim
 import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
+import { composeStartupPassList } from './systems/startupPassComposition.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -46,6 +55,7 @@ import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
+import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVocabulary.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
@@ -53,8 +63,12 @@ import {
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+// The item -> managed-component resolver the crafting listing's summary phase tallies held
+// stacks with (issue 1075), shared with InventoryListingBuilder's owned-row matching.
+import { findMatchingComponent } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
+import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -76,6 +90,8 @@ import {
   getInteractablesManagerAppClass
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
+import { managerExtensions } from './ui/managerExtensions.js';
+import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
@@ -87,7 +103,7 @@ import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
-import { MigrationRunner } from './migration/MigrationRunner.js';
+import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
@@ -97,7 +113,7 @@ import {
   ActorPropertyCoinSpender,
 } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
-import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
+import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
@@ -144,6 +160,16 @@ const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 // Separate budget for the blind-start relay (issue 901) so a burst of gathers and
 // a burst of starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
+
+// The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
+// could not be read, or could not be written. One complete localized sentence per reason,
+// selected by a positive lookup, because the two differ in what the GM must do — only the
+// writeback failure instructs a reload, since only that path leaves this session holding a
+// transformed copy of data that was never saved.
+const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
+  [MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED]: 'FABRICATE.Migration.Deferred.CorpusUnreadable',
+  [MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED]: 'FABRICATE.Migration.Deferred.WritebackFailed'
+});
 
 // The GM-only crafting system manager app is deferred to a lazy chunk so
 // non-GM players never download/parse its subtree at module init. The dynamic
@@ -562,6 +588,14 @@ class Fabricate {
   async initialize() {
     console.log('Fabricate | Initializing...');
 
+    // Explicit performance boundaries around startup (issue 1073). The Foundry perf profile
+    // reports "ready time attributable to Fabricate"; without marks that attribution is a guess,
+    // because a stopwatch around the `ready` hook also times Foundry, the game system and every
+    // other active module. `createStartupMarks` is total — an absent or partial `performance`
+    // degrades to a no-op — so this can never fail a boot.
+    this._startupMarks = createStartupMarks();
+    this._startupMarks.begin(STARTUP_PHASES.INITIALIZE);
+
     // Register settings
     this.registerSettings();
     applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
@@ -572,10 +606,29 @@ class Fabricate {
     // key: it is brand new, so no prior stored value exists to migrate.
     applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data
+    this._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
     await this._runMigrations();
+    this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
     // Create managers
+    // Both seams are lazy closures because `craftingSystemManager` is constructed on the
+    // next statement — it needs `recipeManager` in ITS constructor, so one of the two has
+    // to be resolved late. `getCraftingSystemManager` (issue 1072) is what the twelve
+    // paths inside RecipeManager that used to read `game.fabricate` directly now go
+    // through, which is why they no longer depend on the `ready`-hook global at all.
+    // The world currency configuration (issue 1278). Constructed FIRST because both the
+    // recipe manager and the crafting engine take it as a collaborator: currency is world
+    // scope, so the ladder is resolved once here rather than per crafting system. It reads
+    // only settings, so it has no dependency of its own to wait for.
+    this.currencyConfigStore = new CurrencyConfigStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.currencyConfigStore.load();
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      getCraftingSystemManager: () => this.craftingSystemManager ?? null,
+      currencyConfigStore: this.currencyConfigStore,
     });
     // Issue 800: the manager RESOLVES source descriptions through Foundry's own
     // enricher at its async ingestion boundaries, so a content link is stored as the
@@ -598,7 +651,15 @@ class Fabricate {
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
       evaluateExpression: evaluateGatheringExpression
     });
-    this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
+    this.recipeVisibilityService = new RecipeVisibilityService(
+      this.recipeManager,
+      this.craftingSystemManager,
+      undefined,
+      // A per-pass INVENTORY SNAPSHOT collaborator, not a visibility one (issue 1228). Every
+      // production snapshot is built with the same identity pair, so the one this service
+      // hands down is interchangeable with the crafting listing's rather than a half of one.
+      findMatchingComponent
+    );
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
       getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
     });
@@ -639,15 +700,29 @@ class Fabricate {
       {
         getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
         getCraftingSystem: systemId => this.craftingSystemManager.getSystem(systemId),
-        resolveItemUuid: uuid => fromUuid(uuid)
+        resolveItemUuid: uuid => fromUuid(uuid),
+        currencyConfigStore: this.currencyConfigStore
       }
     );
 
-    // Initialize recipe manager
+    // Initialize recipe manager. Both `initialize()` calls deserialize a whole world-setting
+    // payload, so this span is the corpus-proportional half of startup.
+    this._startupMarks.begin(STARTUP_PHASES.DATA_LOAD);
     await this.recipeManager.initialize();
     await this.craftingSystemManager.initialize();
+    this._startupMarks.end(STARTUP_PHASES.DATA_LOAD);
+    // The WORLD travel configuration (issue 1282): the realm library, the reveal mode and the
+    // modifier visibility. Constructed FIRST because the environment store validates realm
+    // references against it, and the resolver and engine both read realms through it.
+    this.gatheringRealmStore = new GatheringRealmStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.gatheringRealmStore.load();
     this.gatheringEnvironmentStore = new GatheringEnvironmentStore({
       systemManager: this.craftingSystemManager,
+      travelStore: this.gatheringRealmStore,
       runCleanup: {
         removeRunsForSystem: (systemId) => this.gatheringRunManager.removeRunsForSystem(systemId),
         removeRunsForEnvironment: (environmentId) => this.gatheringRunManager.removeRunsForEnvironment(environmentId),
@@ -655,11 +730,9 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
-    // Per-system gathering realms + Fabricate-managed parties + current-realm
-    // resolver for location-aware gathering. Parties persist to a world setting;
-    // realms live on the crafting system via the realm store's updateSystem
-    // seam. The resolver is constructor-injected into the engine (not imported).
-    this.gatheringRealmStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
+    // Fabricate-managed parties + the current-realm resolver for location-aware gathering.
+    // Both are world scope; the resolver is constructor-injected into the engine, never
+    // imported, so the engine stays testable without Foundry.
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
@@ -670,7 +743,7 @@ class Fabricate {
     this.gatheringPartyStore.load();
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
-      systemManager: this.craftingSystemManager,
+      travelStore: this.gatheringRealmStore,
       // Live token-derived sensing: which Scene Region UUIDs the party's travel
       // marker token currently sits inside, across the marker's own scene(s).
       // Prefer Foundry's AUTHORITATIVE membership (V13 `TokenDocument#regions`),
@@ -779,6 +852,7 @@ class Fabricate {
       }),
       getRunViewer: getGatheringRunViewer,
       locationResolver: this.gatheringLocationService,
+      travelStore: this.gatheringRealmStore,
       localize: localizeGathering,
       // Interactable-scoped node respawn enumeration (issue 302): scan scenes for
       // scoped-node behaviours and route the changed `system.node` write through the
@@ -842,20 +916,6 @@ class Fabricate {
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
-    const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
-    const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
-    const validSalvageComponentsBySystem = new Map(
-      this.craftingSystemManager.getSystems().map(system => [
-        system.id,
-        new Set((system.components || []).map(component => component.id))
-      ])
-    );
-    // Flatten the per-system salvage component sets the run cleanup below already
-    // computed: the progressive-order map's `salvage:<componentId>` keys are not
-    // system-scoped, so the prune needs one flat id set.
-    const validComponentIds = new Set(
-      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
-    );
     // Housekeeping that drops entries naming deleted content. Each pass is
     // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
     // refused or otherwise failed write must never prevent `this.ready` below —
@@ -864,38 +924,45 @@ class Fabricate {
     // Each pass is also scoped to the actors this client owns (see
     // `selectWritableActors`), so a refusal should no longer be reachable at all;
     // this guard is the belt to that braces.
-    await runStartupMaintenance([
-      ['crafting runs', () =>
-        this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
-      // Prune legacy phantom crafting runs: a single-step recipe with no time
-      // requirement can never legitimately persist an active run, so any such run left
-      // in the active store predates the craft() cleanup guard and is stranded.
-      ['phantom crafting runs', () =>
-        this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
-          this.recipeManager.getRecipe(id)
-        )],
-      ['salvage runs', () =>
-        this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem)],
-      ['learned recipes', () =>
-        this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes)],
-      ['stale preferences', () =>
-        cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
-          resolveGatheringActor,
-          isSelectableGatheringActor,
-          validComponentIds
-        })]
-    ]);
+    //
+    // The pass list itself is composed by `composeStartupPassList` (issue 1224), which
+    // computes the valid-id sets and omits any pass no entity kind declares. The call sits
+    // BELOW both `initialize()` calls so the id sets are derived from the corpus this boot
+    // actually loaded, and `getSetting` is passed as the ACCESSOR rather than a value read
+    // earlier in this method.
+    this._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
+    await runStartupMaintenance(composeStartupPassList({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      craftingRunManager: this.craftingRunManager,
+      salvageRunManager: this.salvageRunManager,
+      recipeVisibilityService: this.recipeVisibilityService,
+      getSetting,
+      setSetting,
+      resolveGatheringActor,
+      isSelectableGatheringActor
+    }));
+    this._startupMarks.end(STARTUP_PHASES.STARTUP_MAINTENANCE);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
 
+    // Close the outer span BEFORE readiness is announced, so anything waiting on
+    // `whenReady()` observes a complete `fabricate:initialize` measure. It sits ABOVE
+    // `this.ready = true` deliberately: `tests/components/manager-launch-readiness.test.js`
+    // pins `this.ready = true;` and `this._resolveReady?.();` as adjacent lines, and that
+    // adjacency is the guard against readiness drifting away from the flag it announces.
+    this._startupMarks.end(STARTUP_PHASES.INITIALIZE);
     this.ready = true;
     this._resolveReady?.();
     console.log('Fabricate | Ready');
   }
 
+
   /**
    * Run versioned startup data migrations via MigrationRunner.
+   *
+   * @returns {Promise<void>}
    */
   async _runMigrations() {
     // Primary-GM only, so exactly one client runs the migration pass in a multi-GM
@@ -921,6 +988,26 @@ class Fabricate {
     });
     const summary = await runner.run();
 
+    // Deferred pass (issue 1242): a corpus could not be read, or a writeback
+    // leg failed, so the pass persisted nothing and left `migrationVersion` where it found it.
+    // This is NOT an abort — there is no failed document to remediate and no downgrade target
+    // to recommend — so it gets its own permanent GM notice rather than the recovery dialog.
+    // Placed ABOVE the abort branch because a deferred summary reports `aborted: false`.
+    if (summary?.deferred === true) {
+      console.error(`Fabricate | migration pass deferred (${summary.deferredReason})`, summary.deferredError ?? '');
+      if (game.user?.isGM) {
+        // A COMPLETE localized sentence per reason; only the writeback failure instructs a
+        // reload, and that distinction is the point. On a writeback failure the migrations
+        // have already transformed this session's live setting values, so a GM who keeps
+        // working writes migrated records back under an un-advanced version. The read
+        // failure refuses before any migration runs, so nothing in the session was touched.
+        const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
+        const message = game.i18n?.localize?.(key) || key;
+        ui.notifications?.error?.(message, { permanent: true });
+      }
+      return;
+    }
+
     // Aborted pass: a fatal migration error rolled the in-memory data back and
     // persisted nothing (migrationVersion is unchanged). Surface a GM-facing error
     // notification and return early WITHOUT firing any success notices. Detailed
@@ -928,7 +1015,7 @@ class Fabricate {
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
         const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
-          || 'Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance.';
+          || "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance.";
         ui.notifications?.error?.(message);
       }
       return;
@@ -1016,6 +1103,25 @@ class Fabricate {
       );
       if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
       else ui.notifications?.info?.(notice.message);
+    }
+
+    // One-time GM-facing notice: the 1.23.0 migration merged each system's two modifier
+    // libraries into one, and where the same id was authored in BOTH the gathering entry
+    // was RE-KEYED. That is a visible rename in the authoring surface — the GM opens
+    // Modifiers and finds `strength-gathering` beside `strength` — so it is reported
+    // rather than left to be discovered. Only systems that actually collided are listed;
+    // a clean merge is silent. PRIMARY-GM ONLY, like every notice above it, because
+    // `_runMigrations` returns early unless this client is the active GM.
+    const unifiedModifierCollisions = Array.isArray(summary?.unifiedModifierCollisions)
+      ? summary.unifiedModifierCollisions : [];
+    if (unifiedModifierCollisions.length > 0 && game.user?.isGM) {
+      const total = unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0);
+      const systemList = unifiedModifierCollisions.map((entry) => entry.system).join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
+        count: total,
+        systems: systemList,
+      }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
+      ui.notifications?.warn?.(message, { permanent: true });
     }
   }
 
@@ -1124,6 +1230,24 @@ class Fabricate {
   }
 
   /**
+   * Get the world currency configuration store (issue 1278).
+   *
+   * World scope, not per crafting system: a world runs one Foundry game system and so has
+   * one way actors store coins. A crafting system decides only whether it participates.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching the coin-spender accessors below and
+   * for the same reason: this is the global fallback `getCurrencyRequirementConfig` reads when
+   * no seam was injected. That resolver guards the call with optional chaining, which catches an
+   * absent accessor but NOT a thrown error, so a readiness throw here would surface as a crash on
+   * the craftability path rather than the empty ladder the resolver is written to tolerate.
+   *
+   * @returns {CurrencyConfigStore|null}
+   */
+  getCurrencyConfigStore() {
+    return this.currencyConfigStore ?? null;
+  }
+
+  /**
    * Get the per-system gathering realm store.
    *
    * @returns {GatheringRealmStore|null}
@@ -1153,7 +1277,7 @@ class Fabricate {
   }
 
   /**
-   * Read redaction-safe current-realm evidence for a selected actor and system.
+   * Read redaction-safe current-realm evidence for a selected actor, gated on a system.
    * Player-callable: the result reports only the resolved source token and
    * disclosure-safe realm display data, never raw secret realm records.
    *
@@ -1166,17 +1290,21 @@ class Fabricate {
     if (!resolvedActor || !systemId) return null;
     // Realm/travel disabled for this system ⇒ no location surface at all.
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor, systemId });
+    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor });
     if (!context) return null;
     const isGM = game.user?.isGM === true;
-    const system = this.craftingSystemManager?.getSystem(systemId);
-    const revealMode = system?.gatheringRealmSettings?.revealMode || 'manual';
-    const discoveredRealmIds = getDiscoveredRealmIdsForSystem(resolvedActor, systemId);
+    // Reveal mode and realm discovery are both WORLD facts now (issue 1282). `systemId` above
+    // remains the GATE — whether this system surfaces a location at all — and nothing more.
+    const revealMode = getRealmRevealMode(this.gatheringRealmStore?.get?.());
+    const discoveredRealmIds = getDiscoveredRealmIds(resolvedActor);
     return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRealmIds });
   }
 
   /**
-   * Set a party's manual current-realm override for one crafting system. GM-only.
+   * Set a party's manual current-realm override. GM-only.
+   *
+   * A party has ONE override since issue 1282, so `systemId` gates the write — whether that
+   * system participates in travel — rather than selecting which override is written.
    *
    * @param {{ partyId: string, systemId: string, realmIds?: string[] }} options
    * @returns {Promise<object|null>}
@@ -1187,7 +1315,7 @@ class Fabricate {
     if (!partyId || !systemId) return null;
     // Realm/travel disabled ⇒ no-op (no override writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, systemId, realmIds);
+    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, realmIds);
   }
 
   /**
@@ -1213,7 +1341,7 @@ class Fabricate {
     if (!partyId || !systemId) return null;
     // Realm/travel disabled ⇒ no-op (no override writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId, systemId);
+    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId);
   }
 
   /**
@@ -1227,8 +1355,8 @@ class Fabricate {
   }
 
   /**
-   * Reveal a realm's discovery on an actor. GM-only; validates the realm
-   * belongs to the referenced crafting system before writing.
+   * Reveal a realm's discovery on an actor. GM-only; validates the realm exists in the WORLD
+   * library before writing. `systemId` is the participation gate, not an ownership claim.
    *
    * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
@@ -1241,12 +1369,14 @@ class Fabricate {
     const system = this.craftingSystemManager?.getSystem(systemId);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
     if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);
+    // `systemId` above stays the GATE — whether this system surfaces travel at all. The realm
+    // itself is validated against the WORLD library (issue 1282), and the discovery it writes
+    // is world-wide.
     return revealGatheringRealm(resolvedActor, {
-      systemId,
       realmId,
       source,
       partyId,
-      validateRealmInSystem: system,
+      validateRealmExists: this.gatheringRealmStore?.get?.(),
       now: () => Date.now()
     });
   }
@@ -1274,7 +1404,7 @@ class Fabricate {
     if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
-    return hideGatheringRealm(resolvedActor, { systemId, realmId });
+    return hideGatheringRealm(resolvedActor, { realmId });
   }
 
   /**
@@ -1419,6 +1549,83 @@ class Fabricate {
   }
 
   /**
+   * List Fabricate's curated icon vocabulary.
+   *
+   * ONE vocabulary serves every icon field in Fabricate — essences, categories, biomes — and it
+   * is published here so a companion module binds to it instead of hand-curating a second list
+   * that drifts. It is measured from the Font Awesome bundle a Foundry install ships rather than
+   * from Font Awesome's published metadata, so its names are the ones that bundle draws, and it
+   * is curated to serve any fiction rather than fantasy alone.
+   *
+   * Named for its siblings: `list…` is what this facade calls a method answering with a
+   * collection of plain display records ({@link Fabricate#listSelectableActors},
+   * `listCraftingSourceActors`), as against `get…`, which answers with one thing.
+   * `Curated` is the qualifier because the unfiltered catalogue is deliberately NOT published:
+   * no Fabricate picker renders it.
+   *
+   * Ready-gated by throwing, as every other `list…` method on this facade is, rather than
+   * answering with an empty list: an empty vocabulary is indistinguishable from a vocabulary
+   * that lost its contents, and a companion's composition edge already wraps these calls and
+   * degrades on throw.
+   *
+   * The records are freshly built per call, down to the `aliases` array, so a caller may keep,
+   * sort or mutate them. The vocabulary's own rows are frozen entry by entry, which is why the
+   * copy is about ownership rather than defence: a frozen array cannot be sorted and a frozen
+   * record cannot be edited, and that freezing lives in a generated file rather than in this
+   * contract.
+   *
+   * `aliases` is published rather than dropped because there is one entry per GLYPH and not per
+   * name. A GM's saved `fas fa-cog` names the row offered as `gear`, so a record without the
+   * other names would be a lossy view of a deduplicated set, and the lost part is exactly what a
+   * caller needs to read data a GM already saved.
+   *
+   * @returns {Array<{iconCode: string, label: string, aliases: string[]}>} the curated icons in
+   *   the set's own order, alphabetical by `iconCode`; the code is bare (`mortar-pestle`), and
+   *   `aliases` carries every other name the same glyph answers to.
+   */
+  listCuratedIcons() {
+    this._requireReady();
+    return listCuratedIconVocabulary();
+  }
+
+  /**
+   * Resolve one icon name against the curated vocabulary, under its offered name or any alias.
+   *
+   * Answers the question {@link Fabricate#listCuratedIcons} makes possible but awkward: is the
+   * icon a GM saved still one this vocabulary offers, and which row is it? A companion holding
+   * `fas fa-cog` gets the `gear` row back; a companion holding a typo, a name Foundry cannot
+   * draw, or a real icon the curation leaves out gets `null`.
+   *
+   * `find…` rather than `get…` because the lookup can miss, which is what `null` says here and
+   * what `Array.prototype.find` has always meant. It is a third naming family on this facade, and
+   * a deliberate one: a `get…` sibling would suggest a value always comes back.
+   *
+   * Ready-gated by throwing, like its sibling. A miss and a premature call are different answers:
+   * `null` says the vocabulary does not offer that name, and it must not also mean that the
+   * vocabulary was not there to ask.
+   *
+   * Published as well as `aliases`, because the two answer different questions. `aliases` is for
+   * OFFERING and SEARCHING — a companion's own picker needs the names a GM might type, which is
+   * what Fabricate's picker puts in its own search text. This is for INTERPRETING a persisted
+   * value, and it is O(1) against a prebuilt index rather than a scan of 1879 rows with an
+   * `includes` on each. Both are derivable from the list alone; the derivation for THIS one is
+   * the line a caller gets subtly wrong, because the obvious
+   * `list.some(({ iconCode }) => iconCode === name)` reports a valid saved `cog` as unknown.
+   *
+   * The vocabulary's `isExcludedIconName` is still NOT published, and the original reason holds:
+   * it consults no catalogue, so it answers "not excluded" for a name Foundry cannot render. This
+   * resolves against the catalogue and cannot make that mistake.
+   *
+   * @param {string} iconName a bare Font Awesome icon name, such as `cog` or `gear`
+   * @returns {{iconCode: string, label: string, aliases: string[]}|null} the curated record, or
+   *   `null` when the vocabulary does not offer that name.
+   */
+  findCuratedIcon(iconName) {
+    this._requireReady();
+    return findCuratedIconRecord(iconName);
+  }
+
+  /**
    * Read the persisted remembered gathering-actor selection.
    *
    * Reads the existing `LAST_GATHERING_ACTOR` client setting; no new key is
@@ -1473,6 +1680,13 @@ class Fabricate {
       nowWorldTime: () => game.time?.worldTime ?? 0,
       resolveCheckFormula: (formula, actor, craftingModifier) =>
         resolveCheckFormulaDisplay(formula, actor, craftingModifier),
+      // How a held document resolves to a managed component, for the summary phase's
+      // per-pass inventory tallies (issue 1075). The SAME full resolver
+      // `InventoryListingBuilder` matches owned stacks with, so the crafting row's
+      // "looks makeable" and the inventory tab's owned count cannot disagree about what
+      // the player is holding. Injected rather than imported by the builder so its matcher
+      // graph stays out of the mounted-component harness.
+      resolveComponentForItem: findMatchingComponent,
     });
     return this._craftingListingBuilder;
   }
@@ -1538,6 +1752,43 @@ class Fabricate {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
     return this._getCraftingListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075).
+   *
+   * The companion of {@link Fabricate#listCraftingForActor}, which since #1075 returns cheap
+   * summary rows. The player app calls this for the selected recipe only, so the exact
+   * per-set craftability, ingredient assignment, check resolution, outcome tiers, steps and
+   * progressive stages are computed for what is on screen rather than for the whole corpus.
+   *
+   * `recipeId` arrives from a client and is NOT trusted: the actor and component sources are
+   * re-resolved through the same ownership-gated `_resolveCraftingSources` every other player
+   * seam uses, and the builder re-evaluates visibility and the system block for the recipe
+   * itself. An id the viewer may not see answers `null`, never a model.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.recipeId] The recipe to hydrate.
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the persisted
+   *   last-crafting selection. Named as `evaluateSelectedSet`'s is, since the two are the
+   *   player app's pair of on-demand per-recipe reads.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory source
+   *   actor ids; defaults to the persisted component-source set.
+   * @returns {object|null} The redaction-safe `RecipeListingModel`, or null.
+   */
+  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    if (!recipeId) return null;
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this._getCraftingListingBuilder().buildRecipeDetail({
+      recipeId,
       craftingActor,
       componentSourceActors,
       viewer: game.user,
@@ -1935,8 +2186,7 @@ class Fabricate {
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component =
-      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',
@@ -2166,6 +2416,10 @@ class Fabricate {
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
+      // The per-pass inventory snapshot's component resolver (issue 1228). The workbench
+      // never reads component tallies itself; this is here so its snapshot is the same
+      // complete value every other pass builds.
+      resolveComponentForItem: findMatchingComponent,
     });
     return this._alchemyListingBuilder;
   }
@@ -2761,6 +3015,10 @@ class Fabricate {
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
+        // The per-pass inventory snapshot's component resolver (issue 1228). The Journal
+        // never reads component tallies itself; this is here so its snapshot is the same
+        // complete value every other pass builds.
+        resolveComponentForItem: findMatchingComponent,
       });
     }
     return this._runJournalBuilder;
@@ -2768,8 +3026,10 @@ class Fabricate {
 
   /**
    * Resolve a system library tool to `{ id, name, img }` for the Journal step
-   * detail. The display name prefers the tool's authored label, falling back to
-   * the referenced component's name, then the raw id.
+   * detail, through the shared `data-models` requirement-13 precedence: authored
+   * label, then the registration snapshot, then the referenced component, then the
+   * raw id. The snapshot rung is load-bearing — without it an item-sourced Tool
+   * (`componentId: null` by construction) printed its raw id (issue 1119).
    * @private
    */
   _resolveJournalTool(systemId, toolId) {
@@ -2777,11 +3037,14 @@ class Fabricate {
     if (!system || !toolId) return null;
     const tool = (system.tools || []).find((entry) => entry?.id === toolId);
     if (!tool) return null;
-    const component = (system.components || []).find((entry) => entry?.id === tool.componentId);
+    const component = linkedComponentFor(tool, system.components || []);
+    const img = resolveToolDisplayImage(tool, component);
     return {
       id: tool.id,
-      name: tool.label || component?.name || tool.id,
-      img: component?.img || null,
+      name: resolveToolDisplayName(tool, component, tool.id),
+      // The Journal renders its own default artwork, so the generic sentinel stays
+      // null rather than being baked in here.
+      img: img === TOOL_IMAGE_SENTINEL ? null : img,
     };
   }
 
@@ -2830,7 +3093,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = (system?.components || []).find((entry) => entry?.id === componentId);
+    const component = findById(getDefinitionIndex(system?.components), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 
@@ -2996,14 +3259,35 @@ class Fabricate {
 
   /**
    * Delete a recipe by ID.
+   *
+   * Routes through `CraftingSystemManager.deleteRecipes` (issue 1132) so this documented
+   * public API and the GM studio cannot disagree about what deleting a recipe reaches: the
+   * recipe-item membership prune cascades here too, in one `recipes` write, at most one
+   * `craftingSystems` write and one actor-flag clean-up (itself two writable-actor walks,
+   * not one pass). The singular `ui.notifications.info` is unchanged —
+   * `RecipeManager.deleteRecipes` raises it for a one-recipe set.
+   *
+   * The system id comes from the recipe itself; a recipe whose `craftingSystemId` names no
+   * system still deletes, and prunes nothing.
+   *
+   * **API change:** this used to return `undefined`.
+   *
    * @param {string} recipeId - The recipe ID to delete
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
+   *   recipeItemsRewritten: number, learnersAffected: number}>}
+   * @throws {Error} When Fabricate is not initialized, or `recipeId` names no recipe.
    */
   async deleteRecipe(recipeId) {
     if (!this.ready) {
       throw new Error('Fabricate not initialized');
     }
 
-    return await this.recipeManager.deleteRecipe(recipeId);
+    const recipe = this.recipeManager.getRecipe(recipeId);
+    if (!recipe) {
+      throw new Error(`Recipe ${recipeId} not found`);
+    }
+
+    return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);
   }
 }
 
@@ -3107,6 +3391,7 @@ function bindFabricateGlobal() {
     // DEPRECATED alias for backwards compatibility — same class.
     GatheringRegionStore: GatheringRealmStore,
     GatheringPartyStore,
+    CurrencyConfigStore,
     GatheringLocationService,
     GatheringRunManager,
     GatheringGateAndCheckEvaluator,
@@ -3121,6 +3406,11 @@ function bindFabricateGlobal() {
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
     HOOKS: FABRICATE_HOOKS
   };
+  managerExtensions.bindPublicApi(game.fabricate.api);
+  // Both registries are page-session singletons imported at module scope, so the init and
+  // ready replays of this function re-publish the SAME registry rather than recreating it:
+  // a companion provider registered during its own `init` survives the ready rebind.
+  playerExtensions.bindPublicApi(game.fabricate.api);
 
   game.fabricate.importFromPack = (packData, options) =>
     fabricate.compendiumImporter?.importFromPackData(packData, options);
@@ -3141,12 +3431,24 @@ function bindFabricateGlobal() {
     // export lossy versus the import path (issue #642).
     const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
     const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
+    // The world currency ladder rides along too (issue 1278). It is WORLD scope, so unlike the
+    // gathering slice there is nothing on the system to fall back on: omit it and the export
+    // carries an empty ladder, and every currency cost in it lands in the destination world as
+    // an unresolvable unit id.
+    const currencyConfig = fabricate.currencyConfigStore?.get?.() ?? {};
+    // The world realm library rides along too (issue 1282), for the same reason and with the
+    // same consequence: realms are WORLD scope, so omitting this exports an empty library and
+    // every realm-gated environment in the payload lands in the destination world citing realm
+    // ids that name nothing.
+    const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
-      gatheringConfig
+      gatheringConfig,
+      currencyConfig,
+      travelConfig
     );
   };
 
@@ -3422,6 +3724,19 @@ Hooks.once('ready', async () => {
   // surfaces as a core `Hooks.onError` line naming this handler (a named `const`, so the
   // line is not anonymous), with no clue which of the four branches below failed or
   // which setting triggered it.
+  //
+  // The live collaborators every leg hands the bridge. Resolved per call, because
+  // `fabricate.recipeManager` is assembled during `ready` and a value captured here would be
+  // stale for the rest of the session. Shared by both listeners so they cannot drift into
+  // passing different managers.
+  const fabricateSettingChangeTargets = () => ({
+    craftingSystemManager: fabricate.craftingSystemManager,
+    recipeManager: fabricate.recipeManager,
+    gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
+    currencyConfigStore: fabricate.currencyConfigStore,
+    travelStore: fabricate.gatheringRealmStore,
+    callAll: (hook, payload) => Hooks.callAll(hook, payload)
+  });
   const handleFabricateSettingDocumentChange = (setting) => {
     try {
       const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
@@ -3438,12 +3753,7 @@ Hooks.once('ready', async () => {
       // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
       // client when the replicated world setting lands, so reload the stale in-memory
       // manager here and re-emit the local change hook so open player apps refresh.
-      handleFabricateSettingChange(key, {
-        craftingSystemManager: fabricate.craftingSystemManager,
-        recipeManager: fabricate.recipeManager,
-        gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
-        callAll: (hook, payload) => Hooks.callAll(hook, payload),
-      });
+      handleFabricateSettingChange(key, fabricateSettingChangeTargets());
     } catch (error) {
       console.error('Fabricate | Failed to handle a Fabricate setting change', error);
     }
@@ -3457,6 +3767,11 @@ Hooks.once('ready', async () => {
   // propagates to nobody until reload. Wiring it at the shared handler also closes the
   // same latent first-write hole for the `craftingSystems`, `recipes`, and
   // `gatheringEnvironments` branches.
+  //
+  // Both legs share ONE listener, which `player-character-actor-types.test.js` and
+  // `item-stack-quantity.test.js` both pin precisely so they cannot drift apart. Nothing
+  // downstream distinguishes a create from an update: both deliver the new value in the
+  // document, and every branch reacts by re-reading the key.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();

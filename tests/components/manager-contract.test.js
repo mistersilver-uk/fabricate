@@ -23,6 +23,12 @@ const tagsCategoriesPath = resolve(
   'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
 );
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
+// World > Currency (issue 1278): the relocated currency editor, whose contract used to be part
+// of SystemEditView's.
+const worldCurrencyPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
+);
 const craftingSettingsPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
@@ -123,6 +129,7 @@ const essenceStudioSources = readdirSync(essenceStudioDir)
 const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
 const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
@@ -145,6 +152,18 @@ const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
+const hostSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
+  'utf8'
+);
+const managerExtensionsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/managerExtensions.js'),
+  'utf8'
+);
+const previewProviderSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
+  'utf8'
+);
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -212,6 +231,98 @@ function sourceName(filePath) {
 }
 
 describe('CraftingSystemManager source contract', () => {
+  it('injects the exact page-session manager extension registry into the Svelte root', () => {
+    assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
+    assert.ok(appSource.includes('managerExtensions,'));
+    assert.ok(
+      rootSource.includes(
+        'let { store, services = null, managerExtensions = null, playerExtensions = null } = $props()'
+      )
+    );
+    assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
+  });
+  it('keeps one owner of the active Downtime provider, and it is the shell', () => {
+    // The rail renders the active tab set while the host is UNMOUNTED, and a mount fault
+    // has to move the rail as well as the panel. Two subscribers to the same registry would
+    // disagree on both, so the shell subscribes and the host takes a prop.
+    assert.ok(
+      rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
+      'the shell subscribes to the surface it renders'
+    );
+    assert.ok(
+      !hostSource.includes('.subscribe('),
+      'the Downtime host takes the live provider as a prop and subscribes to nothing'
+    );
+    assert.ok(
+      hostSource.includes('onProviderFault(activeProvider)'),
+      'a mount fault is reported UP to the shell rather than healed locally'
+    );
+    // Core's own tab id list is content, not contract: nothing on the seam may read it.
+    assert.ok(
+      !managerExtensionsSource.includes('CORE_DOWNTIME_PREVIEW_TAB_IDS'),
+      'the registry never enumerates the tab ids it will accept'
+    );
+    assert.ok(
+      previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
+      "Core's preview tab ids live beside the copy and icons they index"
+    );
+  });
+  // The cross-component handoff that names the companion panel (issue 1213). Root owns the id
+  // and threads it down; the host consumes it. Every claim here was ungated at review, and the
+  // host's DEFAULT was itself the hand-maintained mirror its own comment forbids — a second
+  // copy of Root's literal, agreeing today and undetectable the day it stops. Deleting the
+  // thread-through at the call site survived the entire suite.
+  it('threads the rail label id into the Downtime host rather than mirroring the literal', () => {
+    assert.ok(
+      rootSource.includes(
+        'const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;'
+      ),
+      'Root owns the rail label id, stated once'
+    );
+    assert.ok(
+      rootSource.includes('navLabelId={downtimeNavLabelId}'),
+      'and passes it to the host — without this the panel region has no name at all'
+    );
+    assert.ok(
+      hostSource.includes('aria-labelledby={navLabelId(tab.id)}'),
+      'the host names its region from the prop and derives no id of its own'
+    );
+    // REQUIRED, with no default. The host must not be able to answer the question itself.
+    assert.match(
+      hostSource,
+      /^\s{4}navLabelId,\s*$/m,
+      'navLabelId is declared with no fallback, so an unthreaded host fails loudly'
+    );
+    assert.ok(
+      !hostSource.includes('manager-downtime-nav'),
+      'and the host carries no copy of Root literal in any form'
+    );
+    // The region takes the SCREEN name, so the id points at the label span rather than at the
+    // button — whose accessible name is the tab's `accessibleName`, an instruction.
+    assert.ok(
+      rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
+      'the id lands on the visible label element'
+    );
+    assert.match(
+      rootSource,
+      /aria-label=\{downtimeCoreFallback\s*\?\s*undefined\s*:\s*downtimeTabText\(item, 'accessibleName'\)\}/,
+      'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
+    );
+  });
+  it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
+    const closeStart = appSource.indexOf('async close(options) {');
+    const closeEnd = appSource.indexOf('  static show()', closeStart);
+    const closeSource = appSource.slice(closeStart, closeEnd);
+    const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
+    const superClose = closeSource.indexOf('return super.close(options);');
+    assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
+    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
+    assert.match(
+      closeSource,
+      /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
+      'the real manager close keeps disposal and ApplicationV2 close in one ordered composition'
+    );
+  });
   it('self-registers as the sole crafting system manager app', () => {
     assert.ok(
       appSource.includes('extends SvelteApplicationMixin('),
@@ -402,21 +513,18 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Issue 643 — the manager titlebar. The gold badge names the SELECTED CRAFTING
-  // SYSTEM. The prototype's "MYTHWRIGHT" is a THEME name and must never leak into
-  // the shipped chrome, and the badge's content is user-authored, so it also needs a
-  // `title` for the truncated case.
-  it('renders a titlebar naming the selected crafting system and its resolution', () => {
+  // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
+  // The badge USED to name the selected crafting system — which the rail's crafting-system
+  // card already does on every screen, so the strip was repeating the rail. It now carries
+  // the premium signal instead, and only when a companion module is registered.
+  it('renders a titlebar carrying the premium signal and the system resolution', () => {
     for (const snippet of [
       'class="manager-titlebar"',
       'data-manager-titlebar',
       'class="manager-titlebar-badge"',
-      'data-manager-titlebar-system',
-      'title={selectedSystem.name}',
-      // Prettier breaks a whitespace-sensitive close tag as `</span\n>` (issue 923), so the
-      // trailing `>` is no longer adjacent. What matters is that the name stays welded to the
-      // open tag — a space there would render inside the titlebar badge.
-      '>{selectedSystem.name}</span',
+      'data-manager-titlebar-premium',
+      '{#if premiumInstalled}',
+      "text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')",
       'data-manager-titlebar-status',
       '{titlebarStatusLabel()}',
     ]) {
@@ -424,7 +532,7 @@ describe('CraftingSystemManager source contract', () => {
     }
     // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
     // the Foundry window's own title bar already names the app, so a second copy inside
-    // the window was duplicated chrome. The gold badge is now the left-most element.
+    // the window was duplicated chrome.
     assert.equal(
       rootSource.includes('manager-titlebar-icon'),
       false,
@@ -435,10 +543,65 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the duplicated "Crafting Systems" titlebar label should be removed'
     );
+    // Issue 1185: the Downtime route briefly led the page header with a 42px glyph tile from
+    // the prototype. No other Manager route has one, so it is gone — and with it the third
+    // header child that broke `justify-content: space-between`.
+    assert.equal(
+      rootSource.includes('manager-route-icon'),
+      false,
+      'no route may lead the page header with an identity tile of its own'
+    );
+    assert.equal(
+      rootSource.includes('data-manager-route-icon'),
+      false,
+      'and its marker attribute goes with it'
+    );
+    // Issue 1185: the system name badge is gone in BOTH states, not merely hidden behind a
+    // flag. Its marker attribute and its lang key go with it.
+    assert.equal(
+      rootSource.includes('data-manager-titlebar-system'),
+      false,
+      'the redundant crafting-system titlebar badge should be removed'
+    );
+    assert.equal(
+      rootSource.includes('Titlebar.SystemBadge'),
+      false,
+      'and its accessible-name key with it'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.SystemBadge,
+      undefined,
+      'the orphaned SystemBadge string should be deleted from lang/en.json, not left behind'
+    );
     assert.equal(
       /mythwright/i.test(rootSource),
       false,
-      'the gold badge names the selected crafting system; "Mythwright" is a theme name and must not be hard-coded'
+      '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
+    );
+    // The premium badge is driven by the REGISTRY, not by Core's Downtime route: a companion
+    // that ships some future surface is still installed and still lights the strip.
+    assert.ok(
+      rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
+      'the titlebar premium signal should read the whole registered surface set'
+    );
+    assert.ok(
+      rootSource.includes('managerExtensions.subscribeSurfaceIds('),
+      'and should stay live through the registry surface-set subscription'
+    );
+    assert.equal(
+      /premiumInstalled[^\n]*downtime/i.test(rootSource),
+      false,
+      'the premium signal must not be keyed on the Core downtime surface id'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.Premium,
+      'PREMIUM',
+      'lang should expose the titlebar premium mark'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus,
+      'Fabricate Premium is installed and connected',
+      'and the accessible name and tooltip that explain it'
     );
     // The status line reports the SYSTEM's resolution mode, and counts outcome tiers
     // only where tiers exist to count (routedByCheck).
@@ -493,7 +656,7 @@ describe('CraftingSystemManager source contract', () => {
       'data-manager-view={currentView}',
       'class="manager-header"',
       'class="manager-breadcrumbs"',
-      "class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}",
+      "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}",
       'class="manager-rail"',
       'class="manager-inspector"',
       'ComponentsBrowserView',
@@ -550,57 +713,68 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The character-modifier editor is formula-only: a plain labelled expression
-    // input, with no provider chip, provider-label helper, or macro UUID field.
+    // The modifier editor is formula-only: one labelled expression field, with no provider
+    // chip, provider-label helper, or macro UUID field. Since issue 1117 that field is
+    // `RollDataExpressionInput` — the control the retired Checks-tab editor used, adopted
+    // here because this is now the ONE surface that authors an expression — so the binding
+    // pinned is its `onChange`, not a raw `event.currentTarget.value` read.
     assert.ok(
       !systemEditSource.includes('ProviderExpressionInput'),
-      'character-modifier editor should not import the deleted provider/expression component'
+      'modifier editor should not import the deleted provider/expression component'
     );
     assert.ok(
       !systemEditSource.includes('characterModifierProviderLabel'),
-      'character-modifier editor should not render a provider label'
+      'modifier editor should not render a provider label'
     );
     assert.ok(
       !systemEditSource.includes('manager-character-modifier-provider'),
-      'character-modifier summary should not render a provider chip'
+      'modifier summary should not render a provider chip'
     );
     assert.ok(
-      /onUpdateCharacterModifier\(entry\.id, \{\s*expression: event\.currentTarget\.value,?\s*\}\)/.test(
-        systemEditSource
-      ),
-      'character-modifier editor should bind a plain expression input'
+      /onUpdateModifier\(entry\.id, \{ expression \}\)/.test(systemEditSource),
+      'modifier editor should bind the expression field through RollDataExpressionInput'
     );
     assert.ok(
-      systemEditSource.includes('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression'),
-      'character-modifier editor should keep the localized Expression label'
+      systemEditSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
+      'modifier editor should keep the localized Expression label'
     );
+    // --- World > Currency (issue 1278) --------------------------------------------------
+    // The ladder, spend strategy, provider and macro set are WORLD scope: a world runs one
+    // ruleset, so there is one way actors store coins and two crafting systems cannot
+    // meaningfully disagree about it. The whole editor therefore reads WorldCurrencyTab. What
+    // survives on System Settings is the participation toggle alone, asserted at the end.
     for (const snippet of [
-      'data-system-currency-units',
+      'data-world-currency-units',
       'manager-currency-unit-card',
       'handleAddCurrencyUnit',
       'onSeedCurrencyPresets',
-      'manager-character-modifier-summary',
       'manager-currency-subunit-builder',
+      // The unit card's collapsed summary row reuses the character-modifier summary class; it
+      // moved with the card rather than staying behind on System Settings.
+      'manager-character-modifier-summary',
       'manager-availability-pill is-currency',
       'manager-availability-pill-amount',
     ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+      assert.ok(
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include ${snippet}`
+      );
     }
     // Asserted as patterns rather than snippets in the list above: Prettier (issue 923) prints
     // both calls one argument per line.
     assert.ok(
       /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
-        systemEditSource
+        worldCurrencySource
       ),
-      'SystemEditView should bind the sub-unit amount input to onUpdateCurrencySubUnit'
+      'WorldCurrencyTab should bind the sub-unit amount input to onUpdateCurrencySubUnit'
     );
     assert.ok(
-      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(systemEditSource),
-      'SystemEditView should wire the sub-unit delete action'
+      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(worldCurrencySource),
+      'WorldCurrencyTab should wire the sub-unit delete action'
     );
     assert.ok(
       rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
-      'root should pass selected currency units to SystemEditView'
+      'root should pass the world currency units to WorldCurrencyTab'
     );
     // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
     // rewrites the long form to it (issue 923). Anchored on the leading whitespace that starts
@@ -608,36 +782,36 @@ describe('CraftingSystemManager source contract', () => {
     // such as `{noOnAddCurrencySubUnit}`.
     assert.ok(
       rootSource.includes(' {onAddCurrencySubUnit}'),
-      'root should pass currency sub-unit actions to SystemEditView'
+      'root should pass currency sub-unit actions to WorldCurrencyTab'
     );
     assert.ok(
       rootSource.includes('{currencySpendStrategy}'),
-      'root should thread the spend strategy to SystemEditView'
+      'root should thread the spend strategy to WorldCurrencyTab'
     );
     // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
     // select renders all three options and the editor branches on each strategy.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'actorInventory'"),
+      worldCurrencySource.includes("currencySpendStrategy === 'actorInventory'"),
       'currency editor should branch on the actorInventory spend strategy'
     );
     for (const value of ['actorProperty', 'actorInventory', 'macro']) {
       assert.ok(
-        systemEditSource.includes(`value: '${value}'`),
+        worldCurrencySource.includes(`value: '${value}'`),
         `currency editor should offer the ${value} spend strategy option`
       );
     }
     // Currency spend-strategy / provider / macro controls.
     for (const snippet of [
-      'data-system-currency-strategy-select',
+      'data-world-currency-strategy-select',
       'onSetCurrencySpendStrategy(event.currentTarget.value)',
       // The single shared strategy hint reflects the selected strategy.
-      'data-system-currency-strategy-hint',
+      'data-world-currency-strategy-hint',
       'currencySpendStrategyHint()',
-      'data-system-currency-provider-select',
+      'data-world-currency-provider-select',
       'onSetCurrencyProvider(event.currentTarget.value)',
-      'data-system-currency-no-provider',
-      'data-system-currency-macros',
-      'data-system-currency-macro-dropzone',
+      'data-world-currency-no-provider',
+      'data-world-currency-macros',
+      'data-world-currency-macro-dropzone',
       'manager-component-source-drop-zone',
       'use:dragDrop',
       'resolveDropData',
@@ -647,110 +821,113 @@ describe('CraftingSystemManager source contract', () => {
       // distinguishable to assistive tech (the linked-state group already has a field-specific label).
       'aria-label={currencyMacroDropZoneLabel(field)}',
     ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+      assert.ok(
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include ${snippet}`
+      );
     }
     // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
     assert.ok(
-      !systemEditSource.includes('data-system-currency-inventory-mode-select'),
+      !worldCurrencySource.includes('data-world-currency-inventory-mode-select'),
       'currency editor should not render the removed nested inventory-mode select'
     );
     assert.ok(
-      !systemEditSource.includes('inventoryMode'),
+      !worldCurrencySource.includes('inventoryMode'),
       'currency editor should not reference the removed inventoryMode model'
     );
     // The macro branch renders only under the peer macro strategy.
     assert.ok(
-      systemEditSource.includes("currencySpendStrategy === 'macro'"),
+      worldCurrencySource.includes("currencySpendStrategy === 'macro'"),
       'currency editor should branch on the macro spend strategy'
     );
-    // A system with no registered provider can still select actorInventory but is steered to the
+    // A world with no registered provider can still select actorInventory but is steered to the
     // macro strategy via a no-provider callout, and its units are never wiped.
     assert.ok(
-      systemEditSource.includes(
+      worldCurrencySource.includes(
         'const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'
       ),
-      'currency editor should derive whether the system has any providers'
+      'currency editor should derive whether the world has any providers'
     );
     // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
     // single responsive row via a namespaced container class.
     assert.ok(
-      systemEditSource.includes('manager-currency-macro-zones manager-currency-macro-row'),
+      worldCurrencySource.includes('manager-currency-macro-zones manager-currency-macro-row'),
       'macro drop zones should be wrapped in the single-row container'
     );
     // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
     // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
     // not render in provider (read-only) or macro modes.
     assert.ok(
-      systemEditSource.includes('const currencyMacroMode = $derived('),
+      worldCurrencySource.includes('const currencyMacroMode = $derived('),
       'currency editor should derive a macro-mode flag'
     );
     assert.ok(
-      systemEditSource.includes('{#if currencyMacroMode}'),
+      worldCurrencySource.includes('{#if currencyMacroMode}'),
       'currency editor should gate the per-unit editor body on the macro-mode flag'
     );
     // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
     // non-macro branch, after the `{#if currencyMacroMode}` gate.
     assert.ok(
-      systemEditSource.indexOf('{#if currencyMacroMode}') <
-        systemEditSource.indexOf('manager-currency-subunit-section'),
+      worldCurrencySource.indexOf('{#if currencyMacroMode}') <
+        worldCurrencySource.indexOf('manager-currency-subunit-section'),
       'sub-unit section should render only in the non-macro (actorProperty) branch'
     );
     // Macro mode shows a conversion hint instead of any sub-unit controls.
     assert.ok(
-      systemEditSource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
+      worldCurrencySource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
       'macro mode should include the macro-conversion hint'
     );
     // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
     // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
     // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
     assert.ok(
-      systemEditSource.includes(
+      worldCurrencySource.includes(
         'const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'
       ),
       'currency editor should derive a read-only flag for the active provider inventory branch'
     );
     assert.ok(
-      systemEditSource.includes('{#if !currencyUnitsReadOnly}'),
+      worldCurrencySource.includes('{#if !currencyUnitsReadOnly}'),
       'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
     );
     assert.ok(
-      systemEditSource.includes('{#if currencyUnitsReadOnly}'),
+      worldCurrencySource.includes('{#if currencyUnitsReadOnly}'),
       'currency editor should render a dedicated read-only branch in provider mode'
     );
     for (const snippet of [
-      'data-system-currency-provider-managed',
+      'data-world-currency-provider-managed',
       'manager-currency-provider-managed-callout',
       'currencyProviderManagedHint()',
       'manager-currency-provider-managed-summary',
       'manager-currency-readonly-fields',
-      'data-system-currency-readonly-label',
-      'data-system-currency-abbreviation',
-      'data-system-currency-denomination',
+      'data-world-currency-readonly-label',
+      'data-world-currency-abbreviation',
+      'data-world-currency-denomination',
       'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
     ]) {
       assert.ok(
-        systemEditSource.includes(snippet),
-        `SystemEditView should include read-only ${snippet}`
+        worldCurrencySource.includes(snippet),
+        `WorldCurrencyTab should include read-only ${snippet}`
       );
     }
     // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
-    // they must NOT render sub-unit chips. The only `data-system-currency-subunit` occurrence lives
+    // they must NOT render sub-unit chips. The only `data-world-currency-subunit` occurrence lives
     // in the editable (actorProperty) branch, after the provider-managed read-only branch.
     assert.ok(
-      systemEditSource.indexOf('data-system-currency-provider-managed') <
-        systemEditSource.indexOf('data-system-currency-subunit'),
+      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
+        worldCurrencySource.indexOf('data-world-currency-subunit'),
       'provider-managed read-only branch should render before the editable sub-unit chips'
     );
     assert.equal(
-      systemEditSource.split('data-system-currency-subunit=').length - 1,
+      worldCurrencySource.split('data-world-currency-subunit=').length - 1,
       1,
       'sub-unit chips should appear only once (in the editable actorProperty branch)'
     );
     // The read-only branch precedes the editable branch, so the editable controls (editable amount
     // input, remove cross) live only after the provider-managed branch.
     assert.ok(
-      systemEditSource.indexOf('data-system-currency-provider-managed') <
-        systemEditSource.indexOf('class="manager-availability-pill-amount"'),
+      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
+        worldCurrencySource.indexOf('class="manager-availability-pill-amount"'),
       'provider-managed read-only branch should render before the editable unit list'
     );
     for (const prop of [
@@ -764,7 +941,7 @@ describe('CraftingSystemManager source contract', () => {
       '{onSetCurrencyMacro}',
       '{onClearCurrencyMacro}',
     ]) {
-      assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
+      assert.ok(rootSource.includes(prop), `root should thread ${prop} to WorldCurrencyTab`);
     }
     // The removed nested inventory-mode setter must no longer be threaded.
     assert.ok(
@@ -775,9 +952,10 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('getCurrencyProvidersForFoundrySystem'),
       'root should derive provider options from the currency provider registry'
     );
-    // The currency feature toggle lives in the Optional features section, reads
-    // requirements.currency.enabled, and calls onToggleCurrency. It renders always (so the section is
-    // never empty), and the Currency Units card is gated on the enabled flag.
+    // --- What survives on System Settings ------------------------------------------------
+    // The participation toggle and nothing else. It reads `requirements.currency.enabled` and
+    // calls `onToggleCurrency`, and renders always so the Optional features section is never
+    // empty.
     for (const snippet of [
       'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
       'data-system-currency-toggle',
@@ -787,18 +965,28 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The currency toggle tile renders independently of visibleFeatures, so the toggle list is no
-    // longer hidden behind the empty-feature guard.
     assert.ok(
       systemEditSource.includes('data-feature-key="currency"'),
       'currency toggle tile should always render in the Optional features section'
     );
-    // The Currency Units card is gated on currencyEnabled.
-    assert.ok(
-      systemEditSource.indexOf('{#if currencyEnabled}') <
-        systemEditSource.indexOf('manager-currency-unit-card'),
-      'Currency Units card should be gated behind the currencyEnabled flag'
-    );
+    // The editor itself is GONE from the crafting system page (issue 1278). These are markers of
+    // the card that was deleted; any of them reappearing means the per-system currency surface
+    // has crept back and the two scopes can disagree again.
+    for (const removed of [
+      'manager-currency-unit-card',
+      'data-system-currency-units',
+      'data-system-currency-strategy-select',
+      'data-system-currency-macros',
+      'currencyProviderOptions',
+      'onSetCurrencySpendStrategy',
+      'onAddCurrencyUnit',
+    ]) {
+      assert.equal(
+        systemEditSource.includes(removed),
+        false,
+        `SystemEditView should no longer carry the relocated currency control ${removed}`
+      );
+    }
     assert.ok(
       rootSource.includes("store.toggleRequirement?.('currency', next)"),
       'root should thread onToggleCurrency to store.toggleRequirement'
@@ -1596,7 +1784,7 @@ describe('CraftingSystemManager source contract', () => {
       'gathering rail should expose an expand/collapse control'
     );
     assert.ok(
-      rootSource.includes("manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"),
+      rootSource.includes("manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}"),
       'expanded gathering rail should style as one submenu group'
     );
     assert.ok(
@@ -2042,8 +2230,11 @@ describe('CraftingSystemManager source contract', () => {
     // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out, under
     // the maintainer's binding decision for this action. The SINGLE delete keeps the
     // store-owned `confirmDialog`, so the two idioms do not collide on one screen.
+    // The arm is now reached through the shared `BulkDeleteCard` (issue 1132), which renders
+    // `ArmedDangerButton` itself. Retargeted rather than dropped: the assertion is about the
+    // IDIOM — this delete arms instead of opening a dialog — and the card is what carries it.
     assert.ok(
-      essenceStudioSource.includes('<ArmedDangerButton'),
+      essenceStudioSource.includes('<BulkDeleteCard'),
       'the bulk delete arms rather than opening a dialog'
     );
     assert.ok(
@@ -2085,6 +2276,49 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       appSource.includes('if (!options?.force)'),
       'v2 app close should bypass interactive dirty guards during forced lifecycle teardown'
+    );
+  });
+
+  /**
+   * THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL.
+   *
+   * `confirmNavigation` answers `undefined` when no companion holds a guard, and its own suite
+   * pins that. What cannot be observed from a mounted test, because a single microtask of
+   * added latency is invisible through Svelte's own flush, is that BOTH callers actually read
+   * `undefined` as "take the branch you took before this seam existed". Written any other way
+   * — awaiting unconditionally, or comparing against `true` — every Manager close would pay an
+   * extra `await` and every route exit would hand `afterTruthyResult` a composed promise, for a
+   * question no companion asked. So the short-circuit is asserted where it lives.
+   */
+  it('costs a companion that registers no navigation guard nothing on either exit path', () => {
+    assert.ok(
+      appSource.includes(
+        'if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;'
+      ),
+      'the window close skips its await entirely when there is no companion guard to ask'
+    );
+    const closeStart = appSource.indexOf('async close(options) {');
+    const forceGate = appSource.indexOf('if (!options?.force) {', closeStart);
+    const companionAsk = appSource.indexOf('_confirmDowntimeCompanionNavigation?.()', closeStart);
+    const toolAsk = appSource.indexOf('_confirmDiscardDirtyToolDraft?.()', closeStart);
+    assert.ok(forceGate > closeStart, 'the close still gates every interactive guard on force');
+    assert.ok(
+      companionAsk > forceGate,
+      'the companion guard sits INSIDE the force gate, so a forced teardown never asks it'
+    );
+    assert.ok(
+      companionAsk < toolAsk,
+      'and is asked before the Core guards that can save, so a veto writes nothing'
+    );
+    assert.ok(
+      rootSource.includes(
+        'if (companion === undefined) return finishRouteExit(nextView, nextRouteId);'
+      ),
+      'the route exit returns its original result untouched when there is nothing to ask'
+    );
+    assert.ok(
+      rootSource.includes("confirmRouteExit('world-downtime', tabId)"),
+      'a Downtime tab switch states its destination tab, so the guard can tell it from a re-entry'
     );
   });
 
@@ -2955,7 +3189,7 @@ describe('CraftingSystemManager source contract', () => {
     // target document id — never a row index, which the asynchronous re-projection
     // would turn into a destructive misfire.
     assert.ok(
-      armedDangerButtonSource.includes('<button\n  type="button"'),
+      armedDangerButtonSource.includes('<button\n  bind:this={element}\n  type="button"'),
       'the armed confirmation should be a real button element'
     );
     assert.equal(
@@ -3031,8 +3265,23 @@ describe('CraftingSystemManager source contract', () => {
     // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
     // learned recipes, usage counts and learn counts all live under `flags`.
     assert.ok(
-      appSource.includes("if ('flags' in diff) reprojectKnowledge();"),
+      appSource.includes("if ('flags' in diff) {"),
       "updateActor re-projects knowledge only on a 'flags' diff"
+    );
+    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
+    // the same diff must ALSO mark the Recipe Studio's learned-recipe index stale — that
+    // index is what the delete card's "Will be forgotten by N characters" counts through
+    // (issue 1132, review round). Marking is all it does: `updateActor` fires for every
+    // module's flag writes, so rebuilding here would be a world walk per foreign write.
+    assert.ok(
+      appSource.includes(
+        'const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();'
+      ),
+      'the actor hooks mark the learned-recipe index stale rather than rebuilding it'
+    );
+    assert.ok(
+      appSource.includes('markLearnerIndexStale();\n        reprojectKnowledge();'),
+      'and the flags branch does both'
     );
     // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
     // `items[]` fires createActor and ZERO createItem.
@@ -3171,17 +3420,54 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
       'toggling the rail should persist managerRailCollapsed through the setSetting seam'
     );
+    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
+    // persisted client preference and stays authoritative for what is written back; what the
+    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
+    // the sidebar open without permanently un-collapsing the rail on every other route.
     assert.ok(
-      rootSource.includes("class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}"),
-      'manager-body should bind the is-rail-collapsed modifier from rail state'
+      rootSource.includes(
+        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
+      ),
+      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
+    );
+    assert.ok(
+      rootSource.includes(
+        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
+      ),
+      'and the displayed state must be DERIVED, never written back over the stored preference'
     );
     assert.ok(
       rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
       'the scope-card header should render the shared collapse/expand control'
     );
-    assert.ok(
-      rootSource.includes('aria-pressed={railCollapsed}'),
-      'rail toggle should expose aria-pressed reflecting collapsed state'
+    // COUNTED, not merely present (issue 1213 review). The control is written TWICE, once per
+    // `{#if selectedSystem}` scope-card branch, and an `includes` check is satisfied by either
+    // one alone — which is how deleting the lock attributes from the no-system branch survived
+    // the whole suite. Both sites read the DISPLAYED state and both are inert under the lock.
+    // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
+    // so a plain substring count reports four sites for two and reads as a pass.
+    const occurrences = (attribute) =>
+      rootSource.match(new RegExp(`(?<![-\\w])${attribute.replace(/[{}]/g, '\\$&')}`, 'g'))
+        ?.length ?? 0;
+    const railToggleSites = occurrences('data-manager-rail-toggle');
+    assert.equal(railToggleSites, 2, 'the scope card renders the rail toggle once per branch');
+    for (const attribute of [
+      'aria-pressed={railCollapsedDisplay}',
+      'aria-label={railToggleLabel}',
+      'title={railToggleTitle}',
+      'disabled={railLockedOpen}',
+      'aria-disabled={railLockedOpen}',
+    ]) {
+      assert.equal(
+        occurrences(attribute),
+        railToggleSites,
+        `every rail-toggle site must carry ${attribute}, not just the one a mounted case renders`
+      );
+    }
+    assert.match(
+      rootSource,
+      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
+      'and the handler early-returns, so a programmatic call obeys the lock too'
     );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&

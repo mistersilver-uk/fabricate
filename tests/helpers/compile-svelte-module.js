@@ -23,12 +23,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compileModule } from 'svelte/compiler';
+import { rewriteClientImports } from './rewriteClientImports.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-function rewriteClientImports(code) {
-  return code.replace(/from 'svelte';/g, "from 'svelte/internal/client';");
-}
 
 /**
  * Create a temp compiler for a single test suite.

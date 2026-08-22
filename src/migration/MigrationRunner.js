@@ -13,6 +13,7 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateCurrencyToWorldScope } from './migrateCurrencyToWorldScope.js';
 import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
 import { migrateEssencesToIngredientGroups } from './migrateEssencesToIngredientGroups.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
@@ -34,13 +35,18 @@ import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringR
 import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
 import { migrateRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
+import { migrateSeedFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
+import { migrateTravelToWorldScope } from './migrateTravelToWorldScope.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
+import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
@@ -50,11 +56,16 @@ export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js
 
 /**
  * Compare two semver strings numerically.
+ *
+ * Exported for issue 1224: the Valid Id Basis has to answer "is `migrationVersion` BEHIND
+ * the highest registered migration", and re-implementing this comparison beside the
+ * registry it compares against is how the two drift apart.
+ *
  * @param {string} a
  * @param {string} b
  * @returns {-1|0|1}
  */
-function compareSemver(a, b) {
+export function compareSemver(a, b) {
   const pa = String(a)
     .split('.')
     .map((n) => Number.parseInt(n, 10) || 0);
@@ -107,6 +118,24 @@ function _normalizeRetiredCraftingModEntry(entry) {
     normalized[key] = Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
   }
   return normalized;
+}
+
+/**
+ * Normalize one entry of the transient `_unifiedModifierCollisions` report (1.23.0) into a
+ * fixed `{ system, collisions }` shape, dropping an entry that reports no collision.
+ *
+ * Coerced rather than passed through, for the reason
+ * {@link _normalizeRetiredCraftingModEntry} is: the GM notice formats the number without
+ * re-guarding it, so a hand-built or partially-written entry cannot put `NaN` or an object
+ * into a notification string.
+ * @param {*} entry
+ * @returns {{ system: string, collisions: number }|null}
+ */
+function _normalizeModifierCollisionEntry(entry) {
+  if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const collisions = Number(entry.collisions);
+  if (!Number.isFinite(collisions) || collisions <= 0) return null;
+  return { system: String(entry.system ?? ''), collisions: Math.trunc(collisions) };
 }
 
 // ---------------------------------------------------------------------------
@@ -378,8 +407,217 @@ const MIGRATIONS = [
     // field (captured and deleted by the runner below for the GM notice).
     migrate: (data) => migrateRetireCraftingModToken(data),
   },
+  {
+    version: '1.22.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, NOT IN A COMMENT. The label is the only
+    // string a GM ever reads about this migration — `migrationRecoveryPrompt` renders it as
+    // "aborted during …" beside the Keep/Downgrade buttons — and "Downgrade to 1.21.0" is
+    // precisely the choice this warning is about. A source comment stating it would be
+    // addressed to the wrong reader at the wrong moment.
+    label:
+      'Lift the check-modifier catalogue out of craftingCheck up to the system, so ' +
+      'salvage and gathering can select over the same one, and rewrite the byRecipe ' +
+      'combination rule to its activity-independent name bySubject. THE RUNNER ORDER IS ' +
+      'LOAD-BEARING: this runs before any manager load, and _normalizeCraftingCheck is an ' +
+      'allowlist rebuild that no longer emits checkModifiers, so a save running first ' +
+      'would have DELETED the catalogue rather than relocating it. DOWNGRADING IS NOT ' +
+      'LOSSLESS, and this is the first migration in this registry of which that is true: ' +
+      '1.21.0 never saw a system-level checkModifiers, so it drops the relocated catalogue ' +
+      'on the first read and every check modifier stops contributing to every roll until ' +
+      'you re-author it. Your formulas and combination rules are unaffected',
+    downgradeTo: '1.21.0',
+    // MACHINE-READABLE, so the label clause above is a RULE rather than one entry's prose. A
+    // migration that marks itself here must name the loss in its own `label`
+    // (`tests/migration-runner.test.js` enforces it over the whole registry), because the label
+    // is the only string a GM reads at the Keep/Downgrade prompt and a caveat left in a source
+    // comment reaches nobody standing in front of that dialog. `1.21.0` is deliberately NOT
+    // marked: it is DATA-lossless and BEHAVIOUR-lossy, which is a different fact.
+    downgradeLosesData: true,
+    migrate: (data) => migrateSystemCheckModifierCatalogue(data),
+  },
+  {
+    version: '1.23.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, for the reason `1.22.0` states: the label
+    // is the only string a GM ever reads about this migration, and "Downgrade to 1.22.0"
+    // is precisely the choice this warning is about.
+    label:
+      'Merge the two modifier libraries a crafting system authored — the check-modifier ' +
+      'catalogue and the gathering character-modifier library — into one system.modifiers, ' +
+      'so a named actor expression is defined once and referenced by checks, drop rows, ' +
+      'events and stamina costs alike. An id authored in BOTH libraries keeps the check ' +
+      "entry's id and the gathering entry is re-keyed with a -gathering suffix, with every " +
+      'gathering reference rewritten to match. THE RUNNER ORDER IS LOAD-BEARING: this runs ' +
+      'before any manager load, and both normalizers are allowlist rebuilds that no longer ' +
+      'emit the old keys, so a save running first would have DELETED both libraries rather ' +
+      'than merging them. DOWNGRADING IS NOT LOSSLESS: 1.22.0 never saw system.modifiers, ' +
+      'so it drops the merged library on the first read — every check modifier stops ' +
+      'contributing to every roll AND every gathering drop row, event and stamina cost ' +
+      'loses the modifier it references, until you re-author both libraries',
+    downgradeTo: '1.22.0',
+    // MACHINE-READABLE, per the rule `1.22.0` established: a migration marked here must
+    // name the loss in its own `label` (`tests/migration-runner.test.js` enforces it over
+    // the whole registry).
+    downgradeLosesData: true,
+    // Reports the per-system id-collision counts through the transient
+    // `_unifiedModifierCollisions` field (captured and deleted by the runner below).
+    migrate: (data) => migrateUnifyModifierLibraries(data),
+  },
+  {
+    version: '1.24.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, per the rule 1.22.0 established: the label
+    // is the only string a GM reads at the Keep/Downgrade prompt.
+    label:
+      'Give the routed check its own DC source, so a routed relative check can compute its ' +
+      'base DC from a macro exactly as a simple check can. NO DATA IS REWRITTEN: the ' +
+      'routed normalizer defaults an absent dcMode to static, so every existing system ' +
+      'loads unchanged and this entry exists to mark the version boundary. DOWNGRADING IS ' +
+      'NOT LOSSLESS: 1.23.0 never saw routed.dcMode or routed.macroUuid, and its routed ' +
+      'normalizer is an allowlist rebuild that does not emit them, so the first save on ' +
+      'that build DELETES both — a routed check set to Dynamic silently reverts to its ' +
+      'static DC and loses the macro link, which you must re-author',
+    downgradeTo: '1.23.0',
+    // MACHINE-READABLE, per the rule 1.22.0 established: a migration marked here must name
+    // the loss in its own `label` (`tests/migration-runner.test.js` enforces it over the
+    // whole registry).
+    downgradeLosesData: true,
+    // A DELIBERATE NO-OP, in the shape 1.20.0's recipe-level entry already uses. There is
+    // nothing to rewrite — absence already reads as `static` — and writing the default onto
+    // every stored routed slot would touch every system in the world to change nothing.
+    // What this entry buys is the boundary the recovery prompt warns at.
+    migrate: (data) => data,
+  },
+  {
+    version: '1.25.0',
+    // NO LOSSY-DOWNGRADE CLAUSE, and that is the fact worth stating. Unlike 1.22.0,
+    // 1.23.0 and 1.24.0 this migration's downgrade IS clean, so it is deliberately not
+    // marked `downgradeLosesData` — the rule those three established is about naming a
+    // real loss in the label, not about every entry claiming one.
+    label:
+      'Seed the new per-activity failure-result policy to "never" on every crafting, ' +
+      'salvage and gathering check that already exists, so NO EXISTING WORLD CHANGES ' +
+      'BEHAVIOUR. A failed check can now produce an authored failure result, and a ' +
+      'newly-created system decides that per record — but a system you authored before ' +
+      'this release was authored against an engine that could not produce on failure at ' +
+      'all. A salvage component may already carry a reserved failure result group that ' +
+      'has always awarded nothing; without this seed the upgrade would start awarding it ' +
+      'on every failed salvage. Turn the policy on yourself, per activity, per system. ' +
+      'Checks that do not exist yet are left alone, and DOWNGRADING IS LOSSLESS: 1.24.0 ' +
+      'does not emit this key, drops it on the first save, and has no failure-result ' +
+      'capability for it to govern',
+    downgradeTo: '1.24.0',
+    // Reports nothing, so it adds no key to the runner's three return literals below:
+    // its entire observable effect is that nothing observable changes.
+    migrate: (data) => migrateSeedFailureResultPolicy(data),
+  },
+  {
+    version: '1.26.0',
+    label:
+      'Move the currency configuration from each crafting system to WORLD scope. The coin ' +
+      'ladder, spend strategy, provider and macro set now live once per world, because a ' +
+      'world runs exactly one game system and so has exactly one way actors store coins; a ' +
+      'crafting system keeps only whether it participates. Units from every system are ' +
+      'UNIONED by unit id (the first system wins an id collision) because recipe and salvage ' +
+      'currency requirements reference units by id, so dropping any unit would orphan them. ' +
+      'The strategy, provider and macros cannot be unioned, so they are taken from the first ' +
+      'system that had currency ENABLED. If two of your systems configured DIFFERENT ' +
+      'strategies or providers, only one survives — check World > Currency afterwards. ' +
+      'DOWNGRADING IS NOT LOSSLESS: 1.25.0 reads currency only from the crafting system, so it ' +
+      'would find no configuration at all and every authored currency cost would stop ' +
+      'resolving until you re-authored it per system',
+    downgradeTo: '1.25.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateCurrencyToWorldScope(data),
+  },
+  {
+    version: '1.27.0',
+    label:
+      'Move the travel configuration from each crafting system to WORLD scope. Realms, their ' +
+      'map region links, the reveal mode and the modifier visibility now live once per world, ' +
+      'because realms are geography — the same valley is the same valley whichever crafting ' +
+      'system a character is there to serve — and a crafting system keeps only whether it ' +
+      'participates. Realms from every system are UNIONED by realm id (the first system wins ' +
+      'an id collision) because environments, party overrides and character discovery all ' +
+      'reference realms by id, so dropping any realm would orphan them. Two systems that ' +
+      'authored a realm of the SAME NAME keep both records; merge them by hand if you want ' +
+      'one. The reveal mode and modifier visibility cannot be unioned, so they are taken from ' +
+      'the first system that had travel ENABLED — if two of your systems set DIFFERENT reveal ' +
+      'modes, only one survives, so check World > Travel afterwards. Each party now has ONE ' +
+      'current-realm override rather than one per system, keeping the most recently set. ' +
+      'DOWNGRADING IS NOT LOSSLESS: 1.26.0 reads realms only from the crafting system, so it ' +
+      'would find none, every realm-gated environment would report no current realm, and ' +
+      'Travel would go dark until you re-authored it per system',
+    downgradeTo: '1.26.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateTravelToWorldScope(data),
+  },
   // Future migrations added here in version order
 ];
+
+/**
+ * The highest version in the registry above — the version a fully migrated world's
+ * `migrationVersion` setting holds once a migration pass has completed.
+ *
+ * Derived by comparison rather than read off the last element, so a future entry appended
+ * out of order cannot silently lower the answer. Exported for issue 1224's Valid Id Basis,
+ * which would otherwise hardcode the literal and stop being true the next time a migration
+ * is registered — a hardcoded version that has fallen behind the registry reads as
+ * "migrations current" forever, which is fail-OPEN in exactly the gate that must fail closed.
+ *
+ * @returns {string} a semver string, e.g. `'1.25.0'`.
+ */
+export function getHighestRegisteredMigrationVersion() {
+  let highest = '0.0.0';
+  for (const migration of MIGRATIONS) {
+    const version = String(migration?.version ?? '');
+    if (version !== '' && compareSemver(version, highest) > 0) highest = version;
+  }
+  return highest;
+}
+
+/**
+ * Why a migration pass persisted nothing and left `migrationVersion` where it found it
+ * (issue 1242).
+ *
+ * A DEFERRAL is not an abort. An abort is a fatal migration error, has per-document
+ * remediation and a downgrade target, and gets the recovery dialog. A deferral is a storage
+ * fact — the corpus could not be read, or could not be written — and its remedy is a reload
+ * rather than a document fix, so it gets its own GM notice.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
+  /** The recipe corpus could not be read. Distinct from an EMPTY corpus, deliberately. */
+  CORPUS_READ_FAILED: 'corpusReadFailed',
+  /** A writeback leg failed, so the remaining legs and the version bump were abandoned. */
+  WRITEBACK_FAILED: 'writebackFailed',
+});
+
+/**
+ * The summary shape a pass returns when it persisted nothing.
+ *
+ * Written once rather than as a fourth copy of the same literal: the early return, the abort
+ * and the two deferrals all describe "this pass wrote nothing", and four hand-maintained
+ * copies drift the moment a summary key is added.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+function emptyPassSummary(overrides = {}) {
+  return {
+    ran: 0,
+    aborted: false,
+    migratedCatalystCount: 0,
+    unifiedRegionSystems: [],
+    removedResultSelectionProviders: {
+      droppedRollTableRecipes: [],
+      strippedGatheringTasks: [],
+    },
+    essenceCollisionDisabledRecipes: [],
+    retiredCraftingModCounts: [],
+    unifiedModifierCollisions: [],
+    ...overrides,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // MigrationRunner class
@@ -392,19 +630,45 @@ export class MigrationRunner {
    *   setSetting: Function,
    *   moduleVersion?: string,
    *   promptRecovery?: Function,
-   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string }>
+   *   recipeCorpus?: { loadAll: Function, createOrUpdateAll: Function },
+   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string, downgradeLosesData?: boolean }>
    * }} opts
    *   `promptRecovery` is an optional seam invoked with the abort context so the
    *   caller can present a GM decision prompt; `migrations` overrides the default
    *   registry (used by tests to inject a fatal migration) and defaults to the
    *   production `MIGRATIONS`.
+   *
+   *   `recipeCorpus` and `craftingSystemCorpus` are the corpus accessors this pass reads and
+   *   writes through (issue 1242). Both DEFAULT to the whole-array setting accessors below,
+   *   which is what production uses; they stay injectable so a fixture can observe or refuse
+   *   a corpus read or write without patching `game.settings`.
    */
-  constructor({ getSetting, setSetting, moduleVersion, promptRecovery, migrations } = {}) {
+  constructor({
+    getSetting,
+    setSetting,
+    moduleVersion,
+    promptRecovery,
+    recipeCorpus,
+    craftingSystemCorpus,
+    migrations,
+  } = {}) {
     this._getSetting = getSetting;
     this._setSetting = setSetting;
     this._moduleVersion = moduleVersion;
     this._promptRecovery = promptRecovery;
     this._migrations = Array.isArray(migrations) ? migrations : MIGRATIONS;
+    this._recipeCorpus = recipeCorpus ?? {
+      loadAll: async () => this._getSetting(SETTING_KEYS.RECIPES) ?? [],
+      createOrUpdateAll: async (records) => {
+        await this._setSetting(SETTING_KEYS.RECIPES, records);
+      },
+    };
+    this._craftingSystemCorpus = craftingSystemCorpus ?? {
+      loadAll: async () => this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [],
+      createOrUpdateAll: async (systems) => {
+        await this._setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, systems);
+      },
+    };
   }
 
   /**
@@ -424,31 +688,55 @@ export class MigrationRunner {
       .sort((a, b) => compareSemver(a.version, b.version));
 
     if (pending.length === 0) {
-      return {
-        ran: 0,
-        aborted: false,
-        migratedCatalystCount: 0,
-        unifiedRegionSystems: [],
-        removedResultSelectionProviders: {
-          droppedRollTableRecipes: [],
-          strippedGatheringTasks: [],
-        },
-        essenceCollisionDisabledRecipes: [],
-        retiredCraftingModCounts: [],
-      };
+      return emptyPassSummary();
     }
 
-    const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
-    const rawSystems = this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [];
+    let rawRecipes;
+    try {
+      // Contained because an escaping rejection is INVISIBLE: the hook dispatcher's try/catch
+      // is synchronous, so a rejection out of the module's async `ready` callback fires no
+      // error hook and no notification, leaves the readiness promise unsettled and the module
+      // with no managers.
+      rawRecipes = await this._recipeCorpus.loadAll();
+    } catch (error) {
+      console.error(
+        'Fabricate | Migrations deferred: the recipe corpus could not be read, so no migration ran and nothing was saved.',
+        error
+      );
+      return emptyPassSummary({
+        deferred: true,
+        deferredReason: MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED,
+        deferredError: error,
+      });
+    }
+    let rawSystems;
+    try {
+      // Contained for the same reason the recipe read is.
+      rawSystems = await this._craftingSystemCorpus.loadAll();
+    } catch (error) {
+      console.error(
+        'Fabricate | Migrations deferred: the crafting system corpus could not be read, so no migration ran and nothing was saved.',
+        error
+      );
+      return emptyPassSummary({
+        deferred: true,
+        deferredReason: MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED,
+        deferredError: error,
+      });
+    }
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
     const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
     const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
+    const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
+    const rawTravelConfig = this._getSetting(SETTING_KEYS.TRAVEL_CONFIG) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
     const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
     const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
     const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
+    const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
+    const originalTravelConfigJson = JSON.stringify(rawTravelConfig);
 
     let data = {
       recipes: rawRecipes,
@@ -456,6 +744,8 @@ export class MigrationRunner {
       gatheringConfig: rawGatheringConfig,
       environments: rawEnvironments,
       gatheringParties: rawGatheringParties,
+      currencyConfig: rawCurrencyConfig,
+      travelConfig: rawTravelConfig,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -499,23 +789,18 @@ export class MigrationRunner {
           this._emitMigrationRecoveryGuidance(migration, error, downgradeTo);
 
           // Optional GM decision-prompt seam (defaults to "Keep existing data").
-          this._promptRecovery?.({ downgradeTo, documents: failures, label: migration.label });
+          this._promptRecovery?.({
+            downgradeTo,
+            documents: failures,
+            label: migration.label,
+          });
 
-          return {
-            ran: 0,
+          return emptyPassSummary({
             aborted: true,
             abortedMigration: migration.label,
             downgradeTo,
             failures,
-            migratedCatalystCount: 0,
-            unifiedRegionSystems: [],
-            removedResultSelectionProviders: {
-              droppedRollTableRecipes: [],
-              strippedGatheringTasks: [],
-            },
-            essenceCollisionDisabledRecipes: [],
-            retiredCraftingModCounts: [],
-          };
+          });
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
       }
@@ -575,6 +860,19 @@ export class MigrationRunner {
     }
     delete data._retiredCraftingModCounts;
 
+    // The 1.23.0 modifier-library unification reports, per system, how many gathering
+    // entries had to be re-keyed because their id was already taken by a check-modifier
+    // entry. Capture it for the GM notice — a re-keyed modifier is a visible rename in the
+    // authoring surface, so the GM has to be told which systems it happened in — and strip
+    // the transient field so it is never persisted.
+    let unifiedModifierCollisions = [];
+    if (Array.isArray(data._unifiedModifierCollisions)) {
+      unifiedModifierCollisions = data._unifiedModifierCollisions
+        .map((entry) => _normalizeModifierCollisionEntry(entry))
+        .filter(Boolean);
+    }
+    delete data._unifiedModifierCollisions;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -582,24 +880,75 @@ export class MigrationRunner {
     const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
     const gatheringPartiesChanged =
       JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
+    const currencyConfigChanged =
+      JSON.stringify(data.currencyConfig) !== originalCurrencyConfigJson;
+    const travelConfigChanged = JSON.stringify(data.travelConfig) !== originalTravelConfigJson;
 
+    // ---------------------------------------------------------------------------
+    // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
+    // incidental (`destructive-changes-and-migrations/spec.md` § Startup Migration Flow).
+    //
+    // The reason is NOT "so a tear leaves the version un-advanced" — that is true in every
+    // ordering, because the version bump is unconditionally last. A tear in the recipes leg
+    // abandons the rest rather than continuing, because the 0.6.0 migration writes `toolIds`
+    // onto recipes and the tool bodies onto systems: a systems write after a failed recipes
+    // write is a dangling reference the re-run cannot reconstruct, since the source fields
+    // have already been consumed.
+    // ---------------------------------------------------------------------------
     if (recipesChanged) {
-      await this._setSetting(SETTING_KEYS.RECIPES, data.recipes);
+      try {
+        await this._recipeCorpus.createOrUpdateAll(data.recipes);
+      } catch (error) {
+        return this._deferOnWriteFailure(error);
+      }
     }
-    if (systemsChanged) {
-      await this._setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, data.systems);
-    }
-    if (gatheringConfigChanged) {
-      await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
-    }
-    if (environmentsChanged) {
-      await this._setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, data.environments);
-    }
-    if (gatheringPartiesChanged) {
-      await this._setSetting(SETTING_KEYS.GATHERING_PARTIES, data.gatheringParties);
-    }
+    try {
+      // ORDER IS LOAD-BEARING: `currencyConfig` is written BEFORE `craftingSystems`.
+      //
+      // The 1.26.0 migration LIFTS the currency ladder out of the systems and then shrinks each
+      // system's block to `{ enabled }`, so systems are the SOURCE and this setting is the
+      // DESTINATION. Write the source first and a tear between the two — any rejection below
+      // abandons the rest and leaves `migrationVersion` behind — destroys the ladder
+      // irrecoverably: the re-run finds systems already shrunk, lifts nothing, and the
+      // idempotence guard keeps the still-empty world config. Writing the destination first
+      // makes the same tear fully recoverable, because the re-run finds a populated world
+      // ladder, keeps it, and re-applies a shrink that is idempotent by construction.
+      if (currencyConfigChanged) {
+        await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
+      }
+      // `travelConfig` is the SECOND destination written before its source, for the identical
+      // reason (issue 1282): 1.27.0 lifts the realm library out of the systems and then strips
+      // it, so a tear after the systems write would leave every system shrunk and the world
+      // library empty, the re-run would lift nothing, and the idempotence guard would
+      // correctly decline to write. The realms, their scene mappings and the reveal mode would
+      // be gone with no error and no recoverable copy.
+      //
+      // `gatheringParties` is NOT ordered against the systems write: its collapse is a
+      // transform of parties into themselves and takes nothing from the systems, so a tear
+      // either side of it is equally recoverable.
+      if (travelConfigChanged) {
+        await this._setSetting(SETTING_KEYS.TRAVEL_CONFIG, data.travelConfig);
+      }
+      if (systemsChanged) {
+        await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
+      }
+      if (gatheringConfigChanged) {
+        await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
+      }
+      if (environmentsChanged) {
+        await this._setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, data.environments);
+      }
+      if (gatheringPartiesChanged) {
+        await this._setSetting(SETTING_KEYS.GATHERING_PARTIES, data.gatheringParties);
+      }
 
-    await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
+      await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
+    } catch (error) {
+      // The remaining six legs and the version bump share one containment and one
+      // disposition: a rejection from any of them would otherwise propagate out of `run()`
+      // past a caller with no `catch`, leaving a partial writeback with no GM-facing notice.
+      return this._deferOnWriteFailure(error);
+    }
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
 
@@ -611,15 +960,38 @@ export class MigrationRunner {
       removedResultSelectionProviders,
       essenceCollisionDisabledRecipes,
       retiredCraftingModCounts,
+      unifiedModifierCollisions,
     };
+  }
+
+  /**
+   * Abandon the rest of the writeback and report the pass as deferred.
+   *
+   * `migrationVersion` is deliberately left where it was found, so the next boot re-runs the
+   * whole pass. That is safe because every writeback leg is a plain whole-array replace.
+   *
+   * @param {Error} error
+   * @returns {object} the deferred pass summary.
+   * @private
+   */
+  _deferOnWriteFailure(error) {
+    console.error(
+      'Fabricate | Migrations deferred: a migrated setting could not be saved, so the remaining writes and the version bump were abandoned. Nothing was marked as migrated.',
+      error
+    );
+    return emptyPassSummary({
+      deferred: true,
+      deferredReason: MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED,
+      deferredError: error,
+    });
   }
 
   /**
    * Emit GM-facing recovery guidance to the console after a migration pass aborts.
    *
    * Output (spec § Migration Abort Recovery Guidance):
-   *  - a clear abort header confirming existing data was kept unchanged,
-   *  - a recommended downgrade target version,
+   *  - a clear abort header scoped to the pass that aborted,
+   *  - a recommended downgrade action,
    *  - per-document fix instructions (type, id/name, exact error, required fix),
    *  - macro-oriented remediation hints when present.
    *
@@ -628,15 +1000,22 @@ export class MigrationRunner {
    * @param {string|null} downgradeTo
    */
   _emitMigrationRecoveryGuidance(migration, error, downgradeTo) {
-    console.error('Fabricate | Migration aborted. Existing data has been kept unchanged.');
+    // Scoped to THIS PASS. It is not a claim that a failed migration leaves data unchanged: a
+    // non-fatal migration error is logged and the pass continues, advancing the version past
+    // the failed migration and writing. And it is a claim about STORED data — the migrations
+    // transform the session's own setting values in place, so a reload is what discards them.
+    console.error(
+      "Fabricate | Migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy."
+    );
     console.error(`Fabricate | Aborted during migration: "${migration.label}"`);
     if (error?.message) {
       console.error(`Fabricate | Reason: ${error.message}`);
     }
 
     const downgradeTarget = downgradeTo ?? 'unknown';
+    // One complete sentence, from the same source the GM dialog reads.
     console.error(
-      `Fabricate | Recommended action: downgrade Fabricate to version ${downgradeTarget} to continue using your existing data without manual remediation.`
+      `Fabricate | Recommended action: ${DOWNGRADE_ADVICE.consoleSentence(downgradeTarget)}`
     );
 
     const documents = Array.isArray(error?.documents) ? error.documents : [];

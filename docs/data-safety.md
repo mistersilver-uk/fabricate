@@ -90,10 +90,23 @@ The next time you reload your world, it will try again.
 That gives you a chance to fix the underlying problem first, if it's with your world data, or me a chance to fix it if it's an error in the module.
 
 When a migration aborts, Fabricate shows you a recovery dialog.
-It tells you plainly that your existing data was kept unchanged.
-It recommends a Fabricate version you can roll back to so you can keep using your data without any manual cleanup.
+It tells you plainly that this pass saved nothing, and that your stored data is exactly as it was before the load.
+It asks you to reload afterwards, because the half-migrated copy the module was working on lives only in that session and a reload throws it away.
 When the problem comes down to specific recipes or systems, it lists them with the reason each one failed and what to do about it.
 The dialog defaults to keeping your existing data, so the safe choice is the one already selected.
+
+The dialog also names a Fabricate version you can roll back to and keep working.
+
+### When migrations do not run at all
+
+There are two situations where Fabricate deliberately skips the whole migration pass rather than guessing.
+
+If it cannot read your recipes or your crafting systems at all, it refuses — an unreadable collection and an empty one look identical, and treating one as the other would let a migration reduce over nothing and save a confidently wrong answer.
+And if a migration ran but its results could not be saved, Fabricate abandons the remaining writes rather than saving some of them.
+
+In both cases nothing is written, the world is not marked as migrated, and the migrations simply run again next time.
+Fabricate tells you which of the two happened.
+Only the second asks you to reload straight away: in that one the migrations have already transformed the copy held in this session, so continuing to work from it would save migrated data into a world still recorded as un-migrated.
 
 {: .warning }
 > This is a safe-abort and recovery design, not a full backup of your world.
@@ -108,6 +121,10 @@ A few more everyday safeguards are worth calling out.
 
 **You are asked before anything destructive happens.**
 When an action in the Crafting System Manager would discard unsaved edits or delete something, Fabricate asks you to confirm first through a standard Foundry confirmation dialog.
+The one known exception is a recipe item you have open for editing in Books & Scrolls — despite the name, that surface manages every recipe item regardless of its Foundry item type, not just books and scrolls.
+If another connected GM changes this system's visibility mode away from Item or Knowledge mode while you have unsaved edits open there, Fabricate can navigate you away and discard those edits without asking first.
+Changing the visibility mode yourself does not trigger this, because that setting lives on the Crafting Settings screen, and leaving unsaved changes there always asks first.
+Save your changes promptly to avoid losing them this way.
 
 **Malformed data is repaired or ignored, not crashed on.**
 Whenever Fabricate reads your stored configuration, it validates and cleans it up as it loads.

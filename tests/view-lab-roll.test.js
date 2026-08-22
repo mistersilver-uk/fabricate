@@ -36,11 +36,11 @@ import { buildLabContent } from './view-lab/world/labContent.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
 import { rolledDiceGroups, evaluateCheckRoll } from '../src/systems/checkRoll.js';
 import {
-  buildCraftingModifierChoice,
-  buildCraftingModifierContext,
+  buildCheckModifierChoice,
+  buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
-} from '../src/systems/craftingModifierResolver.js';
+} from '../src/systems/checkModifierResolver.js';
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
@@ -402,7 +402,19 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
     false,
     'and the FIXTURE seeds no retired placeholder, so the capture case does not depend on one'
   );
-  const context = buildCraftingModifierContext(herbalism, stillroom);
+  // The lab fixture authors its two libraries at their PRE-MIGRATION locations on purpose
+  // (issues 1095 C13, 1117), so the lab BUILD's migration pass is what lifts and merges
+  // them. This test reads `buildLabContent()` directly — before that pass — so it applies
+  // the same relocation the runner would, rather than asserting against a shape the
+  // rendered world never has. `tests/view-lab-world-migration.test.js` owns the merge
+  // itself, including the id collision the two lab libraries carry: only the CHECK entries
+  // matter to a crafting check, and those keep their ids, so the crafting-side reading here
+  // is unaffected by it.
+  const migrated = {
+    ...herbalism,
+    modifiers: herbalism.craftingCheck?.checkModifiers,
+  };
+  const context = buildCheckModifierContext(migrated, 'crafting', stillroom);
   assert.equal(
     resolveModifierPolicy(context),
     'playerPicks',
@@ -411,7 +423,7 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
 
   // …and the descriptor the prompt renders from. `null` here is the failure the CI capture
   // reported: the dialog opens with no fieldset in it.
-  const choice = buildCraftingModifierChoice(context, () => 1);
+  const choice = buildCheckModifierChoice(context, () => 1);
   assert.ok(choice, 'a modifier-choice descriptor is built');
   assert.ok(
     choice.modifiers.length >= 2,

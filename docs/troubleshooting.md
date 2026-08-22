@@ -95,8 +95,8 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
-   Is a roll formula configured for the system's resolution mode?
+1. Open the Crafting Admin panel, select the system, and open **Checks › Crafting**.
+   On **The roll** section, is a roll formula configured for the system's resolution mode?
 2. Check the system's **Resolution Mode**.
    If the resolution mode is **Routed by check** or **Progressive**, a crafting check is required.
    Fabricate reports a validation error when its roll formula is missing.
@@ -115,34 +115,36 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 **Likely causes:**
 
-- The system's **Combination rule** is not **Recipe picks**.
+- The system's **Combination rule** is not **By recipe**.
   That is the one rule that hands the selection to the recipe author, so it is the only rule under which the control appears.
   Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
-- The system has no check modifiers in its catalogue yet, so there is nothing to pick from.
+- The system's modifier library is empty, so there is nothing to pick from.
 - The system's active crafting check cannot use a modifier right now.
   Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.
-  Under **Recipe picks** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
+  Under **By recipe** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
 
 **Related symptom:** The control is there, but the **Add modifier** button is greyed out.
 The recipe has reached the system's **Maximum picks**.
-Raise that limit, or clear it entirely for no limit, on the **Check modifiers** card.
+Raise that limit, or clear it entirely for no limit, on the **How they combine** card of **Checks › Crafting › Modifiers**.
 
-**What is and is not lost:** Switching a system away from **Recipe picks**, or lowering **Maximum picks**, never deletes what a recipe picked.
+**What is and is not lost:** Switching a system away from **By recipe**, or lowering **Maximum picks**, never deletes what a recipe picked.
 The picks stay stored and stop being applied, and restoring the rule or the limit applies them again immediately with nothing to re-enter.
 A lowered limit rolls only the first few picks, up to the limit, and keeps the rest.
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel, select the system, go to the **Crafting check** page, and open the **Check modifiers** card.
-2. Confirm the catalogue has at least one modifier.
-   If it is empty, choose **Add modifier** and author one.
-3. Check the **Combination rule**.
-   If it is anything other than **Recipe picks**, that is why no recipe has a control; choose **Recipe picks** to hand the selection to your recipes.
-4. If the rule is already **Recipe picks**, open the recipe's **Overview** tab and read the banner in place of the control.
+1. Open the Crafting Admin panel, select the system, and open **Checks › Crafting › Modifiers**.
+2. Confirm the library has at least one modifier.
+   The **Named modifiers** card lists them, and it is read-only.
+   If it is empty, follow its **Edit in system settings** link to **System settings › Modifiers** and choose **Add modifier** there.
+3. Check the **Combination rule** on the **How they combine** card.
+   If it is anything other than **By recipe**, that is why no recipe has a control.
+   Choose **By recipe** to hand the selection to your recipes.
+4. If the rule is already **By recipe**, open the recipe's **Overview** tab and read the banner in place of the control.
    It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
-5. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
+5. Fix whichever of those applies on **Checks › Crafting**, then return to the recipe's Overview tab.
 
-**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the catalogue, the four combination rules, and the pick limit in full.
+**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the library, the four combination rules, and the pick limit in full.
 
 ---
 
@@ -170,6 +172,53 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 
 **See also:** [Routed Modes]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
 [Crafting Checks]({% link crafting-checks.md %}) for how a routed check rolls and resolves its difficulty.
+
+---
+
+## A Failed Check Produces Nothing, or Suddenly Produces Something
+
+**Symptom:** A recipe, salvageable item or gathering task has a failure result authored, but a failed
+check hands the crafter nothing — or the reverse, a failed check has started producing something it
+never used to.
+
+**Likely causes:**
+
+- The activity's **Produce a result on a failed check** setting is **Never**.
+  Every system that existed before Fabricate 1.25.0 was set to **Never** by the upgrade, deliberately,
+  so that nothing about it changed when you upgraded.
+- The record authors no failure output at all.
+  The setting SELECTS a failure output you wrote; it never invents one, so **Always** on a recipe with
+  no failure result still produces nothing.
+- The resolution mode has no failure outcome to produce.
+  **Routed by ingredients** and **Progressive** have no failure tier or reserved failure result set,
+  and gathering's routed and progressive modes are still being built, so the setting is inert there
+  and the section says so.
+- On a **Routed by check** system, the failure-marked outcome tier is not assigned to any result set.
+  A failing tier routes exactly like a succeeding one: it has to be bound to a result set.
+
+**Step-by-step checks:**
+
+1. Open the activity's check route — **Checks › Crafting**, **Checks › Salvage** or **Checks › Gathering** — and
+   go to its **On failure** section.
+   Read the **Produce a result on a failed check** card: **Never**, **Decided per recipe** or
+   **Always**.
+   Each activity has its own copy of this setting, so a crafting system set to **Always** says nothing
+   about what its salvage does.
+2. If the section shows a note saying the setting does not apply in this mode, that is the answer: the
+   mode has no failure outcome, and the note names why.
+3. In **simple** mode, open the record and confirm the failure output exists.
+   For a recipe that is the reserved failure result set on the **Results** tab, drawn with a danger
+   border; for a salvageable item it is the reserved failure result set on the component's Salvage
+   panel.
+4. In **Routed by check** mode, set the check route's **Produce a result on a failed check** to
+   **Decided per recipe** or **Always** first — the failure-marked tiers only appear in a result set's
+   **Produced on outcome** picker while failure results are permitted — then assign a result set to the
+   failing tier.
+   Nothing you have already assigned is deleted when you set it back to **Never**; those assignments
+   simply stop being offered and stop routing, and they come back when you permit failure results again.
+
+**See also:** [Crafting Checks]({% link crafting-checks.md %}#on-failure) for the setting and its three
+values, and [Salvage]({% link salvage.md %}) for salvage's own On failure section.
 
 ---
 
@@ -211,7 +260,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
    This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
-[Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) covers consumption on failure settings.
+[Crafting Checks]({% link crafting-checks.md %}#failure-consumption-policy) covers consumption on failure settings.
 [Repairing Item Data](#repairing-item-data) covers the maintenance action that gives duplicated copies a durable identity link.
 
 ---
@@ -296,7 +345,7 @@ Additional causes:
 
 ## Character Missing From the Character Bar or Rosters
 
-**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, or in the party member picker.
+**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, in the party member picker, or in a party's travel-actor picker.
 The player owns the actor, and it is otherwise a normal player character for the game system.
 
 **Likely cause:**
@@ -316,11 +365,15 @@ The player owns the actor, and it is otherwise a normal player character for the
 4. Click **Save**.
    The change takes effect for every connected player immediately, without a reload.
 
-**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, and the party member picker.
+**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, the party member picker, and a party's travel-actor picker.
 It does not change who is allowed to attempt a craft or a gathering task.
 That always depends on who owns or controls the actor.
 An actor of an unconfigured type remains fully usable for crafting and gathering.
-It is simply not offered as a choice in those four lists.
+It is simply not offered as a choice in those five lists.
+
+Note that these lists share one setting.
+Adding an actor type so that a group, vehicle or caravan actor can be chosen as a party's travel actor also makes actors of that type eligible party members.
+If you would rather not widen both, drag the actor onto the travel-actor panel instead: a drop assigns any actor directly and ignores the type list.
 
 **See also:** [Gathering Environments]({% link gathering-environments.md %}#actor-selection-bar) covers the character bar from the player's side.
 
@@ -559,6 +612,33 @@ Make sure Fabricate is up to date.
 3. Make sure Fabricate is updated to the latest version, which includes the more robust drag-data handling.
 
 **See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) explains adding components via drag-and-drop.
+
+---
+
+## A Tab Added by Another Module Will Not Display
+
+**Symptom:** The Fabricate window shows a tab that another module added, and choosing it displays **This section could not be displayed** instead of that module's content.
+
+**Cause:**
+
+Another installed module can add its own tabs to the Fabricate window.
+Fabricate supplies the tab and the space beneath it, and the other module draws everything inside that space.
+When that module fails while drawing its content, Fabricate shows the message in place of the panel rather than leaving a blank or half-drawn section.
+The message names the section that failed.
+
+**Fix:**
+
+1. Close the Fabricate window, open it again, and choose the tab again.
+   Fabricate tries the section afresh on every new window, which is enough when the failure was a one-off.
+   Bringing an already-open window back to the front does not retry it.
+2. If the message comes back every time, report it to the author of the module that added the tab rather than to Fabricate, and quote the section name the message gives.
+3. Disabling that module removes its tabs from the Fabricate window altogether.
+   Fabricate puts nothing in their place.
+
+Fabricate's own tabs keep working throughout.
+The message covers the whole section rather than one tab of it, so every tab belonging to that section shows it until the section is retried.
+
+**See also:** [Downtime Preview]({% link downtime-preview.md %}) covers installed companion modules that replace the GM downtime preview.
 
 ---
 

@@ -51,6 +51,12 @@ const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilit
 const { isRecipeItemSpent } = await import(
   '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js'
 );
+// The entry-boundary reader the service and the GM surfaces share (issue 1143). Pure,
+// dependency-free, and imported here so the tests assert the same view production does
+// rather than re-deriving ids from the persisted shape by hand.
+const { readLearnedRecipeEntries, readDiscoveryProgressEntries } = await import(
+  '../src/systems/recipeKeyedFlagEntries.js'
+);
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -77,6 +83,46 @@ function setPathValue(object, path, value) {
 }
 
 // ---------------------------------------------------------------------------
+// Value-tree expansion (issue 1143)
+//
+// `Document#update` dot-expands the whole nested VALUE TREE of an `ObjectField`, not
+// just the update path key, so a map key containing a `.` is NOT persisted flat. Both
+// supported builds do it, by different routes:
+//
+//   V14.365 — `ObjectField#_cleanType` → `#reconstructOperators` calls
+//             `SchemaField.expandObject` then recurses into every nested plain object
+//             (`common/data/fields.mjs`).
+//   V13.351 — `DataModel#updateSource` (`common/abstract/data.mjs`) replaces `changes`
+//             with `expandObject(changes)` whenever any top-level key contains a dot,
+//             and V13's `expandObject` (`common/utils/helpers.mjs`) recurses into
+//             nested plain objects, re-splitting keys at EVERY depth via `setProperty`.
+//             Fabricate always writes the dotted `flags.fabricate.fabricate.<key>`
+//             path, so that guard always fires.
+//
+// This mirrors that recursion. Without it the doubles stored a dotted key verbatim,
+// which is the single reason no test saw issue 1143: every fixture lied about the
+// persisted shape. `pins the double against real Foundry V13.351 output` below asserts
+// this function's results against shapes produced by EXECUTING the real V13 helper.
+// ---------------------------------------------------------------------------
+
+function isPlainObjectValue(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function expandValueTree(value, depth = 0) {
+  if (depth > 32) throw new Error('Maximum object expansion depth exceeded');
+  if (Array.isArray(value)) return value.map((entry) => expandValueTree(entry, depth + 1));
+  if (!isPlainObjectValue(value)) return value;
+  const expanded = {};
+  for (const [key, inner] of Object.entries(value)) {
+    setPathValue(expanded, key, expandValueTree(inner, depth + 1));
+  }
+  return expanded;
+}
+
+// ---------------------------------------------------------------------------
 // FakeDocument
 //
 // Stores state in this._flags = { fabricate: <flagsArg> }
@@ -84,15 +130,21 @@ function setPathValue(object, path, value) {
 //   getPathValue(this._flags['fabricate'], 'fabricate.learnedRecipes')
 //   = this._flags.fabricate.fabricate.learnedRecipes
 // So to seed 'learnedRecipes', pass flagsArg = { fabricate: { learnedRecipes: value } }
+//
+// Every value the document accepts — the constructor seed, `setFlag`, and `update` —
+// goes through `expandValueTree`, so a fixture written with a dotted id is stored in the
+// shape Foundry would really persist it in. Seeding without expanding would leave the
+// fixture lying even once the two write paths were faithful (issue 1143).
 // ---------------------------------------------------------------------------
 
 class FakeDocument {
   constructor(flagsArg = {}) {
-    this._flags = { fabricate: flagsArg };
+    this._flags = { fabricate: expandValueTree(flagsArg) };
     // Spies (issue 773): payload-level assertions against the deletion primitive.
-    // The fake's setFlag REPLACES via setPathValue and is merge-blind, so a getFlag
-    // read-back cannot distinguish a reload-safe `-=` delete from a resurrecting
-    // setFlag-merge rebuild — the tests must assert what update()/setFlag() RECEIVE.
+    // The fake's setFlag REPLACES and is still merge-blind — that axis of fidelity is
+    // deliberately unmodelled — so a getFlag read-back cannot distinguish a reload-safe
+    // `-=` delete from a resurrecting setFlag-merge rebuild; the tests assert what
+    // update()/setFlag() RECEIVE. Value-tree EXPANSION is modelled faithfully (1143).
     this.updateCalls = [];
     this.setFlagCalls = [];
   }
@@ -105,7 +157,7 @@ class FakeDocument {
   async setFlag(scope, key, value) {
     this.setFlagCalls.push({ scope, key, value });
     if (!this._flags[scope]) this._flags[scope] = {};
-    setPathValue(this._flags[scope], key, value);
+    setPathValue(this._flags[scope], key, expandValueTree(value));
     return value;
   }
 
@@ -141,7 +193,7 @@ class FakeDocument {
         const key = last.slice(2);
         if (target && typeof target === 'object') delete target[key];
       } else {
-        target[last] = value;
+        target[last] = expandValueTree(value);
       }
     }
     return this;
@@ -3660,6 +3712,14 @@ test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resid
     'safe-retained': safeEntry
   });
 
+  // The seed is stored NESTED (issue 1143) — this is the shape the two-step actually
+  // operates on in production, and the shape the old double hid.
+  assert.deepEqual(
+    actor.getFlag('fabricate', 'fabricate.learnedRecipes').imported.recipe.id,
+    { learnedAt: 1, sourceItemUuid: null },
+    'the dotted id is persisted as a subtree, not as a flat key'
+  );
+
   await service.forgetLearnedRecipes(actor, [dottedId], { freeLearnBudget: false });
 
   // Ordered payload assertion — call 1 is EXACTLY the parent delete...
@@ -3677,7 +3737,328 @@ test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resid
   // Post-reload (re-read): the retained entry survives byte-faithfully, dotted is gone.
   const reloaded = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
   assert.deepEqual(reloaded['safe-retained'], safeEntry, 'retained entry survives post-reload');
-  assert.ok(!(dottedId in reloaded), 'the dotted entry is removed post-reload');
+  assert.ok(!('imported' in reloaded), 'the dotted entry subtree is removed post-reload');
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1143 — deleting a recipe destroyed learned knowledge for recipes that still
+// exist, because every reader derived ids from the map's TOP LEVEL while
+// `Document#update` had nested a dotted id into a subtree.
+//
+// Every persisted shape asserted here was produced by EXECUTING Foundry V13.351's real
+// `common/utils/helpers.mjs#expandObject` against the exact payload `setFabricateFlag`
+// writes; V14.365 reaches the same shape through `ObjectField#_cleanType`.
+// ---------------------------------------------------------------------------
+
+const entryAt = (n, uuid = null) => ({ learnedAt: n, sourceItemUuid: uuid });
+
+test('1143 pins the double against real Foundry V13.351 expandObject output', () => {
+  // Guard against the double drifting back into storing dotted keys verbatim, which is
+  // the exact defect that let issue 1143 ship. Left-hand values are what the REAL V13
+  // helper returned for the same input; a mismatch means the double stopped modelling
+  // Foundry, not that the product changed.
+  const stored = (map) =>
+    new FakeActor({ flagsArg: { fabricate: { learnedRecipes: map } } }).getFlag(
+      'fabricate',
+      'fabricate.learnedRecipes'
+    );
+
+  assert.deepEqual(
+    stored({ 'imported.recipe.keep': entryAt(1), 'imported.recipe.gone': entryAt(2), plainid: entryAt(3) }),
+    {
+      imported: { recipe: { keep: entryAt(1), gone: entryAt(2) } },
+      plainid: entryAt(3)
+    },
+    'a dotted id nests into a subtree and shares its first segments with its siblings'
+  );
+  assert.deepEqual(
+    stored({ a: entryAt(1), 'a.b': entryAt(2) }),
+    { a: { learnedAt: 1, sourceItemUuid: null, b: entryAt(2) } },
+    'a strict-prefix id becomes a CHILD of the prefix entry'
+  );
+  assert.deepEqual(
+    stored({ 'a.b': entryAt(2), a: entryAt(1) }),
+    { a: entryAt(1) },
+    'written the other way round, the prefix write REPLACES the node and destroys a.b'
+  );
+  assert.deepEqual(
+    stored({ a: entryAt(1, 'U1'), 'a.learnedAt': entryAt(2, 'U2') }),
+    { a: { learnedAt: entryAt(2, 'U2'), sourceItemUuid: 'U1' } },
+    "the a / a.learnedAt collision overwrites recipe a's own learnedAt with an entry"
+  );
+});
+
+test('1143 AC1 recipe deletion forgets the dotted entry and its siblings SURVIVE (post-reload)', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor({
+    'imported.recipe.keep': entryAt(1),
+    'imported.recipe.gone': entryAt(2),
+    plainid: entryAt(3)
+  });
+  globalThis.game = { actors: [actor] };
+
+  // 'imported.recipe.gone' was deleted; the other two recipes still exist.
+  await service.cleanupLearnedRecipes(new Set(['imported.recipe.keep', 'plainid']));
+
+  // Asserted against the NESTED persisted shape, post-reload — not the update payload.
+  const reloaded = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  const view = readLearnedRecipeEntries(reloaded);
+  assert.deepEqual(
+    [...view.keys()].sort(),
+    ['imported.recipe.keep', 'plainid'],
+    'only the deleted recipe is forgotten'
+  );
+  assert.deepEqual(
+    view.get('imported.recipe.keep'),
+    entryAt(1),
+    'the surviving sibling under the SAME first segment keeps its entry intact'
+  );
+  assert.deepEqual(view.get('plainid'), entryAt(3), 'an unrelated safe entry is untouched');
+  // The whole-subtree deletion the defect performed would have emptied the map.
+  assert.ok(reloaded.imported, 'the shared `imported` subtree was not deleted wholesale');
+});
+
+test('1143 AC1 a stale id is still forgotten when it is the ONLY entry under its subtree', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor({ 'imported.recipe.gone': entryAt(2), plainid: entryAt(3) });
+  globalThis.game = { actors: [actor] };
+
+  await service.cleanupLearnedRecipes(new Set(['plainid']));
+
+  const view = readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes'));
+  assert.deepEqual([...view.keys()], ['plainid'], 'the orphaned dotted entry is really gone');
+});
+
+test('1143 AC1 cleanup leaves an actor with NO stale ids completely untouched', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor({ 'imported.recipe.keep': entryAt(1), plainid: entryAt(3) });
+  globalThis.game = { actors: [actor] };
+
+  await service.cleanupLearnedRecipes(new Set(['imported.recipe.keep', 'plainid']));
+
+  assert.equal(actor.updateCalls.length, 0, 'no write at all when nothing is stale');
+  assert.equal(actor.setFlagCalls.length, 0, 'and no map rebuild either');
+});
+
+test('1143 the reader stops at the ENTRY boundary, never at flattenObject leaves', () => {
+  // The obvious fix — flatten the stored map and diff against the valid ids — recurses
+  // to non-object LEAVES (`plainid.learnedAt`, …), none of which is a recipe id, so
+  // every key reads as stale and every actor's whole map is deleted on any recipe
+  // deletion. This pins that the reader yields ids, not leaf paths.
+  const stored = { imported: { recipe: { id: entryAt(1) } }, plainid: entryAt(2) };
+  const view = readLearnedRecipeEntries(stored);
+
+  assert.deepEqual([...view.keys()], ['imported.recipe.id', 'plainid']);
+  for (const id of view.keys()) {
+    assert.ok(
+      !id.endsWith('.learnedAt') && !id.endsWith('.sourceItemUuid'),
+      `${id} must be a recipe id, not an entry-field leaf path`
+    );
+  }
+});
+
+test('1143 the reader is shape-agnostic: a FLAT dotted key resolves to the same id', () => {
+  // Belt and braces for a world that somehow holds the un-expanded shape (a write that
+  // never went through `Document#update`). Both spellings answer to the same recipe id.
+  assert.deepEqual(
+    [...readLearnedRecipeEntries({ 'a.b': entryAt(1) }).keys()],
+    [...readLearnedRecipeEntries({ a: { b: entryAt(1) } }).keys()]
+  );
+});
+
+test('1143 the reader preserves the legacy scalar entry shape `{ id: 1 }`', () => {
+  // `Object.keys` surfaced these and the Books & Scrolls fixtures still use them, so the
+  // entry-shape walk must not silently drop a non-object entry.
+  const view = readLearnedRecipeEntries({ r1: 1, 'imported.r2': 1 });
+  assert.deepEqual([...view.keys()], ['r1', 'imported.r2']);
+});
+
+test('1143 AC2 a strict-prefix id pair resolves each entry to the RIGHT one', async () => {
+  const service = buildService();
+  // Written a-then-a.b, which is the recoverable order (see the double pin above).
+  const actor = seedLearnedActor({ a: entryAt(1, 'Actor.x.Item.prefix'), 'a.b': entryAt(2, 'Actor.x.Item.child') });
+
+  const view = readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes'));
+  assert.deepEqual(view.get('a'), entryAt(1, 'Actor.x.Item.prefix'), 'the prefix entry excludes its child');
+  assert.deepEqual(view.get('a.b'), entryAt(2, 'Actor.x.Item.child'), 'the child entry resolves on its own');
+
+  // And the cascade forgets exactly one of them.
+  globalThis.game = { actors: [actor] };
+  await service.cleanupLearnedRecipes(new Set(['a']));
+  const after = readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes'));
+  assert.deepEqual([...after.keys()], ['a'], 'only a.b is forgotten');
+  assert.deepEqual(after.get('a'), entryAt(1, 'Actor.x.Item.prefix'), 'and a keeps its own fields');
+});
+
+test('1143 AC2 forgetting the PREFIX id leaves the child entry addressable', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor({ a: entryAt(1), 'a.b': entryAt(2) });
+  globalThis.game = { actors: [actor] };
+
+  await service.cleanupLearnedRecipes(new Set(['a.b']));
+
+  const after = readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes'));
+  assert.deepEqual([...after.keys()], ['a.b'], 'the prefix entry is gone and the child survives');
+  assert.deepEqual(after.get('a.b'), entryAt(2));
+});
+
+test('1143 AC3 the a / a.learnedAt collision is UNRECOVERABLE and is reported as such', () => {
+  // Both ids are written; the merge destroys data before any reader runs, so this
+  // documents a loss rather than repairing one.
+  const actor = seedLearnedActor({ a: entryAt(1, 'U1'), 'a.learnedAt': entryAt(2, 'U2') });
+  const stored = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  const view = readLearnedRecipeEntries(stored);
+
+  // Recipe `a`'s own learnedAt TIMESTAMP is gone — overwritten by the colliding entry
+  // during the write. It is not reconstructable from anything left on the document.
+  assert.ok(!('learnedAt' in view.get('a')), "recipe a's learnedAt is destroyed by the collision");
+  assert.equal(view.get('a').sourceItemUuid, 'U1', "recipe a's other fields do survive");
+  // What the reader must NOT do is report the colliding entry AS a's timestamp.
+  assert.ok(
+    typeof stored.a.learnedAt === 'object',
+    'the raw stored value at a.learnedAt is another entry, not a timestamp'
+  );
+  // The colliding recipe itself is still addressable, so the loss is bounded to one field.
+  assert.deepEqual(view.get('a.learnedAt'), entryAt(2, 'U2'), 'recipe a.learnedAt survives whole');
+});
+
+test('1143 AC3 the reversed write order destroys the OTHER id outright, also unrecoverably', () => {
+  // `_setLearnedMap` writes the whole map, so insertion order is learn order. Learning
+  // `a.b` first and `a` second replaces the node: nothing downstream can recover a.b.
+  const actor = seedLearnedActor({ 'a.b': entryAt(2), a: entryAt(1) });
+  const view = readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes'));
+
+  assert.deepEqual([...view.keys()], ['a'], 'a.b is gone from storage entirely');
+  assert.ok(!view.has('a.b'), 'and no reader can bring it back — this is why intake refuses dotted ids');
+});
+
+test('1143 AC4 budget refund still resolves the ENTRY OBJECT for a dotted id', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'once', learnScope: 'perInstance', learnsAllowed: 1 });
+  const recipe = buildCappedRecipe({ id: 'imported.recipe.id' });
+  const book = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 1 } } }
+  });
+  const service = buildService({ system, recipes: [recipe] });
+  const actor = seedLearnedActor(
+    { 'imported.recipe.id': entryAt(1, 'Actor.a1.Item.book') },
+    {},
+    [book]
+  );
+
+  const result = await service.forgetLearnedRecipes(actor, ['imported.recipe.id']);
+
+  assert.equal(result.count, 1, 'the dotted entry is found and forgotten');
+  assert.equal(
+    service._getRecipeItemLearnCount(book),
+    0,
+    'the entry OBJECT resolved, so the held copy got its learn slot back'
+  );
+});
+
+test('1143 AC4 freeLearnBudget still defaults ON and reset-all still reaches a dotted id', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'once', learnScope: 'perInstance', learnsAllowed: 1 });
+  const recipes = [buildCappedRecipe({ id: 'imported.recipe.id' }), buildCappedRecipe({ id: 'safe-id' })];
+  const book = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
+  const service = buildService({ system, recipes });
+  const actor = seedLearnedActor(
+    {
+      'imported.recipe.id': entryAt(1, 'Actor.a1.Item.book'),
+      'safe-id': entryAt(2, 'Actor.a1.Item.book')
+    },
+    { 'imported.recipe.id': { progress: 40 } },
+    [book]
+  );
+
+  // No explicit freeLearnBudget — the default must still be true.
+  const result = await service.forgetAllLearnedRecipes(actor);
+
+  assert.equal(result.count, 2, 'reset-all enumerates the dotted id as well as the safe one');
+  assert.equal(service._getRecipeItemLearnCount(book), 0, 'both slots were refunded');
+  assert.deepEqual(
+    [...readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes')).keys()],
+    [],
+    'every learned key is gone'
+  );
+  assert.deepEqual(
+    [...readDiscoveryProgressEntries(actor.getFlag('fabricate', 'fabricate.discoveryProgress')).keys()],
+    [],
+    'and so is the dotted discovery entry'
+  );
+});
+
+test('1143 AC4 per-system reset reaches a dotted id and leaves the other system alone', async () => {
+  const recipes = [
+    buildMockRecipe({ id: 'imported.sys1.recipe', craftingSystemId: 'system-1' }),
+    buildMockRecipe({ id: 'imported.sys2.recipe', craftingSystemId: 'system-2' })
+  ];
+  const service = buildService({ recipes });
+  const actor = seedLearnedActor({
+    'imported.sys1.recipe': entryAt(1),
+    'imported.sys2.recipe': entryAt(2)
+  });
+
+  const result = await service.forgetSystemLearnedRecipes(actor, 'system-1');
+
+  assert.equal(result.count, 1);
+  assert.deepEqual(
+    [...readLearnedRecipeEntries(actor.getFlag('fabricate', 'fabricate.learnedRecipes')).keys()],
+    ['imported.sys2.recipe'],
+    "only system-1's dotted entry is cleared"
+  );
+});
+
+test('1143 discoveryProgress carries the identical defect and is repaired with it', async () => {
+  // The same call rewrites TWO recipe-id-keyed maps. `discoveryProgress` nests the same
+  // way but has its own entry shape, so the reader is parameterised on the shape.
+  const service = buildService();
+  const actor = seedLearnedActor(
+    { 'imported.recipe.gone': entryAt(1), 'imported.recipe.keep': entryAt(2) },
+    {
+      'imported.recipe.gone': { progress: 40, fragments: [], discoveredAt: null, manuallySet: false },
+      'imported.recipe.keep': { progress: 70, fragments: ['f1'], discoveredAt: null, manuallySet: true }
+    }
+  );
+
+  await service.forgetLearnedRecipes(actor, ['imported.recipe.gone'], { clearDiscovery: true });
+
+  const discovery = readDiscoveryProgressEntries(actor.getFlag('fabricate', 'fabricate.discoveryProgress'));
+  assert.deepEqual([...discovery.keys()], ['imported.recipe.keep'], 'only the deleted id loses discovery');
+  assert.deepEqual(
+    discovery.get('imported.recipe.keep'),
+    { progress: 70, fragments: ['f1'], discoveredAt: null, manuallySet: true },
+    'the surviving sibling keeps every field, including its ARRAY-valued fragments'
+  );
+});
+
+test('1143 a learned entry is SCALAR-ONLY, which is what the entry-shape walk relies on', async () => {
+  // The walk treats a plain-object-valued field as a nested recipe id, so an entry that
+  // grew an object field would silently break the disambiguation. Drive the real learn
+  // path and pin the contract at the source rather than in a fixture.
+  const service = buildService();
+  const recipe = buildMockRecipe({ id: 'r-scalar' });
+  const actor = new FakeActor({ id: 'a-scalar' });
+  await service._setLearnedMap(actor, {
+    [recipe.id]: { learnedAt: Date.now(), sourceItemUuid: null }
+  });
+
+  const stored = actor.getFlag('fabricate', 'fabricate.learnedRecipes')[recipe.id];
+  for (const [field, value] of Object.entries(stored)) {
+    assert.ok(
+      value === null || typeof value !== 'object',
+      `learned entry field "${field}" must stay scalar (see recipeKeyedFlagEntries.js)`
+    );
+  }
+  assert.deepEqual(
+    Object.keys(stored).sort(),
+    ['learnedAt', 'sourceItemUuid'],
+    'and the marker fields the reader keys on are exactly the fields written'
+  );
 });
 
 test('773 freeing budget decrements a still-held perInstance book learnedCount (floored at 0)', async () => {

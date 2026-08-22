@@ -169,33 +169,47 @@ test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at t
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.27.0', 'advances to the new highest version');
 
+  // 1.27.0 runs after this rename and LIFTS the realms to world scope (issue 1282), so the
+  // renamed realms land in `travelConfig` rather than back on the system. That the rename
+  // happened at all is what the world library proves — a `gatheringRegions` payload that was
+  // never renamed would arrive here empty.
   const savedSystems = settings.store.get('craftingSystems');
-  assert.ok(Array.isArray(savedSystems[0].gatheringRealms), 'systems persisted under gatheringRealms');
+  assert.equal(savedSystems[0].gatheringRealms, undefined, 'realms no longer live on the system');
   assert.equal(savedSystems[0].gatheringRegions, undefined);
+  assert.deepEqual(
+    settings.store.get('travelConfig').realms.map((realm) => realm.id),
+    ['north'],
+    'the renamed realm was lifted to the world library'
+  );
 
   const savedEnvs = settings.store.get('gatheringEnvironments');
   assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
 
   // The party-override rewrite proves gatheringParties is wired through the runner.
+  // The override is collapsed to one per party by 1.27.0, having first been renamed by 1.1.0.
   const savedParties = settings.store.get('gatheringParties');
-  assert.deepEqual(savedParties[0].currentRealmOverrides['sys-a'].realmIds, ['north']);
+  assert.deepEqual(savedParties[0].currentRealmOverride.realmIds, ['north']);
+  assert.equal(savedParties[0].currentRealmOverrides, undefined);
   assert.equal(savedParties[0].currentRegionOverrides, undefined);
   const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(setKeys.includes('gatheringParties'), 'party-override rename is persisted');
 });
 
-test('runner: gatheringParties is left untouched (no write) when it carries no legacy override keys', async () => {
+test('runner: gatheringParties is left untouched (no write) when it is already current', async () => {
+  // Already collapsed AND already renamed, so neither 1.1.0 nor 1.27.0 has anything to do.
   const settings = makeSettings({
     migrationVersion: '1.0.0',
-    gatheringParties: [{ id: 'p1', name: 'Heroes', currentRealmOverrides: { 'sys-a': { mode: 'none', realmIds: [] } } }]
+    gatheringParties: [
+      { id: 'p1', name: 'Heroes', currentRealmOverride: { mode: 'none', realmIds: [] } }
+    ]
   });
   const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   await runner.run();
 
   const setKeys = settings.calls.set.map(c => c.key);
-  assert.equal(setKeys.includes('gatheringParties'), false, 'no rewrite when nothing to rename');
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(setKeys.includes('gatheringParties'), false, 'no rewrite when nothing to change');
+  assert.equal(settings.store.get('migrationVersion'), '1.27.0');
 });

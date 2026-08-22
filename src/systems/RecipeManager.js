@@ -1,9 +1,10 @@
-import { getFabricateFlag } from '../config/flags.js';
-import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
+import { SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateItemEssences,
   findMatchingComponent,
@@ -17,11 +18,26 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
+import {
+  craftingDataChange,
+  emitCraftingDataChanged,
+  PendingChangeDomains,
+} from './craftingDataChange.js';
+import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
+import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
+import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import {
+  corpusDelta,
+  patchCorpusInPlace,
+  REVISION_SCOPES,
+  RevisionRegistry,
+} from './revisionTokens.js';
+import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
@@ -56,13 +72,210 @@ function selectedIngredientItems(selection) {
 }
 
 /**
+ * Whether a retained alchemy signature report's guard still describes the world (issue
+ * 1074). Every field is compared by IDENTITY or by `===` on a number, so this is O(1) —
+ * the O(cohort) half of the guard is paid once while `members` is derived, and returns the
+ * previous array unchanged when nothing moved.
+ *
+ * See {@link RecipeManager#_alchemySignatureReport} for what each clause exists to catch.
+ *
+ * @param {object} previous
+ * @param {object} next
+ * @returns {boolean}
+ */
+function signatureGuardsMatch(previous, next) {
+  return (
+    previous.recipesToken === next.recipesToken &&
+    previous.systemToken === next.systemToken &&
+    previous.recipeMap === next.recipeMap &&
+    previous.recipeCount === next.recipeCount &&
+    previous.components === next.components &&
+    previous.componentCount === next.componentCount &&
+    previous.members === next.members
+  );
+}
+
+/**
+ * A recipe in its comparable, persisted form — the projection `reload()`'s corpus
+ * comparison runs over. A fixture may write a plain object straight into the map, which has
+ * no `toJSON`, so it stands in for its own projection.
+ *
+ * @param {object} recipe
+ * @returns {object}
+ */
+function projectRecipe(recipe) {
+  return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+}
+
+/**
+ * The machine-readable reason an import skipped a recipe the activation gate refused.
+ *
+ * A refused recipe is `invalid` unless EVERY issue it carries is an alchemy signature
+ * collision, in which case it is `signature-conflict` (issue 1167). The distinction is the
+ * GM's, not the code's: a colliding recipe is authored correctly and is refused only
+ * because another ENABLED recipe in the system claims an inseparable ingredient signature,
+ * so reporting it as "invalid" in the conflict report sends the GM looking for a fault in
+ * a recipe that has none. A recipe that is BOTH malformed and colliding stays `invalid`,
+ * because the structural fault is the one to fix first.
+ *
+ * @param {{code: string|null}[]} [issues]
+ * @returns {'invalid'|'signature-conflict'}
+ */
+function importConflictReason(issues) {
+  const list = Array.isArray(issues) ? issues : [];
+  const collisionOnly =
+    list.length > 0 && list.every((issue) => issue?.code === 'signatureCollision');
+  return collisionOnly ? 'signature-conflict' : 'invalid';
+}
+
+/**
+ * The repository the manager builds when the caller injects none — the ONE place the
+ * recipe backend is chosen (issue 1089).
+ *
+ * The adapter takes a `corpus` thunk because `game.settings.set` REPLACES a value and has no
+ * addressable element, so a single-record `put` necessarily rewrites the whole array. That
+ * parameter's presence IS the statement of what this backend cannot do.
+ *
+ * @param {object} options
+ * @param {() => Map<string, object>} options.corpus The manager's own recipe map.
+ * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+ */
+function buildDefaultRecipeRepository({ corpus }) {
+  return new SettingsCraftingDefinitionRepository({
+    settingKey: SETTING_KEYS.RECIPES,
+    corpus,
+    hydrate: (raw) => Recipe.fromJSON(raw),
+    serialize: (recipe) => recipe.toJSON(),
+    scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
+  });
+}
+
+/**
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
-  constructor({ getCraftingSystem = null } = {}) {
+  /**
+   * @param {object} [deps]
+   * @param {Function|null} [deps.getCraftingSystem] - `(systemId) => system`. The
+   *   pre-existing narrow seam; still honoured by {@link _resolveCraftingSystem}.
+   * @param {Function|null} [deps.getCraftingSystemManager] - `() => CraftingSystemManager`.
+   *   The manager itself, for the paths that need more than one system or need the
+   *   recipe/component accessors (issue 1072). Both default to the `game.fabricate`
+   *   globals, so every existing `new RecipeManager({})` construction is unaffected.
+   * @param {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+   *   [deps.repository] - the persistence seam (issue 1089). Defaults to the
+   *   settings-backed adapter, so the ~100 single-argument construction sites in
+   *   production and tests keep working unchanged; inject a fake to count reads and
+   *   writes without patching `game.settings`.
+   */
+  constructor({
+    getCraftingSystem = null,
+    getCraftingSystemManager = null,
+    repository = null,
+    // The world currency configuration (issue 1278). Optional for the same reason the
+    // manager seam is: when absent the shared affordance resolver falls back to the
+    // `game.fabricate` global, so no existing construction site changes.
+    currencyConfigStore = null,
+  } = {}) {
+    this.currencyConfigStore = currencyConfigStore;
     this.recipes = new Map();
     this.initialized = false;
+    // The revision-token registry this manager mints from (issue 1076). Per manager, never
+    // a module singleton: two managers in one test process must not share counters.
+    this._revisions = new RevisionRegistry();
+    // The retained `craftingSystemId -> recipe id[]` cohort, rebuilt lazily. Holds IDS, not
+    // recipe objects, so replacing a stored recipe under the same id is transparently
+    // correct and only an add/remove/move can invalidate it.
+    this._cohortCache = null;
+    // The retained per-system alchemy signature reports (issue 1074), each with the guard
+    // it was compiled under. Keyed by system id rather than held singly because the GM can
+    // switch systems and a single slot would thrash between two open browsers.
+    /** @type {Map<string, {guard: object, report: object}>} */
+    this._signatureReports = new Map();
+    // The unconsumed delta from the most recent `reload()` (issue 1078), read once through
+    // `consumeReloadDelta()`.
+    /** @type {import('./revisionTokens.js').CorpusDelta|null} */
+    this._reloadDelta = null;
+    // The invalidation domains attributed since the last announcement (issue 1078 part B1).
+    // Recorded at every mutation site, drained by `_notifyRecipesChanged`.
+    this._pendingDomains = new PendingChangeDomains();
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
+    this._getCraftingSystemManager =
+      typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
+    // The SETTINGS adapter shares THIS map rather than mirroring it — see
+    // `SettingsCraftingDefinitionRepository` for why a second ordered map would be a
+    // silent corruption of the persisted array's order. The manager still owns every
+    // in-memory `set`/`delete` on it: the repository is the persistence seam, not the
+    this._repository = repository ?? buildDefaultRecipeRepository({ corpus: () => this.recipes });
+  }
+
+  /**
+   * The crafting-system manager collaborator.
+   *
+   * Every path that needs the manager routes through here (issue 1072). Twelve sites
+   * previously read `game.fabricate?.getCraftingSystemManager?.()` inline — including
+   * {@link _validateSignatures}, the one path the alchemy signature-audit work has to
+   * instrument — which meant the manager was reachable only by installing a global
+   * shim. A counting or caching collaborator can now be injected through the
+   * constructor, and the global stays as the default so no existing caller changes.
+   *
+   * Resolved per call, never cached: `game.fabricate` is assembled during Foundry's
+   * `ready` hook, after the managers are constructed, so a value captured in the
+   * constructor would be `undefined` forever.
+   *
+   * @returns {object|null}
+   * @private
+   */
+  _systemManager() {
+    if (this._getCraftingSystemManager) return this._getCraftingSystemManager() ?? null;
+    return game.fabricate?.getCraftingSystemManager?.() ?? null;
+  }
+
+  /**
+   * The seam bag handed to the currency affordance layer.
+   *
+   * `evaluateCraftability` builds a currency probe per recipe, and that probe resolves the
+   * system's currency config — so without this the player listing path would still reach
+   * the `game.fabricate` global once per recipe even though the manager holds an injected
+   * collaborator (issue 1072). Mirrors `CraftingEngine._currencySeams()`, which supplies
+   * the coin spenders on the same bag.
+   *
+   * @returns {{getCraftingSystemManager: () => object|null}}
+   * @private
+   */
+  _currencySeams() {
+    return {
+      getCraftingSystemManager: () => this._systemManager(),
+      getCurrencyConfig: () => this.currencyConfigStore?.get(),
+    };
+  }
+
+  /**
+   * A {@link SignatureValidator} source built from the manager collaborator.
+   *
+   * One definition shared by the enable-time gate ({@link _validateSignatures}) and the
+   * post-mutation reconciliation ({@link disableSignatureConflicts}), which previously
+   * carried near-identical adapter closures that could drift apart (issue 1072).
+   * `getComponentsForSystem` prefers the manager's own accessor so a counting or indexed
+   * manager is actually consulted, and falls back to reading `system.components` for the
+   * many fixtures whose system manager is a bare `{getSystem}` object.
+   *
+   * @param {object} systemManager
+   * @param {(systemId: string) => object[]} getRecipesForSystem - Supplied by the caller
+   *   because the two callers genuinely differ: the enable-time gate substitutes the
+   *   candidate recipe for its still-disabled stored copy.
+   * @returns {{getSystem: Function, getRecipesForSystem: Function, getComponentsForSystem: Function}}
+   * @private
+   */
+  _signatureSource(systemManager, getRecipesForSystem) {
+    return {
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem,
+      getComponentsForSystem: (id) =>
+        typeof systemManager.getComponentsForSystem === 'function'
+          ? systemManager.getComponentsForSystem(id)
+          : systemManager.getSystem(id)?.components || [],
+    };
   }
 
   /**
@@ -77,28 +290,100 @@ export class RecipeManager {
   }
 
   /**
+   * Reject a recipe id that cannot serve as a durable-flag MAP KEY (issue 1143), the
+   * exact sibling of `CraftingSystemManager._assertValidSystemId` and the same
+   * `isSafeFlagKeySegment` doctrine.
+   *
+   * A recipe id is interpolated into two per-actor flag maps, `learnedRecipes` and
+   * `discoveryProgress`. Those are written through a flattened `Document#update` path,
+   * and `Document#update` dot-expands the whole nested VALUE TREE of an `ObjectField`
+   * (V14 in `ObjectField#_cleanType`, V13 one level up in `DataModel#updateSource`), so
+   * an id containing a `.` is not stored under the key it was written with — it becomes
+   * a SUBTREE. Every reader indexing the map by id then misses it, and worse, the
+   * id→storage mapping stops being injective: learning `a.b` and then `a` silently
+   * destroys `a.b` before any reader runs. Reader-side repair
+   * (`recipeKeyedFlagEntries.js`) is best-effort for worlds that already carry such an
+   * id; refusing it here is the complete fix.
+   *
+   * Fail LOUDLY at the entry point rather than accepting a booby-trapped id. The id is
+   * NEVER rewritten — recipe books, Required Knowledge, and learned entries all
+   * reference the recipe by id. `foundry.utils.randomID()` always satisfies the pattern,
+   * so this can only fire for an imported or hand-authored id; the compendium importer
+   * already isolates a per-recipe failure into its import report. Loading an existing
+   * world does NOT route through here, so a world that already holds such an id keeps
+   * working under reader-side repair instead of being bricked.
+   *
+   * @private
+   */
+  _assertValidRecipeId(id) {
+    if (!isSafeFlagKeySegment(id)) {
+      throw new Error(
+        `Invalid recipe id "${id}": a recipe id must match /^[A-Za-z0-9_-]+$/ (no dots or spaces), because it is used as a durable-flag map key in learnedRecipes and discoveryProgress.`
+      );
+    }
+  }
+
+  /**
    * Initialize the recipe manager and load saved recipes
    */
   async initialize() {
     if (this.initialized) return;
 
-    // Load recipes from game settings
-    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
-    for (const recipeData of savedRecipes) {
-      const recipe = Recipe.fromJSON(recipeData);
+    // Load recipes through the definition repository (issue 1089)
+    for (const recipe of await this._repository.loadAll()) {
       this.recipes.set(recipe.id, recipe);
     }
+    this._advanceRecipeRevision();
 
     this.initialized = true;
     console.log(`Fabricate | Loaded ${this.recipes.size} recipes`);
   }
 
   /**
-   * Save all recipes to game settings
+   * Persist a recipe mutation through the definition repository (issue 1089).
+   *
+   * `save()` with no argument is the whole-corpus write it has always been, and it is
+   * still the batch callers' flush point: the compendium importer and the
+   * essence-deletion cascade mutate the in-memory map per recipe with
+   * `{ persist: false }` and then issue exactly one of these.
+   *
+   * `save({ put })` / `save({ delete })` / `save({ batch })` name the records a
+   * mutation actually touched. Under the settings adapter all four write the same
+   * bytes, because `game.settings.set` cannot address one element — but the
+   * information is carried to the seam instead of being discarded at the call site, so a
+   * backend that CAN address one record needs no caller to change.
+   *
+   * ## The in-place mutation invariant
+   *
+   * A NAMED `save({put})` writes `[...corpus().values()]` here, so it flushes every
+   * in-memory mutation — including ones made by code paths that never called `save()`
+   * themselves. That is a property of THIS adapter and not of the seam, so every call site
+   * was audited against a backend that writes only what it was named, and the invariant is
+   * stated here because it is what future work must preserve:
+   *
+   * > **A named `save({put|delete|batch})` may only be issued for records the SAME
+   * > operation created, replaced or removed. A site that mutates a stored recipe in place
+   * > must flush through the argument-less whole-corpus `save()`.**
+   *
+   * | Site | Shape | Why it is safe |
+   * |---|---|---|
+   * | {@link RecipeManager#createRecipe} | `save({put})` | The only in-place write is the draft clamp `recipe.enabled = false` on the record being put. |
+   * | {@link RecipeManager#updateRecipe} | `save({put})` | `updatedRecipe` is a fresh `Recipe.fromJSON`; nothing else in the map is touched. |
+   * | {@link RecipeManager#deleteRecipe} | `save({delete})` | Removes one map entry and mutates no other record. |
+   * | {@link RecipeManager#deleteRecipes} | `save()` | Whole-corpus, so it carries any pending in-place mutation as well as the removals. |
+   * | {@link RecipeManager#importRecipes} | `save()` | Whole-corpus, same. |
+   * | {@link RecipeManager#disableSignatureConflicts} | `save({batch})` | The ONE in-place writer in this manager (`recipe.enabled = false`), and the batch is derived from the same `disabled` list, so the mutated set and the persisted set are the same array by construction. |
+   *
+   * The three EXTERNAL in-place mutators of a hydrated recipe are all in
+   * `CraftingSystemManager` — the recipe-item link repair (`recipe.recipeItemId`, both
+   * branches) and `deleteRecipeItemDefinition`
+   * (`recipe.recipeItemId` / `recipe.linkedRecipeItemUuid`) — and all three already flush
+   * through the argument-less `recipeManager.save()`.
+   *
+   * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
-  async save() {
-    const recipesArray = [...this.recipes.values()].map((r) => r.toJSON());
-    await setSetting(SETTING_KEYS.RECIPES, recipesArray);
+  async save(change = null) {
+    await applyDefinitionChange(this._repository, change, this.recipes.values());
   }
 
   /**
@@ -109,33 +394,201 @@ export class RecipeManager {
    * catches up here. Does NOT persist, so it is safe to call from a settings hook
    * without a write loop.
    *
-   * @returns {boolean} `true` only when the serialized recipes actually changed, so
+   * Change detection is {@link corpusDelta}, NOT `JSON.stringify` of the whole corpus
+   * (issue 1076). The old comparison serialized every recipe twice per reload — 22.3 MB of
+   * string per pass at 10,000 recipes — on every connected client, purely to answer a
+   * boolean. The replacement compares record by record with a reference fast path, and a
+   * reload that finds no change advances no revision token.
+   *
+   * ## What the delta buys, and why it is not an optimisation of an optimisation
+   *
+   * A world setting replicates as ONE `Setting` document whose whole value is a JSON string,
+   * so a remote client re-parses the entire corpus and no object reference survives the
+   * wire. This method used to replace `this.recipes` unconditionally and advance EVERY
+   * system's token whenever anything changed, which meant that on every client except the
+   * writer's, every retained guard keyed on a token or on container identity missed on every
+   * reload — #1074's signature report and #1076's definition indexes included. Two shipped
+   * optimisations did nothing for a player (issue 1078).
+   *
+   * So this does two things instead, both driven by the same delta:
+   *
+   * 1. **It advances only the systems whose recipes actually moved.** An edit in system A
+   *    leaves a consumer scoped to system B holding a valid token.
+   * 2. **It preserves container identity.** The map object is patched IN PLACE, and a recipe
+   *    the delta proved unchanged keeps its EXISTING object — so the retained cohort index
+   *    and the signature guard's `recipeMap` / `members` clauses survive a no-op reload.
+   *    Reuse is licensed by the delta's record-level structural equality and by nothing
+   *    weaker.
+   *
+   * A change the delta cannot attribute to individual records — a reordering — routes
+   * exactly as this method always did: replace the map, preserve no identity, advance every
+   * system. The failure direction is deliberate, because an over-broad refresh is a
+   * performance bug while a stale read model is a correctness one.
+   *
+   * The boolean return is unchanged. The delta itself is read once through
+   * {@link consumeReloadDelta}.
+   *
+   * @returns {boolean} `true` only when the recipes actually changed, so
    *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
    *   the writing client, whose map already holds the saved data).
    */
   reload() {
-    const serialize = (map) => JSON.stringify([...map.values()].map((r) => r.toJSON()));
-    const before = serialize(this.recipes);
-    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
-    const next = new Map();
-    for (const recipeData of savedRecipes) {
-      const recipe = Recipe.fromJSON(recipeData);
-      next.set(recipe.id, recipe);
-    }
-    this.recipes = next;
-    this.initialized = true;
-    return before !== serialize(this.recipes);
+    // Optional repository capability: `null` means the backend has no synchronous
+    // replicated snapshot to read, which is the honest answer for anything
+    // document-backed (#1088 Q3). Reloading is then a no-op rather than a wrong
+    // answer, and #1092 owns the replacement transport.
+    const savedRecipes = this._repository.readReplicatedSnapshot();
+    // Every reload replaces the pending delta, including a reload that reads nothing, so a
+    // stale delta can never be consumed after a later one.
+    this._reloadDelta = null;
+    if (!savedRecipes) return false;
+    return this._adoptCorpus(savedRecipes);
   }
 
+  /**
+   * Replace the in-memory corpus with a freshly read one, preserving as much identity as the
+   * delta licenses.
+   *
+   * Extracted from {@link RecipeManager#reload} (issue 1232) because
+   * {@link RecipeManager#rebuildDefinitionStorage} needs exactly this work over an
+   * ASYNCHRONOUS `loadAll()` rather than a synchronous replicated snapshot. The two differ
+   * only in where the records came from, and a second copy of this body would drift from the
+   * identity-preservation rules above — the failure mode being a retained index that survives
+   * one path and not the other.
+   *
+   * @param {object[]} savedRecipes
+   * @returns {boolean} whether the corpus actually changed.
+   * @private
+   */
+  _adoptCorpus(savedRecipes) {
+    const next = new Map();
+    for (const recipe of savedRecipes) {
+      next.set(recipe.id, recipe);
+    }
+    const delta = corpusDelta(this.recipes.values(), next.values(), { project: projectRecipe });
+    this._reloadDelta = delta;
+    this.initialized = true;
+    if (!delta.changed) return false;
+
+    if (delta.reordered) {
+      this.recipes = next;
+      const touched = new Set();
+      for (const recipe of next.values()) touched.add(recipe?.craftingSystemId);
+      // Also drops the cohort index, which is keyed on the map object and so would have
+      // missed on the replacement above regardless. A reordering is attributable to no
+      // record, so no fact class can be ruled out either (issue 1078 part B1); the delta the
+      // bridge consumes reports `reordered` and routes BROADLY.
+      this._advanceRecipeRevision(...touched);
+      this._advanceFactScopes([], ...touched);
+      return true;
+    }
+
+    const touched = new Set();
+    for (const entry of delta.perRecord.values()) {
+      // A recipe MOVED between systems names both, exactly as `updateRecipe` does.
+      const owners = [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
+        (systemId) => systemId != null
+      );
+      for (const systemId of owners) touched.add(systemId);
+      // The replicated half of the attribution: the delta already names the top-level keys
+      // that moved, so a remote client narrows on exactly what the writer narrowed on.
+      this._advanceFactScopes(domainsForRecipeFields(entry.fields), ...owners);
+    }
+    patchCorpusInPlace(this.recipes, next, delta);
+    // Also drops the cohort index, whose token clause this advance would fail anyway.
+    this._advanceRecipeRevision(...touched);
+    return true;
+  }
+
+  /**
+   * The invalidation scopes of the most recent REPLICATED change, consumed from its delta
+   * (issue 1078 part B1).
+   *
+   * This is `consumeReloadDelta()`'s production caller. Part A shipped that method with none —
+   * its only other references in the tree are its two definitions and one test — so without
+   * this the delta a remote client already computes is discarded and every replicated edit
+   * routes broadly.
+   *
+   * A `reordered` delta yields NO scopes, which the signal represents as an empty scope set and
+   * every consumer routes broadly. That is the contract `corpusDelta` states: "a consumer MUST
+   * route a `reordered` delta broadly, whatever `perRecord` holds."
+   *
+   * @returns {{systemId: string|null, domains: string[]}[]}
+   */
+  consumeReplicatedChangeScopes() {
+    const delta = this.consumeReloadDelta();
+    if (!delta?.changed || delta.reordered) return [];
+    const scopes = [];
+    for (const entry of delta.perRecord.values()) {
+      const domains = domainsForRecipeFields(entry.fields);
+      const owners = new Set(
+        [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
+          (systemId) => systemId != null
+        )
+      );
+      if (owners.size === 0) owners.add(null);
+      for (const systemId of owners) scopes.push({ systemId, domains });
+    }
+    return scopes;
+  }
+
+  /**
+   * The delta from the most recent {@link reload}, cleared by this read (issue 1078).
+   *
+   * One-shot on purpose: a delta describes one transition, and a consumer that re-read a
+   * retained one would invalidate work a second time for a change that already happened. It
+   * is also cleared by the NEXT reload, so there is no window in which a stale delta is
+   * readable.
+   *
+   * @returns {import('./revisionTokens.js').CorpusDelta|null} `null` when there is no
+   *   unconsumed delta — never reloaded, already consumed, or a backend with no replicated
+   *   snapshot to read.
+   */
+  consumeReloadDelta() {
+    const delta = this._reloadDelta;
+    this._reloadDelta = null;
+    return delta;
+  }
+
+  /**
+   * Announce a recipe change: the PUBLISHED legacy hook with its unchanged payload, then the
+   * unpublished scoped signal carrying everything attributed since the last announcement.
+   *
+   * The two are emitted from one place so a mutation path cannot acquire one without the
+   * other. Draining here rather than at `save()` is what keeps the paths that deliberately
+   * save WITHOUT announcing silent — see {@link PendingChangeDomains}.
+   *
+   * @param {string} action
+   * @param {object} [details]
+   * @returns {void}
+   * @private
+   */
   _notifyRecipesChanged(action, details = {}) {
     globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
       action,
       recipes: this.getRecipes(),
       ...details,
     });
+    emitCraftingDataChanged(
+      craftingDataChange({ source: 'recipes', scopes: this._pendingDomains.drain() })
+    );
   }
 
-  notifyRecipesChanged(details = {}) {
+  /**
+   * The public announcement seam, for a batch caller that suppressed the per-record hooks.
+   *
+   * `domains` and `systemIds` are consumed here rather than forwarded into the legacy payload:
+   * a caller that mutated something OUTSIDE this manager (the component-deletion cascade owns
+   * the crafting-system record, and announces through here because it deliberately does not
+   * call `_notifySystemsChanged`) attributes it so the scoped signal still names it.
+   *
+   * @param {object} [details]
+   * @param {readonly string[]} [details.domains] Extra domains to attribute before announcing.
+   * @param {readonly string[]} [details.systemIds] The systems those domains belong to.
+   * @returns {void}
+   */
+  notifyRecipesChanged({ domains = null, systemIds = [], ...details } = {}) {
+    if (domains) this._attributeChange(domains, ...systemIds);
     this._notifyRecipesChanged(details.action || 'external', details);
   }
 
@@ -157,6 +610,7 @@ export class RecipeManager {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
+    this._assertValidRecipeId(recipe.id);
     const validation = this._validateRecipeForPersistence(recipe, {
       requireComplete: !options.allowIncomplete,
     });
@@ -183,8 +637,10 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipe.id, recipe);
+    // A whole record arrived, so every fact class it can express is new.
+    this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ put: recipe });
     }
     console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
@@ -247,9 +703,16 @@ export class RecipeManager {
       }
     }
 
+    // Attributed BEFORE the map write, while `recipe` is still the stored copy: the domains
+    // come from the fields that actually moved, which is what makes a description-only edit
+    // narrow to `narrative` and leave the journal alone (issue 1078 acceptance criterion 3).
+    const editedDomains = this._domainsForRecipeEdit(recipe, updatedRecipe);
     this.recipes.set(recipeId, updatedRecipe);
+    // Both systems, because an edit that MOVES a recipe must also invalidate a consumer
+    // watching the system it left (issue 1076).
+    this._recordChange(editedDomains, recipe.craftingSystemId, updatedRecipe.craftingSystemId);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ put: updatedRecipe });
     }
     console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
     if (options.notify !== false) {
@@ -326,6 +789,17 @@ export class RecipeManager {
    *   per recipe and then issues a SINGLE `save()` after the whole batch; only the
    *   per-recipe `save()` (one whole-array `recipes` world write) is skipped. Default
    *   `true` keeps every single-recipe caller issuing its one write.
+   *
+   * **This is the LEAF, and it does NOT cascade the recipe-item membership prune**
+   * (issue 1132). A recipe deleted through here stays named by every
+   * `recipeItemDefinitions[].recipeIds` array that contained it, because write ownership
+   * of the `craftingSystems` setting lives on `CraftingSystemManager` and not here.
+   * {@link CraftingSystemManager#deleteRecipes} is the entry point that DOES cascade, and
+   * every GM-initiated delete — the studio singular and set, `game.fabricate.deleteRecipe`
+   * and the resolution-mode migration — routes through it. The exemptions are
+   * {@link CraftingSystemManager#deleteSystem} (the books go with the system) and the
+   * compendium importer's orphan-prune phase (the pack owns the definition set it just
+   * wrote, and the phase deliberately batches to a single `recipes` write).
    */
   async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
@@ -336,11 +810,13 @@ export class RecipeManager {
     }
 
     this.recipes.delete(recipeId);
+    // A whole record left, so every fact class it expressed is gone with it.
+    this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ delete: recipeId });
     }
     if (options.cleanupFlags !== false) {
-      await this._cleanupFlagsAfterRecipeMutation();
+      await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds: [recipeId] });
     }
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" deleted`);
@@ -351,15 +827,101 @@ export class RecipeManager {
   }
 
   /**
+   * Delete a SET of recipes in ONE `recipes` world write, guarding the in-memory map
+   * against a refused write (issue 1132).
+   *
+   * **The map guard is the point of this method existing, and it belongs here.**
+   * {@link RecipeManager#deleteRecipe} deletes from `this.recipes` BEFORE it persists, so
+   * a rejected `save()` leaves the map missing recipes the world setting still holds — and
+   * the next unrelated successful `save()` then persists a deletion that failed. A batch
+   * makes that worse by the size of the batch. The guard sits inside `RecipeManager`
+   * because the map is `RecipeManager`'s: a batch caller driving a `{persist: false}` loop
+   * from outside would have to reach into another manager's state to snapshot and restore
+   * it, which is a layer boundary the fix does not need to cross.
+   *
+   * The restore is a whole-map swap back to the pre-delete snapshot. That is exactly the
+   * state the `recipes` setting still holds when OUR write is the one that failed. A peer
+   * write landing through `reload()` inside the failed `save()`'s await window would be
+   * discarded by the restore — an accepted, bounded exposure, and the same absence of any
+   * compare-and-set that `_applyBulkRecipePatches` documents for the settings path.
+   *
+   * A requested id that resolves to no recipe is SKIPPED rather than thrown, unlike the
+   * singular form: a bulk selection is assembled from a projection that republishes at a
+   * different moment from the click, so a stale id is expected rather than exceptional.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean}} [options]
+   *   Same three gates as {@link RecipeManager#deleteRecipe}; there is no `persist` gate,
+   *   because owning its single `save()` is what this method is for.
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipes: object[]}>} The
+   *   recipes actually removed, in requested order.
+   * @throws {Error} Rethrows a refused `recipes` write AFTER restoring the map, so the
+   *   caller must not have mutated anything else first (see the write ordering in
+   *   {@link CraftingSystemManager#deleteRecipes}).
+   */
+  async deleteRecipes(recipeIds, options = {}) {
+    this._assertGM('delete recipes');
+
+    const requested = [
+      ...new Set([...(recipeIds || [])].map((id) => String(id ?? '').trim()).filter(Boolean)),
+    ];
+    const removed = requested.map((id) => this.recipes.get(id)).filter(Boolean);
+    if (removed.length === 0) return { deleted: 0, recipeIds: [], recipes: [] };
+
+    const removedIds = removed.map((recipe) => String(recipe.id));
+    const restorePoint = new Map(this.recipes);
+    for (const id of removedIds) this.recipes.delete(id);
+    // Whole records left, so every fact class they expressed is gone. This is also the only
+    // entity-revision advance on this path — the batch delete never had one, so before issue
+    // 1078 a bulk delete left every recipe-scoped token stale.
+    this._recordChange(
+      ALL_INVALIDATION_DOMAINS,
+      ...new Set(removed.map((recipe) => recipe.craftingSystemId))
+    );
+
+    try {
+      await this.save();
+    } catch (error) {
+      this.recipes = restorePoint;
+      throw error;
+    }
+
+    if (options.cleanupFlags !== false) {
+      await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds: removedIds });
+    }
+    if (options.notify !== false) {
+      ui.notifications.info(
+        removed.length === 1
+          ? `Recipe "${removed[0].name}" deleted`
+          : `Deleted ${removed.length} recipes`
+      );
+    }
+    if (options.emitChange !== false) {
+      this._notifyRecipesChanged('delete', { recipeIds: removedIds });
+    }
+
+    return { deleted: removed.length, recipeIds: removedIds, recipes: removed };
+  }
+
+  /**
    * Run ONE bulk actor-flag cleanup pass after a batch of recipe deletions (the
    * `deleteSystem` precedent). A batch caller — e.g. the compendium importer's prune
    * phase — deletes many recipes with `cleanupFlags:false` to suppress the per-recipe
    * fan-out, then calls this once so invalid-run and learned-recipe flags reconcile
    * against the post-deletion map in a single O(affected actors) pass rather than
    * O(pruned × actors). Public thin wrapper over `_cleanupFlagsAfterRecipeMutation`.
+   *
+   * **A batch caller MUST name what it removed** (issue 1226). The corpus-derived sweep
+   * behind this is gated, and the ids passed here are what the gate falls back to pruning
+   * when a sweep is omitted. A caller that omits them still gets the sweep today and gets
+   * NOTHING if the sweep is ever omitted — which is safe, but leaves the flags its own
+   * deletions orphaned until the next boot.
+   *
+   * @param {object} [options]
+   * @param {Iterable<string>} [options.removedRecipeIds]
    */
-  async cleanupOrphanedRecipeFlags() {
-    await this._cleanupFlagsAfterRecipeMutation();
+  async cleanupOrphanedRecipeFlags({ removedRecipeIds = [] } = {}) {
+    await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds });
   }
 
   /**
@@ -372,21 +934,314 @@ export class RecipeManager {
   }
 
   /**
+   * The current revision token of one scope (issue 1076).
+   *
+   * The read half of the contract documented in {@link module:revisionTokens}. Consumers
+   * (#1074's signature report, #1077's snapshots, #1078's invalidation routing) hold a
+   * token and compare it with `===`; they never advance one.
+   *
+   * @param {string} [scope] A member of `REVISION_SCOPES`, defaulting to the whole recipe
+   *   domain.
+   * @returns {number}
+   */
+  revision(scope = REVISION_SCOPES.recipes) {
+    return this._revisions.read(scope);
+  }
+
+  /**
+   * Advance the recipe revision tokens after a mutation, and drop the cohort index.
+   *
+   * Always advances the DOMAIN scope plus the scope of every crafting system named — a
+   * move between systems names both, because a consumer watching the system the recipe
+   * LEFT must also stop trusting its cache.
+   *
+   * @param {...(string|null|undefined)} systemIds The crafting systems this mutation
+   *   touched.
+   * @returns {void}
+   * @private
+   */
+  _advanceRecipeRevision(...systemIds) {
+    this._cohortCache = null;
+    const scopes = systemIds
+      .filter((systemId) => systemId != null)
+      .map((systemId) => REVISION_SCOPES.recipesOfSystem(systemId));
+    this._revisions.advance(REVISION_SCOPES.recipes, ...scopes);
+  }
+
+  /**
+   * Advance the `facts:<domain>:<systemId>` token of every named pair (issue 1078 part B1).
+   *
+   * The third granularity of the revision contract: a consumer that depends on SOME of a
+   * system's fact classes and not others holds one of these, and survives an edit to a class it
+   * does not read. Advanced on every path that changes stored recipes, local or replicated,
+   * because a token is only ever wrong when a manager failed to advance it.
+   *
+   * @param {readonly string[]} domains An omitted set means every domain and an EXPLICIT empty
+   *   one means unattributable. Both advance EVERY fact scope of every named system, because in
+   *   both cases no fact class can be ruled out.
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _advanceFactScopes(domains, ...systemIds) {
+    const advanced =
+      Array.isArray(domains) && domains.length > 0 ? domains : ALL_INVALIDATION_DOMAINS;
+    for (const systemId of systemIds) {
+      if (systemId == null) continue;
+      this._revisions.advance(...advanced.map((domain) => REVISION_SCOPES.facts(domain, systemId)));
+    }
+  }
+
+  /**
+   * Attribute a LOCAL mutation: advance its fact scopes and record it for the next
+   * announcement to drain into the change signal.
+   *
+   * Replicated changes deliberately do NOT come through here. They advance fact scopes but are
+   * announced by `src/config/settingChangeBridge.js` from the reload delta
+   * ({@link consumeReplicatedChangeScopes}), so recording them as pending would leave an
+   * undrained attribution to widen the next LOCAL announcement.
+   *
+   * @param {readonly string[]} domains See {@link PendingChangeDomains#record}.
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _attributeChange(domains, ...systemIds) {
+    this._advanceFactScopes(domains, ...systemIds);
+    this._pendingDomains.record(domains, ...systemIds);
+  }
+
+  /**
+   * The ONE mutation-site call: advance the entity revisions AND attribute the change.
+   *
+   * Every site in this manager that mutates `this.recipes` for a reason a consumer must see
+   * calls this rather than {@link _advanceRecipeRevision} directly, which is what makes "did
+   * this mutation say what it changed?" a mechanical question — `_advanceRecipeRevision` has
+   * exactly two callers, this method and `initialize()`, and the second is a LOAD rather than a
+   * change. `tests/invalidation-domain-attribution.test.js` counts them.
+   *
+   * @param {readonly string[]} domains
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _recordChange(domains, ...systemIds) {
+    this._advanceRecipeRevision(...systemIds);
+    this._attributeChange(domains, ...systemIds);
+  }
+
+  /**
+   * The domains a REPLACEMENT of one stored recipe belongs to, read off the fields that
+   * actually moved.
+   *
+   * Uses {@link corpusDelta} — the same comparison `reload()` runs over a whole corpus — so a
+   * locally authored edit and the replicated copy of that same edit cannot be attributed
+   * differently. A pair the delta reports nothing for is a no-op edit and is attributed to
+   * nothing.
+   *
+   * @param {object|null} previous
+   * @param {object|null} next
+   * @returns {string[]}
+   * @private
+   */
+  _domainsForRecipeEdit(previous, next) {
+    if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];
+    const delta = corpusDelta([previous], [next], { project: projectRecipe });
+    if (delta.reordered) return [...ALL_INVALIDATION_DOMAINS];
+    const entry = [...delta.perRecord.values()][0];
+    return entry ? domainsForRecipeFields(entry.fields) : [];
+  }
+
+  /**
+   * The retained `craftingSystemId -> recipe id[]` cohort index (issue 1076).
+   *
+   * `getRecipes({craftingSystemId})` is called from every listing, visibility and
+   * validation path, and each call used to copy EVERY recipe in EVERY system into a fresh
+   * array before discarding all but one system's. The index answers the same question from
+   * the smallest cohort instead.
+   *
+   * It stores IDS rather than recipe objects on purpose: replacing a stored recipe under
+   * the same id — which is what `updateRecipe` does — leaves the cohort correct without any
+   * bookkeeping, so only an add, a delete or a move between systems can invalidate it. Its
+   * validity is the map's identity plus its size plus the domain revision token, so a
+   * fixture that populates `manager.recipes` directly is still seen.
+   *
+   * @returns {Map<*, string[]>} Recipe ids per crafting system id, in map insertion order.
+   * @private
+   */
+  _recipeCohorts() {
+    const token = this._revisions.read(REVISION_SCOPES.recipes);
+    const cached = this._cohortCache;
+    const warm =
+      cached &&
+      cached.map === this.recipes &&
+      cached.size === this.recipes.size &&
+      cached.token === token;
+    if (warm) return cached.cohorts;
+    const cohorts = new Map();
+    for (const [recipeId, recipe] of this.recipes) {
+      const key = recipe?.craftingSystemId;
+      const bucket = cohorts.get(key);
+      if (bucket) bucket.push(recipeId);
+      else cohorts.set(key, [recipeId]);
+    }
+    this._cohortCache = { map: this.recipes, size: this.recipes.size, token, cohorts };
+    return cohorts;
+  }
+
+  /**
+   * The retained alchemy signature report for one system (issue 1074).
+   *
+   * Compiled at most once per revision by `SignatureValidator.compileReport`, which costs
+   * exactly one full audit; every subsequent read reuses it, and the enable gate answers a
+   * candidate from its inverted component index instead of re-auditing the system.
+   *
+   * ## The invalidation rule
+   *
+   * A retained report is reusable only when ALL THREE clauses hold. Tokens alone are not
+   * enough, for the same reason {@link _recipeCohorts} needed more than a token: a manager
+   * that fails to advance one, or a fixture that writes the map directly, would otherwise
+   * pin a wrong answer — and a wrong signature answer blocks or permits a GM's save.
+   *
+   * 1. **Tokens** — the `recipes:<systemId>` scope minted here, and the `system:<systemId>`
+   *    scope minted by `CraftingSystemManager`. The second is what catches a component,
+   *    tag or essence edit changing how an ingredient expands. Note it advances at that
+   *    manager's `save()`, so a fixture that stubs `save` never advances it; clause 2 is
+   *    what keeps such a fixture honest.
+   * 2. **Containers** — the recipe map's identity and size, and the system's component array
+   *    and that array's length. Catches a whole-map swap (`reload`, the `deleteRecipes`
+   *    restore), a batch delete, a recipe written straight into the map, and a fixture
+   *    assigning `system.components` outright while stubbing the `save` that would have
+   *    advanced the token. The SYSTEM object's own identity is deliberately NOT a clause:
+   *    nothing it carries other than the component array can change a compiled signature, so
+   *    the clause could not be given a failing test and would have been untested code.
+   * 3. **Members** — the enabled cohort must be the SAME recipe objects in the same order.
+   *    This is the in-place clause: every `RecipeManager` write path replaces the stored
+   *    object, so a surviving object whose `enabled` flag flipped underneath us is exactly
+   *    the mutation the first two clauses cannot see. It walks the cached cohort index and
+   *    allocates nothing, so re-reading N rows stays free of corpus copies.
+   *
+   * @param {string} systemId
+   * @param {object} systemManager the resolved crafting-system manager collaborator.
+   * @returns {object|null} the report, or `null` when the system is unknown.
+   * @private
+   */
+  _alchemySignatureReport(systemId, systemManager) {
+    const cached = this._signatureReports.get(systemId);
+    const guard = this._captureSignatureReportGuard(systemId, systemManager, cached?.guard);
+    if (cached && signatureGuardsMatch(cached.guard, guard)) return cached.report;
+
+    const validator = new SignatureValidator(
+      this._signatureSource(systemManager, (id) => this.getRecipes({ craftingSystemId: id }))
+    );
+    const report = validator.compileReport(systemId);
+    if (!report) {
+      this._signatureReports.delete(systemId);
+      return null;
+    }
+    this._signatureReports.set(systemId, { guard, report });
+    return report;
+  }
+
+  /**
+   * Read the three-clause guard for a system's signature report.
+   *
+   * `previousGuard` is the retained report's own guard. When one is supplied, clause 3's
+   * walk compares against its member array in place and returns that SAME array on a match,
+   * so a warm read allocates nothing at all; on a miss (or a cold read) it materialises the
+   * cohort the fresh report will be stored under.
+   *
+   * @param {string} systemId
+   * @param {object} systemManager
+   * @param {object|null} [previousGuard]
+   * @returns {object} the guard tuple.
+   * @private
+   */
+  _captureSignatureReportGuard(systemId, systemManager, previousGuard = null) {
+    const system = systemManager.getSystem?.(systemId) ?? null;
+    const components =
+      typeof systemManager.getComponentsForSystem === 'function'
+        ? systemManager.getComponentsForSystem(systemId)
+        : system?.components;
+    return {
+      recipesToken: this._revisions.read(REVISION_SCOPES.recipesOfSystem(systemId)),
+      systemToken:
+        typeof systemManager.revision === 'function'
+          ? systemManager.revision(REVISION_SCOPES.system(systemId))
+          : null,
+      recipeMap: this.recipes,
+      recipeCount: this.recipes.size,
+      components,
+      componentCount: Array.isArray(components) ? components.length : -1,
+      members: this._enabledCohortMembers(systemId, previousGuard?.members),
+    };
+  }
+
+  /**
+   * The enabled recipes of a system, in cohort order — clause 3 of the signature guard.
+   *
+   * Returns `previous` UNCHANGED when the cohort still holds exactly those objects, so the
+   * warm path costs one pass over an already-cached id list and zero allocation. Any
+   * difference — a flipped `enabled` flag on a surviving object, a replaced object under
+   * the same id, a different length — yields a fresh array, which fails identity comparison
+   * against the retained guard and forces a recompile.
+   *
+   * @param {string} systemId
+   * @param {object[]} [previous]
+   * @returns {object[]}
+   * @private
+   */
+  _enabledCohortMembers(systemId, previous) {
+    const cohort = this._recipeCohorts().get(systemId) ?? [];
+    if (previous) {
+      let matched = 0;
+      let intact = true;
+      for (const recipeId of cohort) {
+        const recipe = this.recipes.get(recipeId);
+        // The truthy `enabled` test mirrors `SignatureValidator`'s own scan scope exactly
+        // (see issue 1134); the guard must track the set the audit actually compiles, not
+        // the set the model's `!== false` default would imply.
+        if (!recipe?.enabled) continue;
+        if (previous[matched] !== recipe) {
+          intact = false;
+          break;
+        }
+        matched += 1;
+      }
+      if (intact && matched === previous.length) return previous;
+    }
+
+    const members = [];
+    for (const recipeId of cohort) {
+      const recipe = this.recipes.get(recipeId);
+      if (recipe?.enabled) members.push(recipe);
+    }
+    return members;
+  }
+
+  /**
    * Get all recipes
    * @param {Object} filters - Optional filters
    * @returns {Recipe[]}
    */
   getRecipes(filters = {}) {
-    let recipes = [...this.recipes.values()];
+    let recipes;
+    // Start from the smallest indexed cohort available rather than copying the whole
+    // corpus and filtering it down (issue 1076). Order is the map's insertion order in
+    // both branches, so the returned list is identical to the pre-index one.
+    if (filters.craftingSystemId === undefined) {
+      recipes = [...this.recipes.values()];
+    } else {
+      recipes = [];
+      for (const recipeId of this._recipeCohorts().get(filters.craftingSystemId) ?? []) {
+        const recipe = this.recipes.get(recipeId);
+        if (recipe) recipes.push(recipe);
+      }
+    }
 
     // Filter by category
     if (filters.category) {
       recipes = recipes.filter((r) => r.category === filters.category);
-    }
-
-    // Filter by crafting system
-    if (filters.craftingSystemId !== undefined) {
-      recipes = recipes.filter((r) => r.craftingSystemId === filters.craftingSystemId);
     }
 
     // Filter by system
@@ -469,7 +1324,7 @@ export class RecipeManager {
     if (!systemId) return false;
     if (cache.has(systemId)) return cache.get(systemId);
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem?.(systemId);
     if (!system) {
       cache.set(systemId, false);
@@ -577,7 +1432,7 @@ export class RecipeManager {
     // Bind the currency affordability probe to the crafting actor so a currency
     // alternative is selectable in the display exactly when the engine could spend
     // it. A null actor yields a probe that is always false (currency shows missing).
-    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
 
     // Resolve the recipe's currency units once so a currency option's cost row can
     // render a human label (abbreviation, else label) instead of the raw unit id.
@@ -819,7 +1674,7 @@ export class RecipeManager {
 
     const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
     const features = this._getSystemFeatures(recipe);
-    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
     const resolveItemEssencesForSet = this._buildEssenceOptionResolver(recipe);
 
     const ingredientByKey = new Map();
@@ -956,7 +1811,7 @@ export class RecipeManager {
     const prerequisiteDefinitions = this._getToolPrerequisiteDefinitions(recipe);
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
-      const componentId = tool?.componentId || tool?.systemItemId;
+      const componentId = tool?.componentId;
       const toolDisplayName = String(tool?.label || tool?.name || '').trim();
       const actor =
         entry?.virtual === true
@@ -997,7 +1852,7 @@ export class RecipeManager {
   _resolveCraftingSystem(systemId) {
     if (!systemId) return null;
     if (this.getCraftingSystem) return this.getCraftingSystem(systemId) ?? null;
-    return game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId) ?? null;
+    return this._systemManager()?.getSystem?.(systemId) ?? null;
   }
 
   _resolveToolItemActor(item, sourceActors) {
@@ -1245,7 +2100,7 @@ export class RecipeManager {
    * @returns {object[]}
    */
   _resolveNormalizedCurrencyUnits(recipe) {
-    const units = getCurrencyRequirementConfig(recipe)?.units || [];
+    const units = getCurrencyRequirementConfig(recipe, this._currencySeams())?.units || [];
     return units.map((unit) => normalizeCurrencyUnit(unit)).filter(Boolean);
   }
 
@@ -1642,9 +2497,7 @@ export class RecipeManager {
    */
   _resolveEssenceDefinition(recipe, type) {
     const systemId = recipe?.craftingSystemId;
-    const system = systemId
-      ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
-      : null;
+    const system = systemId ? this._systemManager()?.getSystem(systemId) : null;
     const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     return definitions.find((def) => def?.id === type) ?? null;
   }
@@ -1927,8 +2780,7 @@ export class RecipeManager {
     // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's
     // own snapshot name, or the linked component's name for a migrated componentId-tool.
     // Shared, telemetry-bearing helper (issue 540); case-INSENSITIVE, exactly as before.
-    const fallbackName =
-      tool.name || this._getComponent(recipe, tool.componentId || tool.systemItemId)?.name || '';
+    const fallbackName = tool.name || this._getComponent(recipe, tool.componentId)?.name || '';
     if (!fallbackName) return false;
     return matchComponentByName(
       item,
@@ -1997,7 +2849,7 @@ export class RecipeManager {
     if (!systemId) {
       return { enableTags: false, enableEssences: false };
     }
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     const features = system?.features || {};
     return {
@@ -2013,10 +2865,10 @@ export class RecipeManager {
   _getComponent(recipe, componentId) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId || !componentId) return null;
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return (system.components || []).find((item) => item.id === componentId) || null;
+    return findById(getDefinitionIndex(system.components), componentId);
   }
 
   /**
@@ -2190,7 +3042,7 @@ export class RecipeManager {
   _getSystemComponents(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.components) ? system.components : [];
   }
@@ -2204,7 +3056,7 @@ export class RecipeManager {
   _getSystemTools(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.tools) ? system.tools : [];
   }
@@ -2214,11 +3066,17 @@ export class RecipeManager {
    *
    * Each recipe that cannot be imported is skipped and recorded as a conflict:
    * `reason: 'invalid'` when activation validation fails (carrying the validation
-   * `errors`), or `reason: 'duplicate-id'` when a recipe with the same id already
-   * exists and `overwrite` is false. On completion the skipped recipes are surfaced
-   * in ONE aggregated conflict-report notification (spec item 3), kept distinct from
-   * the terminal counts notification (spec item 4). Duplicate-id skips are no longer
+   * `errors`), `reason: 'signature-conflict'` when the ONLY thing it fails is alchemy
+   * signature uniqueness against the enabled recipes already in the system (issue 1167 —
+   * see {@link importConflictReason}), or `reason: 'duplicate-id'` when a recipe with the
+   * same id already exists and `overwrite` is false. On completion the skipped recipes are
+   * surfaced in ONE aggregated conflict-report notification (spec item 3), kept distinct
+   * from the terminal counts notification (spec item 4). Duplicate-id skips are no longer
    * silent.
+   *
+   * A colliding recipe is SKIPPED AND REPORTED, never thrown: that is how import already
+   * treats every other recipe it refuses, and one ambiguous recipe in a pack must not
+   * abort the recipes around it.
    *
    * @param {Object[]} recipesData - Array of recipe data
    * @param {boolean} overwrite - Whether to overwrite existing recipes
@@ -2244,7 +3102,7 @@ export class RecipeManager {
         conflicts.push({
           recipeId: recipe.id,
           recipeName: recipe.name,
-          reason: 'invalid',
+          reason: importConflictReason(validation.issues),
           errors: validation.errors,
         });
         skipped++;
@@ -2262,10 +3120,16 @@ export class RecipeManager {
       }
 
       this.recipes.set(recipe.id, recipe);
+      // An imported recipe is a whole record, exactly as a create is.
+      this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
       imported++;
     }
 
     await this.save();
+    // No `removedRecipeIds`: an import only ADDS or REPLACES records, so there is nothing
+    // this mutation orphaned and nothing for the gate to fall back to (issue 1226). The
+    // sweep here is a pure orphan hunt, and skipping it on a partial corpus removes and
+    // leaks nothing.
     await this._cleanupFlagsAfterRecipeMutation();
     // Spec item 3: one aggregated conflict report naming each skipped recipe and its
     // reason (duplicate-id skips are no longer silent).
@@ -2292,7 +3156,11 @@ export class RecipeManager {
    * @private
    */
   _formatImportConflictReport(conflicts) {
-    const reasonLabels = { 'duplicate-id': 'duplicate id', invalid: 'invalid' };
+    const reasonLabels = {
+      'duplicate-id': 'duplicate id',
+      invalid: 'invalid',
+      'signature-conflict': 'signature conflict',
+    };
     const details = conflicts
       .map((c) => `"${c.recipeName || c.recipeId}" (${reasonLabels[c.reason] || c.reason})`)
       .join(', ');
@@ -2398,18 +3266,41 @@ export class RecipeManager {
   }
 
   /**
-   * Validate that this recipe's ingredient signatures do not overlap with other recipes
-   * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
-   * @param {Recipe} recipe
-   * @returns {{valid: boolean, errors: string[]}}
-   * @private
+   * The ingredient-signature conflicts a candidate recipe would participate in, as coded,
+   * id-free `{code, params, message}` issues (issue 550).
+   *
+   * Evaluates the candidate as though it were already stored and enabled — see
+   * {@link AlchemySignatureReport#candidateConflicts} — so a recipe that has not been
+   * persisted yet is gated exactly like one that has (issue 1167).
+   *
+   * Public because the recipe editor asks this question of a LIVE DRAFT on every keystroke
+   * (issue 1201). It used to answer itself, by copying the whole recipe corpus and running a
+   * fresh `O(n^2)` audit per mutation — 2,000 recipes cost 1,999,000 comparisons and ~233 ms
+   * — because the retained report and everything reaching it were private. A draft is one
+   * candidate, which is exactly what this seam takes: the answer comes from the report's
+   * inverted component index, so it costs `O(candidates)` and no corpus copy at all.
+   *
+   * `systemId` is separable from the candidate because a draft is editor JSON that need not
+   * carry `craftingSystemId`, while the editor always knows which system it is in.
+   *
+   * The returned array is always a fresh copy, but a conflict's `params` object is not: for a
+   * candidate whose compiled entries match its stored copy exactly, the fast path in
+   * {@link AlchemySignatureReport#candidateConflicts} returns the SAME `params` object the
+   * retained report holds internally. Treat every `params` as read-only.
+   *
+   * @param {object} recipe A recipe, or the JSON of one — anything carrying `id`, `name`,
+   *   `enabled` and `ingredientSets`. Compiled exactly as the audit would compile it.
+   * @param {{systemId?: string}} [options] `systemId` defaults to the candidate's own
+   *   `craftingSystemId`.
+   * @returns {{code: string|null, params: object, message: string}[]} conflicts in
+   *   full-audit order; empty for a non-alchemy system, an unknown system, or a candidate
+   *   that cannot participate in one. Do not mutate a conflict's `params`.
    */
-  _validateSignatures(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return { valid: true, errors: [] };
+  getSignatureConflicts(recipe, { systemId = recipe?.craftingSystemId } = {}) {
+    if (!systemId) return [];
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    if (!systemManager) return { valid: true, errors: [] };
+    const systemManager = this._systemManager();
+    if (!systemManager) return [];
 
     // Signature uniqueness only matters when the engine *infers* which recipe
     // the player is crafting from the submitted ingredients — i.e. alchemy
@@ -2419,36 +3310,44 @@ export class RecipeManager {
     // are never ambiguous. Enforcing overlap there is stricter than the runtime
     // that depends on it and rejects perfectly valid recipes.
     const system = systemManager.getSystem(systemId);
-    if (system?.resolutionMode !== 'alchemy') return { valid: true, errors: [] };
+    if (system?.resolutionMode !== 'alchemy') return [];
 
-    const csm = {
-      getSystem: (id) => systemManager.getSystem(id),
-      // The validator is now enabled-scoped (issue 649). This gate runs on an ENABLE
-      // transition, but the store copy of `recipe` is still disabled (it is persisted
-      // only after this passes). Substitute the candidate recipe (enabled = its target
-      // state) so the scan evaluates the collision the enable would create; without the
-      // swap the enabled-scoped validator would exclude the still-disabled store copy
-      // and miss the conflict.
-      getRecipesForSystem: (id) =>
-        this.getRecipes({ craftingSystemId: id }).map((existing) =>
-          existing.id === recipe.id ? recipe : existing
-        ),
-      getComponentsForSystem: (id) => {
-        const system = systemManager.getSystem(id);
-        if (!system) return [];
-        return system.components || [];
-      },
-    };
+    // The validator is enabled-scoped (issue 649). The enable gate runs on an ENABLE
+    // transition, but the store copy of `recipe` is still disabled (it is persisted only
+    // after the gate passes), so the scan has to evaluate the candidate in the store copy's
+    // place — otherwise the enabled-scoped audit excludes the still-disabled copy and misses
+    // the conflict. The editor's draft is the same shape of question one keystroke earlier.
+    // The retained report holds the compiled entries for every OTHER enabled recipe, and
+    // `candidateConflicts` performs exactly that substitution against them (issue 1074): the
+    // candidate's own stored entries are excluded, its sets are compared with each other,
+    // and the result is emitted in full-audit order. What it no longer does is re-audit the
+    // whole system and copy the recipe corpus once per call, which is what made preparing N
+    // GM browser rows O(N^3).
+    const report = this._alchemySignatureReport(systemId, systemManager);
+    if (!report) return [];
 
-    const validator = new SignatureValidator(csm);
-    const result = validator.validateRecipe(recipe, systemId);
-    const errors = result.conflicts.map((c) => c.message);
-    const issues = result.conflicts.map((c) => ({
-      code: c.code,
-      params: c.params,
-      message: c.message,
+    return report.candidateConflicts(recipe).map((conflict) => ({
+      code: conflict.code,
+      params: conflict.params,
+      message: conflict.message,
     }));
-    return { valid: errors.length === 0, errors, issues };
+  }
+
+  /**
+   * Validate that this recipe's ingredient signatures do not overlap with other recipes
+   * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
+   *
+   * The enable gate's projection of {@link getSignatureConflicts} — one implementation, so
+   * the editor's prediction and the refusal it predicts can never disagree about a message
+   * or its order.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[],
+   *   issues: {code: string|null, params: object, message: string}[]}}
+   * @private
+   */
+  _validateSignatures(recipe) {
+    const issues = this.getSignatureConflicts(recipe);
+    return { valid: issues.length === 0, errors: issues.map((issue) => issue.message), issues };
   }
 
   /**
@@ -2465,25 +3364,18 @@ export class RecipeManager {
    * @returns {Promise<Array<{id: string, name: string}>>} the recipes that were disabled
    */
   async disableSignatureConflicts(systemId) {
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (system?.resolutionMode !== 'alchemy') return [];
 
-    const validator = new SignatureValidator({
-      getSystem: (id) => systemManager.getSystem(id),
-      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
-      getComponentsForSystem: (id) => systemManager.getSystem(id)?.components || [],
-    });
-
-    const { conflicts } = validator.validateSystem(systemId);
-    const conflictIds = new Set();
-    for (const conflict of conflicts) {
-      conflictIds.add(conflict.recipeA.id);
-      conflictIds.add(conflict.recipeB.id);
-    }
+    // No candidate substitution here — this runs AFTER the mutation is stored — so the
+    // whole-system report answers it directly (issue 1072, issue 1074). `blockedRecipeIds`
+    // is precisely the set this pass has always derived by hand from the conflict list.
+    const report = this._alchemySignatureReport(systemId, systemManager);
+    if (!report) return [];
 
     const disabled = [];
-    for (const id of conflictIds) {
+    for (const id of report.blockedRecipeIds) {
       const recipe = this.recipes.get(id);
       if (recipe?.enabled === true) {
         recipe.enabled = false;
@@ -2492,7 +3384,22 @@ export class RecipeManager {
     }
 
     if (disabled.length > 0) {
-      await this.save();
+      // This is the ONE write path in this manager that mutates a STORED recipe in place
+      // rather than replacing it, so nothing else would advance the token and every
+      // revision-keyed consumer — the signature report above included — would keep serving
+      // an answer computed against recipes that are no longer enabled. The report's member
+      // clause would catch it too; advancing here is the correct fix rather than the
+      // backstop, because a token is only ever wrong when a manager failed to advance it
+      // (see `module:revisionTokens`).
+      // `enabled` and nothing else moved, so the attribution is read off the same field map
+      // the replication path uses rather than restated here.
+      this._recordChange(domainsForRecipeFields(['enabled']), systemId);
+      // The repository's bulk boundary, on a real multi-record mutation: each disabled
+      // recipe announces itself, and the batch coalesces them into exactly one write —
+      // the same single write the whole-corpus `save()` issued here before. Naming the
+      // records is what would let a record-addressing backend write only these N without
+      // any caller changing.
+      await this.save({ batch: disabled.map(({ id }) => this.recipes.get(id)) });
       this._notifyRecipesChanged('update', {
         disabledForSignatureConflict: disabled.map((d) => d.id),
       });
@@ -2524,7 +3431,7 @@ export class RecipeManager {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return null;
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
 
@@ -2713,7 +3620,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
       return { valid: true, errors: [], issues: [] };
@@ -2772,19 +3679,55 @@ export class RecipeManager {
     };
   }
 
-  async _cleanupFlagsAfterRecipeMutation() {
+  /**
+   * Reconcile the actor flags a recipe mutation orphaned, through the shared gate
+   * (issue 1226, `data-models/spec.md` § Valid Id Basis).
+   *
+   * Before the gate this recomputed `validRecipes`/`validSystems` from the live managers
+   * and handed them straight to the same destructive collaborators the startup passes call,
+   * with nothing declaring what those sets had to be complete over. Every corpus-derived
+   * sweep is now declared and gated, and what replaces an omitted one is a SUBJECT-TARGETED
+   * prune of exactly the ids this mutation removed — which is safe on any corpus, because
+   * no missing record can make a just-deleted id valid again. See
+   * `mutationCleanupComposition.js`.
+   *
+   * @param {object} [options]
+   * @param {Iterable<string>} [options.removedRecipeIds] The recipes this mutation actually
+   *   removed. Absent for a mutation that removed nothing (an import), in which case an
+   *   omitted sweep removes nothing and leaks nothing.
+   */
+  async _cleanupFlagsAfterRecipeMutation({ removedRecipeIds = [] } = {}) {
     const runManager = game.fabricate?.getCraftingRunManager?.();
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     if (!runManager && !visibilityService) return;
 
+    const removed = [...(removedRecipeIds || [])]
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean);
     const validRecipes = new Set(this.getRecipes({}).map((r) => r.id));
     const validSystems = new Set((systemManager?.getSystems?.() || []).map((s) => s.id));
+
+    const passes = [];
     if (runManager) {
-      await runManager.cleanupInvalidRuns(validRecipes, validSystems);
+      passes.push({
+        label: 'orphaned crafting runs',
+        sweep: () => runManager.cleanupInvalidRuns(validRecipes, validSystems),
+        targeted: removed.length > 0 ? () => runManager.removeRunsForRecipes?.(removed) : null,
+      });
     }
     if (visibilityService) {
-      await visibilityService.cleanupLearnedRecipes(validRecipes);
+      passes.push({
+        label: 'orphaned learned recipes',
+        sweep: () => visibilityService.cleanupLearnedRecipes(validRecipes),
+        targeted:
+          removed.length > 0 ? () => visibilityService.forgetDeletedRecipes?.(removed) : null,
+      });
     }
+
+    return runGatedMutationCleanup({
+      passes,
+      subject: 'a recipe change',
+    });
   }
 }

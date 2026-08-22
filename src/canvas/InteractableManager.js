@@ -707,7 +707,14 @@ class InteractableManager {
         toolId: system.toolId,
         tool,
       });
-      if (!activeCanvasTool) return false;
+      if (!activeCanvasTool) {
+        // Tell the requesting user WHY. This used to be a bare `return false`, so a
+        // station whose Tool no longer resolves answered a click with NOTHING AT ALL —
+        // the failure mode that hid the issue-1119 item-sourced defect in play, because
+        // the station places and renders perfectly and only dies on activation.
+        this._routeActivationDenied(request.userId, 'SOURCE_MISSING');
+        return false;
+      }
       grant.context = { ...grant.context, activeCanvasTool };
     }
 

@@ -91,6 +91,18 @@ A group authored `[essence, currency]` therefore still tries the block branch be
 The search is bounded by a generous node/subset safeguard; on the rare bound-hit it degrades to the greedy author-order pass (never worse than the pre-663 behaviour, never a double-count) — an implementation safeguard, not user-facing behaviour.
 The byte-for-byte pre-663 equivalence (zero churn) now claims only sets with **no** essence group; a set carrying one resolves its essence options last by design, which is a strict relaxation and can never make a previously satisfiable set unsatisfiable.
 Resolution order is not emission order: `selectedIngredients` is still emitted one entry per non-missing group in **author-group order**, so a caller reading it back by running index (`RecipeManager._chosenOptionByGroup`) stays aligned with the authored groups even when an essence group is authored ahead of a component/tag group.
+- **Contention scoping (an implementation freedom, never an outcome change):** the resolver MAY partition a set's groups into independent **contention components** — maximal sets of groups whose candidate held stacks can overlap, with the essence block treated as one further member that contends both by membership (every group carrying a still-satisfiable essence option) and by draw (every group whose candidates include a block carrier) — resolve each component separately, and skip the search entirely for a component of one group that does not carry the block.
+It MAY likewise skip an essence option whose requirement exceeds what the whole untouched ledger could deliver for that essence.
+Each of these MUST leave the selection byte-identical wherever the unscoped search already succeeded, for every observable field: `selectedIngredients` and its positional group alignment, `plan` order and per-stack draws, `currencySpends`, `missingGroups` have/need, and the essence allocation.
+Groups in different components cannot alter each other's available quantities, so this changes only how much of the space is walked.
+- `IngredientSet.resolveIngredientSelection` MUST report the cost of the search that produced its answer, as `searchStats: { nodes, capHit }`, on BOTH exits — the assignment found by the search and the greedy author-order fallback.
+`nodes` is the number of search nodes explored and `capHit` records whether the safeguard bound was reached.
+`nodes` MAY be `0`: a set whose groups do not contend is resolved directly and enters no search at all, and reporting that honestly is what makes "an ordinary direct-component recipe does not search" observable rather than asserted.
+This is diagnostic only and changes no resolution outcome: it reports what the resolver already computed rather than altering what it decides.
+It is REQUIRED because the node cap bounds nodes, not work, and an operation count is the only deterministic measure of assignment cost — a wall-clock reading of a resolve is the product of tree size and per-node cost and cannot separate the two terms.
+- **Per-node cost MUST NOT grow with held-stack count.** The shared no-double-count ledger is reverted on backtrack by an undo journal recording only the keys a node overwrote, never by copying and restoring the whole ledger, and the stacks matching an option are resolved once per resolve pass rather than re-matched per node.
+Without both, the node cap bounds the search TREE while leaving the work it implies unbounded in inventory size, which is the failure that made "adversarial fixtures remain bounded by the safety cap" an unfalsifiable claim about elapsed time.
+Any index used for this is derived per resolve pass and MUST NOT be retained across calls: nothing mints a revision token when an actor's items change, so a retained index would describe stacks a craft had already consumed.
 - A player MAY override which option a multi-option group consumes, and — for a tag option matching more than one held stack — which specific held item, via `IngredientSet.resolveIngredientSelection`'s `optionOverrides` argument (keyed by `group.id` → `{ optionIndex, heldItemId? }`).
 An override is honoured whether satisfiable or not: a satisfiable option wins; an insufficient option reports that option's have/need and blocks the craft with the missing-materials message (it is never silently redirected to a different option).
 An explicit override MAY select a currency alternative over an available item option (routing to `currencySpends` when affordable); with no override the default items-first resolution is byte-for-byte unchanged.
@@ -197,6 +209,44 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    Timed exception: a time-gated step consumes at START (the check outcome is unknowable
    until the gate matures), so the same misconfiguration detected at FINISH records a step
    FAILURE with no refund and still reports failure — never a false success with zero items.
+
+3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
+   (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
+   Both crafting failure branches do this — the immediate one in `craft()` and the timed
+   recorder in `_finishTimedStep` — through ONE producer, because a delay is a scheduling
+   property and not a different set of outcomes.
+   Under `never` the branch short-circuits BEFORE resolution is asked at all, so a failed
+   craft walks no result model and nothing can observe a selection that was never made.
+
+   **The award is an ALLOWLIST over the resolution disposition, never a fall-through.**
+   Only `fail` (the reserved `role: 'failure'` group of `simple` / alchemy-`simple`,
+   selected BY ROLE) and `failure` (the group a `routedByCheck` recipe assigned to a
+   failure-marked outcome tier) may be produced on a failed check.
+   This is not a formality: under `routedByCheck` a step with exactly ONE result group takes
+   the single-group exemption, which was written for the success path and returns that group
+   with `disposition: 'success'` for any non-keyword outcome — including the `null` outcome a
+   failed check carries — so producing on anything else hands a failed craft its full SUCCESS
+   output. `routedByIngredients` is excluded on the same grounds: it routes by the chosen
+   ingredient set and reports no disposition, so a failed craft would award the set's normal
+   result.
+   A routed failing tier that no result group lists resolves to `unrouted-tier`, which is not
+   on the allowlist: it produces nothing, and it does NOT convert the craft into a
+   misconfiguration abort, because the failure consumption policy has already been applied
+   and there is nothing left to abort cleanly.
+
+   **The award is REPORTED on every seam the success award is**: the created records are
+   threaded into the run record's `createdResults` through the SAME mapper the success path
+   uses (that record persists into the actor's run-container flag, so an empty list beside
+   real items is a durable contradiction), passed to the crafting chat card — whose failure
+   branch gained a results section shared with salvage — and returned as `results` rather
+   than `null`, with the additive `disposition: 'produced-on-failure'` discriminator attached
+   only when something was produced, so a failure awarding nothing is unchanged in every
+   observable way.
+
+   **It decides nothing about COST.** Consumption and tool breakage are governed by
+   `craftingCheck.consumption` and are applied BEFORE the award; a failure AWARD and a
+   failure COST are separate decisions, and a recipe may award on failure while returning
+   its ingredients.
 
 ### Apply Effects
 
@@ -405,7 +455,13 @@ If it is present, the run must resume automatically when world time reaches the 
 - **Simple**: Exactly one success result group, plus a tolerated but inert reserved `role: 'failure'` group when a Simple salvage check formula (`salvageCraftingCheck.simple.rollFormula`) exists.
 Additional groups are invalid and are dropped by normalization (see `data-models/spec.md` Component Requirement 5).
 Optional pass/fail check.
-The engine awards `slice(0, 1)` — the first success result group — and does not route to a failure group; salvage does not adopt the recipe/alchemy failure-award semantics.
+On SUCCESS the engine awards `slice(0, 1)` — the first success result group, by index and with no role filter.
+**The claim that salvage does not route to a failure group is RETRACTED (issue 1098).**
+`_resolveSalvageResultGroups` now takes an explicit `disposition` argument.
+Under `disposition: 'failure'` — reached only when `salvageCraftingCheck.failureResultPolicy` permits results on failure — `simple` selects the single reserved `role: 'failure'` group **BY ROLE, never by index** (the retain-one clamp guarantees index 0 is the SUCCESS group, so an index-based selection would award the full success salvage output on a failed check) and returns nothing when none is authored; `routed` selects by `component.salvage.outcomeRouting[outcome]` for the failing tier's name; `progressive` returns nothing, having one success group against a budget and no tier to mark.
+Under `disposition: 'success'` — the default — every branch is unchanged.
+**The failure award is REPORTED on every seam the success award is**: the created records are threaded into `completeRun`'s `createdResults` in the success branch's shape (that record persists into the actor's run-container flag, so an empty list beside real items leaves a durable contradiction), passed to the salvage chat card — whose failure branch gained a results section of its own, having previously read neither `model.results` nor rendered one — and returned as `results` rather than `null`, which is what the bulk-salvage surfaces read.
+The failure branch builds the salvage recipe view the success branch builds.
 - **Routed**: Check is mandatory and requires an authored `salvageCraftingCheck.routed.rollFormula`.
   The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
   an outcome tier whose NAME is the `outcome`; with no authored formula the salvage fails loudly
@@ -427,7 +483,17 @@ The engine awards `slice(0, 1)` — the first success result group — and does 
   `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
 
-### Failure Consumption Policy
+### Failure Consumption and Failure-Result Policy
+
+Two ORTHOGONAL axes, and a system may author any combination of them: what a failed attempt COSTS, and what it PRODUCES.
+
+**The produce axis** is `salvageCraftingCheck.failureResultPolicy` (`'never' | 'perRecord' | 'always'`, see `data-models` requirement 35 and `resolution-modes` §Check Source).
+
+**The consume axis** is the pair below, both GM-authorable on the Salvage route's On-failure section since issue 1098 — persisted since 1.7.0 and reachable from no editor before it.
+**Both defaults are traps, and BOTH must be mirrored by any projection of them.**
+`consumeComponentOnFail` defaults **TRUE** via `!== false`, so a projection that drops it INVERTS a system authored `false` rather than merely losing it.
+`breakToolsOnFail` is read as `(consumption?.breakToolsOnFail ?? consumption?.consumeCatalystsOnFail) === true` — a **legacy alias**, default FALSE — so a projection reading the new key alone silently flips a pre-1.7.0 system's break-tools setting from ON to OFF the first time a GM opens the section and saves.
+The store projection mirrors the normalizer's new-then-legacy read exactly, as the crafting projection already does.
 
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
 - `salvageCraftingCheck.consumption.breakToolsOnFail`: if false (default), Tools are not broken on failure.

@@ -20,7 +20,7 @@
  * still contributes an active-filter chip.
  */
 
-import { categoryTotalOf } from './browserGroupCounts.js';
+import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 import { paginateRows } from './browserPagination.js';
 import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
@@ -316,4 +316,62 @@ export function describeActiveComponentFilters(filters = {}) {
 export function paginateComponents(components, options = {}) {
   const { rows, ...window } = paginateRows(components, options, COMPONENT_DEFAULT_PAGE_SIZE);
   return { components: rows, ...window };
+}
+
+/**
+ * Run the whole pipeline in one call: filter → sort → paginate (→ group the page), the
+ * SIBLING of `recipeBrowserModel.buildRecipeBrowserModel` (issue 1081).
+ *
+ * `ComponentsBrowserView` composed these four steps by hand, which was harmless while every
+ * component row was richly projected up front. It stops being harmless once projection is
+ * page-scoped: the counting step and the pagination step then read different arrays, and a
+ * hand-composed pipeline is where "count whatever list is in scope" gets written. Composing
+ * them here means the category totals are derived from `filtered` and the page from the same
+ * `filtered`, in one place, for both studios.
+ *
+ * `groups` is `[]` — not a single unnamed bucket — when grouping is off, preserving what the
+ * view already did with `ui.groupByCategory ? groupComponentsByCategory(...) : []`.
+ *
+ * @param {object[]} components the already search-filtered cohort the store projected.
+ * @param {{
+ *   category?: string, essence?: string, search?: string,
+ *   sortKey?: ComponentSortKey, sortDirection?: SortDirection,
+ *   pageIndex?: number, pageSize?: number, groupByCategory?: boolean
+ * }} [options]
+ * @returns {{
+ *   filtered: object[], sorted: object[], page: object[],
+ *   groups: {category: string, components: object[], total: number}[],
+ *   categoryTotals: Map<string, number>,
+ *   pageIndex: number, pageCount: number, totalCount: number,
+ *   rangeStart: number, rangeEnd: number,
+ *   chips: {id: string, value: string}[]
+ * }}
+ */
+export function buildComponentBrowserModel(components, options = {}) {
+  const filtered = filterComponents(components, options);
+  const sorted = sortComponents(filtered, {
+    key: options.sortKey,
+    direction: options.sortDirection,
+    categoryMajor: !!options.groupByCategory,
+  });
+  // Counted over the FILTERED COHORT and before pagination — see `countByCategory`.
+  const categoryTotals = countByCategory(filtered, componentCategoryOf);
+  const paged = paginateComponents(sorted, options);
+  const groups = options.groupByCategory
+    ? groupComponentsByCategory(paged.components, categoryTotals)
+    : [];
+
+  return {
+    filtered,
+    sorted,
+    page: paged.components,
+    groups,
+    categoryTotals,
+    pageIndex: paged.pageIndex,
+    pageCount: paged.pageCount,
+    totalCount: paged.totalCount,
+    rangeStart: paged.rangeStart,
+    rangeEnd: paged.rangeEnd,
+    chips: describeActiveComponentFilters(options),
+  };
 }

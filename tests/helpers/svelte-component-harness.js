@@ -9,6 +9,7 @@ import { compile, compileModule } from 'svelte/compiler';
 import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
+import { rewriteClientImports } from './rewriteClientImports.js';
 
 const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -88,15 +89,11 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
 }
 
 /**
- * Rewrite a compiled component's imports so they resolve against the temp dir:
- * point bare `svelte` at the client runtime and append `.js` to `.svelte`
- * specifiers (the temp dir holds the compiled `.svelte.js` siblings).
+ * Re-exported from its own leaf so mount suites keep importing it from here, while store
+ * suites reach it without pulling in `svelte/legacy` and happy-dom. See that file for why a
+ * bare `svelte` specifier is deliberately left alone.
  */
-export function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
+export { rewriteClientImports };
 
 /**
  * Guard the whole CLIENT/SERVER split every mounted suite depends on.
@@ -223,7 +220,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // the compiled graph, so omitting this HANGS every mounted crafting suite (# cancelled)
   // rather than failing one. It imports nothing, so this single entry suffices.
   'src/ui/svelte/util/essenceTint.js',
-  'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
@@ -237,9 +235,15 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out
+  // of the builder into an import-free leaf so #1091's summary projection can share them
+  // without pulling the builder in. The builder re-exports the vocabulary and imports the
+  // rule, so this entry must accompany it — an omission HANGS every mounted crafting suite
+  // (# cancelled) rather than failing one. The leaf imports nothing, so it suffices alone.
+  'src/systems/craftingBrowseStatus.js',
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
-  'src/systems/craftingModifierResolver.js',
+  'src/systems/checkModifierResolver.js',
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer
   // suffices. It appends the resolved scalar through `toolCheckBonus.js` (so the sign
   // split, the bracketing and the zero-skip stay ONE implementation) and reads the
@@ -247,10 +251,56 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // these two entries close the graph.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // …and issue 1118 a FOURTH: the resolver ranks a rolling modifier by the deterministic
+  // average this import-free leaf computes, which is also what tells it that a modifier
+  // rolls at all.
+  'src/utils/rollExpressionAverage.js',
+  // Issue 1095 gave it a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
+  // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair. That module
+  // imports only `craftingCheckExpression.js`, already listed, so this entry closes the
+  // graph again.
+  'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   // Same rule, issue 917: the builder now shares its step->recipe view projection and
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.
   'src/systems/stepRecipeView.js',
+  // Same rule, issue 1075: the builder's SUMMARY phase projects each browsable recipe
+  // through #1091's canonical summary, which reads held quantities from #1077's per-pass
+  // inventory snapshot. These SEVEN entries are that projection's whole transitive closure —
+  // summaryProjection -> componentCategories + inventorySnapshot, and inventorySnapshot ->
+  // config/flags + itemStackQuantity -> stackQuantityPathPresets + objectPath. (Its other
+  // FOUR imports — craftingImageDefaults, recipeCategories, craftingBrowseStatus and
+  // stepRecipeView — are already listed above.)
+  //
+  // Omitting one is caught by `setup()`'s dependency pre-validator, which rejects with the
+  // full importer chain before any component is imported
+  // (`tests/components/svelte-component-harness.test.js`). The HANG that reports as
+  // `# cancelled` rather than `# fail` is what happens when a suite reaches a module the
+  // pre-validator cannot see — the older failure mode this enumeration was written against,
+  // and still the reason the closure is enumerated rather than trimmed to what one suite
+  // happens to reach.
+  'src/systems/summaryProjection.js',
+  'src/utils/componentCategories.js',
+  'src/systems/inventorySnapshot.js',
+  'src/config/flags.js',
+  'src/systems/itemStackQuantity.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/utils/objectPath.js',
+  // Same rule, issue 1228: the builder no longer calls `buildInventorySnapshot` directly. It
+  // builds the ONE shared pass snapshot, which owns the recipe-item matcher so that no call
+  // site can build a snapshot missing it — the collaborator whose absence is SILENT. These
+  // four entries are that factory's whole new closure: passInventorySnapshot -> sourceUuid
+  // (+ inventorySnapshot, flags and itemStackQuantity, already listed above), and sourceUuid
+  // -> definitionIndex -> sourceReferenceUnion.
+  //
+  // The component RESOLVER stays injected and is deliberately absent here: importing it would
+  // add essenceResolver + componentNameMatch on top, which is the matcher graph the builder's
+  // own constructor documentation records as the reason that half is injected.
+  'src/systems/passInventorySnapshot.js',
+  'src/utils/sourceUuid.js',
+  'src/utils/definitionIndex.js',
+  'src/utils/sourceReferenceUnion.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
@@ -368,6 +418,17 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
     },
     async mount(props = {}) {
+      // Cross a macrotask boundary BEFORE building the next tree. Happy DOM memoizes
+      // `querySelector`/`querySelectorAll` results behind `WeakRef`s, and V8 keeps a WeakRef's
+      // target strongly reachable for the rest of the job that read it
+      // (`weak_refs_keep_during_job`). A suite whose tests never await anything real runs
+      // back-to-back inside ONE turn, so every torn-down tree — and, through its listeners, its
+      // whole Svelte component graph — stays pinned until some macrotask finally arrives. That
+      // is retention rather than a leak, but it stacks up a tree per test and pushes a large
+      // mounted suite past 2 GB of heap. Yielding here rather than in `remount()` covers every
+      // consumer: `mount()` is async and always awaited, whereas `remount()` is called
+      // synchronously from hundreds of places.
+      await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
       document.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props });
@@ -388,6 +449,11 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }
     },
-    get target() { return target; }
+    get target() { return target; },
+    // The mounted instance, so a suite can call a component's `export function` — the seam an
+    // application shell reaches for when it must act while the mount target is still
+    // connected (`disposeBeforeRemoval`). Reading it off `target` is impossible, so without
+    // this a suite proving that contract would have to re-inline the whole mount boilerplate.
+    get component() { return mounted; }
   };
 }

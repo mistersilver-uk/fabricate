@@ -220,7 +220,7 @@ There are no other strategies and no per-environment configuration of the select
 GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment.
 Environments do not override them.
-18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from the Travel tab / environment editor.
+18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from World > Travel > Realms / the environment editor.
 They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRealm` id, no longer participates in composition matching, and is not editor-surfaced.
 The legacy `biomes` tag list remains a composition match dimension.
 An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior.
@@ -235,11 +235,19 @@ Realm authoring stays lightweight geography — a Realm owns no tasks, events, o
 A **Gathering Realm** is the Fabricate geography concept; it is distinct from a Foundry **Scene Region** (`RegionDocument` / Region Behaviour), the canvas object that a realm maps to many-to-one through `sceneMappings[].sceneRegionUuid`.
 This distinction is the reason the Fabricate concept was renamed from **Region** to **Realm**.
 
-This section specifies the **shipped Phase 1** behavior (manual current-realm MVP).
-Scene Region automation, realm modifier application, and the full player travel/discovery UI are later-phase follow-ups; the reserved fields and source tokens below leave room for them without changing the contract.
+This section specifies the shipped manual override and live token-derived Scene Region behavior.
+Realm modifier application and the full player travel/discovery UI remain later-phase follow-ups; the reserved fields below leave room for them without changing the contract.
 
 The entire realm/travel/availability subsystem is gated by a per-system `gatheringRealmSettings.enabled` toggle that defaults to `false` (see *Gathering Realm Settings*).
-When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, and the Manager Travel tab and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist.
+When disabled, every runtime gate point — the engine location-block choke point, current-realm resolver, location-aware public API, selected-system Travel navigation, and environment realm selectors — behaves as if no environment is location-gated.
+World Party CRUD remains available.
+In Manager, parties are always reached through world-level `World > Parties`, and realm/map
+authoring through world-level `World > Travel`, which carries the `Realms | Map Region Links`
+tab strip.
+Both are reachable without a selected crafting system, because neither is a property of one.
+Ownership follows the navigation: the party list, the realm library and every Map Region Link are
+world-global, and a party has ONE current-realm override rather than one per system.
+What remains per crafting system is the participation toggle alone.
 Realm is geography only and is NOT a composition axis (composition uses biome + danger); the legacy region vocabulary that previously conflated geography with composition tagging has been removed.
 
 ### Gathering Realm
@@ -247,7 +255,6 @@ Realm is geography only and is NOT a composition axis (composition uses biome + 
 ```js
 GatheringRealm = {
   id: string,
-  craftingSystemId: string,
   name: string,
   description?: string,
   img?: string | null,
@@ -255,43 +262,72 @@ GatheringRealm = {
   secret: boolean,    // default false
   biomes: string[],   // terrain/ecology traits from the system biome vocabulary
   sort?: number,
-  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via the Travel route's Map Region Links tab, applied at runtime by live sensing
+  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via World > Travel > Map Region Links, applied at runtime by live sensing
   modifiers?: GatheringRealmModifier[],         // reserved for Phase 4 realm modifiers
 }
 ```
 
 #### Requirements
 
-1. `id` must be unique within the owning crafting system's realm list; duplicate realm ids are rejected at save boundaries (and keep the first occurrence on read).
-2. `craftingSystemId` is forced to the owning system on normalization so a stored or imported realm can never claim a foreign owner.
+1. `id` must be unique within the world's realm library; duplicate realm ids are rejected at save boundaries (and keep the first occurrence on read).
+Realm ids are STABLE and must never be re-keyed by a merge or a migration: environments, party overrides and actor discovery flags all reference realms by id, so re-keying one orphans every reference to it.
+2. A realm has no owning crafting system. `craftingSystemId` is not emitted on normalization, and a stored or imported realm carrying one has it dropped rather than rewritten.
 3. Realms are geography; they must not own environment, task, event, or drop records.
 4. `biomes` are terrain/ecology traits resolved through the system's biome vocabulary and normalize to a de-duplicated, lower-cased list.
 5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
 6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
 7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via the Travel route's Map Region Links tab (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by live token-derived sensing (Phase 3, shipped).
+8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via World > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by shipped live token-derived sensing.
+Because one Foundry Scene Region maps to at most one realm, pointing a region at a realm both attaches it there and detaches it from wherever it was, and the store performs that as a SINGLE write: a read-modify-write loop over the realm list would lose every iteration but the last against a setting-backed store.
 `modifiers` normalize, validate, and round-trip but are **not yet applied at runtime** — realm modifier application (Phase 4) is not shipped.
 The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
-### Gathering Realm Settings
+### Travel Configuration
+
+The world's realm library and the behaviour that governs it.
 
 ```js
-GatheringRealmSettings = {
-  enabled: boolean,                                             // default false; gates the whole realm/travel/availability subsystem
+TravelConfig = {                                                // world setting `fabricate.travelConfig`
   revealMode: "manual" | "onPartyTokenEntry" | "alwaysVisible", // default "manual"
   modifierVisibility: "visible" | "gmOnly",                     // default "visible"
+  realms: GatheringRealm[],
 }
 ```
 
 #### Requirements
 
-1. Settings are scoped to one crafting system (`CraftingSystem.gatheringRealmSettings`) because realms are per system.
-2. Missing settings normalize to `enabled: false`, `revealMode: "manual"`, and `modifierVisibility: "visible"`.
+1. The travel configuration is WORLD scope, because realms are geography: the same valley is the
+same valley whichever crafting system a character is there to serve.
+Every crafting system that participates shares one library, one reveal mode and one modifier visibility.
+2. Missing configuration normalizes to `revealMode: "manual"`, `modifierVisibility: "visible"` and an empty `realms` list.
+Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data.
+3. The configuration carries no `enabled` flag.
+Participation is a crafting system's answer, not the world's, and a reader that takes it from here is reading the wrong object.
+4. A missing `revealMode` coerces to `"manual"`, which SILENTLY hides realm names rather than failing.
+So a normalizer must not emit the key onto a record that no longer owns it: a stale per-system read must be structurally absent and fail loudly rather than quietly reverting an `alwaysVisible` world.
+5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` automatic discovery is not yet active; that follow-up is distinct from the shipped live token-derived realm sensing used for current-realm resolution.
+
+### Gathering Realm Settings
+
+The per-crafting-system participation answer, and nothing else.
+
+```js
+GatheringRealmSettings = {
+  enabled: boolean,   // default false; whether THIS system participates in travel
+}
+```
+
+#### Requirements
+
+1. Settings are scoped to one crafting system (`CraftingSystem.gatheringRealmSettings`) and carry the participation flag alone.
+The realm library, the reveal mode and the modifier visibility are world scope (see *Travel Configuration*).
+2. Missing settings normalize to `enabled: false`.
 3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data. `enabled` must be a real boolean when present; only an explicit `true` enables the subsystem, and any non-boolean coerces to `false` on read.
-4. `enabled` gates the entire realm/travel/availability subsystem.
-When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides the Travel tab and the environment realm selectors.
+4. `enabled` decides CONSUMPTION, never authoring, and has exactly three jobs: whether the party's current location gates this system's environment access and availability in the engine, what this system's UI shows, and whether this system's environments offer the realm controls.
+When `false` (the default, including for all migrated systems), every environment in that system behaves as ungated (no location blocking), the location-aware public API returns null/false for it, and the Manager hides its environment realm selectors.
+It does NOT gate authoring: World > Travel and World > Parties stay reachable, current-realm resolution still runs, and Party CRUD remains available.
 A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth every gate reads.
-5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
+5. Because the library is world scope, more than one participating system is no longer ambiguous: there is one honest answer to "which realm is the party in", so the engine reports it rather than giving up.
 
 ### Gathering Party
 
@@ -299,28 +335,30 @@ A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth
 GatheringParty = {
   id: string,
   name: string,
-  enabled: boolean,              // default false; enabling requires a travel actor
+  enabled: boolean,              // default false; a travel actor is NOT required to enable
   memberActorUuids: string[],
   travelActorUuid: string | null,
-  currentRealmOverrides?: {                                    // was currentRegionOverrides
-    [systemId: string]: {
-      mode: "none" | "manual",
-      realmIds: string[],                                      // was regionIds
-      updatedAt: number,
-      updatedByUserId: string,
-    },
+  currentRealmOverride?: {                                     // was currentRealmOverrides[systemId]
+    mode: "none" | "manual",
+    realmIds: string[],                                        // was regionIds
+    updatedAt: number,
+    updatedByUserId: string,
   },
 }
 ```
 
 #### Requirements
 
-1. Parties are world-level Fabricate records (world setting `fabricate.gatheringParties`) because the same party can interact with multiple crafting systems; `currentRealmOverrides` is keyed by `systemId`.
+1. Parties are world-level Fabricate records (world setting `fabricate.gatheringParties`) because the same party can interact with multiple crafting systems.
+A party has at most ONE `currentRealmOverride`: a party is one set of tokens standing in one place, and realms are world geography, so a per-system map would model a party as being in several places at once.
 2. Parties are excluded from crafting-system import/export.
 Overrides referencing missing systems or realms persist as stale repair evidence.
 3. `travelActorUuid` identifies the single Actor that represents the party on a campaign map — the **Travel Actor**.
-It is an Actor document UUID, not a placed Token UUID or prototype-token reference; Phase 3 realm presence sensing will resolve the travel actor's placed token(s).
-4. An enabled party must have exactly one travel actor; a newly created party defaults to `enabled: false`, and setting `enabled: true` without a travel actor is rejected at save.
+It is an Actor document UUID, not a placed Token UUID or prototype-token reference; shipped realm presence sensing resolves the travel actor's placed token(s).
+4. A party has at most one travel actor, and a newly created party defaults to `enabled: false`.
+Enabling does **not** require a travel actor: a party without one senses no scene regions, so Current Realm Resolution req 3 already resolves it to `unresolved` and its members gather exactly as an actor in no party at all does.
+That equivalence is to the no-party case and **not** to realms being disabled: with realms enabled an unresolved current realm still blocks an environment that declares included realms or biomes (`NO_CURRENT_REALM`), so enabling such a party leaves its members exactly where they already were rather than making every environment ungated.
+A downtime party that never stands on a map is therefore a supported configuration rather than a rejected one, and realm gating is opted into by assigning a travel actor.
 5. **Composite uniqueness invariant:** an actor may be associated with at most one *enabled* party in total — as a member, as the travel actor, or both (when both, it must be the same party).
 The travel actor may also be a member of its own party.
 Membership in disabled parties does not count toward the invariant.
@@ -328,15 +366,19 @@ This keeps a selected actor's current-realm resolution unambiguous.
 6. A selected actor resolves to the unique enabled party that references the actor's UUID in `memberActorUuids` or as `travelActorUuid`; if the actor is in no enabled party, realm-aware gathering falls back to no current realm.
 7. Party membership is actor-based, not user-based, and must not depend on a game-system-supplied party/group actor type.
 8. Existing blind-task `revealScope: "party"` is not redefined by this change.
+9. Party create, select, rename, enable/disable, delete, membership, and travel-actor operations are available without a selected crafting system.
+Reading or writing `currentRealmOverride` through Manager requires a selected system that is Gathering-enabled and opted into Travel & Realms; otherwise Manager explains the prerequisite and the store performs no override write.
+That remains an AUTHORING gate on the Manager surface rather than a statement about the data: the override itself is world scope, and a system opting out does not clear or hide where the party is.
 
 ### Current Realm Resolution
 
-Current realms are resolved per `partyId` and `systemId`.
+Current realms are resolved per `partyId` alone.
+A party is somewhere, and that is not a property of a crafting system: resolution runs regardless of which systems participate, and the per-system toggle applies only on the CONSUMPTION side, deciding whether that system's environments are gated by the resolved location.
 Canonical source tokens: `manualOverride`, `travelActor`, `unresolved` (player-facing labels `GM override`, `Travel actor`, `No current realm`).
 
 #### Requirements
 
-1. A GM manual override (`currentRealmOverrides[systemId].mode === "manual"`) is authoritative and resolves to `manualOverride`.
+1. A GM manual override (`currentRealmOverride.mode === "manual"`) is authoritative and resolves to `manualOverride`.
 A manual override that explicitly includes a *disabled* realm id still resolves that realm (GM diagnostic/preview inclusion).
 Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve.
 2. When no manual override resolves, resolution falls through to **live token-derived sensing**: `senseSceneRegions` is called over the party's travel-actor tokens and matched against each realm's `sceneMappings[].sceneRegionUuid`, resolving to `source: 'travelActor'` with no stored state (`GatheringLocationService.resolveCurrentRealms`).
@@ -398,7 +440,7 @@ The `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and ar
 ### Reserved Records (Not Yet Applied)
 
 ```js
-GatheringRealmSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // Foundry bridge — member field names NOT renamed; Phase 3
+GatheringRealmSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // shipped live-sensing Foundry bridge — member field names NOT renamed
 GatheringRealmModifier = {
   id: string, enabled: boolean,
   kind: "eventChance" | "dropRate" | "yield" | "difficulty" | "staminaCost" | "attemptLimit" | "custom",
@@ -407,7 +449,8 @@ GatheringRealmModifier = {
 } // Phase 4
 ```
 
-These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export, but Fabricate does not yet resolve Scene Region mappings (Phase 3) or apply realm modifiers to listing/attempt calculations (Phase 4).
+These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export.
+Fabricate resolves Scene Region mappings through shipped live token sensing, but does not yet apply realm modifiers to listing/attempt calculations (Phase 4).
 When implemented, modifiers must adjust gathering behavior only and must not rewrite source environment, task, event, drop, or component records.
 
 ## System Gathering Rules
@@ -622,27 +665,43 @@ There is **no** gathering-scoped tools store; the 0.7.0 migration (`migrateTools
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
 3. Crafting systems without a `tools` array normalize to `tools: []` on load.
 4. The Manager authors tools into the system-owned library; the same library backs the recipe/step/ingredient-set/salvage tool gate, the canvas interactable browser, and gathering.
-5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`.
+5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which is sourced the same way, from `system.modifiers` (issue 1117), with a live registry lookup by id as the fallback for a caller that holds no system.
 Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 6. The library is per crafting system.
 Tools are not shared across crafting systems.
+
+## One Library, Two Arithmetics
+
+A system authors modifiers in exactly ONE place (issue 1117): `CraftingSystem.modifiers`, edited in System settings › Modifiers.
+Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; the shapes are now one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
+
+**What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
+A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
+A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes additive `[Modifiers]` terms on the roll — one flat `+ N` term and one `+ (…)` term per rolling entry; it is inert in `d100` and reports the cause `noModifierSupport` — that mode's check IS the d100 rolled against each drop's chance, and the inert cause names the absent modifier seam rather than claiming the mode rolls nothing.
+The two arithmetics stay incompatible — unifying the LIBRARY does not unify them — so an entry is a shared definition, never a shared application.
+
+**A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118).
+A drop row evaluates the expression and applies the result; a check appends the DICE to its roll formula, so the authored variance survives to the roll.
+The two consumers still read an entry differently — a delta on a chance, against a term in a formula — but neither refuses a roll.
+The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIRED; the two BOUNDS faults are unaffected, and for a rolling entry they clamp the rolled result rather than a resolved number.
+
+**The disambiguation is now a naming requirement about SECTIONS, not libraries.**
+The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.
+
+**The check-modifier seam on gathering is DORMANT.**
+`_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders `progressive` and `routed` disabled, so no GM-selectable configuration reaches `runFormulaRouted` or `runFormulaProgressive` today.
+The persisted shape, both mirrored normalizers (`normalizeLibraryTask` and `_normalizeGatheringTask` must BOTH emit `GatheringTask.checkModifierIds`), the projection and the UI all land now, and the Modifiers section renders the same inert notice `d100` gets, **naming that reason**.
+The capability activates when 683 lands; no separate follow-up issue is opened.
 
 ## Gathering Character Modifiers
 
 ### Purpose
 
-Represent reusable actor-driven modifiers that a GM can apply to d100 drop rows and events for one crafting system.
+Represent a d100 drop row's or event's REFERENCE into the system's one modifier library, with its own operator and bounds.
 
 ### Properties
 
-```js
-GatheringCharacterModifier = {
-  id: string,
-  label: string,
-  icon: string,
-  expression: string,
-}
-```
+The library entry itself is `CraftingSystem.modifiers[]` (§data-models); this section owns only the reference shape and the arithmetic it drives.
 
 Character modifier row references use this shape:
 
@@ -659,10 +718,12 @@ GatheringCharacterModifierReference = {
 
 ### Requirements
 
-1. Character modifier libraries are scoped to one crafting system at `gatheringConfig.systems[systemId].characterModifiers`.
-2. New system gathering shells initialize `characterModifiers` to an empty array.
+1. References resolve against the ONE system-level library `CraftingSystem.modifiers` (issue 1117).
+The gathering config carries no library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired, the `1.23.0` migration merges it up, and the gathering config normalizer — an allowlist rebuild — no longer emits the key.
+2. A new system's library is empty.
 Presets are never seeded automatically.
 3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
+It seeds into the one system library, from the one authoring surface.
 4. Drop row and event references resolve against the selected gathering actor using the effective expression — the row `expressionOverride` when present, otherwise the library entry `expression`.
 Character modifiers are formula-only: there is no provider discriminator and no macro support on this surface.
 5. Operators are restricted to `+` and `-`; the operator defines the direction of the contribution.
@@ -1552,10 +1613,62 @@ threshold/outcome-tier configuration) drives resolution:
 4. A failing tier, or no tier name, takes the failure path.
 5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-6. If a succeeding tier name matches no result group, the attempt resolves to a
-   terminal failure (no group is awarded).
+6. If a succeeding tier name matches no result group, the attempt resolves to the
+   MISCONFIGURED disposition `ROUTED_TIER_UNROUTED`, not to a terminal failure.
+   Gathering routes by NAME, so renaming a tier on the system silently unroutes every
+   task whose groups were named for the old tier; reporting it as misconfigured surfaces
+   the drift on the first roll and — because a misconfigured outcome becomes a blocked
+   start before any commit — costs the player nothing.
+   **A misconfigured outcome never participates in failure awarding** (issue 1098): under
+   `always` the stale "terminal failure" reading would have turned authoring drift into
+   failure loot.
 7. A routed task with no system routed `rollFormula` reports a GM-fix-required
    misconfiguration diagnostic and does not resolve.
+
+### Failure-Result Path
+
+`gatheringCraftingCheck.failureResultPolicy` governs whether a failed gathering check may
+produce a result, and gathering has the path that makes it meaningful:
+`_resolveRoutedFormulaOutcome` carries a matched FAILURE tier's result group through
+instead of returning bare.
+
+**The award gate is MIRRORED, and BOTH halves are policy-gated together.**
+`_terminalSideEffectPlan` carries an `outcome.status === 'succeeded'` gate around result
+PLANNING and `_commitTerminalSideEffects` carries the identical gate around result
+CREATION; both run in sequence on both flows, and the plan's `createdResults` is what
+feeds the run record, the API response and the chat card.
+Gating only the commit half creates items on the actor that the run record, the response
+and the chat card all report as zero — a state an item-count-only assertion cannot detect.
+
+**Four dispositions never participate in failure awarding, whatever the policy:**
+
+1. A `failureOnBreak`-flipped attempt — the tool-breakage realm rule sets
+   `status = 'failed'` and clears `resultGroups`.
+   That is a VOIDED SUCCESS, not an authored failure.
+2. A `null` outcome name — a fixed-tier total outside every authored range.
+   There is no tier, so there is no authored failure output to select.
+3. A `ROUTED_TIER_UNROUTED` misconfigured outcome (item 6 above).
+4. Every `d100` outcome.
+   The d100 resolver's `failureWithEvent` policy returns a failed outcome that still
+   carries its matched drop rows, so only the routed failure seam's own opt-in marker —
+   never the presence of groups — admits an outcome to this path.
+
+Gathering has no consumption block and gains none; `task.failureOutcome` dispatches
+through `_applyFailureFeedback` exactly as before and **is emitted by ALL THREE
+gathering-task rebuilds** — both library whitelist rebuilds AND the engine-facing runtime
+task builder — where it was emitted by none, so the field was unpersisted AND unread at
+roll time.
+The Checks Studio's gathering On-failure section cross-references it read-only.
+The `d100` branch is untouched.
+
+**THE WHOLE PATH SHIPS DORMANT.** `_libraryTaskToRuntimeTask` hardcodes
+`resolutionMode: 'd100'` and synthesizes a single result group, and `GatheringEconomyView`
+renders `progressive` and `routed` disabled — both pending issue 683 — so no configuration
+a GM can select reaches this path today.
+The persisted shape, all three rebuilds, the projection and the UI land now, and the
+On-failure section renders the same inert notice `d100` gets on Modifiers, **naming that
+reason**.
+The capability activates when 683 lands.
 
 ### Reserved Keywords
 

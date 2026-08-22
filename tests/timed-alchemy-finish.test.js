@@ -408,3 +408,110 @@ test('a matured Simple brew that fails its check produces the reserved failure r
     'discovery is on a matched signature, independent of the check outcome'
   );
 });
+
+// ---------------------------------------------------------------------------
+// 5. A matured NON-ALCHEMY timed craft awards its failure result too (issue 1098)
+//
+// The alchemy twin above has produced on failure since issue 966, through
+// `_finishAlchemySimpleFailure`. The GENERIC timed failure recorder had no such path at
+// all: like the immediate branch it recorded the failure and returned `results: null`.
+//
+// This is the arm a mutation proved unasserted — deleting the timed producer call left the
+// whole suite green — so it is pinned on the same three seams the immediate branch is.
+// The delay is a scheduling property, not a different set of outcomes.
+// ---------------------------------------------------------------------------
+
+/** A plain `simple`-mode system whose failure-result policy is the argument. */
+function buildTimedSimpleSystem(id, failureResultPolicy) {
+  return {
+    id,
+    resolutionMode: 'simple',
+    visibilityMode: 'global',
+    features: { craftingChecks: true, essences: false, multiStepRecipes: false },
+    craftingCheck: {
+      enabled: true,
+      failureResultPolicy,
+      // Nothing is consumed on failure and no tool breaks, so the only thing these
+      // assertions can be observing is the award.
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+    },
+    components: [
+      { id: 'herb', name: 'Herb' },
+      { id: 'elixir', name: 'Elixir' },
+      { id: 'sludge', name: 'Sludge' },
+    ],
+  };
+}
+
+/** Start a timed craft, mature the gate, and finish it with a FAILING check. */
+async function runTimedCraftToFailure(failureResultPolicy) {
+  const system = buildTimedSimpleSystem(`sys-timed-${failureResultPolicy}`, failureResultPolicy);
+  const spy = buildVisibilitySpy();
+  const resolutionService = setupGame(system, spy.service, 1000);
+
+  const { recipe, set } = buildTimedAlchemyRecipe(system.id, [SUCCESS_GROUP, FAILURE_GROUP]);
+  const herb = new FakeItem('herb', 'Herb', 5);
+  const crafter = new FakeActor('Crafter');
+  const source = new FakeActor('Source', [herb]);
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager(set), runManager, resolutionService);
+  let checkPasses = true;
+  engine._runCraftingCheck = async () => ({
+    success: checkPasses,
+    outcome: null,
+    value: null,
+    data: {},
+    message: checkPasses ? 'Success' : 'The work is spoiled',
+  });
+
+  await engine.craft(crafter, [source], recipe, null, {});
+  const runId = runManager.getActiveRuns(crafter)[0].id;
+
+  // The check runs at FINISH, not at START, so flip it while the gate matures.
+  checkPasses = false;
+  game.time.worldTime = 1000 + 3600;
+  const finished = await engine.craft(crafter, [source], recipe, null, { runId });
+
+  return { finished, crafter, runManager };
+}
+
+test('a matured timed craft that fails its check awards the reserved failure result', async () => {
+  const { finished, crafter } = await runTimedCraftToFailure('always');
+
+  assert.equal(finished.success, false, 'a failed check is still a failure');
+  assert.equal(crafter.createdItems.length, 1, 'exactly one item was produced');
+  assert.equal(
+    crafter.createdItems[0].name,
+    'Sludge',
+    'the reserved FAILURE set, never the success one'
+  );
+  // The return value — what `advanceCraftingRun` and the workbench read.
+  assert.ok(Array.isArray(finished.results), 'results is an array, not null');
+  assert.equal(finished.results.length, 1);
+  assert.equal(finished.disposition, 'produced-on-failure');
+});
+
+test('a matured timed failure records its award on the run, in the success-branch shape', async () => {
+  const { crafter, runManager } = await runTimedCraftToFailure('always');
+
+  // The run record persists into the actor's Fabricate run-container flag, so an empty
+  // `createdResults` beside real items is a durable contradiction rather than a gap.
+  const run = runManager.getRunHistory(crafter)[0];
+  assert.equal(run.status, 'failed', 'the run completed as failed');
+  const recorded = run.steps[0].createdResults ?? run.createdResults ?? [];
+  assert.equal(recorded.length, 1, 'the award is in the run record');
+  assert.equal(recorded[0].name, 'Sludge', 'with the name captured at award time');
+});
+
+test('a matured timed craft under never awards nothing, exactly as before', async () => {
+  const { finished, crafter } = await runTimedCraftToFailure('never');
+
+  assert.equal(finished.results, null, 'the return value is the pre-1098 one');
+  assert.equal(
+    Object.hasOwn(finished, 'disposition'),
+    false,
+    'and carries no discriminator, so nothing about the old shape changed'
+  );
+  assert.equal(crafter.createdItems.length, 0, 'nothing was created on the actor');
+});

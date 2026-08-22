@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildEssencePreviewRow } from '../../src/ui/svelte/util/essencePreviewRow.js';
+import {
+  buildEssencePreviewRow,
+  SAMPLE_COMPONENT_IMAGE,
+} from '../../src/ui/svelte/util/essencePreviewRow.js';
 import { GENERIC_ITEM_IMAGE } from '../../src/ui/svelte/util/craftingImageDefaults.js';
 
 // The exact set of top-level keys `InventoryListingBuilder._buildEssenceRows` emits — the
@@ -73,11 +76,19 @@ test('an essence with no chosen colour yields a null colorToken (the tile keeps 
 test('the carrying-component row is a normal item on a CORE Foundry icon, carrying the essence pip', () => {
   const { component } = buildEssencePreviewRow(FIRE, { sampleComponentName: 'Ember Ash' });
   assert.equal(component.isEssenceSource, false, 'a normal item, so the card renders artwork');
-  assert.equal(component.img, GENERIC_ITEM_IMAGE);
+  assert.equal(component.img, SAMPLE_COMPONENT_IMAGE);
   assert.equal(
     component.img,
-    'icons/svg/item-bag.svg',
-    'a core asset present in every Foundry install'
+    'icons/containers/bags/pack-engraved-leather-leaf-tan.webp',
+    'a core asset present in every Foundry install, served from the core public root'
+  );
+  // The tile wears REAL artwork, never the "no image" sentinel: `resolveRecipeImage` and
+  // `InventoryListingBuilder._resolveRecipeImg` both read the bag as absent artwork, so
+  // reaching for it here would say "a component nobody gave an image".
+  assert.notEqual(
+    component.img,
+    GENERIC_ITEM_IMAGE,
+    'not the generic item-bag "no image" sentinel'
   );
   assert.equal(component.name, 'Ember Ash');
   // The one essence pip the card reads off `essences[]` — id (keyed on), name, icon and

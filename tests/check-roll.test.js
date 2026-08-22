@@ -416,7 +416,11 @@ test('playerPicks: the chosen modifier is APPENDED BEFORE the advantage transfor
   });
   // The append (med → 3) precedes the plain-d20 advantage rewrite, so the modifier
   // composes on top of the kept-highest pool: `2d20kh1 + 3[Modifiers]`, eval == display.
-  assert.equal(rolledFormulas.at(-1), '2d20kh1 + 3[Modifiers]', 'advantage composes on the chosen modifier');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + 3[Modifiers]',
+    'advantage composes on the chosen modifier'
+  );
   assert.equal(rolled.resolvedFormula, '2d20kh1 + 3[Modifiers]', 'display equals what evaluated');
   delete globalThis.Roll;
 });
@@ -459,6 +463,164 @@ async function rollChoice(modifierChoice, choice) {
   delete globalThis.Roll;
   return rolled;
 }
+
+// ── a chosen ROLLING modifier (issue 1118) ──────────────────────────────────
+//
+// A descriptor option carries `formula` instead of `value` when its expression rolls, and
+// the chosen fragment is appended VERBATIM as its own flavoured term. It is taken from the
+// descriptor rather than rebuilt here, so the chip the player was offered and the term that
+// rolls are one derivation.
+const DICE_PICK_CHOICE = {
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
+    {
+      id: 'luck',
+      label: 'Luck',
+      icon: 'fa-luck',
+      value: null,
+      formula: '(1d4)',
+      display: '+1d4',
+    },
+    {
+      id: 'bounded',
+      label: 'Bounded',
+      icon: 'fa-b',
+      value: null,
+      formula: 'min(max((1d8), -1), 6)',
+      display: '+min(max((1d8), -1), 6)',
+    },
+  ],
+  maxPicks: 2,
+  defaultSelectedIds: ['bounded'],
+  defaultSelectedId: 'bounded',
+};
+
+test('playerPicks: a chosen ROLLING modifier appends its dice, not its average', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['luck'] }),
+    '1d20 + (1d4)[Modifiers]',
+    'the fragment is appended verbatim; 2.5 is a number the roll could never produce'
+  );
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['bounded'] }),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'and a bounded one keeps its clamp'
+  );
+});
+
+test('playerPicks: a mixed selection sums the flat half and appends the rolling half', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'one flat term, then one term per rolling pick'
+  );
+});
+
+test('playerPicks: the cap still truncates a rolling selection', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck', 'bounded'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'the third pick exceeds maxPicks 2 and is dropped in descriptor order'
+  );
+});
+
+test('playerPicks: a rolling PRE-SELECTION is what a headless confirm rolls', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, {}),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'confirming without a selection falls back to the descriptor pre-selection'
+  );
+});
+
+// ── advantage belongs to the AUTHORED check, not to a modifier (issue 1118 review) ──
+//
+// `parsePlainDiceGroups` splits on parens AND flavour brackets, so `(1d20)[Modifiers]`
+// tokenises to a plain `1d20`. Without scoping, a check with no d20 of its own would offer
+// Advantage and the transform would rewrite the MODIFIER's die.
+const D20_MODIFIER_CHOICE = {
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
+    { id: 'wild', label: 'Wild', icon: 'fa-w', value: null, formula: '(1d20)', display: '+1d20' },
+  ],
+  maxPicks: 1,
+  defaultSelectedIds: ['wild'],
+  defaultSelectedId: 'wild',
+};
+
+test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '3d6',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      modifierChoice: D20_MODIFIER_CHOICE,
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, chosenModifierIds: ['wild'], advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, false, '3d6 is not a plain-d20 check, whatever it appends');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '3d6 + (1d20)[Modifiers]',
+    "the modifier's die is left alone even when a caller forces the disposition"
+  );
+  delete globalThis.Roll;
+});
+
+// The NON-DEFERRED path asked the same question of the POST-append formula, so it is
+// covered separately: on the deferred path the two readings coincide and a mutation there
+// would go unnoticed.
+test('a non-deferred d20 modifier does not manufacture an advantage offer', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '3d6',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      craftingModifier: {
+        catalogue: [{ id: 'wild', label: 'Wild', expression: '1d20' }],
+        systemPolicy: 'addAll',
+        defaultModifierIds: ['wild'],
+      },
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, false, 'the appended d20 is not the check`s own');
+  assert.equal(rolledFormulas.at(-1), '3d6 + (1d20)[Modifiers]');
+  delete globalThis.Roll;
+});
+
+test('advantage still rewrites the CHECK`s own d20 with a d20 modifier appended', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '1d20',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      modifierChoice: D20_MODIFIER_CHOICE,
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, chosenModifierIds: ['wild'], advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, true, 'the authored check IS a plain-d20 one');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + (1d20)[Modifiers]',
+    'the FIRST plain d20 is the check`s own, and the modifier keeps its die'
+  );
+  delete globalThis.Roll;
+});
 
 test('playerPicks: a multi-pick selection SUMS the chosen modifiers', async () => {
   assert.equal(
@@ -684,12 +846,16 @@ function withChatMessage(run) {
 test('playerPicks: the chosen modifier label is appended to the chat flavor', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: PICK_CHOICE,
-      flavor: 'Healing Salve — Crafting check (DC 10)',
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: PICK_CHOICE,
+        flavor: 'Healing Salve — Crafting check (DC 10)',
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(
     posted.at(-1).data.flavor,
@@ -702,12 +868,16 @@ test('playerPicks: the chosen modifier label is appended to the chat flavor', as
 test('playerPicks: an empty base flavor gets the label alone, never an orphan bullet', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: PICK_CHOICE,
-      // No `flavor`: a direct caller / test path production never takes.
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: PICK_CHOICE,
+        // No `flavor`: a direct caller / test path production never takes.
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(posted.at(-1).data.flavor, 'Herbalism', 'no leading "· " on an empty base');
   delete globalThis.Roll;
@@ -763,18 +933,22 @@ test('playerPicks: an EMPTY multi-pick selection leaves the flavor untouched', a
 test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: {
-        modifiers: [
-          { id: 'bare', label: '', icon: '', value: 3 },
-          { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
-        ],
-        defaultSelectedId: 'herb',
-      },
-      flavor: 'Crafting check',
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: {
+          modifiers: [
+            { id: 'bare', label: '', icon: '', value: 3 },
+            { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+          ],
+          defaultSelectedId: 'herb',
+        },
+        flavor: 'Crafting check',
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(posted.at(-1).data.flavor, 'Crafting check', 'no trailing "· " for a blank label');
   delete globalThis.Roll;
@@ -1465,4 +1639,234 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
   assert.equal(r.success, false);
   assert.equal(r.outcome, null);
   assert.match(r.message, /Salvage check roll failed/);
+});
+
+// ── classifyCheckTotal (issue 1097) ─────────────────────────────────────────
+//
+// The Checks Studio's odds histogram buckets every enumerated face through this
+// function, and `runFormulaRouted` resolves a real roll through it too. That makes
+// "they cannot drift" a property of the code rather than a promise — but only if the
+// EXTRACTION was faithful, and a differential test over the two REAL functions is the
+// only thing that shows it was. Two hand-written models agreeing proves nothing about
+// either.
+
+const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
+
+/** The fixed-range tier set, with a recipe minimum to gate against. */
+const FIXED_TIERS = [
+  { id: 'slag', name: 'Slag', start: 1, end: 9, success: false },
+  { id: 'rough', name: 'Rough', start: 10, end: 17, success: true, breakTools: true },
+  { id: 'fine', name: 'Fine', start: 18, end: 26, success: true },
+];
+
+// A total of 12 lands in Rough, the MIDDLE fixed tier, so a step up is a real move rather
+// than a clamped no-op — and a no-op would make the parity case below vacuous while still
+// passing, because both sides would report `tierStepApplied: null`.
+const STEP_TOTAL = 12;
+
+/** Step a rolled tier up one whenever the group total is exactly 12. */
+const STEP_UP_ONE = {
+  id: 'step-up',
+  condition: {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'total',
+    operator: '==',
+    value: STEP_TOTAL,
+  },
+  outcome: 'none',
+  tierStep: { mode: 'up', steps: 1 },
+};
+
+/** Ask for FOUR steps up from a three-tier list, so the clamp is exercised. */
+const STEP_UP_FOUR = { ...STEP_UP_ONE, id: 'step-four', tierStep: { mode: 'up', steps: 4 } };
+
+const CLASSIFIER_CASES = [
+  ['relative, mid-range', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 15],
+  ['relative, below every threshold', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 1],
+  [
+    'relative, below every threshold with the clamp',
+    { type: 'relative', relativeOutcomes: RELATIVE, dc: 15, clampToNearest: true },
+    1,
+  ],
+  ['relative, exceed comparison', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 15],
+  ['fixed, inside a range', { type: 'fixed', fixedOutcomes: FIXED_TIERS }, 12],
+  ['fixed, outside every range', { type: 'fixed', fixedOutcomes: FIXED_TIERS }, 99],
+  [
+    'fixed, blocked by the recipe minimum',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, minOutcomeId: 'fine' },
+    12,
+  ],
+  [
+    'forced success reroutes to the best succeeding tier',
+    {
+      type: 'relative',
+      relativeOutcomes: RELATIVE,
+      dc: 15,
+      triggers: [totalTrigger({ value: 20, outcome: 'success' })],
+    },
+    20,
+  ],
+  [
+    'forced failure reroutes to the worst failing tier',
+    {
+      type: 'relative',
+      relativeOutcomes: RELATIVE,
+      dc: 15,
+      triggers: [totalTrigger({ value: 1, outcome: 'failure' })],
+    },
+    1,
+  ],
+  [
+    // The forced-outcome BYPASS of the recipe minimum, which no other case reaches: a forced
+    // success reroutes to Fine, whose `start` clears the minimum, while an UNFORCED total in
+    // Rough would be blocked by it. Without this case the `!forced &&` guard on the gate can
+    // be deleted and every other parity assertion stays green.
+    'a forced FAILURE bypasses the recipe minimum gate',
+    {
+      type: 'fixed',
+      fixedOutcomes: FIXED_TIERS,
+      minOutcomeId: 'fine',
+      triggers: [totalTrigger({ value: 12, outcome: 'failure' })],
+    },
+    STEP_TOTAL,
+  ],
+  [
+    'an UNFORCED total below the recipe minimum is blocked',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, minOutcomeId: 'fine' },
+    STEP_TOTAL,
+  ],
+  [
+    'a tier step moves the rolled tier',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, triggers: [STEP_UP_ONE] },
+    STEP_TOTAL,
+  ],
+  [
+    'a CLAMPED tier step reports the realized magnitude',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, triggers: [STEP_UP_FOUR] },
+    STEP_TOTAL,
+  ],
+];
+
+for (const [name, config, total] of CLASSIFIER_CASES) {
+  test(`classifyCheckTotal agrees with runFormulaRouted: ${name}`, async () => {
+    const thresholdMode = name.includes('exceed') ? 'exceed' : 'meet';
+    const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    const diceGroups = [{ groupId: 0, group: '1d20', sum: total, results: [total] }];
+    stubRoll(total, [{ number: 1, faces: 20, total, results: [{ result: total, active: true }] }]);
+
+    const runner = await runFormulaRouted({
+      formula: '1d20',
+      dc: config.dc,
+      thresholdMode,
+      type: config.type,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers: config.triggers,
+      actor: ACTOR,
+      clampToNearest: config.clampToNearest === true,
+      minOutcomeId: config.minOutcomeId ?? null,
+    });
+
+    const classified = classifyCheckTotal({
+      type: config.type,
+      total,
+      dc: config.dc,
+      comparison,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers: config.triggers,
+      diceGroups,
+      clampToNearest: config.clampToNearest === true,
+      minOutcomeId: config.minOutcomeId ?? null,
+    });
+
+    assert.equal(classified.success, runner.success, 'success');
+    assert.equal(classified.matched?.name ?? null, runner.outcome, 'the routed outcome NAME');
+    assert.equal(classified.matched?.id ?? null, runner.data.outcomeId, 'and its id');
+    assert.equal(classified.breakTools, runner.data.breakTools, 'the per-tier breakage bridge');
+    assert.deepEqual(
+      classified.tierStepApplied,
+      runner.data.tierStepApplied ?? null,
+      'the tier-step evidence, present only on a REAL tier change'
+    );
+    assert.equal(classified.minTierFailed, runner.data.minTierFailed === true, 'the minimum gate');
+    assert.equal(
+      classified.blockedOutcomeId,
+      runner.data.blockedOutcomeId ?? null,
+      'and the tier that gate blocked'
+    );
+  });
+}
+
+test('classifyCheckTotal: the clamped step reports the REALIZED magnitude, not the request', async () => {
+  const classified = classifyCheckTotal({
+    type: 'fixed',
+    total: STEP_TOTAL,
+    dc: 0,
+    comparison: 'meet',
+    relativeOutcomes: [],
+    fixedOutcomes: FIXED_TIERS,
+    triggers: [STEP_UP_FOUR],
+    diceGroups: [{ groupId: 0, group: '1d20', sum: STEP_TOTAL, results: [STEP_TOTAL] }],
+  });
+  assert.equal(classified.tierStepApplied.steps, 1, 'Fine is one step above Rough, not four');
+  assert.equal(classified.tierStepApplied.stepClamped, true, 'and the author asked for more');
+});
+
+test('classifyCheckTotal: a per-die trigger is INVISIBLE without `results` on the bag', () => {
+  const nat20 = {
+    id: 'nat20',
+    condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 20 },
+    outcome: 'success',
+  };
+  const args = {
+    type: 'relative',
+    total: 20,
+    dc: 15,
+    comparison: 'meet',
+    relativeOutcomes: RELATIVE,
+    fixedOutcomes: [],
+    triggers: [nat20],
+  };
+  const withResults = classifyCheckTotal({
+    ...args,
+    diceGroups: rolledDiceGroups({
+      dice: [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }],
+    }),
+  });
+  const withoutResults = classifyCheckTotal({
+    ...args,
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 20 }],
+  });
+  assert.equal(withResults.forcedDisposition, 'success', 'the production bag carries the faces');
+  assert.equal(withoutResults.forcedDisposition, null, 'a hand-shaped bag silently drops them');
+});
+
+test('classifyCheckTotal: a forced outcome BYPASSES the recipe minimum-success-tier gate', () => {
+  const args = {
+    type: 'fixed',
+    total: STEP_TOTAL,
+    dc: 0,
+    comparison: 'meet',
+    relativeOutcomes: [],
+    fixedOutcomes: FIXED_TIERS,
+    minOutcomeId: 'fine',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: STEP_TOTAL, results: [STEP_TOTAL] }],
+  };
+  const unforced = classifyCheckTotal({ ...args, triggers: [] });
+  // A forced FAILURE, deliberately: it reroutes to the WORST failing tier, which ranks
+  // below the recipe minimum. A forced SUCCESS reroutes to the best succeeding tier, which
+  // clears the minimum on its own — so a test built on one would pass whether or not the
+  // bypass existed, which is exactly the vacuous proof this case replaces.
+  const forced = classifyCheckTotal({
+    ...args,
+    triggers: [totalTrigger({ value: STEP_TOTAL, outcome: 'failure' })],
+  });
+  assert.equal(unforced.minTierFailed, true, 'Rough ranks below the required Fine');
+  assert.equal(unforced.matched, null, 'so nothing routes');
+  assert.equal(unforced.blockedOutcomeId, 'rough', 'and the blocked tier is named');
+  assert.equal(forced.minTierFailed, false, 'a natural crit is never judged by a recipe minimum');
+  assert.equal(forced.matched?.id, 'slag', 'the forced tier routes, minimum or not');
+  assert.equal(forced.blockedOutcomeId, null, 'and no tier is reported as blocked');
 });

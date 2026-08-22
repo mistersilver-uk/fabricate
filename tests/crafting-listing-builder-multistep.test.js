@@ -162,10 +162,16 @@ function makeBuilder({ system = simpleSystem(), recipe, exhausted = false } = {}
   });
 }
 
+// The rich per-recipe model now comes from the DETAIL phase (issue 1075); `buildListing`
+// returns cheap summaries and never the step/craftability data these tests are about.
 function buildOne(opts) {
   const actor = { id: 'actor-1', items: opts.items ?? [] };
-  const listing = makeBuilder(opts).buildListing({ craftingActor: actor, viewer: opts.viewer });
-  return listing.recipes[0];
+  return makeBuilder(opts).buildRecipeDetail({
+    recipe: opts.recipe,
+    access: { reason: 'ok', visible: true },
+    craftingActor: actor,
+    viewer: opts.viewer,
+  });
 }
 
 // An actor holding everything BOTH steps need (leather/cloth for step 1, lumber for
@@ -434,10 +440,16 @@ test('teaser redaction: steps[] and detail are redacted for a non-GM teaser', ()
     craftingSystemManager,
     localize: (key) => key,
   });
-  const model = builder.buildListing({
+  const model = builder.buildRecipeDetail({
+    recipe,
+    access: {
+      reason: 'teaser',
+      visible: true,
+      teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+    },
     craftingActor: { id: 'actor-1', items: [] },
     viewer: { id: 'player-1', isGM: false },
-  }).recipes[0];
+  });
   assert.deepEqual(model.steps, [], 'no step data leaks on a teaser');
   assert.equal(model.duration, null, 'no aggregate or recipe duration leaks on a teaser');
   assert.equal('time' in model.result, false, 'duration is not smuggled through terminal result');

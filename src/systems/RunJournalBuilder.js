@@ -10,6 +10,7 @@ import {
   stringOrEmpty,
   stringOrNull,
 } from './gatheringEngineInternals.js';
+import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 // Generic player-facing label for a blind gathering run, shared with the
@@ -140,6 +141,11 @@ export class RunJournalBuilder {
    * @param {Function} [deps.getViewer] `() => viewer` (current Foundry user) for redaction.
    * @param {Function} [deps.localize] `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] `() => number` current world time.
+   * @param {Function} [deps.resolveComponentForItem] `(item, components, systemId) =>
+   *   component|null`. A SNAPSHOT collaborator, not a builder one: this builder never calls
+   *   it. It is supplied so the per-pass snapshot built here is the same complete value the
+   *   crafting and visibility passes build (issue 1228) rather than a half of one — see
+   *   `passInventorySnapshot`'s header for what a half-snapshot does to each consumer.
    */
   constructor({
     craftingRunManager = null,
@@ -157,6 +163,7 @@ export class RunJournalBuilder {
     getViewer = null,
     localize = (key) => key,
     nowWorldTime = () => 0,
+    resolveComponentForItem = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -174,6 +181,8 @@ export class RunJournalBuilder {
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
+    this._resolveComponentForItem =
+      typeof resolveComponentForItem === 'function' ? resolveComponentForItem : null;
   }
 
   /**
@@ -199,17 +208,47 @@ export class RunJournalBuilder {
       };
     }
 
+    // Crafting runs and their recipes are resolved ONCE for the whole pass, then reused by
+    // both phases (issue 1228). Redaction asks the visibility service about every one of them,
+    // and on an `item`-visibility-mode system that question re-enumerated the actor's whole
+    // inventory PER RUN. One snapshot answers all of them; it needs the recipes anyway, for
+    // their legacy book links.
+    const activeCraftingRuns = normalizeList(this._craftingRunManager?.getActiveRuns?.(actor));
+    const historyCraftingRuns = normalizeList(this._craftingRunManager?.getRunHistory?.(actor));
+    const recipesByRunId = this._craftingRunRecipes([
+      ...activeCraftingRuns,
+      ...historyCraftingRuns,
+    ]);
+    // A per-pass VALUE, discarded when this returns — never a field. Nothing mints a revision
+    // token when `actor.items` changes, and a stale read here would redact (or un-redact) a
+    // run against a book the actor no longer holds.
+    const snapshot = buildPassInventorySnapshot({
+      craftingActor: actor,
+      // The Journal is scoped to ONE actor: it has no component-source selection, and the
+      // redaction call it makes passes none either. Stated rather than defaulted so the
+      // snapshot's actor set is visibly the same set the question is asked about.
+      componentSourceActors: [],
+      recipes: [...recipesByRunId.values()],
+      resolveComponent: this._resolveComponentForItem,
+    });
+
     const activeRuns = this._buildRunModels({
       actor,
       viewer: resolvedViewer,
       worldTime,
       terminal: false,
+      craftingRuns: activeCraftingRuns,
+      recipesByRunId,
+      snapshot,
     });
     const history = this._buildRunModels({
       actor,
       viewer: resolvedViewer,
       worldTime,
       terminal: true,
+      craftingRuns: historyCraftingRuns,
+      recipesByRunId,
+      snapshot,
     });
     return {
       selectedActorId: idOf(actor),
@@ -222,15 +261,62 @@ export class RunJournalBuilder {
   }
 
   /**
+   * The recipe every non-fizzle crafting run in the pass resolves to, keyed by run id.
+   *
+   * Resolved once here instead of once inside each `_craftingRunModel`, because
+   * {@link buildListing} needs the recipes up front to give the pass snapshot their legacy
+   * book links — and resolving them twice would be a second `getRecipe` per run.
+   *
+   * @param {object[]} runs
+   * @returns {Map<string, object>}
+   * @private
+   */
+  _craftingRunRecipes(runs) {
+    const byRunId = new Map();
+    for (const run of runs) {
+      // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe, so
+      // resolving one for it here would add a lookup the pass does not make today.
+      if (!run?.id || run.isFizzle === true || byRunId.has(run.id)) continue;
+      const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
+      if (recipe) byRunId.set(run.id, recipe);
+    }
+    return byRunId;
+  }
+
+  /**
    * Collect crafting + salvage + gathering models for one phase (active/terminal).
    * @private
    */
-  _buildRunModels({ actor, viewer, worldTime, terminal }) {
-    const crafting = normalizeList(
-      terminal
-        ? this._craftingRunManager?.getRunHistory?.(actor)
-        : this._craftingRunManager?.getActiveRuns?.(actor)
-    ).map((run) => this._craftingRunModel({ run, actor, viewer, worldTime, terminal }));
+  _buildRunModels({
+    actor,
+    viewer,
+    worldTime,
+    terminal,
+    craftingRuns = null,
+    recipesByRunId = null,
+    snapshot = null,
+  }) {
+    const runs = normalizeList(
+      craftingRuns ??
+        (terminal
+          ? this._craftingRunManager?.getRunHistory?.(actor)
+          : this._craftingRunManager?.getActiveRuns?.(actor))
+    );
+    // Resolved here when the pass did not resolve them, so this method stays self-sufficient
+    // for a direct caller while `buildListing` still resolves each run's recipe exactly once
+    // for both phases.
+    const recipes = recipesByRunId ?? this._craftingRunRecipes(runs);
+    const crafting = runs.map((run) =>
+      this._craftingRunModel({
+        run,
+        actor,
+        viewer,
+        worldTime,
+        terminal,
+        recipe: recipes.get(run?.id) ?? null,
+        snapshot,
+      })
+    );
 
     const salvage = normalizeList(
       terminal
@@ -276,12 +362,22 @@ export class RunJournalBuilder {
     return stringOrNull(resolveRecipeImage(recipe));
   }
 
-  _craftingRunModel({ run, actor, viewer, worldTime, terminal }) {
+  _craftingRunModel({
+    run,
+    actor,
+    viewer,
+    worldTime,
+    terminal,
+    // Always supplied by `_buildRunModels`, which resolves the pass's recipes once (issue
+    // 1228) rather than letting each run model perform its own lookup. `null` is a genuinely
+    // unresolvable recipe — an edited or deleted id — and is projected, not re-queried.
+    recipe = null,
+    snapshot = null,
+  }) {
     if (!run?.id) return null;
     if (run.isFizzle === true) return this._fizzleRunModel({ run, viewer });
-    const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
-    const redacted = this._isCraftingRedacted({ recipe, actor, viewer });
+    const redacted = this._isCraftingRedacted({ recipe, actor, viewer, snapshot });
 
     const runSteps = normalizeList(run.steps);
     const recipeSteps =
@@ -671,7 +767,7 @@ export class RunJournalBuilder {
    * never redacted. No visibility service ⇒ no redaction.
    * @private
    */
-  _isCraftingRedacted({ recipe, actor, viewer }) {
+  _isCraftingRedacted({ recipe, actor, viewer, snapshot = null }) {
     // The GM bypass must precede the missing-recipe guard (issue 738): a recipe that
     // no longer resolves (edited id / deleted) still has a run whose persisted step
     // snapshots (requirements, roll, consumed items) the GM must see — collapsing it
@@ -685,6 +781,10 @@ export class RunJournalBuilder {
         recipe,
         viewer,
         craftingActor: actor,
+        // The per-pass snapshot (issue 1228). A pure read optimisation for the knowledge
+        // branches — omit it and this is byte-for-byte what it was, at one whole inventory
+        // walk per run.
+        snapshot,
       });
       return access?.visible === false;
     } catch {

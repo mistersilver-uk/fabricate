@@ -1,10 +1,28 @@
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+
+// ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
+// every computed-style parity guard in the repo and used to launch a fresh browser per test —
+// 20 separate `chromium.launch()` calls — and Chromium's own startup cost dominated the file's
+// runtime badly enough to blow its CI budget under load. A browser process is expensive to
+// start and cheap to reuse; the isolation that actually matters is per-TEST state (cookies,
+// `document`, injected markup), which a fresh browser CONTEXT gives for a fraction of the cost.
+// So every test below opens its own `sharedBrowser.newContext()` (or `.newPage()` on one, where
+// a helper hands back a bare page) and closes ONLY that context, never the shared browser.
+let sharedBrowser;
+
+before(async () => {
+  sharedBrowser = await chromium.launch();
+});
+
+after(async () => {
+  await sharedBrowser.close();
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -28,6 +46,16 @@ const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Ico
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
 // reason, so its scale is read out of the component rather than the global sheet.
 const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
+const partyExpandedBodyPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
+);
+const partiesTabPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/GatheringPartiesTab.svelte'
+);
+const partiesTabSource = readFileSync(partiesTabPath, 'utf8');
+const partiesTabScoped = scopedComponentCss(partiesTabPath);
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
@@ -48,9 +76,7 @@ function scopedStyles(componentSource) {
   const start = componentSource.lastIndexOf(STYLE_OPEN);
   const end = componentSource.lastIndexOf('\n</style>');
   if (start < 0 || end <= start) return '';
-  return componentSource
-    .slice(start + STYLE_OPEN.length, end)
-    .replace(/\/\*[\s\S]*?\*\//g, '');
+  return componentSource.slice(start + STYLE_OPEN.length, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 const emptyStateStyles = scopedStyles(emptyStateSource);
@@ -94,14 +120,18 @@ function blockFor(selector) {
 // container is left alone.
 const chipScoped = scopedComponentCss(chipPath);
 const chipCss = chipScoped.css;
+const partyExpandedBodyScoped = scopedComponentCss(partyExpandedBodyPath);
 
 function withChipHash(markup) {
   return withScopeHash(markup, 'manager-chip', chipScoped.hashClass);
 }
 
 async function readRenderedToolGeometry(width, view) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     const editor =
       view === 'tool-edit'
@@ -190,7 +220,7 @@ async function readRenderedToolGeometry(width, view) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -310,6 +340,18 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   );
 });
 
+test('Fabricate app shell suppresses the host outline on the selected-tab state class', () => {
+  // Core's `button.active` carries the same orange outline + glow as `button:focus`,
+  // so the selected nav-rail button keeps a Foundry ring once focus leaves it. The
+  // :focus reset above only masks it while the button is focused.
+  const shellActiveBlock = blockFor('.fabricate-app button.active,\n.fabricate-app a.button.active');
+
+  assert.ok(
+    shellActiveBlock.includes('outline: none;') && shellActiveBlock.includes('box-shadow: none;'),
+    'selected shell buttons should clear the host active outline and glow'
+  );
+});
+
 test('manager character modifier search suggestions keep icons in row flow', () => {
   const searchIconBlock = blockFor('.fabricate-manager .manager-search > i');
   const characterModifierSuggestionBlock = blockFor(
@@ -341,11 +383,11 @@ test('manager character modifier search suggestions keep icons in row flow', () 
 });
 
 test('manager character modifier search suggestions render with availability-style icon geometry', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -502,8 +544,7 @@ test('manager character modifier search suggestions render with availability-sty
       'character suggestion icon gap should match availability rows'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -644,7 +685,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // the button is inert. The hover affordance has to live on the TRACK, which is the
   // part with an edge — otherwise every switch in the manager has no hover state at all.
   const toggleHoverBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track'
+    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
@@ -776,10 +817,7 @@ test('manager nav buttons clear host mouse focus and keep green keyboard focus',
     navFocusBlock.includes('box-shadow: none;'),
     'mouse focus on nav buttons should not inherit the host orange focus shadow'
   );
-  assert.ok(
-    activeNavFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'active nav focus should keep the active left accent'
-  );
+  assert.ok(activeNavFocusBlock.includes('box-shadow: none;'), 'active nav focus stays neutral');
   assert.ok(
     navFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
     'keyboard focus on nav buttons should use the manager accent'
@@ -874,29 +912,29 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'gathering submenu entries should be nested inside the group'
   );
   assert.ok(
-    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'),
+    // FOUR tracks since issue 1096: a Checks child can carry an unsaved marker AND an issue
+    // badge beside its label, and the three-track grid put the second one into the ICON cell
+    // of the row below it. The claim is unchanged — a submenu entry's trailing markers stay
+    // inside its own row — and the extra track is simply empty for every other rail group.
+    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto auto;'),
     'gathering submenu entries should keep count chips inside their rows'
   );
-  // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it
-  // moved off the success family onto the accent family. Success stays reserved for
-  // the enabled/disabled status the manager screens' rows report.
+  // Issue 1179: World established the neutral active language and every corresponding
+  // selected-system link now shares it.
   assert.ok(
-    activeSubitemBlock.includes('background: var(--fab-accent-soft);'),
-    'only selected gathering submenu entries should use selected fill'
+    activeSubitemBlock.includes('background: var(--fab-surface-active);'),
+    'selected submenu entries should use the neutral active fill'
   );
   assert.ok(
-    activeSubitemBlock.includes('border-color: var(--fab-accent-border);'),
-    'selected gathering submenu entries should carry the accent edge'
+    activeSubitemBlock.includes('border-color: transparent;'),
+    'selected submenu entries should not add a strong edge'
   );
   assert.equal(
     activeSubitemBlock.includes('var(--fab-success'),
     false,
     'the rail selected state should not reuse the enabled-status success family'
   );
-  assert.ok(
-    activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'selected gathering submenu entries should keep the active left accent'
-  );
+  assert.ok(activeSubitemBlock.includes('box-shadow: none;'), 'selected entries have no stripe');
   assert.ok(
     toggleFocusBlock.includes('outline: none;'),
     'mouse focus on gathering toggle should not inherit the host outline'
@@ -917,10 +955,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     subitemFocusBlock.includes('box-shadow: none;'),
     'mouse focus on gathering submenu entries should not inherit the host orange focus shadow'
   );
-  assert.ok(
-    activeSubitemFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'active gathering submenu focus should keep the active left accent'
-  );
+  assert.ok(activeSubitemFocusBlock.includes('box-shadow: none;'), 'active focus stays neutral');
   assert.ok(
     subitemFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
     'keyboard focus on gathering submenu entries should use the manager accent'
@@ -1085,10 +1120,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     !emptyPanelBlock.includes('min-height:'),
     'panel height should be padding-driven as in the prototype, not floored'
   );
-  assert.ok(
-    !emptyPanelBlock.includes('background:'),
-    'the prototype panel carries no fill'
-  );
+  assert.ok(!emptyPanelBlock.includes('background:'), 'the prototype panel carries no fill');
   assert.ok(
     emptyIconBlock.includes('font-size: 18px;') &&
       emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
@@ -1260,10 +1292,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
   // out of its card and a one-link primitive is exactly the incompatibility that kept a
   // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
   // than kept alongside — two ways to express one link is the drift this pass removes.
-  assert.ok(
-    /\blinks = \[\]/.test(explainerCardSource),
-    'the explainer takes a list of docs links'
-  );
+  assert.ok(/\blinks = \[\]/.test(explainerCardSource), 'the explainer takes a list of docs links');
   for (const dead of ['docsHref', 'docsLabel']) {
     assert.equal(
       withoutComments(explainerCardSource).includes(dead),
@@ -1368,7 +1397,13 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
-    ['checks/ChecksRightMenu.svelte', ['ExplainerCard']],
+    // `checks/ChecksRightMenu.svelte` is NOT on this list any more (issue 1096). The
+    // maintainer removed the `ABOUT CRAFTING CHECKS` explainer outright: the prototype's
+    // rail has no such card, and it pushed every panel with a subject below the fold. This
+    // row asserted the card was rendered through the primitive rather than by hand, which
+    // is a different question from whether it should be rendered at all — the rail now
+    // renders no explainer, and `the checks rail follows the Tool Studio's inspector
+    // convention` below is what holds that.
   ]) {
     const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
     for (const primitive of imports) {
@@ -1386,7 +1421,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
 // and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
 // `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
 // exactly why the rail could not simply be left alone.
-test('the checks rail builds no card of its own', () => {
+test("the checks rail follows the Tool Studio's inspector convention", () => {
   const rightMenu = withoutComments(
     readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
   );
@@ -1404,21 +1439,57 @@ test('the checks rail builds no card of its own', () => {
     );
   }
 
-  // Both cards on the rail wear the shared shell, and the Active card titles itself with
-  // the manager's one card-title contract rather than a second heading treatment.
+  // ── The heading convention INVERTED (issue 1096) ────────────────────────────────────
+  //
+  // This block used to assert the opposite: a `.manager-card-title` inside each card and
+  // NO `.manager-kicker` anywhere on the rail. The maintainer made the Tool Studio's
+  // inspector the authority for this rail's structure, and the Tool Studio's
+  // (`ToolBehaviorPreview.svelte`) is a flat uppercase `.manager-kicker` naming the
+  // section with its card directly beneath — never a card wrapping the section with a
+  // title inside it. Two studios cannot both be right, so the assertion moves with the
+  // ruling rather than being deleted.
   assert.ok(
-    rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
+    rightMenu.includes('manager-inspector-card manager-checks-active-card'),
     'the Active card wears the shared inspector-card shell'
   );
   assert.ok(
-    rightMenu.includes('<h3 class="manager-card-title">{activeTitle}</h3>'),
-    'the Active card titles itself with the shared card-title contract'
+    rightMenu.includes('<p class="manager-kicker">{title}</p>'),
+    'sections are named by a flat kicker above their card, as the Tool Studio does'
   );
   assert.equal(
-    rightMenu.includes('manager-kicker'),
+    rightMenu.includes('manager-card-title'),
     false,
-    'the rail should carry no second heading treatment'
+    'a card-title inside a rail card is the convention the Tool Studio replaced'
   );
+
+  // …and the ACTIVATION section is named by nothing at all (issue 1096, maintainer inspector
+  // comparison). The prototype gives that card no heading: the switch and the words beside it
+  // are the statement, and an `ACTIVE` kicker over a card reading `On` said it twice. The
+  // convention above is unchanged for the five sections that DO carry a heading.
+  assert.equal(
+    rightMenu.includes('{activeTitle}'),
+    false,
+    'the Active kicker is gone; the card states its own subject'
+  );
+
+  // Every heading row leads with the prototype's glyph. A kicker with no glyph is the reading
+  // this replaced, and the snippet is the only place a heading is built — so one assertion
+  // covers all five.
+  assert.ok(
+    rightMenu.includes('manager-checks-rail-head-icon'),
+    'the heading row leads with a glyph'
+  );
+
+  // The two collapsibles are gone with it. The prototype has no disclosure anywhere in
+  // this rail, and a panel whose whole content is one sentence of pre-roll copy has
+  // nothing to collapse.
+  for (const dead of ['RowDisclosure', 'manager-checks-rail-body', 'ExplainerCard']) {
+    assert.equal(
+      rightMenu.includes(dead),
+      false,
+      `${dead} was removed from the checks rail (issue 1096); it must not come back`
+    );
+  }
 
   // The procedure format stays available to the surfaces it belongs to, so this is a
   // conversion rather than a deletion.
@@ -1842,13 +1913,13 @@ test('manager recipe row collapses in the specified order and never drops its co
 // declarations — the base and the two rungs — or the checkbox lands under the edit pencil
 // at the very widths where the row is tightest.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
-  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(([, value]) =>
-    value.replace(/\s+/g, ' ').trim()
+  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
+    ([, value]) => value.replace(/\s+/g, ' ').trim()
   );
   assert.equal(
     declarations.length,
     3,
-    'the base template plus the ladder\'s two rewrites — a fourth would be an unpinned band'
+    "the base template plus the ladder's two rewrites — a fourth would be an unpinned band"
   );
 
   for (const declaration of declarations) {
@@ -1926,7 +1997,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
   assert.equal(
     css.includes('has no selection row at all'),
     false,
-    'that block\'s stated reason is retired by issue 1010 and must not survive as a false claim'
+    "that block's stated reason is retired by issue 1010 and must not survive as a false claim"
   );
 });
 
@@ -3027,9 +3098,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     continuousGradientFillBlock.includes('width: 100%;') &&
-      continuousGradientFillBlock.includes(
-        'background: var(--fab-chance-slider-track-gradient);'
-      ),
+      continuousGradientFillBlock.includes('background: var(--fab-chance-slider-track-gradient);'),
     'configured chance sliders should paint their semantic gradient across the complete inset track'
   );
   assert.ok(
@@ -3361,15 +3430,15 @@ test('manager gathering task browser defines bounded toolbar and compact table g
 });
 
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 640, height: 240 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
-      <style>${css}</style>
+      <style>${css}</style><style>${partiesTabScoped.css}</style>
       <main class="fabricate-manager" style="padding: 24px;">
         <span
           class="manager-drop-rate-control has-continuous-gradient"
@@ -3432,8 +3501,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
     assert.equal(report.gathering.backgroundImage, 'none');
     assert.notEqual(report.gathering.backgroundColor, 'rgba(0, 0, 0, 0)');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -3730,7 +3798,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
     'essence source drop target should have a stable wide drop-zone height'
   );
   assert.ok(
-    iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'),
+    iconTriggerBlock.includes(
+      'grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr) 16px;'
+    ),
     'icon picker trigger should be a real picker control, not a raw text field'
   );
   assert.ok(
@@ -3767,7 +3837,12 @@ test('manager environments browser and edit route define compact responsive geom
   const editorShellBlock = blockFor('.fabricate-manager .manager-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
-  const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
+  // NOT `blockFor`: that returns the FIRST block matching the selector, and the workspace's
+  // narrow override — which sets only the column token — is declared EARLIER in the file than
+  // the base rule this assertion is about. The base rule is the unindented one.
+  const workspaceBlock = (css.match(
+    /^\.fabricate-manager \.manager-environment-workspace \{[\s\S]*?\}/m
+  ) || [''])[0];
   const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
   const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
   const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
@@ -3892,8 +3967,10 @@ test('manager environments browser and edit route define compact responsive geom
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 300px;'),
-    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths'
+    workspaceBlock.includes(
+      'grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);'
+    ),
+    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths, through the token its narrow override sets'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
@@ -4055,19 +4132,20 @@ test('manager environments browser and edit route define compact responsive geom
       mediumQuery.includes('overflow: visible;'),
     'stacked environment edit layout should release nested scroll containment'
   );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-environment-workspace') &&
-      mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'stacked environment editor should put details, task rail, editor, and evidence in one column'
-  );
+  // The workspace's own narrow override is NOT asserted as text here. It was, and the
+  // assertion passed for the whole life of a rule that never applied: a container query adds
+  // no specificity, so `grid-template-columns` inside this block tied with the base rule
+  // declared later in the sheet and lost on source order. A source-text assertion cannot tell
+  // a live rule from a dead one — `manager workspace restacks at the declared floor` below
+  // measures the rendered grid instead.
 });
 
 test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4310,17 +4388,16 @@ test('manager environment inspector evidence table wraps compact pills without h
       'status pills should retain subtle state backgrounds'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('manager environment composition overflow menu renders bounded single-line rows', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 260 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4498,8 +4575,7 @@ test('manager environment composition overflow menu renders bounded single-line 
       'disabled note labels should truncate within the same bounded label column'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -4840,6 +4916,172 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   );
 });
 
+// The rail nav was unreachable in a SHORT window.
+//
+// Every rule that ever gave the rail a scroller lived in an `inline-size` container query — the
+// 1120px stacked block above and the per-view 831px ones — so a window that stayed WIDE and only
+// lost height never reached one. The rail's height is definite (the shell's `1fr` row) and it
+// carries `overflow: hidden` from the grouped region rule, so the bottom of the section list was
+// clipped: Tools, Checks, Gathering and the placeholders sat in the DOM and could not be reached
+// with a pointer. `assertManagerLayoutStable` cannot see this either — a CLIPPED rail does not
+// overflow, the same blind spot the issue-643 note above records.
+//
+// The fixture is the real shell shape on purpose: two `auto` header rows ABOVE the body, so
+// `.manager-body` lands in the `1fr` row and the rail inherits a window-bound height. Rendering
+// the body alone would put it in an implicit `auto` row, size it to its content, and the bug
+// would be unreproducible.
+function shortWindowRailMarkup(navItems) {
+  const items = Array.from({ length: navItems }, (item, index) => {
+    const last = index === navItems - 1 ? ' data-last-nav' : '';
+    return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
+  }).join('');
+  return `<div class="fabricate-manager" data-manager-view="systems">
+      <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
+      <header class="manager-header"><h1>Crafting systems</h1></header>
+      <div class="manager-body">
+        <aside class="manager-rail">
+          <p class="manager-rail-title" data-manager-rail-section>GM management</p>
+          <section class="manager-rail-block">
+            <div class="manager-scope-card" data-scope-card>
+              <div class="manager-scope-card-head"><p class="manager-kicker">Crafting system</p><button class="manager-rail-toggle manager-scope-collapse" data-manager-rail-toggle>&lsaquo;</button></div>
+              <select class="manager-scope-select"><option>Lab Smithing</option></select>
+              <button class="manager-scope-return">All crafting systems</button>
+            </div>
+          </section>
+          <nav class="manager-nav">${items}</nav>
+        </aside>
+        <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
+        <aside class="manager-inspector"><section class="manager-inspector-card">Inspector</section></aside>
+      </div>
+    </div>`;
+}
+
+async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
+    );
+    return await page.evaluate(() => {
+      const rail = document.querySelector('.manager-rail');
+      const nav = document.querySelector('.manager-nav');
+      const scope = document.querySelector('[data-scope-card]');
+      const last = document.querySelector('[data-last-nav]');
+      const scopeTopBefore = scope.getBoundingClientRect().top;
+      const navScrollable = nav.scrollHeight - nav.clientHeight;
+
+      // Reaching the bottom entry is the whole question, so drive the scroller rather than
+      // measuring its resting position: a clipped box reports a bottom entry that is simply
+      // off the end of the rail and stays there.
+      nav.scrollTop = nav.scrollHeight;
+
+      const navRect = nav.getBoundingClientRect();
+      const scopeRect = scope.getBoundingClientRect();
+      return {
+        navOverflowY: getComputedStyle(nav).overflowY,
+        navScrollable,
+        navScrolledBy: nav.scrollTop,
+        navTop: navRect.top,
+        navBottom: navRect.bottom,
+        lastItemBottom: last.getBoundingClientRect().bottom,
+        railBottom: rail.getBoundingClientRect().bottom,
+        railScrollable: rail.scrollHeight - rail.clientHeight,
+        scopeTopBefore,
+        scopeTopAfter: scopeRect.top,
+        scopeBottom: scopeRect.bottom,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+test('a short window scrolls the rail nav instead of clipping its bottom entries', async () => {
+  const report = await readShortWindowRailGeometry();
+
+  assert.equal(
+    report.navOverflowY,
+    'auto',
+    'the rail nav must be a real scroller at full width, not a clipped box'
+  );
+  assert.ok(
+    report.navScrollable > 0,
+    'the fixture must actually overflow the rail, or this proves nothing'
+  );
+  assert.ok(report.navScrolledBy > 0, 'the nav must accept a scroll, not sit pinned at the top');
+  assert.ok(
+    report.lastItemBottom <= report.navBottom + 1,
+    'the last nav entry must be reachable inside the nav once it is scrolled to the end'
+  );
+  assert.ok(
+    report.navBottom <= report.railBottom + 1,
+    'the scrolling nav must stay inside the rail rather than run past it'
+  );
+
+  // The user-facing claim, stated against the rail rather than the nav: with the scroller
+  // removed this fixture puts the last entry ~340px BELOW the rail, clipped and unclickable,
+  // while every nav-relative measurement still looks healthy.
+  assert.ok(
+    report.lastItemBottom <= report.railBottom + 1,
+    'the last nav entry must be on screen inside the rail, not clipped below it'
+  );
+
+  // The scope card carries the rail collapse toggle and the system picker. Scrolling the
+  // sections must not take them off screen — that is why the nav is the scroller and not the
+  // whole rail.
+  assert.equal(
+    report.scopeTopAfter,
+    report.scopeTopBefore,
+    'the crafting-system scope card stays pinned while the section list scrolls'
+  );
+  assert.ok(
+    report.scopeBottom <= report.navTop + 1,
+    'the pinned scope card sits above the scrolling section list'
+  );
+
+  // The nav absorbs the rail's slack, so the rail itself must not also become a scroller here:
+  // two nested scrollbars in one 220px column is a worse bug than the one being fixed.
+  assert.ok(
+    report.railScrollable <= 1,
+    'the rail itself must not scroll while the nav has room to absorb the overflow'
+  );
+});
+
+test('the rail nav declares the scroller and the stacked breakpoint hands it back', () => {
+  const navBlock = blockFor('.fabricate-manager .manager-nav');
+  assert.ok(
+    navBlock.includes('flex: 1 1 auto;') &&
+      navBlock.includes('min-height:') &&
+      navBlock.includes('overflow: hidden auto;'),
+    'the nav grows into the rail and scrolls, with a floor so the pinned blocks cannot crush it'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-rail').includes('overflow: hidden auto;'),
+    'the rail keeps a backstop scroller for a window too short even for the nav floor'
+  );
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-rail > .manager-rail-title,\n.fabricate-manager .manager-rail > .manager-rail-block {'
+    ),
+    'the blocks above the nav must opt out of shrinking, or they absorb the nav scroller'
+  );
+
+  // Stacked, the rail is already a bounded 232px strip that scrolls itself, so the nav must
+  // hand the scrolling back rather than scroll inside whatever the pinned blocks leave of it.
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const navStart = query.indexOf('.fabricate-manager .manager-nav {');
+  assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
+  const stackedNavRule = query.slice(navStart, query.indexOf('}', navStart) + 1);
+  assert.ok(
+    stackedNavRule.includes('flex: 0 0 auto;') && stackedNavRule.includes('overflow: visible;'),
+    'the stacked nav keeps its content height and lets the bounded rail do the scrolling'
+  );
+});
+
 // Issue 643: the Studio rail adds a section label, a crafting-system card and count
 // numerals. Each has to opt out of the 56px collapsed strip explicitly, or it blows the
 // icon column out.
@@ -4928,7 +5170,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
   );
 });
 
-test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
+test('the manager titlebar caps the premium badge and keeps the status line on one line', () => {
   const rootBlock = blockFor('.fabricate-manager');
   const titlebarBlock = blockFor('.fabricate-manager .manager-titlebar');
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
@@ -4948,22 +5190,42 @@ test('the manager titlebar caps the selected system badge and keeps the status l
     titlebarBlock.includes('min-width: 0;'),
     'the titlebar must be allowed to shrink inside the manager grid'
   );
-  // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
+  // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
+  // system's name, which the rail's crafting-system card already shows).
+  //
+  // Its gold pair is stated ONCE, in a rule it SHARES with the rail's Downtime PREMIUM chip.
+  // Two marks that must stay the same colour must not name that colour twice: a second copy
+  // is a second thing to keep in step across all seven palettes. So the pair is asserted on
+  // the shared rule, and the badge's own block is asserted NOT to restate it.
+  const goldChipBlock =
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-button \.manager-nav-count\.manager-nav-premium \{[\s\S]*?\}/.exec(
+      withoutComments(css)
+    )?.[0] ?? '';
   assert.ok(
-    badgeBlock.includes('background: var(--fab-badge-gold);'),
-    'the system badge should use the gold badge token'
+    goldChipBlock.includes('background: var(--fab-badge-gold);'),
+    'the gold chip rule should fill both marks from the gold badge token'
   );
   assert.ok(
-    badgeBlock.includes('color: var(--fab-on-badge-gold);'),
-    'the system badge should use its paired on-gold text token'
+    goldChipBlock.includes('color: var(--fab-on-badge-gold);'),
+    'and ink both from its paired on-gold token'
+  );
+  assert.ok(
+    !badgeBlock.includes('--fab-badge-gold'),
+    'the badge must take the pair from the shared rule rather than repeating it'
   );
   assert.ok(
     badgeBlock.includes('max-width:'),
-    'the system badge must cap its width against long system names'
+    'the premium badge must cap its width against a long localized mark'
   );
   assert.ok(
     badgeBlock.includes('text-overflow: ellipsis;') && badgeBlock.includes('white-space: nowrap;'),
-    'the system badge should ellipsis rather than push the status line off the strip'
+    'the premium badge should ellipsis rather than push the status line off the strip'
+  );
+  // Both sources are now the literal localized string `PREMIUM`, so neither mark uppercases
+  // in CSS — shouting an already-uppercase word is how a translation gets shouted twice.
+  assert.ok(
+    !badgeBlock.includes('text-transform:'),
+    'the premium badge should leave casing to the translation'
   );
   assert.ok(statusBlock.includes('margin-left: auto;'), 'the status line should sit right-aligned');
   assert.ok(
@@ -5448,10 +5710,7 @@ test('the armed danger button paints a solid danger fill with its own readable f
   );
 
   assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
-  assert.ok(
-    armedBlock.includes('border-color: var(--fab-danger);'),
-    'armed uses the danger edge'
-  );
+  assert.ok(armedBlock.includes('border-color: var(--fab-danger);'), 'armed uses the danger edge');
   assert.ok(
     armedBlock.includes('color: var(--fab-on-danger);'),
     'armed text uses the dedicated on-danger token, not on-accent or danger-text'
@@ -5481,14 +5740,19 @@ test('the armed danger button paints a solid danger fill with its own readable f
 // still hold while the detail pane is at its narrowest, so a non-wrapping row clips
 // its action cluster with no scrollbar. Measured, not asserted from CSS text.
 async function readRenderedKnowledgeGeometry(width) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+      )
     );
     return await page.evaluate(() => {
       const box = (selector) => {
@@ -5509,7 +5773,7 @@ async function readRenderedKnowledgeGeometry(width) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -5519,7 +5783,10 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
     assert.equal(Math.round(report.rail.width), 220, `${width}px rail column`);
     assert.equal(Math.round(report.roster.width), 250, `${width}px roster column`);
     assert.ok(report.roster.left >= report.rail.right - 1, `${width}px roster follows the rail`);
-    assert.ok(report.detail.left >= report.roster.right - 1, `${width}px detail follows the roster`);
+    assert.ok(
+      report.detail.left >= report.roster.right - 1,
+      `${width}px detail follows the roster`
+    );
     assert.equal(report.inspectorPresent, false, `${width}px no fourth inspector column`);
     assert.ok(
       report.actions.right <= report.row.right + 1,
@@ -5535,11 +5802,11 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
   // non-last items a margin-bottom inflated only the first chip's box (e.g. it
   // rendered 34px tall vs the last chip's 30px). Our class rule must zero the
   // margin and win on specificity even when the host rule is declared later.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5592,19 +5859,18 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
     }
     assert.equal(report[0].height, report[1].height, 'both chips should derive the same height');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('recipe tag list spans the full row width on its own line below the controls', async () => {
   // The chosen-tags box should drop to a full-width line under the match
   // controls + quantity row, so chips never share width with the row-end controls.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5692,8 +5958,7 @@ test('recipe tag list spans the full row width on its own line below the control
       'tags list should sit on its own line below the controls/quantity row'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -5810,8 +6075,8 @@ test('the Tags & Categories route names one grid track per section and grows the
 // class-based, so nothing here depends on the element; the fixture is updated so it keeps
 // MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
+  const page = await context.newPage();
   try {
     const lockedRow = `<div class="manager-vocabulary-row">
       <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
@@ -5825,7 +6090,9 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`
+      )
     );
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');
@@ -5841,9 +6108,8 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         lockedChipHeight: Math.round(
           locked.querySelector('.manager-chip').getBoundingClientRect().height
         ),
-        lockedChipBackground: getComputedStyle(
-          locked.querySelector('.manager-chip')
-        ).backgroundColor,
+        lockedChipBackground: getComputedStyle(locked.querySelector('.manager-chip'))
+          .backgroundColor,
         defaultChipBackground: getComputedStyle(
           document.querySelector('.manager-editor-tab-button .manager-chip')
         ).backgroundColor,
@@ -5893,7 +6159,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       'the reserved row must not render an inline explanatory sentence'
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -5909,10 +6175,10 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 // Asserted on the RENDERED background rather than on the selector text, so a future rule
 // that reintroduces a background by some other route fails too (issue 883).
 test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 200 } });
   try {
     for (const view of ['manager-gathering-task-edit-view', 'manager-gathering-event-edit-view']) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 200 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -5949,7 +6215,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -5963,8 +6229,8 @@ test('a range input inside the gathering edit views stays transparent for the sl
 // reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
 // this stays true if the shell's own values are ever retuned (issue 883).
 test('the gathering inspector rail cards render as one card, not three treatments', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 420, height: 600 } });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style>` +
@@ -6027,8 +6293,7 @@ test('the gathering inspector rail cards render as one card, not three treatment
       );
     }
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6106,10 +6371,10 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
     },
   ];
 
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 260 } });
   try {
     for (const site of sites) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 260 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -6165,7 +6430,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6281,8 +6546,10 @@ test('every manager select paints an opaque background, so its popup opens dark'
   // 2. Component scoped styles: correlate `<select class="x">` with `.x { background }` in
   //    the same file's `<style>` block. This is the shape the defect actually took, so a
   //    global-sheet-only scan would have missed it.
-  const managerFiles = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
+  const managerFiles = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  }).filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
 
   for (const entry of managerFiles) {
     const full = resolve(entry.parentPath, entry.name);
@@ -6308,4 +6575,2406 @@ test('every manager select paints an opaque background, so its popup opens dark'
     [],
     `a translucent select background opens a LIGHT popup:\n- ${offenders.join('\n- ')}`
   );
+});
+
+// ── The Checks Studio restacks at the declared floor, MEASURED (issue 1096) ──────────────
+//
+// This replaces two source-text assertions, and the replacement is the whole point. Both of
+// the rules below were asserted by `css.includes(...)` and both passed while broken:
+//
+//  - the workspace's `@container … (max-width: 1120px)` override tied with the base rule on
+//    specificity (a container query adds none) and LOST on source order, so between 1120 and
+//    961 — a band that contains the declared 1024x640 floor — `.manager-body` restacked while
+//    the workspace stayed a 300px side column. The acceptance frame that exists to show a
+//    stacked studio at the floor showed a side rail.
+//  - `[data-manager-view^="checks"]` is a PREFIX match because `checks` became four child
+//    routes. Narrowing it to `=` matched nothing, and an `includes('…checks…')` assertion
+//    cannot see the difference between the two.
+//
+// A rendered measurement can see both. `chromium` is already this file's tool for exactly
+// this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
+// mounted suite could ever have caught either.
+async function readWorkspaceGrid(width, view, worldTravelTab = '') {
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div style="width:${width}px;height:640px">` +
+        `<div class="fabricate-manager" data-manager-view="${view}" data-world-travel-tab="${worldTravelTab}">` +
+        `<div class="manager-body"><aside class="manager-rail">Rail</aside>` +
+        `<main class="manager-main"><div class="manager-environment-edit-view">` +
+        `<div class="manager-environment-workspace">` +
+        `<div class="manager-environment-tab-panel">Panel</div>` +
+        `<aside class="manager-inspector manager-environment-inspector">Rail</aside>` +
+        `</div></div></main></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const columns = (selector) => {
+        const node = document.querySelector(selector);
+        return node ? getComputedStyle(node).gridTemplateColumns.split(' ').length : 0;
+      };
+      const workspace = document.querySelector('.manager-environment-workspace');
+      return {
+        bodyColumns: columns('.manager-body'),
+        workspaceColumns: columns('.manager-environment-workspace'),
+        workspaceWidth: workspace ? workspace.getBoundingClientRect().width : 0,
+        panelWidth: document
+          .querySelector('.manager-environment-tab-panel')
+          ?.getBoundingClientRect().width,
+        inspectorWidth: document
+          .querySelector('.manager-environment-inspector')
+          ?.getBoundingClientRect().width,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+// Imported rather than restated, so a change to the route set is a change to this guard too.
+const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } =
+  await import('../../src/ui/svelte/apps/manager/checks/checksNav.js');
+
+test('every checks child route releases the shared inspector column', async () => {
+  // The aside is unconditionally suppressed on a Checks route by the root's `!isChecksRoute`
+  // guard, so the 300px column MUST be released for every child or the studio renders against
+  // a dead strip. `recipe-edit` has this guard already (recipe-edit-placeholder.test.js); the
+  // Checks half is the one that was missing.
+  for (const view of [...CHECKS_VIEWS, CHECKS_REDIRECT_VIEW]) {
+    const { bodyColumns } = await readWorkspaceGrid(1280, view);
+    assert.equal(bodyColumns, 2, `${view} must render rail + main, with no dead inspector track`);
+  }
+  // A negative control: an ordinary route keeps the three-column body, so the assertion above
+  // is discriminating rather than true of everything.
+  const { bodyColumns } = await readWorkspaceGrid(1280, 'recipes');
+  assert.equal(bodyColumns, 3, 'a non-editor route still has its inspector column');
+});
+
+test('the manager workspace restacks at the declared 1024 floor, not only below 960', async () => {
+  // 1280: the side-rail state, which must survive.
+  const wide = await readWorkspaceGrid(1280, 'checks-crafting');
+  assert.equal(wide.workspaceColumns, 2, 'the workspace is panel + rail above the breakpoint');
+  assert.ok(
+    Math.abs(wide.inspectorWidth - 300) < 1,
+    `the side rail is 300px wide, got ${wide.inspectorWidth}`
+  );
+
+  // 1024x640 — the DECLARED FLOOR, and the width `manager-checks-stacked-floor` photographs.
+  // It sits inside the 1120→961 band, which is exactly where the dead rule left a side rail.
+  const floor = await readWorkspaceGrid(1024, 'checks-crafting');
+  assert.equal(floor.bodyColumns, 1, 'the body is stacked at the floor');
+  assert.equal(floor.workspaceColumns, 1, 'and so is the workspace — no 300px side column');
+  assert.ok(
+    floor.panelWidth > 600,
+    `the panel takes the full stacked width, got ${floor.panelWidth}`
+  );
+
+  // 1100: the top of the same band, to prove the boundary is 1120 and not 960.
+  const band = await readWorkspaceGrid(1100, 'checks-crafting');
+  assert.equal(band.workspaceColumns, 1, 'the whole 1120→961 band is stacked');
+});
+
+test('the environment, tags and system studios restack at the same floor', async () => {
+  // The dead rule was never Checks-specific: `.manager-environment-workspace` is the shared
+  // editor shell, so every studio built on it carried the same 1120→961 side rail.
+  for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
+    const floor = await readWorkspaceGrid(1024, view);
+    assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
+  }
+});
+
+test('World Parties preserves the shared stacked rail and body layout at narrow widths', async () => {
+  // The World route deliberately releases the unused inspector at desktop widths. Its route
+  // rule is more specific than the shared 1120px stack, however, so this must be measured:
+  // a source-text assertion would pass while the cascade left the two desktop tracks alive.
+  const wide = await readWorkspaceGrid(1280, 'world', 'parties');
+  assert.equal(wide.bodyColumns, 2, 'wide World Parties keeps its rail beside the full-width body');
+
+  for (const width of [1100, 1024]) {
+    const narrow = await readWorkspaceGrid(width, 'world', 'parties');
+    assert.equal(
+      narrow.bodyColumns,
+      1,
+      `World Parties uses the shared stacked rail/body layout at ${width}px`
+    );
+  }
+});
+
+test('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
+  // `gathering-parties-tab.test.js` mounts this component and pins the sibling DOM. This
+  // source join keeps the Chromium geometry below attached to those real rendered classes:
+  // deleting or renaming either node fails here instead of leaving a stale layout fixture.
+  const contentAt = partiesTabSource.indexOf('class="manager-travel-parties-content"');
+  const footerAt = partiesTabSource.indexOf('class="manager-travel-parties-pagination"');
+  assert.ok(contentAt > -1, 'the product component renders the card scroller class');
+  assert.ok(footerAt > contentAt, 'the product component renders the sibling pager after it');
+
+  const hash = partiesTabScoped.hashClass;
+  const cards = Array.from(
+    { length: 4 },
+    (_, index) =>
+      `<div class="manager-travel-parties-row ${hash}" data-manager-travel-party-id="party-${index + 1}"><div class="probe-card-editor">Party ${index + 1} editor</div></div>`
+  ).join('');
+  const productContractMarkup = `<div class="manager-travel-parties ${hash}">
+    <div class="manager-travel-parties-content ${hash}">
+      <div class="manager-travel-parties-list ${hash}">${cards}</div>
+    </div>
+    <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
+      <div class="manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
+    </div>
+  </div>`;
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1100, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const nav = Array.from(
+      { length: 10 },
+      (_, index) =>
+        `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
+    ).join('');
+    // The component's OWN scoped CSS, after the global sheet — the same pairing every
+    // other probe in this file uses (see the components-route probe above) and matching
+    // `css: 'injected'`, which puts a component's block in `document.head` after Foundry's
+    // `<link>`. Omitting it is what disabled this test: the fixture carried the real hash
+    // class but nothing declared `.manager-travel-parties` or its content child, so the
+    // pane rendered `display: block; overflow: visible`, the scroller sized to its cards,
+    // and the opening `scrollRange > 100` precondition read 0 — a fixture that proved
+    // nothing rather than a product regression.
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${css}</style>
+      <style>${partiesTabScoped.css}</style>
+      <style>
+        html, body { margin: 0; width: 100%; height: 100%; }
+        :root { --font-primary: Arial, sans-serif; }
+        .probe-titlebar { height: 28px; }
+        .probe-header { height: 76px; }
+        .probe-card-editor { height: 220px; }
+      </style></head><body>
+      <div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"
+        data-manager-view="world" data-world-travel-tab="parties">
+        <div class="probe-titlebar"></div><div class="probe-header"></div>
+        <div class="manager-body">
+          <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
+          <main class="manager-main">
+            <section class="manager-section-header"><div class="manager-heading"><h2>World Parties</h2></div></section>
+            <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
+          </main>
+        </div>
+      </div></body></html>`);
+
+    const report = await page.evaluate(() => {
+      const body = document.querySelector('.manager-body');
+      const main = document.querySelector('.manager-main');
+      const pane = document.querySelector('.manager-travel-parties');
+      const scroller = document.querySelector('.manager-travel-parties-content');
+      const footer = document.querySelector('[data-manager-party-pagination]');
+      const pagerControl = footer.querySelector('[data-pagination-size]');
+      const before = footer.getBoundingClientRect();
+      const paneBox = pane.getBoundingClientRect();
+      const mainBox = main.getBoundingClientRect();
+      const scrollRange = scroller.scrollHeight - scroller.clientHeight;
+      scroller.scrollTop = scroller.scrollHeight;
+      const after = footer.getBoundingClientRect();
+      const controlBox = pagerControl.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        controlBox.left + controlBox.width / 2,
+        controlBox.top + controlBox.height / 2
+      );
+      const horizontalOverflow = [body, main, pane, scroller].map(
+        (element) => element.scrollWidth - element.clientWidth
+      );
+      return {
+        scrollRange,
+        scrolledBy: scroller.scrollTop,
+        scrollerOverflowY: getComputedStyle(scroller).overflowY,
+        footerIsSibling: footer.parentElement === pane && !scroller.contains(footer),
+        footerFullWidth:
+          Math.abs(before.left - paneBox.left) <= 1 && Math.abs(before.right - paneBox.right) <= 1,
+        footerVisible: before.top >= mainBox.top - 1 && before.bottom <= mainBox.bottom + 1,
+        footerStable:
+          Math.abs(before.top - after.top) <= 1 &&
+          Math.abs(before.bottom - after.bottom) <= 1 &&
+          Math.abs(before.left - after.left) <= 1 &&
+          Math.abs(before.right - after.right) <= 1,
+        pagerControlHit: hit === pagerControl || pagerControl.contains(hit),
+        pagerControlVisible:
+          controlBox.width > 0 &&
+          controlBox.height > 0 &&
+          controlBox.top >= mainBox.top - 1 &&
+          controlBox.bottom <= mainBox.bottom + 1,
+        bodyScrollRange: body.scrollHeight - body.clientHeight,
+        bodyScrollTop: body.scrollTop,
+        mainScrollRange: main.scrollHeight - main.clientHeight,
+        horizontalOverflow,
+      };
+    });
+
+    assert.ok(report.scrollRange > 100, `cards must overflow the pane (got ${report.scrollRange}px)`);
+    assert.equal(report.scrollerOverflowY, 'auto', 'the card content remains the scroll node');
+    assert.ok(report.scrolledBy > 0, 'the card scroller accepts an independent scroll');
+    assert.equal(report.footerIsSibling, true, 'the pager is a sibling outside the scroll node');
+    assert.equal(report.footerFullWidth, true, 'the sibling footer spans the full Parties pane');
+    assert.equal(report.footerVisible, true, 'the footer remains visible inside the bounded main');
+    assert.equal(report.footerStable, true, 'inner scrolling does not move the footer bounds');
+    assert.equal(report.pagerControlVisible, true, 'a pager control remains visibly reachable');
+    assert.equal(report.pagerControlHit, true, 'the visible pager control owns its pointer target');
+    assert.ok(report.bodyScrollRange <= 1, 'the outer manager body must not scroll the footer');
+    assert.equal(report.bodyScrollTop, 0, 'inner scrolling leaves the manager body fixed');
+    assert.ok(report.mainScrollRange <= 1, 'the main column does not become a second scroller');
+    assert.ok(
+      report.horizontalOverflow.every((overflow) => overflow <= 1),
+      `the 1100px route has no horizontal overflow (${report.horizontalOverflow.join(', ')})`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('a 680px manager container stacks each party body without viewport coupling or overflow', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const markup = withScopeHash(
+      `<div class="fabricate-manager" style="container: fabricate-manager / inline-size; width: 680px">
+        <div class="manager-party-body">
+          <div class="manager-party-members-col"><button>Add a member</button></div>
+          <div class="manager-party-travel-col"><button>Link an actor</button></div>
+        </div>
+      </div>`,
+      'manager-party-body',
+      partyExpandedBodyScoped.hashClass
+    );
+    await page.setContent(`<style>${partyExpandedBodyScoped.css}</style>${markup}`);
+    const report = await page.evaluate(() => {
+      const root = document.querySelector('.fabricate-manager');
+      const body = document.querySelector('.manager-party-body');
+      const rootRect = root.getBoundingClientRect();
+      const controls = Array.from(body.querySelectorAll('button'), (button) => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+        return {
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+          selfHit: hit === button || button.contains(hit),
+        };
+      });
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        columns: getComputedStyle(body).gridTemplateColumns.split(' ').length,
+        overflow: body.scrollWidth > body.clientWidth + 1,
+        rootLeft: rootRect.left,
+        rootRight: rootRect.right,
+        controls,
+      };
+    });
+
+    assert.ok(report.viewportWidth > 720, 'the outer browser viewport stays above the breakpoint');
+    assert.equal(report.columns, 1, 'the 680px manager container selects one party column');
+    assert.equal(report.overflow, false, 'the stacked body has no horizontal overflow');
+    for (const control of report.controls) {
+      assert.ok(control.width > 0 && control.height > 0, 'each editing control has a hit box');
+      assert.ok(
+        control.left >= report.rootLeft - 1,
+        'each editing control starts inside the manager'
+      );
+      assert.ok(control.right <= report.rootRight + 1, 'each editing control remains reachable');
+      assert.equal(control.selfHit, true, 'each editing control owns its pointer target');
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('the Checks Studio really renders into the classes those measurements measure', () => {
+  // `readWorkspaceGrid` builds its DOM from CLASS LITERALS and measures the stylesheet, so
+  // every assertion above survives ChecksView renaming its own wrapper — the measurement
+  // would keep proving a fact about a shell the studio no longer uses. This is the join.
+  const checksView = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/ChecksView.svelte'),
+    'utf8'
+  );
+  for (const className of ['manager-environment-workspace', 'manager-environment-tab-panel']) {
+    assert.match(
+      withoutComments(checksView),
+      new RegExp(`class="${className}"`),
+      `ChecksView must render into .${className} for the restack measurements to be about it`
+    );
+  }
+});
+
+// The Difficulty card and the recipe-tier list beneath it (issue 1096 follow-up, "The roll").
+// Both card contracts render into `.manager-checks-card-body` — Difficulty's plain (14px each
+// side) and the tier list's `is-stack` (12px 14px) — so a row that fills its OWN list should
+// already land at the same 14px inset as the radio cards above. The routed editor's tier
+// section broke that by wrapping `CheckRecipeTiers` in the bare shared `.manager-inspector-card`
+// shell instead of `.manager-inspector-card.manager-checks-card`: the bare shell carries its
+// OWN `padding: var(--fab-space-3)` (12px) plus a border and background the card-with-padding-0
+// override exists to strip, so the tier row's edges landed 12px further in on both sides than
+// the Difficulty card's radio cards. Real Chromium + the real stylesheet, because happy-dom
+// applies no cascade and could not see either the extra padding or the fix.
+//
+// ONE shared page for both the fixed and the reintroduced-defect measurement below — a second
+// `page.setContent()` on the same page is all a second measurement ever needed, whether the
+// browser behind it is this file's shared one or a fresh one.
+async function checksRollEdges(page, tiersWrapperClass) {
+  const difficultyCard = `
+    <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
+      </div>
+      <div class="manager-checks-card-body">
+        <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+          <legend class="manager-resolution-mode-legend">DC source</legend>
+          <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+            <label class="manager-resolution-option is-active" data-dc-mode-option="static">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Static</span></span>
+            </label>
+            <label class="manager-resolution-option" data-dc-mode-option="dynamic">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Dynamic</span></span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="manager-checks-difficulty-fields">
+          <div class="manager-checks-difficulty-field is-dc">
+            <span class="manager-checks-difficulty-label">Base DC</span>
+          </div>
+          <div class="manager-checks-difficulty-field is-comparison">
+            <span class="manager-checks-difficulty-label">Comparison</span>
+          </div>
+        </div>
+      </div>
+    </section>`;
+  const tiersCard = `
+    <section class="${tiersWrapperClass}" data-routed-tiers>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Recipe difficulty tiers</h3></div>
+      </div>
+      <div class="manager-checks-card-body is-stack">
+        <div class="manager-checks-tier-list" role="list" aria-label="Recipe difficulty tiers">
+          <div class="manager-checks-tier-row" role="listitem" data-tier-row="t1">
+            <button type="button" class="manager-checks-tier-grip"><i class="fas fa-grip-vertical"></i></button>
+            <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
+            <span class="manager-checks-tier-unit">DC</span>
+            <div class="manager-checks-tier-stepper is-narrow">
+              <div class="fab-stepper is-fill">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+                <input type="number" class="fab-stepper-input" data-tier-dc value="8">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+              </div>
+            </div>
+            <button type="button" class="manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="manager-button fab-manager-button is-dashed" data-add-tier>
+          <i class="fas fa-plus"></i><span>Add difficulty tier</span>
+        </button>
+      </div>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:800px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${difficultyCard}${tiersCard}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value);
+    const options = [
+      ...document.querySelectorAll('[data-check-difficulty-card] .manager-resolution-option'),
+    ];
+    const firstOption = options[0].getBoundingClientRect();
+    const lastOption = options[options.length - 1].getBoundingClientRect();
+    const row = document.querySelector('[data-tier-row]').getBoundingClientRect();
+    const addTier = document.querySelector('[data-add-tier]').getBoundingClientRect();
+    return {
+      radioLeft: round(firstOption.left),
+      radioRight: round(lastOption.right),
+      rowLeft: round(row.left),
+      rowRight: round(row.right),
+      addTierLeft: round(addTier.left),
+      addTierRight: round(addTier.right),
+    };
+  });
+}
+
+test('the recipe difficulty tier row shares the Difficulty card radio-card edges, and the bare card shell reintroduces the inset', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 800 },
+    deviceScaleFactor: 1,
+  });
+  try {
+    const page = await context.newPage();
+
+    const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
+    assert.equal(
+      edges.rowLeft,
+      edges.radioLeft,
+      `tier row left (${edges.rowLeft}) must equal the Difficulty card's radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.rowRight,
+      edges.radioRight,
+      `tier row right (${edges.rowRight}) must equal the Difficulty card's radio-card right (${edges.radioRight})`
+    );
+    assert.equal(
+      edges.addTierLeft,
+      edges.radioLeft,
+      `the dashed Add control's left (${edges.addTierLeft}) must equal the radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.addTierRight,
+      edges.radioRight,
+      `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
+    );
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
+    // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
+    // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
+    const broken = await checksRollEdges(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.rowLeft,
+      broken.radioLeft,
+      'expected the bare card shell to inset the tier row past the radio-card left edge'
+    );
+    assert.notEqual(
+      broken.rowRight,
+      broken.radioRight,
+      'expected the bare card shell to inset the tier row past the radio-card right edge'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
+  // The two measurement tests above are built from class LITERALS, so this is the join: it
+  // proves the real component renders the wrapper class combination the passing test measured,
+  // not merely that some markup string with the right classes exists somewhere in this file.
+  const craftingCheckEditor = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(craftingCheckEditor),
+    /<section class="manager-inspector-card manager-checks-card" data-routed-tiers>/,
+    'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and its own 12px padding re-insets the tier row'
+  );
+});
+
+// The Modifiers card and its "How they combine" combination-rule grid (issue 1096 follow-up,
+// found by pointing the visual-parity tooling at the real app). The studio's own control scale
+// for a combination-rule card is scoped `.manager-checks-card .manager-resolution-mode-card
+// .is-config-cards .manager-resolution-option`, so it only fires when the CARD ancestor carries
+// `manager-checks-card`. `CraftingModifierCatalogueCard` shipped wrapped in the bare shared
+// `.manager-inspector-card` shell instead — the identical defect the recipe-tier list above was
+// fixed for — so the card took the generic 8px radius and translucent fill, and the
+// combination-rule cards fell back to the shared `RadioCardGroup` primitive's own generic
+// padding and gap instead of the studio's 13px/11px. Real Chromium + the real stylesheet, for
+// the same reason the tier-row measurement above needs both.
+async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
+  const card = `
+    <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
+      <h3 class="manager-card-title">Named modifiers</h3>
+      <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <legend class="manager-resolution-mode-legend">How they combine</legend>
+        <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Add all</span></span>
+          </label>
+          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Highest</span></span>
+          </label>
+        </div>
+      </fieldset>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:600px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${card}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value * 100) / 100;
+    const section = document.querySelector('[data-crafting-modifier-catalogue]');
+    const sectionCs = getComputedStyle(section);
+    const option = document.querySelector('.manager-resolution-option');
+    const optionCs = getComputedStyle(option);
+    return {
+      cardRadius: round(parseFloat(sectionCs.borderTopLeftRadius)),
+      cardBackground: sectionCs.backgroundColor,
+      optionPaddingLeft: round(parseFloat(optionCs.paddingLeft)),
+      optionPaddingTop: round(parseFloat(optionCs.paddingTop)),
+      optionGap: optionCs.columnGap,
+      optionRadius: round(parseFloat(optionCs.borderTopLeftRadius)),
+    };
+  });
+}
+
+test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 700 },
+    deviceScaleFactor: 1,
+  });
+  try {
+    const page = await context.newPage();
+
+    const fixed = await modifiersCombinationRuleMetrics(
+      page,
+      'manager-inspector-card manager-checks-card'
+    );
+    assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
+    assert.equal(
+      fixed.optionPaddingLeft,
+      13,
+      "the combination-rule card's studio padding is 13px left/right"
+    );
+    assert.equal(
+      fixed.optionPaddingTop,
+      12,
+      "the combination-rule card's studio padding is 12px top/bottom"
+    );
+    assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the card in the bare
+    // `.manager-inspector-card` shell `CraftingModifierCatalogueCard` actually shipped with —
+    // must desynchronise both the card's own look AND the combination-rule scale, because the
+    // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
+    // and fires only then. If this cannot fail, the assertions above prove nothing.
+    const broken = await modifiersCombinationRuleMetrics(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.cardRadius,
+      fixed.cardRadius,
+      `expected the bare card shell to fall back off the studio's 11px radius (bare: ${broken.cardRadius}px)`
+    );
+    assert.notEqual(
+      broken.cardBackground,
+      fixed.cardBackground,
+      'expected the bare card shell to fall back to the generic translucent fill'
+    );
+    assert.notEqual(
+      broken.optionPaddingLeft,
+      fixed.optionPaddingLeft,
+      `expected the bare shell to drop the combination-rule cards off 13px padding ` +
+        `(bare: ${broken.optionPaddingLeft}px)`
+    );
+    assert.notEqual(
+      broken.optionGap,
+      fixed.optionGap,
+      `expected the bare shell to drop the combination-rule cards off the studio's 11px gap ` +
+        `(bare: ${broken.optionGap})`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('CraftingModifierCatalogueCard really wraps its card in the checks-card contract', () => {
+  // The measurement test above is built from class LITERALS, so this is the join: it proves the
+  // real component renders the wrapper class combination the passing test measured, not merely
+  // that some markup string with the right classes exists somewhere in this file.
+  const modifierCatalogueSource = readFileSync(
+    resolve(
+      __dirname,
+      '../../src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
+    ),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(modifierCatalogueSource),
+    /<section\s+class="manager-inspector-card manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and the combination-rule cards fall back to the generic scale'
+  );
+});
+
+test('the locked activation indicator offers no hover affordance', async () => {
+  // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
+  // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
+  // pointer brightened a thing nothing happens when you press — a false affordance measurable
+  // only in a browser, since the rule is a `:hover` over a `color-mix()`.
+  const context = await sharedBrowser.newContext({ viewport: { width: 600, height: 300 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><div class="fabricate-manager">` +
+        `<button type="button" class="manager-status-toggle is-on" id="live">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></button>` +
+        `<span class="manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></span>` +
+        `</div>`
+    );
+    const trackStyle = (id) =>
+      page.evaluate((selector) => {
+        const track = document.querySelector(selector);
+        const style = getComputedStyle(track);
+        return `${style.backgroundColor}|${style.borderColor}`;
+      }, `#${id} .manager-status-toggle-track`);
+
+    const liveResting = await trackStyle('live');
+    const lockedResting = await trackStyle('locked');
+    await page.hover('#live');
+    const liveHovered = await trackStyle('live');
+    await page.hover('#locked');
+    const lockedHovered = await trackStyle('locked');
+
+    // The positive control: the real switch DOES respond, so the negative below means something.
+    assert.notEqual(liveHovered, liveResting, 'an actionable switch still lifts under the pointer');
+    assert.equal(lockedHovered, lockedResting, 'the locked indicator does not');
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The outcome band strip's fill, its swatch key, and the AA the names need (issue 1096) ──
+//
+// Everything below is measured in a real browser, and the reason is that NOTHING else in the
+// repo can see these facts. The mounted suites assert the inline custom property the editor
+// emits, which stays true after the rule that CONSUMES it is renamed or deleted: renaming
+// `.fab-band-strip-band` to `.fab-band-strip-band-unused` — a total visual break, since that
+// rule carries `position`, `width`, `overflow` AND the background — left the mounted suite
+// green. And `color-mix()` cannot be evaluated at all outside a browser, so the contrast the
+// band names actually get was invisible to every gate here until this one.
+const bandStripPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/components/ThresholdBandStrip.svelte'
+);
+const checkEditorPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'
+);
+const bandStripScoped = scopedComponentCss(bandStripPath);
+const checkEditorSource = readFileSync(checkEditorPath, 'utf8');
+
+/** Renders a fixture against the real sheet plus the strip's own scoped CSS, in one context. */
+async function withBandStripPage(run) {
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 400 } });
+  const page = await context.newPage();
+  try {
+    return await run(page);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * The strip's fixture, stamped with the real scope hash on EVERY class the component's own
+ * `<style>` addresses — not just the band.
+ *
+ * `withScopeHash` matches a whole class token, so stamping only `fab-band-strip-band` left
+ * `fab-band-strip-band-name` unstamped and its scoped rule matching nothing. That was
+ * invisible while the rule declared `color: var(--fab-text)`, because an unmatched rule and
+ * an inherited `--fab-text` paint the same pixels; it stops being invisible the moment the
+ * name takes an ink of its own, which is exactly the change this fixture now has to see.
+ */
+function bandStripFixture(body) {
+  const stamped = [
+    'fab-band-strip-track',
+    'fab-band-strip-band',
+    'fab-band-strip-band-name',
+  ].reduce(
+    (markup, className) => withScopeHash(markup, className, bandStripScoped.hashClass),
+    body
+  );
+  return `<style>${css}</style><style>${bandStripScoped.css}</style>${stamped}`;
+}
+
+test('the band fill and the tier-row swatch are painted by rules that still match', async () => {
+  const painted = await withBandStripPage(async (page) => {
+    await page.setContent(
+      bandStripFixture(
+        `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
+          // `left`/`width` as the component emits them, so the band is a real bounded box
+          // and the long name below has something to be truncated against.
+          `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40); --fab-band-strip-ink: rgb(250, 200, 10);">` +
+          // A long localized tier name, because the rule that keeps it on one line is the
+          // reason the strip's height is stable — a wrapped name shoves the tier rows down.
+          `<span class="fab-band-strip-band-name" id="longname">Ausserordentlich Meisterhaft Geschmiedet</span></span>` +
+          `<span class="fab-band-strip-band" id="plain">` +
+          `<span class="fab-band-strip-band-name" id="plainname">Ruined</span></span>` +
+          `</div>` +
+          `<div class="manager-checks-outcome-table is-relative">` +
+          `<span class="manager-checks-outcome-swatch" id="keyed" style="--fab-outcome-swatch: rgb(20, 90, 40);"></span>` +
+          `<span class="manager-checks-outcome-swatch" id="unkeyed"></span>` +
+          `</div></div>`
+      )
+    );
+    return page.evaluate(() => {
+      const read = (id) => {
+        const node = document.getElementById(id);
+        const style = getComputedStyle(node);
+        return {
+          background: style.backgroundColor,
+          width: node.getBoundingClientRect().width,
+          position: style.position,
+          overflow: style.overflow,
+        };
+      };
+      const longName = document.querySelector('#longname');
+      const longNameStyle = getComputedStyle(longName);
+      const keyed = document.getElementById('keyed');
+      return {
+        tinted: read('tinted'),
+        plain: read('plain'),
+        keyed: read('keyed'),
+        unkeyed: read('unkeyed'),
+        inkedName: longNameStyle.color,
+        plainName: getComputedStyle(document.querySelector('#plainname')).color,
+        keyedRadius: getComputedStyle(keyed).borderRadius,
+        keyedHeight: keyed.getBoundingClientRect().height,
+        longName: {
+          whiteSpace: longNameStyle.whiteSpace,
+          textOverflow: longNameStyle.textOverflow,
+          overflow: longNameStyle.overflow,
+          // `line-height` computes to the keyword `normal` here, so the number of lines is
+          // derived from the rendered height against the font size instead: one line lands
+          // near 1.2em and two lines cannot fit under 2em.
+          height: longName.getBoundingClientRect().height,
+          fontSize: parseFloat(longNameStyle.fontSize),
+          overflowed: longName.scrollWidth > longName.clientWidth,
+        },
+        tableTracks: getComputedStyle(
+          document.querySelector('.manager-checks-outcome-table.is-relative')
+        ).gridTemplateColumns.split(' '),
+      };
+    });
+  });
+
+  // The consuming rule exists AND reads the inline property: the same element with and
+  // without it must not paint the same colour.
+  assert.equal(painted.tinted.background, 'rgb(20, 90, 40)', 'the band paints its inline fill');
+  assert.notEqual(
+    painted.plain.background,
+    painted.tinted.background,
+    'an unset fill falls back to the declared neutral rather than to the tinted colour'
+  );
+  // The rest of the rule the mounted assertion also cannot see.
+  assert.equal(painted.tinted.position, 'absolute', 'the band is placed against the track');
+  assert.equal(painted.tinted.overflow, 'hidden', 'a long band name truncates rather than wraps');
+
+  // The band NAME's own rule, which nothing measured until this fixture started stamping the
+  // scope hash onto it. The component states the contract ("a long localized band name wraps
+  // to nothing and truncates instead, so a wide name cannot change the strip's height"), and
+  // a wrapped name is the failure: it grows the 44px track and pushes the tier rows down.
+  assert.equal(painted.longName.whiteSpace, 'nowrap', 'a long tier name stays on one line');
+  assert.equal(painted.longName.textOverflow, 'ellipsis', 'and is elided rather than clipped');
+  assert.equal(painted.longName.overflow, 'hidden', 'with the overflow the ellipsis needs');
+  assert.ok(
+    painted.longName.height < painted.longName.fontSize * 2,
+    `so it occupies one line box, got ${painted.longName.height}px at ${painted.longName.fontSize}px`
+  );
+  // The positive control: the name really is wider than its box, so "one line" is a fact
+  // about the rule rather than about a string that happened to fit.
+  assert.ok(painted.longName.overflowed, 'the fixture name is long enough to need truncating');
+
+  // The band's INK is per-band and inline (issue 1096), so the name rule has to READ it. A
+  // hard-coded `color: var(--fab-text)` here would leave the AA gate below measuring an ink no
+  // band ever wears; the untinted control proves the declared fallback still applies.
+  assert.equal(painted.inkedName, 'rgb(250, 200, 10)', 'a band name takes its own inline ink');
+  assert.notEqual(painted.plainName, painted.inkedName, 'and falls back when the band omits one');
+
+  // The swatch key, whose whole rule could be deleted without a red before this (issue 1096
+  // made it normative in `ui-integration`). It is a 12x12 DOT: square, round, and exactly the
+  // width of the table's leading track, so a track literal moved without the rule reds here.
+  assert.equal(painted.keyed.background, 'rgb(20, 90, 40)', 'the swatch repeats its band colour');
+  assert.notEqual(painted.unkeyed.background, painted.keyed.background, 'unkeyed paints neutral');
+  assert.ok(
+    Math.abs(painted.keyed.width - 12) < 0.5,
+    `the swatch is the table's 12px leading track, got ${painted.keyed.width}`
+  );
+  assert.ok(
+    Math.abs(painted.keyedHeight - painted.keyed.width) < 0.5,
+    `a dot is square, got ${painted.keyed.width}x${painted.keyedHeight}`
+  );
+  assert.equal(painted.keyedRadius, '50%', 'and round rather than a bar with soft corners');
+  assert.equal(painted.tableTracks[0], '12px', 'and the table still declares that track first');
+});
+
+// The band-strip hint's separation from the first tier row (maintainer parity round 4). The
+// REAL defect two attempts at this fix both missed was never the pixel value: `.fabricate-
+// manager .manager-muted` (this sheet, below) states `margin: var(--fab-space-2xs) 0 0` — a
+// SHORTHAND that zeroes `margin-bottom` — at the SAME (0,2,0) specificity as an unscoped
+// `.fabricate-manager [data-outcome-band-strip-hint]` rule and LATER in source order, so the
+// unscoped rule always lost and the hint's bottom margin computed to 0 no matter what number
+// it declared. The fix is scoped to `[data-outcome-bands]` at (0,3,0), and 20px reproduces the
+// prototype's rhythm without the 10px a deliberately-dropped column-header row occupied there
+// (see the CSS comment on `[data-outcome-band-strip-hint]`, and `scripts/visual-parity`
+// region `band-strip-hint`). This fixture mirrors the card's own DOM order — `.manager-muted`
+// hint, then `.manager-checks-tier-list` — so a regression back to the unscoped selector, or
+// to the shorthand reset winning again, reds here exactly as it would on screen.
+test('the band-strip hint keeps its 20px separation from the first tier row', async () => {
+  const gap = await withBandStripPage(async (page) => {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate-manager">' +
+        '<section class="manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<div class="manager-checks-card-body is-roomy">' +
+        '<p class="manager-muted" data-outcome-band-strip-hint>' +
+        'Drag or arrow-key a band edge to move its threshold.</p>' +
+        '<div class="manager-checks-tier-list" role="list">' +
+        '<div class="manager-checks-tier-row" role="listitem">Common Craft &middot; DC 8</div>' +
+        '<div class="manager-checks-tier-row" role="listitem">Uncommon Craft &middot; DC 12</div>' +
+        '</div></div></section></div>'
+    );
+    return page.evaluate(() => {
+      const hint = document.querySelector('[data-outcome-band-strip-hint]').getBoundingClientRect();
+      const row = document.querySelector('.manager-checks-tier-row').getBoundingClientRect();
+      return Math.round((row.top - hint.bottom) * 100) / 100;
+    });
+  });
+  assert.equal(
+    gap,
+    20,
+    `the hint must sit 20px above the first tier row (14px block separation + the list's own ` +
+      `6px row cadence), got ${gap}px`
+  );
+});
+
+test('every outcome band name clears WCAG AA in every shipped theme', async () => {
+  // The ramp is READ OUT OF the editor rather than restated, so adding a tone or widening the
+  // mix without re-checking contrast fails here. `bandFill`'s expression and the ink's are
+  // pinned too — otherwise this could go on measuring a formula the component no longer uses.
+  const toneNames = /const BAND_TONES = \[([^\]]+)\];/
+    .exec(checkEditorSource)?.[1]
+    .split(',')
+    .map((name) => name.trim().replace(/^'|'$/g, ''));
+  const toneMix = Number(/const BAND_TONE_MIX = (\d+);/.exec(checkEditorSource)?.[1]);
+  const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
+  assert.ok(toneNames?.length >= 2, 'the ramp tones are readable');
+  assert.ok(toneMix > 0, 'the mix percentage is readable');
+  assert.match(
+    checkEditorSource,
+    /color-mix\(in oklab, var\(--fab-\$\{tone\}\) \$\{BAND_TONE_MIX\}%, \$\{BAND_TONE_BASE\}\)/,
+    'bandFill still composes exactly the expression measured here'
+  );
+  // Each tone brings its OWN ink, which is the headroom this ramp is spending. Pinning the
+  // expression stops the component quietly reverting to one `--fab-text` for the whole strip
+  // while this file goes on measuring five inks it no longer paints.
+  assert.match(
+    checkEditorSource,
+    /ink: `var\(--fab-\$\{tone\}-text\)`/,
+    'and each band still takes its own tone-text ink'
+  );
+  // An OPAQUE base is what makes this measurable at all: mixed into a translucent surface the
+  // fill's painted colour depends on whatever the strip is stacked on, so no fixture could
+  // state the contrast a GM actually sees.
+  assert.equal(toneBase, 'var(--fab-bg-0)', 'the ramp is mixed into an opaque base');
+
+  const themes = [...css.matchAll(/:root\[data-fabricate-theme="([\w-]+)"\]/g)].map((m) => m[1]);
+  assert.ok(themes.length >= 6, `every palette is measured, found ${themes.length}`);
+
+  const measured = await withBandStripPage(async (page) => {
+    const cells = themes
+      .map(
+        (theme) =>
+          `<div class="fabricate" data-fabricate-theme="${theme}">` +
+          `<div class="fab-band-strip-track">` +
+          toneNames
+            .map(
+              (tone) =>
+                `<span class="fab-band-strip-band" data-probe="${theme}|${tone}" ` +
+                `style="--fab-band-strip-fill: color-mix(in oklab, var(--fab-${tone}) ${toneMix}%, ${toneBase}); ` +
+                `--fab-band-strip-ink: var(--fab-${tone}-text);">` +
+                `<span class="fab-band-strip-band-name">Masterwork</span></span>`
+            )
+            .join('') +
+          `</div></div>`
+      )
+      .join('');
+    await page.setContent(bandStripFixture(`<div class="fabricate-manager">${cells}</div>`));
+    return page.evaluate(() => {
+      // THE COLOUR IS RASTERISED, because scraping numbers out of the computed string is
+      // what made the first version of this gate vacuous.
+      //
+      // `color-mix(in srgb, …)` does NOT compute to `rgb()`. It computes to
+      // `color(srgb 0.303059 0.374588 0.346039)` — fractional channels in 0..1. The old
+      // `colour.match(/[\d.]+/g)` read those three fractions as 0..255 channels, so EVERY
+      // fill measured as very nearly black, every ratio came back at 12-19:1, and the gate
+      // could not have failed whatever the ramp did. (`color-mix(in oklab, …)` computes to
+      // `oklab(…)` and breaks it the same way, with the added trap of negative a/b channels
+      // the regex silently drops the sign from.)
+      //
+      // A canvas does the colour-space conversion the browser itself does when painting, so
+      // the bytes that come back are the pixels a GM actually sees, in any colour space.
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const rasterise = (value) => {
+        // Two different sentinels: `fillStyle` IGNORES an unparseable value and keeps the
+        // previous one, so painting the same colour twice from opposite sentinels is what
+        // tells "the browser refused this" apart from "this really is that colour".
+        const samples = ['#000000', '#ffffff'].map((sentinel) => {
+          ctx.fillStyle = sentinel;
+          ctx.fillStyle = value;
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillRect(0, 0, 1, 1);
+          return [...ctx.getImageData(0, 0, 1, 1).data];
+        });
+        const [first, second] = samples;
+        if (first.some((channel, index) => channel !== second[index])) return null;
+        return first;
+      };
+      const channel = (value) => {
+        const s = value / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = ([r, g, b]) =>
+        0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+
+      return [...document.querySelectorAll('[data-probe]')].map((band) => {
+        const name = band.querySelector('.fab-band-strip-band-name');
+        const fill = getComputedStyle(band).backgroundColor;
+        const ink = getComputedStyle(name).color;
+        const fillPixel = rasterise(fill);
+        const inkPixel = rasterise(ink);
+        if (!fillPixel || !inkPixel) {
+          return { probe: band.dataset.probe, fill, ink, unreadable: true, ratio: 0 };
+        }
+        // Alpha, measured rather than pattern-matched: a translucent fill in ANY colour
+        // space would make the ratio below a statement about a fixture, not about a GM's
+        // screen. `rgba(…)` was the only shape the old test could recognise.
+        const translucent = fillPixel[3] < 255 || inkPixel[3] < 255;
+        const [light, dark] = [luminance(inkPixel), luminance(fillPixel)].sort((a, b) => b - a);
+        return {
+          probe: band.dataset.probe,
+          fill,
+          ink,
+          fillPixel: `rgb(${fillPixel.slice(0, 3).join(', ')})`,
+          translucent,
+          ratio: Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100,
+        };
+      });
+    });
+  });
+
+  // ── The measurement's own preconditions, asserted rather than assumed ──────────────────
+  //
+  // Every one of these is a way this gate can go green while measuring nothing, and the
+  // shipped version of it tripped the second.
+
+  // 1. The colour parsed at all. A value `fillStyle` refuses leaves the previous paint on the
+  //    canvas, so a refusal must not read as a colour.
+  const unreadable = measured.filter((m) => m.unreadable).map((m) => `${m.probe}: ${m.fill}`);
+  assert.deepEqual(unreadable, [], `unrasterisable colours:\n- ${unreadable.join('\n- ')}`);
+
+  // 2. The fill did not collapse to black, which is exactly where a `color(srgb 0.30 …)`
+  //    string lands when it is scraped as three 0..255 channels — the failure that made this
+  //    gate report a comfortable 12-19:1 for every band regardless of the ramp.
+  assert.ok(
+    measured.every((m) => m.fillPixel !== 'rgb(0, 0, 0)'),
+    'a fill measured as pure black means the colour never survived conversion'
+  );
+
+  // 3. The inline fill is REACHING the element. Every probe painting the same pixels would
+  //    mean the fixture's custom property is inert and the ramp is not under test at all.
+  const distinctFills = new Set(measured.map((m) => m.fillPixel));
+  assert.ok(
+    distinctFills.size > 5,
+    `the ramp must paint distinct fills, got ${distinctFills.size}: ${[...distinctFills].join(' ')}`
+  );
+
+  if (process.env.FAB_REPORT_BAND_AA) {
+    for (const m of measured) {
+      console.log(`${m.probe} ${m.ratio.toFixed(2)}:1 ${m.ink} on ${m.fillPixel}`);
+    }
+  }
+
+  const failures = measured
+    .filter((m) => m.translucent || m.ratio < 4.5)
+    .map((m) =>
+      m.translucent
+        ? `${m.probe}: translucent fill ${m.fill}`
+        : `${m.probe}: ${m.ratio.toFixed(2)}:1 (${m.ink} on ${m.fillPixel})`
+    );
+
+  assert.deepEqual(
+    failures,
+    [],
+    `a band name at 0.72rem/600 is normal-size text and needs 4.5:1:\n- ${failures.join('\n- ')}`
+  );
+
+  // PER-BAND IDENTITY, measured per palette rather than inferred from the tone TOKENS having
+  // different names. `foundry-native` shipped `--fab-accent` byte-identical to `--fab-warning`,
+  // so five differently-named tones painted four colours and bands 2 and 5 were one band —
+  // invisible to every check on this ramp, because they all reasoned about token names.
+  const collisions = [];
+  for (const theme of themes) {
+    const inTheme = measured.filter((m) => m.probe.startsWith(`${theme}|`));
+    for (let i = 0; i < inTheme.length; i += 1) {
+      for (let j = i + 1; j < inTheme.length; j += 1) {
+        if (inTheme[i].fillPixel !== inTheme[j].fillPixel) continue;
+        collisions.push(
+          `${inTheme[i].probe} and ${inTheme[j].probe} both paint ${inTheme[i].fillPixel}`
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    collisions,
+    [],
+    `two bands of one strip must never paint the same colour:\n- ${collisions.join('\n- ')}`
+  );
+});
+
+// ── The tool studio is the AUTHORITY for a manager button (issue 1096) ─────────────────────
+//
+// The reported defect was that the Modifiers card's buttons did not look like the Tool
+// Studio's: a bare `manager-button` for a destructive verb, and a visibly different label
+// scale. The cause is structural rather than a typo. The Tool Studio's refined treatment
+// comes from an ANCESTOR-CONTEXT rule — `.manager-header-actions .manager-button`, 38px and
+// `0.72rem` — so a card that is not inside a `.manager-header-actions` could never match it
+// however carefully its class string was written.
+//
+// A shared component that merely emits the same class names would not have caught this and
+// will not catch the next one: the drift lives in the SHEET, not in the markup. So the
+// equivalence is measured, in a real browser, on the two roles the maintainer's screenshot
+// shows drifting. `ManagerButton.svelte`'s own class list is read out of the component
+// rather than restated here, so a fixture that stopped matching what the component emits
+// fails instead of quietly measuring markup the product no longer renders.
+const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
+const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
+
+function managerButtonClassesFor(role) {
+  const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
+  assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
+  const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
+  assert.ok(
+    base.includes('manager-button') && base.includes('fab-manager-button'),
+    `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
+  );
+  assert.match(
+    literal[1],
+    /is-\$\{role\}/,
+    'ManagerButton must derive its role modifier from the prop, not hard-code one'
+  );
+  return `${base.join(' ')} is-${role}`;
+}
+
+const AUTHORITY_PROBES = ['primary', 'danger'];
+
+test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const toolButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="tool-${role}"><i class="fas fa-save"></i><span>Save tool</span></button>`
+    ).join('');
+    const cardButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="card-${role}"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>`
+    ).join('');
+    // The NEGATIVE CONTROL: the class string this card shipped before the conversion. If it
+    // measured the same as the converted one, the primitive would be changing nothing and
+    // every assertion below would pass vacuously.
+    const unconverted =
+      '<button type="button" class="manager-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <header class="manager-tool-edit-header">
+              <div class="manager-header-actions manager-tool-edit-actions">${toolButtons}</div>
+            </header>
+            <section class="manager-edit-card manager-character-modifier-card">
+              <div class="manager-modifier-body manager-character-modifier-editor">
+                <div class="manager-character-modifier-actions">${cardButtons}${unconverted}</div>
+              </div>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          borderRadius: style.borderRadius,
+        };
+      };
+      return Object.fromEntries(
+        ['tool-primary', 'card-primary', 'tool-danger', 'card-danger', 'card-unconverted'].map(
+          (probe) => [probe, read(probe)]
+        )
+      );
+    });
+
+    for (const probe of Object.keys(measured)) {
+      assert.ok(measured[probe], `${probe} rendered`);
+    }
+
+    // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
+    // UA default on both sides and matches trivially. These pin that the authority's own
+    // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
+    // .manager-button` renders — NOT the 38px `.manager-header-actions` declares, which that
+    // later, more specific block overrides.
+    assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
+    assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
+
+    // …and the control proves the conversion is doing work: the shipped bare class string
+    // renders at the app's inherited body size, which is the reported defect.
+    assert.notEqual(
+      measured['card-unconverted'].fontSize,
+      measured['tool-primary'].fontSize,
+      'an unconverted card button must NOT already match the authority, or this gate proves nothing'
+    );
+
+    for (const role of AUTHORITY_PROBES) {
+      const authority = measured[`tool-${role}`];
+      const card = measured[`card-${role}`];
+      for (const property of ['fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+        assert.equal(
+          card[property],
+          authority[property],
+          `${role}: the Modifiers card's ${property} (${card[property]}) must match the tool studio's (${authority[property]})`
+        );
+      }
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The Checks rail's CONTROL TYPE SCALE (issue 1097 follow-up) ────────────────────────────
+//
+// Three reported defects, one measurement, because all three are the same failure: a control
+// that matched no rule stating its type and silently took whatever it inherited.
+//
+//  - The two "Preview as" controls sat in a `.manager-field`, so they took that wrapper's
+//    0.82rem/700 BY INHERITANCE. Inheritance is invisible to every gate this repo has: no
+//    rule declares it, so a source-text pin cannot see it and a per-region parity comparison
+//    has no region to compare. They rendered at 13.12px/700 against the prototype's 11.5/500.
+//  - The simulator's roll action was a hand-written `manager-button is-primary`, and the base
+//    `.manager-button` rule states no `font-size` at all — so it landed on Foundry's own 14px
+//    app base, larger still, next to a studio whose every other button reads at 11.52px.
+//
+// MEASURED, in Chromium, under the real Foundry core sheet, because that last one only
+// happens when Foundry's stylesheet is present. The two NEGATIVE CONTROLS below are what
+// stop this passing vacuously: they are the exact class strings the defect shipped with, and
+// each must still measure WRONG, or the rules being asserted are doing nothing.
+const CHECKS_RAIL_FOUNDRY_CSS = readFileSync(
+  resolve(__dirname, '../fixtures/foundry-core-min.css'),
+  'utf8'
+);
+
+test('the Checks rail states its own control type scale instead of inheriting one', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    // The rail is the workspace grid's 300px column, so the panel sibling is load-bearing:
+    // without it the rail lands in the `minmax(0, 1fr)` track and every control measures a
+    // width no product surface has.
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>${CHECKS_RAIL_FOUNDRY_CSS}</style>
+          <style>${css}</style>
+          <style>:root { --font-primary: Arial, sans-serif; }</style>
+        </head>
+        <body class="game">
+          <div class="application theme-dark">
+            <section class="window-content">
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="checks">
+                <div class="manager-body">
+                  <div class="manager-environment-workspace">
+                    <div class="manager-environment-tab-panel"></div>
+                    <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
+                      <section class="manager-inspector-card" data-checks-preview-as>
+                        <div class="manager-travel-picker manager-checks-preview-actor">
+                          <button type="button" data-probe="preview-actor" data-checks-preview-actor
+                            class="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
+                            <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
+                          </button>
+                        </div>
+                        <label class="manager-field">
+                          <span class="sr-only">Preview against record</span>
+                          <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
+                        </label>
+                        <label class="manager-field">
+                          <span>Result difficulties</span>
+                          <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
+                        </label>
+                      </section>
+                      <section class="manager-inspector-card" data-checks-simulator>
+                        <div class="manager-checks-simulator">
+                          <button type="button" data-probe="roll" data-checks-simulator-roll
+                            class="manager-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                          <button type="button" data-probe="roll-unconverted"
+                            class="manager-button is-primary">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                        </div>
+                      </section>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+              <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
+                   rule, is what the two pickers measured before it existed. -->
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
+                <label class="manager-field">
+                  <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
+                </label>
+              </div>
+            </section>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-probe]')].map((element) => {
+          const style = getComputedStyle(element);
+          return [
+            element.dataset.probe,
+            {
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+              width: Math.round(element.getBoundingClientRect().width),
+              height: Math.round(element.getBoundingClientRect().height),
+            },
+          ];
+        })
+      )
+    );
+
+    // 11.5px/500 is the prototype's own declaration on both of its rail pickers
+    // (`font: 500 11.5px var(--sans)`), read off the artefact rather than chosen. The
+    // sandbox input is joined to them because it stands in the same card, in the same slot.
+    for (const probe of ['preview-actor', 'preview-record', 'preview-difficulties']) {
+      assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the prototype's size`);
+      assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
+    }
+
+    // The NEGATIVE CONTROL for the pickers: the identical `.manager-field` control one card
+    // away still inherits 0.82rem/700, which is what the rail's two controls rendered as.
+    assert.equal(
+      measured['field-select-elsewhere'].fontSize,
+      '13.12px',
+      'a field control outside the rail is unchanged — this gate must not be measuring a ' +
+        'global re-type of every select in the manager'
+    );
+    assert.notEqual(
+      measured['preview-record'].fontSize,
+      measured['field-select-elsewhere'].fontSize,
+      'and the rail rule is therefore doing work'
+    );
+
+    // The roll action takes the PRIMITIVE's scale, not a value chosen here: 11.52px is
+    // `.manager-button.fab-manager-button`'s 0.72rem, the Tool Studio's authority, and it is
+    // within half a pixel of the prototype's own 11.5px/700 roll button.
+    assert.equal(measured.roll.fontSize, '11.52px', 'the roll button reads at the primitive');
+    assert.equal(measured.roll.fontWeight, '700');
+    // The Foundry reset. Core's `button` rule pins a height and centres content; the button
+    // is a full-width icon+label pair inside a card, so the rail block releases the height
+    // and the width. `height: auto` is the load-bearing half — `min-height` does not cancel
+    // a fixed `height`.
+    assert.equal(measured.roll.height, 34, 'released from Foundry’s fixed button height');
+    assert.equal(
+      measured.roll.width,
+      measured['preview-record'].width,
+      'and spans the card exactly as the controls above it do'
+    );
+
+    // The NEGATIVE CONTROL for the button: the bare class string it shipped with lands on
+    // Foundry's app base, which is the reported "font is too large".
+    assert.equal(
+      measured['roll-unconverted'].fontSize,
+      '14px',
+      'the unconverted class string still bleeds Foundry’s 14px app base'
+    );
+    assert.notEqual(
+      measured.roll.fontSize,
+      measured['roll-unconverted'].fontSize,
+      'so converting to the primitive is what changes the reading'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
+//
+// Reported from a live build: with icon and label taking the row's growth, the two bound
+// steppers collapsed to roughly 70px each and the `Unbounded` placeholder truncated to
+// `Unb`. That placeholder is the ONLY thing on the control that says an empty bound means
+// no limit rather than a limit of zero, so a truncation there is not cosmetic — it deletes
+// the field's meaning. `empty is not zero` is a documented product rule, and this is where a
+// GM reads it.
+//
+// It is MEASURED rather than eyeballed, and measured the only way an `<input>` placeholder
+// can be: an input's `scrollWidth` always equals its `clientWidth`, so overflow is invisible
+// to the DOM. The text is measured against the input's own computed font with a canvas
+// metric and compared to the content box.
+const MODIFIER_BOUNDS_ROW_WIDTHS = [1280, 1120, 960, 831, 680];
+
+// `Stepper` owns its chrome in a scoped `<style>`, and the whole measurement turns on ONE of
+// its rules: `.fab-stepper.is-fill … .fab-stepper-input { flex: 1 1 0; width: auto;
+// min-width: 0 }` is what makes the input obey the track it is given. Without the compiled
+// CSS the fixture renders a UA-default `<input>` — 181px wide and happily overflowing an
+// 80px stepper — so every width would "fit" and the gate would prove nothing. It is stamped
+// with the real scoping hash and appended after the global sheet, exactly as `css: 'injected'`
+// ships it.
+const stepperScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
+);
+
+function withStepperHash(markup) {
+  return ['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct'].reduce(
+    (current, token) => withScopeHash(current, token, stepperScoped.hashClass),
+    markup
+  );
+}
+
+test('the modifier row gives every field room for its longest content at every manager width', async () => {
+  const context = await sharedBrowser.newContext({ deviceScaleFactor: 1 });
+
+  try {
+    const stepper = (bound) =>
+      `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-system-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
+    const boundField = (bound, caption) =>
+      `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+    const editor = `
+      <div class="manager-modifier-body manager-character-modifier-editor">
+        <div class="manager-modifier-name-row">
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
+          <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="manager-modifier-bounds-row" data-system-modifier-bounds="mod-probe">
+            ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
+          </div>
+        </div>
+      </div>`;
+
+    const failures = [];
+    for (const width of MODIFIER_BOUNDS_ROW_WIDTHS) {
+      const page = await context.newPage();
+      await page.setViewportSize({ width, height: 800 });
+      try {
+        await page.setContent(`
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <style>
+                ${css}
+                ${stepperScoped.css}
+                body { margin: 0; font-family: Arial, sans-serif; font-size: 16px; }
+                /* The real manager container, so the shipped fabricate-manager container
+                   queries resolve against this width rather than never matching. */
+                .fabricate-manager { container-type: inline-size; container-name: fabricate-manager; }
+                .manager-settings-pane { box-sizing: border-box; width: 100%; padding: 16px; }
+                .fas::before { content: "x"; }
+              </style>
+            </head>
+            <body>
+              <main class="fabricate-manager"><div class="manager-settings-pane">${withStepperHash(editor)}</div></main>
+            </body>
+          </html>
+        `);
+
+        const report = await page.evaluate(() => {
+          const measureText = (element, text) => {
+            const style = getComputedStyle(element);
+            const context = document.createElement('canvas').getContext('2d');
+            context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            return context.measureText(text).width;
+          };
+          const row = document.querySelector('.manager-modifier-name-row');
+          const label = document.querySelector('[data-modifier-label]');
+          const labelStyle = getComputedStyle(label);
+          return {
+            rowOverflow: row.scrollWidth > row.clientWidth + 1,
+            label: {
+              content: Math.round(
+                label.getBoundingClientRect().width -
+                  Number.parseFloat(labelStyle.paddingLeft) -
+                  Number.parseFloat(labelStyle.paddingRight)
+              ),
+              // The longest label the product itself authors, measured in the FIELD'S OWN
+              // font rather than compared to a round number someone picked.
+              needed: Math.round(measureText(label, 'Herbalism Training')),
+            },
+            bounds: ['min', 'max'].map((bound) => {
+              const input = document.querySelector(`[data-system-modifier-field="${bound}"]`);
+              const style = getComputedStyle(input);
+              const content =
+                input.getBoundingClientRect().width -
+                Number.parseFloat(style.paddingLeft) -
+                Number.parseFloat(style.paddingRight);
+              return {
+                bound,
+                content: Math.round(content),
+                needed: Math.round(measureText(input, input.placeholder)),
+                fieldWidth: Math.round(
+                  document.querySelector(`[data-bound="${bound}"]`).getBoundingClientRect().width
+                ),
+              };
+            }),
+          };
+        });
+
+        if (report.rowOverflow) failures.push(`${width}px: the row overflows its track`);
+        if (report.label.content < report.label.needed) {
+          failures.push(
+            `${width}px label: "Herbalism Training" needs ${report.label.needed}px and the field offers ${report.label.content}px`
+          );
+        }
+        for (const bound of report.bounds) {
+          if (bound.content < bound.needed) {
+            failures.push(
+              `${width}px ${bound.bound}: "Unbounded" needs ${bound.needed}px and the input offers ${bound.content}px (field ${bound.fieldWidth}px)`
+            );
+          }
+        }
+      } finally {
+        await page.close();
+      }
+    }
+
+    assert.deepEqual(
+      failures,
+      [],
+      `a truncated "Unbounded" reads as "Unb" and destroys the empty-is-not-zero contract:\n- ${failures.join('\n- ')}`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The simulator's face tile and the odds row (issue 1097) ─────────────────────────────
+//
+// Both are surfaces a mounted assertion CANNOT judge. `CheckOutcomePreview` layers the
+// rolled face over a `Medallion` with `position: absolute; inset: 0`, and `CheckOddsPanel`
+// lays its rows out on a three-track grid — neither of which happy-dom computes, so a
+// scoped selector renamed out from under either rule would leave every mounted assertion
+// green while the tile printed its digit beside the medallion instead of on it. That is
+// not hypothetical: the FIRST version of the face tile omitted the offsets, so the digit
+// landed at its static position to the RIGHT of the medallion and underneath the breakdown
+// line. It rendered, it was in the DOM, and it was invisible in the published frame.
+const previewScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
+);
+const oddsScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte')
+);
+
+test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+    // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`, so the hash has to land on
+    // every element the rules reach — not only on the token `withScopeHash` stamps. A
+    // fixture that stamped the wrapper alone would compute `position: static` and read as
+    // a defect in the component rather than in the fixture.
+    const hash = previewScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${previewScoped.css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
+        `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
+        `<span style="display:block;width:44px;height:44px"></span>` +
+        `<small id="value" class="${hash}"><strong class="${hash}">20</strong>` +
+        `<span class="${hash}">d20</span></small>` +
+        `</span></div></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const tile = document.getElementById('tile').getBoundingClientRect();
+      const value = document.getElementById('value').getBoundingClientRect();
+      return {
+        position: getComputedStyle(document.getElementById('value')).position,
+        overlaps:
+          value.left >= tile.left - 0.5 &&
+          value.right <= tile.right + 0.5 &&
+          value.top >= tile.top - 0.5 &&
+          value.bottom <= tile.bottom + 0.5,
+        width: Math.round(value.width),
+        tileWidth: Math.round(tile.width),
+      };
+    });
+    assert.equal(geometry.position, 'absolute', 'the rule that positions it still matches');
+    assert.equal(geometry.tileWidth, 44, 'the tile is the medallion’s own 44px square');
+    assert.equal(
+      geometry.width,
+      geometry.tileWidth,
+      '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
+    );
+    assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('an odds row keeps its bar between a bounded label and a pinned percentage', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 320, height: 300 } });
+    const hash = oddsScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${oddsScoped.css}</style>` +
+        `<div class="fabricate-manager"><ul class="manager-checks-odds-list ${hash}">` +
+        `<li class="manager-checks-odds-row ${hash}" id="row">` +
+        `<span class="manager-checks-odds-label ${hash}" id="label">` +
+        `An extremely long localized outcome tier name that must not squeeze the bar</span>` +
+        `<span class="fab-fill-bar" id="bar" style="display:block;height:6px"></span>` +
+        `<span class="manager-checks-odds-percent ${hash}" id="percent">100%</span>` +
+        `</li></ul></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const read = (id) => document.getElementById(id).getBoundingClientRect();
+      return {
+        display: getComputedStyle(document.getElementById('row')).display,
+        label: Math.round(read('label').width),
+        bar: Math.round(read('bar').width),
+        percent: Math.round(read('percent').width),
+        overflow: getComputedStyle(document.getElementById('label')).overflow,
+      };
+    });
+    assert.equal(geometry.display, 'grid', 'the grid rule still matches this row');
+    assert.equal(geometry.overflow, 'hidden', 'and the label truncates rather than wrapping');
+    assert.ok(
+      geometry.label <= 90,
+      `a long tier name is bounded at the 5.5rem track (got ${geometry.label}px)`
+    );
+    assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
+  } finally {
+    await browser.close();
+  }
+});
+
+// -- The GM Downtime preview at a real window width (issue 1185) ------------------------
+//
+// A container query is measured against the CONTENT box, so a threshold reads far larger
+// than the window it actually fires in. The shipped preview collapsed at `max-width: 1040px`
+// and an ordinary 1314px Foundry window gives this panel 1052px: the board dropped below the
+// hero and the four feature cards folded to 2x2 on a window nobody would call narrow. The
+// visual-parity harness could not see it either, because it ran at the one width that cleared
+// the breakpoint -- by four pixels.
+//
+// So this gate measures the arrangement at the width the defect was reported from, and at the
+// widths where the layout is SUPPOSED to fold, in a real browser with the component's own
+// compiled CSS. Nothing else in the repository can evaluate a container query: happy-dom
+// cannot compute a cascade, and a source assertion on the breakpoint number would pass on any
+// arithmetic somebody wrote down.
+const downtimePreviewPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte'
+);
+const downtimePreviewScoped = scopedComponentCss(downtimePreviewPath);
+
+/**
+ * Render the preview's own markup at one manager-pane width and read its two track counts.
+ *
+ * @param {number} paneWidth width of the manager main pane, in px
+ * @returns {Promise<object>} track counts, the container's content width, and two box widths
+ */
+async function readDowntimePreviewArrangement(paneWidth) {
+  const hash = downtimePreviewScoped.hashClass;
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1920, height: 1000 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const card = (index) =>
+      `<article class="${hash}">` +
+      `<span class="downtime-feature-icon is-tint-accent ${hash}"><i class="fas fa-star"></i></span>` +
+      `<h4 class="${hash}">Benefit ${index}</h4>` +
+      `<p class="${hash}">A short line of benefit copy for card ${index}.</p></article>`;
+    await page.setContent(
+      `<style>${css}</style><style>${downtimePreviewScoped.css}</style>` +
+        `<div class="fabricate-manager" data-manager-view="world-downtime">` +
+        `<div style="width:${paneWidth}px">` +
+        `<div class="downtime-preview ${hash}">` +
+        `<section class="downtime-hero ${hash}">` +
+        `<div class="downtime-hero-copy ${hash}"><h2 class="${hash}">Run downtime.</h2></div>` +
+        `<div class="downtime-board ${hash}"><header class="${hash}">Party board</header></div>` +
+        `</section>` +
+        `<section class="downtime-benefits ${hash}">` +
+        `<div class="downtime-feature-grid ${hash}">${[1, 2, 3, 4].map(card).join('')}</div>` +
+        `</section></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const at = (selector) => document.querySelector(selector);
+      const tracks = (selector) =>
+        getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
+      const boxWidth = (selector) => Math.round(at(selector).getBoundingClientRect().width);
+      const panel = at('.downtime-preview');
+      const panelStyle = getComputedStyle(panel);
+      return {
+        containerWidth: Math.round(
+          panel.clientWidth -
+            Number.parseFloat(panelStyle.paddingLeft) -
+            Number.parseFloat(panelStyle.paddingRight)
+        ),
+        heroTracks: tracks('.downtime-hero'),
+        gridTracks: tracks('.downtime-feature-grid'),
+        boardWidth: boxWidth('.downtime-board'),
+        cardWidth: boxWidth('.downtime-feature-grid > article'),
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+test('the downtime preview keeps a two-column hero and a four-across grid in an ordinary Foundry window', async () => {
+  // 1092px is what a 1314px Foundry window -- the reported one -- leaves `.manager-main`.
+  const real = await readDowntimePreviewArrangement(1092);
+  assert.equal(
+    real.containerWidth,
+    1052,
+    'the pane arithmetic this gate rests on: a 1092px main pane is a 1052px query container'
+  );
+  assert.equal(
+    real.heroTracks,
+    2,
+    `the hero keeps the board beside the copy at a real window width (got ${real.heroTracks})`
+  );
+  assert.equal(
+    real.gridTracks,
+    4,
+    `the four benefit cards stay four-across at a real window width (got ${real.gridTracks})`
+  );
+  assert.ok(
+    real.boardWidth < 400,
+    `and the board is still the narrow column, not a half-width block (${real.boardWidth}px)`
+  );
+
+  // The fallbacks are half the claim: a breakpoint low enough to survive a real window must
+  // still fold where the content genuinely stops fitting, or "it never collapses" is the bug.
+  const narrow = await readDowntimePreviewArrangement(960);
+  assert.equal(narrow.gridTracks, 2, 'the grid folds to 2x2 once a card would go under 228px');
+  assert.equal(narrow.heroTracks, 2, 'and the hero, with far more room, does not fold with it');
+
+  const tight = await readDowntimePreviewArrangement(700);
+  assert.equal(tight.heroTracks, 1, 'the hero stacks once its copy column would drop under 420px');
+
+  const smallest = await readDowntimePreviewArrangement(660);
+  assert.equal(smallest.gridTracks, 1, 'and the existing 640px stage still stacks the cards');
+});
+
+test('the rail Downtime premium mark renders as the shared gold badge chip', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    // One row shape, rendered twice: Core's preview state (gold) and the companion-installed
+    // state (muted). Writing the markup once is what makes the two frames comparable — and
+    // keeps a second near-identical block out of the SonarCloud duplication gate.
+    const downtimeRow = (rowId, chipId, chipModifier) =>
+      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
+      ` data-world-nav-item="downtime" id="${rowId}">` +
+      `<i class="fas fa-hourglass-half"></i>` +
+      `<span class="manager-nav-label">Downtime</span>` +
+      `<span class="manager-nav-count manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
+      `</button>`;
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager">` +
+        `<span class="manager-titlebar-badge" id="titlebar">PREMIUM</span>` +
+        `<nav class="manager-rail"><div class="manager-world-nav">` +
+        downtimeRow('row', 'chip', '') +
+        downtimeRow('row-installed', 'chip-installed', ' is-installed') +
+        `<button class="manager-nav-button manager-nav-parent is-active" id="plain-active">` +
+        `<i class="fas fa-users"></i>` +
+        `<span class="manager-nav-label">Parties</span>` +
+        `<span class="manager-nav-count">5</span>` +
+        `</button>` +
+        `<button class="manager-nav-button manager-nav-parent" id="plain">` +
+        `<span class="manager-nav-label">Parties</span>` +
+        `<span class="manager-nav-count" id="count">10</span>` +
+        `</button>` +
+        `</div></nav></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id) => {
+        const computed = getComputedStyle(document.getElementById(id));
+        return {
+          background: computed.backgroundColor,
+          color: computed.color,
+          weight: computed.fontWeight,
+          radius: computed.borderTopLeftRadius,
+          padding: computed.paddingLeft,
+          borderColor: computed.borderTopColor,
+        };
+      };
+      // Line boxes, counted by the browser rather than derived from a computed line-height:
+      // this fixture sets none, so `line-height` computes to `normal` and any arithmetic on it
+      // is NaN — which an `=== 1` check reads as a pass-shaped failure.
+      const lineCount = (selector) => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector(selector));
+        return range.getClientRects().length;
+      };
+      return {
+        chip: of('chip'),
+        chipInstalled: of('chip-installed'),
+        titlebar: of('titlebar'),
+        count: of('count'),
+        row: of('row'),
+        plainActive: of('plain-active'),
+        labelLines: lineCount('#row .manager-nav-label'),
+        installedLabelLines: lineCount('#row-installed .manager-nav-label'),
+      };
+    });
+
+    // The chip is asserted against the SHIPPED chip rather than against a hex, because the
+    // point of the change is that one gold pair serves both marks: a literal here would pass
+    // just as happily with the pair copied into a second place, which is what it must not be.
+    assert.equal(
+      read.chip.background,
+      read.titlebar.background,
+      'the rail chip fills with the same gold as the title bar badge'
+    );
+    assert.equal(
+      read.chip.color,
+      read.titlebar.color,
+      'and inks with the same dark pair, rather than the rail count colour'
+    );
+    assert.equal(read.chip.weight, '700', 'the chip is a badge weight, not the count weight');
+    assert.notEqual(
+      read.chip.background,
+      'rgba(0, 0, 0, 0)',
+      'a transparent chip is the reported defect: bare tan lettering rather than a mark'
+    );
+    assert.notEqual(
+      read.chip.color,
+      read.count.color,
+      'the chip must beat the later nav-count rules that re-tone every trailing marker'
+    );
+    assert.equal(read.chip.radius, '4px', 'at the rail scale the design draws a 4px chip');
+    // 5px, one pixel tighter each side than the design's own `2px 6px`: this rail row ends in
+    // a real 28px expand/collapse button where the design's ends in an inert chevron, and at
+    // the design's exact padding the row's label broke `Downtime` across two lines mid-word.
+    // The row height is the assertion that matters — the pixel is only how it was bought.
+    assert.equal(read.chip.padding, '5px', 'the rail chip keeps its filled-chip padding');
+    assert.ok(
+      read.labelLines === 1,
+      `the chip must not squeeze the label into a second line (got ${read.labelLines})`
+    );
+
+    // Issue 1185 — the MUTED state. With a companion installed the title bar carries the loud
+    // gold signal, so the rail chip steps down. "Somewhat mute" is the whole requirement, so
+    // both halves are asserted: it must stop being gold, AND it must still be a filled chip.
+    assert.notEqual(
+      read.chipInstalled.background,
+      read.chip.background,
+      'an installed companion mutes the rail chip off the gold fill'
+    );
+    assert.notEqual(
+      read.chipInstalled.color,
+      read.chip.color,
+      'and off the dark on-gold ink with it'
+    );
+    assert.notEqual(
+      read.chipInstalled.background,
+      'rgba(0, 0, 0, 0)',
+      'muted is not removed: the row must still say which route premium provides'
+    );
+    assert.notEqual(
+      read.chipInstalled.color,
+      read.count.color,
+      'and it must still read as a marker rather than collapsing into a plain rail count'
+    );
+    assert.equal(read.chipInstalled.weight, '600', 'the muted chip drops one weight step');
+    // Geometry is NOT part of the mute: the muted rule restates colour and weight only, so
+    // the row cannot change height or break its label when a companion registers.
+    assert.equal(read.chipInstalled.radius, read.chip.radius, 'the muted chip keeps its radius');
+    assert.equal(read.chipInstalled.padding, read.chip.padding, 'and its padding');
+    assert.ok(
+      read.installedLabelLines === 1,
+      `and still leaves the label on one line (got ${read.installedLabelLines})`
+    );
+
+    // The active Downtime ROW is an ordinary active rail row and nothing more. It briefly
+    // carried the prototype's bespoke accent fill, border and ink, which made one row in the
+    // rail look like a different control; the premium signal lives in the chip and the title
+    // bar, not in the row. Asserted against a plain active row rather than against literals,
+    // so a change to the rail's selected language moves both or fails here.
+    assert.equal(
+      read.row.background,
+      read.plainActive.background,
+      'the active Downtime row fills exactly like any other active rail row'
+    );
+    assert.equal(read.row.color, read.plainActive.color, 'and inks like one');
+    assert.equal(
+      read.row.borderColor,
+      read.plainActive.borderColor,
+      'and borders like one — no accent outline of its own'
+    );
+    assert.notEqual(
+      read.row.background,
+      'rgba(0, 0, 0, 0)',
+      'and the shared active fill is still a real fill, so the comparison is not two blanks'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// Issue 1185 — the Downtime children are RAIL SUB-ITEMS, and had stopped looking like it.
+// They carried the prototype's own 32px indent and 10px gap, which put them visibly further
+// right than the Crafting and Gathering children immediately above them. Measured against a
+// real sibling rather than against the numbers, so the two move together or this fails.
+test('the Downtime rail children sit on the same indent and gap as every other rail child', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const subitem = (id, extraClass) =>
+      `<button class="manager-nav-subitem${extraClass}" id="${id}">` +
+      `<i class="fas fa-flask"></i>` +
+      `<span class="manager-nav-label">Recipes</span>` +
+      `<span class="manager-nav-count">7</span>` +
+      `</button>`;
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
+        `<nav class="manager-nav">` +
+        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="crafting-submenu">` +
+        subitem('crafting-child', '') +
+        `</div></div>` +
+        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="downtime-submenu">` +
+        subitem('downtime-child', ' manager-downtime-subitem') +
+        `</div></div>` +
+        `</nav></aside><main class="manager-main"></main></div></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id, submenuId) => {
+        const button = document.getElementById(id);
+        const computed = getComputedStyle(button);
+        return {
+          // The visible indent is what a GM compares, so measure where the GLYPH lands
+          // relative to the group that holds it, not the declared padding.
+          glyphOffset:
+            +(
+              button.querySelector('i').getBoundingClientRect().left -
+              document.getElementById(submenuId).getBoundingClientRect().left
+            ).toFixed(2),
+          gap: computed.columnGap,
+          paddingLeft: computed.paddingLeft,
+          minHeight: computed.minHeight,
+          radius: computed.borderTopLeftRadius,
+          columns: computed.gridTemplateColumns,
+        };
+      };
+      return {
+        crafting: of('crafting-child', 'crafting-submenu'),
+        downtime: of('downtime-child', 'downtime-submenu'),
+      };
+    });
+
+    assert.equal(
+      read.downtime.glyphOffset,
+      read.crafting.glyphOffset,
+      `a Downtime child starts where a Crafting child starts (got ${read.downtime.glyphOffset} vs ${read.crafting.glyphOffset})`
+    );
+    assert.equal(read.downtime.paddingLeft, read.crafting.paddingLeft, 'same indent');
+    assert.equal(read.downtime.gap, read.crafting.gap, 'same gap between glyph and label');
+    assert.equal(read.downtime.minHeight, read.crafting.minHeight, 'same row floor');
+    assert.equal(read.downtime.radius, read.crafting.radius, 'same corner');
+    assert.equal(read.downtime.columns, read.crafting.columns, 'same four-track grid');
+  } finally {
+    await context.close();
+  }
+});
+
+// Issue 1185 — a rail label degrades by wrapping at a SPACE and then by ELLIPSIS, never by
+// splitting a word. `overflow-wrap: anywhere` used to lower the label's min-content width so
+// the `minmax(0, 1fr)` track could shrink under the widest word, and `Downtime` rendered as
+// `Downtim` / `e`. A companion supplies its own labels, so this has to hold for text that is
+// not ours to shorten.
+test('a rail label wraps at a space and ellipsises, and never splits a word', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const row = (id, label) =>
+      `<div class="manager-nav-group" style="position:relative">` +
+      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
+      `<i class="fas fa-hourglass-half"></i>` +
+      `<span class="manager-nav-label">${label}</span>` +
+      `<span class="manager-nav-count manager-nav-premium">PREMIUM</span>` +
+      `</button></div>`;
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
+        `<nav class="manager-nav"><section class="manager-world-nav">` +
+        row('short', 'Downtime') +
+        row('oneword', 'Handelsverwaltungsuebersicht') +
+        row('twowords', 'Trade Administration') +
+        `</section></nav></aside><main class="manager-main"></main></div></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id) => {
+        const label = document.getElementById(id).querySelector('.manager-nav-label');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        // Count LINE BOXES by distinct top edge: a range yields several rects for one visual
+        // line, so `rects.length` reads a single line as two and passes a split as fine.
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        return {
+          lines: lines.size,
+          clipped: label.scrollWidth > label.clientWidth,
+          trackWidth: +label.getBoundingClientRect().width.toFixed(1),
+          overflow: getComputedStyle(label).overflow,
+          textOverflow: getComputedStyle(label).textOverflow,
+          wrap: getComputedStyle(label).overflowWrap,
+        };
+      };
+      return { short: of('short'), oneWord: of('oneword'), twoWords: of('twowords') };
+    });
+
+    assert.equal(read.short.lines, 1, 'the shipped Downtime label still fits on one line');
+    assert.equal(read.short.clipped, false, 'and is not ellipsised at the shipped rail width');
+
+    // The proof that a word is not split: one line, and the overflow taken by the clip.
+    assert.equal(
+      read.oneWord.lines,
+      1,
+      'a label too wide for its track stays on ONE line rather than breaking mid-word'
+    );
+    assert.ok(read.oneWord.clipped, 'and is clipped, which is what `text-overflow` ellipsises');
+    assert.equal(read.oneWord.overflow, 'hidden', 'the clip is what puts ellipsis in scope');
+    assert.equal(read.oneWord.textOverflow, 'ellipsis');
+    assert.notEqual(
+      read.oneWord.wrap,
+      'anywhere',
+      '`anywhere` is what produced the reported mid-word break'
+    );
+
+    // And a label that CAN break at a space still does, rather than ellipsising whole words.
+    assert.equal(read.twoWords.lines, 2, 'a multi-word label still wraps at its space');
+  } finally {
+    await context.close();
+  }
+});
+
+// -- The companion Downtime panel's layout contract (issue 1213) -------------------------
+//
+// This is the Manager counterpart of the player seam's panel contract, and every claim in it
+// is a computed-style fact that nothing else in the repository can evaluate: happy-dom cannot
+// compute a cascade, so a mounted suite can only assert that a DECLARATION exists, never that
+// it lands on a real box.
+//
+// The chain is applied WHOLE, deliberately. Two earlier probes of this same rule reached the
+// wrong conclusion by shortening it -- one set `height: 100%` on the companion root alone,
+// which reads as definite while its ancestor is auto, and one appended a tall child to a
+// `flex-direction: column` root, where `flex-shrink: 1` squashes the child so nothing ever
+// overflows. So the fixture runs `.fabricate-manager` -> `.manager-body` -> `.manager-main` ->
+// `.downtime-host` -> `.downtime-extension-panels` -> the panel region -> the mount target,
+// with the host's own compiled CSS after the global sheet, and every overflow case below
+// controls the flex factor explicitly.
+//
+// One thing is deliberately NOT asserted anywhere here: `contain`. The Manager root's
+// `container-type: inline-size` implies layout containment, but reading the `contain` property
+// returns `none`, so an assertion on it would be measuring the absence of a declaration rather
+// than the presence of the behaviour.
+const downtimeHostPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'
+);
+const downtimeHostScoped = scopedComponentCss(downtimeHostPath);
+
+// A companion root, parameterised by the ONE thing each overflow case varies.
+const companionRoot = (style, children) =>
+  `<div id="companion-root" style="height:100%;min-height:0;${style}">${children}</div>`;
+const companionRows = '<p style="height:200px;margin:0">row</p>'.repeat(12);
+const companionShort = companionRoot('', '<p style="margin:0">short</p>');
+const MANAGER_WIDTH_LADDER = [1400, 1200, 1100, 900, 700, 600];
+
+/**
+ * Render the Downtime route at one Manager width and read it with `readInPage`.
+ *
+ * The Manager chrome around the host is what makes the block size definite, so it is stated
+ * once here and every case below shares it — the two modes differ only in the host's own
+ * class and children.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @param {string} hostClasses extra classes on `.downtime-host`
+ * @param {string} hostChildren the host's own markup
+ * @param {Function} readInPage evaluated in the page; returns the measurements
+ * @returns {Promise<object>} whatever `readInPage` returned
+ */
+async function readDowntimeRoute(managerWidth, hostClasses, hostChildren, readInPage) {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>${downtimeHostScoped.css}</style>` +
+        `<div style="width:${managerWidth}px;height:760px">` +
+        `<div class="fabricate-manager" data-manager-view="world-downtime">` +
+        `<div class="manager-titlebar">titlebar</div>` +
+        `<div class="manager-header">header</div>` +
+        `<div class="manager-body">` +
+        `<aside class="manager-rail">rail</aside>` +
+        `<main class="manager-main">` +
+        `<section class="downtime-host ${hostClasses}" data-world-downtime-host>` +
+        hostChildren +
+        `</section></main></div></div></div>`
+    );
+    return await page.evaluate(readInPage);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Render the provider-mode chain at one Manager width and read every link's box.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @param {string} companionMarkup what the companion mounts into the target
+ * @returns {Promise<object>} client heights down the chain, plus the panel's scroll state
+ */
+async function readCompanionPanelChain(managerWidth, companionMarkup) {
+  const hash = downtimeHostScoped.hashClass;
+  return readDowntimeRoute(
+    managerWidth,
+    hash,
+    `<div class="downtime-extension-panels ${hash}">` +
+      `<div class="downtime-extension-panel ${hash}" role="region" tabindex="-1">` +
+      `<div class="downtime-extension-target ${hash}" data-downtime-extension-panel="board">` +
+      companionMarkup +
+      `</div></div></div>`,
+    () => {
+      const at = (selector) => document.querySelector(selector);
+      const panels = at('.downtime-extension-panels');
+      const host = at('.downtime-host');
+      const target = at('.downtime-extension-target');
+      const targetElement = target;
+      const targetStyle = getComputedStyle(target);
+      return {
+        main: at('.manager-main').clientHeight,
+        host: host.clientHeight,
+        panels: panels.clientHeight,
+        panelsScrollHeight: panels.scrollHeight,
+        panelsOverflowY: getComputedStyle(panels).overflowY,
+        // BOTH halves, because `scrollHeight` reports overflowing content whether or not the
+        // box can scroll it: an `overflow: hidden` panel that CLIPS its companion reports the
+        // identical `scrollHeight > clientHeight` as one that scrolls it, so overflow alone
+        // reads as "the fallback works" over a panel that silently swallows the content.
+        panelScrolls:
+          /auto|scroll/.test(getComputedStyle(panels).overflowY) &&
+          panels.scrollHeight > panels.clientHeight,
+        panelsOverflows: panels.scrollHeight > panels.clientHeight,
+        region: at('.downtime-extension-panel').clientHeight,
+        target: targetElement.clientHeight,
+        targetWidth: targetElement.clientWidth,
+        targetPadding: [
+          targetStyle.paddingTop,
+          targetStyle.paddingRight,
+          targetStyle.paddingBottom,
+          targetStyle.paddingLeft,
+        ].join(' '),
+        targetOverflow: `${targetStyle.overflowX} ${targetStyle.overflowY}`,
+        targetContainerType: targetStyle.containerType,
+        // How far the mount target sits inside the host box. Core's old `12px 20px 24px` lived
+        // on the panels row rather than on the target, so reading the target's OWN padding
+        // could never have seen it — the inset has to be measured as an offset.
+        insetTop: Math.round(target.getBoundingClientRect().top - host.getBoundingClientRect().top),
+        insetLeft: Math.round(
+          target.getBoundingClientRect().left - host.getBoundingClientRect().left
+        ),
+        hostWidth: host.clientWidth,
+        companion: at('#companion-root').clientHeight,
+      };
+    }
+  );
+}
+
+/**
+ * Read the CORE-FALLBACK host, which keeps two grid tracks and its own preview scroller.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @returns {Promise<object>} the two rows' boxes and the host's resolved track list
+ */
+async function readCoreFallbackHostRows(managerWidth) {
+  const hash = downtimeHostScoped.hashClass;
+  return readDowntimeRoute(
+    managerWidth,
+    `core-fallback ${hash}`,
+    `<div class="downtime-preview-scroll ${hash}">` +
+      '<p style="height:200px;margin:0">row</p>'.repeat(12) +
+      `</div><div class="downtime-tab-card-stand-in" style="height:44px">strip</div>`,
+    () => {
+      const at = (selector) => document.querySelector(selector);
+      const host = at('.downtime-host');
+      const scroll = at('.downtime-preview-scroll');
+      const strip = at('.downtime-tab-card-stand-in');
+      return {
+        host: host.clientHeight,
+        scroll: scroll.clientHeight,
+        scrollScrolls:
+          /auto|scroll/.test(getComputedStyle(scroll).overflowY) &&
+          scroll.scrollHeight > scroll.clientHeight,
+        strip: strip.clientHeight,
+        stripBottomGap: Math.round(
+          host.getBoundingClientRect().bottom - strip.getBoundingClientRect().bottom
+        ),
+      };
+    }
+  );
+}
+
+test('the companion Downtime panel states a height at every link, which Chromium alone cannot gate', () => {
+  // MEASUREMENT CANNOT PROVE THIS ONE, and saying so is the point of a separate test.
+  //
+  // Chromium resolves a percentage height through a chain of `height: auto` in-flow block
+  // ancestors up to the nearest definite one, so with the host grid correct the companion's
+  // own `height: 100%` lands on the pane's height whether or not the wrapper and the target
+  // state a height themselves.
+  //
+  // MEASURED, and an earlier note here overstated it. Removing BOTH declarations leaves every
+  // number in the width ladder below identical — that test stays green — but it is not true
+  // that nothing changes: the last case of the overflow test does move, because a companion
+  // that states NO height of its own has nothing left to propagate through and its target
+  // collapses to content height (18px against the pane's 685). So one measuring test is blind
+  // to this and one is not, which is exactly why the declaration is asserted here as well.
+  //
+  // The declarations are load-bearing beyond that, because Chromium is not the only engine
+  // Foundry runs in and CSS 2.1's own rule is the opposite one — a percentage against a
+  // containing block whose height depends on content computes to `auto`. Only Chromium is
+  // installed here, so the honest gate is the declaration rather than a second engine's
+  // measurement.
+  const hash = downtimeHostScoped.hashClass;
+  for (const selector of ['.downtime-extension-panel', '.downtime-extension-target']) {
+    const rule = blockIn(downtimeHostScoped.css, `${selector}.${hash}`);
+    assert.ok(rule, `${selector} should own a rule in the host's scoped CSS`);
+    // ANCHORED. `/height:\s*100%/` is also satisfied by `min-height: 100%`, and swapping the
+    // one for the other is precisely the regression this test exists to catch: it left the
+    // declaration looking present while the box stopped being sized by it.
+    assert.match(
+      rule,
+      /(^|[;{\s])height:\s*100%/,
+      `${selector} must state its own height — Chromium's propagation hides its absence`
+    );
+  }
+});
+
+test("the companion Downtime panel hands over the Manager pane's whole height, at every width", async () => {
+  // The full ladder, because the block-size guarantee is what a companion's own `height: 100%`
+  // rests on, and `styles/fabricate.css` exempts this route from the shared `.manager-body`
+  // stack inside `@container fabricate-manager (max-width: 1120px)`. That exemption is the ONLY
+  // reason the host stays a definite-height grid below 1120px instead of becoming content-sized,
+  // which would silently invert every companion's percentage height into a page-length scroll.
+  // Delete it and the three narrow rungs here are what fails.
+  for (const managerWidth of MANAGER_WIDTH_LADDER) {
+    const read = await readCompanionPanelChain(managerWidth, companionShort);
+    const at = `at ${managerWidth}px`;
+    assert.equal(
+      read.target,
+      read.panels,
+      `the target is the panel's whole content box ${at} (got ${read.target} vs ${read.panels})`
+    );
+    assert.equal(
+      read.region,
+      read.panels,
+      `the panel region fills that box too ${at} (got ${read.region} vs ${read.panels})`
+    );
+    // The link the one-track host grid buys, and the one a vacuous equality hides: with two
+    // tracks left in place the panels landed in the `auto` one and collapsed to content height,
+    // while `target === panels` went on reading true because both sides collapsed together.
+    assert.equal(
+      read.panels,
+      read.host,
+      `and the panel row is the host's whole content box ${at} (got ${read.panels} vs ${read.host})`
+    );
+    assert.equal(
+      read.host,
+      read.main,
+      `and the host fills the Manager pane ${at} (got ${read.host} vs ${read.main})`
+    );
+    assert.ok(
+      read.main > 400,
+      `the pane is a REAL height ${at}, not a collapsed one every link agrees on (${read.main})`
+    );
+    assert.equal(
+      read.companion,
+      read.target,
+      `so a companion root asking for height: 100% actually gets it ${at}`
+    );
+  }
+});
+
+test('the companion Downtime panel is a bare box whose inline size is not guaranteed', async () => {
+  const widths = [];
+  for (const managerWidth of MANAGER_WIDTH_LADDER) {
+    const read = await readCompanionPanelChain(managerWidth, companionShort);
+    widths.push(read.targetWidth);
+    assert.equal(read.targetPadding, '0px 0px 0px 0px', 'the companion supplies its own inset');
+    assert.equal(read.targetOverflow, 'visible visible', 'and its own scroller, if it wants one');
+    assert.equal(read.targetContainerType, 'normal', 'Core imposes no CSS container on it');
+    // Core's own `12px 20px 24px` is GONE. It lived on the panels row, not on the target, so
+    // the padding read above could never have seen it; the offset from the host is what can.
+    assert.equal(read.insetTop, 0, `the target starts at the top of the host at ${managerWidth}px`);
+    assert.equal(read.insetLeft, 0, `and at its left edge at ${managerWidth}px`);
+    assert.equal(
+      read.targetWidth,
+      read.hostWidth,
+      `so the companion is handed the host's whole inline box at ${managerWidth}px`
+    );
+  }
+  // Core enforces no minimum Manager size and makes no no-horizontal-overflow promise for this
+  // panel, explicitly unlike the player seam's enforced 1024x640 floor. Pin the ladder so the
+  // contract's "not guaranteed" is a measured fact rather than a caveat nobody checked.
+  assert.ok(
+    widths.every((width, index) => index === 0 || width < widths[index - 1]),
+    `the target's inline size tracks the window all the way down (${widths.join(' -> ')})`
+  );
+  assert.ok(widths.at(-1) < 400, `and reaches a genuinely narrow box (${widths.at(-1)}px)`);
+});
+
+test('Core keeps the Downtime panel scroller for a visibly overflowing companion, and only then', async () => {
+  // Every case below states `height: 100%` on the companion root, so height is held CONSTANT
+  // and the only variable is how the root treats its own content. That is the whole point:
+  // "a full-height companion kills Core's scroller" and "a definite height kills Core's
+  // scroller" are both false, and each was believed once.
+  const visible = await readCompanionPanelChain(1400, companionRoot('display:block', companionRows));
+  assert.equal(
+    visible.panelsOverflowY,
+    'auto',
+    'Core keeps a real scroller on the panel row, not a clip that swallows the overflow'
+  );
+  assert.ok(
+    visible.panelScrolls,
+    `a full-height companion overflowing VISIBLY still scrolls (${visible.panelsScrollHeight} vs ${visible.panels})`
+  );
+
+  const nonShrinking = await readCompanionPanelChain(
+    1400,
+    companionRoot(
+      'display:flex;flex-direction:column',
+      '<div style="height:2400px;flex-shrink:0">tall</div>'
+    )
+  );
+  assert.ok(
+    nonShrinking.panelScrolls,
+    'a flex column whose child cannot shrink overflows visibly too, and still scrolls'
+  );
+
+  // The confound, pinned so it cannot be reintroduced as a probe: the SAME markup with the
+  // default flex factor squashes its child instead of overflowing, and reads as "full height
+  // killed the scroller" while nothing about height changed.
+  const shrinkable = await readCompanionPanelChain(
+    1400,
+    companionRoot('display:flex;flex-direction:column', '<div style="height:2400px">tall</div>')
+  );
+  assert.equal(
+    shrinkable.panelsOverflows,
+    false,
+    'a shrinkable child is SQUASHED rather than scrolled -- this is flex-shrink, not height'
+  );
+  assert.equal(
+    shrinkable.panels,
+    shrinkable.panelsScrollHeight,
+    'nothing overflowed at all, which is why the earlier probe measured no scroll'
+  );
+
+  const ownScroller = await readCompanionPanelChain(
+    1400,
+    companionRoot('overflow:auto', companionRows)
+  );
+  assert.equal(
+    ownScroller.panelsOverflows,
+    false,
+    'and a companion absorbing its own content with a non-visible overflow makes Core inert'
+  );
+
+  // The height stays OPT-IN either way: a companion that states none renders at content height
+  // rather than being stretched, so the contract adds a reachable box and forces nothing.
+  const noHeight = await readCompanionPanelChain(
+    1400,
+    '<div id="companion-root"><p style="margin:0">no height stated</p></div>'
+  );
+  assert.ok(
+    noHeight.companion < 100 && noHeight.target > 400,
+    `a companion stating no height keeps content height in a full-height target (${noHeight.companion} in ${noHeight.target})`
+  );
+});
+
+test("Core's preview keeps its own two-track host, with the tab strip on the bottom edge", async () => {
+  // CORE-FALLBACK HAD NO `npm test` LAYOUT GATE AT ALL (issue 1213 review) — its two-row host
+  // was exercised only by Playwright frames — so this rung states what a free user actually
+  // gets: the strip on the bottom edge and the preview scroller taking everything above it.
+  //
+  // ONE CORRECTION, measured rather than reasoned. The finding this rung answers claimed that
+  // losing `.downtime-host.core-fallback { grid-template-rows: minmax(0,1fr) auto }` would
+  // stack both children in one cell now that the base rule is the single provider track. It
+  // would not, in Chromium: with one explicit track and two children the second child lands in
+  // an IMPLICIT row, `grid-auto-rows` defaults to `auto`, and the resolved tracks are
+  // "638px 44px" either way — byte-identical geometry with the override deleted. So the
+  // override is an explicit statement of intent rather than the thing producing this layout,
+  // and a test asserting its presence by measurement could not fail.
+  //
+  // What this rung DOES catch is the failure that has actually happened here twice: the tracks
+  // in the wrong ORDER. Inverting them to `auto minmax(0,1fr)` puts the strip 44px above the
+  // host's bottom edge and fails below.
+  const read = await readCoreFallbackHostRows(1400);
+  assert.equal(read.strip, 44, 'the strip takes its own content height in the `auto` track');
+  assert.equal(read.stripBottomGap, 0, 'and sits on the bottom edge of the host');
+  assert.equal(
+    read.scroll,
+    read.host - read.strip,
+    `the preview scroller takes the rest (${read.scroll} of ${read.host} beside a ${read.strip} strip)`
+  );
+  assert.ok(read.scrollScrolls, 'and it still scrolls its own overflowing preview content');
 });

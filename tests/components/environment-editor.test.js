@@ -185,13 +185,16 @@ describe('environment multi-realm selector', () => {
     assert.ok(overviewSource.includes('data-environment-realm-empty'), 'empty-state hint hook should exist');
     assert.ok(overviewSource.includes('realmOptions.length === 0'), 'empty state guards on no realm options');
     assert.equal(typeof lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty, 'string');
-    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty.includes('Travel'), 'empty-state hint names the Travel tab');
+    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty.includes('World > Travel'), 'empty-state hint names the world route realms are authored on');
   });
 
   it('sources realm options from GatheringRealm records, not the removed vocabulary', () => {
     assert.ok(overviewSource.includes('realmRecords'), 'overview consumes realmRecords (GatheringRealm records)');
     assert.equal(shellSource.includes("realmOptions={gatheringVocabularyOptions('realms')}"), false, 'no longer sources realm from the vocabulary');
-    assert.ok(managerRootSource.includes('realmRecords={$viewState.selectedSystemRealms'), 'root threads realm records into the editor');
+    // `worldRealms` since issue 1282, and the key rename is why this assertion is not merely
+    // cosmetic: it pinned the OLD view-model key, so a root left reading it would have handed
+    // the editor `undefined`, emptied the realm picker, and kept this guard green.
+    assert.ok(managerRootSource.includes('realmRecords={worldRealms}'), 'root threads the world realm records into the editor');
     assert.ok(managerRootSource.includes('realmsEnabled={gatheringRealmsEnabled}'), 'root threads the toggle gate into the editor');
   });
 });

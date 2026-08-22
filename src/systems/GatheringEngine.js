@@ -2,14 +2,18 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
 import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
+  resolvePresentToolIds,
 } from '../gatheringToolRuntime.js';
+import { resolveToolDisplayImage, resolveToolDisplayName } from '../models/toolDisplay.js';
 import {
   buildInteractiveRollOptions,
   promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
@@ -40,8 +44,8 @@ import {
   evaluateLocationAvailability,
 } from './gatheringLocation.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
-import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
-import { isGatheringRealmsEnabled } from './gatheringRealms.js';
+import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
+import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { computeSystemVisibility } from './systemValidation.js';
@@ -158,6 +162,7 @@ export class GatheringEngine {
     hookPublisher = null,
     getRunViewer = null,
     locationResolver = null,
+    travelStore = null,
     random = Math.random,
     localize = defaultLocalize,
     // Stamina regen / node respawn run on world-time advance and write shared
@@ -220,6 +225,11 @@ export class GatheringEngine {
     // Constructor-injected current-realm resolver (GatheringLocationService),
     // NOT a module import — keeps the engine system-agnostic and testable.
     this.locationResolver = locationResolver;
+    // The WORLD travel configuration (issue 1282): the realm library and the reveal mode.
+    // Injected for the same reason, and deliberately NOT reached through a composer — unlike
+    // currency, whose reader starts from a recipe carrying only a system id, every realm
+    // reader here is a class that already receives its collaborators this way.
+    this.travelStore = travelStore;
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
@@ -1201,13 +1211,17 @@ export class GatheringEngine {
    * @param {Map<string, object>|null} [args.cache]
    * @returns {object} Current-realm context (resolved/source/realms/...).
    */
-  _resolveRealmContext({ actor, systemId, cache = null }) {
-    if (cache && cache.has(systemId)) return cache.get(systemId);
+  _resolveRealmContext({ actor, cache = null }) {
+    // ONE cache entry, not one per system (issue 1282). Where the actor's party is standing is
+    // world-wide now, so keying this by `systemId` would recompute an identical answer once
+    // per crafting system in the listing.
+    const key = 'world';
+    if (cache && cache.has(key)) return cache.get(key);
     const context =
       typeof this.locationResolver?.buildCurrentRealmContext === 'function'
-        ? this.locationResolver.buildCurrentRealmContext({ actor, systemId })
+        ? this.locationResolver.buildCurrentRealmContext({ actor })
         : { resolved: false, source: 'unresolved', realms: [], realmIds: [], staleRealmIds: [] };
-    if (cache) cache.set(systemId, context);
+    if (cache) cache.set(key, context);
     return context;
   }
 
@@ -1261,14 +1275,14 @@ export class GatheringEngine {
     const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const availability = evaluateLocationAvailability(environment, context);
     const isGM = viewer?.isGM === true;
-    const revealMode = this._realmRevealMode(system);
+    const revealMode = this._realmRevealMode();
+    // The FULL world library, not `context.realms`: this feeds `buildTravelGuidance`, which
+    // names the destinations a player could travel to, not merely the ones they are in.
+    const worldRealms = this.travelStore?.list?.();
     const realmsById = new Map(
-      (Array.isArray(system?.gatheringRealms) ? system.gatheringRealms : []).map((realm) => [
-        realm.id,
-        realm,
-      ])
+      (Array.isArray(worldRealms) ? worldRealms : []).map((realm) => [realm.id, realm])
     );
-    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
+    const discoveredRealmIds = actor ? getDiscoveredRealmIds(actor) : new Set();
 
     const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
       buildRealmDisclosure(realm, {
@@ -1329,8 +1343,8 @@ export class GatheringEngine {
     const systemId = stringOrNull(environment?.craftingSystemId);
     const context = this._resolveRealmContext({ actor, systemId, cache: realmContextCache });
     const isGM = viewer?.isGM === true;
-    const revealMode = this._realmRevealMode(system);
-    const discoveredRealmIds = actor ? getDiscoveredRealmIdsForSystem(actor, systemId) : new Set();
+    const revealMode = this._realmRevealMode();
+    const discoveredRealmIds = actor ? getDiscoveredRealmIds(actor) : new Set();
     const currentRealms = (Array.isArray(context?.realms) ? context.realms : []).map((realm) =>
       buildRealmDisclosure(realm, {
         isGM,
@@ -1384,10 +1398,17 @@ export class GatheringEngine {
           .filter(Boolean)
       ),
     ];
-    // System-singularity rule: a single chip can only honestly represent one
-    // system's realm context. Zero realm-enabled systems → chip stays hidden;
-    // more than one → ambiguous, fall back to selection-driven behavior.
-    if (realmEnabledSystemIds.length !== 1) {
+    // The system-singularity rule is GONE (issue 1282).
+    //
+    // It used to refuse the chip whenever more than one realm-enabled system appeared, on the
+    // grounds that "a single chip can only honestly represent one system's realm context".
+    // That was true, and it was an artefact of the wrong scope rather than a rule worth
+    // keeping: the realm library, the reveal mode and the party's location are all world-wide
+    // now, so every enabled system would answer identically and WHICH one supplies the gate is
+    // no longer observable. The chip shows whenever at least one system participates.
+    //
+    // Zero participating systems still hides it — there is nothing the location could gate.
+    if (realmEnabledSystemIds.length === 0) {
       return { enabled: false, realms: [], systemId: null };
     }
     const systemId = realmEnabledSystemIds[0];
@@ -1408,9 +1429,15 @@ export class GatheringEngine {
     };
   }
 
-  _realmRevealMode(system) {
-    const mode = system?.gatheringRealmSettings?.revealMode;
-    return mode === 'alwaysVisible' || mode === 'onPartyTokenEntry' ? mode : 'manual';
+  /**
+   * How realm names are disclosed to players — a WORLD fact since issue 1282.
+   *
+   * Read through the shared helper rather than inline, because the old per-system read
+   * coerced a missing value to `'manual'`: a reader left pointing at the retired field would
+   * have turned every `alwaysVisible` world into a `manual` one silently, with no error.
+   */
+  _realmRevealMode() {
+    return getRealmRevealMode(this.travelStore?.get?.());
   }
 
   async _checkSceneAccess({ environment, viewer, actor }) {
@@ -1583,11 +1610,12 @@ export class GatheringEngine {
 
     const resolved = states.map(({ tool, state }) => {
       const component = componentsById.get(stringOrNull(tool?.componentId)) ?? null;
-      const name =
-        stringOrNull(tool?.label) ||
-        stringOrEmpty(component?.name) ||
-        this.localize(UNKNOWN_TOOL_LABEL_KEY);
-      const img = stringOrNull(component?.img) || DEFAULT_TOOL_IMG;
+      // The shared `data-models` requirement-13 precedence: authored label, then the
+      // registration snapshot, then the linked component. Consulting the component alone
+      // rendered "Unknown tool" + the item-bag glyph for every item-sourced Tool, which
+      // carries `componentId: null` by construction (issue 1119).
+      const name = resolveToolDisplayName(tool, component, this.localize(UNKNOWN_TOOL_LABEL_KEY));
+      const img = resolveToolDisplayImage(tool, component);
       return {
         id: stringOrNull(tool?.id) || stringOrNull(tool?.componentId),
         name,
@@ -1665,11 +1693,13 @@ export class GatheringEngine {
     // Fallback: treat a tool as satisfied when virtually present (canvas Tool).
     // System-scoped: a present tool only counts when the active tool's systemId
     // matches this task's crafting system (componentId is a per-system id).
-    const presentSet = resolvePresentComponentIds({
-      presentTools,
-      systemId: system?.id ?? task?.craftingSystemId ?? null,
-    });
-    const missing = tools.filter((tool) => !presentSet.has(tool?.componentId));
+    const presentScope = { presentTools, systemId: system?.id ?? task?.craftingSystemId ?? null };
+    const presentSet = resolvePresentComponentIds(presentScope);
+    // An item-sourced Tool station has no componentId to key on (issue 1119).
+    const presentToolSet = resolvePresentToolIds(presentScope);
+    const missing = tools.filter(
+      (tool) => !presentToolSet.has(tool?.id) && !presentSet.has(tool?.componentId)
+    );
     return missing.length === 0
       ? { available: true, missing: [], failedRequirements: [] }
       : { available: false, missing, failedRequirements: [] };
@@ -2703,14 +2733,19 @@ export class GatheringEngine {
       const toolBroke =
         Array.isArray(usedTools) && usedTools.some((entry) => entry?.broken === true);
       if (toolBroke && resolveToolBreakagePolicy(environment) === 'failureOnBreak') {
+        // A VOIDED SUCCESS, not an authored failure (issue 1098). Clearing the groups
+        // here is what keeps `failureOnBreak` out of failure awarding under `always`:
+        // `awardsResultsFor` selects on the surviving group list, so an attempt the
+        // tool-breakage policy voided has nothing left to award and cannot convert
+        // "the attempt is void" into "award the failure loot".
         outcome.status = 'failed';
         outcome.resultGroups = [];
+        outcome.failureAward = false;
       }
 
-      const createdResults =
-        outcome.status === 'succeeded'
-          ? await this._planGatheredResults({ viewer, actor, system, environment, task, outcome })
-          : [];
+      const createdResults = awardsResultsFor(outcome, system)
+        ? await this._planGatheredResults({ viewer, actor, system, environment, task, outcome })
+        : [];
       if (createdResults?.status === 'misconfigured') return createdResults;
 
       return {
@@ -2848,7 +2883,12 @@ export class GatheringEngine {
     checkResult,
     presentTools = null,
   }) {
-    if (outcome.status === 'succeeded') {
+    // THE MIRRORED HALF of the gate in `_terminalSideEffectPlan` (issue 1098, AF4/CF6).
+    // Both run in sequence on both flows, and the PLAN's `createdResults` is what feeds
+    // the run record, `response.createdResults` and the posted chat card. Gating only
+    // this half would create items on the actor that all three report as zero — a state
+    // an item-count-only assertion cannot detect — so the two read the SAME predicate.
+    if (awardsResultsFor(outcome, system)) {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
     }
     await this._applyTerminalTools({
@@ -2896,7 +2936,14 @@ export class GatheringEngine {
       });
     }
 
-    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive });
+    return this._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula,
+      actor,
+      system,
+      task,
+      interactive,
+    });
   }
 
   /**
@@ -2910,8 +2957,23 @@ export class GatheringEngine {
    * `normalizeTerminalOutcome` machinery the provider path uses.
    * @private
    */
-  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive = false }) {
+  async _resolveRoutedFormulaOutcome({
+    routed,
+    rollFormula,
+    actor,
+    system = null,
+    task,
+    interactive = false,
+  }) {
     const dc = this._resolveGatheringRoutedDc(routed, task);
+    // THIS SEAM IS DORMANT (issue 1095, decision 8) — unreachable, not dead. No
+    // GM-selectable configuration reaches it today: `_libraryTaskToRuntimeTask` hardcodes
+    // `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders both
+    // formula-rolled modes `disabled`. The check-modifier context lands here now so the
+    // capability is complete when 683 flips the switch, and so this path is not the one
+    // place the shape was forgotten. Gathering has no tool-bonus seam, so nothing is
+    // appended before the modifier term (a named out-of-scope follow-up on issue 1093).
+    const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
     const rolled = await runFormulaRouted({
       formula: rollFormula,
       dc,
@@ -2922,6 +2984,7 @@ export class GatheringEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Gathering',
+      craftingModifier,
       // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
       // a per-task dcOverride never opens a null-outcome dead zone.
       clampToNearest: true,
@@ -2953,10 +3016,25 @@ export class GatheringEngine {
       engineEvaluated: true,
     };
 
-    // A failing tier (or no tier match) routes to a terminal failure; a succeeding
-    // tier routes to the result group whose name matches the tier name.
+    // A failing tier routes to a terminal failure — and, since issue 1098, CARRIES the
+    // failure tier's matched result group with it so the award gate downstream has
+    // something to award. `_terminalSideEffectPlan` and `_commitTerminalSideEffects` own
+    // the policy decision; this seam only stops throwing the group away.
+    //
+    // A NULL `outcomeName` (a fixed-tier total outside every authored range) carries
+    // NOTHING and therefore never awards: there is no tier, so there is no authored
+    // failure output to select, and matching "no name" against group names would award
+    // whatever happened to be unnamed.
     if (rolled.success !== true || !outcomeName) {
-      return normalizeTerminalOutcome({ status: 'failed', outcome: outcomeName, checkResult });
+      const failureGroups = outcomeName
+        ? matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
+            firstOnly: false,
+          })
+        : [];
+      return normalizeTerminalOutcome(
+        { status: 'failed', outcome: outcomeName, resultGroups: failureGroups, checkResult },
+        { retainFailureResultGroups: true }
+      );
     }
     // Gathering keeps ALL same-named groups (`firstOnly: false`); the per-system
     // routing key (the success tier name) stays in the caller above.
@@ -3178,11 +3256,16 @@ export class GatheringEngine {
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
+      // DORMANT, exactly as the routed seam above is (issue 1095, decision 8): progressive
+      // gathering is rendered `disabled` in the economy editor and no runtime task ever
+      // carries the mode, so this modifier context is unreachable pending issue 683. It
+      // lands now so the shape is complete on arrival rather than half-threaded.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
         triggers: progressive.checkBreakage?.triggers,
         actor,
         label: 'Gathering',
+        craftingModifier: buildCheckModifierContext(system, 'gathering', task),
         rollOptions: buildInteractiveRollOptions({
           interactive,
           actor,
@@ -3869,7 +3952,17 @@ function normalizeToolResult(result) {
   };
 }
 
-function normalizeTerminalOutcome(raw) {
+/**
+ * @param {object} raw
+ * @param {object} [options]
+ * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a
+ *   FAILED outcome instead of clearing it (issue 1098). Opt-in, and used by exactly one
+ *   caller — the routed failure branch — so every other caller's failed outcome is
+ *   byte-for-byte what it was: a resolver that happens to hand back groups alongside a
+ *   failure (the progressive path spreads a whole resolver payload) must not start
+ *   awarding them because a different branch needed the field.
+ */
+function normalizeTerminalOutcome(raw, { retainFailureResultGroups = false } = {}) {
   if (!raw || typeof raw !== 'object') {
     return misconfiguredOutcome({
       code: 'MALFORMED_OUTCOME',
@@ -3903,9 +3996,18 @@ function normalizeTerminalOutcome(raw) {
     ['failed', 'failure', 'fail', 'miss'].includes(disposition) ||
     FAILURE_KEYWORDS.has(outcomeText);
   if (failed) {
+    const retained = retainFailureResultGroups ? normalizeOutcomeGroups(raw) : [];
     return {
       status: 'failed',
-      resultGroups: [],
+      resultGroups: retained,
+      // THE OPT-IN MARKER (issue 1098). A failed outcome carrying groups is NOT by
+      // itself an authored failure award: the d100 resolver's `failureWithEvent` policy
+      // returns exactly that shape — a failed attempt whose matched drop rows are what
+      // the "nothing found" card reports — and awarding those would change d100
+      // behaviour, which this issue must not do. Only the routed seam that deliberately
+      // matched a FAILURE TIER'S group sets this, so the gate can tell the two apart
+      // without inspecting the resolution mode from the far side of the engine.
+      ...(retained.length > 0 && { failureAward: true }),
       checkResult: normalizeOutcomeCheckResult(raw),
     };
   }
@@ -4085,6 +4187,42 @@ function difficultyForResult(system, result) {
 
 function hasAwardedResults(resultGroups) {
   return normalizeList(resultGroups).some((group) => normalizeList(group?.results).length > 0);
+}
+
+/**
+ * May this terminal outcome award its result groups? — THE ONE PREDICATE both halves of
+ * gathering's mirrored award gate read (issue 1098, AF4/CF6/CF10).
+ *
+ * A succeeded outcome always may, exactly as before. A FAILED one may only when
+ * `gatheringCraftingCheck.failureResultPolicy` permits results on failure AND the
+ * outcome still carries a group — which is what excludes, without a special case each:
+ *
+ *  - a `failureOnBreak`-voided attempt (the tool-breakage policy clears both);
+ *  - a `null` outcome name, a fixed-tier total outside every authored range (the routed
+ *    seam carries nothing for it);
+ *  - a `ROUTED_TIER_UNROUTED` misconfiguration, whose status is `misconfigured`, not
+ *    `failed` — under `always` the stale "unrouted tier is a plain failure" reading would
+ *    have turned authoring drift into failure loot;
+ *  - EVERY d100 outcome. The d100 resolver's `failureWithEvent` policy returns a failed
+ *    outcome that still carries the matched drop rows, so a groups-only test would start
+ *    awarding on a branch this issue must leave untouched. `failureAward` is set by
+ *    `normalizeTerminalOutcome` only for the routed failure seam, and d100 outcomes do
+ *    not pass through it at all.
+ *
+ * THE WHOLE PATH SHIPS DORMANT pending issue 683 (decision 8): `_libraryTaskToRuntimeTask`
+ * hardcodes `resolutionMode: 'd100'` and `GatheringEconomyView` renders both
+ * formula-rolled modes disabled, so no configuration a GM can select reaches it today.
+ *
+ * @param {?{status?: string, resultGroups?: Array}} outcome
+ * @param {?object} system
+ * @returns {boolean}
+ */
+function awardsResultsFor(outcome, system) {
+  if (outcome?.status === 'succeeded') return true;
+  if (outcome?.status !== 'failed') return false;
+  if (outcome?.failureAward !== true) return false;
+  if (!activityPermitsFailureResults(system, 'gathering')) return false;
+  return normalizeList(outcome?.resultGroups).length > 0;
 }
 
 function normalizeVisibilityResult(result) {

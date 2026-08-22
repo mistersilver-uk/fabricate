@@ -12,6 +12,41 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+
+/**
+ * The options list's own max height, floored to a WHOLE number of rows (issue 1280).
+ *
+ * The popover's `maxHeight` is derived from the viewport, so the space left for the list after
+ * the search field and the popover's padding is an arbitrary number of pixels. Left to fill it,
+ * the list slices its last row in half at the viewport edge, and the slice sits directly against
+ * the popover's bottom padding — which reads as a rendering fault rather than as "more below".
+ *
+ * Flooring is deliberately silent about the leftover pixels: they stay as popover padding, which
+ * is where a reader expects slack. Returning `null` when the caller supplies no measurements is
+ * what keeps this back-compatible — a caller that does not measure rows gets the previous
+ * behaviour rather than a guessed height.
+ *
+ * @param {number} maxHeight The popover's own max height.
+ * @param {object} options `rowPitch` (row height + the gap between rows) and `chromeHeight`
+ *   (everything in the popover that is not the list: its padding, the search field, the gap).
+ * @returns {number|null} The list's max height, or `null` when it cannot be derived.
+ */
+function floorListToWholeRows(maxHeight, options) {
+  const rowPitch = Number(options?.rowPitch) || 0;
+  const chromeHeight = Number(options?.chromeHeight) || 0;
+  if (rowPitch <= 0) return null;
+
+  const available = maxHeight - chromeHeight;
+  // A popover too short for even one row still shows one, clipped: refusing to render the list
+  // at all would be a worse answer than a cramped one, and the caller cannot open a picker with
+  // no options in it.
+  const rows = Math.max(1, Math.floor(available / rowPitch));
+  // `rows` pitches minus the trailing gap: N rows carry only N-1 gaps between them, so keeping
+  // the last gap would reintroduce exactly the sliver this exists to remove.
+  const trailingGap = Number(options?.rowGap) || 0;
+  return Math.max(0, rows * rowPitch - trailingGap);
+}
+
 export function computeIconPickerPopoverLayout(triggerRect, viewport, options = {}) {
   const resolvedRect = triggerRect && typeof triggerRect === 'object' ? triggerRect : null;
   const viewportWidth = Number(viewport?.width) || 0;
@@ -68,13 +103,16 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
     Math.max(availableHeight, Math.min(minUsableHeight, fallbackHeight))
   );
 
+  const listMaxHeight = floorListToWholeRows(maxHeight, options);
+
   if (placement === 'top') {
     return {
       placement,
       left,
       width,
       bottom: Math.max(viewportMargin, viewportHeight - triggerTop + gap),
-      maxHeight
+      maxHeight,
+      listMaxHeight
     };
   }
 
@@ -83,6 +121,7 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
     left,
     width,
     top: Math.max(viewportMargin, triggerBottom + gap),
-    maxHeight
+    maxHeight,
+    listMaxHeight
   };
 }

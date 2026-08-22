@@ -6,7 +6,10 @@
  * single source of truth for that set: the router (which owns the rail) imports
  * `buildCraftingNavItems` to render the visible tabs, `activeCraftingTab` to
  * highlight the tab for the active view, and `isCraftingRoute` to decide whether
- * the active view belongs to the Crafting group at all.
+ * the active view belongs to the Crafting group at all. Route reconciliation reads
+ * the same model through `isCraftingViewAvailable` and `resolveCraftingRedirect`
+ * (issue 1151), so a system that stops offering the entry owning the active route
+ * cannot strand the GM on a surface with no rail entry to return to it.
  *
  * The visibility of the Access and Books & Scrolls tabs derives from
  * `craftingEffect(visibilityMode)` so the conditional surface stays in lockstep
@@ -36,6 +39,21 @@ export const CRAFTING_VIEWS = Object.freeze([
   'knowledge',
   'crafting-settings',
 ]);
+
+/**
+ * The MODE-CONDITIONAL views, in rail order.
+ *
+ * `recipes` and `crafting-settings` are unconditional, so they are deliberately not
+ * members: they are never the subject of a redirect and never its target. Order is
+ * rail order, which is also the redirect's precedence order — one ordering table,
+ * so the rail and the router cannot disagree about which entry comes first.
+ *
+ * This is a read of what {@link buildCraftingNavItems} can EMIT, not a second copy
+ * of its gates; `tests/crafting-nav.test.js` fails when a fifth mode-gated entry is
+ * added to the builder without being listed here.
+ * @type {readonly string[]}
+ */
+export const CRAFTING_CONDITIONAL_VIEWS = Object.freeze(['access', 'books-scrolls', 'knowledge']);
 
 // The sub-tab a given active view belongs under. Editor/detail views collapse
 // onto their parent browse tab so the rail highlight stays stable while editing.
@@ -156,4 +174,62 @@ export function activeCraftingTab(view) {
  */
 export function isCraftingRoute(view) {
   return CRAFTING_VIEWS.includes(view);
+}
+
+/**
+ * Whether the sub-tab that OWNS a view is offered for a system (issue 1151).
+ *
+ * The test is taken over the owning ENTRY, never over the view, and that is the
+ * whole point of routing it through {@link activeCraftingTab}: no nav item carries
+ * the view `recipe-edit` or `recipe-item-edit` under any mode, so asking whether
+ * some item's `view` equals the active one is false for both of them always, and a
+ * router clause written that way would eject the GM from the recipe editor the
+ * instant it opened. `crafting-settings` would survive that only by accident of the
+ * id/view mismatch (the Settings item's id is `settings`), which is exactly the
+ * vocabulary trap `checks/checksNav.js` warns about.
+ *
+ * `recipes`/`recipe-edit` own `recipes` and `crafting-settings` owns `settings`, and
+ * both entries are unconditional, so neither is ever unavailable. `recipe-item-edit`
+ * owns `books-scrolls` and therefore follows its parent.
+ *
+ * @param {string} view The active view id.
+ * @param {object} [args] The same argument bag {@link buildCraftingNavItems} takes.
+ * @returns {boolean} False for a view outside the Crafting group, which the router's
+ *   own {@link isCraftingRoute} guard makes unreachable.
+ */
+export function isCraftingViewAvailable(view, args = {}) {
+  const owner = activeCraftingTab(view);
+  if (!owner) return false;
+  return buildCraftingNavItems(args).some((item) => item.id === owner);
+}
+
+/**
+ * The view to fall back to when the active Crafting route's owning entry is not in
+ * the submenu for the selected system (issue 1151).
+ *
+ * It is the FIRST mode-conditional item {@link buildCraftingNavItems} emits, and
+ * `recipes` when the system offers none. The rule is source-independent: it asks
+ * only what the new system offers, never which view the GM was on, so one order —
+ * rail order — answers every entry path.
+ *
+ * This deliberately departs from `resolveChecksRedirect`, which returns
+ * `items[0]?.view`. `items[0]` is always `recipes` here, so the Checks shape would
+ * produce a redirect that is technically valid and practically useless: a GM sent
+ * from Access to Recipes has been moved off the surface that governs who may see
+ * what onto a browser. The two resolvers share the property that matters — the
+ * target is read out of the same builder the rail renders, never hard-coded — and
+ * differ only in which item they select from it.
+ *
+ * Because the target is derived from the built list rather than from a
+ * `visibilityMode` lookup table, the Knowledge entry's wider gate falls out
+ * automatically: a `global` alchemy system lands on Knowledge, not Recipes.
+ *
+ * @param {object} [args] The same argument bag {@link buildCraftingNavItems} takes.
+ * @returns {string} A view id the rail renders for those same arguments.
+ */
+export function resolveCraftingRedirect(args = {}) {
+  const conditional = buildCraftingNavItems(args).find((item) =>
+    CRAFTING_CONDITIONAL_VIEWS.includes(item.view)
+  );
+  return conditional?.view ?? 'recipes';
 }

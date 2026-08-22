@@ -100,7 +100,8 @@ The resolution mode determines how ingredients map to results:
 ## Multi-Step Recipes
 
 When multi-step recipes are enabled, recipes can have several sequential steps.
-Each step has its own ingredients, results, required tools, and optional time and currency requirements.
+Each step has its own ingredients, results, required tools, and an optional time requirement.
+An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 Conceptually, each step is a separate recipe that is part of a larger recipe.
 You could achieve the same outcome using multiple recipes.
 
@@ -133,7 +134,7 @@ The Overview tab edits identity (name, description, image, and whether it is on 
 When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
-When the system has a check-modifier catalogue and its combination rule is **Recipe picks**, the Overview tab also lets the recipe pick which of those modifiers apply to it, up to the system's pick limit.
+When the system has a Modifiers library and its combination rule is **By recipe**, the Overview tab also lets the recipe pick which of those modifiers apply to it, up to the system's pick limit.
 The combination rule itself is always the system's, and no other rule offers a recipe a control.
 See [Check modifiers]({% link crafting-checks.md %}#check-modifiers).
 

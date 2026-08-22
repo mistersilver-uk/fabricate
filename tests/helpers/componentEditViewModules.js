@@ -19,6 +19,14 @@
  * throws for it up front.
  */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
+  // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
+  // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
+  'src/systems/checkModifierResolver.js',
+  'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
+  'src/systems/toolCheckBonus.js',
+  'src/utils/craftingCheckExpression.js',
+  'src/utils/rollExpressionAverage.js',
   'src/ui/svelte/util/foundryBridge.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
   // (issue 1050); `ComponentEditView` reaches it through the salvage quantity and DC fields.
@@ -66,5 +74,10 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // turns the essences section on.
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
+  // The SHARED subject check-modifier picker (issue 1095), rendered inside the salvage
+  // block. A `.svelte` the tree renders but this list omits HANGS the suite.
+  'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
+  'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

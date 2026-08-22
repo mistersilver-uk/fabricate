@@ -333,8 +333,8 @@ export function bulkRecipeBookOp(draft, bookId) {
  * for a book that holds every selected recipe. Counting from the definition would report
  * "holds none selected" and DISABLE Remove on exactly the legacy worlds that most need
  * this axis. Each projected row's `recipeItemIds` is derived by
- * `_recipeItemDefinitionsContaining` (`adminStore.js`), which takes the basis as a
- * parameter and is pinned against a real legacy-basis world by
+ * `recipeItemDefinitionsContaining` (`utils/recipeItemMembership.js`), which takes the
+ * basis as a parameter and is pinned against a real legacy-basis world by
  * `tests/recipe-book-membership-basis.test.js` — so reading it is basis-aware for free.
  *
  * A `Map` rather than a plain object because a recipe-item definition id is unvalidated
@@ -416,7 +416,7 @@ function tierAxisUnavailable(reason) {
 
 /**
  * Whether the check-tier axis can be offered for this system, and if not, WHICH of the
- * five reasons it is — so the panel can state the reason in place of the control rather
+ * six reasons it is — so the panel can state the reason in place of the control rather
  * than silently hiding it.
  *
  * The gate mirrors `resolveRecipeCheckTierOptions`'s own structure exactly, because the two
@@ -427,27 +427,38 @@ function tierAxisUnavailable(reason) {
  * - `dynamic` — a simple check whose DC is resolved at craft time.
  * - `fixed` — a routed check of fixed type, where per-recipe difficulty is the recipe's
  *   minimum success tier instead.
+ * - `noCheck` — the system's resolution mode rolls NO crafting check, so there is no check
+ *   to author tiers on. See below.
  * - `unrecognisedMode` — see below.
  * - `noTiers` — the gate is open but the check authors no tiers, so every recipe uses the
  *   default DC and there is nothing to pick.
  *
- * `unrecognisedMode` is a DEFENSIVE branch, not a reachable state.
- * `CraftingSystemManager._normalizeResolutionMode` coerces every persisted
- * `resolutionMode` to one of five tokens with a `simple` fallback, and it runs on load, on
- * create and on update; the manager root then defaults a missing mode to `simple` again. So
- * `craftingCheckMode` is never `null` for a system read through the manager. The branch
- * exists only so this function is TOTAL over its input and can be unit-tested by passing
- * `null` directly — it is deliberately absent from the canonical spec, because a canonical
- * requirement must not assert a state no world can produce.
+ * `noCheck` IS REACHABLE, and it is why `unrecognisedMode` can no longer speak for a
+ * `null` mode (issue 1096). `craftingCheckMode` is the SLOT
+ * `resolveActiveCraftingCheckFormula` selects, and that helper returns `null` for a
+ * perfectly well-formed alchemy system authored at `alchemy.checkMode: 'none'` — a GM's
+ * ordinary choice, not a defect. Reporting "Fabricate doesn't recognise this system's
+ * resolution mode" there would send that GM to the Crafting settings to fix a system that
+ * has nothing wrong with it.
  *
- * This is NOT the same fact as the system having no usable crafting check at all (no
- * authored `rollFormula`); that is orthogonal, and the row's own `No check` pill reports it.
- * The two are never conflated.
+ * `unrecognisedMode` survives for the token OUTSIDE the canonical set.
+ * `CraftingSystemManager._normalizeResolutionMode` coerces every persisted `resolutionMode`
+ * to one of five tokens with a `simple` fallback on load, on create and on update, so a
+ * system read through the manager cannot reach it; it exists so this function is TOTAL over
+ * its input, including the `undefined` an absent axis object yields.
+ *
+ * The two are distinguished by `craftingCheckMode` alone, which is why the caller must pass
+ * the resolver's slot verbatim: `null` is "this mode rolls no check", `undefined` is "no
+ * mode was supplied at all".
+ *
+ * This is NOT the same fact as the system having a check slot but no usable `rollFormula`;
+ * that is orthogonal, and the row's own `No check` pill reports it. The two are never
+ * conflated.
  *
  * An early-return chain rather than nested ternaries (Sonar S3358).
  *
  * @param {{craftingCheck?: object, craftingCheckMode?: ?string, tierOptions?: object[]}} axis
- * @returns {{available: boolean, reason: ?('progressive'|'dynamic'|'fixed'|'unrecognisedMode'|'noTiers')}}
+ * @returns {{available: boolean, reason: ?('progressive'|'dynamic'|'fixed'|'noCheck'|'unrecognisedMode'|'noTiers')}}
  */
 export function describeRecipeCheckTierAxis(axis = {}) {
   const { craftingCheck, craftingCheckMode, tierOptions } = axis || {};
@@ -459,6 +470,7 @@ export function describeRecipeCheckTierAxis(axis = {}) {
   if (craftingCheckMode === 'routed' && craftingCheck?.routed?.type === 'fixed') {
     return tierAxisUnavailable('fixed');
   }
+  if (craftingCheckMode === null) return tierAxisUnavailable('noCheck');
   if (craftingCheckMode !== 'simple' && craftingCheckMode !== 'routed') {
     return tierAxisUnavailable('unrecognisedMode');
   }

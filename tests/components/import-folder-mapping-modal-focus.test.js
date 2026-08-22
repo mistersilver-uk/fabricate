@@ -15,7 +15,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js'
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js'
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',

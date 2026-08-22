@@ -40,6 +40,8 @@
     routingProvider = null,
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
+    // Issue 1098: threaded on to the section and the single-step group card alike.
+    failureResultsAllowed = false,
     // Progressive systems award results in order; forwarded to each result section
     // so its rows get drag-reorder handles.
     progressive = false,
@@ -210,6 +212,7 @@
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {outcomeTiersDefined}
+            {failureResultsAllowed}
             onAssignIngredientSet={(groupId, setId, assigned) =>
               onAssignIngredientSet(step.id, groupId, setId, assigned)}
             onChange={(nextGroups) => onUpdateResultGroups(step.id, nextGroups)}
@@ -228,6 +231,7 @@
       {ingredientSets}
       {outcomeTierOptions}
       {outcomeTiersDefined}
+      {failureResultsAllowed}
       onAssignIngredientSet={(groupId, setId, assigned) =>
         onAssignIngredientSet(null, groupId, setId, assigned)}
       onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}

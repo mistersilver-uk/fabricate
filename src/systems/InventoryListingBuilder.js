@@ -56,6 +56,13 @@ import {
 // of the builder re-reading `match.componentId` and missing every non-direct type.
 import { getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+import {
+  TOOL_IMAGE_SENTINEL,
+  linkedComponentFor,
+  resolveToolDescription,
+  resolveToolDisplayImage,
+  resolveToolDisplayName,
+} from '../models/toolDisplay.js';
 // Single-sourced with the GM UI so the builder and the recipe-item editor share one
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
@@ -63,7 +70,7 @@ import { findMatchingComponent } from '../utils/essenceResolver.js';
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
 // A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
-import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
+import { matchRecipeItemDefinition, resolveToolForItem } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { readStackQuantity } from './itemStackQuantity.js';
@@ -273,7 +280,11 @@ export class InventoryListingBuilder {
       worldTime: Number(this._nowWorldTime() || 0),
       rows,
       counts: {
-        components: componentRows.length,
+        // Tool-only cards are their own pill, so they are excluded from the component
+        // count rather than double-counted under both (issue 1119). A whetstone is a
+        // component that is also a tool, so it counts in both.
+        components: componentRows.filter((row) => row.isToolOnly !== true).length,
+        tools: componentRows.filter((row) => row.isTool === true).length,
         essences: essenceRows.length,
         recipeItems: recipeItemRows.length,
         total: rows.length,
@@ -333,18 +344,52 @@ export class InventoryListingBuilder {
    */
   _buildSystemParticipations(system, sources, allowedRecipeIds = null, isGM = true, order = 0) {
     const components = Array.isArray(system?.components) ? system.components : [];
-    if (components.length === 0) return { participations: [], essenceRows: [] };
+    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    // A system with tools and ZERO components must still project its owned tools (issue
+    // 1119), so the cheap bail-out is the union of both libraries, not components alone.
+    if (components.length === 0 && tools.length === 0) {
+      return { participations: [], essenceRows: [] };
+    }
 
-    const owned = this._collectOwnedEntities(
+    const owned =
+      components.length === 0
+        ? new Map()
+        : this._collectOwnedEntities(
+            sources,
+            (item) => findMatchingComponent(item, components, system?.id),
+            'component'
+          );
+
+    // Tool ownership is resolved through a LIGHTWEIGHT lookup that issues no recipe query,
+    // so a system nobody owns anything in still costs nothing — `_systemRowContext` fetches
+    // this system's recipes, and building it unconditionally would query every installed
+    // system on every listing.
+    const toolLookup = this._toolLookup(system, components);
+    const ownedTools =
+      toolLookup.tools.length === 0
+        ? new Map()
+        : this._collectOwnedEntities(
+            sources,
+            (item) => this._resolveOwnedTool(item, toolLookup),
+            'tool'
+          );
+    if (owned.size === 0 && ownedTools.size === 0) {
+      return { participations: [], essenceRows: [] };
+    }
+
+    const context = this._systemRowContext({
+      system,
       sources,
-      (item) => findMatchingComponent(item, components, system?.id),
-      'component'
-    );
-    if (owned.size === 0) return { participations: [], essenceRows: [] };
-
-    const context = this._systemRowContext({ system, sources, allowedRecipeIds, isGM, components });
+      allowedRecipeIds,
+      isGM,
+      components,
+      toolLookup,
+    });
 
     const participations = [];
+    // docKey → the component participation that already backs that physical document, so a
+    // tool match on the same stack folds rather than duplicating (issue 1119).
+    const claimedByDoc = new Map();
     // essenceTotals: essenceId → Map<actorId, {name, img, qty}>
     const essenceTotals = new Map();
     // essenceContributors: essenceId → [{componentId, name, img, quantity}] — the
@@ -364,18 +409,20 @@ export class InventoryListingBuilder {
       const rawEssences =
         component.essences && typeof component.essences === 'object' ? component.essences : {};
 
-      participations.push(
-        this._buildComponentParticipation({
-          component,
-          representativeItem,
-          rowSources,
-          totalQuantity,
-          rawEssences,
-          context,
-          order,
-          documents,
-        })
-      );
+      const participation = this._buildComponentParticipation({
+        component,
+        representativeItem,
+        rowSources,
+        totalQuantity,
+        rawEssences,
+        context,
+        order,
+        documents,
+      });
+      participations.push(participation);
+      // Claim this participation's documents so a tool match on the same physical stack
+      // folds into it instead of emitting a second row (issue 1119).
+      for (const docKey of participation.docKeys) claimedByDoc.set(docKey, participation);
 
       // Fold this component's essence content into the per-essence source totals
       // (perUnit content × owned quantity, per source actor) and the per-essence
@@ -393,8 +440,147 @@ export class InventoryListingBuilder {
       }
     }
 
+    participations.push(
+      ...this._buildToolParticipations({ context, ownedTools, claimedByDoc, order })
+    );
+
     const essenceRows = this._buildEssenceRows({ essenceTotals, essenceContributors, context });
     return { participations, essenceRows };
+  }
+
+  /**
+   * Project this system's owned first-class Tools (issue 1119).
+   *
+   * Each owned tool's contributing documents are partitioned against `claimedByDoc`:
+   *
+   * - **Claimed** documents already back a component participation in THIS system — a
+   *   whetstone that is both a managed component and a registered Tool. Those FOLD into
+   *   that participation (badge it, OR its broken verdict, merge its required-for) so the
+   *   card keeps one `systems[]` entry per system. Emitting a second participation would
+   *   still collapse to one card via the union-find, but would leave the inspector's system
+   *   selector listing the same system twice.
+   * - **Unclaimed** documents get their own tool participation, with `sources` rebuilt from
+   *   just those documents so a partly-claimed tool never double-counts quantity.
+   *
+   * The fold is the common case, not an edge one: `CraftingSystemManager._normalizeSystem`
+   * runs `deriveToolSourceFromComponents` on every load, so component-linked tools carry
+   * their own source references too and resolve here just like item-sourced ones.
+   * @private
+   */
+  _buildToolParticipations({ context, ownedTools, claimedByDoc, order }) {
+    if (!ownedTools || ownedTools.size === 0) return [];
+
+    const participations = [];
+    for (const { tool, item: representativeItem, documents } of ownedTools.values()) {
+      const docs = Array.isArray(documents) ? documents : [];
+      const unclaimed = [];
+      // participation → the first of ITS OWN documents that matched this tool, so the
+      // folded broken verdict is read off a document that participation actually backs.
+      const foldedInto = new Map();
+      for (const doc of docs) {
+        const claimed = claimedByDoc.get(doc.docKey);
+        if (!claimed) unclaimed.push(doc);
+        else if (!foldedInto.has(claimed)) foldedInto.set(claimed, doc);
+      }
+
+      for (const [participation, doc] of foldedInto) {
+        this._foldToolIntoParticipation(participation, tool, context, doc.item);
+      }
+      if (unclaimed.length === 0) continue;
+
+      const sourceMap = new Map();
+      for (const doc of unclaimed) {
+        this._addSourceQuantity(sourceMap, doc.actorId, doc.actorName, doc.actorImg, doc.quantity);
+      }
+      const rowSources = context.orderSources(sourceMap);
+      const totalQuantity = rowSources.reduce((sum, source) => sum + source.quantity, 0);
+      if (totalQuantity <= 0) continue;
+
+      participations.push(
+        this._buildToolParticipation({
+          tool,
+          // The representative document must be one this participation actually backs, or
+          // the broken verdict could be read off a document that folded elsewhere.
+          representativeItem: unclaimed[0]?.item ?? representativeItem,
+          totalQuantity,
+          context,
+          order,
+          documents: unclaimed,
+        })
+      );
+    }
+    return participations;
+  }
+
+  /**
+   * Badge an existing component participation as a Tool and merge the tool-scoped facts a
+   * component lookup cannot supply. Never overwrites component identity — the component is
+   * the more complete row, and the primary-selection bias keeps it that way.
+   * @private
+   */
+  _foldToolIntoParticipation(participation, tool, context, representativeItem) {
+    participation.isTool = true;
+    participation.toolId = stringOrNull(tool?.id);
+    participation.broken ||= this._isToolBroken(context.system, tool, representativeItem);
+    const toolEntries = context.toolRequiredFor.get(tool?.id) ?? [];
+    if (toolEntries.length === 0) return;
+    const seen = new Set(
+      (participation.requiredFor ?? []).map(
+        (entry) => `${entry?.kind}:${entry?.recipeId ?? entry?.name}`
+      )
+    );
+    const merged = [...(participation.requiredFor ?? [])];
+    for (const entry of toolEntries) {
+      const key = `${entry?.kind}:${entry?.recipeId ?? entry?.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(entry);
+    }
+    participation.requiredFor = merged;
+  }
+
+  /**
+   * Build one owned-Tool PARTICIPATION — the tool-only counterpart of
+   * {@link _buildComponentParticipation}. A tool is never consumed, produced, salvaged or
+   * essence-bearing IN THAT ROLE, so those affordances are deliberately empty rather than
+   * absent: the card assembly and the inspector read the same shape for every participation.
+   * @private
+   */
+  _buildToolParticipation({ tool, representativeItem, totalQuantity, context, order, documents }) {
+    const { system, systemId, systemName, componentById, toolRequiredFor } = context;
+    const linked = tool?.componentId ? (componentById.get(tool.componentId) ?? null) : null;
+    const img = resolveToolDisplayImage(tool, linked);
+    const docs = Array.isArray(documents) ? documents : [];
+    return {
+      order,
+      kind: 'tool',
+      systemId,
+      systemName,
+      componentId: null,
+      toolId: stringOrNull(tool?.id),
+      name: resolveToolDisplayName(
+        tool,
+        linked,
+        this.localize('FABRICATE.App.Inventory.UntitledTool')
+      ),
+      // The generic sentinel projects as NO image so an unarted tool inherits the same
+      // default artwork an unarted component shows, per `craftingImageDefaults`.
+      img: img === TOOL_IMAGE_SENTINEL ? null : img,
+      description: resolveToolDescription(tool, linked),
+      tags: [],
+      tier: null,
+      isTool: true,
+      salvage: null,
+      isSalvageable: false,
+      ownedQuantity: totalQuantity,
+      essences: [],
+      usedBy: [],
+      requiredFor: toolRequiredFor.get(tool?.id) ?? [],
+      producedBy: [],
+      broken: this._isToolBroken(system, tool, representativeItem),
+      documents: docs,
+      docKeys: new Set(docs.map((doc) => doc.docKey)),
+    };
   }
 
   /**
@@ -481,8 +667,18 @@ export class InventoryListingBuilder {
 
     const primary = this._selectPrimaryParticipation(group);
     return {
-      key: `${primary.systemId}:${primary.componentId}`,
+      // A tool-only card has no componentId, so `${systemId}:${componentId}` would collide
+      // across every item-sourced tool in one system at `null` (issue 1119).
+      key:
+        primary.kind === 'tool'
+          ? `tool:${primary.systemId}:${primary.toolId}`
+          : `${primary.systemId}:${primary.componentId}`,
       componentId: primary.componentId,
+      toolId: group.find((participation) => participation.toolId != null)?.toolId ?? null,
+      // True only when NO participation in this card backs a component — the discriminator
+      // the Components filter chip excludes on. A whetstone is `false`: it is a real
+      // component that is also a tool, and belongs under both chips.
+      isToolOnly: group.every((participation) => participation.kind === 'tool'),
       systemId: primary.systemId,
       systemName: primary.systemName,
       name: primary.name,
@@ -521,6 +717,11 @@ export class InventoryListingBuilder {
   _selectPrimaryParticipation(group) {
     return [...group].sort(
       (left, right) =>
+        // A COMPONENT participation outranks a tool one (issue 1119): a whetstone's card
+        // must keep its component identity, key, salvage tab, essences and produced-by, and
+        // be merely badged as a tool. Without this the two tie on every later key and the
+        // primary falls out of array order.
+        Number(left.kind === 'tool') - Number(right.kind === 'tool') ||
         Number(right.isSalvageable === true) - Number(left.isSalvageable === true) ||
         left.order - right.order ||
         stringOrEmpty(left.name).localeCompare(stringOrEmpty(right.name))
@@ -557,6 +758,7 @@ export class InventoryListingBuilder {
       systemId: participation.systemId,
       systemName: participation.systemName,
       componentId: participation.componentId,
+      toolId: participation.toolId ?? null,
       name: participation.name,
       img: participation.img,
       description: participation.description,
@@ -609,6 +811,10 @@ export class InventoryListingBuilder {
           actorName,
           actorImg,
           quantity: qty,
+          // The document itself, so a caller partitioning these records can read per-document
+          // state (issue 1119's tool fold reads the broken flag off the document it folds
+          // into). Component and recipe-item callers ignore it.
+          item,
         });
       }
     }
@@ -635,7 +841,7 @@ export class InventoryListingBuilder {
    * and the System-Validity Gate's entity tier — never re-queried per row.
    * @private
    */
-  _systemRowContext({ system, sources, allowedRecipeIds, isGM, components }) {
+  _systemRowContext({ system, sources, allowedRecipeIds, isGM, components, toolLookup }) {
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
     const essencesEnabled = system?.enableEssences === true;
@@ -656,15 +862,28 @@ export class InventoryListingBuilder {
       ? NO_HIDDEN_ENTITIES
       : this._hiddenEntityIdsForSystem(system, systemRecipes);
 
-    const { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy } =
-      this._buildRecipeIndexes(system, allowedRecipeIds, systemRecipes);
+    const {
+      componentUsedBy,
+      componentRequiredFor,
+      toolRequiredFor,
+      essenceUsedBy,
+      componentProducedBy,
+    } = this._buildRecipeIndexes(system, allowedRecipeIds, systemRecipes);
     // Component ids registered as a Tool in the system library — a tool reads as a
     // tool even when no recipe references it.
+    //
+    // Retained deliberately (issue 1119) alongside the first-class tool resolution below:
+    // it is additive and never wrong, and it still badges a component-linked tool whose
+    // owned document resolves to the component but not to the tool.
     const toolComponentIds = new Set(
       (Array.isArray(system?.tools) ? system.tools : [])
         .filter((tool) => tool?.componentId)
         .map((tool) => tool.componentId)
     );
+
+    // The first-class Tools library lookup, built by the caller BEFORE this context so
+    // tool ownership can be decided without paying for the recipe query above.
+    const { tools, toolByLowerName, syntheticToolRecipe } = toolLookup;
 
     // Preserve the source actor order (crafting actor first) for stable display.
     const orderedSourceIds = sources.map(actorKey);
@@ -698,13 +917,82 @@ export class InventoryListingBuilder {
       hiddenEntityIds,
       componentUsedBy,
       componentRequiredFor,
+      toolRequiredFor,
       essenceUsedBy,
       componentProducedBy,
       toolComponentIds,
+      tools,
+      toolByLowerName,
+      syntheticToolRecipe,
       orderSources,
       componentById,
       sourceActorsById,
     };
+  }
+
+  /**
+   * The per-system Tools lookup the ownership matcher needs (issue 1119): the library
+   * itself, a lower-cased display-name index for the O(1) name-rung candidate, and the
+   * synthetic recipe the shared presence matcher is called through.
+   *
+   * Deliberately free of any recipe query so `_buildSystemParticipations` can decide
+   * ownership before paying for `_systemRowContext`.
+   * @private
+   */
+  _toolLookup(system, components) {
+    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const systemId = stringOrNull(system?.id);
+    // A tool's OWN snapshot name first, then its linked component's, mirroring
+    // `RecipeManager.toolMatchesItem`'s fallback ordering.
+    const toolByLowerName = new Map();
+    for (const tool of tools) {
+      const fallbackName = tool?.name || linkedComponentFor(tool, components)?.name || '';
+      if (!fallbackName) continue;
+      const key = fallbackName.toLowerCase();
+      if (!toolByLowerName.has(key)) toolByLowerName.set(key, tool);
+    }
+    return {
+      tools,
+      systemId,
+      toolByLowerName,
+      // `toolMatchesItem` takes a recipe purely to resolve its crafting system, so the
+      // inventory hands it a synthetic one rather than inventing a second matcher.
+      syntheticToolRecipe: { id: `inventory:${systemId}`, craftingSystemId: systemId },
+    };
+  }
+
+  /**
+   * Resolve the first-class library Tool an owned item IS, or null (issue 1119).
+   *
+   * Deliberately mirrors the WIDE presence gate `RecipeManager.toolMatchesItem` rather than
+   * the narrow `itemIsToolByDurableIdentity` used for usage/breakage: if the crafting tool
+   * gate says the player has the hammer, the inventory must show the hammer, or the same
+   * "the app says I don't own it" complaint reappears one tier down.
+   *
+   *   1. `resolveToolForItem` — durable `roles[systemId].toolId`, then source-ref
+   *      intersection. Pure, and the only rung that runs for most items.
+   *   2. The snapshot-name fallback, taken as an O(1) index hit and then CONFIRMED through
+   *      the injected `toolMatchesItem` so issue-540's name-only telemetry still fires and
+   *      the inventory can never disagree with the gate.
+   *
+   * Fails OPEN when no matcher is injected (unit fixtures): nothing on this read-only path
+   * is destructive, so a false positive costs a listed row, never a destroyed item.
+   * @private
+   */
+  _resolveOwnedTool(item, lookup) {
+    const { tools, systemId, toolByLowerName, syntheticToolRecipe } = lookup;
+    if (!Array.isArray(tools) || tools.length === 0) return null;
+
+    const resolved = resolveToolForItem(item, tools, systemId);
+    if (resolved) return resolved;
+
+    const candidate = toolByLowerName.get(stringOrEmpty(item?.name).toLowerCase());
+    if (!candidate) return null;
+    const matches = this.recipeManager?.toolMatchesItem;
+    if (typeof matches !== 'function') return candidate;
+    return matches.call(this.recipeManager, syntheticToolRecipe, candidate, item)
+      ? candidate
+      : null;
   }
 
   /**
@@ -764,6 +1052,8 @@ export class InventoryListingBuilder {
     const docs = Array.isArray(documents) ? documents : [];
     return {
       order,
+      kind: 'component',
+      toolId: null,
       systemId,
       systemName,
       componentId: stringOrNull(component.id),
@@ -786,7 +1076,11 @@ export class InventoryListingBuilder {
       // A derived, read-only runtime verdict (issue 675) OR-ed at card level into the
       // singular top-level `broken`. It drives the card overlay/pip/banner — and it does
       // NOT gate salvage.
-      broken: this._isToolBroken(system, component.id, representativeItem),
+      broken: this._isToolBroken(
+        system,
+        this._toolForComponentId(system, component.id),
+        representativeItem
+      ),
       // The contributing documents this participation aggregates (its own uuid set for the
       // collapse join, and its per-actor stack quantities for the card's dedup union).
       documents: docs,
@@ -1197,7 +1491,9 @@ export class InventoryListingBuilder {
     const { mode, config, checkUsable } = resolveSalvageCheck(system);
     // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
     // re-normalized legacy config with more than one success group is misconfigured: the
-    // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this
+    // engine's SUCCESS award is `slice(0, 1)`, so the surplus is silently ignored. (The
+    // failure award added by issue 1098 selects the reserved `role: 'failure'` group BY
+    // ROLE, so it is not counted here and cannot be the surplus.) The GM sees this
     // cue on the GM inventory path (the non-GM path hard-hides via `hiddenEntityIds`),
     // and the config self-heals on the next system save.
     const salvageGroups = Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [];
@@ -1375,7 +1671,11 @@ export class InventoryListingBuilder {
   /**
    * Project a salvage result group's results for display. Mirrors
    * `CraftingEngine._resolveSalvageResultGroups`'s `allGroups.slice(0, 1)` for simple
-   * mode, so the list shown is the list the engine awards.
+   * mode UNDER `disposition: 'success'`, so the list shown is the list the engine awards
+   * on a passed check. This projection is deliberately the SUCCESS award only: issue
+   * 1098 gave the failure branch its own role-keyed selection of the reserved
+   * `role: 'failure'` group, and what a player is shown before salvaging is what
+   * salvaging successfully yields.
    * @private
    */
   _salvageResultItems(group, componentById) {
@@ -1543,7 +1843,7 @@ export class InventoryListingBuilder {
    *    authority: a forced break that flags the item is a real past fact.
    * @private
    */
-  _isToolBroken(system, componentId, item) {
+  _isToolBroken(system, tool, item) {
     if (!item) return false;
     // The persisted past fact — mode-agnostic and authority-agnostic.
     if (isToolBroken(item)) return true;
@@ -1551,8 +1851,10 @@ export class InventoryListingBuilder {
     // The projection. Never under checkDriven: usage still accrues there, but it
     // decides nothing.
     if (system?.toolBreakage?.authority === 'checkDriven') return false;
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
-    const tool = tools.find((entry) => entry?.componentId === componentId) ?? null;
+    // The caller supplies the Tool. It used to be found here by `componentId`, which made
+    // the exhaustion projection unreachable for an item-sourced Tool (issue 1119) — and
+    // reachable for a component-linked one only by luck, since two tools may link one
+    // component. Both call sites already know exactly which Tool they mean.
     if (tool?.breakage?.mode !== 'limitedUses') return false;
     const maxUses = Number(tool.breakage.maxUses);
     if (!Number.isFinite(maxUses) || maxUses <= 0) return false;
@@ -1562,6 +1864,17 @@ export class InventoryListingBuilder {
       {};
     const timesUsed = Number(usage?.timesUsed || 0);
     return timesUsed >= maxUses;
+  }
+
+  /**
+   * The first library Tool linked to `componentId`, for the component participation's
+   * broken projection. Returns null for a component no Tool names.
+   * @private
+   */
+  _toolForComponentId(system, componentId) {
+    if (!componentId) return null;
+    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    return tools.find((entry) => entry?.componentId === componentId) ?? null;
   }
 
   /**
@@ -1820,6 +2133,11 @@ export class InventoryListingBuilder {
   _buildRecipeIndexes(system, allowedRecipeIds = null, systemRecipes = null) {
     const componentUsedBy = new Map();
     const componentRequiredFor = new Map();
+    // Required-for keyed by TOOL id, in PARALLEL with the componentId-keyed map above
+    // (issue 1119). Deliberately additive rather than a retarget: an item-sourced tool has
+    // no componentId to key on, but retargeting would strip required-for from every legacy
+    // component-linked tool's component card.
+    const toolRequiredFor = new Map();
     const essenceUsedBy = new Map();
     const componentProducedBy = new Map();
 
@@ -1828,6 +2146,7 @@ export class InventoryListingBuilder {
     // Required-for: recipes/gathering tasks that require the component as a TOOL
     // (present but not consumed).
     const addRequiredFor = makeAdder(componentRequiredFor);
+    const addRequiredForTool = makeAdder(toolRequiredFor);
 
     // Reuse the caller's already-fetched recipes when provided (one query per owned
     // system); fall back to a direct fetch for standalone callers.
@@ -1840,6 +2159,7 @@ export class InventoryListingBuilder {
       essenceUsedBy,
       addProduced,
       addRequiredFor,
+      addRequiredForTool,
     };
     for (const recipe of Array.isArray(recipes) ? recipes : []) {
       if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
@@ -1847,9 +2167,21 @@ export class InventoryListingBuilder {
     }
 
     this._indexSalvageProducers(system, addProduced);
-    this._indexGatheringProducers(system, toolComponentById, addProduced, addRequiredFor);
+    this._indexGatheringProducers(
+      system,
+      toolComponentById,
+      addProduced,
+      addRequiredFor,
+      addRequiredForTool
+    );
 
-    return { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy };
+    return {
+      componentUsedBy,
+      componentRequiredFor,
+      toolRequiredFor,
+      essenceUsedBy,
+      componentProducedBy,
+    };
   }
 
   /**
@@ -1874,7 +2206,15 @@ export class InventoryListingBuilder {
    */
   _indexRecipeReferences(
     recipe,
-    { system, toolComponentById, componentUsedBy, essenceUsedBy, addProduced, addRequiredFor }
+    {
+      system,
+      toolComponentById,
+      componentUsedBy,
+      essenceUsedBy,
+      addProduced,
+      addRequiredFor,
+      addRequiredForTool,
+    }
   ) {
     // ONE recipe-image resolver for this class (issue 887). The used-by/produced-by index
     // previously had its own, which borrowed the containing book's artwork ahead of an
@@ -1903,6 +2243,7 @@ export class InventoryListingBuilder {
       componentUsedBy,
       essenceUsedBy,
       addRequiredFor,
+      addRequiredForTool,
       seen,
     };
     const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
@@ -1925,6 +2266,9 @@ export class InventoryListingBuilder {
 
   _indexRecipeTools(toolIds, ctx) {
     for (const toolId of Array.isArray(toolIds) ? toolIds : []) {
+      // Key by the tool's OWN id as well as its linked component's, so the disclosure
+      // survives `componentId: null` on an item-sourced tool (issue 1119).
+      ctx.addRequiredForTool(toolId, ctx.recipeSourceKey, ctx.recipeSourceValue);
       const componentId = ctx.toolComponentById.get(toolId);
       if (componentId) {
         ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
@@ -1942,12 +2286,7 @@ export class InventoryListingBuilder {
       this._indexIngredientOptions(group, ctx);
     }
     if (ingredientSetToolsAreActive(ctx.system, set)) {
-      for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
-        const componentId = ctx.toolComponentById.get(toolId);
-        if (componentId) {
-          ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
-        }
-      }
+      this._indexRecipeTools(set?.toolIds, ctx);
     }
     for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
       if (Number(quantity) > 0) {
@@ -2028,7 +2367,13 @@ export class InventoryListingBuilder {
    * task's required tools (present, not consumed).
    * @private
    */
-  _indexGatheringProducers(system, toolComponentById, addProduced, addRequiredFor) {
+  _indexGatheringProducers(
+    system,
+    toolComponentById,
+    addProduced,
+    addRequiredFor,
+    addRequiredForTool
+  ) {
     const tasks = this._getGatheringTasksForSystem(system?.id) ?? [];
     for (const task of Array.isArray(tasks) ? tasks : []) {
       if (task?.enabled === false) continue;
@@ -2048,7 +2393,14 @@ export class InventoryListingBuilder {
         if (row?.enabled === false) continue;
         addProduced(row?.componentId, key, value);
       }
-      this._indexGatheringTools(task, key, value, toolComponentById, addRequiredFor);
+      this._indexGatheringTools(
+        task,
+        key,
+        value,
+        toolComponentById,
+        addRequiredFor,
+        addRequiredForTool
+      );
     }
   }
 
@@ -2057,11 +2409,14 @@ export class InventoryListingBuilder {
    * library (`task.toolIds`) or read from inline `task.tools`.
    * @private
    */
-  _indexGatheringTools(task, key, value, toolComponentById, addRequiredFor) {
+  _indexGatheringTools(task, key, value, toolComponentById, addRequiredFor, addRequiredForTool) {
     for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+      // Keyed by tool id too, so an item-sourced tool's card lists the task (issue 1119).
+      addRequiredForTool(toolId, key, value);
       const componentId = toolComponentById.get(toolId);
       if (componentId) addRequiredFor(componentId, key, value);
     }
+    // Inline tools stay componentId-only: they carry no library id to key against.
     for (const inlineTool of Array.isArray(task?.tools) ? task.tools : []) {
       if (inlineTool?.componentId) addRequiredFor(inlineTool.componentId, key, value);
     }

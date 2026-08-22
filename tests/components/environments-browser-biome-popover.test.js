@@ -9,7 +9,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 // EnvironmentsBrowserView's Settings tab renders the biome vocabulary panel, which
 // mounts IconPicker + (conditionally) ManagerColorPopover side by side, plus every
-// other Gathering sub-view EnvironmentsBrowserView statically imports. A `.svelte`
+// retained Gathering and World content views EnvironmentsBrowserView statically imports. A `.svelte`
 // or `.js` the mounted tree renders but this allowlist omits does NOT fail the
 // suite — it HANGS (reported as `# cancelled`).
 const harness = createMountedComponentHarness({
@@ -22,7 +22,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/dropUtils.js',
     // The shared colour-token constant + its localized labels (issue 1036). Both colour
     // components import it, and both are compiled below.
@@ -44,10 +45,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/GatheringTravelTabs.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
+    // The three card components the parties rebuild added (issue 1182), each imported
+    // by PartyExpandedBody, so each must be compiled before it.
+    'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
+    'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
+    'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
     'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
     'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
     'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte',

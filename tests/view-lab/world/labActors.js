@@ -416,6 +416,20 @@ const ACTOR_DEFINITIONS = [
     name: 'Vosk',
     img: `${PORTRAIT_BASE}/commodities/leather/fur-brown-gold.webp`,
   },
+  // The one NON-player-character actor in the lab world, and it is APPENDED rather than
+  // inserted: `labWorld.js` picks `lab-party`'s travel actor by position out of the
+  // character subset, and the manager's "Preview as" and knowledge rosters read this list
+  // in order. It exists so the two exclusions the World > Parties pickers apply are
+  // photographable and testable rather than merely asserted: a vehicle is offered by
+  // neither the member picker nor the travel-actor picker's eligible set, yet a vehicle
+  // ALREADY linked as a travel actor is still offered by that picker so it can be seen
+  // and changed — which is `lab-party-long-haul`'s state.
+  {
+    id: 'lab-actor-wagon',
+    name: 'The Ashfall Wagon',
+    type: 'vehicle',
+    img: `${PORTRAIT_BASE}/environment/settlement/wagon.webp`,
+  },
 ];
 
 /**
@@ -442,7 +456,11 @@ export function buildLabActors(content) {
     const actor = {
       ...definition,
       uuid: `Actor.${definition.id}`,
-      type: 'character',
+      // Read from the definition, and it MUST be: this line sits after the `...definition`
+      // spread, so a hardcoded `'character'` silently overwrote any type a definition
+      // declared — a `type: 'vehicle'` actor would have become a player character with no
+      // error, falsifying every claim made for it.
+      type: definition.type ?? 'character',
       // Iterated with `[...actor.items]` throughout the engine, so a plain array is enough.
       items,
       system: {
@@ -460,7 +478,7 @@ export function buildLabActors(content) {
       flags: {},
       isOwner: true,
       testUserPermission: () => true,
-      // `checkRoll.js` and `craftingModifierResolver.js` resolve `@`-expressions against this. A
+      // `checkRoll.js` and `checkModifierResolver.js` resolve `@`-expressions against this. A
       // real dnd5e actor supplies it; without it every `@prof` / `@abilities.*.mod` in a check
       // formula resolves to NaN and the card renders a broken formula.
       getRollData() {

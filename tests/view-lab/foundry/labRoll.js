@@ -27,7 +27,7 @@
  * written here. A private parser is how the lab would start quietly disagreeing with the resolver
  * about what a formula means.
  */
-import { evaluateNumericExpression } from '../../../src/systems/craftingModifierResolver.js';
+import { evaluateNumericExpression } from '../../../src/systems/checkModifierResolver.js';
 
 /**
  * `NdS` with an optional keep-highest / keep-lowest modifier.
@@ -36,12 +36,19 @@ import { evaluateNumericExpression } from '../../../src/systems/craftingModifier
  * `src/utils/craftingCheckExpression.js` rewrites a plain `1d20` to `2d20kh1` / `2d20kl1` for
  * advantage and disadvantage, and nothing else in `src/` rewrites a formula.
  *
- * A term this pattern does NOT understand is thrown on, by the `UNPARSED_DIE` check below, and
- * that check is load-bearing rather than belt-and-braces: `evaluateNumericExpression` returns its
- * partial parse with no end-of-input assertion, so it truncates instead of rejecting. Measured,
- * before the guard existed: `3d6dl1` evaluated to 9 (the drop-lowest silently ignored) and
- * `1d20 + 1dF` to 21 (the fudge die silently contributing 1). Those are exactly the "silently
- * plausible number" this harness must not produce.
+ * A term this pattern does NOT understand is thrown on, by the `UNPARSED_DIE` check below.
+ *
+ * That check no longer stands where its own note said it did, and the note is corrected rather
+ * than deleted because the correction is the interesting part. It cited `evaluateNumericExpression`
+ * returning a partial parse with no end-of-input assertion — true when it was written, and false
+ * twice over now: issue 1118 moved that walk into `reduceRollExpression`, gave it an end-of-input
+ * assertion, and taught it dice, so `3d6dl1` and `1d20 + 1dF` both reduce correctly there. And the
+ * two residues it cited were never what `UNPARSED_DIE` matched anyway — `/\dd\d/i` needs a DIGIT
+ * on both sides of the `d`, so `dl1` and `dF` never reached it.
+ *
+ * The guard is kept, retargeted at what it can actually see: a die term whose faces are numeric
+ * and which this pattern therefore left in the string. A term the pattern misses entirely still
+ * escapes it, and that is stated rather than implied.
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*))?/gi;
 
@@ -203,5 +210,317 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
     static validate(formula) {
       return validate(formula);
     }
+
+    /**
+     * Parse a formula into roll TERMS, the way `Roll.parse` does.
+     *
+     * WHY THIS EXISTS. `CheckOddsPanel` calls `Roll.parse` on every render to decide
+     * whether the check's outcome space can be enumerated. Without this static the lab's
+     * `Roll` exposes only `replaceFormulaData` and `validate`, so every lab render of that
+     * panel would either throw — and one bad case fails the whole capture job, publishing
+     * NOTHING while `check-screenshots` stays green on stale frames — or degrade to "not
+     * enumerable", making the required enumerable-histogram frame unproduceable.
+     *
+     * Order of operations matches `client/dice/roll.mjs` `Roll.parse`: substitute roll
+     * data with `missing: "0"` FIRST, then parse. That order is load-bearing rather than
+     * incidental — it is exactly why an unresolved `@` key is INVISIBLE to the parse and
+     * has to be detected from `resolveCheckFormulaDisplay`'s `missing: 'NaN'` signal
+     * instead, and a double that substituted afterwards would let a test "prove" a
+     * detection production cannot make.
+     *
+     * @param {string} formula The roll expression.
+     * @param {object} [data] Roll data for `@path` substitution.
+     * @returns {Array<object>} Roll terms.
+     */
+    static parse(formula = '', data = {}) {
+      if (typeof formula !== 'string') throw new TypeError(`Not parsable: ${formula}`);
+      if (!formula) return [];
+      return parseLabTerms(replaceFormulaData(formula, data, { missing: '0' }));
+    }
   };
+}
+
+/**
+ * A die term, in the shape RECORDED from Foundry 14.365 rather than invented.
+ *
+ * Every field below was read off `client/dice/terms/{dice,die,fate,coin}.mjs` in the
+ * 14.365 release archive, and the two that look redundant are the ones that matter:
+ *
+ * - `DiceTerm#denomination` returns `this.constructor.DENOMINATION`, which `Die`
+ *   OVERRIDES to `` `d${this.faces}` `` — so `denomination === 'd' + faces` is a real
+ *   discriminator, and it is the ONLY one that separates a numeric die from a `FateDie`
+ *   or a `Coin`.
+ * - `FateDie`'s constructor assigns `termData.faces = 3` and `Coin`'s assigns `2`, so
+ *   both report a perfectly INTEGRAL `faces`. A double that left their faces undefined
+ *   would be looser than the real thing and would let `1df` pass a predicate the live
+ *   client refuses — the exact false-pass class `Roll.validate`'s own lab double was
+ *   caught producing.
+ * - `DiceTerm#number` and `#faces` return `undefined` when the underlying value is an
+ *   unevaluated sub-`Roll`, which is why `1d(1d4)` reports `faces: undefined` here.
+ *
+ * @param {object} params Params.
+ * @param {number|undefined} params.number Dice count, or undefined for a sub-roll.
+ * @param {string} params.denominationSource The raw denomination text (`20`, `f`, `c`).
+ * @param {string} params.modifiers The raw modifier text.
+ * @returns {object} The term.
+ */
+function labDieTerm({ number, denominationSource, modifiers }) {
+  const numericFaces = /^\d+$/.test(denominationSource) ? Number(denominationSource) : null;
+  const fixedFaces = { f: 3, c: 2 }[denominationSource.toLowerCase()];
+  const faces = numericFaces ?? fixedFaces;
+  const denomination = numericFaces === null ? denominationSource.toLowerCase() : `d${faces}`;
+  const classes = { f: 'FateDie', c: 'Coin' };
+  return {
+    class: numericFaces === null ? (classes[denominationSource.toLowerCase()] ?? 'Die') : 'Die',
+    number,
+    faces,
+    denomination,
+    modifiers: modifiers ? (modifiers.match(/[a-z]+[<>=]?-?\d*/gi) ?? []) : [],
+    isDeterministic: false,
+  };
+}
+
+/** A die whose faces are a parenthetical sub-roll: `number`/`faces` read `undefined`. */
+const SUB_ROLL_DIE = /^(\d*)d\(/i;
+
+/**
+ * `NdS` with an optional trailing modifier run.
+ *
+ * The non-numeric denominations are `f` and `c` ONLY, because those are the two Foundry
+ * core registers in `CONFIG.Dice.terms` beside `d`. Admitting `[a-z]` here would tokenize
+ * an ordinary word — `dexterity` — as a fudge die with modifiers, which is the "silently
+ * plausible number" this harness exists not to produce.
+ */
+const LAB_DIE = /^(\d*)d(\d+|[fc])((?:[a-z]+[<>=]?-?\d*)*)/i;
+
+/** A math function opening, e.g. `max(`. */
+const LAB_FUNCTION = /^([a-z][a-z0-9]*)\(/i;
+
+/** A bare word the grammar leaves as an unmatched `StringTerm`, e.g. `prof`. */
+const LAB_WORD = /^[a-z_][\w.]*/i;
+
+/** A decimal number. */
+const LAB_NUMBER = /^\d+(?:\.\d+)?/;
+
+/** A flavour annotation, which Foundry attaches to the preceding term as inert text. */
+const LAB_FLAVOUR = /^\[[^\]]*]/;
+
+/**
+ * Read the balanced parenthetical starting at `source[start]` (which must be `(`).
+ *
+ * @param {string} source The formula.
+ * @param {number} start Index of the opening parenthesis.
+ * @returns {{inner: string, end: number}} The contents and the index after the `)`.
+ * @throws {SyntaxError} When the parenthesis is never closed — which is what a GM's
+ *   half-typed `1d20 + (` is, and what the real grammar raises for it.
+ */
+function readBalanced(source, start) {
+  let depth = 0;
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === '(') depth += 1;
+    else if (source[index] === ')') {
+      depth -= 1;
+      if (depth === 0) return { inner: source.slice(start + 1, index), end: index + 1 };
+    }
+  }
+  throw new SyntaxError(`Unbalanced parenthesis in "${source}"`);
+}
+
+/**
+ * Parse a substituted formula into lab roll terms.
+ *
+ * It REFUSES rather than guesses. The real `Roll.parse` throws a peggy `SyntaxError` on
+ * every intermediate keystroke of a formula a GM is still typing, and the enumerator's
+ * whole `parse-threw` branch exists for that; a double that quietly accepted `1d20 +`
+ * would leave that branch unexercised in the lab and let a capture run photograph a
+ * histogram for a formula the live client cannot parse.
+ *
+ * @param {string} source The `@`-substituted formula.
+ * @returns {Array<object>} Roll terms in infix order.
+ * @throws {SyntaxError} On a malformed or half-typed formula.
+ */
+/**
+ * Split an argument list on its TOP-LEVEL commas only.
+ *
+ * `String#split(',')` was the first spelling and it is wrong for the one formula shape this
+ * whole lab exists to render: a bounded rolling check modifier emits
+ * `min(max((1d8), -1), 6)`, whose outer argument list is `max((1d8), -1)` and `6`. Splitting
+ * on every comma cuts the inner call in half, and `readBalanced` then throws
+ * `Unbalanced parenthesis` out of a `Roll.parse` the real client parses without complaint —
+ * so the View Lab's odds panel would fail on exactly the formula the histogram is for, and
+ * one failing selector fails a capture job whole.
+ *
+ * @param {string} inner The text between the brackets.
+ * @returns {string[]} One entry per top-level argument.
+ */
+function splitArguments(inner) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < inner.length; index += 1) {
+    const character = inner[index];
+    if (character === '(' || character === '{') depth += 1;
+    else if (character === ')' || character === '}') depth -= 1;
+    else if (character === ',' && depth === 0) {
+      parts.push(inner.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(inner.slice(start));
+  return parts;
+}
+
+function parseLabTerms(source) {
+  const terms = [];
+  let cursor = 0;
+  // `true` while the parser is waiting for a VALUE and `false` while it is waiting for an
+  // operator. Ending on `true` is what makes a trailing `+` a syntax error rather than a
+  // silently truncated parse.
+  let expectOperand = true;
+
+  while (cursor < source.length) {
+    const rest = source.slice(cursor);
+    if (/^\s/.test(rest)) {
+      cursor += 1;
+      continue;
+    }
+    const flavour = LAB_FLAVOUR.exec(rest);
+    if (flavour) {
+      cursor += flavour[0].length;
+      continue;
+    }
+    if (!expectOperand) {
+      if (!/^[+\-*/%]/.test(rest)) throw new SyntaxError(`Expected an operator in "${source}"`);
+      terms.push({ class: 'OperatorTerm', operator: rest[0], isDeterministic: true });
+      cursor += 1;
+      expectOperand = true;
+      continue;
+    }
+    cursor += readOperand(source, cursor, rest, terms);
+    expectOperand = false;
+  }
+
+  if (expectOperand) throw new SyntaxError(`Incomplete expression "${source}"`);
+  return terms;
+}
+
+/**
+ * Push the one operand starting at `cursor` and report how many characters it spanned.
+ *
+ * @param {string} source The whole formula.
+ * @param {number} cursor The operand's start index.
+ * @param {string} rest `source` from `cursor`.
+ * @param {Array<object>} terms The output list, appended to in place.
+ * @returns {number} The operand's length in characters.
+ * @throws {SyntaxError} When nothing the grammar accepts starts here.
+ */
+function readOperand(source, cursor, rest, terms) {
+  const subRoll = SUB_ROLL_DIE.exec(rest);
+  if (subRoll) {
+    const { end } = readBalanced(source, cursor + subRoll[0].length - 1);
+    // `DiceTerm#faces` returns undefined while the faces are an unevaluated sub-Roll, and
+    // `Die#denomination` is `` `d${this.faces}` `` — so the recorded 14.365 output really
+    // is the literal string `"dundefined"`. It is reproduced rather than tidied: a double
+    // that emitted a clean `"d"` would be a different shape from the real thing.
+    terms.push({
+      class: 'Die',
+      number: subRoll[1] === '' ? 1 : Number(subRoll[1]),
+      faces: undefined,
+      denomination: 'dundefined',
+      modifiers: [],
+      isDeterministic: false,
+    });
+    return end - cursor;
+  }
+
+  if (rest.startsWith('{')) {
+    const closing = source.indexOf('}', cursor);
+    if (closing === -1) throw new SyntaxError(`Unbalanced pool brace in "${source}"`);
+    const inner = source.slice(cursor + 1, closing);
+    const trailing = /^[a-z]+[<>=]?-?\d*/i.exec(source.slice(closing + 1));
+    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
+    // `PoolTerm#isDeterministic` is `terms.every(...)`, and — unlike a parenthetical or a
+    // function term — the recorded shape reports `isIntermediate: false`.
+    terms.push({
+      class: 'PoolTerm',
+      modifiers: trailing ? [trailing[0]] : [],
+      isIntermediate: false,
+      isDeterministic: parts.every((part) => part.isDeterministic === true),
+    });
+    return closing + 1 - cursor + (trailing ? trailing[0].length : 0);
+  }
+
+  const die = LAB_DIE.exec(rest);
+  if (die) {
+    terms.push(
+      labDieTerm({
+        number: die[1] === '' ? 1 : Number(die[1]),
+        denominationSource: die[2],
+        modifiers: die[3],
+      })
+    );
+    return die[0].length;
+  }
+
+  const number = LAB_NUMBER.exec(rest);
+  if (number) {
+    terms.push({ class: 'NumericTerm', number: Number(number[0]), isDeterministic: true });
+    return number[0].length;
+  }
+
+  // A UNARY SIGN, which the grammar allows in front of any operand and which a bounded
+  // rolling check modifier always produces: `min(max((1d8), -1), 6)` opens its second
+  // argument with one. The double used to refuse it outright, so the lab could not parse the
+  // formula the real client parses — and a Roll double that is STRICTER than core fails the
+  // panel on a formula that works in the product, which is the mirror of the
+  // looser-double trap this file exists to close.
+  if ((rest.startsWith('-') || rest.startsWith('+')) && rest.length > 1) {
+    const consumed = readOperand(source, cursor + 1, rest.slice(1), terms);
+    const operand = terms.at(-1);
+    if (rest.startsWith('-') && operand?.class === 'NumericTerm') operand.number = -operand.number;
+    return consumed + 1;
+  }
+
+  const fn = LAB_FUNCTION.exec(rest);
+  if (fn) {
+    const { inner, end } = readBalanced(source, cursor + fn[0].length - 1);
+    // `FunctionTerm#isDeterministic` is `this.terms.every(t => Roll.create(t).isDeterministic)`,
+    // so it recurses; a comma-separated argument list is parsed argument by argument.
+    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
+    terms.push({
+      class: 'FunctionTerm',
+      fn: fn[1],
+      terms: parts,
+      isIntermediate: true,
+      isDeterministic: parts.every((part) => part.isDeterministic === true),
+    });
+    return end - cursor;
+  }
+
+  if (rest.startsWith('(')) {
+    const { inner, end } = readBalanced(source, cursor);
+    const parts = parseLabTerms(inner);
+    // `ParentheticalTerm` carries BOTH a string `term` and an own `roll` slot, and
+    // `isIntermediate = true`. Those are what tell it apart from a `StringTerm`, which
+    // also carries a string `term` — see `checkOdds.js`'s `isStringTermLike`.
+    terms.push({
+      class: 'ParentheticalTerm',
+      term: inner,
+      roll: undefined,
+      isIntermediate: true,
+      isDeterministic: parts.every((part) => part.isDeterministic === true),
+    });
+    return end - cursor;
+  }
+
+  const word = LAB_WORD.exec(rest);
+  if (word) {
+    // `StringTerm#isDeterministic` returns TRUE for a string the classifier cannot
+    // resolve — and evaluating it then throws. The double reproduces the lie rather than
+    // correcting it, because the predicate under test is the one that refuses it.
+    terms.push({ class: 'StringTerm', term: word[0], isDeterministic: true });
+    return word[0].length;
+  }
+
+  throw new SyntaxError(`Unexpected "${rest[0]}" in "${source}"`);
 }

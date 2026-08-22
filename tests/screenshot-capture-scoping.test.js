@@ -389,6 +389,136 @@ test('every capture-map label appears as a literal in the harness (no phantom ro
   }
 });
 
+test('World Parties and World Travel capture-map order mirrors the live Foundry walk', () => {
+  const start = HARNESS.indexOf('// World Parties plus World Travel (#1179');
+  const end = HARNESS.indexOf('// Doc journey (quickstart Step 7', start);
+  assert.ok(start >= 0 && end > start, 'the #1179 Foundry capture block must remain bounded');
+  const harnessLabels = [
+    ...HARNESS.slice(start, end).matchAll(
+      /label: '(manager-world-(?:parties|travel)[^']+)'/g
+    ),
+  ].map((match) => match[1]);
+  const mappedLabels = SCREENSHOT_CAPTURE_ORDER.filter(
+    (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-world-travel')
+  );
+
+  assert.deepEqual(mappedLabels, harnessLabels);
+  assert.ok(!harnessLabels.includes('manager-world-parties-no-selection'));
+  assert.ok(!harnessLabels.includes('manager-world-travel-long-label-focus'));
+});
+
+test('the Foundry Map capture uses a deterministic click while View Lab retains keyboard evidence', () => {
+  const blockStart = HARNESS.indexOf('// World Parties plus World Travel (#1179');
+  const mapDestinationStart = HARNESS.indexOf('const mapDestination = page.locator', blockStart);
+  const mapPanelWait = HARNESS.indexOf('[data-travel-panel="map"]', mapDestinationStart);
+  assert.ok(
+    blockStart >= 0 && blockStart < mapDestinationStart && mapDestinationStart < mapPanelWait,
+    'the #1179 Map interaction must remain bounded before its panel wait'
+  );
+
+  const mapInteraction = HARNESS.slice(mapDestinationStart, mapPanelWait);
+  assert.match(mapInteraction, /await mapDestination\.click\(\)/);
+  assert.doesNotMatch(mapInteraction, /\.press\('(?:Enter|Space)'\)/);
+
+  const viewLabCases = CAPTURE_PRODUCERS.find(
+    ({ path }) => path === 'scripts/lib/viewLabCases.js'
+  ).source;
+  const keyboardCaseStart = viewLabCases.indexOf(
+    "id: 'manager-world-travel-long-label-focus'"
+  );
+  const keyboardCaseEnd = viewLabCases.indexOf('\n  managerCase({', keyboardCaseStart);
+  assert.ok(
+    keyboardCaseStart >= 0 && keyboardCaseEnd > keyboardCaseStart,
+    'the View Lab Map keyboard evidence case must remain bounded'
+  );
+  const keyboardCase = viewLabCases.slice(keyboardCaseStart, keyboardCaseEnd);
+  assert.match(
+    keyboardCase,
+    /selector: '#manager-travel-nav-map', press: 'Space'/
+  );
+  assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
+});
+
+test('Phase C seeds system modifiers canonically before the settings-list action', () => {
+  const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
+  const gatheringStart = HARNESS.indexOf(
+    "await game.settings.set('fabricate', 'gatheringConfig'",
+    phaseCStart
+  );
+  const systemPatchStart = HARNESS.indexOf(
+    '// Modifiers and Tools are SYSTEM-OWNED',
+    gatheringStart
+  );
+  const systemPatchEnd = HARNESS.indexOf(
+    '// Reference the deliberately-unlabelled tool',
+    systemPatchStart
+  );
+  const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
+  const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
+  assert.ok(
+    phaseCStart >= 0 &&
+      phaseCStart < gatheringStart &&
+      gatheringStart < systemPatchStart &&
+      systemPatchStart < systemPatchEnd &&
+      systemPatchEnd < listStart &&
+      listStart < firstAction,
+    'the Phase-C gathering patch, canonical system patch, and list action must remain strictly ordered'
+  );
+
+  const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
+  const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
+  const beforeFirstAction = HARNESS.slice(listStart, firstAction);
+  const systemObjectMatch = gatheringPatch.match(/^(\s*)\[systemId\]: \{/m);
+  assert.ok(systemObjectMatch, 'the Phase-C gathering fixture must retain its system object');
+  const topLevelCharacterModifiers = new RegExp(
+    `^${systemObjectMatch[1]}  characterModifiers\\s*:`,
+    'm'
+  );
+  assert.match(
+    `${systemObjectMatch[1]}  characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must detect a top-level system fixture library'
+  );
+  assert.doesNotMatch(
+    `${systemObjectMatch[1]}    characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must permit nested task, drop-row, and event references'
+  );
+  assert.doesNotMatch(gatheringPatch, topLevelCharacterModifiers);
+  assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
+  assert.match(systemPatch, /smoke-mod-herbalism/);
+  assert.match(systemPatch, /smoke-mod-survival/);
+  assert.match(systemPatch, /tools:\s*game\.settings\.get/);
+  assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
+  assert.match(beforeFirstAction, /modifierRowCount !== 2/);
+});
+
+test('manager stability counts populated system Travel realm and map rows', () => {
+  const guardStart = HARNESS.indexOf('async function assertManagerLayoutStable(page, label)');
+  const rowCountStart = HARNESS.indexOf('const rowCount = metrics.filter', guardStart);
+  const editFormCountStart = HARNESS.indexOf(
+    'const editFormCount = metrics.filter',
+    rowCountStart
+  );
+  assert.ok(
+    guardStart >= 0 && guardStart < rowCountStart && rowCountStart < editFormCountStart,
+    'the Manager layout measurement and row-count guard must remain bounded'
+  );
+
+  const measurementBlock = HARNESS.slice(guardStart, rowCountStart);
+  const rowCountBlock = HARNESS.slice(rowCountStart, editFormCountStart);
+  for (const selector of ['.manager-travel-realms-row', '.manager-map-link-row']) {
+    assert.ok(
+      measurementBlock.includes(`'${selector}'`),
+      `${selector} must participate in overflow measurement`
+    );
+    assert.ok(
+      rowCountBlock.includes(`metric.selector === '${selector}'`),
+      `${selector} must satisfy the populated-row backstop`
+    );
+  }
+});
+
 test('phase assignment matches the manager/player prefix split', () => {
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     const phase = phaseForCaptureLabel(label);
@@ -862,6 +992,57 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   );
 });
 
+// ── The Checks Studio's navigation hooks (issue 1096) ─────────────────────────────────────
+//
+// Issue 1096 replaced the four `data-checks-tab-button` ACTIVITY TABS with four rail routes and
+// a five-section strip. The smoke walk went on clicking the tabs and NOTHING failed: that hook
+// lived only in Svelte markup and in a Playwright selector string, so no unit test, lint rule or
+// type check ever saw the pair. The walk against real Foundry is the only thing that does, and
+// it is a manual twenty-minute run — which is how a whole surface's navigation came to be broken
+// on a branch whose CI was green.
+//
+// So both capture producers get a source-text contract: every `data-checks-*` attribute NAME
+// they navigate by must still be authored in the Checks Studio's own source. Name-level rather
+// than value-level, because the markup interpolates the values (`data-checks-panel={activity}`)
+// — and name-level is exactly the granularity this defect needed, since `data-checks-tab-button`
+// left `src/` altogether.
+const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
+const CHECKS_STUDIO_SRC = [
+  ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
+  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
+
+test('every Checks hook a capture producer navigates by is still shipped', () => {
+  const shipped = new Set(
+    [...CHECKS_STUDIO_SRC.matchAll(/\b(data-checks-[\w-]+)/g)].map((match) => match[1]),
+  );
+  // A derived contract whose input set silently empties passes forever while checking nothing.
+  // These three are the routing spine — the view wrapper, the activity panel and the section
+  // strip — so their absence means the scan read the wrong files, not that the product changed.
+  for (const anchor of ['data-checks-editor', 'data-checks-panel', 'data-checks-section-button']) {
+    assert.ok(shipped.has(anchor), `the Checks Studio source scan found no ${anchor}`);
+  }
+
+  let navigated = 0;
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const [, hook] of producer.source.matchAll(/\[(data-checks-[\w-]+)[=\]]/g)) {
+      navigated += 1;
+      assert.ok(
+        shipped.has(hook),
+        `${producer.path}: \`${hook}\` is not authored anywhere in the Checks Studio — it names a control the product no longer has`,
+      );
+    }
+  }
+  assert.ok(navigated > 0, 'no capture producer selects a Checks hook, so this guard checks nothing');
+
+  // The rail sub-item is addressed by its id, built by interpolation at both ends, so the
+  // name-level scan above cannot see it. Pin the two halves against each other instead.
+  assert.match(HARNESS, /#manager-checks-nav-\$\{activity\}/);
+  assert.match(CHECKS_STUDIO_SRC, /id=\{`manager-checks-nav-\$\{checksItem\.id\}`\}/);
+});
+
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
   // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
   // EARLIEST call site and happily swallows the two before it, which would let a staging
@@ -1181,9 +1362,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-edit-view\]'\)\.first\(\)/);
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
   assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
+  // The closing move is RE-EXPRESSED, not relaxed (issue 1096). It used to be a bare Checks
+  // rail click, because the trigger card the next span drives was one scroll down a single
+  // Checks tab. The tabs are rail routes now and each route renders ONE section at a time, so
+  // reaching that card is a route AND a section — and a walk that lands on the crafting route
+  // without selecting Triggers finds no trigger card at all. Pinning the section is what makes
+  // that mistake fail here rather than 13 minutes into a real run.
   assert.match(
     toolStudioWalk,
-    /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?manager-nav-button:has-text\("Checks"\)/,
+    /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?openChecksActivity\(page, 'crafting', 'triggers'\)/,
     'the Recipe Tools check must prove policy-free rows without dirtying the Recipe draft',
   );
   assert.match(

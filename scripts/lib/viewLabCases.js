@@ -10,6 +10,14 @@
  * a fan-out hazard — an edit to a shared component or to `styles/` would otherwise select all
  * fourteen cases — so those broad signals deliberately map to a small representative set instead.
  * See {@link mapChangedFilesToCases}.
+ *
+ * The same hazard has a second, larger shape: a change to one of the lab's OWN inputs — the fixture
+ * world, the mount page, the capture driver, this registry's shared code — cannot be attributed to
+ * one window, and used to select the whole corpus. That answer is no longer bought: what such a
+ * change has to prove is that the lab still boots and still reaches and photographs every SURFACE,
+ * not that every state of every surface still looks the way it did. It therefore selects one frame
+ * per surface — {@link LAB_SURFACE_CASES} — and the detailed states of a surface are captured when
+ * the files that govern their behaviour or presentation change. See {@link labSurfaceKey}.
  */
 
 import { readFileSync } from 'node:fs';
@@ -27,31 +35,47 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
- * the Foundry shim it renders against, and this registry. None of these is a render file, so none
- * is selectable by {@link isUiFile} — but a change to any of them can move every frame at once.
+ * the Foundry shim it renders against, its capture and layout-assertion helpers, and this registry.
+ * None of these is a render file, so none is selectable by {@link isUiFile} — but a change to any
+ * of them can move or invalidate captured frames.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/viewLabCases\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
 
 /** This registry's own path, as a diff names it. */
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
 
+/** The helper that enforces the opt-in responsive layout contract. */
+const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
+
 /** The lab's actor fixture, as a diff names it. Attributed by fixture table — see below. */
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 
+/** The page that mounts every frame, as a diff names it. Attributed by marked region — see below. */
+const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
+
 /**
- * "Every publishable case" as a value, so an attribution can say it without building the set.
+ * ── How this machinery says "part of this reached beyond what I can attribute" ──────────────────
  *
- * A Symbol rather than a sentinel array or `null`, because the two answers this machinery returns
- * are a SET OF IDS and THE WHOLE CORPUS, and every caller has to tell them apart. `null` would make
- * "I could not parse this" and "this selects nothing" the same value — and those must never be the
- * same value here, since one has to widen to 157 frames and the other has to narrow to none.
+ * It carries a `{keys, unattributable}` PAIR at every level of the attribution walk — from one
+ * candidate anchor, up through a hunk's candidates, a patch's hunks, an input's patch, and a
+ * change's inputs — and each level merges both halves of its children's pairs.
+ *
+ * It used to carry a sentinel instead, `EVERY_PUBLISHABLE_CASE`, which each level returned the
+ * moment any child produced it. That was correct only because the value it stood for CONTAINED
+ * every selection it discarded on the way out. It stands for {@link LAB_SURFACE_CASES} now — 35
+ * frames a reviewer reads instead of 246 they scroll past — which contains no detailed state at
+ * all, so discarding became dropping: a change that edited one case literal and also touched
+ * shared code published coverage and no frame of the case it edited.
+ *
+ * A pair is what makes that unrepresentable rather than merely fixed. There is no value left for a
+ * level to return that means "forget what you found", so the defect cannot come back one level
+ * down — which is exactly how it came back once already, after the first three levels were fixed.
  */
-const EVERY_PUBLISHABLE_CASE = Symbol('every publishable case');
 
 /**
  * Signals too broad to attribute to one window. A shared primitive or a global stylesheet can
- * affect every screen, so selecting every case would make the evidence set useless noise. These map
+ * affect every window, so selecting every case would make the evidence set useless noise. These map
  * to the representative set below plus the fallback.
  */
 /**
@@ -94,6 +118,22 @@ const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
 
 /**
+ * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
+ * armed control every studio's set delete renders.
+ *
+ * Separate from `BULK_EDIT_CHROME_PATTERN` because the two select DIFFERENT frames. The chrome
+ * appears in every bulk-edit frame; this card is below the sticky Apply dock and under the rail's
+ * fold, so the only frames that photograph it at all are the four `*-bulk-delete-*` cases, each of
+ * which scrolls or clicks it into view. Attributing it to the bulk-EDIT frames would publish a
+ * frame in which the changed component is not visible.
+ *
+ * Not in `MANAGER_PRIMITIVES` either, for the reason stated above: a broad signal is claim-exempt
+ * and routes to the representative set, and this component has exactly the delete frames as its
+ * consumers, so targeting is both possible and honest.
+ */
+const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
+
+/**
  * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
  *
  * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
@@ -119,6 +159,22 @@ const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/utils\/recipeBulkEditModel\.js$/,
 ];
 
+/**
+ * The literal typed into the World > Parties search field by `manager-world-parties-search-filtered`.
+ *
+ * EXPORTED, and that is the point. The World > Parties filter matches a party's name, any
+ * member's name AND its travel actor's name, so which parties survive a given term is a fact
+ * about the lab fixture rather than about this case — and an over-match is invisible in a
+ * screenshot, because a frame showing three cards where two were meant looks like a frame.
+ * `tests/view-lab-cases.test.js` derives the survivors from `labWorld.js` and `labActors.js`
+ * and fails by name when a rename makes this term match a third party.
+ *
+ * It sits outside every case region for the same reason `RECIPE_BULK_EDIT_MATCHES` does.
+ *
+ * @type {string}
+ */
+export const WORLD_PARTIES_SEARCH_TERM = 'wagon';
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -127,6 +183,31 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
     String.raw`^src/ui/svelte/apps/manager/(${MANAGER_PRIMITIVES.join('|')})\.svelte$`,
   ].join('|')
 );
+
+/**
+ * Deliberate visible states that a broad primitive's representative pair does not contain.
+ *
+ * Broad signals still select {@link REPRESENTATIVE_CASE_IDS}; these are additive, narrowly named
+ * exceptions for a primitive whose changed presentation is otherwise absent from both generic
+ * frames. Keeping the path literal makes the mapping test fail on a primitive rename, while the
+ * case id fails closed through the registry filter if its deliberate state is removed.
+ */
+const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
+  // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
+  // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
+  'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
+  // BOTH parties pickers, because between them they are the primitive's two modes and
+  // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
+  // its trigger with the search field and suppresses the in-popover search row; the
+  // realm-override picker keeps its value-bearing trigger and renders that row. A change
+  // to the search row, the header ordering or the compact field is invisible in the first
+  // frame and a change to the inline trigger is invisible in the second.
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
+    'manager-world-parties-actor-picker',
+    'manager-world-parties-realm-override-picker',
+  ]),
+});
 
 /**
  * The player crafting app, split by which resolution mode's body a file belongs to.
@@ -243,6 +324,27 @@ const REPRESENTATIVE_CASE_IDS = Object.freeze(['fabricate-app-shell', 'manager-c
 export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 
 /**
+ * Each app's default window geometry.
+ *
+ * Named rather than written inline in the two factories, because a THIRD reader appeared: the
+ * surface-coverage chooser asks whether a case renders at its app's default size, and a case that
+ * does not is a responsive STATE of a surface rather than the surface itself. Two literals and a
+ * predicate that had to agree with them by eye is exactly the drift that silently picks a 680px
+ * frame as a screen's only coverage.
+ */
+const DEFAULT_POSITION = Object.freeze({
+  [MANAGER]: Object.freeze({ width: 1280, height: 820 }),
+  [PLAYER]: Object.freeze({ width: 1280, height: 860 }),
+});
+
+/**
+ * The Foundry application theme every case renders under unless it says otherwise. Only the
+ * `coverage-theme-light-*` pair says otherwise, and the cascade it guards is a different surface
+ * from the same screen in dark — see {@link labSurfaceKey}.
+ */
+const DEFAULT_COLOR_SCHEME = 'dark';
+
+/**
  * Case factories.
  *
  * `app` and `publish` are not independent facts — they follow from which window a case targets.
@@ -261,10 +363,35 @@ export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 function managerCase(entry) {
   return {
     app: MANAGER,
-    position: { width: 1280, height: 820 },
+    position: DEFAULT_POSITION[MANAGER],
     publish: true,
     ...entry,
   };
+}
+
+/**
+ * Choose an actor in the Checks rail's "Preview as" picker.
+ *
+ * TWO STEPS, because that control is a `SearchablePopover` rather than a native `<select>`
+ * (issue 1097 follow-up): a world's actor directory is mostly bestiary, so the list is
+ * filtered to player characters and made searchable. There is no `selectOption` to issue —
+ * open the trigger, then click the option by its own `data-popover-option` identity handle
+ * rather than by its localized label.
+ *
+ * Written once and spread into every case that needs it. Five cases select an actor before
+ * they can reach their state (every lab system's check formula carries
+ * `@abilities.int.mod`, so under the resting "No actor" selection nothing reduces to a
+ * number), and five hand-written pairs are five places for the control's hooks to drift out
+ * of step — a stale one fails the capture job WHOLE and publishes nothing.
+ *
+ * @param {string} actorId The lab actor id to preview as.
+ * @returns {object[]} The ordered steps.
+ */
+function previewAsActor(actorId) {
+  return [
+    { selector: '[data-checks-preview-actor]' },
+    { selector: `[data-popover-option="${actorId}"]` },
+  ];
 }
 
 /**
@@ -274,10 +401,14 @@ function managerCase(entry) {
 function playerCase(entry) {
   return {
     app: PLAYER,
-    position: { width: 1280, height: 860 },
+    position: DEFAULT_POSITION[PLAYER],
     publish: true,
     ...entry,
   };
+}
+
+function responsiveLayout(containerSelector, gridSelector) {
+  return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
 }
 
 /**
@@ -347,6 +478,34 @@ function journalBlindRunCases() {
     }),
   ];
 }
+
+/**
+ * The player companion surface (issue 1198): the route key its frames address, the rail control
+ * that addresses it, and the render files those frames are evidence about.
+ *
+ * The route key is `ext:<surfaceId>:<tabId>` and it is what `activeTab`, `data-active-tab` and
+ * `data-player-nav-tab` all carry, so the same string is the `?tab=` query, the tab the capture
+ * driver's derived `expectTab` gate checks, and the rail selector. Written once for that reason.
+ *
+ * Selection is by ATTRIBUTE and never by id: the key contains colons, and an id selector
+ * containing a colon is invalid CSS — it throws `SyntaxError` rather than returning null. The
+ * matching `id` exists only as an IDREF target, where no CSS parse happens.
+ *
+ * `sourceMatches` is shared rather than restated three times: fifteen identical lines is what a
+ * duplication detector counts, and `scripts/**` is analysed by SonarCloud's Automatic Analysis.
+ * The five files are the whole seam a Core frame can show — the mount host, the shell that
+ * composes the rail, the registry the shell reads, its shared factory, and the pure derivation
+ * all three call — so a change to any of them selects these frames rather than an unrelated one.
+ */
+const PLAYER_EXTENSION_ROUTE = 'ext:downtime:projects';
+const PLAYER_EXTENSION_RAIL_BUTTON = `[data-player-nav-tab="${PLAYER_EXTENSION_ROUTE}"]`;
+const PLAYER_EXTENSION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/PlayerExtensionHost\.svelte$/,
+  /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+  /^src\/ui\/playerExtensions\.js$/,
+  /^src\/ui\/playerNavModel\.js$/,
+  /^src\/ui\/extensionRegistry\.js$/,
+]);
 
 export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
@@ -518,85 +677,133 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-system-edit-lists',
     label: 'Manager — System edit lists',
     smokeLabels: ['manager-system-edit-lists'],
-    // The three settings-list cards together — Character modifiers, Character prerequisites and
+    // The three settings-list cards together — Modifiers, Character prerequisites and
     // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
-    // section collapsed to show whole-section collapse. That needs ONE system carrying all three,
-    // and herbalism is the only one that can: the modifiers card is gated on `gathering`, which
-    // Runework (the currency system) does not have.
+    // section collapsed to show whole-section collapse. Herbalism carries all three and is
+    // the system whose Modifiers library the checks screens select over. (The card is no
+    // longer gated on `gathering`, per issue 1117 — it now holds every CHECK modifier too —
+    // but herbalism remains the fixture with a populated library.)
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
-      { selector: '[data-section-collapse="currency"]' },
-      { selector: '[data-system-character-modifier] [data-toggle-character-modifier]' },
-      { selector: '[data-system-character-modifier] .essence-icon-picker-trigger' },
-      { selector: '[data-system-character-modifiers]', scroll: true },
+      { selector: '[data-system-modifier] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier] .essence-icon-picker-trigger' },
+      // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
+      // over-tall element's BOTTOM edge, and issue 1117 made this section taller (a bounds
+      // row and its hint per open entry), which pushed the renamed "Modifiers" heading off
+      // the top of the frame. The title anchors it from the top instead — the same fix the
+      // checks-entries case records for the same cause.
+      { selector: '[data-system-modifiers] .manager-card-title', scroll: true },
     ],
     expectView: 'system-edit',
+    // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
+    // Checks-tab editor rather than only on the section it already had: the open row's `min`
+    // Stepper is what proves the check-only bounds pair reached this card, and it is the only
+    // frame in the registry that can show it now that no Checks route authors an entry.
+    // `hb-mod-medicine` is the world's only BOUNDED entry, so this frame carries real values
+    // rather than two `Unbounded` placeholders.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-bounds] [data-system-modifier-field="min"])',
+    position: { width: 1280, height: 980 },
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
+      // itself is a BROAD SIGNAL and reaches this case through
+      // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-system-edit-modifier-rolls',
+    label: 'Manager — System edit rolling modifier',
+    // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
+    // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE ISSUE 1118 CREATES. A check accepts dice now, so `hb-mod-luck` (`1d4`, capped at
+    // +3) is a first-class entry rather than one the surface warns about: the row's "Rolls dice"
+    // chip is neutral, the open editor's roll note says the dice reach the check's own roll and
+    // that a competing rule ranks the entry by its average, and the bounds pair beside it clamps
+    // the ROLLED result. The retired copy said the opposite of all three, so this frame is the
+    // one place the reversal is visible.
+    //
+    // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
+    // what this frame exists for, and `manager-system-edit-lists` already frames the card from
+    // its heading.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-system-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier="hb-mod-luck"]', scroll: true },
+    ],
+    expectView: 'system-edit',
+    // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
+    // rule's copy occupied and the only one that cannot render if the note is dropped.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-roll-note="hb-mod-luck"])',
     position: { width: 1280, height: 980 },
     kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
     id: 'currency-actor-property',
-    label: 'Manager — Currency actor property',
+    label: 'Manager — World Currency actor property',
     smokeLabels: ['currency-actor-property'],
     reaches: 'exact',
-    // The Currency Units card renders only for a system with `requirements.currency.enabled`, and
-    // the lab authors that on Runework alone — see the fixture note there for why not the default
-    // system. `scroll` is load-bearing and not a convenience: the card sits below the settings
-    // panel's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
-    // nested overflow containers, so without it every assertion passes and the card is simply
+    // World > Currency (issue 1278). The ladder is WORLD scope, so this route needs no selected
+    // system and is ungated — the card renders whether or not any crafting system has switched
+    // currency on. `scroll` is load-bearing and not a convenience: the ladder runs below the
+    // page's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
+    // nested overflow containers, so without it every assertion passes and the units are simply
     // absent from the PNG.
-    query: { system: 'lab-runework' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-macro',
-    label: 'Manager — Currency macro',
+    label: 'Manager — World Currency macro',
     smokeLabels: ['currency-macro'],
     reaches: 'exact',
-    query: { system: 'lab-runework' },
     // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-strategy-select]', select: 'macro' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]', select: 'macro' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-actor-inventory',
-    label: 'Manager — Currency actor inventory',
+    label: 'Manager — World Currency actor inventory',
     smokeLabels: ['currency-actor-inventory'],
     reaches: 'exact',
-    query: { system: 'lab-runework' },
     // dnd5e registers no inventory currency provider, so this strategy resolves to the
     // no-provider callout steering the GM to macro mode — which is the state the smoke's
     // counterpart photographs too, for the same reason.
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-strategy-select]', select: 'actorInventory' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]', select: 'actorInventory' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'manager-recipes-normal',
@@ -642,7 +849,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '' },
       // The Checks view is a STAGED editor: typing only marks the draft dirty, and the browser's
       // check pills read the PERSISTED system. Without this the case cleared the field, navigated
@@ -881,6 +1088,89 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
+  // ── The Recipe Studio's set delete (issue 1132) ────────────────────────────────────
+  //
+  // BOTH FRAMES RUN ON HERBALISM, NOT ON THE FLAGSHIP SMITHING LIBRARY every other recipe case
+  // photographs, and the choice is the whole reason these frames say anything. The card states
+  // three numbers and two of them are unreachable on smithing: no actor has learned a smithing
+  // recipe (`labActors.js` teaches only `hb-*`), and smithing is deliberately on the LEGACY
+  // membership basis with both its books' `recipeIds` absent, so its recipe-item figure comes
+  // from a single legacy scalar. Photographed there the card would render its subject row and
+  // one gated-away consequence, which is the state the Component Studio's frames already show.
+  //
+  // Herbalism is knowledge-gated and modern-basis: `hb-book` holds healing, salve and grind,
+  // Idrin has learned healing and salve, and Vosk has learned oil. The selection below is
+  // therefore 3 recipes / 1 recipe item / 2 characters — every row rendered, and the recipe
+  // count deliberately DISAGREEING with the item count, which is the state the corrected copy
+  // exists for. The delta's authored "1 book or scroll will lose it." would read as a lie in
+  // this exact frame.
+  managerCase({
+    id: 'manager-recipes-bulk-delete-idle',
+    label: 'Manager — Recipes bulk delete idle',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The UNARMED face: the impact statement and the standing permanence hint, rendered BEFORE
+    // the control is armed. That pairing is the entire justification for this action arming
+    // instead of raising a `confirmDialog`, so it is the frame the carve-out rests on.
+    //
+    // The explicit `scroll` step is not optional. The card sits below the panel shell and below
+    // the sticky Apply dock, which puts it under the rail's fold at the registry's 1280x820
+    // position, and `frame.screenshot()` does not scroll nested overflow containers — without it
+    // the card is out of frame while every assertion still passes. The Component Studio's idle
+    // twin records the same measurement.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
+      { selector: '[data-recipe-bulk-delete-card]', scroll: true },
+    ],
+    expectView: 'recipes',
+    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
+    // from its armed twin below — a selector naming only the card would pass on either.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="false"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/utils\/recipeDeleteImpact\.js$/,
+      BULK_DELETE_CARD_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-delete-armed',
+    label: 'Manager — Recipes bulk delete armed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The ARMED half, and the frame whose final step clicks INSIDE the delete card. The first
+    // click only arms, so this shows `Confirm delete` beside the impact statement it is a
+    // confirmation OF, with nothing written.
+    //
+    // Two frames rather than one because the two states are the point: the idle sibling shows
+    // the statement rendered before arming, and this one shows that the arm is a second,
+    // separate act. Either alone leaves half of the pairing unphotographed.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
+      // arms, so this cannot drift onto a wrapper the way a class selector could. Clicking also
+      // scrolls it into view, which is why this case needs no `scroll` step.
+      { selector: '[data-arm-token="delete-recipes"]' },
+    ],
+    expectView: 'recipes',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the idle case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="true"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/utils\/recipeDeleteImpact\.js$/,
+      BULK_DELETE_CARD_PATTERN,
+    ],
+  }),
   managerCase({
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
@@ -911,6 +1201,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      // The manager router and the Crafting entry model (issue 1151). Both decide which
+      // mode-conditional entries this frame's submenu shows and which route survives a
+      // system change, and neither is reachable from the view components above — so
+      // without these two a router change published nine frames that never render the
+      // Crafting submenu at all.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
   managerCase({
@@ -987,7 +1284,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The recipe end of the `byRecipe` rule (issue 1055) ───────────────────────────────────────
+  // ── The recipe end of the `bySubject` rule (issues 1055, 1095) ───────────────────────────────
   //
   // Every frame below reaches its state by CLICKING the rule group (and, for the capped pair, by
   // typing into the pick-cap Stepper) rather than by authoring a second catalogued system. The
@@ -1022,7 +1319,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The per-recipe check-modifier picker AT REST. `RecipeOverviewTab` gates the whole control on
-    // `craftingModifierOptions.length > 0` AND on the system's rule being `byRecipe`, so it exists
+    // `craftingModifierOptions.length > 0` AND on the system's rule being `bySubject`, so it exists
     // on exactly one lab system — herbalism, the only one carrying a catalogue — and every other
     // recipe-editor frame in this registry runs on smithing or jewelry.
     //
@@ -1032,8 +1329,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
       { selector: '#recipe-tab-overview' },
@@ -1082,8 +1380,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1123,8 +1422,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '5' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1149,8 +1449,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '3' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1172,7 +1473,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no counterpart frame of the surface being gone.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `byRecipe` this
+    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `bySubject` this
     // tab renders NOTHING about check modifiers — no picker, and no standing "the system decides"
     // banner either. The rejected design put such a banner on every recipe of every system that
     // never delegated, and this frame is the evidence that it is gone rather than merely restyled.
@@ -1228,13 +1529,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // Clearing the field reaches `noFormula`: a check slot that exists and rolls nothing.
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-inert]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The CAUSE, not just the notice. Both causes render through the same element with the
     // same chrome, so a presence-only assertion would photograph the wrong sentence.
     expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noFormula"]',
@@ -1257,13 +1559,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     // so this frame is also the only evidence that the control is withdrawn rather than left
     // live-but-useless, and the only one showing `RecipeModeBanner`'s warning tone at all.
     //
-    // The `byRecipe` click is what makes the contradiction reachable: under a non-selecting
+    // The `bySubject` click is what makes the contradiction reachable: under a non-selecting
     // rule there are no picks to warn about and the tab says nothing.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Back to The roll to clear the formula: the field and the catalogue it makes inert
+      // are two SECTIONS apart now (issue 1096), and a step that stayed on Modifiers would
+      // find no formula field and abort the case.
+      { selector: '#checks-section-roll' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
       'Crafting',
@@ -1272,7 +1579,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-modifier-inert]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The cause, and the withdrawal. The rule click puts this system on `byRecipe`, so an
+    // The cause, and the withdrawal. The rule click puts this system on `bySubject`, so an
     // inert state that failed to suppress the control would still render the picker cell —
     // which is exactly what this frame claims cannot happen.
     expectSelector:
@@ -1557,6 +1864,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      // The manager router and the Crafting entry model (issue 1151), for the reason
+      // recorded on `manager-books-scrolls-normal`. This case runs on `lab-alchemy`,
+      // which is restricted AND alchemy, so its submenu is the two-conditional-entry
+      // shape — `Recipes / Access / Knowledge / Settings` — that the wider Knowledge
+      // gate produces.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
   managerCase({
@@ -1600,6 +1914,87 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-components-bulk-delete-idle',
+    label: 'Manager — Components bulk delete idle',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The UNARMED face of the set delete (issue 1129), and the frame that actually
+    // photographs the impact statement.
+    //
+    // The bulk-edit cases above do NOT photograph it "for free". The delete card sits below
+    // the panel shell and below the sticky Apply dock, which puts it under the rail's fold at
+    // the registry's 1280x820 position — measured on the published
+    // `manager-components-bulk-edit-unstaged` frame, where the rail ends at the essence grid
+    // and the card is simply absent. The armed case only shows it because CLICKING the button
+    // scrolls it into view, and that frame shows the armed state by definition.
+    //
+    // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
+    // containers, so without it the card is out of frame while every assertion still passes.
+    //
+    // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
+    // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
+    // the only frame in the registry that photographs the DISABLED row at all — the armed twin
+    // below selects iron+copper ore, which computes 2 / 1 / 0 and therefore photographs the
+    // zero-gating instead. Between the two, every branch of the impact list has a frame.
+    // Selecting an ore here as well would leave the card's most consequential sentence, and the
+    // one this round rewrote, with no visual evidence anywhere.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
+      { selector: '[data-component-bulk-delete-card]', scroll: true },
+    ],
+    expectView: 'components',
+    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
+    // from its armed twin below — an `expectSelector` naming only the card would pass on
+    // either.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="false"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-components-bulk-delete-armed',
+    label: 'Manager — Components bulk delete armed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The ARMED half of the set delete (issue 1129), the twin of
+    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
+    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
+    // written.
+    //
+    // Two frames rather than one because the two states are the point: the idle sibling
+    // directly above shows the impact statement rendered BEFORE arming, and this one shows
+    // that the arm is a second, separate act. Either frame alone would leave half of the
+    // pairing — statement plus arm — unphotographed.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
+      // it arms, so this cannot drift onto a wrapper the way a class selector could.
+      { selector: '[data-arm-token="delete-components"]' },
+    ],
+    expectView: 'components',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the bulk-edit case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="true"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -1722,6 +2117,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
+    // The SHARED subject check-modifier picker does NOT render here, and this list used to
+    // claim it did (issue 1095). `lab-runework`'s salvage check is on `addAll`, and the picker
+    // renders under `bySubject` alone — so routing the component's changed file to this case
+    // would publish a frame that provably cannot depict it. The two cases that CAN are
+    // `manager-component-edit-salvage-modifier-pick` and
+    // `manager-gathering-task-edit-modifier-pick`, each of which clicks the rule first.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -1764,8 +2165,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-gathering'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-gathering' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-gathering' }],
+    expectView: 'checks-gathering',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1778,8 +2179,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-validation'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-validation' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-validation' }],
+    expectView: 'checks-validation',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1805,14 +2206,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // A placement the shim REFUSES, so the whole formula is discarded: critical, not the
       // ignorable warning an additive placement raises.
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
-      { selector: '#checks-tab-validation' },
+      { selector: '#manager-checks-nav-validation' },
       { selector: '[data-issue="retiredPlaceholderBreaksFormula"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-validation',
     // The CRITICAL id specifically. A presence-only assertion would be satisfied by the
     // warning, which is the other half of the split and says the opposite thing.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
@@ -1822,18 +2223,231 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
+  // ── The GM Checks Studio IA (issue 1096) ──────────────────────────────────────────────
+  //
+  // Six states the old four-tab surface had no shape for, and every one of them is a claim
+  // this change makes that only a photograph settles.
+  managerCase({
+    id: 'manager-checks-rail-group',
+    label: 'Manager — Checks rail group expanded',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Jewelry is the system whose SALVAGE is routed with no authored check, so salvage
+    // carries a real readiness issue: the parent badge, the salvage child badge and the
+    // Validation child badge are all visible together, which is the whole rule the frame
+    // has to settle (the parent sums the ACTIVITY children only, and Validation restates
+    // that total rather than adding to it).
+    query: { system: 'lab-jewelry' },
+    steps: ['Checks'],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-nav-issues="checks"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-rail-dirty',
+    label: 'Manager — Checks rail dirty marker beside an issue badge',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THREE-MARKER COLUMN. An unsaved edit is staged on Crafting, then the GM moves to
+    // Salvage — so the rail shows a DIRTY marker on a route they are not standing on, an
+    // ISSUE badge on another, and the record-count numerals of every non-Checks entry above.
+    // The drafts living above the route is what makes this state reachable at all; under the
+    // old per-tab model the edit would have been abandoned by the move.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @prof + 2' },
+      { selector: '#manager-checks-nav-salvage' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector: '.fabricate-manager [data-checks-nav-dirty="crafting"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-section-badged-and-dotted',
+    label: 'Manager — Checks section with a count AND a warning dot',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // No frame in the prototype shows a section carrying BOTH markers, and they occupy the
+    // same slot, so this is the one that proves they do not collide. Runework is routed by
+    // check with THREE authored tiers — the count the header badge reads — and blanking the
+    // first one's NAME raises `unnamedOutcome`, which buckets to Outcomes, the section that
+    // already carries the tier count.
+    //
+    // The tier it blanks is the TOP one, so this frame's strongest band is captioned with
+    // nothing. That is correct for what this case photographs and wrong for anything about
+    // band NAMES: `coverage-mode-routed-check-checks` is the frame that shows those.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-name]', fill: '' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-section-dot="outcomes"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-off',
+    label: 'Manager — Checks crafting switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Reached by TURNING THE CHECK OFF rather than by a fixture whose check is already off:
+    // every lab system authors an enabled check, and a seventh system carrying a disabled one
+    // would change the system count every other manager frame is composed against. Jewelry's
+    // `routedByIngredients` check is the optional one, so its rail toggle is live.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-active-toggle]' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-off-empty]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-stacked-floor',
+    label: 'Manager — Checks stacked at the declared floor',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE 1024x640 DECLARED FLOOR, and it is STACKED there rather than a side rail: the
+    // shipped `fabricate-manager` container ladder restacks `.manager-body` to one column at
+    // 1120, so at the floor every panel is reached by scrolling the body. An acceptance that
+    // described a side rail at this width would have been read as a defect in the frame.
+    query: { system: 'lab-runework' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-rail="crafting"]',
+    position: { width: 1024, height: 640 },
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks', 'responsive'],
+  }),
   managerCase({
     id: 'manager-checks-crafting-consumption',
     label: 'Manager — Checks crafting consumption',
     smokeLabels: ['manager-checks-crafting-consumption'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
-    expectView: 'checks',
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-salvage-on-failure',
+    label: 'Manager — Checks salvage on failure',
+    // BEYOND the smoke, and beyond every previous build: this SECTION HAS NEVER EXISTED.
+    // Until issue 1098 the salvage route's On-failure section rendered the shared "nothing
+    // to set here" empty state, which was true of the screen and false of the data —
+    // `consumeComponentOnFail` and `breakToolsOnFail` have been persisted since 1.7.0 and
+    // were reachable from no editor at all.
+    //
+    // `lab-runework` is the system that authors BOTH of them at their non-default values
+    // (`consumeComponentOnFail: false`, `breakToolsOnFail: true`), so the frame photographs
+    // persisted state rather than two defaults, and its salvage policy is `always`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector:
+      '.fabricate-manager [data-failure-result-policy="salvage"]' +
+      ' ~ [data-salvage-failure-consumption]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-gathering-on-failure',
+    label: 'Manager — Checks gathering on failure',
+    // The activity that renders the policy and NO consumption toggles, because it has no
+    // consumption block — plus the dormancy notice naming issue 683 and the read-only
+    // `task.failureOutcome` cross-reference in its no-record state. The absence of the
+    // toggles is the subject as much as the presence of the policy, and an absence is only
+    // judgeable from a photograph.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-gathering',
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="gathering"]' +
+      ':has([data-failure-result-policy="gathering"])' +
+      ':has([data-gathering-failure-dormant])' +
+      ':has([data-gathering-failure-outcome-empty])' +
+      ':not(:has([data-salvage-failure-consumption]))' +
+      ':not(:has([data-failure-consumption]))',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-tier',
+    label: 'Manager — Recipe edit results failure tier',
+    // DECISION 7, and the only frame of it: a routed-by-check recipe's result-group card
+    // offering a FAILURE-MARKED outcome tier, which is reachable only because
+    // `lab-runework`'s crafting check authors `failureResultPolicy: 'always'`. Under the
+    // `never` every other routed system would carry, the picker offers success tiers only
+    // and this frame would be indistinguishable from `coverage-mode-routed-check-results`.
+    //
+    // The selector names `rw-ruined` — the world's one `success: false` tier —
+    // rather than counting options, because a count would pass on three success tiers.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-add="routing-option"]' },
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      /^src\/systems\/ResolutionModeService\.js$/,
+      /^src\/utils\/routedOutcomeKeywords\.js$/,
     ],
   }),
   managerCase({
@@ -1868,22 +2482,41 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
-      // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so anchoring the LAST of
-      // the things this frame is named for — the default-modifier pill row, below the rule group —
-      // puts the whole card in frame with the catalogue rows above it for context.
-      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+      // RE-ANCHORED (issue 1095 review). `[data-crafting-modifier-defaults]` was the anchor while
+      // it was the pill row directly under "Default modifiers"; this change turned it into the
+      // eligibility intro and MOVED it above the rows, so the anchor stopped naming the thing it
+      // was chosen for — and each entry grew from two lines to four at the same time, so the
+      // published frame clipped mid-entry with two `Unbounded` steppers and a `Selectable` pill
+      // whose own row's icon, name, expression and delete button were all above the fold.
+      //
+      // "Put the WHOLE card in frame" is no longer achievable and the claim is retired rather
+      // than restated: at four entries the card is ~1240px and `.application`'s max-height
+      // resolves to ~1000px against the harness viewport, which the harness refuses outright
+      // rather than silently clamping. So the two crafting cases were split by SUBJECT instead.
+      // This one is the RULE GRID and the UNLIMITED cap reading, so it anchors the cap — the
+      // card's last element — and carries the grid above it, with the not-selected eligibility
+      // pill of the last entry for context. `manager-checks-crafting-modifier-entries` below is
+      // the entry editor's own frame.
+      { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
-    // Two things at once, on the one card. `byRecipe` is the FOURTH option — the one the redesign
-    // restored, the one that makes the row count even, and the only one whose absence would
-    // silently turn the 2x2 this frame is evidence for back into a three-across row. The
-    // `unlimited` cap reading is the other half, and asserting the VALUE rather than the field's
-    // presence is what separates this frame from its bounded sibling.
+    expectView: 'checks-crafting',
+    // Two things at once, on the one card — and that card is `How they combine`, which issue
+    // 1096's parity round split out of the catalogue card. This selector named
+    // `[data-crafting-modifier-catalogue]`, which is now the LIBRARY card and contains neither
+    // the rule grid nor the cap: left alone it would match nothing, and a registry selector
+    // that matches nothing fails the capture job whole and publishes NO frames at all.
+    //
+    // `bySubject` is the FOURTH option — the one the redesign restored, the one that makes the
+    // row count even, and the only one whose absence would silently turn the 2x2 this frame is
+    // evidence for back into a three-across row. The `unlimited` cap reading is the other half,
+    // and asserting the VALUE rather than the field's presence is what separates this frame
+    // from its bounded sibling.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue]' +
-      ':has([data-crafting-modifier-policy-option="byRecipe"])' +
+      '.fabricate-manager [data-crafting-modifier-policy-card]' +
+      ':has([data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -1903,22 +2536,268 @@ export const VIEW_LAB_CASES = Object.freeze([
     // different pictures of the same control — which is exactly the pair a reviewer needs to judge
     // whether "empty means no limit" is legible without reading the hint.
     //
-    // `byRecipe` rather than `playerPicks`, so the two cap frames also differ in their hint: the
+    // `bySubject` rather than `playerPicks`, so the two cap frames also differ in their hint: the
     // cap means a bound on the RECIPE AUTHOR at edit time here and on the PLAYER at roll time
     // there, and the card keys its sentence off the rule rather than writing one ambiguous line.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
+      // The CAP FIELD, which is this case's whole subject and the card's last element, so the
+      // frame carries the rule grid above it. NOT the rows: at four entries the card is
+      // ~1240px against a ~1000px maximum viewport, so no anchor frames the whole of it, and
+      // an anchor that framed the entries would push this case's own subject off the bottom.
+      // The entries have their own case (`manager-checks-crafting-modifier-entries`).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The VALUE, not the presence of a field: a fill that silently did not land leaves the field
     // rendered and blank, which is the sibling frame published under this name.
     expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
     kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-modifier-entries',
+    label: 'Manager — Checks crafting modifier entries',
+    // BEYOND the smoke: the walk never opens a system carrying a catalogue on this tab, and the
+    // two sibling cases above frame the rule grid and the cap rather than the entries.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE CRAFTING ROWS, and since issue 1117 what they show is the ABSENCE of an editor.
+    // This case framed the entry editor while crafting owned the entries; crafting now renders
+    // the library read-only exactly as salvage and gathering do, so the frame's job is to prove
+    // that symmetry on the one activity that used to be special — the identity/expression
+    // read-out, the bounds chip on the world's only bounded entry, and the deep link that
+    // replaces the add button.
+    //
+    // Anchored on the card's TITLE (issue 1096's parity round), not on its first row.
+    // `scrollIntoViewIfNeeded` lands an over-tall element's BOTTOM edge, so anchoring the rows
+    // container frames the last entries; anchoring the first ROW was the previous fix and it
+    // now drops the card HEAD — which is where the rebuild put the deep link and the rule's own
+    // sentence, and is therefore half of what this frame exists to show. The title anchors it
+    // from the top, the same fix `manager-system-edit-lists` records for the same cause.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      {
+        selector: '[data-crafting-modifier-catalogue="crafting"] .manager-checks-card-title',
+        scroll: true,
+      },
+    ],
+    expectView: 'checks-crafting',
+    // THE WHOLE OF THE REBUILT CARD, clause by clause, because each clause is a thing that
+    // shipped wrong and could come back: the rule's sentence in the head's description slot,
+    // the read-only expression, the bounds chip ON the row, the deep link (which was a
+    // full-width button at the foot), and the library note that now CLOSES the card instead of
+    // opening it.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
+      ':has(.manager-checks-card-head [data-crafting-modifier-defaults])' +
+      ':has([data-crafting-modifier-readonly="expression"])' +
+      ':has(.manager-modifier-readonly-row .manager-modifier-bounds-chip)' +
+      ':has(.manager-checks-card-head [data-crafting-modifier-edit-link])' +
+      ':has([data-crafting-modifier-library-note])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
+  //
+  // Every activity renders the library READ-ONLY now, with a bounds chip and a link to the system
+  // editor, while the per-entry eligibility control and the rule grid stay fully editable. What
+  // distinguishes these two frames from the crafting one above is therefore their SELECTION and
+  // their notices, not their editability — which is exactly the asymmetry issue 1117 removed.
+  //
+  // Both run on `lab-herbalism`, the one system with a catalogue, and both its salvage and its
+  // gathering features are on. Their selections DIFFER from crafting's (`labContent.js`), which is
+  // what makes the two frames distinguishable from the crafting one at a glance rather than three
+  // photographs of the same state.
+  managerCase({
+    id: 'manager-checks-salvage-modifiers',
+    label: 'Manager — Checks salvage modifiers',
+    // BEYOND the smoke: the walk never opens the salvage sub-tab of a system carrying a
+    // library, so no counterpart frame of these rows exists.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-rows]', scroll: true },
+    ],
+    expectView: 'checks-salvage',
+    // THE READ-ONLY ROW, asserted through the one element the retired editable branch could not
+    // draw. The `has(...bounds-chip)` clause pins the bounds chip against the world's only
+    // bounded entry, `hb-mod-medicine`.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
+      ':has([data-crafting-modifier-readonly="expression"])' +
+      ':has(.manager-modifier-bounds-chip)' +
+      ':has([data-crafting-modifier-edit-link])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-gathering-modifiers',
+    label: 'Manager — Checks gathering modifiers',
+    // BEYOND the smoke, and the only frame of the DORMANCY notice against a populated catalogue:
+    // `manager-checks-gathering` runs on the default system, whose catalogue is empty, so its card
+    // draws the empty state and none of the rows the notice is about.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-rows]', scroll: true },
+    ],
+    expectView: 'checks-gathering',
+    // The gathering card carries TWO notices no other activity's does — the check-vs-character
+    // modifier disambiguation and the issue-683 dormancy note — and both are stated against real
+    // rows here rather than against an empty catalogue.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="gathering"]' +
+      ':has([data-gathering-modifier-disambiguation])' +
+      ':has([data-check-modifier-dormant])' +
+      ':has([data-crafting-modifier-readonly="expression"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // ── the SHARED subject picker, one case per host (issue 1095) ───────────────────────────────
+  //
+  // `SubjectModifierPicker` is one component with TWO hosts, and both gate it on the activity's
+  // rule being `bySubject`. Both lab systems author a non-selecting rule, so it renders in NO
+  // existing frame — which is why these two cases click the rule card first, exactly as the
+  // recipe picker's cases do. Clicking a `RadioCardGroup` radio is legal in this registry (see the
+  // recipe block's own note); the card persists on change, so no Save step follows.
+  //
+  // Both open the picker in its INHERIT state, which is the reading the pill row cannot show: the
+  // inherited set is NAMED from the activity's own `defaultModifierIds`, and a picker that said
+  // "inheriting" and stopped there told the GM nothing about what the record actually rolls.
+  //
+  // BOTH FRAMES DEPEND ON A FIXTURE, not merely on the click. The inherit note has a SECOND
+  // reading — "the default set is empty, so no check modifier applies" — and that is what renders
+  // when the activity has no eligible entries. `lab-herbalism` carries a `salvageCraftingCheck`
+  // and (since issue 1095's review) a `gatheringCraftingCheck`, each with its OWN non-empty
+  // `defaultModifierIds`, precisely so each frame photographs the NAMING reading. Both
+  // `expectSelector`s therefore assert the inherit note itself rather than only that the picker
+  // rendered — without that, a world whose default set went empty would publish a frame showing
+  // the opposite sentence and the case would still pass.
+  managerCase({
+    id: 'manager-component-edit-salvage-modifier-pick',
+    label: 'Manager — Component edit salvage modifier pick',
+    // BEYOND the smoke: the walk never presses a rule card, so the picker is on no smoke frame.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
+          '.manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The picker AND its inherit note. The first proves the rule click landed (the picker renders
+    // under no other rule), the second proves the frame shows the inherit reading rather than an
+    // authored pick — and the note is where the inherited entries are named.
+    expectSelector:
+      '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
+      '[data-subject-modifier-inherited]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-edit-modifier-pick',
+    label: 'Manager — Gathering task edit modifier pick',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // The rail's gathering group is a SUBMENU, so reaching the task library is two clicks —
+    // the same route `manager-gathering-task-editor-normal` takes, after the rule click.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-check-modifiers]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    // The task card, the picker inside it AND the picker's inherit note: the card carries the
+    // check-vs-character modifier hint, which is the disambiguation this screen is the second half
+    // of, and the note is where the inherited entries are named.
+    expectSelector:
+      '.fabricate-manager [data-gathering-task-check-modifiers] ' +
+      '[data-subject-modifier-picker="gathering-check-modifier"] ' +
+      '[data-subject-modifier-inherited]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-modifiers-narrow',
+    label: 'Manager — Checks crafting modifiers narrow',
+    // BEYOND the smoke: the walk runs one geometry, and the whole subject here is the other one.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE 1x4 REFLOW, which is only judgeable from a photograph. The rule grid is a FIXED
+    // two-track `RadioCardGroup`, so its 2x2 is a decision rather than a reflow — and the card
+    // declares itself a container so the shipped `@container (max-width: 620px)` rule measures
+    // THIS card's inline size instead of the whole manager shell's. That is what drops the grid to
+    // 1x4 at a narrow pane, and a claim about a container query with no narrow frame behind it is
+    // a claim about code nobody has looked at.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // RE-POINTED at the rule card (issue 1096's parity round). The grid moved out of
+    // `[data-crafting-modifier-catalogue]` into its own `How they combine` card, so the old
+    // descendant selector matches nothing — and a registry selector that matches nothing fails
+    // the capture job whole rather than this one case.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-policy-card] [data-crafting-modifier-policy]',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'checks', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
@@ -2208,6 +3087,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -2234,6 +3114,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
   managerCase({
@@ -2257,6 +3141,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
   managerCase({
@@ -2279,6 +3167,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
 
@@ -2293,7 +3185,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
     ],
   }),
@@ -2309,7 +3201,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
   managerCase({
@@ -2335,7 +3227,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
   managerCase({
@@ -2364,7 +3256,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
   managerCase({
@@ -2404,7 +3296,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
   managerCase({
@@ -2425,48 +3317,809 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
   managerCase({
-    id: 'manager-gathering-travel-normal',
-    label: 'Manager — Gathering travel normal',
-    smokeLabels: ['manager-gathering-travel-normal'],
-    // Lands on the real Travel and parties surface — the parties/realms/map-region tabs, an
-    // ENABLED party with its three members, and the selected-party inspector — rather than the
-    // environments browser this used to capture. The seed that blocked it is fixed: it authored
-    // `memberActorIds` where `GatheringPartyStore._normalizeParty` reads `memberActorUuids`, so
-    // every field normalised away and the card read "Disabled, 0 members".
+    id: 'manager-world-travel-default-collapsed',
+    label: 'Manager — World Travel collapsed by default',
+    smokeLabels: ['manager-world-travel-default-collapsed'],
     reaches: 'exact',
-    // SMITHING, not herbalism. The Travel subitem exists only while the owning system's
-    // `gatheringRealmSettings.enabled` is true, and switching that on for herbalism would
-    // realm-lock all three of its environments (every one names an included realm) and take the
-    // already-captured environments, blind and stacked frames with it. Smithing already runs the
-    // Travel/Realms subsystem for the realm-locked environment teaser.
     query: { system: 'lab-smithing' },
-    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
-    expectView: 'environments',
-    kinds: ['manager', 'environments'],
+    steps: [],
+    expectView: 'systems',
+    expectSelector: '#manager-world-nav-travel[aria-expanded="false"]:not(.is-active)',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world'],
     sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-expanded-neutral',
+    label: 'Manager — World Travel expanded neutral',
+    smokeLabels: ['manager-world-travel-expanded-neutral'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-travel-toggle', press: 'Space' }],
+    expectView: 'systems',
+    expectSelector:
+      '.manager-world-travel-group:has(#manager-world-nav-travel[aria-expanded="true"])' +
+      ':not(:has([aria-current="page"]))',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-normal',
+    label: 'Manager — World Parties normal',
+    smokeLabels: ['manager-world-parties-normal'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector: '[data-travel-panel="parties"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
     ],
   }),
   managerCase({
-    id: 'manager-gathering-travel-stacked',
-    label: 'Manager — Gathering travel stacked',
-    smokeLabels: ['manager-gathering-travel-stacked'],
-    // Reaches Travel for the same reason as its normal-width twin above, at the stacked breakpoint.
+    id: 'manager-world-parties-stacked',
+    label: 'Manager — World Parties stacked',
+    // Same populated state as the normal frame, pinned inside the manager's 1120px responsive
+    // breakpoint so the full-width Parties route is photographed after the shell restacks.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector: '[data-travel-panel="parties"]',
+    position: { width: 1100, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Environment/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
+      /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-card-stacked-680',
+    label: 'Manager — World Parties card stacked at 680px',
+    // The browser viewport stays 1920x1080; only the Foundry window is narrow. This case therefore
+    // proves the card responds to the named manager container rather than to a viewport media rule.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector:
+      '[data-travel-panel="parties"] [data-manager-party-body="lab-party"]' +
+      ':has([data-manager-party-add-open="lab-party"])' +
+      ':has([data-manager-party-actor-trigger="lab-party"])',
+    position: { width: 680, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-no-selection',
+    label: 'Manager — World Parties with no crafting system selected',
+    // The live smoke always has systems and normalizes an empty selection to the first one. This
+    // honest no-systems state is therefore View-Lab-only, not a Foundry smoke counterpart.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { clearSystem: '1' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector: '[data-travel-panel="parties"] [data-party-realm-override-unavailable]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      // The gate lock this case is NAMED for is drawn by `PartyExpandedBody`, in the card's
+      // right column. Without this pattern, editing that component selects every other party
+      // case and not the only one that photographs the unavailable state.
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  // The World > Parties states the populated frame cannot hold. Each is `beyond`: none has a
+  // Foundry smoke counterpart, because the smoke world seeds neither an empty party list nor a
+  // fifth party, and no smoke walk opens a travel-actor picker.
+  managerCase({
+    id: 'manager-world-parties-empty',
+    label: 'Manager — World Parties empty',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', noParties: '1' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    // The primitive's own hook, so the frame proves the pane rendered `EmptyState` rather than
+    // a bespoke panel — `ui-integration/spec.md:174` requires every manager "nothing here"
+    // message to go through the one primitive and `:182` forbids a per-screen size override.
+    expectSelector: '[data-travel-panel="parties"] [data-travel-parties-none]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab|EmptyState)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-search-filtered',
+    label: 'Manager — World Parties filtered by search',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties-query', fill: WORLD_PARTIES_SEARCH_TERM },
+    ],
+    expectView: 'world',
+    // Both survivors on ONE page is the claim, and it is unreachable unfiltered: the five
+    // parties page at three, and these two are the second and the fifth, so they are never
+    // siblings in the same list without the filter. The `long-haul` card matches on its TRAVEL
+    // ACTOR's name alone — the widened domain this change added — which a party-name-only
+    // filter cannot fake.
+    //
+    // The filtered set is TWO, which is below `PAGER_THRESHOLD`, so this frame deliberately
+    // shows the pane with NO pager footer. That is the state under test — a filtered pane
+    // whose bar has gone with the matches it described — and not a missing control.
+    expectSelector:
+      '[data-travel-panel="parties"] .manager-travel-parties-list' +
+      ':has([data-manager-travel-party-id="lab-party-long-haul"])' +
+      ':has([data-manager-travel-party-id="lab-party-wagonwright"])',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-last-page',
+    label: 'Manager — World Parties last page',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties [data-pagination-next]' },
+    ],
+    expectView: 'world',
+    // Five records at the default page size of three: page two holds the trailing two, so the
+    // absence of the first card is as load-bearing as the presence of the last. This is also
+    // the only frame in which the pager's own state — a live prev arrow, "Page 2 of 2" and the
+    // per-page select — is anything other than its resting one.
+    expectSelector:
+      '[data-travel-panel="parties"] .manager-travel-parties-list' +
+      ':has([data-manager-travel-party-id="lab-party-wagonwright"])' +
+      ':not(:has([data-manager-travel-party-id="lab-party"]))',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/components\/Pagination\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-actor-picker',
+    label: 'Manager — World Parties travel-actor picker open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '[data-manager-party-actor-trigger="lab-party"]' },
+    ],
+    expectView: 'world',
+    // Content, not the trigger. The trigger-only frame satisfies none of these claims:
+    // the popover exists and is portaled into the manager (the reason it escapes the pane's
+    // own `overflow: auto`), it uses the shared title/count header with no duplicated unlink
+    // footer, and its rows carry the placement meta line that surfaces a composite-uniqueness
+    // collision BEFORE the pick fails. Asserting the trigger alone would pass over a closed
+    // picker, which is precisely the frame this case exists to distinguish itself from.
+    expectSelector:
+      '.fabricate-manager .manager-travel-actor-popover' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':not(:has([data-manager-party-actor-unlink-footer]))' +
+      ' .manager-travel-option .manager-travel-option-meta',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-realm-override-picker',
+    label: 'Manager — World Parties realm-override picker open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties-override-trigger' },
+    ],
+    expectView: 'world',
+    // The ONLY frame that renders `SearchablePopover`'s in-popover search row. The
+    // travel-actor picker next to it is `inlineSearchTrigger`, which suppresses that row
+    // entirely and replaces its trigger instead — so the actor-picker case above, which
+    // `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover.svelte` change to, cannot
+    // photograph the compact search field, its leading glyph, or the fact that it now sits
+    // BELOW the title/count header rather than above it.
+    //
+    // The selector demands all three of the things that distinguish this presentation from
+    // the plain popover the other 13 consumers render: the shared header, the compact
+    // search row, and a compact option row. The DOM order of the header before the search
+    // row is what `:has(...) + ...` would assert; `:has()` is unordered, so the ordering
+    // claim is left to `tests/components/party-expanded-body.test.js` and this frame
+    // carries the visual one.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover.is-compact-option-rows' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':has(.manager-travel-popover-search.is-compact)' +
+      ' .manager-travel-option',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim (issue 1185
+  // aligned it to the design's own wording), so a lang edit that forgets these frames
+  // fails the case rather than publishing a frame whose caption no longer exists.
+  ...[
+    [
+      'tracking',
+      'Tracking',
+      'Open the Tracking preview',
+      'Preview Downtime Tracking · Fabricate Premium',
+    ],
+    [
+      'activities',
+      'Activities',
+      'Open the Activities preview',
+      'Preview Downtime Activities · Fabricate Premium',
+    ],
+    [
+      'factions',
+      'Factions',
+      'Open the Factions preview',
+      'Preview Factions & Reputation · Fabricate Premium',
+    ],
+    [
+      'settings',
+      'Settings',
+      'Open the Settings preview',
+      'Preview Downtime Settings · Fabricate Premium',
+    ],
+  ].map(([tabId, tabLabel, accessibleName, tooltip]) =>
+    managerCase({
+      id: `manager-world-downtime-${tabId}`,
+      label: `Manager — World Downtime ${tabLabel}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing' },
+      steps: [
+        { selector: '#manager-world-nav-downtime', press: 'Enter' },
+        { selector: `[data-downtime-tab="${tabId}"]`, press: 'Enter' },
+        { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+      ],
+      expectView: 'world-downtime',
+      expectSelector: `[data-downtime-panel="${tabId}"]`,
+      expectAttributes: [
+        { selector: `[data-downtime-tab="${tabId}"]`, name: 'aria-selected', value: 'true' },
+        {
+          selector: `[data-downtime-tab="${tabId}"]`,
+          name: 'aria-label',
+          value: accessibleName,
+        },
+        {
+          selector: `[data-downtime-tab="${tabId}"]`,
+          name: 'aria-describedby',
+          value: `world-downtime-tooltip-${tabId}`,
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'href',
+          value: 'https://www.patreon.com/c/mistersilver',
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'target',
+          value: '_blank',
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'rel',
+          value: 'noopener noreferrer',
+        },
+        ...['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+          selector: `[data-downtime-tab="${id}"]`,
+          name: 'aria-controls',
+          value: `world-downtime-panel-${id}`,
+        })),
+        // The rail child and the studio-card button are two triggers for ONE navigation,
+        // so the frame proves the rail followed the card that drove it (issue 1185).
+        {
+          selector: `[data-world-downtime-item="${tabId}"]`,
+          name: 'aria-current',
+          value: 'true',
+        },
+      ],
+      expectVisible: `[data-downtime-tooltip="${tabId}"]:has-text("${tooltip}")`,
+      expectContained: [
+        { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+        { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      ],
+      expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+      expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+      expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+      // The pane OWNS the vertical overflow at every size, which is what `expectOverflowY`
+      // states. It does not overflow at 1330x900 — the preview fits — so no `expectScrollable`
+      // here; `manager-world-downtime-narrow` is the frame whose window really cannot hold it
+      // and is where that proof lives. See the note in `tests/view-lab-cases.test.js`.
+      expectOverflowY: '.downtime-preview-scroll',
+      position: { width: 1330, height: 900 },
+      kinds: ['manager', 'world', 'downtime'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      ],
+    })
+  ),
+  managerCase({
+    id: 'manager-world-downtime-narrow',
+    label: 'Manager — World Downtime narrow long localization',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', longDowntimeLabels: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-downtime-tab="tracking"]', press: 'Enter' },
+      { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+    ],
+    expectView: 'world-downtime',
+    expectSelector: '[data-downtime-panel="tracking"]',
+    expectAttributes: [
+      {
+        selector: '[data-downtime-tab="tracking"]',
+        name: 'aria-label',
+        value: 'Open campaign-wide tracking and pending decisions',
+      },
+      {
+        selector: '[data-downtime-tab="tracking"]',
+        name: 'aria-describedby',
+        value: 'world-downtime-tooltip-tracking',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'href',
+        value: 'https://www.patreon.com/c/mistersilver',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'target',
+        value: '_blank',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'rel',
+        value: 'noopener noreferrer',
+      },
+    ],
+    expectVisible:
+      '[data-downtime-tooltip="tracking"]:has-text("Preview campaign-wide tracking and pending decisions in Fabricate Premium")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.fabricate-manager',
+    ],
+    expectOverflowY: '.downtime-preview-scroll',
+    expectScrollable: '.downtime-preview-scroll',
+    expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+    expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+    position: { width: 960, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-downtime-collapsed',
+    label: 'Manager — World Downtime collapsed rail',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+      { selector: '[data-downtime-tab="tracking"]', press: 'Enter' },
+      { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+    ],
+    expectView: 'world-downtime',
+    expectSelector: '.manager-body.is-rail-collapsed [data-downtime-panel="tracking"]',
+    expectAttributes: [
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'href',
+        value: 'https://www.patreon.com/c/mistersilver',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'target',
+        value: '_blank',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'rel',
+        value: 'noopener noreferrer',
+      },
+    ],
+    expectVisible: '[data-downtime-tooltip="tracking"]',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    // Collapsing the rail WIDENS the pane, so this frame overflows even less than the tab
+    // frames above — same reasoning, same owner for the scrolling proof.
+    expectOverflowY: '.downtime-preview-scroll',
+    expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+    expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+  }),
+  // Issue 1185 — the PREMIUM-INSTALLED chrome. Every other manager case renders the free
+  // module, so without this one the title bar's gold badge, the rail's muted Downtime chip
+  // and the installed-state rail tooltip have no frame at all, and a push would publish an
+  // unrelated free-module frame as evidence for them.
+  managerCase({
+    id: 'manager-world-downtime-premium-installed',
+    label: 'Manager — World Downtime with the premium companion installed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    // COLLAPSE THE RAIL FIRST, and the order is the whole point (issue 1213). The lab world
+    // seeds `managerRailCollapsed: false` and cases cannot override a lab setting, so a frame
+    // that never touches the toggle is pixel-identical whether the rail lock ships or not and
+    // proves nothing about it. Pressing it here, one route BEFORE Downtime, reaches a genuinely
+    // stored collapsed rail — and it has to happen here rather than on the route, where the
+    // control is `disabled` and Playwright's actionability check would refuse to press it.
+    steps: [
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+    ],
+    expectView: 'world-downtime',
+    // One selector for the whole lock: the body is NOT collapsed although the GM's stored
+    // preference says it is, and the control that would collapse it is genuinely disabled and
+    // reports the displayed state rather than the stored one.
+    expectSelector:
+      '.manager-body:not(.is-rail-collapsed) [data-manager-rail-toggle][disabled][aria-pressed="false"]',
+    expectAttributes: [
+      {
+        selector: '[data-manager-titlebar-premium]',
+        name: 'aria-label',
+        value: 'Fabricate Premium is installed and connected',
+      },
+      {
+        selector: '#manager-world-nav-downtime',
+        name: 'title',
+        value: 'Downtime Studio is unlocked by Fabricate Premium',
+      },
+      {
+        selector: '[data-world-nav-premium]',
+        name: 'data-world-nav-premium-state',
+        value: 'installed',
+      },
+      // The lock explains itself in sidebar wording, not the section-scoped string the rail
+      // GROUPS use.
+      {
+        selector: '[data-manager-rail-toggle]',
+        name: 'title',
+        value: 'The sidebar stays open on this page.',
+      },
+      // No tab strip over a companion's screens: its tabs are the rail sub-items, and the
+      // panel is a region named by the one that is current.
+      {
+        selector: '[data-downtime-extension-panel]',
+        name: 'data-downtime-extension-panel',
+        value: 'ledger',
+      },
+      // Named by the sub-item's LABEL, not by the sub-item: the button carries the tab's
+      // `accessibleName` as its own name, which is an instruction, and a landmark takes the
+      // name of the screen.
+      {
+        selector: '#world-downtime-panel-ledger',
+        name: 'aria-labelledby',
+        value: 'manager-downtime-nav-label-ledger',
+      },
+      { selector: '#world-downtime-panel-ledger', name: 'role', value: 'region' },
+      {
+        selector: '#manager-downtime-nav-ledger',
+        name: 'aria-label',
+        value: 'Open the downtime ledger',
+      },
+    ],
+    // The title bar carries the loud signal and the rail chip is muted beside it; the
+    // provider's own three tabs are rendered rather than Core's four.
+    expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    // The companion owns the scrolling, which is only true if Core handed it the whole height.
+    expectOverflowY: '[data-lab-companion-scroll]',
+    expectScrollable: '[data-lab-companion-scroll]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  // The companion driving CORE'S header. Every other Downtime frame photographs a resting
+  // list screen, which renders identically whether or not the runtime route-chrome channel
+  // exists — so without this case a change to that channel would publish a frame that cannot
+  // show it, which is precisely the mis-evidence this registry exists to prevent.
+  //
+  // The state is only reachable through the companion: the lab provider's drill-down button
+  // calls `context.setRouteChrome(...)`, and Core repaints its own header without remounting.
+  // The frame is the proof that a companion's editor is INDISTINGUISHABLE from one of
+  // Fabricate's own — same medallion identity block, same `Unsaved` chip, same ghost/danger/
+  // primary trio — which is a claim about pixels that no assertion here can make on its own.
+  managerCase({
+    id: 'manager-world-downtime-companion-chrome',
+    label: 'Manager — World Downtime with a companion driving the route header',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-lab-companion-drilldown]' },
+    ],
+    expectView: 'world-downtime',
+    // The identity block Core's recipe and component editors render, now over a companion's
+    // screen — and its medallion carrying a real image rather than the glyph fallback.
+    expectSelector: '[data-downtime-chrome-heading] [data-medallion="image"] img',
+    expectAttributes: [
+      // The leaf crumb follows the drill-down rather than the tab it started on.
+      {
+        selector: '[data-breadcrumb-downtime-tab]',
+        name: 'data-breadcrumb-downtime-tab',
+        value: 'ledger',
+      },
+      { selector: '.manager-header-actions', name: 'aria-label', value: 'Crew member actions' },
+      // Core's own three treatments, reached through the seam's `tone`.
+      {
+        selector: '[data-manager-header-action="lab-back"]',
+        name: 'class',
+        value: 'manager-button is-ghost',
+      },
+      {
+        selector: '[data-manager-header-action="lab-delete"]',
+        name: 'class',
+        value: 'manager-button is-danger',
+      },
+      {
+        selector: '[data-manager-header-action="lab-save"]',
+        name: 'class',
+        value: 'manager-button is-primary',
+      },
+      // The companion's screen is still mounted: the header changed, the mount did not.
+      {
+        selector: '[data-downtime-extension-panel]',
+        name: 'data-downtime-extension-panel',
+        value: 'ledger',
+      },
+    ],
+    expectVisible: '[data-downtime-chrome-status]:has-text("Unsaved")',
+    expectNoHorizontalOverflow: ['.manager-header', '[data-world-downtime-host]', '.manager-body'],
+    expectCenterHit: '[data-manager-header-action="lab-save"]',
+    expectClick: '[data-manager-header-action="lab-save"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$/,
+      /^src\/ui\/svelte\/components\/Medallion\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    // World > Travel is UNGATED (issue 1282). This case used to prove the opposite — that the
+    // selected-system Travel group DISAPPEARED when that system's Travel & Realms toggle was
+    // off — and the fact it asserted went with the route. It now proves the rule that replaced
+    // it, on the same non-participating system: the World entry is there regardless, because
+    // realms are world geography and have to be authorable before any system opts in.
+    id: 'manager-world-travel-ungated',
+    label: 'Manager — World Travel present for a non-participating system',
+    smokeLabels: ['manager-world-travel-ungated'],
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
+    steps: [],
+    expectView: 'systems',
+    expectSelector: '.manager-world-nav:has(#manager-world-nav-travel) #manager-world-nav-parties',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-with-gathering-expanded',
+    label: 'Manager — Gathering and World Travel expanded together',
+    smokeLabels: ['manager-world-travel-with-gathering-expanded'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
-    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
-    expectView: 'environments',
-    position: { width: 1000, height: 720 },
-    kinds: ['manager', 'environments', 'responsive'],
+    steps: [
+      {
+        selector: '.manager-nav-toggle[aria-controls="manager-gathering-submenu"]',
+        press: 'Enter',
+      },
+      { selector: '#manager-travel-toggle', press: 'Space' },
+    ],
+    expectView: 'systems',
+    expectSelector:
+      '.manager-nav:has(.manager-nav-group #manager-gathering-submenu)' +
+      ':has(.manager-world-travel-group #manager-travel-submenu)',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-realms-normal',
+    label: 'Manager — World Travel Realms expanded',
+    smokeLabels: ['manager-world-travel-realms-normal'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-realms', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    expectSelector: '.manager-travel-inspector[aria-label="Selected realm"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-realms-stacked',
+    label: 'Manager — World Travel Realms stacked',
+    smokeLabels: ['manager-world-travel-realms-stacked'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-realms', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    expectSelector: '[data-travel-panel="realms"]',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-map-normal',
+    label: 'Manager — World Travel Map Region Links normal',
+    smokeLabels: ['manager-world-travel-map-normal'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    expectSelector:
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
+      '.manager-map-link-name):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"] .manager-travel-region-item-name)',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-map-stacked',
+    label: 'Manager — World Travel Map Region Links stacked',
+    smokeLabels: ['manager-world-travel-map-stacked'],
+    reaches: 'exact',
+    distinctEvidenceGroup: 'manager-world-travel-map-label-focus',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    expectSelector:
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
+      '.manager-map-link-name):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"] .manager-travel-region-item-name)',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-map-collapsed-rail',
+    label: 'Manager — World Travel Map Region Links collapsed rail',
+    smokeLabels: ['manager-world-travel-map-collapsed-rail'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Enter' },
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+    ],
+    expectView: 'world-travel',
+    expectSelector: '.manager-body.is-rail-collapsed #manager-world-nav-travel.is-active',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-travel-long-label-focus',
+    label: 'Manager — World Travel long child label keyboard focus',
+    // The live smoke uses shipped localization, so its ordinary focused Map row is not long-label
+    // evidence. The View Lab supplies the localized stress string and guards it against duplicates.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', longTravelLabels: '1' },
+    distinctEvidenceGroup: 'manager-world-travel-map-label-focus',
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Space' },
+    ],
+    expectView: 'world-travel',
+    expectSelector: '#manager-travel-nav-map[aria-current="page"]:focus-visible',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^styles\/fabricate\.css$/,
     ],
   }),
   managerCase({
@@ -2485,7 +4138,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     // The state is DRIVEN rather than seeded. The fixture world enables stamina on no system, and
     // seeding one would be a `tests/view-lab/**` change — which `LAB_INFRASTRUCTURE_PATTERN` maps
-    // to the whole 157-frame corpus, and which would put a stamina readout into the player
+    // to surface coverage, and which would put a stamina readout into the player
     // gathering frames of whichever system it was seeded on (`GatheringDetail.svelte` renders one
     // whenever `staminaEnabled`). Four GM gestures reach the same state and disturb nothing:
     // enable the Stamina limitation, give it a max expression (without one
@@ -3340,15 +4993,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // go through, so this is the real floor rather than a chosen size — 900 is refused by the
     // harness's own geometry gate before anything renders.
     //
-    // IT DOES NOT REACH THE CONTAINER BREAKPOINT, and saying so is the point of this comment.
-    // `.inventory-view-container` measures 938px inside a 1024px window, and
-    // `@container fabricate-inventory (max-width: 900px)` therefore never matches — by design:
-    // `MIN_WINDOW_WIDTH`'s own comment says the floor keeps the columns usable "before the
-    // narrow-width stacking breakpoint takes over". `player-gathering-stacked` sits at the same
-    // 1024 and is in the same position. So this frame is evidence about the narrowest permitted
-    // GEOMETRY, not about the stacked block: the detail column falls from ~500px to 342px, which
-    // is where a queue row's name competes with its certainty chip, its broken chip and its remove
-    // control, and where the footer's note-left / actions-right row is most likely to break.
+    // `.inventory-view-container` measures roughly 938px inside the supported 1024px floor, so the
+    // shared 960px query now stacks this frame and the computed-layout expectation proves it.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -3357,6 +5003,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'inventory', 'bulk', 'responsive'],
+    expectLayout: responsiveLayout('.inventory-view-container', '.inventory-view-grid'),
     expectSelector:
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
@@ -3776,6 +5423,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'gathering', 'responsive'],
+    expectLayout: responsiveLayout('.gathering-view-container', '.gathering-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -3906,7 +5554,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // RE-AIMED by issue 1055, and the aim moved for a reason worth recording. The rule used to be
     // a per-RECIPE override on this recipe; a recipe can no longer override the system's rule at
     // all, so it now lives on `lab-herbalism` itself (`labContent.js`). The system is UNBOUNDED,
-    // so `buildCraftingModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
+    // so `buildCheckModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
     // fieldset renders as a MULTI-pick checkbox group legended "Pick up to 3" — the control this
     // change introduces, rather than the pick-one radio group it generalizes.
     reaches: 'exact',
@@ -4229,21 +5877,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-progressive-stacked',
     label: 'Player app — Crafting progressive stacked',
     smokeLabels: ['player-crafting-progressive-stacked'],
-    // WINDOW, and the blocker is a WIDTH the lab cannot reach rather than a fixture gap.
+    // The shared 960px boundary makes the smoke counterpart's stacked condition reachable at
+    // production's 1024px player-window floor: the named container is roughly 938px wide there.
     //
-    // The counterpart shrinks `#fabricate-app` to 780px by writing `min-width: 0` inline, which
-    // takes the grid under its 900px container breakpoint so the three columns STACK and the stage
-    // rows get the full width. The lab cannot do that: `assertWindowGeometry` requires the applied
-    // box to equal the declared one, and production's `.fabricate-app { min-width: 1024px }` is
-    // therefore the floor for a PLAYER case. (That floor is player-only: `.fabricate-app` is the
-    // player shell, so the manager's responsive cases sit below it at 1000, 900 and 680.)
-    //
-    // At 1024 the grid does NOT stack; the centre column lands at ~290px, and the counterpart's
-    // own assertions fail there. Measured: `rowOverflow: 3` where the counterpart demands 0, and
-    // all three stage names compute to zero width rather than ellipsing. That is a real finding
-    // about the un-stacked narrow band — the smoke never renders this width — and the frame is
-    // published as evidence of it, not as the counterpart's state.
-    reaches: 'window',
+    // The smoke still forces its shell to 780px by clearing the production minimum, but both walks
+    // now render the same single-column progressive layout with full-width stage rows. Keep the
+    // 1024px geometry here so the lab proves that production's supported floor reaches that state.
+    reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
@@ -4266,6 +5906,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
+    expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
@@ -4305,7 +5946,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'alchemy', 'responsive'],
+    expectLayout: responsiveLayout('.alchemy-view-container', '.alchemy-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
+    id: 'player-journal-stacked',
+    label: 'Player app — Journal stacked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal' },
+    steps: [],
+    position: { width: 1024, height: 860 },
+    kinds: ['player', 'journal', 'responsive'],
+    expectLayout: responsiveLayout('.journal-view-container', '.journal-view-grid'),
+    sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   playerCase({
     id: 'fabricate-journal',
@@ -4407,12 +6061,72 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
     // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
     // table sits above it in frame.
+    //
+    // IT IS ALSO THE BAND STRIP'S ONLY EVIDENCE, and the only frame in the registry that
+    // shows a NAMED label on the strongest band (issue 1096). Its sibling
+    // `manager-checks-section-badged-and-dotted` blanks the top tier's name to raise
+    // `unnamedOutcome`, so its top band is captioned with nothing — which is how a band-name
+    // contrast regression on exactly that band reached a published frame set unseen.
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
       { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
+    // Anchored on the strip's own `<span>` band, so a case that stopped drawing the strip
+    // fails here rather than publishing a frame of the table alone.
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
+    kinds: ['manager', 'checks', 'resolution-mode'],
+    // Deliberately NO pattern for `components/ThresholdBandStrip.svelte`, for the reason
+    // `manager-gathering-stamina-rolls` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
+    // matches `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a
+    // broad-signal file BEFORE consulting any case's `sourceMatches`, so such an entry would
+    // be unreachable. A change to the strip PRIMITIVE therefore publishes the representative
+    // set, and a change to this editor — where the band colours are chosen — publishes this.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+  }),
+  managerCase({
+    id: 'coverage-mode-routed-check-five-bands',
+    label: 'Coverage — routedByCheck outcome tiers, five bands',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    // THE FRAME THAT SHOWS THE WHOLE RAMP (issue 1096). The band ramp has five tones and every
+    // routed check in the fixture world has THREE tiers, so until this case the two ends of the
+    // ramp — the tones a four- or five-tier check reaches and a three-tier one skips — appeared
+    // in no frame at all. A five-band strip is also the only count at which "one tone per band"
+    // and "a tone reused" look different.
+    //
+    // It reaches five tiers by DRIVING the editor rather than by seeding a fifth system: the
+    // fixture world's `ROUTED_CHECK` is read by the salvage routing rows, the section badge
+    // count and both player routed-crafting cases, so widening it would rewrite frames that are
+    // not about this. Two `Add outcome tier` clicks and four typed fields cost nothing outside
+    // case.
+    //
+    // The two new tiers are given DCs OUTSIDE the authored −5/0/+5 span. A new outcome is born
+    // at `dc: 0`, which ties Standard's lower edge, and the strip refuses to draw a tied edge as
+    // a clean seam — so without these the case would photograph the non-contiguous fallback note
+    // and be named for a strip it never rendered.
+    //
+    // `:nth-match()` is Playwright's, not CSS's: the two new rows carry `randomID()` ids, so
+    // there is no stable per-row hook to aim at and position in the authored table is the only
+    // address they have.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome-tier]' },
+      { selector: '[data-add-outcome-tier]' },
+      { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
+      { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
+      { selector: ':nth-match([data-outcome-success], 4)' },
+      { selector: ':nth-match([data-outcome-name], 5)', fill: 'Slag' },
+      { selector: ':nth-match([data-outcome-dc], 5)', fill: '-10' },
+      { selector: '[data-outcome-band-strip-hint]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
@@ -4436,16 +6150,48 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-dc-mode-option="dynamic"] input' },
       { selector: '[data-check-macro-dropzone]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
       /^src\/utils\/macroReference\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-recipe-tiers',
+    label: 'Manager — Checks crafting recipe tiers',
+    // BEYOND the smoke. The walk never adds a recipe tier, and every simple check in the
+    // fixture world authors none — so the populated list has never been photographed at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ROW TREATMENT, which is what issue 1096 changed here: the recipe-tier list was the
+    // last consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a
+    // grid with a column-header row, while the prototype draws the same list as the Outcomes
+    // screen draws its tiers. An EMPTY list photographs the dashed control and nothing else,
+    // so the case adds two rows to reach the state it is named for.
+    query: {},
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-add-tier]' },
+      { selector: '[data-add-tier]' },
+      { selector: ':nth-match([data-tier-name], 1)', fill: 'Apprentice work' },
+      { selector: ':nth-match([data-tier-name], 2)', fill: 'Masterwork' },
+      { selector: '[data-tier-row]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The ROW, not the card: a card that kept its old table would still satisfy a selector
+    // aimed at the section, and the row class is the thing this frame is evidence for.
+    expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
     ],
   }),
   managerCase({
@@ -4464,17 +6210,295 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      // The list COLLAPSES (issue 1096), so the subject of this case — the tier-step row — is
+      // not in the document until its trigger is opened. Clicking the head is what a GM does
+      // and is the only way to reach it; without this step the case would fail rather than
+      // quietly photograph a fold, because the anchor below resolves to nothing.
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
       // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
       // which control that is depends on the mode, so a mode change would silently move the
       // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
-      // second (and last) authored trigger frames both cards — the `target` tier select
-      // above and this one's step count — rather than one card and a fold.
+      // second (and last) authored trigger frames both cards — the collapsed one above and
+      // this one's expanded body — rather than one card and a fold.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
+    // The route alone is not enough here: the case is named for a control that only exists
+    // once the disclosure above has actually opened, and a click that no-oped would leave the
+    // right screen showing the wrong state.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-trigger-break-tools',
+    label: 'Manager — Checks crafting trigger break-tools card',
+    // BEYOND the smoke, and a state NO other frame reaches: breaking tools is authored on a
+    // trigger only while the SYSTEM's tool-breakage authority is check-driven, and every
+    // fixture system rests on `toolSpecific`. Without this case the card that issue 1096 gave
+    // that effect — a bordered card with a wrench, a sentence and a switch, where a two-word
+    // pill used to sit — is in no published frame at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      // The authority is a per-system radio pair on the tools browser, so it is CLICKED rather
+      // than pinned on the fixture — the same route `manager-tool-stress-immune` takes for the
+      // same reason, and the same one the smoke takes.
+      'Tools',
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The subject itself, not the route: the authority click and the disclosure click both have
+    // to have landed, and a frame of the right screen with either one missing would show the
+    // state this case is named for being ABSENT.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+  }),
+  // ── The outcome simulator and the odds histogram (issue 1097) ────────────────────────
+  //
+  // All four cases select an ACTOR first, and that is not decoration. Every lab system's
+  // check formula carries `@abilities.int.mod`, so under the resting "No actor" selection
+  // the formula does not reduce to a number, the simulator renders its unresolved warning
+  // and the histogram abstains — which is a real state, and one of these cases photographs
+  // it deliberately, but it is not the state the other three are named for.
+  managerCase({
+    id: 'manager-checks-crafting-simulator-rolled',
+    label: 'Manager — Checks crafting outcome preview, rolled',
+    // BEYOND the smoke. The walk never opens the Checks rail's simulator, so there is no
+    // counterpart frame of a rolled readout to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Runework is the only routed-by-check fixture with NAMED outcome tiers, which is what
+    // makes the matched band card render something a GM can read.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      // NO DISCLOSURE STEP. These two panels were collapsible when this case was written and
+      // are not any more: issue 1096's rail is a flat `.manager-kicker` heading over a bare
+      // card, on the Tool Studio's inspector convention, so the body is always in the
+      // document and a click on a chevron that no longer exists would fail the capture job
+      // WHOLE and publish nothing at all.
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-readout]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // Anchored on the readout itself: a case that stopped rolling would fail here rather
+    // than publishing a frame of the pre-roll hint under a "rolled" name.
+    expectSelector: '.fabricate-manager [data-checks-simulator-band]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-enumerable',
+    label: 'Manager — Checks crafting odds histogram (enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The bars themselves, not the panel: a panel that abstained would still render.
+    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-not-enumerable',
+    label: 'Manager — Checks crafting odds histogram (not enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    // The formula is TYPED rather than authored, for the reason
+    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so
+    // authoring `2d20` there would move every already-captured Runework frame to
+    // photograph one panel. The Checks editor stages into a draft, so the typed formula
+    // reaches the rendered state without persisting anything.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-check-roll-formula]', fill: '2d20 + @abilities.int.mod' },
+      { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The REASON, not merely the note: an abstention with no stated reason is the defect
+    // the discriminated codes exist to prevent.
+    expectSelector: '.fabricate-manager [data-checks-odds-reason="non-unit-count"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-progressive',
+    label: 'Manager — Checks crafting odds histogram (progressive award count)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Herbalism is the world's ONLY progressive system, so it is the only route where a
+    // histogram bucketed by award count exists at all. Its check carries the authored
+    // preview sandbox (`progressive.preview.difficulties`) that supplies the order — see
+    // `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js` for why those four numbers.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // A BUCKET THAT MUST EXIST, not merely a bar. `award-0` is the reachable award of
+    // nothing, and it is the half of the rule a histogram is most likely to drop by
+    // treating "awarded nothing" as "no outcome": anchoring on it means a build that
+    // stopped listing it fails here instead of publishing a three-bar frame that looks fine.
+    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    kinds: ['manager', 'checks'],
+    // NO entry for `src/systems/progressiveCheckSandbox.js`, deliberately: `isUiFile` admits
+    // only `src/ui/`, `styles/`, `.svelte` and `.css`, so a change confined to that module
+    // selects no case at all and a pattern for it here would be unreachable code — the same
+    // trap the `Stepper` note two thousand lines up records for a different reason.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-simple-two-band-strip',
+    label: 'Manager — Checks simple two-band DC strip',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Smithing is the fixture's `simple` system, so its Outcomes section is the two-outcome
+    // card the third `ThresholdBandStrip` binding renders in.
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      ...previewAsActor('lab-actor-brenna'),
+      { selector: '[data-simple-band-strip]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-outcomes-empty',
+    label: 'Manager — Checks crafting Outcomes with zero tiers',
+    // BEYOND the smoke. The walk never empties an outcome table, and every routed check in the
+    // fixture world authors three tiers, so the state a routed check STARTS in was in no frame
+    // at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE DEAD END THAT WAS FIXED (issue 1097 follow-up, maintainer report). `Add outcome tier`
+    // used to be the last child of `.manager-checks-tier-list`, which only renders when at least
+    // one tier exists — so a zero-tier routed check displayed "No outcome tiers yet. Add the
+    // tiers this check routes results into." and offered nothing to press. Every frame in the
+    // registry photographed a POPULATED table, so the dead end was invisible to capture and its
+    // repair is invisible without this.
+    //
+    // Reached by SWITCHING ALCHEMY TO TIERED rather than by deleting Runework's three tiers or
+    // by seeding a sixth system. `lab-alchemy` carries the shared frozen `SIMPLE_CHECK`, which
+    // authors no `routed` block at all, so `tiered` is the one route in this world where zero
+    // tiers is the check's own resting state rather than the residue of three delete clicks —
+    // and it is the second of the two states the fix's own comment names. It costs one click
+    // and no fixture change: seeding `checkMode: 'tiered'` on the fixture instead would flip
+    // every already-captured alchemy frame off the Simple two-slot Results editor
+    // `labContent.js` records as load-bearing, and raise a permanent no-tiers validation warning
+    // on the Validation frames.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      // The mode radio group renders only on The roll section, which is where the route lands.
+      { selector: '[data-crafting-alchemy-checkmode-option="tiered"] input' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome-tier]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // THE FIX ITSELF, as a selector: the add control has to be a SIBLING of the empty sentence,
+    // which is what taking it out of the list's `{#if}` made it. Anchoring on either hook alone
+    // would pass on the broken markup — the sentence rendered fine before, and the control still
+    // exists whenever a tier does — so the sibling combinator is the assertion, not decoration.
+    expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-alchemy-off',
+    label: 'Manager — Checks crafting alchemy check switched off',
+    // BEYOND the smoke. The walk never opens a switched-off crafting check, so the state has no
+    // counterpart frame.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE OFF SWITCH EXISTS FOR. Alchemy `checkMode: 'none'` used to render a
+    // read-only "resolves without a check" notice and NO Active card at all — the studio said
+    // the mode required the check and offered no way to change that. It is now the OFF state of
+    // an optional check: the shared switched-off panel with its `Turn this check on` action, and
+    // a live Active switch in the rail reading off.
+    //
+    // `lab-tidewrack` rather than `lab-alchemy`, and PERSISTED rather than clicked. Tidewrack is
+    // the world's `checkMode: 'none'` alchemy system, so this is its resting state — clicking
+    // `lab-alchemy`'s toggle would reach the same panel but photograph it wearing an `Unsaved`
+    // chip, which is a picture of the staging lifecycle rather than of the off state.
+    query: { system: 'lab-tidewrack' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    // The turn-on action INSIDE the off panel, as one selector: the panel alone would pass on a
+    // dead end with no way back, which is precisely the failure this state used to be.
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="crafting"][data-checks-off] [data-checks-turn-on]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-alchemy-behaviour',
+    label: 'Manager — Checks crafting alchemy behaviour card',
+    // BEYOND the smoke. The walk never opens an alchemy system's On failure section, so there is
+    // no counterpart frame to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A CARD NO FRAME REACHED. `data-alchemy-behaviour` renders only for a system whose
+    // resolution mode is `alchemy`, and only on On failure — every other crafting route draws
+    // the two-toggle `data-failure-consumption` list there instead. `lab-alchemy` is the
+    // world's alchemy system with a check mode set, so it is the only route to this card, and
+    // its intro sentence (corrected in issue 1097 to name The roll section rather than pointing
+    // "above" at a card this screen no longer shows beside it) is what the frame is evidence for.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+      { selector: '[data-alchemy-behaviour]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The card, which is the subject and exists in no other state — not one of its toggles.
+    // A deeper anchor would fail the capture job WHOLE, and publish nothing, the day a flag is
+    // added or renamed inside a card whose SENTENCE is what this frame is about.
+    expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
   }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four
@@ -4593,33 +6617,31 @@ export const VIEW_LAB_CASES = Object.freeze([
   //
   // So light differs from dark in the window header bar, and that is what this pair covers.
   //
-  // What it does NOT cover is a heading-colour leak, and the mechanism is INHERITANCE rather than
-  // per-component colours — do not restate it as "the components set their own". Neither headline
-  // heading declares a `color` at all: the manager's `h2.manager-title` comes from
-  // `src/ui/svelte/apps/manager/SystemsBrowserView.svelte`, which has no `<style>` block, and no
-  // `.manager-title` rule in `styles/fabricate.css` sets `color`; the player's
-  // `h2.crafting-detail-name` comes from `src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte`,
-  // whose scoped rule sets size and truncation only. Each inherits its colour from a Fabricate
-  // ancestor INSIDE `.window-content`, which is closer to the heading than anything core puts on
-  // the window frame or the body. For the manager that ancestor is the root itself,
-  // `.fabricate-manager`. For the player the shell root `.fabricate-app-shell` in
-  // `src/ui/svelte/apps/FabricateAppRoot.svelte` sets `color: var(--fab-text)` for every tab, and
-  // in this frame a nearer rule — `.crafting-view-grid` in
-  // `src/ui/svelte/apps/crafting/CraftingView.svelte` — re-declares the same value, so either one
-  // would do the job. Do not assume the shell root is the NEAREST colour source on the player
-  // side — on this tab it is not — so chase a heading-colour leak by walking the chain from the
-  // heading up, rather than by editing the shell and waiting for something to move.
+  // It also covers a heading-colour leak, which it did not when this comment was first written.
+  // The paragraph here used to say the mechanism was INHERITANCE and that the leak lived "on the
+  // surfaces no Fabricate root colour reaches". That reading was wrong, and it was wrong in the
+  // direction that hides the defect: it sent a reader up the ancestor chain looking for a missing
+  // Fabricate colour, when nothing up that chain was missing one. Both headline headings did
+  // inherit `--fab-text` correctly, and both still rendered `#111111`.
   //
-  // NOT VERIFIED: whether core also sets a `color` on the heading ELEMENT (`h1`–`h6`) under
-  // `theme-light`. Proximity is no defence against that — a rule matching the heading itself
-  // beats an ancestor's inherited value — so such a heading would leak here. A plain checkout
-  // has no `foundry2.css` to read (the `.foundry-chrome` cache is populated only by an explicit
-  // harvest, see `scripts/lib/foundryChromeCache.js`), which is also why reason 2 above is an
-  // older probe rather than something re-checked on every change. Harvest the chrome and grep
-  // `css/foundry2.css` for a heading-element `color` under the light theme to settle both.
+  // The `NOT VERIFIED` note that followed it asked the right question, and the answer is yes.
+  // Core's `@layer elements.typography` sets `color` on the heading ELEMENT — `h1`/`h2` take
+  // `--color-text-emphatic`, `h3` takes `--color-text-primary` — and a declaration matching the
+  // element beats an inherited value from any ancestor, however near. Under `theme-light` those
+  // resolve to `--color-dark-1`/`--color-dark-2`, so the headings went dark-on-dark. Core ships
+  // an antidote (`body.game .app h1,…,h6 { color: inherit }`) but scopes it to the ApplicationV1
+  // `.app` class, which no Fabricate window carries.
   //
-  // Either way, do not read these frames as proof the leak is gone. Issue 972 owns it, and it
-  // lives on the surfaces no Fabricate root colour reaches.
+  // Issue 972 fixed that with a `.fabricate :where(.window-content) h1,…,h6` normalization in
+  // `styles/fabricate.css`, so these two frames now guard a cascade that is actually correct.
+  // What makes them worth keeping is that they are still the only frames rendered under
+  // `theme-light`: the normalization is what stops core's theme reaching a heading, and if it
+  // regresses, this pair is where it shows.
+  //
+  // The general lesson survives its wrong example. When a Fabricate surface takes a Foundry
+  // colour, check for a rule matching the ELEMENT before walking the ancestor chain — proximity
+  // is no defence, and an ancestor that looks correct proves nothing about what the element
+  // itself matched.
   playerCase({
     id: 'coverage-theme-light-player',
     label: 'Coverage — player app in Foundry light-theme chrome, dark Fabricate surfaces',
@@ -4669,6 +6691,94 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'crafting', 'settings'],
     sourceMatches: [CRAFTING_SHARED],
   }),
+  // Issue 1198 — the player companion surface. What a Core frame can show here is bounded and
+  // worth stating: the rail entry (icon, verbatim provider label, active state, ordering AFTER
+  // Core's own tabs), the panel's geometry, no horizontal overflow, the pointer hit-test on the
+  // new rail control, and Core's own fault state. Everything inside a healthy panel is the
+  // companion's, which Core neither authors nor can photograph in production.
+  //
+  // `reaches: 'beyond'` with no smoke labels, for the reason the honesty contract wants stated:
+  // the live smoke walk has no companion installed and no player-extension screen at all, so
+  // there is no counterpart these frames could fall short of.
+  playerCase({
+    id: 'player-extension-surface',
+    label: 'Player app — companion navigation surface',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1' },
+    steps: [],
+    // The MOUNTED STAMP, not the panel element. The stamp is written imperatively on a
+    // successful mount and cleared the moment the mount is disposed, so a companion that failed
+    // to mount fails the capture here instead of publishing an empty panel that looks fine.
+    expectSelector: '[data-player-extension-mounted="downtime"]',
+    expectAttributes: [
+      // A provider tab's `accessibleName` REPLACES the visible label as the control's accessible
+      // name, so the value is the stand-in's own composed string, verbatim and unlocalized.
+      { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-label', value: 'Open Projects' },
+      // The IDREF wiring the rail gained with this seam: every rail button points at the one
+      // content panel, and the panel is labelled back by the active button.
+      { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-controls', value: 'player-nav-panel' },
+    ],
+    // The seam adds a control to an existing fixed grid, so the pointer contract is photographed
+    // rather than assumed. `expectClick` establishes hit-testability ONLY: the lab stubs the
+    // tab-select callback and the app's render, so a click changes nothing in the frame.
+    expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
+    kinds: ['player', 'extension'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-extension-surface-narrow',
+    label: 'Player app — companion navigation surface, narrow with long labels',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // Both gaps in one frame: the enforced minimum window size, rendered directly rather than
+    // asserted about a larger frame, and the rail label's worst case against the truncation rule
+    // that admits a third-party label at all.
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', longPlayerLabels: '1' },
+    steps: [],
+    expectSelector: '[data-player-extension-mounted="downtime"]',
+    expectAttributes: [
+      {
+        selector: PLAYER_EXTENSION_RAIL_BUTTON,
+        name: 'aria-label',
+        value: 'Open Commissions, projects and standing orders',
+      },
+    ],
+    expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
+    // The rail is the point of this frame: `.fabricate-app-nav` is `overflow-y: auto`, so its
+    // `overflow-x` computes to `auto` and an untruncated label would put a horizontal scrollbar
+    // in the 84px column. The shell is included so a spill cannot hide one level up.
+    expectNoHorizontalOverflow: [
+      '.fabricate-app-content',
+      '.fabricate-app-nav',
+      '.fabricate-app-shell',
+    ],
+    position: { width: 1024, height: 640 },
+    kinds: ['player', 'extension', 'responsive'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-extension-fault',
+    label: 'Player app — companion surface fault state',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', playerProviderFault: '1' },
+    steps: [],
+    // The whole decision in one selector: the faulted surface's rail entry SURVIVES, the active
+    // tab does not move, and Core renders its own error state in the panel. Dropping the entry
+    // and teleporting the user to Crafting is the behaviour this frame exists to disprove.
+    expectSelector: `.fabricate-app-shell:has(${PLAYER_EXTENSION_RAIL_BUTTON}[aria-selected="true"]) [data-player-extension-fault="downtime"]`,
+    // Core's own diagnostic copy, rendered rather than merely present in the DOM. It names the
+    // provider that failed and nothing else: no product name, no offer, no call to action.
+    expectVisible:
+      '[data-player-extension-fault="downtime"]:has-text("This section could not be displayed")',
+    expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
+    kinds: ['player', 'extension'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
 ]);
 
 /**
@@ -4703,7 +6813,9 @@ export function isUiFile(filePath) {
  */
 export function hasUiChanges(files = []) {
   const normalized = files.map((file) => normalizePath(file));
-  if (normalized.some((file) => isUiFile(file))) return true;
+  if (normalized.some((file) => isUiFile(file) || file === LAYOUT_ASSERTION_PATH)) {
+    return true;
+  }
   return false;
 }
 
@@ -4732,6 +6844,142 @@ export function fallbackCase() {
   return getCaseById(FALLBACK_CASE_ID);
 }
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Surface coverage — what a change the registry CANNOT attribute captures.
+//
+// The old answer was every publishable case, and it was the wrong shape of honest. A change to the
+// fixture world or the capture driver genuinely can move any frame, so the selection had to be
+// wide; but 246 frames is not evidence a person reads, it is a directory they scroll. In practice
+// it bought nothing and cost twenty-five minutes, and its real effect was to make the whole
+// per-PR capture feel expensive enough to want switched off.
+//
+// What such a change actually has to prove is that the LAB still works: that it boots, mounts both
+// applications, and still navigates to and photographs every ROUTE AND TAB. It does not have to
+// re-answer "does the Recipe Studio's blocked bulk-edit banner still look right" — nothing in that
+// frame is under test, and the frame that would show a regression in it is selected by the files
+// that draw it. So the widening target is one frame per SURFACE, and the states of a surface are
+// captured when the files governing their behaviour or presentation change.
+//
+// SURFACE MEANS ROUTE-OR-TAB, AND THAT IS NARROWER THAN "SCREEN". Say it exactly, because the
+// looser word is the one a future reader will lean on. A route's own internal tabs are NOT
+// separately covered: the Recipe editor's Results tab, the Tool editor's Requirements tab and the
+// Tags studio's second tab all fold into their route's single frame, because nothing a case
+// declares distinguishes them — reaching them is a `steps` click, and `steps` is the axis this
+// key deliberately collapses. Adding a sub-tab axis would mean adding a field to ~250 cases and
+// is not done here.
+//
+// The exposure this accepts, stated plainly, is therefore two things. A fixture edit that changes
+// only a DETAILED state — one recipe's tools, one actor's broken stack — moves a frame nobody
+// photographs on that PR. So does one that breaks a sub-tab WITHIN a covered route. Both land
+// unphotographed until the next PR touching the surface they belong to. That is the same bargain
+// every other narrowing here already makes (a `sourceMatches` change selects its own cases, not
+// the corpus).
+//
+// What is NOT accepted is silence at the route level: every route and every tab is still
+// photographed, so a fixture edit that breaks the lab, breaks a window, or stops a ROUTE rendering
+// at all still reds this PR rather than the next one.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The SURFACE a case photographs — the screen you can navigate to, as distinct from the state you
+ * can drive that screen into.
+ *
+ * Derived from what a case already declares, so a case added tomorrow is classified without anyone
+ * remembering to classify it:
+ *
+ *   - the MANAGER's surface is `expectView`, the route the capture asserts it reached. That is the
+ *     manager's own notion of "which screen am I on", already gated (`view-lab-cases.test.js`
+ *     checks every value against the app's real view ids), so keying on it cannot invent a screen
+ *     the app does not have;
+ *   - the PLAYER app's surface is `query.tab`, which is the same fact for a window whose screens
+ *     are tabs;
+ *   - the Foundry application THEME joins the key, because `theme-light` is a different cascade
+ *     rather than a different state of one — it is the only thing the `coverage-theme-light-*`
+ *     pair exists to photograph, and folding it into its dark twin would drop the only two frames
+ *     rendered under it.
+ *
+ * A case that declares NEITHER route nor tab is its own surface, keyed by id. That is the
+ * fail-safe direction: an unclassifiable case is always captured rather than silently represented
+ * by a frame of some other screen.
+ *
+ * @param {object} viewCase A registry case.
+ * @returns {string} Its surface key.
+ */
+export function labSurfaceKey(viewCase) {
+  const surface = viewCase.app === MANAGER ? viewCase.expectView : viewCase.query?.tab;
+  const theme = viewCase.query?.colorScheme ?? DEFAULT_COLOR_SCHEME;
+  return `${viewCase.app}|${surface || viewCase.id}|${theme}`;
+}
+
+/**
+ * Which of two cases is the better photograph OF ITS SURFACE, rather than of a state that surface
+ * can be driven into. Lower sorts first.
+ *
+ * Three facts, in order, all read off the case itself:
+ *
+ *   1. it renders at its app's default geometry. A 680px or stacked case is a responsive state,
+ *      and a narrow frame is a poor look at a screen whose ordinary width is 1280;
+ *   2. no dialog is open over it. A modal covers the screen it is asked to represent;
+ *   3. fewest steps. The least-driven state of a surface is the closest thing it has to a resting
+ *      one — which is why almost every surface's representative comes out as its own `*-normal`
+ *      frame without that string being mentioned anywhere.
+ *
+ * Ties break on registry order at the call site, so the choice is total and stable: the same
+ * registry always yields the same coverage set, and a reviewer diffing two runs sees frames move
+ * only when the registry moved them.
+ *
+ * @param {object} a One case.
+ * @param {object} b Another case on the same surface.
+ * @returns {number} Negative when `a` is the better representative.
+ */
+function compareSurfaceRepresentative(a, b) {
+  const offDefault = (viewCase) => {
+    const position = DEFAULT_POSITION[viewCase.app];
+    return position &&
+      viewCase.position?.width === position.width &&
+      viewCase.position?.height === position.height
+      ? 0
+      : 1;
+  };
+  const dialogOpen = (viewCase) => (viewCase.query?.dialog ? 1 : 0);
+  return (
+    offDefault(a) - offDefault(b) ||
+    dialogOpen(a) - dialogOpen(b) ||
+    (a.steps?.length ?? 0) - (b.steps?.length ?? 0)
+  );
+}
+
+/**
+ * One publishable case per surface, in registry order.
+ *
+ * @returns {object[]} The coverage set.
+ */
+function chooseSurfaceRepresentatives() {
+  const order = new Map(VIEW_LAB_CASES.map((viewCase, index) => [viewCase.id, index]));
+  const bySurface = new Map();
+  for (const viewCase of publishableCases()) {
+    const key = labSurfaceKey(viewCase);
+    const held = bySurface.get(key);
+    if (!held || compareSurfaceRepresentative(viewCase, held) < 0) bySurface.set(key, viewCase);
+  }
+  return [...bySurface.values()].sort((a, b) => order.get(a.id) - order.get(b.id));
+}
+
+/**
+ * One frame of every surface the lab renders: the capture a change whose reach cannot be
+ * attributed selects.
+ *
+ * DERIVED, never listed. A hand-written list would be correct on the day it was written and wrong
+ * the first time a screen was added — and wrong in the silent direction, since the new screen
+ * would simply have no coverage frame and nothing would say so.
+ *
+ * @type {readonly object[]}
+ */
+export const LAB_SURFACE_CASES = Object.freeze(chooseSurfaceRepresentatives());
+
+/** @type {readonly string[]} */
+export const LAB_SURFACE_CASE_IDS = Object.freeze(LAB_SURFACE_CASES.map((viewCase) => viewCase.id));
+
 /**
  * The cases a set of RENDER files selects, by the `sourceMatches` patterns each case declares.
  *
@@ -4744,6 +6992,7 @@ function selectRenderFileCases(renderFiles) {
   for (const file of renderFiles) {
     if (BROAD_SIGNAL_PATTERN.test(file)) {
       sawBroadSignal = true;
+      for (const id of BROAD_SIGNAL_CASE_OVERRIDES[file] ?? []) selected.add(id);
       continue;
     }
     for (const viewCase of VIEW_LAB_CASES) {
@@ -4758,18 +7007,20 @@ function selectRenderFileCases(renderFiles) {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // Diff-aware selection, for the lab inputs whose diff can be attributed.
 //
-// Adding two cases used to select all 157, when the honest answer is those two. The selector had
-// the diff available and did not use it. It does now — for this registry and for the actor fixture
-// — but only for a change it can PROVE is confined to one region of the file, and it proves that
-// against that file's own text.
+// Adding two cases used to select the whole corpus, when the honest answer is those two. The
+// selector had the diff available and did not use it. It does now — for this registry and for the
+// actor fixture — but only for a change it can PROVE is confined to one region of the file, and it
+// proves that against that file's own text.
 //
-// The whole design is one question: when do we widen back to everything? The answer is "at the
-// first sign of anything we do not fully understand", which here means:
+// The whole design is one question: when do we widen back to surface coverage? The answer is "at
+// the first sign of anything we do not fully understand", which here means:
 //
 //   - no patch, an empty patch, or a patch that is not a unified diff;
 //   - a hunk header that does not parse, or a body line whose marker is not ` `, `+`, `-` or `\`;
-//   - a hunk whose content cannot be LOCATED unambiguously in the file that will render — see
-//     {@link regionsTouchedByHunk} for the three ways that happens;
+//   - a hunk whose content cannot be LOCATED AT ALL in the file that will render — see
+//     {@link regionsTouchedByHunk} for the two ways that happens. Content found in SEVERAL places
+//     is located, not unlocated: it answers with the union of those places, which contains
+//     whichever one the edit really was (issue 1127);
 //   - that file's own text not parsing into regions;
 //   - a changed line outside every region — in this registry a shared helper, a pattern constant,
 //     a case factory or `mapChangedFilesToCases` itself, any of which can move every frame.
@@ -4784,7 +7035,7 @@ function selectRenderFileCases(renderFiles) {
 // revision — and in CI they systematically are not. `pr-screenshots.yml` runs on `pull_request`, so
 // the workspace is the MERGE commit while GitHub's `patch` field describes the PR HEAD; any PR
 // whose base moved the file it patches verifies against shifted lines, fails at the first
-// comparison, and silently pays the whole-corpus capture. Worse, a shifted patch that happens to
+// comparison, and silently pays the full coverage capture. Worse, a shifted patch that happens to
 // land on a verbatim twin of its own content verifies against the WRONG occurrence and attributes
 // the change to a case it does not touch — publishing a frame under a name it does not show, which
 // is strictly worse than over-capturing. The header must still PARSE, because that is the signal
@@ -4852,6 +7103,9 @@ const registrySourceLines = memoized(() => readSourceLines(import.meta.url));
 const labActorSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_ACTORS_PATH}`, import.meta.url))
 );
+const mountSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${LAB_MOUNT_PATH}`, import.meta.url))
+);
 
 /**
  * The `VIEW_LAB_CASES` array's body, with the file line number its first line has.
@@ -4913,6 +7167,14 @@ const caseLineRegions = memoized(() => parseCaseLineRegions(registrySourceLines(
  * @returns {boolean} True when it can render a component stack an actor holds.
  */
 function rendersOwnedComponents(viewCase) {
+  return viewCase.app === PLAYER;
+}
+
+/**
+ * @param {object} viewCase A case.
+ * @returns {boolean} True when it photographs the player window rather than the Manager.
+ */
+function rendersInPlayerWindow(viewCase) {
   return viewCase.app === PLAYER;
 }
 
@@ -5056,6 +7318,88 @@ export function parseLabActorTableRegions(sourceLines) {
 const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSourceLines()));
 
 /**
+ * The four regions of `tests/view-lab/mount.js` that only the PLAYER window can render, each with
+ * the predicate deciding which frames read what it produces (issue 1198).
+ *
+ * All four are `app === PLAYER`, and each is a derivation rather than a convenience:
+ *
+ *   - `player-extension-params` — the three companion query params. Nothing but `mountPlayerApp`
+ *     reads them, and only a player frame carries a nav rail to put a provider tab in.
+ *   - `lab-player-provider` — the stand-in companion provider. It is registered with the PLAYER
+ *     registry, whose surface-id namespace is disjoint from the Manager's.
+ *   - `player-settle-stores` — the store-quiescence wait. It watches six names the player service
+ *     bag declares and the Manager's `_buildServices()` does not declare at all, so `watched` is
+ *     empty on every manager frame and the block cannot move one.
+ *   - `mount-player-app` — the player window's whole mount path.
+ *
+ * They are MARKED regions rather than whole functions on purpose. Two of the four edits this
+ * attribution exists for land inside functions the manager window also runs — `readParams` and
+ * `settle` — so keying on those functions would claim a player-only readership the file does not
+ * have, and a later edit to a manager param would then select the player frames and silently
+ * publish no evidence for the manager frames it moved. Marking the blocks keeps every declared
+ * region's readership true, and a hunk landing outside every marker widens to surface coverage,
+ * which is the fail-safe default.
+ */
+const PLAYER_MOUNT_REGIONS = Object.freeze({
+  'player-extension-params': rendersInPlayerWindow,
+  'lab-player-provider': rendersInPlayerWindow,
+  'player-settle-stores': rendersInPlayerWindow,
+  'mount-player-app': rendersInPlayerWindow,
+});
+
+/** The line opening a marked region: `// view-lab-region:<key>`, at any indent. */
+const MOUNT_REGION_OPEN_PREFIX = '// view-lab-region:';
+
+/** The line closing one: `// view-lab-region:end`. */
+const MOUNT_REGION_CLOSE = `${MOUNT_REGION_OPEN_PREFIX}end`;
+
+/**
+ * The 1-based, inclusive span of each marked region in `tests/view-lab/mount.js`.
+ *
+ * Marker-anchored rather than column-anchored, unlike {@link parseCaseLineRegions} and
+ * {@link parseLabActorTableRegions}, because two of the four regions are BLOCKS INSIDE a function
+ * the other window runs too — see {@link PLAYER_MOUNT_REGIONS} for why that has to be so. A marker
+ * is a comment, so `isInertSourceLine` skips it: moving or re-wording one can never itself be the
+ * change a hunk is attributed on.
+ *
+ * Self-checked the way its two siblings are, and for the same reason — a plausible authoring must
+ * not produce a plausible-looking wrong answer. Every declared key must be opened exactly once and
+ * closed; a marker naming a key this table does not declare, a nested or unclosed region, or a
+ * close with nothing open, is not a parse. A non-parse widens to everything, so every refusal
+ * fails safe, and `tests/view-lab-cases.test.js` drives each of them from synthetic line arrays.
+ *
+ * @param {string[]} sourceLines That file, by line.
+ * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
+ */
+export function parsePlayerMountRegions(sourceLines) {
+  const regions = [];
+  let open = null;
+  for (const [offset, line] of sourceLines.entries()) {
+    const text = line.trim();
+    if (!text.startsWith(MOUNT_REGION_OPEN_PREFIX)) continue;
+    if (text === MOUNT_REGION_CLOSE) {
+      if (!open) return null;
+      regions.push({ ...open, end: offset + 1 });
+      open = null;
+      continue;
+    }
+    // A nested opener, or a key nothing in the table knows how to answer for.
+    if (open) return null;
+    const key = text.slice(MOUNT_REGION_OPEN_PREFIX.length);
+    if (!Object.hasOwn(PLAYER_MOUNT_REGIONS, key)) return null;
+    open = { key, start: offset + 1 };
+  }
+
+  if (open) return null;
+  const keys = regions.map((region) => region.key);
+  if (keys.length !== new Set(keys).size) return null;
+  if (Object.keys(PLAYER_MOUNT_REGIONS).some((key) => !keys.includes(key))) return null;
+  return regions;
+}
+
+const mountLineRegions = memoized(() => parsePlayerMountRegions(mountSourceLines()));
+
+/**
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
  */
@@ -5127,39 +7471,30 @@ function anchorOffsets(sourceLines, sequence) {
  * same region for any edit within one, and outside every region (so: everything) for a removal at
  * a region boundary.
  *
+ * A hunk can STRADDLE a region boundary — a changed line inside a case literal and another in the
+ * shared code after it — so this reports both halves rather than collapsing to the wider one. That
+ * is the same correction the three levels above it carry: the answer for a straddling hunk is the
+ * region it touched TOGETHER WITH the widening, never the widening alone.
+ *
  * @param {{marker: string, text: string}[]} hunk One hunk body.
  * @param {number} offset The 0-based source line its first new-file line sits at.
  * @param {{key: string, start: number, end: number}[]} regions The file's regions.
- * @returns {Set<string>|symbol} Region keys, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions its changed lines sit in,
+ *   and whether any changed line sat outside every region.
  */
 function regionsTouchedAt(hunk, offset, regions) {
   const keys = new Set();
+  let unattributable = false;
   let cursor = offset + 1;
   for (const { marker, text } of hunk) {
     if (marker !== ' ' && !isInertSourceLine(text)) {
       const region = regions.find((entry) => cursor >= entry.start && cursor <= entry.end);
-      if (!region) return EVERY_PUBLISHABLE_CASE;
-      keys.add(region.key);
+      if (region) keys.add(region.key);
+      else unattributable = true;
     }
     if (marker !== '-') cursor += 1;
   }
-  return keys;
-}
-
-/**
- * Whether two candidate anchors attributed a hunk to the same regions.
- *
- * Compared as SETS rather than as a joined string. A separator-joined signature conflates
- * `{'a b', 'c'}` with `{'a', 'b c'}`, and nothing forbids a space in a region key — `CASE_ID_PATTERN`
- * accepts any run of non-quote characters — so two candidates that disagree could sign identically
- * and the disagreement rule would pass them through as agreement.
- *
- * @param {Set<string>} left One candidate's keys.
- * @param {Set<string>} right Another candidate's keys.
- * @returns {boolean} True when the two hold exactly the same keys.
- */
-function sameKeys(left, right) {
-  return left.size === right.size && [...left].every((key) => right.has(key));
+  return { keys, unattributable };
 }
 
 /**
@@ -5167,47 +7502,60 @@ function sameKeys(left, right) {
  *
  * The hunk's context and added lines are exactly the lines that must exist, in that order, in the
  * file the producer will render — so they are the anchor, and the header's line numbers are never
- * consulted. Four outcomes, three of which widen:
+ * consulted. Four outcomes, two of which widen:
  *
  *   - an EMPTY sequence — a hunk carrying no context and no additions, which `-U0` produces — has
  *     nothing to anchor against, and "matches everywhere" is not an attribution;
  *   - NO occurrence — the patch describes content this checkout does not have, exactly as an
  *     unverifiable patch always did;
  *   - ONE occurrence — that is the anchor, and attribution proceeds from it;
- *   - SEVERAL occurrences — the hunk is attributed at each, and the answer is used only when every
- *     candidate agrees. The repetition is real, not theoretical: 76 distinct seven-line windows
- *     recur in this registry, one `sourceMatches` block recurs fourteen times verbatim, and the
- *     three `currency-*` cases share a byte-identical tail. Taking the first candidate would
- *     attribute a change to whichever twin came earlier in the file, which is the silent
- *     misattribution this rule exists to make unreachable.
+ *   - SEVERAL occurrences — the hunk is attributed at each, and the answer is their UNION. The
+ *     repetition is real, not theoretical: 76 distinct seven-line windows recur in this registry,
+ *     one `sourceMatches` block recurs fourteen times verbatim, and the three `currency-*` cases
+ *     share a byte-identical tail.
  *
- * The cost of the last rule is measured, not guessed: of the 3,740 lines inside a case literal, a
- * single-line edit with git's three lines of context anchors uniquely at 3,489 (93.3%) and widens
- * at 251 (6.7%). Those 251 narrow today only when their line numbers happen to be right, and are
- * silently misattributed when a merge shift lands them on a twin.
+ * The union is sound, and the argument is one sentence: the anchor sequence is the content that
+ * must EXIST in the file that will render, so wherever the edit actually landed, that place is one
+ * of the matched offsets — and a set containing every candidate therefore contains the true one.
+ * It is exact when the anchor is unique and a superset when it is not, which is the same direction
+ * of error the widened answer makes, at a fraction of the cost. Taking the FIRST candidate
+ * instead would attribute a change to whichever twin came earlier in the file; that is the silent
+ * misattribution this rule still makes unreachable (issue 1127).
+ *
+ * The rule this replaced widened whenever two candidates disagreed. Of the 3,740 lines inside a
+ * case literal, a single-line edit with git's three lines of context anchors uniquely at 3,489
+ * (93.3%) and was ambiguous at 251 (6.7%) — but that measurement understates what it cost, because
+ * the ambiguity is not randomly distributed. Applying the SAME edit to a family of sibling cases is
+ * one of the commonest registry changes there is, and byte-identical siblings are precisely what
+ * makes an anchor ambiguous. PR #1125 added four lines to three sibling case literals and captured
+ * 209 frames in 28 minutes for want of three.
  *
  * @param {{marker: string, text: string}[]} hunk One hunk body.
  * @param {string[]} sourceLines The file that will render, by line.
  * @param {{key: string, start: number, end: number}[]} regions That file's regions.
- * @returns {Set<string>|symbol} Region keys, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions its candidate locations sit
+ *   in, and whether any candidate reached beyond them.
  */
 function regionsTouchedByHunk(hunk, sourceLines, regions) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
-  if (sequence.length === 0) return EVERY_PUBLISHABLE_CASE;
+  if (sequence.length === 0) return { keys: new Set(), unattributable: true };
 
-  let agreed = null;
+  const keys = new Set();
+  let unattributable = false;
+  let anchored = false;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
+    anchored = true;
     const touched = regionsTouchedAt(hunk, offset, regions);
-    // One candidate widening settles it either way: if every candidate widens the answer is
-    // everything, and if only some do the candidates disagree, which is also everything.
-    if (touched === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
-    if (agreed === null) {
-      agreed = touched;
-      continue;
-    }
-    if (!sameKeys(agreed, touched)) return EVERY_PUBLISHABLE_CASE;
+    // A candidate that lands outside every region — a shared factory, a section banner, the
+    // selection machinery itself — can move any frame, and the true edit may be that candidate,
+    // so it has to widen. It no longer DISCARDS its siblings to do so: a widening candidate
+    // contributes coverage while the candidates that did land in a region contribute their
+    // regions, and the answer is both.
+    unattributable ||= touched.unattributable;
+    for (const key of touched.keys) keys.add(key);
   }
-  return agreed ?? EVERY_PUBLISHABLE_CASE;
+  // No candidate at all: the patch describes content this checkout does not have.
+  return { keys, unattributable: unattributable || !anchored };
 }
 
 /**
@@ -5218,34 +7566,63 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
  * `sonar.cpd.exclusions`, so a second copy of the walk would fail the gate as well as being a
  * second place for the anchoring rule to drift.
  *
+ * REPORTS unattributability rather than RETURNING it, and that distinction is the whole reason
+ * this returns a pair. A patch can be part attributable and part not — one hunk inside a case
+ * literal, one hunk in the shared factory above it, which is exactly the shape of "add a case and
+ * touch the constant it uses". While the unattributable answer was the whole corpus, discarding
+ * the attributed half on the way out was harmless, because the corpus contained it. Surface
+ * coverage does not: it holds one frame per surface and would drop the very case the patch edited,
+ * publishing a capture that shows everything except the change. So the halves are kept apart here
+ * and UNIONED by the caller.
+ *
  * @param {string|undefined} patch The unified diff for that file, if the caller supplied one.
  * @param {Function} readSource The file that will render, read lazily.
  * @param {Function} readRegions Its regions, parsed lazily.
- * @returns {Set<string>|symbol} Region keys, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions located, and whether any
+ *   part of the patch reached beyond them.
  */
 function touchedRegionKeys(patch, readSource, readRegions) {
-  if (typeof patch !== 'string' || patch.trim() === '') return EVERY_PUBLISHABLE_CASE;
+  const nothingLocated = { keys: new Set(), unattributable: true };
+  if (typeof patch !== 'string' || patch.trim() === '') return nothingLocated;
 
   const hunks = parseHunks(patch);
-  if (!hunks) return EVERY_PUBLISHABLE_CASE;
+  if (!hunks) return nothingLocated;
   const regions = readRegions();
-  if (!regions) return EVERY_PUBLISHABLE_CASE;
+  if (!regions) return nothingLocated;
 
   const sourceLines = readSource();
   const keys = new Set();
+  let unattributable = false;
   for (const hunk of hunks) {
     const touched = regionsTouchedByHunk(hunk, sourceLines, regions);
-    if (touched === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
-    for (const key of touched) keys.add(key);
+    unattributable ||= touched.unattributable;
+    for (const key of touched.keys) keys.add(key);
   }
-  return keys;
+  return { keys, unattributable };
 }
 
 /**
- * Lab inputs whose blast radius is narrower than the whole corpus, with the predicate — over a
+ * Widen a located selection by surface coverage when part of the change could not be attributed.
+ *
+ * The union, in one place, so every attribution path widens the same way: what WAS located is
+ * kept, and coverage is added for the part that was not. Replacing rather than unioning is the
+ * defect this function exists to prevent — see {@link touchedRegionKeys}.
+ *
+ * @param {Set<string>} ids The case ids that were attributed.
+ * @param {boolean} unattributable Whether any part of the change reached beyond them.
+ * @returns {Set<string>} The selection.
+ */
+function widenedByCoverage(ids, unattributable) {
+  if (!unattributable) return ids;
+  for (const id of LAB_SURFACE_CASE_IDS) ids.add(id);
+  return ids;
+}
+
+/**
+ * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
  * case's OWN declared fields — that decides which frames can render them.
  *
- * The default for a lab input is still EVERYTHING (see {@link mapChangedFilesToCases}); this table
+ * The default for a lab input is surface coverage (see {@link mapChangedFilesToCases}); this table
  * is the exception list, and an entry earns its place only when the narrowing can be DERIVED. A
  * hand-maintained list of case ids would drift the moment a case is added, and would drift silently
  * — the failure being a PR that renders no evidence for the frames it moved.
@@ -5272,7 +7649,7 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  * ({@link LAB_ACTOR_FIXTURE_TABLES}); everything else in it — `ACTOR_DEFINITIONS`, `ownedItem`,
  * `recipeItemCopy`, `installToObject`, `installDeleteSemantics`, `buildLabActors`,
  * `buildDocumentIndex` and any symbol added later — sits outside every region and keeps the
- * whole-corpus default. `buildDocumentIndex` is the clearest reason that has to be so: it builds
+ * coverage default. `buildDocumentIndex` is the clearest reason that has to be so: it builds
  * the uuid table `fromUuid` resolves against, and the manager resolves through it everywhere
  * (`BooksScrollsView`, `ItemPageInspector`, `SystemEditView`, `EnvironmentSummaryInspector`,
  * `GatheringEventEditView`, `RecipeBooksScrollsTab`, `SimpleCraftingCheckEditor`, the knowledge
@@ -5283,7 +7660,7 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  * corpus, which is what the default is for.
  *
  * Per-ACTOR selection is not offered, and that is a measured refusal rather than an omission: three
- * of 181 cases name an actor id at all, the `manager-knowledge-*` frames that click
+ * cases in the whole registry name an actor id at all, the `manager-knowledge-*` frames that click
  * `[data-knowledge-actor="…"]`. Every player frame mounts `ActorSelectTopBar` for the default
  * crafting actor, the lab's component-source set is the whole roster, and both the listing and the
  * recipe-visibility computation read every source actor's items — so a per-actor selector would be
@@ -5298,8 +7675,23 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  *     seeds `craftingSystems`, `recipes`, `gatheringEnvironments` and `gatheringConfig`, which is
  *     the definition set BOTH windows render, and it owns the five `lab-*` system ids that 51 cases
  *     name in `query.system`. It is the broadest input the lab has.
+ *
+ * `viewLabLayoutAssertion.js` also qualifies whole-file. Every path through the helper validates
+ * only cases carrying `expectLayout`, so that case-owned field derives its complete readership.
+ *
+ * `mount.js` qualifies per REGION for the same reason `labActors.js` does — it is several things
+ * at once — but its regions are MARKED rather than found by column, because two of the four are
+ * blocks inside functions BOTH windows run. See {@link PLAYER_MOUNT_REGIONS}. Everything else in
+ * the file — the determinism styles, the chrome-font gate, the lab-induced-clipping measurement,
+ * `boot`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and the shared half
+ * of `settle` — sits outside every region and keeps the coverage default, which is right: a
+ * frame of either window renders through all of it.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
+  Object.freeze({
+    path: LAYOUT_ASSERTION_PATH,
+    selects: (viewCase) => Boolean(viewCase.expectLayout),
+  }),
   Object.freeze({
     path: 'tests/view-lab/world/labRunStates.js',
     selects: (viewCase) => viewCase.app === PLAYER,
@@ -5309,6 +7701,12 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     sourceLines: labActorSourceLines,
     regions: labActorLineRegions,
     selectsRegion: (table) => LAB_ACTOR_FIXTURE_TABLES[table],
+  }),
+  Object.freeze({
+    path: LAB_MOUNT_PATH,
+    sourceLines: mountSourceLines,
+    regions: mountLineRegions,
+    selectsRegion: (region) => PLAYER_MOUNT_REGIONS[region],
   }),
 ]);
 
@@ -5331,10 +7729,11 @@ function casesSelecting(selects) {
  * confined to one selects exactly that case.
  *
  * @param {string|undefined} patch The unified diff for this file, if the caller supplied one.
- * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {Set<string>} Selected ids.
  */
 function casesFromRegistryPatch(patch) {
-  return touchedRegionKeys(patch, registrySourceLines, caseLineRegions);
+  const { keys, unattributable } = touchedRegionKeys(patch, registrySourceLines, caseLineRegions);
+  return widenedByCoverage(keys, unattributable);
 }
 
 /**
@@ -5342,17 +7741,20 @@ function casesFromRegistryPatch(patch) {
  *
  * @param {string|undefined} patch The unified diff for that input, if the caller supplied one.
  * @param {object} attribution Its {@link ATTRIBUTED_LAB_INPUTS} entry.
- * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {Set<string>} Selected ids.
  */
 function casesFromRegionPatch(patch, attribution) {
-  const keys = touchedRegionKeys(patch, attribution.sourceLines, attribution.regions);
-  if (keys === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
+  const { keys, unattributable } = touchedRegionKeys(
+    patch,
+    attribution.sourceLines,
+    attribution.regions
+  );
 
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
   }
-  return ids;
+  return widenedByCoverage(ids, unattributable);
 }
 
 /**
@@ -5360,15 +7762,16 @@ function casesFromRegionPatch(patch, attribution) {
  *
  * @param {string} file A normalized path matching {@link LAB_INFRASTRUCTURE_PATTERN}.
  * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {Set<string>} Selected ids.
  */
 function selectLabInputCases(file, patchByPath) {
   if (file === REGISTRY_PATH) return casesFromRegistryPatch(patchByPath.get(file));
   const attribution = ATTRIBUTED_LAB_INPUTS.find((entry) => entry.path === file);
   // The DEFAULT, and the fail-safe: an input nobody has attributed — a new file under
-  // `tests/view-lab/`, the mount page, the fixture assembler, the Foundry shim — selects the whole
-  // corpus. See {@link mapChangedFilesToCases} for why that has to be the default.
-  if (!attribution) return EVERY_PUBLISHABLE_CASE;
+  // `tests/view-lab/`, the fixture assembler, the Foundry shim — reaches further than this
+  // registry can say, and resolves to surface coverage. See {@link mapChangedFilesToCases} for
+  // why that has to be the default.
+  if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.regions) return casesFromRegionPatch(patchByPath.get(file), attribution);
   return casesSelecting(attribution.selects);
 }
@@ -5376,16 +7779,21 @@ function selectLabInputCases(file, patchByPath) {
 /**
  * The union of what every lab input in a changed set selects.
  *
+ * A plain union, with no early exit. It used to bail out with the unattributable sentinel the
+ * moment one input produced it, which discarded whatever the inputs before it had attributed —
+ * harmless only while that sentinel meant the whole corpus, which contained them. It resolves to
+ * surface coverage now, which does not, so bailing out would drop a co-changed case's own frame:
+ * a PR editing one case literal AND the mount page would publish coverage and no frame of the
+ * case it edited.
+ *
  * @param {string[]} labInputs Normalized lab-input paths.
  * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ * @returns {Set<string>} Selected ids.
  */
 function selectAllLabInputCases(labInputs, patchByPath) {
   const selected = new Set();
   for (const file of labInputs) {
-    const ids = selectLabInputCases(file, patchByPath);
-    if (ids === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
-    for (const id of ids) selected.add(id);
+    for (const id of selectLabInputCases(file, patchByPath)) selected.add(id);
   }
   return selected;
 }
@@ -5404,20 +7812,40 @@ function normalizePatches(patches) {
  * Map a changed-file set onto the cases that should be captured.
  *
  * A change to the lab's own inputs — the fixture world, the page that mounts it, the Foundry shim,
- * this registry — selects EVERYTHING that publishes unless it is one of the few inputs whose reach
- * can be derived (see {@link ATTRIBUTED_LAB_INPUTS} and {@link casesFromRegistryPatch}).
+ * this registry — selects SURFACE COVERAGE ({@link LAB_SURFACE_CASES}: one frame of every route
+ * and tab the lab renders) unless it is one of the few inputs whose reach can be derived (see
+ * {@link ATTRIBUTED_LAB_INPUTS} and {@link casesFromRegistryPatch}).
  *
  * That default is the rule that stops the harness lying about its riskiest change. Every frame
- * renders from one fixture world, so an edit to `labContent.js` can reflow all of them — and none
+ * renders from one fixture world, so an edit to `labContent.js` can reflow any of them — and none
  * of those paths is a render file, so `isUiFile` rejects them and the selection came back EMPTY.
- * The PRs most able to invalidate the whole corpus were precisely the PRs that selected no evidence
- * and passed green. Verified before that rule existed:
+ * The PRs most able to invalidate the corpus were precisely the PRs that selected no evidence and
+ * passed green. Verified before that rule existed:
  *   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
  *
- * Narrowing it is therefore allowed in exactly one direction: an input may select FEWER frames only
- * when the registry can show its work from what the cases declare about themselves, or from a diff
- * it has checked against the file that will render. Everything unmapped, unparseable or ambiguous
- * still selects all of them.
+ * The coverage set is what that rule costs now. It used to be the whole corpus, and it stopped
+ * being worth its price: 246 frames is not evidence anyone reads, and a twenty-five minute job on
+ * every lab-infrastructure PR is the thing that makes per-PR capture look optional. Coverage keeps
+ * the property that matters — no lab-input change can select NOTHING, and none can leave a screen
+ * unphotographed — while leaving each surface's detailed states to the files that draw them.
+ *
+ * Narrowing BELOW coverage is allowed in exactly one direction: an input may select fewer frames
+ * only when the registry can show its work from what the cases declare about themselves, or from a
+ * diff it has checked against the file that will render. Everything unmapped or unparseable
+ * resolves to coverage; a diff whose content is AMBIGUOUS selects the union of the places it could
+ * be, which is a superset of the truth rather than a guess at it.
+ *
+ * ONE PROPERTY IS GONE, and it is worth recording rather than discovering. This function answers
+ * for BOTH the producer (`pr-screenshots.yml`) and the gate (`check-screenshots` in `ci.yml`), from
+ * the same `pulls/{n}/files` payload — but from two independently-computed merge commits, so a
+ * `main` that moves between them can leave one side able to anchor a hunk and the other not. While
+ * the widened answer was the whole corpus, any such disagreement resolved to a SUPERSET of whatever
+ * the other side chose, and the gate's overlap test could not fail for that reason. Coverage is not
+ * a superset, so the two can now disagree disjointly in principle. In practice the gate only arms
+ * when a render file changed, and a render file's selection is patch-independent and therefore
+ * common to both sides — so reaching the hole needs an armed gate whose render files select no case
+ * at all, on top of an anchoring disagreement. Unioning rather than replacing (above) narrows it
+ * further. Accepted, not overlooked.
  *
  * @param {string[]} files Changed paths.
  * @param {object} [options] Selection inputs beyond the file list.
@@ -5448,14 +7876,16 @@ export function mapChangedFilesToCases(files = [], { patches } = {}) {
     return [];
   }
 
-  const labSelection = selectAllLabInputCases(labInputs, normalizePatches(patches));
-  if (labSelection === EVERY_PUBLISHABLE_CASE) return publishableCases();
-
-  // A UNION, not an early return. The lab-input branch used to answer for the whole changed set, so
-  // the render files shipping alongside it were never consulted — which was invisible while the
-  // answer was "everything" and would silently drop frames now that it is not.
+  // A UNION at every level, never a replacement. Five levels carry it — one candidate anchor, a
+  // hunk's candidates, a patch's hunks, an input's patch, and a change's inputs — and this is the
+  // last of them. Every one used to short-circuit on unattributability, which was
+  // safe only because the answer then was the whole corpus — a superset of every selection it
+  // discarded. Surface coverage is a superset of nothing: it holds one frame per surface, not
+  // the detailed state a render file or a case literal selects. Widening now ADDS coverage to what
+  // was attributed rather than replacing it, so a PR that edits one case and also touches shared
+  // code publishes coverage AND the frame of the case it edited.
   const selected = selectRenderFileCases(renderFiles);
-  for (const id of labSelection) selected.add(id);
+  for (const id of selectAllLabInputCases(labInputs, normalizePatches(patches))) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
 
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);

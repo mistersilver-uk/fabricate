@@ -186,12 +186,18 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
  */
 export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
   const componentId = typeof tool?.componentId === 'string' ? tool.componentId.trim() : '';
-  if (!componentId) return null;
+  const resolvedToolId = typeof toolId === 'string' ? toolId.trim() : '';
+  // The station's identity is its LIBRARY TOOL ID (issue 1119). Requiring a componentId
+  // here returned null for every item-sourced Tool — which `upsertTool` force-nulls and
+  // the Tool Studio can only produce — and the caller answered that null with a silent
+  // activation denial. A componentId, when present, is still carried so a migrated
+  // component-linked station keeps satisfying componentId-keyed virtual presence.
+  if (!resolvedToolId && !componentId) return null;
   const label = typeof tool?.label === 'string' && tool.label.trim() ? tool.label.trim() : '';
   return {
     componentId,
     systemId: typeof systemId === 'string' ? systemId : '',
-    toolId: typeof toolId === 'string' ? toolId : '',
+    toolId: resolvedToolId,
     label,
   };
 }

@@ -22,6 +22,34 @@
  * @returns {Set<string>} componentIds present for this system scope.
  */
 export function resolvePresentComponentIds({ presentTools, systemId } = {}) {
+  return resolvePresentIds({ presentTools, systemId, key: 'componentIds' });
+}
+
+/**
+ * The `toolId` twin of {@link resolvePresentComponentIds} (issue 1119).
+ *
+ * Virtual presence was keyed ONLY by `componentId`, which an item-sourced Tool does not
+ * have — so a Tool station built from one satisfied nothing, and `buildActiveCanvasTool`
+ * refused to construct its payload at all. Since `upsertTool` force-nulls `componentId`
+ * for any item source and the Tool Studio offers no other authoring path, that was every
+ * Tool station a GM could build. The same per-system scope guard applies: a library tool
+ * id is unique per system only.
+ *
+ * @param {object} params
+ * @param {{ systemId?: string|null, toolIds?: string[] }|string[]|null} [params.presentTools]
+ * @param {string|null} [params.systemId]
+ * @returns {Set<string>} library tool ids present for this system scope.
+ */
+export function resolvePresentToolIds({ presentTools, systemId } = {}) {
+  return resolvePresentIds({ presentTools, systemId, key: 'toolIds' });
+}
+
+/**
+ * The shared scope guard behind both resolvers: a present tool counts only for its own
+ * crafting system, because both id kinds are per-system.
+ * @private
+ */
+function resolvePresentIds({ presentTools, systemId, key }) {
   if (!presentTools || Array.isArray(presentTools)) {
     // No scoped payload (or a legacy bare array with no system scope): under
     // system-scoped matching there is no resolvable scope, so treat as inert.
@@ -33,8 +61,8 @@ export function resolvePresentComponentIds({ presentTools, systemId } = {}) {
   if (!toolSystemId || !scopeSystemId || toolSystemId !== scopeSystemId) {
     return new Set();
   }
-  const componentIds = Array.isArray(presentTools.componentIds) ? presentTools.componentIds : [];
-  return new Set(componentIds.filter(id => typeof id === 'string' && id));
+  const ids = Array.isArray(presentTools[key]) ? presentTools[key] : [];
+  return new Set(ids.filter(id => typeof id === 'string' && id));
 }
 
 export function createGatheringToolAvailability({ craftingSystemManager, evaluator }) {
@@ -110,10 +138,9 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
   const matcher = resolveToolMatcher(craftingSystemManager);
   const identityMatcher = resolveToolIdentityMatcher(craftingSystemManager);
   const items = normalizeFoundryCollection(actor?.items);
-  const presentSet = resolvePresentComponentIds({
-    presentTools,
-    systemId: system?.id ?? task?.craftingSystemId ?? null
-  });
+  const presentScope = { presentTools, systemId: system?.id ?? task?.craftingSystemId ?? null };
+  const presentSet = resolvePresentComponentIds(presentScope);
+  const presentToolSet = resolvePresentToolIds(presentScope);
 
   for (const tool of tools) {
     // Attempt validation: a broken tool counts as unavailable (missing).
@@ -127,7 +154,7 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
     const item = identityItem || available.find(candidate => matcher(syntheticRecipe, tool, candidate)) || null;
     if (item) {
       matchedItems.push({ tool, item, breakable: identityItem != null });
-    } else if (presentSet.has(tool?.componentId)) {
+    } else if (presentToolSet.has(tool?.id) || presentSet.has(tool?.componentId)) {
       // Virtual-present: satisfied by the active canvas Tool, no owned item.
       matchedItems.push({ tool, item: null, virtual: true });
     } else {
@@ -166,17 +193,16 @@ export function classifyGatheringToolStates({ actor, system, task, tools = [], c
   const syntheticRecipe = syntheticToolRecipe({ system, task });
   const matcher = resolveToolMatcher(craftingSystemManager);
   const items = normalizeFoundryCollection(actor?.items);
-  const presentSet = resolvePresentComponentIds({
-    presentTools,
-    systemId: system?.id ?? task?.craftingSystemId ?? null
-  });
+  const presentScope = { presentTools, systemId: system?.id ?? task?.craftingSystemId ?? null };
+  const presentSet = resolvePresentComponentIds(presentScope);
+  const presentToolSet = resolvePresentToolIds(presentScope);
 
   return tools.map(tool => {
     const matches = items.filter(candidate => matcher(syntheticRecipe, tool, candidate));
     let state = 'missing';
     if (matches.length > 0) {
       state = matches.some(candidate => !isToolBroken(candidate)) ? 'present' : 'damaged';
-    } else if (presentSet.has(tool?.componentId)) {
+    } else if (presentToolSet.has(tool?.id) || presentSet.has(tool?.componentId)) {
       // Virtual-present: an active canvas Tool station satisfies this tool.
       state = 'present';
     }

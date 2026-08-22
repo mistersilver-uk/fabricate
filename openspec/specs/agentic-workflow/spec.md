@@ -547,6 +547,8 @@ It MUST draw the same Foundry build that the live smoke boots, because the smoke
 Pull requests that change UI files MUST include screenshot evidence for the relevant changed views before the PR is opened or updated.
 Evidence MUST depict the changed view as a full application window.
 Every collected automated view MUST prove successful, non-degraded, exact-run provenance.
+Automatically published evidence MUST be identifiable as belonging to the pull request's current head.
+The evidence gate MUST NOT decide before the automated producer for that same head has concluded, UNLESS the pull request body already carries evidence sufficient to satisfy the gate for that head.
 
 #### Scenario: UI files changed
 
@@ -593,6 +595,32 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **AND** a selection that resolves to no case announces that outcome explicitly, and is never reported the same way as a run that rendered frames
 - **AND** a producer that selected cases but rendered none fails, because a run that publishes nothing is indistinguishable from success to every downstream check
 
+#### Scenario: the gate and the automated producer run concurrently
+
+- **WHEN** a pull request changes render files and the automated producer is able to run for that head
+- **THEN** the evidence gate does not decide until that pull request's producer run for that exact head has reached a conclusion, except where it already holds evidence sufficient to decide without that run's output
+- **AND** it re-reads the pull request body after that conclusion rather than deciding on a copy fetched before the producer wrote it
+- **AND** where several producer runs exist for one head, an unfinished one is awaited rather than an older finished one being read in its place
+- **AND** a producer run that is cancelled because a newer head superseded it does not fail the superseded head's gate, since the new head's own run is the authoritative one
+- **AND** a producer that never concludes fails the gate, because a gate that passes on a timeout can be waited out
+- **AND** the gate does not wait where no producer run can exist for that head, so a pull request the producer cannot serve is decided immediately on the evidence in its body rather than reported as skipped
+- **AND** that exception is exactly this: a gate that already holds satisfying evidence for the current head decides immediately, without waiting on a producer whose output it does not need
+
+#### Scenario: naming which evidence problem a failure is
+
+- **WHEN** the gate fails a pull request that changes render files
+- **THEN** the failure names which of these it is: no screenshot section where none was ever going to be produced automatically, a producer that was expected and never appeared, a producer whose run was cancelled without a newer head having superseded it, a producer that failed, a producer that concluded while publishing nothing, frames published for a different head, frames that depict none of the views this change selects, a producer that did not conclude, or the gate itself being unable to read the pull request's body when it goes to check what the producer published
+- **AND** a producer that was expected for this head and has not appeared is never reported as evidence the author failed to supply, because that is the same red this requirement exists to remove
+- **AND** a cancelled run is excused only when a newer head superseded it before its capture finished, since that newer head's own run is then the authoritative one; a cancelled run whose head has not moved is this failure instead, since the same cancellation means the opposite thing depending on whether the head moved
+- **AND** a producer that concludes successfully while publishing nothing — because the infrastructure it depends on was unavailable, which it treats as outside the pull request's control — is reported as that, and never as a fault in the change
+- **AND** a producer that fails is reported as a failure of that run, distinctly from an infrastructure gap, because the two point the reader at different things to fix
+- **AND** the gate being unable to read the pull request's body is reported as that, and never as the producer having published nothing, because an unread body carries no evidence of what the producer did and conflating the two sends the reader to debug the wrong system
+- **AND** a body the gate cannot read fails the gate rather than passing it, because a check that passes when it cannot read its own evidence can be satisfied by breaking that read
+- **AND** automatically published frames are identified by the case they depict and the head they were drawn for, carried in their published location rather than in their caption
+- **AND** evidence supplied by a person, which carries no such identity, satisfies the gate without that identification, so the maintainer-supplied path is unchanged
+- **AND** identification requires the automatically published frames to overlap the selected views rather than to equal them, because a run that renders only some of its selection has still produced evidence
+- **AND** automatically published frames left over from an earlier head do not satisfy the gate, since a stale frame depicts a state the pull request no longer proposes
+
 #### Scenario: a changed render file claims no case
 
 - **WHEN** a render file inside a captured window is claimed by no case's selection patterns
@@ -602,13 +630,19 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 
 #### Scenario: the producer's own inputs change
 
-- **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
-- **THEN** every publishable case is selected by default, because a change to a shared fixture can alter every frame at once
+- **WHEN** a PR changes any input the producer itself renders from — the fixture world, the mounting page, the case registry, the capture driver, or the window-chrome specification — rather than a file the product renders
+- **THEN** one case per captured SURFACE is selected by default — every application the producer renders and every route or tab reachable within it, each photographed once — because a change to a shared input can alter any frame at once, and what it has to prove is that the producer still reaches and captures every route and tab
+- **AND** the default is not every publishable case, because the detailed states of a route are evidence about the files that draw them rather than about a shared input, and a selection nobody reads is not evidence
+- **AND** a surface is a route or a tab and NOT every screen: a route's own internal tabs fold into that route's single frame, because no case declares which one it reaches, so they are deferred alongside detailed states rather than covered
+- **AND** that surface set is derived from what the cases already declare about themselves — the route or tab each reaches, and the application theme it renders under — rather than enumerated, so a route added later is covered without anyone remembering to cover it
+- **AND** each surface is represented by a frame that shows that route or tab rather than a variant of it — preferring, in order, the application's default window geometry, no dialog covering the screen, and the least-driven state of it — wherever the surface offers such a frame
 - **AND** a narrower selection is permitted only on an axis a case already declares about itself, or from a diff whose hunks are verified against the content of the file the producer will actually render
-- **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it accepts the result only when every candidate location attributes the change identically
+- **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it attributes the hunk at every location it could be and answers with their union, which contains the true one
 - **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
-- **AND** an input the registry does not narrow, a diff the registry cannot parse, or a verification that finds no anchor — an empty sequence, no occurrence, or occurrences whose candidates disagree — still selects every publishable case
-- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
+- **AND** widening happens on an input the registry does not narrow, a diff it cannot parse, a hunk with no anchor or an empty sequence to anchor by, or a changed line landing outside every attributed region — and not merely because a recurring anchor's candidate locations disagree, since disagreement is answered by their union
+- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the corpus
+- **AND** widening is a UNION at every level and never a replacement: a change whose reach is partly attributable and partly not selects what was attributed TOGETHER WITH the surface set, whether the unattributable part is another hunk of the same patch, another shared input in the same change, or a co-changed render file
+- **AND** the reason that has to hold at every level is that the surface set contains no detailed state, so replacing an attributed selection with it would publish a capture of everything except the thing the change altered
 
 #### Scenario: screenshot capture is blocked
 
@@ -655,3 +689,78 @@ Skills SHOULD include provider-specific metadata under the skill directory when 
 
 - **WHEN** a skill is intended for OpenAI/Codex reuse
 - **THEN** it may include `agents/openai.yaml` within the skill directory
+
+### Requirement: Two-class performance measurement baselines
+
+Committed performance baselines MUST contain only machine-invariant values, and machine-dependent measurements MUST NOT be committed or asserted.
+Comparison between two runs MUST be refused when the runs came from environments that cannot be meaningfully compared.
+
+#### Scenario: recording a performance measurement
+
+- **WHEN** the deterministic benchmark harness measures a profile
+- **THEN** it writes operation counts, model counts, serialized payload sizes, and fixture checksums to a committed class-1 baseline under `benchmarks/baselines/`
+- **AND** it writes wall clock and heap to a gitignored class-2 run record carrying the commit, branch, dirty flag, Node and V8 versions, OS, architecture, CPU model and count, memory, containerization, fixture profile, fixture seed, and harness version
+- **AND** no committed artifact contains a wall-clock or heap value, and no test asserts one
+- **AND** fixture generation and case setup run outside every timed region
+
+#### Scenario: guarding a committed baseline against drift
+
+- **WHEN** a committed class-1 count or fixture checksum changes
+- **THEN** a drift test re-derives the counts from the fixtures and the code under measurement and fails, naming the case, the count, and both values
+- **AND** the failure instructs the author to re-record the baseline in the same pull request and state what moved and why
+
+#### Scenario: comparing two performance runs
+
+- **WHEN** two class-2 run records are compared
+- **THEN** the comparison is refused, naming the differing fields, when their Node version, CPU model, or architecture differ
+- **AND** an accepted comparison reports a median ratio with an interquartile band rather than absolute milliseconds
+- **AND** a band spanning parity is reported as no measured difference rather than as a change
+
+#### Scenario: varying an independent scaling dimension
+
+- **WHEN** a measured hot path's cost is a product of two quantities
+- **THEN** each quantity is a separate fixture dimension that varies while the other is pinned, so a regression is attributable to one of them
+- **AND** the dimension is reported as a series of at least three points rather than as a single number
+- **AND** each fixture declares the composition that decides which branch of the measured path it exercises
+
+### Requirement: Opt-in live-Foundry performance measurement
+
+Measurement that requires a licensed Foundry installation MUST be an opt-in profile of the existing Foundry harness, MUST run in no required check, and MUST NOT start or download anything before its preconditions are met.
+Its measurements MUST NOT become assertions.
+
+#### Scenario: adding a live-Foundry measurement profile
+
+- **WHEN** performance behaviour can only be observed inside a running Foundry
+- **THEN** the profile is added to the existing harness's check and profile mechanisms and reuses its container identity, world lifecycle and teardown, rather than introducing a second harness, compose file or world script
+- **AND** the profile is declared in no GitHub Actions workflow, and a test fails when one references it
+- **AND** the profile carries its own wall-clock budget entry rather than inheriting a smoke walk's
+
+#### Scenario: preconditions for a licensed measurement run
+
+- **WHEN** a live-Foundry profile is invoked
+- **THEN** it checks for the container runtime, the credentials, the already-cached Foundry image and the fixtures it seeds, before any build, container start or download
+- **AND** an unmet precondition exits non-zero naming the precondition and the command that satisfies it
+- **AND** no image, Foundry build or licence material is fetched by the check itself
+
+#### Scenario: seeding a large corpus for measurement
+
+- **WHEN** a measurement profile needs a corpus at the scale being characterised
+- **THEN** the corpus is written as a bounded number of persistence writes that does not vary with corpus size, rather than through a per-record authoring API
+- **AND** the fixtures are the ones the Foundry-free harness uses, so the two layers measure the same corpus
+- **AND** the world is reloaded after seeding, so a startup measurement is taken against the seeded corpus rather than an empty world
+- **AND** the composition the store actually retained is counted against the composition requested, and any drift is reported
+
+#### Scenario: attributing startup cost to the module
+
+- **WHEN** a measurement reports startup time attributable to the module
+- **THEN** the module opens explicit performance mark boundaries around its own initialization and around each nested phase whose cost scales with the corpus
+- **AND** the instrumentation degrades to a no-op rather than failing a boot when the timing API is absent, partial or throwing
+- **AND** a phase that reported no measurement is recorded as missing rather than as zero
+
+#### Scenario: recording a live-Foundry measurement
+
+- **WHEN** a live-Foundry profile completes
+- **THEN** every duration and heap value is written to a gitignored run record, is never asserted, and carries a statement in the artifact itself that it must not be quoted as an absolute
+- **AND** counts are recorded against the Foundry build, game system and fixture that produced them, and no live-Foundry measurement is committed as a baseline
+- **AND** a comparison between two run records is refused, naming the differing fields, when their host, Foundry build, arm, game system, browser build, fixture profile or fixture seed differ
+- **AND** every measurement the profile declares but does not implement records what blocks it, and every declared measurement that produced no result is reported by name

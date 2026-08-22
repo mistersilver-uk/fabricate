@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { visualizer } from 'rollup-plugin-visualizer';
-import { fabricateDevProxy } from './scripts/vite-foundry-proxy.js';
+import { fabricateDevProxy, premiumSourceRoot } from './scripts/vite-foundry-proxy.js';
 
 /** Resolves the global CSS import to an empty module during production builds. */
 function stripGlobalCss() {
@@ -49,6 +49,10 @@ export default defineConfig(({ command }) => {
         port: 5173,
         strictPort: true,
         hmr: { port: 5174 },
+        // The premium companion is served from its own checkout (see the dev proxy), so
+        // Vite has to be allowed to read outside this repo. Scoped to that one directory
+        // rather than opened up, and omitted entirely when premium is not checked out.
+        fs: { allow: ['.', ...(premiumSourceRoot() ? [premiumSourceRoot()] : [])] },
         proxy: {
           '/socket.io': { target: 'http://localhost:30000', ws: true },
         },

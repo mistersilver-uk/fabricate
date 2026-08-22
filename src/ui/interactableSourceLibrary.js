@@ -17,6 +17,8 @@
  * @property {() => object|null} getGatheringConfig        Persisted gathering config accessor.
  */
 
+import { resolveToolDisplayName } from '../models/toolDisplay.js';
+
 /**
  * Resolve the live crafting system record for an id (or null). Tolerates a missing
  * manager / accessor so callers never need their own guards.
@@ -112,10 +114,10 @@ export function listSystemTasks(deps, systemId) {
  * @returns {string}
  */
 export function resolveToolName(tool, component) {
-  const label = String(tool?.label || '').trim();
-  if (label) return label;
-  if (component?.name) return String(component.name);
-  return String(tool?.id ?? '');
+  // `data-models` requirement 13. The missing snapshot rung printed the RAW TOOL ID for
+  // every item-sourced Tool, which carries `componentId: null` by construction (issue
+  // 1119). The id remains the last resort — this surface has no localized fallback.
+  return resolveToolDisplayName(tool, component, String(tool?.id ?? ''));
 }
 
 /**

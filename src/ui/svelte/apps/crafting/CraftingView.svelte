@@ -31,14 +31,20 @@
 
   const listing = $derived(store?.listing ?? null);
   const hasActor = $derived(Boolean(listing?.selectedActorId));
-  const recipes = $derived(Array.isArray(listing?.recipes) ? listing.recipes : []);
+  // The cheap SUMMARY rows (issue 1075). The rich model for the selected recipe is
+  // hydrated separately by the store and read through `selectedRecipe` below.
+  const summaries = $derived(Array.isArray(listing?.summaries) ? listing.summaries : []);
 
   const isLoading = $derived(Boolean(store?.loading) && !store?.loadedOnce);
   const isError = $derived(Boolean(store?.error));
   const isNoActor = $derived(Boolean(store?.loadedOnce) && !hasActor);
-  const isEmpty = $derived(Boolean(store?.loadedOnce) && hasActor && recipes.length === 0);
+  const isEmpty = $derived(Boolean(store?.loadedOnce) && hasActor && summaries.length === 0);
 
+  // The hydrated rich model, and the row it was hydrated from. The browser list highlights
+  // the ROW, so a hydration that answers nothing leaves the selection visible rather than
+  // silently clearing it.
   const selectedRecipe = $derived(store?.selectedRecipe ?? null);
+  const selectedSummary = $derived(store?.selectedSummary ?? null);
   const selectedSetId = $derived(
     store?.selectedIngredientSetId ?? selectedRecipe?.defaultSetId ?? null
   );
@@ -83,7 +89,7 @@
   // Shopping-list entries enriched with display name/img from the listing.
   const shoppingEntries = $derived(
     (store?.shoppingEntries ?? []).map((entry) => {
-      const recipe = recipes.find((item) => item?.id === entry.recipeId) ?? null;
+      const recipe = summaries.find((item) => item?.id === entry.recipeId) ?? null;
       return {
         recipeId: entry.recipeId,
         quantity: entry.quantity,
@@ -204,7 +210,7 @@
         <RecipeBrowser
           recipes={store?.pageItems ?? []}
           search={store?.search ?? ''}
-          selectedRecipeId={selectedRecipe?.id ?? null}
+          selectedRecipeId={selectedSummary?.id ?? null}
           totalCount={store?.visibleRecipes?.length ?? 0}
           pageIndex={store?.page ?? 0}
           pageSize={store?.pageSize ?? 12}
@@ -300,7 +306,9 @@
     color: var(--fab-text);
   }
 
-  @container fabricate-crafting (max-width: 900px) {
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable. */
+  @container fabricate-crafting (max-width: 960px) {
     .crafting-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);

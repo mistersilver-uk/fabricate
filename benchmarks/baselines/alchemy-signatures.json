@@ -1,0 +1,95 @@
+{
+  "profile": "alchemy-signatures",
+  "harnessVersion": 2,
+  "seed": 1071,
+  "description": "2,000 enabled alchemy signatures with a controlled 10% collision pool over 500 components.",
+  "construction": "literal payloads",
+  "requiresNodeModules": false,
+  "ceiling": "Capped at 2,000, not the 5,000 target: validateSystem is quadratic (~6.1 s per audit at 5,000), and the pre-fix N-audits-per-N-rows behaviour extrapolates to ~8.5 hours for one GM manager open. Prove #1074 with the comparison counter, never with wall clock.",
+  "scale": {
+    "components": 500,
+    "recipes": 2000,
+    "collidingRecipes": 200
+  },
+  "inventoryMix": [
+    {
+      "stacks": 20,
+      "unmatched": 14,
+      "durable": 4,
+      "sourceRef": 2,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 1
+    }
+  ],
+  "checksums": {
+    "corpus": "7f96e44bd6958778",
+    "components": "9b8f1efaee4d5fdf",
+    "inventory": "37fd544e256af8b9"
+  },
+  "cases": {
+    "signatureValidator.validateSystem": {
+      "description": "The pairwise enabled-signature audit over 2,000 signatures. The comparison counter is the number #1074 must move; the wall clock at full 5,000 scale is unobtainable.",
+      "counts": {
+        "componentCandidatesExamined": 4400000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "signatureComparisons": 1999000,
+        "conflicts": 8800
+      }
+    },
+    "adminRecipeRows.buildRecipeList": {
+      "description": "The GM recipe browser COHORT projection over the signature corpus, bounded to 200 rows. This is the tier the browser model filters, sorts, counts and paginates, so it runs for every matching definition and must stay cheap: since issue 1081 it derives no recipe body, no requirements preview and no activation verdict. The `blockedRows` count below is taken OUTSIDE the timed region, which is the whole point — reading it is what materialises the tier this case proves the cohort no longer pays for.",
+      "counts": {
+        "componentCandidatesExamined": 1200000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeCorpusCopies": 2,
+        "rows": 200,
+        "blockedRows": 200,
+        "signatureComparisons": 19900,
+        "reportBuilds": 1
+      }
+    },
+    "adminRecipeRows.browsePage": {
+      "description": "What a GM actually does: project the cohort, then filter, sort, count, paginate and RENDER page 1 of it — 25 rows out of 200. This is the case issue 1081 exists to move, and the criteria are the two page-scope counters: one report build for the whole open, and per-row detail work bounded by the page rather than by the cohort.",
+      "counts": {
+        "componentCandidatesExamined": 1200000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeCorpusCopies": 2,
+        "rows": 200,
+        "pagedRows": 25,
+        "blockedPageRows": 25,
+        "signatureComparisons": 19900,
+        "reportBuilds": 1
+      }
+    },
+    "adminRecipeRows.sortByAttention": {
+      "description": "The WORST case for the activation gate: the `attention` sort key reads `enableBlocked` for every row in the filtered cohort before pagination, so it cannot be page-scoped and must instead be amortised. `reportBuilds` is the criterion — 200 rows must still cost ONE full-system audit, not 200 of them.",
+      "counts": {
+        "componentCandidatesExamined": 1200000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "rows": 200,
+        "blockedRows": 200,
+        "signatureComparisons": 19900,
+        "reportBuilds": 1
+      }
+    },
+    "alchemyListing.buildListing": {
+      "description": "The alchemy workbench open, bounded to 100 rows of the signature corpus.",
+      "counts": {
+        "componentCandidatesExamined": 7000,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 20,
+        "identityCandidatesExamined": 506,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 20,
+        "knownRecipes": 0,
+        "chooserSystems": 1
+      }
+    }
+  }
+}

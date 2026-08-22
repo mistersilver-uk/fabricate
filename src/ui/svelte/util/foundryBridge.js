@@ -64,6 +64,19 @@ function normalizeDialogOptions(options = {}) {
   return normalized;
 }
 
+/**
+ * Whether the current Foundry user is a Game Master.
+ *
+ * This is `isGM`, not `activeGM`: it answers "may this client see and drive a GM surface",
+ * a single-client question with no duplicate-execution risk, so an assistant GM must
+ * answer true. It is NOT authorization — every write still passes its own gate.
+ *
+ * @returns {boolean} True when the current user holds the GM role.
+ */
+export function isGameMaster() {
+  return globalThis.game?.user?.isGM === true;
+}
+
 export function localize(key, data) {
   const i18n = globalThis.game?.i18n;
   if (!i18n) return key;
@@ -100,10 +113,50 @@ export function formatList(items) {
   return i18n.getListFormatter(LIST_FORMAT_OPTIONS).format(values);
 }
 
+/**
+ * Put a confirm's option bag into the shape `DialogV2.confirm` and `ApplicationV2`
+ * actually READ. Shared with `src/ui/foundryCompat.js`, which imports it, so the manager
+ * app's confirm seam and the player app's cannot drift apart (issue 1154).
+ *
+ * Two mappings, both narrow, both load-bearing:
+ *
+ *  - `title` → `window.title`, because `ApplicationV2#title` is
+ *    `_loc(this.options.window.title)` and `DEFAULT_OPTIONS.window.title` is `""`. A
+ *    top-level `title` is read by nothing, so before this every manager confirm — the
+ *    crafting-system delete included — rendered with an EMPTY title bar. An explicit
+ *    `window.title` always wins; the top-level form is accepted sugar, not a second
+ *    contract.
+ *  - a function `yes`/`no` → `{ callback }`, because `DialogV2.confirm` merges each over
+ *    a default button with `mergeObject`, which iterates `Object.keys(other)` — `[]` for
+ *    a function. A bare `yes: () => 'x'` therefore configures NOTHING, silently keeping
+ *    the default label AND the default `() => true` callback. Wrapping it makes the
+ *    callback real; the LABEL is still the caller's job, and on a destructive confirm it
+ *    is not optional.
+ *
+ * It deliberately does NOT go through `normalizeDialogOptions`. That one injects
+ * `buttons: [{ action: 'close', … }]` when `buttons` is absent, and `DialogV2.confirm`
+ * then does `config.buttons ??= []; config.buttons.unshift(yes, no)` — i.e. reusing it
+ * here would render a THREE-button confirm on every site.
+ *
+ * Returns a fresh bag; the caller's object is never mutated.
+ *
+ * @param {object} [options]
+ * @returns {object}
+ */
+export function normalizeConfirmOptions(options) {
+  const normalized = { ...(options || {}) };
+  if (normalized.title && !normalized.window?.title) {
+    normalized.window = { ...(normalized.window || {}), title: normalized.title };
+  }
+  if (typeof normalized.yes === 'function') normalized.yes = { callback: normalized.yes };
+  if (typeof normalized.no === 'function') normalized.no = { callback: normalized.no };
+  return normalized;
+}
+
 export async function confirmDialog(options) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;
-  return DialogV2.confirm(options);
+  return DialogV2.confirm(normalizeConfirmOptions(options));
 }
 
 export function renderDialog(options) {
@@ -262,27 +315,147 @@ export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs 
 }
 
 /**
- * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
- * or recipe) so callers can reload definition-derived views. Registers the local
- * Fabricate hooks `fabricate.craftingSystemsChanged` and `fabricate.recipesChanged`.
- * Those fire directly on the writing client; on OTHER clients they are re-emitted by
- * main.js's `updateSetting` bridge after the replicated world setting reloads the
- * in-memory managers — so this single subscription covers both same-client and
- * cross-client edits. Returns an unsubscribe function; no-ops gracefully when the
- * Foundry `Hooks` global is absent (e.g. unit tests).
+ * The unpublished scoped crafting-data signal.
  *
- * @param {Function} handler Invoked (no args) on a systems OR recipes change.
+ * A LITERAL, mirroring `CRAFTING_DATA_CHANGED_HOOK` in `src/systems/craftingDataChange.js`
+ * rather than importing it, and the reason is mechanical rather than stylistic: roughly 75
+ * mounted-component harnesses declare THIS module in their dependency allowlist, and the
+ * harness pre-validator walks the whole static import closure — so one new import here would
+ * make every one of those suites fail until each declared the new transitive module.
+ * `tests/util/foundry-bridge-subscriptions.test.js` asserts the two are equal, so they cannot
+ * drift.
+ *
+ * @type {string}
+ */
+export const CRAFTING_DATA_CHANGED_HOOK = 'fabricate.craftingDataChanged';
+
+/**
+ * How many times a change payload has been routed BROADLY because it named no domains.
+ *
+ * Exposed so a per-domain test can assert "the narrowing came from domain routing" rather than
+ * inferring it: a fixture in which the counter moved narrowed by accident, because a payload
+ * that reaches the fallback is delivered to EVERY subscriber whatever its domain set. Counted
+ * per SUBSCRIBER delivery, not per payload — each subscription classifies independently — so a
+ * fail-safe case asserts a rise of exactly the subscriber count.
+ *
+ * @type {number}
+ */
+let broadFallbackCount = 0;
+
+/**
+ * Read the broad-fallback counter.
+ *
+ * @returns {number}
+ */
+export function readCraftingDataFallbackCount() {
+  return broadFallbackCount;
+}
+
+/**
+ * Reset the broad-fallback counter, so a case can assert against a known baseline.
+ *
+ * @returns {void}
+ */
+export function resetCraftingDataFallbackCount() {
+  broadFallbackCount = 0;
+}
+
+/**
+ * Every invalidation domain this build knows, mirroring `INVALIDATION_DOMAIN_NAMES` in
+ * `src/systems/invalidationDomains.js`.
+ *
+ * A LITERAL for the same mechanical reason `CRAFTING_DATA_CHANGED_HOOK` above is one, and pinned
+ * against the real constant by `tests/util/foundry-bridge-subscriptions.test.js` so it cannot
+ * drift.
+ *
+ * @type {ReadonlySet<string>}
+ */
+const KNOWN_INVALIDATION_DOMAINS = new Set([
+  'labelling',
+  'narrative',
+  'materials-and-yield',
+  'resolution-config',
+  'component-definitions',
+  'access-and-knowledge',
+  'held-inventory',
+]);
+
+/**
+ * The domains a change payload names, or `null` when it names none this build understands and
+ * must therefore route broadly.
+ *
+ * Four shapes route broadly, and they are ONE rule rather than four special cases — "I cannot
+ * attribute this": a payload that is not a recognised change, a change whose `scopes` are
+ * malformed, a change whose scopes union to nothing (a corpus reordering, which is the
+ * production-reachable producer), and a change every one of whose domains is a name this build
+ * does not know.
+ *
+ * That last clause is the one that is easy to leave out and is the only input class that would
+ * otherwise route NARROW when it must route broad: an unknown name yields a non-empty set that
+ * intersects no subscriber's wanted set, so nothing refreshes and the fallback counter does not
+ * move — a stale read model wearing the appearance of correct narrowing. Unreachable from
+ * today's producers, and reachable the moment issue 1092 replicates a payload between clients
+ * running different module versions.
+ *
+ * Over-broad invalidation is a performance bug; a stale read model is a correctness one.
+ *
+ * @param {*} payload
+ * @returns {Set<string>|null}
+ */
+function payloadDomains(payload) {
+  const scopes = payload?.scopes;
+  if (!Array.isArray(scopes)) return null;
+  const domains = new Set();
+  for (const scope of scopes) {
+    if (!Array.isArray(scope?.domains)) return null;
+    for (const domain of scope.domains) {
+      if (KNOWN_INVALIDATION_DOMAINS.has(domain)) domains.add(domain);
+    }
+  }
+  return domains.size > 0 ? domains : null;
+}
+
+/**
+ * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
+ * or recipe) so callers can reload definition-derived views.
+ *
+ * Registers the UNPUBLISHED `fabricate.craftingDataChanged` hook, which both managers emit
+ * beside their published change hooks and which `main.js`'s `updateSetting` bridge re-emits on
+ * every other client once the replicated setting has reloaded the in-memory managers — so this
+ * single subscription still covers both same-client and cross-client edits.
+ *
+ * It deliberately no longer binds `fabricate.craftingSystemsChanged` /
+ * `fabricate.recipesChanged` (issue 1078 part B1). Those bindings were ZERO-ARGUMENT, so the
+ * payload was discarded and no narrowing was possible however good a delta was emitted. The two
+ * hooks keep firing with their existing payloads for third-party subscribers; every publisher
+ * of one also publishes the scoped signal, so nothing this drops is a signal the shell used to
+ * receive.
+ *
+ * Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks` global is absent
+ * (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked with the change payload when it names a domain this
+ *   subscriber consumes, and unconditionally when the change names none.
+ * @param {object} [options]
+ * @param {readonly string[]|null} [options.domains] The invalidation domains this subscriber
+ *   depends on — normally `STORE_DOMAINS[store]` from `src/systems/invalidationDomains.js`.
+ *   Omitted means every domain, the behaviour before issue 1078, and stays the safe default.
  * @returns {Function} Unsubscribe callback.
  */
-export function subscribeCraftingDataChange(handler) {
+export function subscribeCraftingDataChange(handler, { domains = null } = {}) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
-  const systemsId = hooks.on('fabricate.craftingSystemsChanged', () => handler());
-  const recipesId = hooks.on('fabricate.recipesChanged', () => handler());
-  return () => {
-    hooks.off?.('fabricate.craftingSystemsChanged', systemsId);
-    hooks.off?.('fabricate.recipesChanged', recipesId);
-  };
+  const wanted = Array.isArray(domains) ? new Set(domains) : null;
+  const id = hooks.on(CRAFTING_DATA_CHANGED_HOOK, (payload) => {
+    const named = payloadDomains(payload);
+    if (named === null) {
+      broadFallbackCount += 1;
+      handler(payload);
+      return;
+    }
+    if (wanted === null || [...named].some((domain) => wanted.has(domain))) handler(payload);
+  });
+  return () => hooks.off?.(CRAFTING_DATA_CHANGED_HOOK, id);
 }
 
 /**

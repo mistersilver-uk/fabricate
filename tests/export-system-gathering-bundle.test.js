@@ -35,10 +35,26 @@ import { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } from './helpers/fullAuth
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const adminStoreSource = readFileSync(
+  resolve(__dirname, '../src/ui/svelte/stores/adminStore.js'),
+  'utf8'
+);
+const exporterSource = readFileSync(
+  resolve(__dirname, '../src/systems/CraftingSystemExporter.js'),
+  'utf8'
+);
 
 // The comparison the acceptance calls for: every authoring-bearing field EXCEPT
 // the volatile `exportedAt` timestamp (which differs between two invocations).
-const COMPARED_FIELDS = ['schemaVersion', 'system', 'recipes', 'gatheringEnvironments', 'gatheringConfig'];
+const COMPARED_FIELDS = [
+  'schemaVersion',
+  'system',
+  'recipes',
+  'gatheringEnvironments',
+  'gatheringConfig',
+  'currencyConfig',
+  'travelConfig',
+];
 function pickComparedFields(envelope) {
   return Object.fromEntries(COMPARED_FIELDS.map((key) => [key, envelope[key]]));
 }
@@ -126,11 +142,89 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
     'exportSystem should resolve gatheringConfig from the GATHERING_CONFIG setting'
   );
 
-  // The five-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
-  // `buildExportPayload(system, recipes, version)` does NOT match and fails here.
+  // The SEVEN-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
+  // `buildExportPayload(system, recipes, version)` does NOT match and fails here, and neither
+  // does the five-arg call that dropped the world currency ladder (issue 1278) nor the six-arg
+  // call that dropped the world realm library (issue 1282). Every parameter of
+  // `buildExportPayload` after `version` is defaulted, so a dropped argument is silent — an
+  // export that simply carries an empty slice rather than one that throws.
   assert.match(
     closure,
-    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig\s*\)/,
-    'exportSystem must hand gatheringEnvironments + gatheringConfig to buildExportPayload'
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig\s*\)/,
+    'exportSystem must hand gatheringEnvironments + gatheringConfig + currencyConfig + travelConfig to buildExportPayload'
+  );
+  assert.ok(
+    closure.includes('fabricate.currencyConfigStore?.get?.() ?? {}'),
+    'exportSystem should resolve the ladder from the world currency config store'
+  );
+  assert.ok(
+    closure.includes('fabricate.gatheringRealmStore?.get?.() ?? {}'),
+    'exportSystem should resolve the realm library from the world travel store'
+  );
+});
+
+test("source contract: the Manager's Export button passes the same args as the public API", () => {
+  // The OTHER half of issue #642, and the half that had no guard at all until issue 1282 found
+  // it drifting again. `game.fabricate.exportSystem` and the Manager's Export button are two
+  // paths to one payload; the test above pins only the first, so the second silently fell a
+  // world slice behind — twice, once for currency and once for the realm library.
+  //
+  // Every parameter of `buildExportPayload` after `version` is DEFAULTED, so neither drift
+  // throws. It exports an empty slice, the round-trip loses data in the export direction only,
+  // and nothing anywhere reports it. That is why this is pinned on the source rather than left
+  // to the behavioural parity test above, which resolves its own arguments through the harness
+  // and therefore cannot see a real call site forget one.
+  const closure = adminStoreSource.slice(
+    adminStoreSource.indexOf('async function exportSystem(systemId) {'),
+    adminStoreSource.indexOf('async function importSystem() {')
+  );
+  assert.ok(closure.length > 0, 'located the adminStore exportSystem function');
+
+  assert.match(
+    closure,
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig\s*\)/,
+    'the Manager export must hand every authoring slice to buildExportPayload'
+  );
+  assert.ok(
+    closure.includes('services.getCurrencyConfigStore?.()?.get?.() || {}'),
+    'the Manager export resolves the ladder from the world currency config store'
+  );
+  assert.ok(
+    closure.includes('services.getGatheringRealmStore?.()?.get?.() || {}'),
+    'the Manager export resolves the realm library from the world travel store'
+  );
+});
+
+test('both export call sites pass every parameter the exporter declares', () => {
+  // A guard on the guards. The two source contracts above name their arguments literally, so a
+  // NEW slice added to `buildExportPayload` would leave both of them green while both call
+  // sites silently defaulted it — the same failure mode one level up. This reads the exporter's
+  // own parameter list and fails the moment it grows past what those patterns pin.
+  // Matched to the closing `\n) {` rather than to the first `)`, because a parameter's `//`
+  // rationale contains one — `(issue 1278)` truncated the list to five and made this guard
+  // pass for the wrong reason.
+  const signature = /export function buildExportPayload\(([\s\S]*?)\n\) \{/.exec(exporterSource);
+  assert.ok(signature, "located buildExportPayload's declaration");
+  const declared = signature[1]
+    // The declaration carries a `//` rationale above two of its parameters, so the comments go
+    // before the split — otherwise a comma inside one reads as a parameter boundary.
+    .replaceAll(/\/\/[^\n]*/g, '')
+    .split(',')
+    .map((parameter) => parameter.split('=')[0].trim())
+    .filter(Boolean);
+  assert.deepEqual(
+    declared,
+    [
+      'system',
+      'recipes',
+      'fabricateVersion',
+      'gatheringEnvironments',
+      'gatheringConfig',
+      'currencyConfig',
+      'travelConfig',
+    ],
+    'buildExportPayload gained or lost a parameter — pin it in BOTH call-site guards above ' +
+      'before updating this list, or the new slice exports empty from one path and full from ' +
+      'the other'
   );
 });

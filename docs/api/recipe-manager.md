@@ -75,7 +75,26 @@ Also cleans up associated runs and learned entries.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**Returns:** `Promise<void>`
+**Returns:** `Promise<object>`
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `deleted` | `number` | Recipes actually deleted. `0` when the id resolved to nothing. |
+| `recipeIds` | `string[]` | The ids that were deleted. |
+| `recipeItemsAffected` | `number` | Books and scrolls that carried the recipe and no longer offer it. Counted on either membership basis. |
+| `recipeItemsRewritten` | `number` | Recipe item definitions the prune actually rewrote. `0` on a legacy-basis system, where the membership lived on the recipe and dies with it. |
+| `learnersAffected` | `number` | Characters, among those the calling client may write, who had learned the recipe. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+`recipeItemsAffected` and `recipeItemsRewritten` are deliberately separate numbers.
+The first is what a GM needs to hear; the second is what the write did.
+They are equal on the `recipeIds` membership basis and differ on the legacy basis.
+
+This previously returned `Promise<void>`.
+The change is additive — the returned object is truthy, so a caller testing the result for success is unaffected.
 
 When `notify` is not `false`, recipe create, update, and delete calls emit the same single-recipe success notifications as the UI.
 
@@ -281,8 +300,47 @@ GM only.
 **Returns:** `Promise<{ imported: number, skipped: number, total: number, conflicts: object[] }>`
 
 Each recipe that cannot be imported is skipped and recorded in `conflicts`.
-A conflict has `recipeId`, `recipeName`, and a `reason` of either `"invalid"` (activation validation failed, and the entry also carries the validation `errors`) or `"duplicate-id"` (a recipe with the same ID already exists and `overwrite` is `false`).
+A conflict has `recipeId`, `recipeName`, and one of three `reason` values.
+`"invalid"` means activation validation failed, and the entry also carries the validation `errors`.
+`"signature-conflict"` means the recipe is well formed but its ingredient signature is inseparable from an already-enabled recipe in the same alchemy system; it also carries the validation `errors`.
+`"duplicate-id"` means a recipe with the same ID already exists and `overwrite` is `false`.
 
 The import emits one aggregate success notification with the imported and skipped counts.
 It does not emit per-recipe create/update notifications.
 When there are conflicts it also emits one aggregated conflict-report warning that names each skipped recipe and its reason, so duplicate-ID skips are no longer silent.
+
+### getSignatureConflicts(recipe, options)
+
+Returns the ingredient-signature conflicts a candidate recipe would have if it were saved and enabled right now, in the same order a full audit of the system would report them.
+This is the same check the enable gate applies to `createRecipe`, `updateRecipe`, and `importRecipes`, exposed so a caller can preview it against a recipe that has not been saved.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `recipe` | `object` | A recipe, or the JSON of one. Must carry `id`, `name`, `enabled`, and `ingredientSets`. |
+| `options.systemId` | `string` | Optional. Defaults to `recipe.craftingSystemId`. Pass this explicitly for a draft whose JSON does not carry `craftingSystemId`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**Returns:** `{ code: string|null, params: object, message: string }[]`
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+Empty for a non-alchemy system, an unknown crafting system, or a recipe with no conflicts.
+Only alchemy systems infer which recipe is being crafted from the submitted ingredients, so signature uniqueness is enforced there alone.
+A `recipe` that has never been saved is evaluated exactly as if it had already been saved and enabled, so a brand-new recipe whose ingredient sets collide with an already-enabled recipe is reported here, before `createRecipe` or `importRecipes` would refuse it.
+Do not treat "not yet saved" as "cannot conflict".
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Each conflict's `message` is default English.
+`code` and `params` let a caller localize it.
+Do not mutate a conflict's `params` object: for a recipe whose ingredient sets already match its saved copy, it may be the same object the manager retains internally.
+
+```javascript
+const rm = game.fabricate.getRecipeManager();
+const draft = { ...recipe, ingredientSets: editedSets };
+const conflicts = rm.getSignatureConflicts(draft, { systemId: recipe.craftingSystemId });
+conflicts.forEach((conflict) => console.log(conflict.message));
+```

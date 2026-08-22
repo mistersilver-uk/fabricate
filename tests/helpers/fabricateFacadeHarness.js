@@ -33,6 +33,7 @@ import { resolve } from 'node:path';
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
 import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
+import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
 
 /**
  * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above
@@ -41,6 +42,24 @@ import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js
  * @type {string}
  */
 export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/main.js'), 'utf8');
+
+/**
+ * THIS FILE as text, so a "faithful copy" claim can be checked rather than trusted.
+ *
+ * The copies below are hand-maintained against `src/main.js`, and every existing
+ * source-contract guard pins the PRODUCTION text only — which catches production
+ * weakening and says nothing about the mirror drifting away from it. A divergence that
+ * is behaviourally identical on the fixtures at hand (issue 1202 hit exactly this: an
+ * indexed lookup in production against a surviving `.find(` scan here) is invisible to
+ * every behavioural test in the suite.
+ *
+ * Slicing this with {@link mainMethodSource} works because the copies are class members
+ * at the same two-space indentation `src/main.js` uses, which is what that helper bounds
+ * on.
+ *
+ * @type {string}
+ */
+export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
 
 /**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
@@ -310,10 +329,14 @@ class FabricateFacadeUnderTest {
   }
 
   // --- Faithful copy of Fabricate#_buildNotPermittedRow ----------------------
+  // The component lookup uses the REAL `definitionIndex` helpers, exactly as production
+  // does (issue 1202). Keeping a raw `.find(` scan here would have been behaviourally
+  // identical for unique ids and so invisible, which is precisely why
+  // `fabricate-facade-bulk-owner-gate.test.js` now pins both texts: a copy that claims
+  // fidelity has to be checkable, not merely asserted in a comment.
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component =
-      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',

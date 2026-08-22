@@ -154,6 +154,50 @@ test('a block that cannot fund forces an earlier tag group to re-branch onto its
   assert.equal(consumed.ember, 1, 'the carrier is left for the essence block');
 });
 
+test('a requirement needing EXACTLY the ledger ceiling is still feasible and search-rescued', () => {
+  // The boundary of issue 1083's essence prune. The pass index withholds an essence option
+  // whose need exceeds what the WHOLE untouched ledger could ever deliver for that id
+  // (`ceiling >= need`); at `ceiling === need` the option must survive, because an assignment
+  // that consumes every carrier unit satisfies it exactly.
+  //
+  // This case is here rather than in the differential corpus for a specific reason. Withholding
+  // the option makes the SEARCH fail, and `resolveIngredientSelection` then falls back to
+  // `_resolveGreedy`, which does not apply the prune at all — so a wrong verdict is invisible in
+  // every case greedy can already answer, which is most of them. It has to be a case greedy gets
+  // WRONG: the carrier is listed first, so greedy spends it on the tag group and strands the
+  // block, and only the re-branch onto `x` satisfies the set. Mutating `>=` to `>` here reports
+  // a craftable recipe as unsatisfiable.
+  //
+  // Ceiling: `y` carries fire 1 per unit and holds 2 units, so the ledger can deliver exactly 2,
+  // which is exactly what the requirement needs.
+  const set = new IngredientSet({
+    id: 's',
+    ingredientGroups: [tagGroup('g-tag', ['metal']), essenceGroup('g-ess', 'fire', 2)],
+  });
+  const matcher = matcherFor({ tags: new Set(['y', 'x']) });
+
+  const selection = set.resolveIngredientSelection([item('y', 2), item('x', 2)], matcher, {
+    resolveItemEssences: essenceProbe({ y: { fire: 1 } }),
+  });
+
+  assert.equal(
+    selection.success,
+    true,
+    'a requirement sitting exactly on the ceiling must not be pruned'
+  );
+  assert.deepEqual(
+    consumedByUuid(selection),
+    { x: 1, y: 2 },
+    'the tag group takes the non-carrier and the block takes both carrier units'
+  );
+  assert.equal(requirementFor(selection, 'g-ess').delivered, 2);
+  assert.ok(
+    selection.searchStats.nodes > 0,
+    'this case is genuinely search-rescued — greedy alone strands the block on `y`, which is ' +
+      'what makes it able to see a prune the greedy fallback would otherwise mask'
+  );
+});
+
 test('the block draws only what the component/tag groups left in the ledger', () => {
   // One 2-unit stack carries the essence AND matches the component group. The
   // component group claims one unit; only the second is available to the block.

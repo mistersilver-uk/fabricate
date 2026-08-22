@@ -21,7 +21,7 @@ const PICK_DESCRIPTOR = {
   defaultSelectedId: 'herb',
 };
 
-// The same options under a cap of 2 — the shape `buildCraftingModifierChoice` produces
+// The same options under a cap of 2 — the shape `buildCheckModifierChoice` produces
 // for an unbounded or multi-pick system (issue 1055).
 const MULTI_PICK_DESCRIPTOR = {
   ...PICK_DESCRIPTOR,
@@ -376,6 +376,55 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
         captured.content.match(/fabricate-roll-prompt__modifier-value/g).length,
         2,
         'the chip is never omitted'
+      );
+    } finally {
+      captured.restore();
+    }
+  });
+
+  // Issue 1118: a ROLLING modifier's chip shows what it will roll. Its `value` is `null`
+  // and its `average` is a number the roll can never produce, so `formatSigned` would print
+  // a promise the dice cannot keep (`+2.5` beside a `1d4`). The resolver builds `display`
+  // beside the resolution it describes, and the chip prefers it.
+  it('shows a rolling modifier’s DICE on its chip, not a fractional average', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: { value: 'luck' },
+    });
+    try {
+      await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: {
+          modifiers: [
+            { id: 'med', label: 'Medicine', icon: 'fa-solid fa-m', value: 3, display: '+3' },
+            {
+              id: 'luck',
+              label: 'Luck',
+              icon: 'fa-solid fa-d',
+              value: null,
+              average: 2.5,
+              formula: '(1d4)',
+              display: '+1d4',
+            },
+          ],
+          defaultSelectedId: 'luck',
+        },
+      });
+      assert.match(
+        captured.content,
+        /<span class="fabricate-roll-prompt__modifier-value">\+1d4<\/span>/,
+        'the rolling option chips its dice'
+      );
+      assert.ok(
+        !captured.content.includes('2.5'),
+        'and never the average it is merely RANKED by'
+      );
+      assert.match(
+        captured.content,
+        /<span class="fabricate-roll-prompt__modifier-value">\+3<\/span>/,
+        'a flat option is unchanged'
       );
     } finally {
       captured.restore();

@@ -819,7 +819,18 @@ describe('player-write guardrail for the actor-types key', () => {
 describe('empty-state copy', () => {
   const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
   const barEmpty = lang.FABRICATE.App.ActorBar.NoActors;
-  const partyEmpty = lang.FABRICATE.Admin.Manager.Travel.Members.NoActors;
+  // Issue 1182 rehomed this string with the World > Parties pane rebuild: the pane is
+  // world-scoped, so its copy moved out of the selected-system `Travel.*` namespace and
+  // the whole `Travel.Members.*` subtree was retired.
+  const partyEmpty = lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured;
+  // The TRAVEL-ACTOR picker's equivalent (issue 1182), gated alongside the member one so
+  // the two cannot drift: they answer the same GM question about the same setting on the
+  // same card, and only one of them being honest is the failure this loop exists to stop.
+  // The reason is split across a short title and a body, so tone is judged on both joined.
+  const travelActorEmpty = [
+    lang.FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors,
+    lang.FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActorsDetail,
+  ].join(' ');
   const menu = lang.FABRICATE.Settings.PlayerCharacterActorTypes;
 
   it('defines every key the picker localizes', () => {
@@ -868,7 +879,7 @@ describe('empty-state copy', () => {
       false,
       'the retired line pointed the player at a selection they cannot make anywhere'
     );
-    for (const copy of [barEmpty, partyEmpty]) {
+    for (const copy of [barEmpty, partyEmpty, travelActorEmpty]) {
       assert.equal(/cannot use Fabricate/i.test(copy), false);
       assert.equal(/not supported/i.test(copy), false);
     }
@@ -882,6 +893,17 @@ describe('empty-state copy', () => {
     );
     assert.match(partyEmpty, /Player Character Actor Types/, 'names the setting');
     assert.match(partyEmpty, /module settings/i, 'and where to find it');
+  });
+
+  it('the travel-actor string names the setting, its side effect, and the way round it', () => {
+    assert.match(travelActorEmpty, /Player Character Actor Types/, 'names the setting');
+    assert.match(travelActorEmpty, /module settings/i, 'and where to find it');
+    // The setting is SHARED with the member picker, so widening it for a travel actor also
+    // widens party membership. A GM who is not told that discovers it by finding a vehicle
+    // offered as a party member.
+    assert.match(travelActorEmpty, /eligible party members/i, 'states the shared consequence');
+    // And the escape hatch, because the type list is not the only way to assign one.
+    assert.match(travelActorEmpty, /drag/i, 'offers the unfiltered drop path');
   });
 });
 

@@ -99,9 +99,20 @@ function makeBuilder({
     getRecipeItemDefinition: () => recipeItemDefinition,
   };
   const resolutionModeService = new ResolutionModeService(craftingSystemManager);
-  const recipeManager = { evaluateCraftability: () => craftability };
+  const recipeManager = {
+    evaluateCraftability: () => craftability,
+    // The detail phase resolves a recipe id through the manager and its access through the
+    // visibility service (issue 1075), so the fixture answers both from the same entries the
+    // summary phase is built from.
+    getRecipe: (id) => entries.find((entry) => entry.recipe?.id === id)?.recipe ?? null,
+  };
   const recipeVisibility = {
     getVisibleRecipes: () => entries,
+    evaluateRecipeAccess: ({ recipe }) =>
+      entries.find((entry) => entry.recipe?.id === recipe?.id)?.access ?? {
+        visible: false,
+        reason: 'visibility',
+      },
     isKnowledgeItemExhausted: () => exhausted,
   };
   return new CraftingListingBuilder({
@@ -116,12 +127,28 @@ function makeBuilder({
   });
 }
 
+/**
+ * The listing (cheap summaries) plus the DETAIL model for its first row.
+ *
+ * Since issue 1075 those are two phases: `buildListing` answers what may be browsed and
+ * `buildRecipeDetail` answers what one recipe's inspector shows. Almost every assertion in
+ * this file is about the rich model, so `recipe` is the detail phase's output; the handful
+ * that are about the listing itself read `listing.summaries`.
+ *
+ * The detail call goes through the visibility service by ID, exactly as production does, so
+ * the fixture's own access result still decides redaction.
+ */
 function buildOne(opts, viewer = PLAYER) {
-  const listing = makeBuilder(opts).buildListing({
-    craftingActor: { id: 'actor-1', items: [] },
-    viewer,
-  });
-  return { listing, recipe: listing.recipes[0] };
+  const builder = makeBuilder(opts);
+  const craftingActor = { id: 'actor-1', items: [] };
+  const listing = builder.buildListing({ craftingActor, viewer });
+  const first = listing.summaries[0] ?? null;
+  return {
+    listing,
+    recipe: first
+      ? builder.buildRecipeDetail({ recipeId: first.id, craftingActor, viewer })
+      : undefined,
+  };
 }
 
 describe('CraftingListingBuilder — listing shape', () => {
@@ -136,7 +163,7 @@ describe('CraftingListingBuilder — listing shape', () => {
     const { listing } = buildOne({
       entries: [{ access: { reason: 'ok' } }, { recipe: makeRecipe(), access: { reason: 'ok' } }],
     });
-    assert.equal(listing.recipes.length, 1);
+    assert.equal(listing.summaries.length, 1);
   });
 });
 
@@ -202,14 +229,14 @@ describe('CraftingListingBuilder — browse status per reason', () => {
 describe('CraftingListingBuilder — system blocked for recipes', () => {
   it('drops a recipe whose system is blocked for a non-GM player', () => {
     const { listing } = buildOne({ isSystemBlockedForRecipes: (id) => id === 'sys-1' });
-    assert.equal(listing.recipes.length, 0, 'a blocked system exposes no recipes to a player');
+    assert.equal(listing.summaries.length, 0, 'a blocked system exposes no recipes to a player');
     assert.deepEqual(listing.counts, { available: 0, total: 0 });
   });
 
   it('retains a recipe from a blocked system for a GM (bypass)', () => {
     const { listing } = buildOne({ isSystemBlockedForRecipes: (id) => id === 'sys-1' }, GM);
-    assert.equal(listing.recipes.length, 1, 'a GM is never gated by the block predicate');
-    assert.equal(listing.recipes[0].id, 'recipe-1');
+    assert.equal(listing.summaries.length, 1, 'a GM is never gated by the block predicate');
+    assert.equal(listing.summaries[0].id, 'recipe-1');
   });
 });
 

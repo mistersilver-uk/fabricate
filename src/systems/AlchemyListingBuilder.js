@@ -36,9 +36,11 @@
 
 import { getFabricateFlag } from '../config/flags.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
+import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function stringOrEmpty(value) {
@@ -63,6 +65,12 @@ export class AlchemyListingBuilder {
    *   Defaults to a fresh {@link SignatureValidator} (the expansion path needs no manager).
    * @param {Function} [deps.getViewer] - Fallback viewer accessor.
    * @param {Function} [deps.localize] - `(key, data?) => string`.
+   * @param {Function} [deps.resolveComponentForItem] - `(item, components, systemId) =>
+   *   component|null`. A SNAPSHOT collaborator, not a builder one: this builder never calls it.
+   *   It is supplied so the per-pass snapshot built here is the same complete value the
+   *   crafting and visibility passes build (issue 1228), rather than a half of one that would
+   *   answer `available: false` for every recipe if a later consumer read its tallies.
+   *   Injected rather than imported — see `passInventorySnapshot`'s header.
    */
   constructor({
     recipeManager = null,
@@ -71,6 +79,7 @@ export class AlchemyListingBuilder {
     recipeVisibility = null,
     getViewer = null,
     localize = (key) => key,
+    resolveComponentForItem = null,
   } = {}) {
     this.recipeManager = recipeManager;
     this.craftingSystemManager = craftingSystemManager;
@@ -83,6 +92,8 @@ export class AlchemyListingBuilder {
     this.recipeVisibility = recipeVisibility;
     this._getViewer = typeof getViewer === 'function' ? getViewer : null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
+    this._resolveComponentForItem =
+      typeof resolveComponentForItem === 'function' ? resolveComponentForItem : null;
   }
 
   /**
@@ -113,11 +124,42 @@ export class AlchemyListingBuilder {
     // (revealed) would diverge from the panel for item/Manual modes.
     const revealSources = this._filterActors(componentSourceActors);
 
+    // Every enabled alchemy system that owns recipes, resolved ONCE with its cohort. The
+    // cohort used to be re-read per system by the enabled filter and again by the summary;
+    // the pass snapshot below needs the union of them anyway (issue 1228).
+    const enabledSystems = this._enabledAlchemySystems();
+
+    // ONE snapshot for the whole pass, discarded when this returns (issue 1228). Every
+    // `_isRevealed` below routes through it, so an `item`-visibility-mode discipline resolves
+    // its held books ONCE instead of re-enumerating every source actor's whole inventory per
+    // recipe — the #1077 defect this builder still carried. It is built from EVERY enabled
+    // alchemy system's cohort, not just the active one, because the chooser summaries evaluate
+    // reveal for all of them and the candidate superset must cover every legacy book link any
+    // of those recipes' matchers could see.
+    //
+    // Nothing here forces an INVENTORY read: the snapshot's walk is lazy, so a `global`- or
+    // `knowledge`-mode discipline, which never consults held items, adds no inventory cost.
+    // It is not literally free — the legacy book links are collected eagerly over every
+    // enabled system's cohort whatever the mode — but that is one pass over the recipes
+    // already in hand, and it is `O(recipes)` once rather than per recipe.
+    const snapshot = this._passSnapshot(
+      craftingActor,
+      revealSources,
+      enabledSystems.flatMap((entry) => entry.recipes)
+    );
+
     // The chooser summaries span every enabled alchemy system with recipes; they
     // are always safe (counts + system identity only).
-    const systems = this._enabledAlchemySystems();
-    const chooserSystems = systems.map((system) =>
-      this._systemSummary(system, craftingActor, isGM, resolvedViewer, revealSources)
+    const chooserSystems = enabledSystems.map((entry) =>
+      this._systemSummary({
+        system: entry.system,
+        recipes: entry.recipes,
+        craftingActor,
+        isGM,
+        viewer: resolvedViewer,
+        componentSourceActors: revealSources,
+        snapshot,
+      })
     );
 
     // No resolvable owner (non-owner viewer upstream) -> denied, empty payload.
@@ -125,9 +167,10 @@ export class AlchemyListingBuilder {
       return this._emptyListing({ craftingSystemId, systems: chooserSystems, denied: true });
     }
 
-    const activeSystem = craftingSystemId
-      ? systems.find((system) => system.id === craftingSystemId) || null
+    const activeEntry = craftingSystemId
+      ? enabledSystems.find((entry) => entry.system.id === craftingSystemId) || null
       : null;
+    const activeSystem = activeEntry?.system ?? null;
     if (!activeSystem) {
       // A resolvable owner with no discipline chosen yet (the >1-system chooser
       // case): report the resolved actor so the view distinguishes "choose a
@@ -147,7 +190,7 @@ export class AlchemyListingBuilder {
       ...this._filterActors(componentSourceActors),
     ]);
     const components = Array.isArray(activeSystem.components) ? activeSystem.components : [];
-    const recipes = this._systemRecipes(activeSystem.id);
+    const recipes = activeEntry.recipes;
     const learnedMap = this._getLearnedMap(craftingActor);
 
     const known = [];
@@ -161,6 +204,7 @@ export class AlchemyListingBuilder {
           craftingActor,
           componentSourceActors: revealSources,
           learnedMap,
+          snapshot,
         })
       ) {
         // A revealed recipe projects identically to a brew-discovered one: full
@@ -200,15 +244,49 @@ export class AlchemyListingBuilder {
     };
   }
 
-  /** Enabled crafting systems in alchemy mode that own at least one recipe. */
+  /**
+   * Enabled crafting systems in alchemy mode that own at least one recipe, each paired with
+   * the cohort that proved it.
+   *
+   * The cohort is RETURNED rather than rediscovered because the enabled filter, the chooser
+   * summary and the active listing loop all needed it and each used to ask the recipe manager
+   * for its own copy (issue 1228).
+   *
+   * @returns {Array<{system: object, recipes: object[]}>}
+   */
   _enabledAlchemySystems() {
     const all = this.craftingSystemManager?.getSystems?.() ?? [];
-    return (Array.isArray(all) ? all : []).filter(
-      (system) =>
-        system?.resolutionMode === 'alchemy' &&
-        system?.enabled !== false &&
-        this._systemRecipes(system?.id).length > 0
-    );
+    const enabled = [];
+    for (const system of Array.isArray(all) ? all : []) {
+      if (system?.resolutionMode !== 'alchemy' || system?.enabled === false) continue;
+      const recipes = this._systemRecipes(system?.id);
+      if (recipes.length === 0) continue;
+      enabled.push({ system, recipes });
+    }
+    return enabled;
+  }
+
+  /**
+   * The per-pass inventory snapshot every reveal decision in one workbench open shares.
+   *
+   * A per-pass VALUE, never a field: `inventorySnapshot`'s invalidation rule is that no
+   * snapshot outlives the synchronous pass that built it, because nothing mints a revision
+   * token when a player's `actor.items` changes and a stale read would feed the reveal gate —
+   * a dropped book must un-reveal on the very next build.
+   *
+   * @param {object|null} craftingActor
+   * @param {object[]} componentSourceActors
+   * @param {object[]} recipes Every recipe this pass will evaluate reveal for.
+   * @returns {object}
+   * @private
+   */
+  _passSnapshot(craftingActor, componentSourceActors, recipes) {
+    return buildPassInventorySnapshot({
+      craftingActor,
+      componentSourceActors,
+      recipes,
+      resolveComponent: this._resolveComponentForItem,
+    });
   }
 
   _systemRecipes(systemId) {
@@ -223,19 +301,31 @@ export class AlchemyListingBuilder {
    * alchemy recipes (the system-validity gate); `knownCount` those REVEALED to the
    * viewer (the routed reveal decision — all of them for a GM), so it matches the
    * panel for item/Manual modes. No undiscovered recipe identity leaks.
+   *
+   * `recipes` is the cohort {@link _enabledAlchemySystems} already resolved and `snapshot` the
+   * per-pass inventory snapshot (issue 1228) — this used to re-read the cohort and evaluate
+   * every reveal with no snapshot at all, which is one full inventory walk per recipe per
+   * chooser card on an `item`-visibility-mode discipline.
    */
-  _systemSummary(system, craftingActor, isGM, viewer, componentSourceActors = []) {
+  _systemSummary({
+    system,
+    recipes,
+    craftingActor,
+    isGM,
+    viewer,
+    componentSourceActors = [],
+    snapshot = null,
+  }) {
     const learnedMap = this._getLearnedMap(craftingActor);
-    const recipes = this._systemRecipes(system.id).filter((recipe) =>
-      this._isValidAlchemyRecipe(recipe)
-    );
-    const knownCount = recipes.filter((recipe) =>
+    const valid = recipes.filter((recipe) => this._isValidAlchemyRecipe(recipe));
+    const knownCount = valid.filter((recipe) =>
       this._isRevealed(recipe, {
         viewer,
         isGM,
         craftingActor,
         componentSourceActors,
         learnedMap,
+        snapshot,
       })
     ).length;
     return {
@@ -244,7 +334,7 @@ export class AlchemyListingBuilder {
       img: stringOrNull(system.img),
       description: stringOrEmpty(system.description),
       knownCount,
-      totalCount: recipes.length,
+      totalCount: valid.length,
     };
   }
 
@@ -271,7 +361,7 @@ export class AlchemyListingBuilder {
    */
   _isRevealed(
     recipe,
-    { viewer, isGM, craftingActor, componentSourceActors = [], learnedMap } = {}
+    { viewer, isGM, craftingActor, componentSourceActors = [], learnedMap, snapshot = null } = {}
   ) {
     if (typeof this.recipeVisibility?.evaluateRecipeAccess === 'function') {
       const access = this.recipeVisibility.evaluateRecipeAccess({
@@ -279,6 +369,9 @@ export class AlchemyListingBuilder {
         viewer,
         craftingActor,
         componentSourceActors,
+        // The per-pass snapshot (issue 1228). A pure read optimisation — omit it and the
+        // evaluation is byte-for-byte what it was, at one whole inventory walk per recipe.
+        snapshot,
       });
       return access?.visible === true;
     }
@@ -457,9 +550,7 @@ export class AlchemyListingBuilder {
   _projectGroup(group, components, system = null) {
     const options = (Array.isArray(group?.options) ? group.options : []).map((option) => {
       const componentId = this._optionComponentId(option);
-      const component = componentId
-        ? components.find((candidate) => candidate.id === componentId)
-        : null;
+      const component = componentId ? findById(getDefinitionIndex(components), componentId) : null;
       // An essence-type ingredient option (componentId is null) resolves to the
       // essence's NAME + ICON from the system's essence definitions, and its
       // display quantity is the required essence AMOUNT (`match.amount`), NOT the
@@ -599,7 +690,7 @@ export class AlchemyListingBuilder {
     const first = results[0];
     if (!first) return null;
     const component = first.componentId
-      ? components.find((candidate) => candidate.id === first.componentId)
+      ? findById(getDefinitionIndex(components), first.componentId)
       : null;
     return {
       componentId: stringOrNull(first.componentId),
@@ -629,8 +720,11 @@ export class AlchemyListingBuilder {
       const option = options[0];
       if (option?.match && option.match.type !== 'component') return null;
       const componentId = this._optionComponentId(option);
-      if (!componentId || components.every((candidate) => !(candidate.id === componentId)))
-        return null;
+      // An EXISTENCE test, not a projection — but still a full library walk per group per
+      // revealed recipe (`recipes x groups x components`), and it stayed on that footing
+      // longer than its neighbours only because it is spelled `.every(c => !(c.id === id))`
+      // rather than `.find(...)` and so was invisible to the site sweep (issue 1202).
+      if (!componentId || !findById(getDefinitionIndex(components), componentId)) return null;
       const quantity = Math.max(1, Number(option?.quantity) || 1);
       multiset[componentId] = (multiset[componentId] || 0) + quantity;
     }

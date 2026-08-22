@@ -28,6 +28,9 @@ function payloadFromFixture() {
     gatheringEnvironments: f.environments,
     // The resolver reads the export shape { system: <slice>, shared }.
     gatheringConfig: { system: f.gatheringConfig.systems[FIXTURE_SYSTEM_ID], shared: {} },
+    // Realms ride the ENVELOPE since issue 1282, so their scene + scene-region UUIDs are
+    // reachable only from the world travel config.
+    travelConfig: f.travelConfig,
   };
 }
 
@@ -129,7 +132,11 @@ test('resolver: all three dispositions can co-occur', async () => {
   const dropUuid = 'Compendium.world.items.Item.rare-root';
   const { unresolvedReferences } = await resolveImportReferences(payload, {
     resolveUuid: async (uuid) =>
-      uuid === dropUuid ? { uuid: `${uuid}-v2` } : uuid === payload.system.gatheringRealms[0].sceneMappings[0].sceneUuid ? null : { uuid },
+      uuid === dropUuid
+        ? { uuid: `${uuid}-v2` }
+        : uuid === payload.travelConfig.realms[0].sceneMappings[0].sceneUuid
+          ? null
+          : { uuid },
   });
   const dispositions = new Set(unresolvedReferences.map((r) => r.disposition));
   assert.ok(dispositions.has('remapped'));
@@ -139,32 +146,43 @@ test('resolver: all three dispositions can co-occur', async () => {
 
 // --- Copy-mode container rebind (D3: preserve task/event/modifier ids) ---
 
-test('rebindCopyContainerIds: regenerates realm + env ids, preserves task/event/modifier ids', () => {
+test('rebindCopyContainerIds: regenerates env ids, preserves realm + task/event/modifier ids', () => {
   const f = buildFullAuthoringFixture();
   const prepared = {
     system: f.system,
     recipes: f.recipes,
     gatheringEnvironments: f.environments,
     gatheringConfig: { system: f.gatheringConfig.systems[FIXTURE_SYSTEM_ID], shared: {} },
+    travelConfig: f.travelConfig,
   };
   let counter = 0;
   rebindCopyContainerIds(prepared, { generateId: () => `gen-${++counter}` });
 
-  // Realm id regenerated and env cross-refs rewired to the new id.
-  const newRealmId = prepared.system.gatheringRealms[0].id;
-  assert.notEqual(newRealmId, FIXTURE_REALM_ID, 'realm id regenerated');
+  // Env record ids regenerated. REALM ids are NOT (issue 1282): realms are world scope and the
+  // destination already owns them, so minting fresh ids here would make a copy-import duplicate
+  // the world's geography rather than recognise it — and the env references that cite those ids
+  // must stay pointed at the world's own realms.
+  assert.deepEqual(
+    prepared.travelConfig.realms.map((realm) => realm.id),
+    [FIXTURE_REALM_ID],
+    'realm ids preserved'
+  );
   for (const env of prepared.gatheringEnvironments) {
     assert.ok(env.id.startsWith('gen-'), 'env record id regenerated');
-    assert.deepEqual(env.includedRealmIds, [newRealmId], 'env realm refs rewired');
+    assert.deepEqual(env.includedRealmIds, [FIXTURE_REALM_ID], 'env realm refs left as authored');
   }
 
-  // Task / event / characterModifier ids PRESERVED (D3) so linkages survive.
+  // Task / event / modifier ids PRESERVED (D3) so linkages survive. The modifier library
+  // moved onto the SYSTEM in issue 1117, so its id is asserted there rather than in the
+  // gathering slice — and the drop-row reference that names it must still resolve.
   const slice = prepared.gatheringConfig.system;
   assert.equal(slice.tasks[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0].id);
   assert.equal(slice.events[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].events[0].id);
-  assert.equal(
-    slice.characterModifiers[0].id,
-    f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].characterModifiers[0].id
+  const modifierIds = prepared.system.modifiers.map((entry) => entry.id);
+  assert.deepEqual(modifierIds, buildFullAuthoringFixture().system.modifiers.map((e) => e.id));
+  assert.ok(
+    modifierIds.includes(slice.tasks[0].dropRows[0].characterModifiers[0].modifierId),
+    'the drop row still names an id the library carries'
   );
   // The env still references the preserved task id.
   assert.ok(prepared.gatheringEnvironments[0].enabledTaskIds.includes(slice.tasks[0].id));

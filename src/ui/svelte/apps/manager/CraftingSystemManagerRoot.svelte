@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { onDestroy } from 'svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
@@ -11,14 +12,16 @@
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../gatheringImageDefaults.js';
-  import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
+  import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
+  import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
-    routedSuccessTierOptions,
     routedOutcomeTierOptions,
+    routedTierOptionsForPolicy,
+    routedOutcomeTierNamesForPolicy,
     routedHasOutcomeTiers,
     routedOutcomeTierCount,
-    routedOutcomeTierNames,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
@@ -32,6 +35,7 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
+  import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import {
@@ -64,6 +68,8 @@
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
+  import GatheringRealmsTab from './GatheringRealmsTab.svelte';
+  import GatheringMapLinksTab from './GatheringMapLinksTab.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
   // The essence library's rail halves and the editor's live preview (issue 1036), extracted
@@ -102,14 +108,155 @@
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
+    isCraftingViewAvailable,
+    resolveCraftingRedirect,
   } from './crafting/craftingNav.js';
+  import {
+    CHECKS_VIEWS,
+    activeChecksTab as resolveActiveChecksTab,
+    buildChecksNavItems,
+    checksNavIssueTotal,
+    isChecksRoute as isChecksView,
+    resolveChecksRedirect,
+  } from './checks/checksNav.js';
+  import { evaluateCheckReadiness, readinessModeForSlot } from './checks/checksReadiness.js';
+  import {
+    buildCheckModifierContext,
+    resolveActiveCraftingCheckFormula,
+    resolveActiveGatheringCheckFormula,
+    resolveActiveSalvageCheckFormula,
+  } from '../../../../systems/checkModifierResolver.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
+  import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
+  import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
+  import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
+  import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
+  import {
+    managerHeaderActionClass,
+    WORLD_DOWNTIME_SURFACE_ID,
+  } from '../../../managerExtensions.js';
 
-  let { store, services = null } = $props();
+  let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
+  let downtimeExtensionHost = $state(null);
+  const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
+  // Which provider currently holds the Downtime surface, and which one has already failed
+  // to mount. The shell owns both because the rail renders the active tab set while the
+  // host is unmounted, and a fault has to move the rail as well as the panel.
+  let downtimeProviderSnapshot = $state(null);
+  let downtimeFaultedProvider = $state(null);
+  // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
+  // object, so a new identity is the whole re-render mechanism.
+  let downtimeContextRevision = $state(0);
+  // The chrome the live companion mount has asked Core to render, or null for "use what the
+  // active tab declared at registration". Assigned ONLY by the channel below.
+  //
+  // This is the whole no-remount mechanism, and it is a mechanism of OMISSION: nothing in
+  // `worldDowntimeContext` reads this state, so writing it re-renders the header and moves
+  // neither the context identity nor the host's mount effect. A reader added to the context
+  // derivation would silently turn every chrome update into a remount, which is precisely the
+  // failure the runtime channel exists to avoid — so keep chrome out of the context.
+  let downtimeRouteChrome = $state(null);
+  const downtimeChromeChannel = createRouteChromeChannel({
+    onChange: (chrome) => {
+      downtimeRouteChrome = chrome;
+    },
+  });
+  // Every surface a companion currently claims, not just Core's Downtime one. The title bar
+  // reports the MODULE, so it must not be keyed on one route: a premium module whose only
+  // surface is one Core has never heard of is still installed and still working.
+  //
+  // …and for the same reason it must not be keyed on one REGISTRY either (issue 1198). A
+  // companion whose only surface is a player-window one is just as installed, so each
+  // registry publishes into its own private array and the pair are unioned below. Widening
+  // the SOURCE rather than the predicate is deliberate: `premiumInstalled` already means
+  // "read the whole registered surface set", so there is nothing about the flag to change.
+  let managerRegisteredSurfaceIds = $state([]);
+  let playerRegisteredSurfaceIds = $state([]);
+
+  $effect(() => {
+    if (!managerExtensions?.subscribe) return;
+    return managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID, (nextProvider) => {
+      // A new snapshot is a new chance: a replacement provider is never pre-blamed for the
+      // previous one's mount fault.
+      downtimeFaultedProvider = null;
+      downtimeProviderSnapshot = nextProvider;
+    });
+  });
+
+  $effect(() => {
+    if (!managerExtensions?.subscribeSurfaceIds) return;
+    return managerExtensions.subscribeSurfaceIds((surfaceIds) => {
+      managerRegisteredSurfaceIds = surfaceIds;
+    });
+  });
+
+  $effect(() => {
+    if (!playerExtensions?.subscribeSurfaceIds) return;
+    return playerExtensions.subscribeSurfaceIds((surfaceIds) => {
+      playerRegisteredSurfaceIds = surfaceIds;
+    });
+  });
+
+  function requestDowntimeRemount() {
+    downtimeContextRevision += 1;
+  }
+
+  // A provider whose mount threw is set aside rather than unregistered: it keeps its
+  // registration (and its unregister handle stays the companion's), Core simply renders its
+  // own surface until the next snapshot arrives.
+  function noteDowntimeProviderFault(faultedProvider) {
+    downtimeFaultedProvider = faultedProvider;
+  }
+
+  function runDowntimeHeaderAction(action) {
+    try {
+      action.onSelect(Object.freeze({ ...worldDowntimeContext, actionId: action.id }));
+    } catch (error) {
+      console.error('Fabricate | Downtime header action failed:', error);
+    }
+  }
+
+  // Core's own tab fields are lang KEYS and a companion's are already-localized text, so
+  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule the
+  // rail's Downtime sub-items already apply to `label` / `tooltip`, applied to route chrome too.
+  // The two defaults are genuinely different values, not one repeated. `coreDefault` is what
+  // Core shows when its OWN lang key is missing. `providerDefault` is what Core shows over a
+  // companion's screens when that companion declared no chrome, and it must never be Core's
+  // preview copy: a raw English marketing sentence under someone else's UI is exactly the
+  // defect this seam exists to remove.
+  //
+  // THREE LAYERS, in one order, everywhere: the live mount's runtime chrome, then the active
+  // tab's registered chrome, then Core's own string. Unsetting is therefore not a separate
+  // path — a runtime update that omits a field simply does not shadow the layer below it, so a
+  // companion that never calls `setRouteChrome` reads exactly as it did before the channel
+  // existed and one that clears it lands back on its registered chrome with no further work.
+  function downtimeChrome(field, coreDefault, providerDefault = coreDefault) {
+    const runtime = downtimeRuntimeChrome?.[field];
+    if (runtime) return runtime;
+    const value = activeDowntimeTab?.[field];
+    if (downtimeCoreFallback) return value ? text(value, coreDefault) : coreDefault;
+    return value || providerDefault;
+  }
+
+  // The same rule, for a named rail entry rather than the active tab's chrome.
+  function downtimeTabText(tab, field) {
+    const value = tab?.[field];
+    if (!value) return tab?.id ?? '';
+    return downtimeCoreFallback ? text(value, tab.id) : value;
+  }
+
+  // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
+  // companion target is still connected. `onDestroy` remains the safety net for
+  // direct Svelte teardown paths that do not go through the application shell.
+  export function disposeDowntimeProviderBeforeRemoval() {
+    downtimeExtensionHost?.disposeBeforeRemoval?.();
+  }
+
+  onDestroy(disposeDowntimeProviderBeforeRemoval);
 
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
@@ -121,6 +268,10 @@
   // blocker banner) force the Validation tab open even when the page is already shown.
   let requestedSystemTab = $state('settings');
   let requestedSystemTabNonce = $state(0);
+  // Deep link into the System Overview page's Modifiers section (issue 1117). The Checks
+  // screen renders the modifier library read-only for every activity and links here, which
+  // is the one navigation that replaces the authoring the Checks card used to do.
+  let requestedSystemModifierSectionNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -171,12 +322,38 @@
   // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
   let componentBulkDraft = $state(createComponentBulkDraft());
   let componentBulkApplying = $state(false);
+  // The armed bulk delete (issue 1129). `…Armed` is the single armed token for the whole
+  // selection — the target is the set, not a row — and it is cleared by the selection effect
+  // below on ANY change to the set.
+  let componentBulkDeleting = $state(false);
+  let componentBulkDeleteArmed = $state(false);
   // The recipe library's twin (issue 1010), owned here for the identical reason: the
   // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
   // draft would be destroyed by the very transition that is supposed to DISCARD it. The
   // selection itself lives on the lifted `recipeBrowserState`.
   let recipeBulkDraft = $state(createRecipeBulkDraft());
   let recipeBulkApplying = $state(false);
+  // The recipe library's armed bulk delete (issue 1132), the third and last studio to get
+  // one. `…Deleting` is the caller's OWN in-flight flag and is what the card's busy face
+  // derives from — never `…Armed`. Disabling a focused button fires blur in Chromium and
+  // Firefox and `ArmedDangerButton` disarms on blur, so a busy face keyed off the arm flips
+  // back to idle for the whole duration of the write; happy-dom does not fire that blur, so
+  // a mounted assertion would pass on behaviour that does not hold in Foundry.
+  let recipeBulkDeleting = $state(false);
+  let recipeBulkDeleteArmed = $state(false);
+  // What a FINISHED delete that left the card mounted has to say for itself. Confirming
+  // disables the control, which moves focus to `document.body` and empties the card's live
+  // region, so on the refused or no-op path an assistive-technology user is left on `<body>`
+  // beside a re-enabled button with nothing announced — the Foundry error toast is not a
+  // live region this module controls. The card announces this and takes focus back; it is
+  // cleared on the next arm so a second refusal speaks again.
+  let recipeBulkDeleteOutcome = $state('');
+  // Its two twins (issue 1157, review round). The Component and Essence panels rendered the
+  // same card and never passed it a sentence, so their refused deletes landed on `<body>`
+  // and said nothing at all — the half of the paragraph above that had only ever been
+  // implemented once.
+  let componentBulkDeleteOutcome = $state('');
+  let essenceBulkDeleteOutcome = $state('');
   // The essence library's lifted view-state (issue 1036) — the third and last studio to get
   // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
   // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
@@ -195,15 +372,45 @@
   // specific set, so it must not survive that set changing.
   let essenceBulkDeleteArmed = $state(false);
   let activeGatheringTab = $state('environments');
+  // `activeTravelTab` serves World > Parties ALONE now (issue 1282). It used to be one
+  // variable behind two routes — the World route and the selected-system Travel route — which
+  // is why entering Parties also had to set `activeGatheringTab = 'travel'`. World > Travel
+  // owns `worldTravelTab` below, so neither route can move the other's selection any more.
   let activeTravelTab = $state('parties');
-  let gatheringMenuExpanded = $state(false);
-  // Crafting nav group (issue 511): mirrors the gathering group's expand state.
-  // The group is always available as of issue 745 (v1.3 headline); only its
-  // expand/collapse state lives here.
-  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
-  // value must STICK until the route category next changes, which a $derived would clobber.
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let craftingMenuExpanded = $state(false);
+  // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
+  let worldTravelTab = $state('realms');
+  // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
+  //
+  // The five collapsible rail groups used to hold user intent and route-derived state in
+  // ONE variable each, and the two overwrote one another in both directions. Four groups
+  // ran an effect that read its own flag to guard itself (`if (!onRoute || expanded)
+  // return; expanded = true`), so collapsing the group changed the effect's own dependency,
+  // re-ran it, passed the now-false guard and forced the group back open — a chevron that
+  // visibly did nothing. Crafting had the mirror defect: `craftingMenuExpanded =
+  // isCraftingRoute` never read its own flag, so a collapse stuck, but leaving the category
+  // force-CLOSED a group the GM had deliberately opened.
+  //
+  // The fix is to stop conflating the two. This map is intent and nothing else: only the
+  // disclosure toggle, a navigation that opens a group, and the auto-open effect below ever
+  // write it. Whether a group is DISPLAYED expanded is `railGroupExpanded`, which ORs this
+  // with `railGroupLockedOpen` — see the block beside the route predicates.
+  const RAIL_GROUP_IDS = Object.freeze([
+    'crafting',
+    'checks',
+    'gathering',
+    'worldTravel',
+    'worldDowntime',
+  ]);
+  let railGroupUserExpanded = $state({
+    crafting: false,
+    checks: false,
+    gathering: false,
+    worldTravel: false,
+    worldDowntime: false,
+  });
+  // The selected Downtime preview is owned here rather than inside the extension host
+  // because the rail, the page header and the breadcrumb all name it.
+  let worldDowntimeTabId = $state('tracking');
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
   // The recipe selected on the Access surface (visibility=restricted); drives the
@@ -237,13 +444,13 @@
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
   function toggleManagerRail() {
+    // Belt and braces beside the `disabled` attribute, exactly as `toggleRailGroup` does it:
+    // the rail lock (issue 1213) is a rule about state, not about one control.
+    if (railLockedOpen) return;
     railCollapsed = !railCollapsed;
     services?.setSetting?.('managerRailCollapsed', railCollapsed);
   }
 
-  function selectTravelTab(tabId) {
-    if (['parties', 'realms', 'map'].includes(tabId)) activeTravelTab = tabId;
-  }
   let selectedGatheringTaskId = $state('');
   let selectedGatheringEventId = $state('');
   let selectedGatheringDropId = $state('');
@@ -259,9 +466,6 @@
   // User-facing failure text for the gathering-event editor, rendered by the header toolbar
   // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
-  let toolsComponentSearchTerm = $state('');
-  let toolsComponentPageIndex = $state(0);
-  let toolsComponentPageSize = $state(6);
   let toolEditorActiveTab = $state('overview');
   let toolValidationFocusNonce = $state(0);
 
@@ -361,18 +565,100 @@
     JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
   );
 
+  // THE ALCHEMY CHECK MODE IS A STAGED DRAFT, not a live write.
+  //
+  // It is a Checks Studio control like every other one on The roll, so it belongs to the
+  // same stage → Unsaved → `Save checks` → applied lifecycle. It used to call
+  // `store.setAlchemyCheckMode` straight from the radio's `onChange`, which persisted on
+  // click: the studio showed no Unsaved chip, the route-exit guard had nothing to guard,
+  // and `Save checks` stayed disabled over a change that had already landed. Worse, it
+  // could not be undone — the Discard branch of the exit prompt reset every OTHER draft
+  // and left this one applied.
+  //
+  // `none` IS THE OFF STATE, and that is the whole reason this is one value rather than a
+  // mode plus a flag. The persisted enum stays `none | simple | tiered` (the engine's own
+  // vocabulary, unchanged), but the studio presents it as a two-option mode — Simple or
+  // Tiered — plus the rail's Active toggle, which writes `simple` on and `none` off. A
+  // separate `enabled` flag beside the mode would be a second spelling of a state the enum
+  // already has, and the two would drift the first time one was written without the other.
+  //
+  // NOT `craftingCheck.enabled`. That flag is the generic `checksEnabled` master toggle,
+  // and the engine deliberately does NOT read it for alchemy — alchemy dispatches on
+  // `alchemy.checkMode` alone (`CraftingEngine.js`, the `mode === 'alchemy'` branch of
+  // `_runCraftingCheck`). Wiring the Active toggle to `enabled` here would have moved a
+  // switch the engine never consults.
+  let alchemyCheckModeDraft = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
+  let alchemyCheckModeBaseline = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
+  let alchemyCheckModeSaving = $state(false);
+  const alchemyCheckModeDirty = $derived(alchemyCheckModeDraft !== alchemyCheckModeBaseline);
+
+  // THE OTHER THREE ACTIVE SWITCHES STAGE TOO — the `enabled` flag of each activity's check.
+  //
+  // The alchemy switch above was staged first because its off state IS a check mode. That
+  // left the studio with ONE CONTROL ON TWO LIFECYCLES: the same switch, on the same screen,
+  // staged on an alchemy crafting route and wrote through on click everywhere else. A GM who
+  // flipped Active on Salvage got no Unsaved chip, a disabled `Save checks`, nothing for the
+  // route-exit guard to guard, and a Discard that could not put it back — while the identical
+  // control one route over behaved correctly. Two contracts behind one affordance is worse
+  // than either contract, so all four now stage.
+  //
+  // CRAFTING'S IS THE NON-ALCHEMY ONE. An alchemy system's switch never touches this draft
+  // (`onToggleCheckActive` returns before it), so the flag stays at its baseline and is never
+  // written for a system whose engine ignores it.
+  function readCheckActive(config) {
+    return config?.enabled === true;
+  }
+  let craftingCheckActiveDraft = $state(readCheckActive($viewState.selectedSystem?.craftingCheck));
+  let craftingCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.craftingCheck)
+  );
+  let craftingCheckActiveSaving = $state(false);
+  const craftingCheckActiveDirty = $derived(
+    craftingCheckActiveDraft !== craftingCheckActiveBaseline
+  );
+  let salvageCheckActiveDraft = $state(
+    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
+  );
+  let salvageCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
+  );
+  let salvageCheckActiveSaving = $state(false);
+  const salvageCheckActiveDirty = $derived(salvageCheckActiveDraft !== salvageCheckActiveBaseline);
+  let gatheringCheckActiveDraft = $state(
+    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
+  );
+  let gatheringCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
+  );
+  let gatheringCheckActiveSaving = $state(false);
+  const gatheringCheckActiveDirty = $derived(
+    gatheringCheckActiveDraft !== gatheringCheckActiveBaseline
+  );
+
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
   // award setting (awardMode) is carried through untouched so a save never drops it.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
-    return {
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097). This clone is the SECOND allowlist
+    // rebuild the block passes through — the manager's `_normalizeProgressiveCraftingCheck`
+    // is the first — and a draft that dropped the key would carry the GM's experiment for
+    // exactly as long as the panel stayed open, then write a block without it. It is
+    // normalized through the SAME derivation the persistence path uses, so a value the
+    // draft holds is a value that survives the save.
+    const preview = normalizePreviewSandbox(source.preview);
+    const draft = {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
+    // Attached rather than spread, so an absent experiment stays absent — and so the
+    // baseline and the draft, both built here, produce the same key order for the
+    // `JSON.stringify` dirty comparison.
+    if (preview) draft.preview = preview;
+    return draft;
   }
   let checkProgressiveDraft = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
@@ -424,9 +710,19 @@
   const gatheringRoutedDirty = $derived(
     JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
   );
-  // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
-  // so the shared header Save persists the right draft.
-  let checksActiveTab = $state('crafting');
+  // Which Checks child route is open (crafting | salvage | gathering | validation).
+  // It is DERIVED from the route now (issue 1096), not held: the four activities became
+  // rail routes, so a second copy of "which one is open" would be a source of truth the
+  // rail highlight and the breadcrumb could disagree with.
+  // Which section of that route is open, for a Validation deep link.
+  // Empty until the router asks for one, so the very first deep link TO the roll section is
+  // still a new request rather than one the view has already honoured at mount.
+  let checksActiveSection = $state('');
+  // The REQUEST's identity, bumped on every deep link. `ChecksView` latches on this rather
+  // than on the section name, so asking twice for the same section is two requests: leave
+  // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
+  // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
+  let checksSectionRequestNonce = $state(0);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
@@ -506,24 +802,33 @@
       mode: selectedSystem?.resolutionMode || 'simple',
       // The crafting check is optional in simple and routedByIngredients (it runs
       // only when a roll formula is authored and checks are enabled); routedByCheck
-      // and progressive REQUIRE it. Alchemy is driven by alchemy.checkMode: simple
-      // and tiered are MANDATORY (cannot be disabled → requiredHint), while none has
-      // NO check (the `none` flag suppresses the Active TOGGLE and shows a distinct
-      // "resolves without a check" hint in place of the requiredHint — the Active
-      // card itself stays as a read-only note).
+      // and progressive REQUIRE it.
+      //
+      // ALCHEMY IS OPTIONAL AT `simple` AND REQUIRED AT `tiered`, read from the DRAFT
+      // check mode so the rail's switch reflects what the GM has staged rather than what
+      // was last saved. Alchemy used to report `optional: false` for all three modes,
+      // which is what put the "cannot be turned off here" hint on a Simple check that has
+      // a perfectly good off state — `checkMode: 'none'` — and left the GM no way to reach
+      // it once "No check" stopped being a mode you pick. Tiered keeps the locked
+      // always-on indicator: it routes result groups by outcome tier, so it cannot resolve
+      // without a roll (see `_isCheckOutcomeSatisfied`).
+      //
+      // `enabled` IS THE MODE, not `craftingCheck.enabled`. The engine ignores that flag
+      // for alchemy and dispatches on `alchemy.checkMode` alone, so reading it here would
+      // have shown a switch position the engine never honours.
       optional:
         (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
-          ? false
+          ? alchemyCheckModeDraft !== 'tiered'
           : ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
-      none:
-        selectedSystem?.resolutionMode === 'alchemy' &&
-        (selectedSystem?.alchemy?.checkMode || 'none') === 'none',
-      enabled: selectedSystem?.craftingCheck?.enabled === true,
+      enabled:
+        selectedSystem?.resolutionMode === 'alchemy'
+          ? alchemyCheckModeDraft !== 'none'
+          : craftingCheckActiveDraft,
     },
     salvage: {
       mode: selectedSystem?.salvageResolutionMode || 'simple',
       optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
-      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true,
+      enabled: salvageCheckActiveDraft,
     },
     // The system-level gathering check's shape is the gathering economy's
     // resolution mode. d100 is the fixed roll (optional/no enable toggle);
@@ -531,73 +836,114 @@
     gathering: {
       mode: gatheringResolutionMode,
       optional: gatheringResolutionMode === 'd100',
-      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true,
+      enabled: gatheringCheckActiveDraft,
     },
   });
 
-  // Which crafting check editor is active for the selected system, and whether it
-  // has unsaved staged edits — drives the single top-right Save button.
-  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
-  // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
-  // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
-  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
-  // separately from the RAW `resolutionMode` rather than from this value:
-  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
-  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
-  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
+  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore
+  // which draft is edited, tracked dirty, saved by the top-right Save button, and read for
+  // the recipe editor's "Check tier" options.
+  //
+  // IT IS THE ENGINE'S OWN ANSWER (issue 1096), not a second mapping beside it.
+  // `checkModifierResolver` owns `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS`, and the copy
+  // that stood here disagreed with it for exactly one configuration: alchemy at
+  // `checkMode: 'tiered'`, which rolls the ROUTED slot. The Checks route renders the routed
+  // editor there (its own derivation reads `alchemy.checkMode`), so a GM could edit that
+  // draft — while this said `simple`, so the edit was never marked dirty and Save never
+  // wrote it. The rail's readiness badge meanwhile evaluated the untouched simple draft
+  // under routed rules. One derivation is the only way those cannot disagree.
+  //
+  // `null` means the mode rolls NO check: alchemy `checkMode: 'none'`, and any resolution
+  // mode outside the canonical set. Nothing is dirty, nothing is saved and no tier options
+  // are offered, which is the honest answer for a check that never runs.
+  //
+  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients` shares
+  // the simple pass/fail slot with `simple`. Collapsing those two here costs nothing
+  // elsewhere, because the multi-set and routing behaviours are derived separately from the
+  // RAW `resolutionMode` rather than from this value: `recipeMultiSetAllowed` gates more than
+  // one ingredient/result set, and `recipeRoutingProvider` picks the routing basis ('check'
+  // for routedByCheck, 'ingredientSet' for routedByIngredients). Both routed modes stay
+  // covered there.
+  // RESOLVED AGAINST THE DRAFT ALCHEMY MODE, not the persisted one, and only alchemy's
+  // input is substituted (every other mode reads the same system it always did).
+  //
+  // The slot decides which draft is dirty-tracked and which one `Save checks` writes, so
+  // resolving it from persisted state stranded the draft it was staged beside. Turn the
+  // alchemy check ON and author a formula in one visit: the persisted mode is still `none`,
+  // which resolves to slot `null`, so `craftingCheckDirty` read false for the simple draft
+  // and Save wrote the mode but dropped the formula the GM had just typed. The two have to
+  // be resolved from the same value to be saved together.
   const craftingCheckMode = $derived(
-    (function _craftingCheckMode(resolution) {
-      if (resolution === 'routedByCheck') return 'routed';
-      if (resolution === 'progressive') return 'progressive';
-      if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
-      return null;
-    })(selectedSystem?.resolutionMode || 'simple')
+    resolveActiveCraftingCheckFormula(
+      selectedSystem?.resolutionMode === 'alchemy'
+        ? {
+            ...selectedSystem,
+            alchemy: { ...(selectedSystem?.alchemy || {}), checkMode: alchemyCheckModeDraft },
+          }
+        : selectedSystem
+    ).slot
   );
   const craftingCheckDirty = $derived(
-    (craftingCheckMode === 'routed' && checkRoutedDirty) ||
+    alchemyCheckModeDirty ||
+      craftingCheckActiveDirty ||
+      (craftingCheckMode === 'routed' && checkRoutedDirty) ||
       (craftingCheckMode === 'simple' && checkSimpleDirty) ||
       (craftingCheckMode === 'progressive' && checkProgressiveDirty)
   );
   const craftingCheckSaving = $derived(
-    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
+    checkRoutedSaving ||
+      checkSimpleSaving ||
+      checkProgressiveSaving ||
+      alchemyCheckModeSaving ||
+      craftingCheckActiveSaving
   );
 
   // The salvage check editor shown is selected by the salvage resolution mode.
   const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
   const salvageCheckDirty = $derived(
-    (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
+    salvageCheckActiveDirty ||
+      (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
       (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) ||
       (salvageResolutionMode === 'simple' && salvageSimpleDirty)
   );
   const salvageCheckSaving = $derived(
-    salvageSimpleSaving || salvageRoutedSaving || salvageProgressiveSaving
+    salvageSimpleSaving ||
+      salvageRoutedSaving ||
+      salvageProgressiveSaving ||
+      salvageCheckActiveSaving
   );
 
   // The gathering check editor shown is selected by the gathering economy's
   // resolution mode; d100 has no editable draft, so it is never dirty/saving.
   const gatheringCheckDirty = $derived(
-    (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
+    gatheringCheckActiveDirty ||
+      (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
       (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
   );
-  const gatheringCheckSaving = $derived(gatheringProgressiveSaving || gatheringRoutedSaving);
+  const gatheringCheckSaving = $derived(
+    gatheringProgressiveSaving || gatheringRoutedSaving || gatheringCheckActiveSaving
+  );
 
-  // Tab-aware Checks dirty/saving/save: the single header Save button persists
-  // whichever check sub-tab is active.
-  const checksDirty = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckDirty
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckDirty
-        : craftingCheckDirty
+  // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
+  //
+  // It used to be tab-aware: `checksDirty` reported only the ACTIVE sub-tab, and the header
+  // Save persisted only that one. That was safe while the four activities were tabs inside
+  // one view, because a switch between them never left the surface. They are ROUTES now, and
+  // one click on `Components` leaves it — so a per-route dirty flag would have let an unsaved
+  // crafting edit walk out of the building while the GM stood on Gathering, with the Unsaved
+  // chip already gone.
+  //
+  // So: ONE dirty set across the four activities, and one plural `Save checks` that persists
+  // every dirty one. The per-activity flags survive as the rail's own markers.
+  const checksDirtyActivities = $derived(
+    [
+      craftingCheckDirty ? 'crafting' : '',
+      salvageCheckDirty ? 'salvage' : '',
+      gatheringCheckDirty ? 'gathering' : '',
+    ].filter(Boolean)
   );
-  const checksSaving = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckSaving
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckSaving
-        : craftingCheckSaving
-  );
+  const checksDirty = $derived(checksDirtyActivities.length > 0);
+  const checksSaving = $derived(craftingCheckSaving || salvageCheckSaving || gatheringCheckSaving);
 
   // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
   // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
@@ -635,8 +981,17 @@
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are
   // excluded — a failed check produces no result set to route to.
+  // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the crafting
+  // failure-result policy forbids failure results, unfiltered when it permits them, so a
+  // GM can bind a result group to a failure-marked tier exactly where the engine will
+  // route one. It is a SWAP between two functions the codebase already had, and
+  // `systemValidation` feeds `recipeReadiness` from the same swap — the picker and the
+  // readiness warnings can never disagree about which tiers are assignable.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
-    routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+    routedTierOptionsForPolicy(
+      selectedSystem?.craftingCheck?.routed,
+      selectedSystem?.craftingCheck?.failureResultPolicy
+    )
   );
   // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
@@ -649,13 +1004,26 @@
   const recipeRoutedHasOutcomeTiers = $derived.by(() =>
     routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
+  // Whether this system's crafting failure-result policy permits results on a failed check
+  // (issue 1098). Read through the shared predicate rather than compared to a literal, so
+  // the editor's third empty hint and the engine's routing decision cannot disagree about
+  // what an absent or unrecognized value means.
+  const recipeFailureResultsAllowed = $derived(
+    permitsFailureResults(selectedSystem?.craftingCheck?.failureResultPolicy)
+  );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
   // Routed-salvage outcome tier NAMES (active type), used by the per-component
   // outcome-routing selects. Names map to result-group ids in component.salvage.
+  // Policy-conditional on the same terms (issue 1098). Unfiltered until that issue, so it
+  // offered failure tier names as DEAD OPTIONS: `salvage()` returned before
+  // `_resolveSalvageResultGroups` on a failed check, and nothing ever routed through them.
   const salvageOutcomeNames = $derived(
-    routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
+    routedOutcomeTierNamesForPolicy(
+      selectedSystem?.salvageCraftingCheck?.routed,
+      selectedSystem?.salvageCraftingCheck?.failureResultPolicy
+    )
   );
   // The second axis of the per-component salvage panel's derived presentation
   // (issue 676, decision 2): salvageResolutionMode × salvage-check enablement.
@@ -709,11 +1077,21 @@
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
     checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    // Reseeded on a system switch alongside the three slot drafts. NOT on every refresh:
+    // the guard above is what keeps a `Save checks` — which refreshes the store — from
+    // clobbering a draft the GM is still editing, and this value needs that protection
+    // exactly as much as the formulas do.
+    alchemyCheckModeDraft = selectedSystem?.alchemy?.checkMode || 'none';
+    alchemyCheckModeBaseline = selectedSystem?.alchemy?.checkMode || 'none';
+    craftingCheckActiveDraft = readCheckActive(selectedSystem?.craftingCheck);
+    craftingCheckActiveBaseline = readCheckActive(selectedSystem?.craftingCheck);
     // A same-system resolution-mode change never touches the salvage/gathering
     // checks; only reseed those on a genuine system switch so an open salvage/
     // gathering draft is not clobbered by a crafting-mode change.
     if (!systemChanged) return;
     const nextSalvage = selectedSystem?.salvageCraftingCheck;
+    salvageCheckActiveDraft = readCheckActive(nextSalvage);
+    salvageCheckActiveBaseline = readCheckActive(nextSalvage);
     salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
     salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);
     salvageRoutedDraft = cloneRoutedCheck(nextSalvage?.routed);
@@ -721,6 +1099,8 @@
     salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
     salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
     const nextGathering = selectedSystem?.gatheringCraftingCheck;
+    gatheringCheckActiveDraft = readCheckActive(nextGathering);
+    gatheringCheckActiveBaseline = readCheckActive(nextGathering);
     gatheringProgressiveDraft = cloneProgressiveCheck(nextGathering?.progressive);
     gatheringProgressiveBaseline = cloneProgressiveCheck(nextGathering?.progressive);
     gatheringRoutedDraft = cloneRoutedCheck(nextGathering?.routed);
@@ -774,97 +1154,285 @@
     });
   }
 
-  async function saveCraftingCheck() {
-    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
-    if (craftingCheckMode === 'routed') {
-      checkRoutedSaving = true;
-      try {
-        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
-        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-      } finally {
-        checkRoutedSaving = false;
-      }
-    } else if (craftingCheckMode === 'simple') {
-      checkSimpleSaving = true;
-      try {
-        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
-        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
-      } finally {
-        checkSimpleSaving = false;
-      }
-    } else if (craftingCheckMode === 'progressive') {
-      checkProgressiveSaving = true;
-      try {
-        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
-        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
-      } finally {
-        checkProgressiveSaving = false;
-      }
+  /**
+   * Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096).
+   *
+   * Every check save used to be `await store?.save…()` and nothing else, which made "did that
+   * work?" an unanswerable question: a store no-op and a rejected `updateSystem` were both
+   * indistinguishable from success, so the route-exit guard's Save branch navigated away from
+   * unsaved work and a rejection escaped as an unhandled promise. The shipped essence and
+   * system-details guards answer it with `result !== false` and are the pattern followed
+   * here, with the rejection caught as well because the three check savers are the only ones
+   * whose store call can reject rather than return.
+   *
+   * The draft is RE-BASELINED only on success, so a failed save leaves the activity dirty —
+   * which is what keeps the rail marker, the Save button and the exit prompt all still
+   * saying there is something to save.
+   *
+   * @param {{ save: () => unknown, rebaseline: () => void, setSaving: (on: boolean) => void }} steps
+   * @returns {Promise<boolean>}
+   */
+  async function persistCheckDraft({ save, rebaseline, setSaving }) {
+    setSaving(true);
+    try {
+      if ((await save()) === false) return false;
+      rebaseline();
+      return true;
+    } catch (error) {
+      console.error('Failed to save check draft', error);
+      return false;
+    } finally {
+      setSaving(false);
     }
+  }
+
+  /**
+   * Persist the staged alchemy check mode, if it moved.
+   *
+   * Runs BEFORE the slot draft below, and the order matters: the slot write reseeds the
+   * store, and a mode that had not landed yet would be re-read as its old value. Both are
+   * awaited inside one `saveCraftingCheck` so the pair lands under a single `Save checks`.
+   */
+  async function saveAlchemyCheckMode() {
+    if (!alchemyCheckModeDirty) return true;
+    return persistCheckDraft({
+      save: () => store?.setAlchemyCheckMode?.(alchemyCheckModeDraft),
+      rebaseline: () => {
+        alchemyCheckModeBaseline = alchemyCheckModeDraft;
+      },
+      setSaving: (on) => {
+        alchemyCheckModeSaving = on;
+      },
+    });
+  }
+
+  /**
+   * Persist one activity's staged Active flag.
+   *
+   * The three share a shape, so they share a function: `enabled` is one boolean per activity
+   * and the only thing that differs is which store action writes it.
+   *
+   * THE CALLER GUARDS ON DIRTY, and that is a timing contract rather than a style choice. Each
+   * activity's save runs its flag before its slot draft, so an UNCONDITIONAL `await` here
+   * would push every ordinary formula save one microtask later — enough to break the shipped
+   * mounted tests that click Save and assert the store call on the next tick. Guarding at the
+   * call site means a save with a clean switch awaits nothing extra at all.
+   */
+  async function persistCheckActive({ save, rebaseline, setSaving }) {
+    return persistCheckDraft({ save, rebaseline, setSaving });
+  }
+
+  async function saveCraftingCheckActive() {
+    return persistCheckActive({
+      save: () => store?.saveCraftingCheckActive?.(craftingCheckActiveDraft),
+      rebaseline: () => {
+        craftingCheckActiveBaseline = craftingCheckActiveDraft;
+      },
+      setSaving: (on) => {
+        craftingCheckActiveSaving = on;
+      },
+    });
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
+    // The mode and its slot draft are one save. `&&` is deliberate over an early return:
+    // a failed mode write must not skip the formula the GM staged beside it, exactly as
+    // `saveChecks` attempts every dirty activity rather than stopping at the first failure.
+    let modeSaved = true;
+    if (alchemyCheckModeDirty) modeSaved = await saveAlchemyCheckMode();
+    if (craftingCheckActiveDirty) modeSaved = (await saveCraftingCheckActive()) && modeSaved;
+    // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG. The outer guard used to be enough, because
+    // `craftingCheckDirty` meant "the active slot draft moved" and nothing else. It now also
+    // reports a moved MODE, so an unguarded branch would write an untouched formula block —
+    // one redundant `updateSystem` plus its store refresh — every time the GM only flipped
+    // the Active switch.
+    if (craftingCheckMode === 'routed' && checkRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
+          rebaseline: () => {
+            checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+          },
+          setSaving: (on) => {
+            checkRoutedSaving = on;
+          },
+        })) && modeSaved
+      );
+    }
+    if (craftingCheckMode === 'simple' && checkSimpleDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
+          rebaseline: () => {
+            checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+          },
+          setSaving: (on) => {
+            checkSimpleSaving = on;
+          },
+        })) && modeSaved
+      );
+    }
+    if (craftingCheckMode === 'progressive' && checkProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
+          rebaseline: () => {
+            checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+          },
+          setSaving: (on) => {
+            checkProgressiveSaving = on;
+          },
+        })) && modeSaved
+      );
+    }
+    // No dirty slot draft: either this resolution mode rolls no crafting check, or the only
+    // thing that moved was the alchemy check mode, which `saveAlchemyCheckMode` has answered.
+    return modeSaved;
   }
 
   async function saveSalvageCheck() {
-    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return;
-    if (salvageResolutionMode === 'routed') {
-      salvageRoutedSaving = true;
-      try {
-        await store?.saveSalvageCheckRouted?.(salvageRoutedDraft);
-        salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
-      } finally {
-        salvageRoutedSaving = false;
-      }
-    } else if (salvageResolutionMode === 'progressive') {
-      salvageProgressiveSaving = true;
-      try {
-        await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
-        salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
-      } finally {
-        salvageProgressiveSaving = false;
-      }
-    } else {
-      salvageSimpleSaving = true;
-      try {
-        await store?.saveSalvageCheckSimple?.(salvageSimpleDraft);
-        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
-      } finally {
-        salvageSimpleSaving = false;
-      }
+    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
+    // The Active flag first, then the slot draft — and each slot guarded on its OWN dirty
+    // flag, because `salvageCheckDirty` now also reports a moved switch. Without the guard a
+    // GM who only flipped Active would rewrite an untouched formula block and pay a second
+    // store refresh for it.
+    let activeSaved = true;
+    if (salvageCheckActiveDirty) {
+      activeSaved = await persistCheckActive({
+        save: () => store?.saveSalvageCheckActive?.(salvageCheckActiveDraft),
+        rebaseline: () => {
+          salvageCheckActiveBaseline = salvageCheckActiveDraft;
+        },
+        setSaving: (on) => {
+          salvageCheckActiveSaving = on;
+        },
+      });
     }
+    if (salvageResolutionMode === 'routed' && salvageRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
+          rebaseline: () => {
+            salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+          },
+          setSaving: (on) => {
+            salvageRoutedSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    if (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
+          rebaseline: () => {
+            salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+          },
+          setSaving: (on) => {
+            salvageProgressiveSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    if (salvageResolutionMode === 'simple' && salvageSimpleDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
+          rebaseline: () => {
+            salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+          },
+          setSaving: (on) => {
+            salvageSimpleSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    return activeSaved;
   }
 
   async function saveGatheringCheck() {
-    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return;
-    if (gatheringResolutionMode === 'routed') {
-      gatheringRoutedSaving = true;
-      try {
-        await store?.saveGatheringCheckRouted?.(gatheringRoutedDraft);
-        gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
-      } finally {
-        gatheringRoutedSaving = false;
-      }
-    } else if (gatheringResolutionMode === 'progressive') {
-      gatheringProgressiveSaving = true;
-      try {
-        await store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft);
-        gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
-      } finally {
-        gatheringProgressiveSaving = false;
-      }
+    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return true;
+    let activeSaved = true;
+    if (gatheringCheckActiveDirty) {
+      activeSaved = await persistCheckActive({
+        save: () => store?.saveGatheringCheckActive?.(gatheringCheckActiveDraft),
+        rebaseline: () => {
+          gatheringCheckActiveBaseline = gatheringCheckActiveDraft;
+        },
+        setSaving: (on) => {
+          gatheringCheckActiveSaving = on;
+        },
+      });
     }
-    // d100 mode has no editable config — nothing to persist.
+    if (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
+          rebaseline: () => {
+            gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+          },
+          setSaving: (on) => {
+            gatheringRoutedSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    if (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
+          rebaseline: () => {
+            gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+          },
+          setSaving: (on) => {
+            gatheringProgressiveSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    // d100 has no editable slot draft — its Active flag above is the only thing to persist.
+    return activeSaved;
   }
 
-  // The shared Checks header Save persists whichever sub-tab is active.
+  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
+  // route in view. Sequential rather than concurrent: each of the three saves through the
+  // store and re-baselines its own draft, and the store's publish is a two-phase projection
+  // rebuild that three overlapping writers would race.
+  //
+  // It ANSWERS, and the answer is the conjunction rather than the last one: a Save that
+  // persisted crafting and failed salvage has not saved the checks, and the route-exit guard
+  // must not navigate away from the half that is still dirty. Every dirty activity is still
+  // ATTEMPTED — a crafting failure does not cancel the salvage write — because the GM asked
+  // to save all of them and stopping early would leave a second, unexplained casualty.
   async function saveChecks() {
-    if (checksActiveTab === 'salvage') return saveSalvageCheck();
-    if (checksActiveTab === 'gathering') return saveGatheringCheck();
-    return saveCraftingCheck();
+    let saved = true;
+    if (craftingCheckDirty) saved = (await saveCraftingCheck()) && saved;
+    if (salvageCheckDirty) saved = (await saveSalvageCheck()) && saved;
+    if (gatheringCheckDirty) saved = (await saveGatheringCheck()) && saved;
+    return saved;
   }
 
+  /**
+   * The rail's Active switch, for all four activities. EVERY ONE STAGES — flip it and the
+   * studio reports Unsaved, `Save checks` lights up, and Discard puts it back.
+   *
+   * ALCHEMY WRITES A CHECK MODE, not the `enabled` flag. Its on/off IS `alchemy.checkMode`,
+   * which is what the engine dispatches on; the generic `craftingCheck.enabled` flag is
+   * ignored for alchemy, so routing this switch there would have moved a control the engine
+   * never consults while the brew rolled anyway.
+   */
   function onToggleCheckActive(kind, enabled) {
-    if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
-    else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
-    else if (kind === 'gathering') store?.saveGatheringCheckActive?.(enabled);
+    const on = enabled === true;
+    if (kind === 'crafting' && selectedSystem?.resolutionMode === 'alchemy') {
+      // `simple` is the only mode "on" can mean here. Tiered reports `optional: false`, so it
+      // renders the locked indicator and never reaches this handler.
+      alchemyCheckModeDraft = on ? 'simple' : 'none';
+      return;
+    }
+    if (kind === 'crafting') craftingCheckActiveDraft = on;
+    else if (kind === 'salvage') salvageCheckActiveDraft = on;
+    else if (kind === 'gathering') gatheringCheckActiveDraft = on;
   }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
@@ -876,20 +1444,29 @@
     recipeCategories: selectedSystem?.categories?.length || 0,
   });
   const itemCards = $derived($viewState.itemCards || []);
-  const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
-  const toolsNormalizedComponentSearchTerm = $derived(
-    toolsComponentSearchTerm.trim().toLowerCase()
-  );
-  const toolsFilteredComponentCards = $derived(
-    toolsComponentCards.filter((item) => {
-      const name = String(item?.name || '').toLowerCase();
-      return (
-        !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm)
-      );
-    })
-  );
+  // Reference counting for the Tags & Categories screen delegates to the pure
+  // `buildVocabularyUsage` helper (issue 689), which — unlike the pre-689 inline count —
+  // also credits a tag for every recipe tag-placeholder ingredient (`match.type === 'tags'`)
+  // that names it, so a tag only ever used as an ingredient filter no longer reads as
+  // "Unused".
+  //
+  // The recipe half of that tag count arrives PRE-COUNTED from the store (issue 1081). This
+  // derivation feeds the left nav rail's Tags & Categories badge, which is a sibling of the
+  // view switch rather than a child of one, so it is evaluated on every render of the
+  // manager in every view. Counting the placeholders here read `ingredientSets` and `steps`
+  // off each projected row, and those are detail-tier fields sharing one memoized producer
+  // — so an always-mounted badge deep-cloned the whole library before first paint. The
+  // recipe CATEGORY count below stays here because `category` is a summary-tier field.
+  // Passed RAW, with no `|| {}` default: an empty record is a legitimate pre-count (a system
+  // with no tag placeholders at all), so `buildVocabularyUsage` has to treat `{}` as
+  // authoritative — which means a defensive `|| {}` here would make its documented
+  // "omit it and the walk runs here" fallback unreachable and turn "not published" into
+  // "there are none". A tag referenced only by a recipe ingredient placeholder would then
+  // read as unused and be offered for one-click deletion with no confirm strip.
   const tagCategoryUsage = $derived(
-    buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards)
+    buildVocabularyUsage($viewState.recipes || [], itemCards, {
+      recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts,
+    })
   );
   const categoryRows = $derived(
     buildCategoryRows(
@@ -1040,20 +1617,30 @@
   const selectedGatheringConditionShortcuts = $derived(
     buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
   );
-  const selectedGatheringCharacterModifiers = $derived(
-    Array.isArray($viewState.gatheringConfig?.systems?.[selectedSystemId]?.characterModifiers)
-      ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
-      : []
+  // The ONE authored modifier library (issue 1117). It is projected off the SYSTEM, not
+  // the gathering config: crafting, salvage and gathering checks select over it, and the
+  // gathering d100 drop rows, events and stamina costs reference it. Every surface that
+  // reads a modifier reads this one derivation.
+  const selectedSystemModifiers = $derived(
+    Array.isArray(selectedSystem?.modifiers) ? selectedSystem.modifiers : []
+  );
+  // The currency ladder is WORLD scope (issue 1278) — one config for the whole world, because a
+  // world runs exactly one ruleset and so has exactly one way actors store coins.
+  const worldCurrency = $derived(
+    $viewState.worldCurrency || {
+      spendStrategy: 'actorProperty',
+      providerId: '',
+      macros: { canAfford: '', increment: '', decrement: '' },
+      units: [],
+    }
   );
   const selectedCurrencyUnits = $derived(
-    Array.isArray(selectedSystem?.requirements?.currency?.units)
-      ? selectedSystem.requirements.currency.units
-      : []
+    Array.isArray(worldCurrency.units) ? worldCurrency.units : []
   );
-  // Units are seeded from adapter presets even for a currency-disabled system, so the
-  // recipe editor must gate cost affordances on the explicit enable flag, not on unit
-  // presence. Threaded alongside the units so existing requirements can render read-only
-  // (rather than vanish) when currency is off.
+  // Units exist world-wide regardless of any one system, so the recipe editor must gate cost
+  // affordances on the SYSTEM's explicit enable flag, not on unit presence. Threaded alongside
+  // the units so existing requirements can render read-only (rather than vanish) when the
+  // selected system has currency off.
   const selectedCurrencyEnabled = $derived(
     selectedSystem?.requirements?.currency?.enabled === true
   );
@@ -1066,12 +1653,20 @@
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
-  const currencySpendStrategy = $derived(
-    selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty'
+  // How many crafting systems actually opt into the world's currency. The World > Currency
+  // subtitle reports it so a GM who has configured a ladder that NO system uses can see that
+  // immediately — the commonest way this feature looks broken when it is merely unadopted.
+  const allSystems = $derived($viewState.systems || []);
+  // Reads the projected `currencyEnabled` flag, NOT `requirements.currency.enabled`: the system
+  // list is a deliberate allowlist projection that does not carry `requirements`, so the deep
+  // read counted zero for every world and the subtitle reported every ladder as unadopted.
+  const currencyEnabledSystemCount = $derived(
+    allSystems.filter((system) => system?.currencyEnabled === true).length
   );
-  const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
+  const currencySpendStrategy = $derived(worldCurrency.spendStrategy || 'actorProperty');
+  const currencyProviderId = $derived(worldCurrency.providerId || '');
   const currencyMacros = $derived(
-    selectedSystem?.requirements?.currency?.macros || {
+    worldCurrency.macros || {
       canAfford: '',
       increment: '',
       decrement: '',
@@ -1085,23 +1680,23 @@
   );
   async function onAddCharacterModifier(partial) {
     if (!selectedSystemId) return null;
-    return await store.addGatheringCharacterModifier(selectedSystemId, partial);
+    return await store.addSystemModifier(selectedSystemId, partial);
   }
   async function onSeedCharacterModifierPresets() {
     if (!selectedSystemId || !characterModifierPresetsSupported) return;
-    await store.seedGatheringCharacterModifierPresets(selectedSystemId);
+    await store.seedSystemModifierPresets(selectedSystemId);
   }
   async function onUpdateCharacterModifier(modifierId, patch) {
     if (!selectedSystemId) return;
-    await store.updateGatheringCharacterModifier(selectedSystemId, modifierId, patch);
+    await store.updateSystemModifier(selectedSystemId, modifierId, patch);
   }
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
-    await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+    await store.deleteSystemModifier(selectedSystemId, modifierId);
   }
   async function onReorderCharacterModifier(fromIndex, toIndex) {
     if (!selectedSystemId) return;
-    await store.reorderGatheringCharacterModifier(fromIndex, toIndex, selectedSystemId);
+    await store.reorderSystemModifier(fromIndex, toIndex, selectedSystemId);
   }
 
   // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
@@ -1134,58 +1729,51 @@
     await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
   }
 
+  // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them
+  // require a selected crafting system — a GM configures the world's coins from the World tab
+  // before any system opts in.
   async function onAddCurrencyUnit() {
-    if (!selectedSystemId) return null;
-    return await store.addCurrencyUnit(selectedSystemId);
+    return await store.addCurrencyUnit();
   }
   async function onUpdateCurrencyUnit(unitId, patch) {
-    if (!selectedSystemId) return;
-    await store.updateCurrencyUnit(selectedSystemId, unitId, patch);
+    await store.updateCurrencyUnit(unitId, patch);
   }
   async function onDeleteCurrencyUnit(unitId) {
-    if (!selectedSystemId) return;
-    await store.deleteCurrencyUnit(selectedSystemId, unitId);
+    await store.deleteCurrencyUnit(unitId);
   }
   async function onReorderCurrencyUnit(fromIndex, toIndex) {
-    if (!selectedSystemId) return;
-    await store.reorderCurrencyUnit(fromIndex, toIndex, selectedSystemId);
+    await store.reorderCurrencyUnit(fromIndex, toIndex);
   }
   async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
-    if (!selectedSystemId) return;
-    await store.addCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+    await store.addCurrencySubUnit(parentUnitId, subUnitId);
   }
   async function onUpdateCurrencySubUnit(parentUnitId, subUnitId, amount) {
-    if (!selectedSystemId) return;
-    await store.updateCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId, amount);
+    await store.updateCurrencySubUnit(parentUnitId, subUnitId, amount);
   }
   async function onDeleteCurrencySubUnit(parentUnitId, subUnitId) {
-    if (!selectedSystemId) return;
-    await store.deleteCurrencySubUnit(selectedSystemId, parentUnitId, subUnitId);
+    await store.deleteCurrencySubUnit(parentUnitId, subUnitId);
   }
   async function onSeedCurrencyPresets() {
-    if (!selectedSystemId || !currencyPresetsSupported) return;
-    await store.seedCurrencyUnitPresets(selectedSystemId);
+    if (!currencyPresetsSupported) return;
+    await store.seedCurrencyUnitPresets();
   }
   async function onSetCurrencySpendStrategy(spendStrategy) {
-    if (!selectedSystemId) return;
-    await store.setCurrencySpendStrategy(selectedSystemId, spendStrategy);
+    await store.setCurrencySpendStrategy(spendStrategy);
   }
   async function onSetCurrencyProvider(providerId) {
-    if (!selectedSystemId) return;
-    await store.setCurrencyProvider(selectedSystemId, providerId);
+    await store.setCurrencyProvider(providerId);
   }
   async function onSetCurrencyMacro(key, uuid) {
-    if (!selectedSystemId || !uuid) return;
-    await store.setCurrencyMacro(selectedSystemId, key, uuid);
+    if (!uuid) return;
+    await store.setCurrencyMacro(key, uuid);
   }
   async function onClearCurrencyMacro(key) {
-    if (!selectedSystemId) return;
-    await store.clearCurrencyMacro(selectedSystemId, key);
+    await store.clearCurrencyMacro(key);
   }
 
   function characterModifierLibraryEntry(modifierId) {
     if (!modifierId) return null;
-    return selectedGatheringCharacterModifiers.find((entry) => entry.id === modifierId) || null;
+    return selectedSystemModifiers.find((entry) => entry.id === modifierId) || null;
   }
 
   function characterModifierLabelForRef(ref) {
@@ -1212,7 +1800,7 @@
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
     if (!editingGatheringTask?.id || !rowId) return;
-    const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
+    const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
     if (!id) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
@@ -1236,7 +1824,7 @@
     const attached = new Set(
       (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1255,7 +1843,7 @@
     const attached = new Set(
       (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1619,6 +2207,38 @@
       ? itemCards.find((item) => item.id === selectedComponentId) || null
       : null
   );
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // verdict and the live description fallback — resolves on demand (issue 1081), and
+  // `ComponentsBrowserView` only ever asks for the page it renders. Both cards above are
+  // resolved from the WHOLE cohort rather than from that page, so unless this asks, nothing
+  // does. Three independent routes reach an un-asked-for card:
+  //   - first open, where `selectedComponentId` is still empty so the inspector falls back
+  //     to `itemCards[0]` — the manager's STORED order, while the browser renders the
+  //     name-sorted page 1, so on any library past one page the default selection is
+  //     off-page from the moment the studio opens;
+  //   - a selection made on one page and still held after paging elsewhere, because every
+  //     refresh rebuilds every card un-hydrated and only the rendered page is re-asked;
+  //   - the component editor, which UNMOUNTS the browser entirely — and Replace source /
+  //     Unlink source refresh without navigating away from it.
+  // Left un-asked, all three render the pre-hydration reading permanently: "No description
+  // has been added." for a compendium-linked component whose prose lives on the source
+  // document, which is the regression issue 676 filed and issue 800 preserved, and an accent
+  // `Compendium` / `Items Directory` pill telling the GM a dangling link is healthy.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper for
+  // the reason `ComponentsBrowserView` states at its own effect: importing that store module
+  // here would pull it into the dependency closure of every mounted suite rendering this
+  // tree, where a module missing from the harness allowlist HANGS the suite rather than
+  // failing it. A card with no `hydrate` — a fixture's plain object — is left as it is.
+  //
+  // The rejection is swallowed deliberately: a card that could not resolve keeps its
+  // un-hydrated reading, which renders correctly rather than blankly, and the projection
+  // drops its memo on rejection so the next render retries rather than re-throwing forever.
+  $effect(() => {
+    for (const card of [selectedComponent, componentForEdit]) {
+      card?.hydrate?.()?.catch?.(() => {});
+    }
+  });
   const componentEditTagOptions = $derived(componentTagOptionsFor(componentForEdit));
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
@@ -1685,11 +2305,31 @@
   const componentBulkCategoryOptions = $derived(
     componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
   );
-  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
-  // prune that removed the last id, or a successful apply. The panel is unmounted at that
-  // point, so this is the only place the discard can honestly happen.
+  // What deleting the current selection would do (issue 1129). Derived from the STORE rather
+  // than from the selected cards, because the "recipes disabled" number depends on the whole
+  // selection against real recipe bodies — see `adminStore.describeComponentDelete`.
+  const componentBulkDeleteImpact = $derived(
+    store.describeComponentDelete?.(componentBulkSelectedIds) ?? {
+      deletable: 0,
+      deletableIds: [],
+      recipesRewritten: 0,
+      recipesDisabled: 0,
+    }
+  );
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
+  // that removed the last id, or a successful apply — and DISARM the delete whenever the
+  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set moves,
+  // the impact sentence the GM read before arming is no longer the impact of confirming, so
+  // the second click must not still be a confirmation. The Essence Studio's twin above is
+  // where this rule is stated at length.
+  //
+  // It reads the SET, not its size, for the reason recorded there: the browser assigns a NEW
+  // `Set` on every mutation, so set identity is what "changes at all" means, and a size
+  // dependency cannot see a same-size swap.
   $effect(() => {
-    if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+    const selectedIds = componentBulkSelectedIds;
+    if (selectedIds.size === 0) componentBulkDraft = createComponentBulkDraft();
+    componentBulkDeleteArmed = false;
   });
   // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
   // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
@@ -1713,7 +2353,7 @@
   // disabled states are derived from.
   //
   // Derived from the same PROJECTED ROWS, and that is the load-bearing part. Each row's
-  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which takes the system's
+  // `recipeItemIds` comes from `recipeItemDefinitionsContaining`, which takes the system's
   // `membershipResolvesByRecipeIds` marker as a parameter and is therefore basis-aware.
   // Counting from `recipeItemDefinitions[].recipeIds` instead would report "holds none
   // selected" on every legacy-basis system — where membership still resolves through the
@@ -1736,11 +2376,76 @@
   const recipeBulkCategoryOptions = $derived(
     getEffectiveRecipeCategories(selectedSystem?.categories || [])
   );
+  // What deleting the current selection would do (issue 1132). Derived from the STORE, not
+  // from the projected rows: the learner count needs actor flags and the recipe-item count
+  // needs the system's definitions with its membership basis, neither of which is in the
+  // row projection — and the store counts through the SAME leaf the write executes
+  // through, so the stated numbers cannot drift from the performed ones.
+  //
+  // THE `$viewState` READ IS A DEPENDENCY, NOT A LEFTOVER (review round). Everything
+  // `describeRecipeDelete` consults is invisible to the rune graph — `get(selectedSystemId)`
+  // is a `svelte/store` read, `getSystem()` walks a plain Map, and the learner index is a
+  // plain `let` — so the selection was the derivation's ONLY trigger. Concretely: select
+  // three recipes, stage "add to Book X" in this same panel, Apply (the selection survives;
+  // only a count reaching zero discards state) and the card still read "Will be removed
+  // from 1 book or scroll" while the confirm pruned two. Taking the projection the store
+  // republishes on every `refresh()` makes the card recompute whenever the world it counts
+  // over has been re-read. It does NOT make the card recompute on an external actor-flag
+  // write with no refresh behind it — the store's stale-index marker is the other half of
+  // that, see `adminStore.markLearnedRecipeIndexStale`.
+  //
+  // Deliberately NOT applied to `componentBulkDeleteImpact` above: that path ships as it is,
+  // and widening its dependency is a change to a shipped studio this change does not owe.
+  const recipeBulkDeleteImpact = $derived.by(() => {
+    void $viewState;
+    return (
+      store.describeRecipeDelete?.(recipeBulkSelectedIds) ?? {
+        deletable: 0,
+        deletableIds: [],
+        recipeItemsAffected: 0,
+        recipeItemIds: [],
+        learnersAffected: 0,
+        learnerIds: [],
+      }
+    );
+  });
   // Discard the staged draft whenever the selection empties — a clear, a system switch, a
   // prune that removed the last id, or a successful apply. The panel is unmounted at that
   // point, so this is the only place the discard can honestly happen.
+  //
+  // It reads the COUNT, and that is deliberate rather than an oversight: retargeting it to
+  // the Set identity — as the Component Studio's single combined effect is keyed — would
+  // discard a staged draft on every selection change, which is a regression of issue 1010's
+  // whole staging model. The arm needs the other dependency, so it gets its own effect
+  // below rather than folding into this one.
   $effect(() => {
     if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
+  });
+  // DISARM the delete whenever the selection changes at all. An arm is a statement about a
+  // SPECIFIC set: once the set moves, the impact sentence the GM read before arming is no
+  // longer the impact of confirming, so the second click must not still be a confirmation.
+  //
+  // It reads the SET, not its size, and the honest reason is narrower than the one issue
+  // 1132's delta gives. The delta motivates it as "a size dependency cannot see a same-size
+  // swap"; MEASURED AGAINST THE SHIPPED BROWSER, no such swap is reachable. Every mutation
+  // `RecipesBrowserView` performs changes the count — untick then tick is two flushes, the
+  // phantom-id prune assigns only `if (pruned.size !== current.size)`, and
+  // `Select all N results` is hidden once every filtered row is selected. So a
+  // count-keyed disarm would behave identically today, and the mutation proof for that
+  // claim comes back GREEN. What the Set dependency actually buys is that this effect is
+  // keyed on the reactive unit the state IS — `bulkSelectedRecipeIds` is reassigned, never
+  // mutated — so it stays correct if a future republish does produce an equal-sized set,
+  // and it matches the Component Studio's shipped effect rather than inventing a second
+  // convention. It is robustness and consistency, not a live defect fix; the test below
+  // says the same rather than dressing an unreachable case up as coverage.
+  //
+  // It is a SECOND effect rather than a clause added to the one above, and that part is
+  // load-bearing: folding the disarm in would either leave the draft discard keyed on the
+  // count (fine) or retarget the draft discard to the Set (a regression of issue 1010,
+  // discarding a staged draft on every selection change).
+  $effect(() => {
+    void recipeBulkSelectedIds;
+    recipeBulkDeleteArmed = false;
   });
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(
@@ -1799,16 +2504,6 @@
       hintFallback: 'Browse reusable events before attaching them to environments.',
     },
     {
-      id: 'travel',
-      icon: 'fas fa-route',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel',
-      labelFallback: 'Travel',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
-      titleFallback: 'Travel and parties',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
-      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.',
-    },
-    {
       id: 'settings',
       icon: 'fas fa-sliders',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings',
@@ -1819,19 +2514,192 @@
       hintFallback: 'Set system-level rules for gathering.',
     },
   ];
-  // The Travel/Realms subsystem is opt-in per system. When disabled, the Travel
-  // nav item is hidden AND removed from the tab-resolution lists so a stale
-  // `activeGatheringTab === 'travel'` falls back to environments (filtering the
-  // render alone is insufficient — the guards below validate against this list).
+  // The SELECTED SYSTEM's participation in Travel & Realms (issue 1282). It no longer gates a
+  // route: the realm library is world scope and World > Travel is always reachable. What it
+  // still gates is this system's environment realm controls and its party overrides.
   const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
-  const visibleGatheringNavItems = $derived(
-    gatheringRealmsEnabled
-      ? gatheringNavItems
-      : gatheringNavItems.filter((tab) => tab.id !== 'travel')
+  // A party's current-realm override is per-selected-system, so it needs that system to take
+  // part: the gathering feature AND its Travel & Realms toggle. `adminStore`'s
+  // `canUsePartyRealmOverrides` states the same rule on the write side; re-stating it here
+  // against the LIVE projection is what stops a stale flag outliving the capability when
+  // gathering is switched off or the selection is cleared under the GM.
+  const partyRealmOverridesAvailable = $derived(
+    canShowEnvironments &&
+      gatheringRealmsEnabled &&
+      $viewState.partyRealmOverridesAvailable === true
   );
+  const partyRealmOverridesUnavailableHint = $derived(
+    !selectedSystem || selectedSystem?.features?.gathering !== true
+      ? text(
+          'FABRICATE.Admin.Manager.World.PartyOverrideGatheringRequired',
+          'Select a crafting system with Gathering enabled to set a current-realm override.'
+        )
+      : !gatheringRealmsEnabled
+        ? text(
+            'FABRICATE.Admin.Manager.World.PartyOverrideTravelRequired',
+            'Enable Travel & Realms in this system\u2019s settings to set a current-realm override.'
+          )
+        : ''
+  );
+  const displayedGatheringTab = $derived(activeGatheringTab);
+  const visibleGatheringNavItems = gatheringNavItems;
   const gatheringInspectorTabs = $derived(
     visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
   );
+  const isWorldRoute = $derived(currentView === 'world');
+  const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
+  const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
+  // World > Currency (issue 1278). UNGATED, like Parties and unlike experimental-gated Downtime:
+  // a GM has to be able to configure the world's coins BEFORE any crafting system opts in, so
+  // gating this on a system having currency enabled would be a chicken-and-egg lock-out.
+  const isWorldCurrencyRoute = $derived(currentView === 'world-currency');
+  // World > Travel (issue 1282). UNGATED for the same reason World > Currency is: the realm
+  // library is world geography, and a GM has to be able to author a valley before deciding
+  // which crafting systems care about it. The per-system Travel & Realms toggle governs
+  // consumption — environment gating and party overrides — never reachability of this page.
+  const isWorldTravelRoute = $derived(currentView === 'world-travel');
+  // ONE attribute answering "which World travel destination is on screen", written once so
+  // the markup carries no nested ternary. Parties still reports through `activeTravelTab`
+  // because World > Parties has not moved off it yet.
+  const worldTravelTabAttribute = $derived.by(() => {
+    if (isWorldTravelRoute) return worldTravelTab;
+    return isWorldRoute ? activeTravelTab : undefined;
+  });
+  // THE WORLD > DOWNTIME EXPERIMENTAL GATE (issue 1257), and it is TEMPORARY.
+  //
+  // The route exists to host the premium Downtime Studio, and the Studio is unreleased: both
+  // seams it needs are on `main` and in no published version. Until it ships, the route and
+  // everything that advertises it — including the premium call to action Core renders when no
+  // companion is installed — are shown only to a GM who has opted into experimental features,
+  // exactly as the unimplemented Graph placeholder is (issue 745, `isViewAvailableForSystem`).
+  // Delete this pair and its readers when the Studio releases; nothing here is a design rule.
+  //
+  // ONE PREDICATE, read in three places and DELIBERATELY NOT IN A FOURTH. The rail group's
+  // `{#if}` and the two route entries are what make the route unreachable: nothing can produce a
+  // `world-downtime` token without passing an entry, and every entry consults this. Adding the
+  // read to `normalizedActiveView` as well looks like defence in depth and is not — that function
+  // has one caller and is always handed `activeView`, so the branch is unreachable on arrival,
+  // and the only state it CAN act on is the one below, where acting is the wrong thing to do.
+  //
+  // TURNING THE SETTING OFF UNDER A GM WHO IS ON THE ROUTE HIDES THE RAIL ENTRY AND LEAVES THE
+  // PANEL. `currentView` is a `$derived`, so a gate read in the normalizer would resolve the
+  // route away in the same flush the setting moved in — unmounting the extension host, which runs
+  // a mounted companion's cleanup and destroys its unsaved work without ever consulting the
+  // `onBeforeNavigate` guard every other exit from this route honours. A GM's in-progress edit is
+  // not ours to discard because a setting changed. So the open panel stays until the GM navigates
+  // away, and that navigation is the ordinary guarded exit it has always been. They cannot come
+  // back: the rail entry is gone and both entries refuse.
+  const worldDowntimeAvailable = $derived(experimentalFeaturesEnabled);
+  // A registered provider holds the surface until it faults; otherwise Core's own preview
+  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface, so
+  // the rail, the route chrome and — in core-fallback only — the preview's tab strip all read
+  // ONE tab list either way.
+  const downtimeProvider = $derived(
+    downtimeProviderSnapshot && downtimeProviderSnapshot !== downtimeFaultedProvider
+      ? downtimeProviderSnapshot
+      : null
+  );
+  const downtimeCoreFallback = $derived(downtimeProvider === null);
+  // The union of both registries' claimed surfaces. The two id namespaces are separate by
+  // design (one companion may claim `downtime` in both windows), so this is a concatenation
+  // and never a set: it is only ever read for its length.
+  const registeredSurfaceIds = $derived([
+    ...managerRegisteredSurfaceIds,
+    ...playerRegisteredSurfaceIds,
+  ]);
+  // The title bar's premium signal (issue 1185). It is deliberately BROADER than
+  // `downtimeCoreFallback`: that flag answers "who owns the Downtime route", while this one
+  // answers "is a companion module registered at all", which is the claim the strip makes.
+  // Reading it off the surface SET rather than off Core's one surface id is what lets a
+  // premium module that ships some future surface light the same badge with no change here.
+  const premiumInstalled = $derived(registeredSurfaceIds.length > 0);
+  const downtimeTabs = $derived(downtimeProvider?.tabs ?? WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs);
+  const activeDowntimeTab = $derived(
+    downtimeTabs.find((tab) => tab.id === worldDowntimeTabId) ?? downtimeTabs[0]
+  );
+  // A tab a provider no longer declares must not leave the route on an empty panel. This
+  // covers registration, unregistration, and re-registration with a different tab set.
+  $effect(() => {
+    const tabs = downtimeTabs;
+    if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
+    worldDowntimeTabId = tabs[0].id;
+  });
+  // The rail's Downtime children render the active tab set. In core-fallback they are one of
+  // TWO renderings of it — the preview's own tab strip is the other — and in provider mode
+  // they are the only one, because a companion's screens carry no strip (issue 1213). Either
+  // way they read the same list, so a rail label and a tab label can never drift apart.
+  const downtimeNavItems = $derived(downtimeTabs);
+  // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
+  // the anchor the group's markup is keyed on.
+  const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
+  // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice:
+  // the rail stamps it, and the extension host reads it for the companion panel's
+  // `aria-labelledby` (issue 1213). A second literal here and there would be a mirror across a
+  // component boundary with nothing to catch its drift.
+  //
+  // It names the LABEL SPAN rather than the button deliberately. The button carries the fuller
+  // `aria-label` — the tab's `accessibleName`, which reads as an instruction ("Open the
+  // downtime ledger") because it names an action — and a landmark inherits the whole accessible
+  // name of whatever it points at, so pointing at the button would announce the region as
+  // "Open the downtime ledger, region". A landmark takes the name of the SCREEN, so it points
+  // at the span that holds exactly that: "Ledger".
+  const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
+  // Gated on provider mode rather than merely on the channel being empty. The channel already
+  // releases itself on every path that ends a mount, so this is belt and braces — but Core's
+  // preview is CORE's screen, and no reachable ordering may ever let a companion's copy,
+  // artwork or Save button land on it.
+  const downtimeRuntimeChrome = $derived(downtimeCoreFallback ? null : downtimeRouteChrome);
+  // Header actions belong to the live mount, then to the active TAB, then to the provider's
+  // own list; Core keeps its bespoke premium anchor rather than routing it through a public
+  // descriptor. `??` and not `||`: an EMPTY runtime array means "this screen has no actions",
+  // which a truthiness test would read as "say nothing" and answer with the tab's own list —
+  // leaving a companion's editor wearing its list screen's buttons.
+  const downtimeHeaderActions = $derived(
+    downtimeCoreFallback
+      ? []
+      : (downtimeRuntimeChrome?.actions ??
+          activeDowntimeTab?.actions ??
+          downtimeProvider.actions ??
+          [])
+  );
+  // The staged-changes indicator, and a runtime-only channel by design: it reports what the
+  // mount is DOING right now, which nothing stated at registration can know.
+  const downtimeHeaderStatus = $derived(downtimeRuntimeChrome?.status ?? null);
+  // Header artwork, opt-in per update. Absent it, this route's header keeps the plain heading
+  // it has carried since issue 1185 removed the prototype's glyph tile from it; present, it
+  // renders the identity block Fabricate's own recipe and component editors use, which is what
+  // makes a companion's drill-down look like a drill-down.
+  const downtimeHeaderArtwork = $derived(
+    downtimeRuntimeChrome?.icon || downtimeRuntimeChrome?.image ? downtimeRuntimeChrome : null
+  );
+  const worldDowntimeContext = $derived.by(() => {
+    // Read the revision so `requestRemount()` yields a NEW frozen identity, which is what
+    // the host's mount effect keys on. Nothing here is a Core store, document or component.
+    const revision = downtimeContextRevision;
+    // The context object is its own mount's identity token, which is why the two channel
+    // functions close over a holder rather than being stated once outside this derivation.
+    // A stable function has no way to say WHICH mount called it, so a companion holding a
+    // retired context could repaint the screen the GM moved on to; bound this way, a call
+    // from a dead mount is simply refused. The holder is written once, immediately below,
+    // and never again — this derivation stays pure.
+    const self = { context: null };
+    const context = Object.freeze({
+      schemaVersion: 1,
+      surface: 'manager',
+      surfaceId: WORLD_DOWNTIME_SURFACE_ID,
+      route: 'world-downtime',
+      tabId: worldDowntimeTabId,
+      craftingSystemId: selectedSystemId || null,
+      isGM: isGameMaster(),
+      revision,
+      requestRemount: requestDowntimeRemount,
+      setRouteChrome: (chrome) => downtimeChromeChannel.setChrome(self.context, chrome),
+      onRouteReselect: (handler) => downtimeChromeChannel.onReselect(self.context, handler),
+      onBeforeNavigate: (handler) => downtimeChromeChannel.onBeforeNavigate(self.context, handler),
+    });
+    self.context = context;
+    return context;
+  });
   const isGatheringRoute = $derived(
     currentView === 'environments' ||
       currentView === 'environment-edit' ||
@@ -1839,13 +2707,13 @@
       currentView === 'gathering-event-edit'
   );
   const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)
+    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === displayedGatheringTab)
   );
   const activeGatheringInspectorTab = $derived(
-    gatheringInspectorTabs.find((tab) => tab.id === activeGatheringTab) || null
+    gatheringInspectorTabs.find((tab) => tab.id === displayedGatheringTab) || null
   );
-  // Stale-tab guard: if the active tab is no longer visible (e.g. Travel after the
-  // GM disables Travel & Realms), fall back to Environments.
+  // Gathering's tab set is fixed, but a restored token can still name a section that no
+  // longer exists — including the retired `travel` one, which is now the World > Travel route.
   $effect(() => {
     if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) {
       activeGatheringTab = 'environments';
@@ -1867,14 +2735,26 @@
   const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
-  const craftingNavItems = $derived(
-    buildCraftingNavItems({
-      visibilityMode: craftingVisibilityMode,
-      resolutionMode: craftingResolutionMode,
-      recipeCount,
-      recipeItemCount,
-    })
-  );
+  // ONE argument bag, read by the rail AND by route reconciliation in
+  // `normalizedActiveView` (issue 1151), mirroring `checksNavArgs`/`checksNavItems`
+  // below. Two bags could disagree about what the selected system offers, which is
+  // the defect: the rail would drop the entry while the router kept rendering it.
+  //
+  // `visibilityMode` is the DEFAULTED `craftingVisibilityMode`, not a bare
+  // `selectedSystem?.visibilityMode`. The difference is invisible to
+  // `buildCraftingNavItems` (`craftingEffect` resolves undefined to `knowledge`
+  // anyway), but this same derived is the prop source for BooksScrollsView,
+  // RecipeItemEditor and ItemPageInspector, and RecipeItemEditor's own prop default
+  // is `'item'` — so feeding an undefined-bearing field through would silently flip
+  // its Limits card from learning caps to use caps for a system with no persisted
+  // mode. None of the four inputs reads `currentView`, so the graph stays acyclic.
+  const craftingNavArgs = $derived({
+    visibilityMode: craftingVisibilityMode,
+    resolutionMode: craftingResolutionMode,
+    recipeCount,
+    recipeItemCount,
+  });
+  const craftingNavItems = $derived(buildCraftingNavItems(craftingNavArgs));
   // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books &
   // Scrolls where that surface applies), mirroring the gathering group's total, so
   // the collapsed group count reflects everything inside it — not recipes alone.
@@ -1883,6 +2763,265 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+
+  // ── The Checks rail GROUP (issue 1096) ───────────────────────────────────────────────
+  //
+  // `Checks` was one flat rail button holding four tabs; it is an expandable group whose
+  // children are routes, exactly like the Gathering group above.
+  //
+  // The badges are a DRAFT PREVIEW: readiness is evaluated against the live drafts the GM
+  // is editing, so a badge clears the moment the edit that clears it is made rather than
+  // when it is saved. The ENABLE gate is a different question and reads committed state —
+  // see the Validation hero, which says so rather than claiming "Ready to enable" for
+  // unsaved work.
+  const checksDraftSystem = $derived({
+    modifiers: selectedSystem?.modifiers || [],
+    craftingCheck: selectedSystem?.craftingCheck || {},
+    salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
+    gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
+  });
+  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and
+  // which rules it is evaluated under. Two derivations answered those two questions before
+  // (issue 1096) and disagreed for alchemy at `checkMode: 'tiered'` — the badge evaluated the
+  // untouched SIMPLE draft under ROUTED rules, so it hid criticals the Validation route
+  // reported, breaking the invariant that the dot, the badge and Validation cannot disagree.
+  const salvageCheckSlot = $derived(
+    resolveActiveSalvageCheckFormula({
+      salvageResolutionMode,
+      salvageCraftingCheck: {
+        simple: salvageSimpleDraft,
+        routed: salvageRoutedDraft,
+        progressive: salvageProgressiveDraft,
+      },
+    }).slot
+  );
+  const gatheringCheckSlot = $derived(
+    resolveActiveGatheringCheckFormula(
+      {
+        gatheringCraftingCheck: {
+          progressive: gatheringProgressiveDraft,
+          routed: gatheringRoutedDraft,
+        },
+      },
+      gatheringResolutionMode
+    ).slot
+  );
+  function draftForSlot(slot, drafts) {
+    return slot ? (drafts[slot] ?? null) : null;
+  }
+  /**
+   * A SWITCHED-OFF check reports NO issues, and this is the same predicate the route renders
+   * by (`ChecksView`'s `routeIsOff`), restated here because the badge is drawn by the rail
+   * rather than by the route.
+   *
+   * Without it the two disagree, and the disagreement is unresolvable from the screen: an off
+   * check's route collapses to the single "Turn this check on" panel with no sections, no
+   * dots and no Modifiers card — while the rail child still badged the issues that panel no
+   * longer renders anywhere. The reachable case is an alchemy system with an authored
+   * check-modifier selection: switching the check off raised `modifiersInertNoCheck`, badged
+   * "1", and left the GM no control anywhere on the route that could clear it.
+   *
+   * It is right on the merits too, not just for agreement: readiness answers "will this check
+   * work when it runs", and a check that has been turned off does not run.
+   */
+  function checksActivityIsOff(activity) {
+    const state = checkActivation?.[activity];
+    if (!state || state.enabled === true) return false;
+    if (activity === 'gathering') return state.mode !== 'd100';
+    return state.optional === true;
+  }
+  function checksIssueCount(activity, slot, drafts) {
+    if (checksActivityIsOff(activity)) return 0;
+    return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
+      mode: readinessModeForSlot(slot),
+      modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
+      activity,
+    }).issues.length;
+  }
+  const checksIssueCounts = $derived({
+    crafting: checksIssueCount('crafting', craftingCheckMode, {
+      simple: checkSimpleDraft,
+      routed: checkRoutedDraft,
+      progressive: checkProgressiveDraft,
+    }),
+    salvage: checksIssueCount('salvage', salvageCheckSlot, {
+      simple: salvageSimpleDraft,
+      routed: salvageRoutedDraft,
+      progressive: salvageProgressiveDraft,
+    }),
+    gathering: checksIssueCount('gathering', gatheringCheckSlot, {
+      progressive: gatheringProgressiveDraft,
+      routed: gatheringRoutedDraft,
+    }),
+  });
+  const checksNavArgs = $derived({
+    features: selectedSystem?.features || {},
+    resolutionMode: selectedSystem?.resolutionMode || 'simple',
+    salvageResolutionMode,
+    gatheringResolutionMode,
+    issueCounts: checksIssueCounts,
+    dirtyActivities: {
+      crafting: craftingCheckDirty,
+      salvage: salvageCheckDirty,
+      gathering: gatheringCheckDirty,
+    },
+  });
+  const checksNavItems = $derived(buildChecksNavItems(checksNavArgs));
+  // The PARENT badge sums the three ACTIVITY children only. Validation's badge is that
+  // same total restated, so adding it in would report every issue twice.
+  const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
+  const isChecksRoute = $derived(isChecksView(currentView));
+  const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
+
+  // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
+  //
+  // One rule, stated once for all five groups: a group is expanded when the GM expanded it
+  // (`railGroupUserExpanded`) OR when collapsing it would hide the screen they are standing
+  // on (`railGroupLockedOpen`). The lock is the ONLY exception to "every group collapses in
+  // any state", and it is why the disclosure control renders genuinely `disabled` there
+  // rather than swallowing the click — a chevron that visibly does nothing is what the
+  // whole defect read as.
+  //
+  // "Locked" means "the current view BELONGS to this group", and an editor detail route
+  // belongs to the group whose sub-item opened it: `recipe-edit` is reached from Recipes and
+  // is read as part of Recipes, so the group that owns it stays open while the GM is in it.
+  // That is why the lock keys on the group's route CATEGORY (`isCraftingView` covers
+  // `CRAFTING_VIEWS`, which carries `recipe-edit` and `recipe-item-edit`) rather than on the
+  // narrower "is a rendered rail entry" test.
+  //
+  // The rule is deliberately uniform across all five groups. Gathering already behaved this
+  // way — `isActiveGatheringChildRoute` is true throughout `environment-edit`,
+  // `gathering-task-edit` and `gathering-event-edit` — and Crafting and Checks were the
+  // outliers, releasing their group the moment an editor opened.
+  // Downtime's every sub-tab IS the one `world-downtime` route (the tab is panel state, not
+  // a route), and that holds for a companion's tab set exactly as it does for Core's four —
+  // nothing here reads a tab id.
+  const railGroupLockedOpen = $derived({
+    crafting: isCraftingRoute,
+    checks: isChecksRoute,
+    gathering: isActiveGatheringChildRoute,
+    worldTravel: isWorldTravelRoute,
+    worldDowntime: isWorldDowntimeRoute,
+  });
+  const railGroupExpanded = $derived({
+    crafting: railGroupUserExpanded.crafting || railGroupLockedOpen.crafting,
+    checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
+    gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
+    worldTravel: railGroupUserExpanded.worldTravel || railGroupLockedOpen.worldTravel,
+    worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
+  });
+  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
+  // navigates away instead of snapping shut behind them.
+  //
+  // This effect reads `railGroupLockedOpen` and NEVER `railGroupUserExpanded`. That is the
+  // whole fix for the re-assert loop: a write to a state this effect does not read cannot
+  // re-trigger it, so a collapse the GM makes is final until the lock itself changes.
+  $effect(() => {
+    const locked = railGroupLockedOpen;
+    for (const group of RAIL_GROUP_IDS) {
+      if (locked[group]) railGroupUserExpanded[group] = true;
+    }
+  });
+  // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its
+  // breadcrumb reads "<system> › Crafting › Tools" — so entering it opens the Crafting group,
+  // as it has since issue 784. What changed is the mechanism: it records INTENT here instead
+  // of ORing `isToolStudioRoute` into the rendered expansion. Tools is not one of Crafting's
+  // rail sub-items, so it must not LOCK the group; the old form pinned the group open and
+  // left its chevron inert, which is one of the five faces of the issue 1185 report.
+  // Reads only the route, never the flag, so a collapse from here is final.
+  $effect(() => {
+    if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
+  });
+  function toggleRailGroup(group, event) {
+    event?.stopPropagation?.();
+    // Belt and braces beside the `disabled` attribute: the lock is a rule about state, not
+    // about one control, so it holds for a programmatic call too.
+    if (railGroupLockedOpen[group]) return;
+    railGroupUserExpanded[group] = !railGroupUserExpanded[group];
+  }
+  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
+  // children come from whichever provider holds the surface, so this cannot name a section.
+  const railGroupLockedTitle = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Nav.LockedOpen',
+      'This section stays open while you are on one of its pages.'
+    )
+  );
+  // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
+  //
+  // MODE-scoped, not route-scoped. Provider mode renders no tab strip, and the 56px rail hides
+  // `.manager-nav-submenu` outright — measured with the strip suppressed, the number of
+  // reachable tab switchers was ZERO. `display: none` also removes them from the accessibility
+  // tree, so a collapsed rail there is a keyboard and screen-reader dead end and not merely a
+  // pointer one. Core's fallback keeps its strip, is never stranded, and therefore keeps its
+  // collapsible rail — which is also what protects the `manager-world-downtime-collapsed`
+  // View Lab frame.
+  //
+  // The lock flips live when a provider registers or deregisters mid-session, so a GM sitting
+  // on this route with a collapsed rail sees it snap open in the same frame as the swap. That
+  // is strand-avoidance working, not a glitch.
+  const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
+  // DISPLAY-ONLY. `railCollapsed` is seeded from and written back to a `client`-scoped setting
+  // — localStorage, per device, surviving reload — so the group lock's template is the WRONG
+  // one here: `toggleRailGroup` resolves its lock by writing intent into `railGroupUserExpanded`,
+  // which is safe only because that map is in-memory. Copying it would mean merely VISITING
+  // World Downtime permanently un-collapses the GM's rail on every other route and in every
+  // future session. Derive what is DISPLAYED instead and leave the stored preference alone, so
+  // leaving the route restores it.
+  const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
+  // Every rail-toggle attribute reads the DISPLAY value, never the stored one. Forcing the rail
+  // open without them gives a GM who arrived collapsed an expanded rail whose control reports
+  // `aria-pressed="true"`, is labelled "Expand navigation rail", points its chevron the wrong
+  // way and does nothing when clicked — the same defect class as issue 1185, in the same widget,
+  // one route over. Stated once here because two scope-card branches render the control.
+  const railToggleLabel = $derived(
+    railCollapsedDisplay
+      ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+      : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')
+  );
+  // Its own string, not the group lock's: `Nav.LockedOpen` is section-worded and wrong for the
+  // whole sidebar.
+  const railToggleTitle = $derived(
+    railLockedOpen
+      ? text('FABRICATE.Admin.Manager.Nav.RailLockedOpen', 'The sidebar stays open on this page.')
+      : railToggleLabel
+  );
+  const railToggleIcon = $derived(
+    railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
+  );
+  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213). Measured at a 1330x900 Manager, the nav
+  // scrollport ends at y=977 while the three Downtime sub-items render at 983-1083: with the
+  // strip gone, the route's FIRST VISIBLE STATE offered no visible way to change screen. They
+  // are reachable by scrolling, so this is not the stranding the rail lock exists to prevent —
+  // it is the one real cost of deleting the strip, and one scroll removes it.
+  //
+  // `nearest` so a switcher already in view does not move the rail at all. Provider mode only:
+  // core-fallback keeps its strip at the top of the panel and needs no help.
+  //
+  // `revealedDowntimeNavId` is DEFENSIVE, not load-bearing, and the distinction was measured
+  // rather than assumed. An earlier version of this comment said the rail "re-renders on far
+  // more than a route change and a repeat would yank the pane back", which misstates Svelte 5:
+  // the effect re-runs on DEPENDENCY change, not on re-render, and every path that changes a
+  // dependency either changes `worldDowntimeTabId` (re-scroll wanted) or resets this to null
+  // (re-scroll wanted). The keyed each-block keeps `bind:this` node identity stable, so
+  // `downtimeNavNodes[tabId]` does not churn either. No re-entry it prevents could be
+  // constructed, and deleting it broke no test — so it stays as cheap insurance against a
+  // future dependency being added, and nothing claims to gate it.
+  const downtimeNavNodes = $state({});
+  let revealedDowntimeNavId = null;
+  $effect(() => {
+    if (!railLockedOpen || !railGroupExpanded.worldDowntime) {
+      revealedDowntimeNavId = null;
+      return;
+    }
+    const tabId = worldDowntimeTabId;
+    if (revealedDowntimeNavId === tabId) return;
+    const node = downtimeNavNodes[tabId];
+    if (!node) return;
+    revealedDowntimeNavId = tabId;
+    // happy-dom does not implement it, hence the optional call.
+    node.scrollIntoView?.({ block: 'nearest' });
+  });
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -1953,13 +3092,6 @@
         )
       : []
   );
-  // The Crafting group's expansion follows the active route: it expands on
-  // entering a crafting child route and collapses on leaving, so the submenu
-  // never dangles open over unrelated views. A manual toggle from a non-crafting
-  // route sticks until the route category next changes.
-  $effect(() => {
-    craftingMenuExpanded = isCraftingRoute;
-  });
   const selectedGatheringRules = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
       rewardSelectionMode: 'highestRankedDrop',
@@ -2035,24 +3167,67 @@
       }))
   );
   const travelParties = $derived($viewState.travelParties || []);
-  const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
-  const selectedTravelParty = $derived(
-    travelParties.find((party) => party.id === selectedTravelPartyId) || null
+
+  // World > Parties page-header subtitle (issue 1182). `enabled` counts `enabled === true`
+  // and NOT the prototype's `enabled && members.length`: an enabled party resolves its
+  // travel actor's current realm with or without members (gathering-and-harvesting req 6),
+  // and an enabled party with neither members nor a travel actor is still the record a
+  // downtime group is grouped by, so a member-less enabled party is in use.
+  //
+  // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
+  // Travel actors are deliberately outside the numerator — a currently linked one is
+  // offered by its picker whether or not its type is configured, so a vehicle standing in
+  // as one would otherwise be counted against a player-character denominator and render
+  // "5 of 4 characters assigned". Stale member
+  // uuids resolve to no projected actor and drop out for the same reason.
+  const playerCharacterUuids = $derived(
+    new Set(
+      ($viewState.actorOptions || [])
+        .filter((actor) => actor.isPlayerCharacter === true)
+        .map((actor) => actor.uuid)
+    )
   );
+  const assignedCharacterCount = $derived.by(() => {
+    const assigned = [];
+    for (const party of travelParties) {
+      for (const uuid of party.memberActorUuids || []) {
+        if (playerCharacterUuids.has(uuid) && !assigned.includes(uuid)) assigned.push(uuid);
+      }
+    }
+    return assigned.length;
+  });
+  const enabledPartyCount = $derived(
+    travelParties.filter((party) => party.enabled === true).length
+  );
+
   // Realm selection is UI-local (no store resolution needed); the inspector
   // reads the selected realm from the system-realm projection.
   let selectedTravelRealmId = $state('');
-  const travelSystemRealms = $derived($viewState.selectedSystemRealms || []);
+  const worldRealms = $derived($viewState.worldRealms || []);
+  // Rows for the Realms tab's per-realm environment editor. Projected here rather than inside
+  // `EnvironmentsBrowserView`, which no longer hosts the Realms surface at all: World > Travel
+  // renders `GatheringRealmsTab` straight from this root.
+  const worldTravelEnvironmentOptions = $derived(
+    environmentList.map((environment) => ({
+      id: environment.id,
+      name: environment.name,
+      img: environment.img || '',
+      enabled: environment.enabled !== false,
+      includedRealmIds: Array.isArray(environment.includedRealmIds)
+        ? environment.includedRealmIds
+        : [],
+    }))
+  );
   const selectedTravelRealm = $derived(
-    travelSystemRealms.find((realm) => realm.id === selectedTravelRealmId) || null
+    worldRealms.find((realm) => realm.id === selectedTravelRealmId) || null
   );
   // Mirror the Parties tab: keep a realm selected whenever one exists, falling
   // back to the first realm when nothing is selected or the selection is gone.
   $effect(() => {
-    if (travelSystemRealms.length === 0) {
+    if (worldRealms.length === 0) {
       if (selectedTravelRealmId) selectedTravelRealmId = '';
-    } else if (!travelSystemRealms.some((realm) => realm.id === selectedTravelRealmId)) {
-      selectedTravelRealmId = travelSystemRealms[0].id;
+    } else if (!worldRealms.some((realm) => realm.id === selectedTravelRealmId)) {
+      selectedTravelRealmId = worldRealms[0].id;
     }
   });
   // Map Region Links tab: selection over the current scene's regions (UI-local).
@@ -2077,7 +3252,6 @@
     environments: environmentList.length,
     tasks: gatheringTaskDefinitions.length,
     encounters: gatheringEventDefinitions.length,
-    travel: travelParties.length,
     total:
       environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length,
   });
@@ -2182,7 +3356,7 @@
     gatheringEventDraftBaseline = null;
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
-    gatheringMenuExpanded = isGatheringRoute;
+    railGroupUserExpanded.gathering = isGatheringRoute;
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -2192,11 +3366,6 @@
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
-  });
-
-  $effect(() => {
-    if (!isActiveGatheringChildRoute || gatheringMenuExpanded) return;
-    gatheringMenuExpanded = true;
   });
 
   $effect(() => {
@@ -2246,12 +3415,15 @@
     return () => services?.registerToolDirtyGuard?.(null);
   });
 
+  // The companion's own window-close guard. Registered unconditionally and SELF-SCOPING: the
+  // channel answers `undefined` unless a live mount holds a guard, and a live mount only
+  // exists while the GM is on the Downtime route with a companion panel on screen. Nothing
+  // here needs to know the active route, and nothing fires on any other one.
   $effect(() => {
-    if (
-      toolsComponentPageIndex > 0 &&
-      toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length
-    )
-      toolsComponentPageIndex = 0;
+    services?.registerDowntimeCompanionGuard?.(() =>
+      downtimeChromeChannel.confirmNavigation('close')
+    );
+    return () => services?.registerDowntimeCompanionGuard?.(null);
   });
 
   function text(key, fallback) {
@@ -2482,9 +3654,45 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
+    // `checks` is RETAINED as a redirect to the first available child (issue 1096), so
+    // existing deep links, the salvage editor's "Manage presets" link and every View Lab
+    // `expectView: 'checks'` still have a defined answer after the split. The target is
+    // resolved from the same nav model the rail renders, so "first available" cannot mean
+    // two different things.
+    if (system && view === 'checks') return resolveChecksRedirect(checksNavArgs);
+    // A child whose feature was switched off while it was open falls back to the same
+    // redirect rather than rendering a route the rail no longer offers.
+    if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
+      return resolveChecksRedirect(checksNavArgs);
+    // The same reconciliation for the Crafting group (issue 1151): a crafting-system
+    // scope change or a `visibilityMode` edit must not leave the GM rendering a
+    // mode-conditional entry the selected system no longer offers, with no rail entry
+    // to return to it.
+    //
+    // The membership test is taken over the entry that OWNS the view, not over the
+    // view — `isCraftingViewAvailable` maps through `activeCraftingTab` — so
+    // `recipes`, `recipe-edit` and `crafting-settings` are never caught, and
+    // `recipe-item-edit` follows its Books & Scrolls parent. The Checks clause above
+    // can compare views directly because every Checks child IS a view; the crafting
+    // model's ids and views deliberately differ.
+    //
+    // This is a read-time normalization, so it invokes no route-exit guard and does
+    // not weaken one: every path reaching it has already passed the guard. A scope
+    // change maps an editor route to its browser through `SCOPE_BROWSER_BY_VIEW` and
+    // prompts BEFORE `selectSystem`, and `setVisibilityMode` is reachable only from
+    // the unconditional Settings entry.
+    if (system && isCraftingView(view) && !isCraftingViewAvailable(view, craftingNavArgs))
+      return resolveCraftingRedirect(craftingNavArgs);
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
+    if (
+      view === 'world' ||
+      view === 'world-downtime' ||
+      view === 'world-currency' ||
+      view === 'world-travel'
+    )
+      return view;
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
@@ -2549,20 +3757,39 @@
       return isCreatingEssenceDraft
         ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
         : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
         'Gathering Tasks'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
-        'Travel and parties'
+    if (currentView === 'world')
+      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    if (currentView === 'world-currency')
+      return text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency');
+    if (currentView === 'world-travel') {
+      if (worldTravelTab === 'map')
+        return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
+      return text('FABRICATE.Admin.Manager.Travel.RealmsTitle', 'Realms');
+    }
+    // The Downtime route titles itself after the tab on screen, not after the route: a GM
+    // switching sub-tabs must see the page name change with them, and a companion's screens
+    // must not wear Core's preview copy.
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'title',
+        'Downtime',
+        text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')
       );
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'tool-edit')
       return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
-    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
+    // Written as a LOOKUP over four whole keys rather than one interpolated template ending
+    // at the `Checks` segment: `tests/lang-keys-no-orphans.test.js` credits an interpolation
+    // base as a covering PREFIX over its whole subtree, so that single template would have
+    // silently un-orphaned every dead key under the Checks namespace — including the
+    // nineteen this repo tracks deliberately in `tests/lang-known-orphans.js`. The scan reads
+    // COMMENTS too, so this note must not spell that prefix out either.
+    if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
     if (currentView === 'environments')
       return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit')
@@ -2649,16 +3876,71 @@
         'FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle',
         'Update identity and icon for this essence.'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
         'Browse gathering tasks before attaching them to environments.'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
-      return text(
-        'FABRICATE.Admin.Manager.Travel.Subtitle',
-        'Manage Fabricate parties and set the current realm for the selected crafting system.'
+    if (currentView === 'world') {
+      if (travelParties.length === 0)
+        return text(
+          'FABRICATE.Admin.Manager.World.Parties.SubtitleEmpty',
+          'No parties yet · world-level, shared by gathering and travel in every system'
+        );
+      const template =
+        travelParties.length === 1
+          ? text(
+              'FABRICATE.Admin.Manager.World.Parties.SubtitleOne',
+              '1 party · {enabled} enabled · {assigned} of {total} characters assigned'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.World.Parties.Subtitle',
+              '{count} parties · {enabled} enabled · {assigned} of {total} characters assigned'
+            );
+      return template
+        .replace('{count}', String(travelParties.length))
+        .replace('{enabled}', String(enabledPartyCount))
+        .replace('{assigned}', String(assignedCharacterCount))
+        .replace('{total}', String(playerCharacterUuids.size));
+    }
+    if (currentView === 'world-currency') {
+      if (selectedCurrencyUnits.length === 0)
+        return text(
+          'FABRICATE.Admin.Manager.World.Currency.SubtitleEmpty',
+          'No coins yet · world-level, shared by every crafting system that enables currency'
+        );
+      const template =
+        selectedCurrencyUnits.length === 1
+          ? text(
+              'FABRICATE.Admin.Manager.World.Currency.SubtitleOne',
+              '1 coin · used by {systems} of {total} crafting systems'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.World.Currency.Subtitle',
+              '{count} coins · used by {systems} of {total} crafting systems'
+            );
+      return template
+        .replace('{count}', String(selectedCurrencyUnits.length))
+        .replace('{systems}', String(currencyEnabledSystemCount))
+        .replace('{total}', String(allSystems.length));
+    }
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'subtitle',
+        'Fabricate Premium · Your party-wide command board for every activity and shared project.',
+        ''
       );
+    if (currentView === 'world-travel') {
+      if (worldTravelTab === 'map')
+        return text(
+          'FABRICATE.Admin.Manager.Travel.MapLinksHint',
+          'Link the active scene\u2019s Foundry Scene Regions to the world\u2019s realms.'
+        );
+      return text(
+        'FABRICATE.Admin.Manager.Travel.RealmsHint',
+        'Author the world\u2019s realms \u00b7 shared by every crafting system that enables Travel & Realms.'
+      );
+    }
     if (currentView === 'tools')
       return text(
         'FABRICATE.Admin.Manager.Tools.Subtitle',
@@ -2669,7 +3951,7 @@
         'FABRICATE.Admin.Manager.Tools.EditSubtitle',
         'Configure Tool identity, breakage, requirements, and validation.'
       );
-    if (currentView === 'checks')
+    if (isChecksRoute)
       return text(
         'FABRICATE.Admin.Manager.Checks.Subtitle',
         'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
@@ -2736,19 +4018,25 @@
       return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions',
-        'Travel and party actions'
+    if (currentView === 'world')
+      return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'actionsLabel',
+        'Downtime actions',
+        text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions')
       );
+    if (currentView === 'world-travel')
+      return worldTravelTab === 'map'
+        ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
+        : text('FABRICATE.Admin.Manager.Travel.RealmsActions', 'Realm actions');
     if (currentView === 'tools')
       return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
     if (currentView === 'knowledge')
       return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
-    if (currentView === 'checks')
-      return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
+    if (isChecksRoute) return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (
       currentView === 'environments' ||
       currentView === 'environment-edit' ||
@@ -2784,16 +4072,17 @@
       );
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
         'Selected gathering task inspector'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector',
-        'Selected party inspector'
-      );
+    if (isWorldRoute)
+      return text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party');
+    if (isWorldTravelRoute)
+      return worldTravelTab === 'map'
+        ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
+        : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm');
     if (currentView === 'tools')
       return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments')
@@ -2899,32 +4188,35 @@
     return true;
   }
 
-  async function finishGatheringTaskRouteExit(action) {
+  async function finishGatheringTaskRouteExit(action, nextView) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringTaskDraft();
       if (saved === false) return false;
     }
     clearGatheringTaskDraft();
+    if (nextView) activeView = nextView;
     return true;
   }
 
-  async function finishGatheringEventRouteExit(action) {
+  async function finishGatheringEventRouteExit(action, nextView) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringEventDraft();
       if (saved === false) return false;
     }
     clearGatheringEventDraft();
+    if (nextView) activeView = nextView;
     return true;
   }
 
-  function confirmGatheringEventRouteExit(_nextView) {
+  function confirmGatheringEventRouteExit(nextView) {
     if (activeView !== 'gathering-event-edit') return true;
-    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
+    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true, nextView);
     const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishGatheringEventRouteExit);
-    return finishGatheringEventRouteExit(confirmed);
+    if (isPromise(confirmed))
+      return confirmed.then((action) => finishGatheringEventRouteExit(action, nextView));
+    return finishGatheringEventRouteExit(confirmed, nextView);
   }
 
   function confirmComponentRouteExit(_nextView) {
@@ -3014,18 +4306,21 @@
     return finishRecipeItemRouteExit(confirmed);
   }
 
-  function confirmGatheringTaskRouteExit(_nextView) {
+  function confirmGatheringTaskRouteExit(nextView) {
     if (activeView !== 'gathering-task-edit') return true;
-    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
+    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true, nextView);
     const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
-    return finishGatheringTaskRouteExit(confirmed);
+    if (isPromise(confirmed))
+      return confirmed.then((action) => finishGatheringTaskRouteExit(action, nextView));
+    return finishGatheringTaskRouteExit(confirmed, nextView);
   }
 
   // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
-  // routes whose view token does not change when the subject does. Only the essence guard
-  // reads it today; every other caller keeps its one-argument shape.
-  function confirmRouteExit(nextView, nextRouteId = '') {
+  // routes whose view token does not change when the subject does. Inside this cascade only
+  // the essence guard reads it; `confirmRouteExit` also reads it for the Downtime tab a
+  // companion's navigation guard is being asked about. Every other caller keeps its
+  // one-argument shape.
+  function confirmRouteExitGuards(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
@@ -3048,6 +4343,77 @@
     }
     if (essenceResult === false) return false;
     return continueRouteExitAfterEssence(nextView);
+  }
+
+  /**
+   * Ask a mounted companion whether the GM may leave the screen it is showing.
+   *
+   * `undefined` — never `true` — means there is nothing to ask, and every caller reads it
+   * as "run the path you ran before this seam existed". That is what makes a companion which
+   * never registers a guard cost exactly nothing: no prompt, no `await`, no extra microtask,
+   * and no change to the promise identity `confirmRouteExit` is careful to preserve.
+   *
+   * The DESTINATION decides whether this is a navigation at all. `nextRouteId` already carries
+   * "the identity of the subject the caller is navigating to, for the routes whose view token
+   * does not change when the subject does" — which is exactly what a Downtime tab is — so the
+   * Downtime tab id travels on the parameter that exists for it rather than on a second one.
+   * Re-entering the route the GM is already on (the parent rail item, which states no tab)
+   * leaves nothing, so it must not prompt.
+   *
+   * @param {string} nextView Route token the caller is navigating to.
+   * @param {string} nextRouteId Destination Downtime tab id, when the caller states one.
+   * @returns {undefined|boolean|Promise<boolean>} `undefined` when there is nothing to ask.
+   */
+  function confirmDowntimeCompanionNavigation(nextView, nextRouteId) {
+    if (activeView !== 'world-downtime') return undefined;
+    if (nextView === 'world-downtime' && (!nextRouteId || nextRouteId === worldDowntimeTabId))
+      return undefined;
+    return downtimeChromeChannel.confirmNavigation(nextView === 'world-downtime' ? 'tab' : 'route');
+  }
+
+  /**
+   * Core's own route-exit cascade, plus the Downtime host disposal that follows it.
+   *
+   * Split out of `confirmRouteExit` so the companion guard can gate the WHOLE of it: a
+   * companion that vetoes must leave Core's drafts untouched and its host mounted, and a
+   * guard placed inside the cascade would have Core prompting — or saving — first.
+   *
+   * @param {string} nextView Route token the caller is navigating to.
+   * @param {string} nextRouteId Destination subject id, for same-token routes.
+   * @returns {boolean|Promise<boolean>} Whether the navigation may proceed.
+   */
+  function finishRouteExit(nextView, nextRouteId) {
+    const result = confirmRouteExitGuards(nextView, nextRouteId);
+    if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
+
+    // Keep the original route-guard promise identity. `afterTruthyResult` already subscribes to
+    // it immediately; wrapping it would put route activation one microtask later and regress
+    // every existing async discard path. Reactions run in registration order, so this cleanup
+    // still happens before the caller's route activation removes the host target.
+    const disposeDowntime = (confirmed) => {
+      if (confirmed !== false) downtimeExtensionHost?.disposeBeforeRemoval?.();
+    };
+    if (isPromise(result)) result.then(disposeDowntime);
+    else disposeDowntime(result);
+    return result;
+  }
+
+  // The companion is asked FIRST, and only about navigations that end its mount. Every Core
+  // guard below is route-gated, so on `world-downtime` the whole Core cascade is already a
+  // synchronous `true` — asking the companion first therefore reorders nothing, and it means
+  // a veto costs no Core write at all, where asking Core first could persist an environment
+  // or a tool for a navigation the companion then refuses.
+  function confirmRouteExit(nextView, nextRouteId = '') {
+    const companion = confirmDowntimeCompanionNavigation(nextView, nextRouteId);
+    // Returned UNTOUCHED, not wrapped: `afterTruthyResult` subscribes to this value
+    // immediately, and wrapping it would put every existing route activation one microtask
+    // later. Only the new path, where a companion actually holds a guard, composes.
+    if (companion === undefined) return finishRouteExit(nextView, nextRouteId);
+    if (isPromise(companion))
+      return companion.then((allowed) =>
+        allowed === false ? false : finishRouteExit(nextView, nextRouteId)
+      );
+    return companion === false ? false : finishRouteExit(nextView, nextRouteId);
   }
 
   function continueRouteExitAfterEssence(nextView) {
@@ -3113,11 +4479,75 @@
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
       return toolsResult.then((value) =>
-        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+        value === false ? false : continueRouteExitAfterChecks(nextView)
       );
     }
     if (toolsResult === false) return false;
+    return continueRouteExitAfterChecks(nextView);
+  }
+
+  function continueRouteExitAfterChecks(nextView) {
+    const checksResult = confirmChecksRouteExit(nextView);
+    if (isPromise(checksResult)) {
+      return checksResult.then((value) =>
+        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+      );
+    }
+    if (checksResult === false) return false;
     return confirmSystemDetailsRouteExit(nextView);
+  }
+
+  /** Reset every check draft to its last saved baseline. */
+  function discardChecksDrafts() {
+    alchemyCheckModeDraft = alchemyCheckModeBaseline;
+    craftingCheckActiveDraft = craftingCheckActiveBaseline;
+    salvageCheckActiveDraft = salvageCheckActiveBaseline;
+    gatheringCheckActiveDraft = gatheringCheckActiveBaseline;
+    checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
+    checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
+    checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);
+    salvageSimpleDraft = cloneSimpleCheck(salvageSimpleBaseline);
+    salvageRoutedDraft = cloneRoutedCheck(salvageRoutedBaseline);
+    salvageProgressiveDraft = cloneProgressiveCheck(salvageProgressiveBaseline);
+    gatheringProgressiveDraft = cloneProgressiveCheck(gatheringProgressiveBaseline);
+    gatheringRoutedDraft = cloneRoutedCheck(gatheringRoutedBaseline);
+  }
+
+  async function finishChecksRouteExit(action) {
+    if (action === 'save') {
+      // Navigation is gated on the SAVE, exactly as the essence and system-details guards
+      // gate theirs: a Save that did not land leaves the GM on the studio with the edit
+      // still in front of them, rather than navigating away from work nothing persisted.
+      return await saveChecks();
+    }
+    if (action === 'discard' || action === true) {
+      discardChecksDrafts();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The Checks Studio's route-exit prompt (issue 1096).
+   *
+   * Navigating BETWEEN Checks children never prompts: the drafts live above the route, so
+   * moving from Crafting to Salvage and back preserves them. Leaving the studio for a
+   * non-Checks route with any activity dirty raises the three-way prompt, which names the
+   * dirty activities — the GM may be standing on Gathering while the unsaved edit is on
+   * Crafting.
+   */
+  function confirmChecksRouteExit(nextView) {
+    if (!isChecksRoute || isChecksView(nextView)) return true;
+    if (!checksDirty) return true;
+    const names = checksDirtyActivities.map((activity) =>
+      text(
+        `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
+        activity
+      )
+    );
+    const confirmation = store?.confirmDiscardDirtyChecksDraft?.(names);
+    if (isPromise(confirmation)) return confirmation.then(finishChecksRouteExit);
+    return finishChecksRouteExit(confirmation);
   }
 
   function surfaceToolsSaveValidationError() {
@@ -3169,6 +4599,7 @@
         view === 'tools' ||
         view === 'tool-edit' ||
         view === 'checks' ||
+        isChecksView(view) ||
         view === 'knowledge') &&
       !selectedSystem
     )
@@ -3206,9 +4637,14 @@
   // A per-record editor/detail view is bound to ONE system's record, so switching the
   // crafting system from the rail scope-select must return the GM to the corresponding
   // studio BROWSER for the new system rather than stranding them in an editor for a
-  // record that does not exist under the new system (e.g. recipe-edit → recipes). Browser,
-  // list, and settings views are not listed and stay put — they simply reload for the new
-  // system, which is the desired behaviour.
+  // record that does not exist under the new system (e.g. recipe-edit → recipes).
+  //
+  // Browser, list, and settings views are not listed here, but "they simply reload for
+  // the new system" is only true once the ROUTER has reconciled them (issue 1151): a
+  // mode-conditional Crafting browser such as `access` or `books-scrolls` may not exist
+  // under the new system at all. `normalizedActiveView` owns that answer, so this map
+  // stays a per-record editor concern and every entry path — a scope change, a
+  // `visibilityMode` edit, a restored stale `activeView` — is reconciled in one place.
   const SCOPE_BROWSER_BY_VIEW = {
     'recipe-edit': 'recipes',
     'recipe-item-edit': 'books-scrolls',
@@ -3262,6 +4698,18 @@
     if (!systemId) return;
     afterTruthyResult(selectSystem(systemId, 'system-edit'), () => {
       requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
+  }
+
+  // Open the System Overview page on its Settings tab with the Modifiers section expanded
+  // and scrolled to (issue 1117). It goes through the SAME route-exit guard every other
+  // navigation here does, so leaving a dirty Checks draft still prompts.
+  function showSystemModifiers() {
+    if (!selectedSystem) return;
+    afterTruthyResult(confirmRouteExit('system-edit'), () => {
+      requestSystemTab('settings');
+      requestedSystemModifierSectionNonce += 1;
       activeView = 'system-edit';
     });
   }
@@ -3325,6 +4773,31 @@
     target.open(id);
   }
 
+  // "{count} issue" / "{count} issues" — the badge must NAME its unit, because a bare
+  // numeral in this column is the record count every other rail entry renders there.
+  const CHECKS_ROUTE_TITLE_KEYS = {
+    crafting: 'FABRICATE.Admin.Manager.Checks.Crafting.PageTitle',
+    salvage: 'FABRICATE.Admin.Manager.Checks.Salvage.PageTitle',
+    gathering: 'FABRICATE.Admin.Manager.Checks.Gathering.PageTitle',
+    validation: 'FABRICATE.Admin.Manager.Checks.Validation.Title',
+  };
+
+  function checksIssueName(count) {
+    const key = count === 1 ? 'IssueCountOne' : 'IssueCountOther';
+    const fallback = count === 1 ? '{count} issue' : '{count} issues';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${key}`, fallback).replace(
+      '{count}',
+      String(count)
+    );
+  }
+
+  // Activating the PARENT opens the group and routes to the first available child, which is
+  // what makes the retained `checks` id a redirect rather than a dead route.
+  function activateChecksParent() {
+    railGroupUserExpanded.checks = true;
+    setView(resolveChecksRedirect(checksNavArgs));
+  }
+
   function backToSystemsBrowser() {
     afterTruthyResult(confirmRouteExit('systems'), () => {
       activeView = 'systems';
@@ -3334,7 +4807,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
-      if (canShowEnvironments) gatheringMenuExpanded = true;
+      if (canShowEnvironments) railGroupUserExpanded.gathering = true;
     });
   }
 
@@ -3533,6 +5006,7 @@
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
       content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name }),
+      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepConfirm'),
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: [] });
@@ -3609,6 +5083,7 @@
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
       content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
+      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.DeleteStep'),
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: steps.filter((entry) => entry?.id !== stepId) });
@@ -3831,6 +5306,126 @@
     store.deleteComponent?.(itemId);
   }
 
+  // ── EMPTYING A BULK SELECTION (issue 1157) ───────────────────────────────────────
+  //
+  // Every action that empties a bulk selection unmounts the panel it was performed FROM.
+  // The three that do it are Clear (the toolbar's and the panel header's, which are one
+  // action reached two ways), a successful set delete, and a successful Apply — and all
+  // three left the GM with focus on `document.body` and nothing announced.
+  //
+  // Both halves are owned HERE rather than by a panel or a browser, and for the same
+  // reason the bulk drafts are: the panel is destroyed by the very transition that has to
+  // be reported. `BulkDeleteCard`'s own region closed the FAILURE half only, because on
+  // that path the card survives; on the success path there was nowhere left to speak
+  // from. This root outlives every one of them.
+  //
+  // ── THE REGION ───────────────────────────────────────────────────────────────────
+  // ONE polite region for the whole manager, rendered at the end of `.fabricate-manager`
+  // (see the markup) and mounted for the manager's whole life. Two live-region facts
+  // shape it, and both are already recorded on `BulkDeleteCard`:
+  //
+  //  - a region inserted into the DOM together with its text is not announced by most
+  //    screen readers, so this one exists from mount and is EMPTY until something is
+  //    said;
+  //  - re-inserting identical text announces nothing the second time, and "Selection
+  //    cleared." twice running is an ordinary GM gesture. The card solves this by having
+  //    its owner clear the outcome on the next arm; there is no equivalent moment here,
+  //    so the announcement is a NEW OBJECT every time and the markup keys its child node
+  //    on it. The node is destroyed and recreated rather than having its text rewritten,
+  //    which is a genuine insertion into the region on every announcement — the same
+  //    device a per-message node gives a live announcer.
+  //
+  // It is deliberately NOT a component. A new `.svelte` under `apps/manager/` is claimed
+  // by four hand-maintained mirrors (the view-lab case registry, the screenshot evidence
+  // map and its pinning test, and this suite's compile list), and one region rendered at
+  // one site is not the repeated control the shared-primitive rule exists for.
+  let bulkSelectionAnnouncement = $state(null);
+  // Orders the deferred announcements below against each other; see
+  // `announceBulkSelectionEmptied`. Plain, not `$state`: nothing renders it.
+  let bulkAnnouncementTicket = 0;
+
+  // The focus target: the studio's TOOLBAR — the `<section>` holding the filter rows and,
+  // as its last row, the selection register. It is a landmark with a per-studio accessible
+  // name ("Essence filters"), it is rendered whether or not anything is selected, and it
+  // survives every transition below, where the panel, the delete card and the toolbar's own
+  // Clear are all gone by the time focus needs somewhere to land.
+  //
+  // IT IS AN INERT TARGET, AND THAT IS THE POINT (review round, issue 1157). The hop first
+  // went to the toolbar's page-selection box, which is a real `<input type="checkbox">`
+  // whose `onchange` selects every rendered row: a GM who clicked Clear with the mouse and
+  // then pressed Space to scroll would have silently re-selected the whole page, with no
+  // visible focus indicator, because the box's only ring is `:focus-visible` and Chrome does
+  // not match that for programmatic focus after a pointer interaction. Landing on a
+  // `tabindex="-1"` section instead announces where the GM now is, leaves Space as scroll,
+  // and leaves every control of the register one Tab away.
+  //
+  // `tabindex="-1"` is also why the browser's results count was wrongly ruled out earlier as
+  // "a `<span>` nothing can focus": that attribute is the standard device for making a
+  // non-actionable element a focus target. The toolbar wins on the accessible name, not on
+  // focusability.
+  //
+  // These three are a hand-maintained mirror of the hooks the browser views put on their own
+  // toolbars; `manager-mounted.test.js` fails if one drifts.
+  const BULK_SELECTION_TOOLBAR = {
+    components: 'data-component-toolbar',
+    essences: 'data-essence-toolbar',
+    recipes: 'data-recipe-toolbar',
+  };
+
+  function selectionClearedAnnouncement() {
+    return text('FABRICATE.Admin.Manager.BulkEdit.SelectionCleared', 'Selection cleared.');
+  }
+
+  /**
+   * Put the keyboard back on `studio`'s toolbar, and report whether it actually moved.
+   *
+   * ONLY RESCUE FOCUS THE RE-RENDER ACTUALLY DROPPED. A GM who tabbed into the search field
+   * while an awaited write was in flight keeps their place; a control the re-render has
+   * detached is not somewhere they can still be, whatever the engine left `activeElement`
+   * pointing at (Chromium moves it to `<body>`, happy-dom can strand it on the removed node
+   * — `recipe-bulk-edit-panel-mounted.test.js` reports both shapes for exactly this reason).
+   *
+   * @returns {boolean} true only when focus was moved, which is what decides whether the
+   *   announcement has a focus utterance to queue behind.
+   */
+  function focusBulkSelectionToolbar(studio) {
+    if (typeof document === 'undefined') return false;
+    const attribute = BULK_SELECTION_TOOLBAR[studio];
+    if (!attribute) return false;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected !== false) return false;
+    const node = document.querySelector(`.fabricate-manager [${attribute}]`);
+    if (!node || node.isConnected === false) return false;
+    node.focus?.();
+    return document.activeElement === node;
+  }
+
+  /**
+   * Report an emptied bulk selection: put the keyboard back on `studio`'s toolbar and
+   * announce `message` through the manager's region, IN THAT ORDER.
+   *
+   * The order is the whole point and it is not the obvious one — see
+   * `util/announceAfterFocus.js`, which owns it for this and for `BulkDeleteCard`. Assigning
+   * the announcement here, synchronously, is what the first cut did, and it puts a queued
+   * `polite` utterance in front of a focus change that cancels it.
+   */
+  function announceBulkSelectionEmptied(studio, message) {
+    const spoken = String(message || '');
+    // The ticket is what the delay costs: a sentence still waiting must never land on top of
+    // one asked for after it, or two actions inside the delay would leave the region holding
+    // the OLDER of the two — with a new node under it, so the GM would hear the wrong
+    // sentence rather than nothing. `BulkDeleteCard` carries the same guard.
+    bulkAnnouncementTicket += 1;
+    const ticket = bulkAnnouncementTicket;
+    announceAfterFocusMove(
+      () => focusBulkSelectionToolbar(studio),
+      () => {
+        if (ticket !== bulkAnnouncementTicket) return;
+        bulkSelectionAnnouncement = { text: spoken };
+      }
+    );
+  }
+
   // ── Bulk edit (issue 772) ────────────────────────────────────────────────────────
   // The panel stages into a draft this root owns; NOTHING is written until Apply. The
   // model's helpers are immutable, so the panel hands back a NEW draft rather than
@@ -3842,8 +5437,14 @@
   // Clearing the selection is the documented escape from a mode that hides unlink, delete
   // and copy-source-UUID; the count reaching zero also discards the draft (see the effect
   // above) and returns the rail to the single-component inspector.
-  function clearComponentBulkSelection() {
+  //
+  // Every caller that empties the selection routes through here, so the announcement and
+  // the focus hop cannot be had by one exit and missed by another. `message` defaults to
+  // the noun-free clear sentence and is overridden by the delete and apply paths with the
+  // sentence they are already toasting, so the two audiences are told the same thing.
+  function clearComponentBulkSelection(message = selectionClearedAnnouncement()) {
     componentBrowserState.bulkSelectedComponentIds = new Set();
+    announceBulkSelectionEmptied('components', message);
   }
 
   async function applyComponentBulkEdit() {
@@ -3868,36 +5469,120 @@
       // tag three of five already carry updates two. Naming the selection size instead
       // would report work that did not happen.
       const count = result.updated;
+      const message = componentBulkAppliedMessage(count);
       // One `save()` and one `refresh()` happened inside the store action, so the rows are
       // already re-rendering; clearing the selection returns the rail to the inspector and
-      // the count-to-zero effect discards the draft.
-      clearComponentBulkSelection();
-      // Singular, on the same terms as the panel's own heading and Apply label: the
-      // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
-      // the ONLY feedback that survives the panel unmounting on a successful apply.
-      // Zero is its own message rather than "applied to 0 components", which reads as a
-      // failure for what is a legitimate outcome — every selected component already
-      // matched the staged values.
-      notifyInfo(
-        count === 0
-          ? text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone',
-              'No components needed changing.'
-            )
-          : count === 1
-            ? text(
-                'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne',
-                'Applied bulk changes to 1 component.'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.Component.BulkEdit.Applied',
-                'Applied bulk changes to {count} components.'
-              ).replace('{count}', count)
-      );
+      // the count-to-zero effect discards the draft. It also announces and re-homes focus,
+      // because the apply is one of the three actions that empties the selection.
+      clearComponentBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       componentBulkApplying = false;
     }
+  }
+
+  // Singular, on the same terms as the panel's own heading and Apply label: the threshold is
+  // `> 0`, so ONE ticked row is the advertised case, and this sentence is the only feedback
+  // that survives the panel unmounting on a successful apply — as a toast for the GM reading
+  // the screen and through the manager's live region for the one who is not.
+  //
+  // Zero is its own message rather than "applied to 0 components", which reads as a failure
+  // for what is a legitimate outcome — every selected component already matched the staged
+  // values. A guard chain rather than a nested ternary, which the SonarCloud gate reports as
+  // a new code smell.
+  function componentBulkAppliedMessage(count) {
+    if (count === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone',
+        'No components needed changing.'
+      );
+    }
+    if (count === 1) {
+      return text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne',
+        'Applied bulk changes to 1 component.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.Applied',
+      'Applied bulk changes to {count} components.'
+    ).replace('{count}', count);
+  }
+
+  // The ARMED bulk delete's confirm step (issue 1129). The impact statement is rendered by
+  // the panel from `componentBulkDeleteImpact`; this only performs the write and reports what
+  // happened. The delete is warned, not blocked, so every selected component is deleted and
+  // nothing is skipped.
+  async function deleteSelectedComponents(ids) {
+    if (componentBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    componentBulkDeleting = true;
+    try {
+      const result = await store.deleteComponents?.(targets);
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` alone caught only the absent-action case and let a failed
+      // delete clear the selection and report "Deleted 0 component(s)" on top of the error
+      // toast the store already raised. Nothing was deleted, so nothing is announced and the
+      // selection stays put; the arm is dropped either way, because the GM's confirmation has
+      // been spent and a still-armed button would delete on the next single click.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) {
+        // The card SURVIVES this path, so it is the one place the outcome can be spoken and
+        // the one control focus can be returned to. The sentence is the neutral one the
+        // recipe twin uses, because the two outcomes folded into this branch — a refused
+        // write, already toasted, and a concurrent client having deleted the same components
+        // — are indistinguishable from here, and "Failed" is false on the more reachable of
+        // the two.
+        componentBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
+        );
+        return false;
+      }
+      const message = componentBulkDeletedMessage(result);
+      clearComponentBulkSelection(message);
+      notifyInfo(message);
+      return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a click
+      // handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected components:', err);
+      return false;
+    } finally {
+      // Both live here so the comment above stays true on EVERY exit. `store.deleteComponents`
+      // catches its own write failures, but it resolves the system and its managed items
+      // OUTSIDE that try, so a rejection can reach this function — and a disarm sitting in the
+      // `try` after the await would be skipped, leaving an armed button that deletes on the
+      // next single click.
+      componentBulkDeleteArmed = false;
+      componentBulkDeleting = false;
+    }
+  }
+
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
+  // players could craft this morning and cannot craft now — and the toast is the ONLY
+  // feedback that survives the panel unmounting on a successful delete. It is reported when
+  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
+  // 0 of them", which reads as a warning about nothing.
+  function componentBulkDeletedMessage(result) {
+    const disabled = Number(result?.recipesDisabled) || 0;
+    const template =
+      disabled > 0
+        ? text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.DeletedWithDisabled',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s), disabling {disabled} of them.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.Deleted',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s).'
+          );
+    return template
+      .replace('{count}', Number(result?.deleted) || 0)
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0)
+      .replace('{disabled}', disabled);
   }
 
   // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
@@ -3911,8 +5596,13 @@
   // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate
   // and Delete; the count reaching zero also discards the draft (see the effect above) and
   // returns the rail to the single-recipe inspector.
-  function clearRecipeBulkSelection() {
+  //
+  // The twin of `clearComponentBulkSelection` above, including its announcement and focus
+  // hop: see that function for why every exit that empties the selection routes through one
+  // place per studio.
+  function clearRecipeBulkSelection(message = selectionClearedAnnouncement()) {
     recipeBrowserState.bulkSelectedRecipeIds = new Set();
+    announceBulkSelectionEmptied('recipes', message);
   }
 
   // Singular / plural over one count, so the three post-apply sentences below do not each
@@ -4033,6 +5723,135 @@
     return sentences.join(' ');
   }
 
+  // The ARMED bulk delete's confirm step (issue 1132). The impact statement is rendered by
+  // the panel from `recipeBulkDeleteImpact`; this only performs the write and reports what
+  // happened. The delete is warned, not blocked, so every resolvable selected recipe is
+  // deleted and nothing is skipped.
+  //
+  // FAILURE IS NOT SILENT, and this path is genuinely reachable: a GM whose
+  // `SETTINGS_MODIFY` has been explicitly revoked passes the client-side `_assertGM` gate
+  // and is then refused by the server. The store raises the error toast; this returns the
+  // card to IDLE — disarmed, not busy — with the selection intact, so the GM can see what
+  // they were about to delete and try again. A stuck spinner over a live selection would be
+  // worse than the failure.
+  // Arming CLEARS the previous outcome, so the card's live region is free to announce the
+  // next one. Without it a second refusal would re-insert identical text, which a live
+  // region does not speak.
+  function armRecipeBulkDelete() {
+    recipeBulkDeleteOutcome = '';
+    recipeBulkDeleteArmed = true;
+  }
+
+  // The two twins. Arming clears the previous outcome for the reason above: a live region
+  // that is handed identical text a second time says nothing the second time.
+  function armComponentBulkDelete() {
+    componentBulkDeleteOutcome = '';
+    componentBulkDeleteArmed = true;
+  }
+
+  function armEssenceBulkDelete() {
+    essenceBulkDeleteOutcome = '';
+    essenceBulkDeleteArmed = true;
+  }
+
+  async function deleteSelectedRecipes(ids) {
+    if (recipeBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    recipeBulkDeleting = true;
+    try {
+      const result = await store.deleteRecipes?.(targets);
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` would catch only the absent-action case and let a failed
+      // delete clear the selection and report "Deleted 0 recipe(s)" on top of the error
+      // toast the store already raised.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) {
+        // The card survives this path, so the outcome is announced through the card's own
+        // live region and focus goes back to the control. The store has already raised the
+        // Foundry toast; a toast is not a live region, so without this the GM's keyboard is
+        // on `<body>` and nothing at all has been said.
+        //
+        // This branch covers TWO outcomes the store's own `deleteRecipes` cannot let this
+        // caller tell apart: a concurrent client already deleted the same recipes (a
+        // WARNING — nothing failed), and a refused write (an ERROR, already toasted). Both
+        // return the identical zero result, so a single neutral sentence is used rather than
+        // the "Failed" wording that was false on the more reachable of the two (issue 1132,
+        // review round 2).
+        recipeBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
+        );
+        return false;
+      }
+      const message = recipeBulkDeletedMessage(result);
+      clearRecipeBulkSelection(message);
+      notifyInfo(message);
+      return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
+      // click handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected recipes:', err);
+      recipeBulkDeleteOutcome = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed',
+        'Failed to delete the selected recipes.'
+      );
+      return false;
+    } finally {
+      // Both live here so the paragraph above stays true on EVERY exit. A disarm sitting in
+      // the `try` after the await would be skipped by a rejection, leaving an armed button
+      // that deletes on the next single click.
+      recipeBulkDeleteArmed = false;
+      recipeBulkDeleting = false;
+    }
+  }
+
+  // The post-delete report, and the only feedback that survives the panel unmounting on a
+  // successful delete. Every NON-ZERO outcome is named, and each is omitted when zero rather
+  // than stated as ", removing them from 0 books & scrolls", which reads as a warning about
+  // nothing. The four-way table is explicit rather than assembled from a localized join
+  // word, which is the part of a sentence a translator is least able to place.
+  //
+  // IT REPORTS `recipeItemsAffected`, THE NUMBER THE CARD PROMISED — not
+  // `recipeItemsRewritten`, the definitions the write actually rewrote (review round). The
+  // two-number design is right and both names are right; surfacing the IMPLEMENTATION figure
+  // to the GM was the defect. On a legacy-basis system membership lives on the recipe and
+  // dies with it, so nothing is rewritten while the books really do stop containing the
+  // recipes: the card read "Will be removed from 1 book or scroll" and the toast then
+  // dropped the clause, making the operation look as though it had done less than it said.
+  function recipeBulkDeletedMessage(result) {
+    const count = Number(result?.deleted) || 0;
+    const items = Number(result?.recipeItemsAffected) || 0;
+    const learners = Number(result?.learnersAffected) || 0;
+    let template;
+    if (items > 0 && learners > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItemsAndLearners',
+        'Deleted {count} recipe(s), removed them from {items} of your books & scrolls, and {learners} character(s) forgot them.'
+      );
+    } else if (items > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItems',
+        'Deleted {count} recipe(s) and removed them from {items} of your books & scrolls.'
+      );
+    } else if (learners > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithLearners',
+        'Deleted {count} recipe(s); {learners} character(s) forgot them.'
+      );
+    } else {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.Deleted',
+        'Deleted {count} recipe(s).'
+      );
+    }
+    return template
+      .replace('{count}', count)
+      .replace('{items}', items)
+      .replace('{learners}', learners);
+  }
+
   async function applyRecipeBulkEdit() {
     if (recipeBulkApplying) return false;
     const ids = recipeBulkSelectedIds;
@@ -4052,10 +5871,12 @@
       if (!result) return false;
       // One save and one refresh happened inside the store action, so the rows are already
       // re-rendering; clearing the selection returns the rail to the single-recipe
-      // inspector and the count-to-zero effect discards the draft. The toast below is the
-      // only feedback that survives the panel unmounting on a successful apply.
-      clearRecipeBulkSelection();
-      notifyInfo(recipeBulkAppliedMessage(result));
+      // inspector and the count-to-zero effect discards the draft. The sentence below is the
+      // only feedback that survives the panel unmounting on a successful apply, so it is both
+      // toasted and announced through the manager's live region.
+      const message = recipeBulkAppliedMessage(result);
+      clearRecipeBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       recipeBulkApplying = false;
@@ -4216,8 +6037,10 @@
     essenceBulkDraft = next || createEssenceBulkDraft();
   }
 
-  function clearEssenceBulkSelection() {
+  // The third twin of `clearComponentBulkSelection`, announcement and focus hop included.
+  function clearEssenceBulkSelection(message = selectionClearedAnnouncement()) {
     essenceBrowserState.bulkSelectedEssenceIds = new Set();
+    announceBulkSelectionEmptied('essences', message);
   }
 
   async function applyEssenceBulkEdit() {
@@ -4234,19 +6057,37 @@
     try {
       const result = await store.applyEssenceBulkEdit?.(ids, edit);
       if (!result) return false;
-      clearEssenceBulkSelection();
-      notifyInfo(
-        result.updated === 1
-          ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedOne', 'Updated 1 essence.')
-          : text(
-              'FABRICATE.Admin.Manager.Essence.BulkEdit.Applied',
-              'Updated {count} essences.'
-            ).replace('{count}', result.updated)
-      );
+      const message = essenceBulkAppliedMessage(Number(result.updated) || 0);
+      clearEssenceBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       essenceBulkApplying = false;
     }
+  }
+
+  // The third of the three apply reports, on the same terms as its two siblings.
+  //
+  // ZERO IS ITS OWN SENTENCE (review round, issue 1157). `updated: 0` is reachable — every
+  // selected essence already matched the staged values — and it used to fall through to the
+  // plural branch and say "Updated 0 essences.", which reads as a failure for a legitimate
+  // outcome. That was survivable while the sentence was only a toast; this change makes it
+  // the SOLE SPOKEN OUTCOME of a successful action, so the branch both siblings already had
+  // is no longer optional here.
+  function essenceBulkAppliedMessage(count) {
+    if (count === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedNone',
+        'No essences needed changing.'
+      );
+    }
+    if (count === 1) {
+      return text('FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedOne', 'Updated 1 essence.');
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.Applied',
+      'Updated {count} essences.'
+    ).replace('{count}', count);
   }
 
   // The ARMED bulk delete's confirm step. The impact statement is rendered by the panel
@@ -4259,23 +6100,61 @@
     essenceBulkDeleting = true;
     try {
       const result = await store.deleteEssences?.(targets);
-      if (!result) return false;
-      essenceBulkDeleteArmed = false;
-      clearEssenceBulkSelection();
-      notifyInfo(essenceBulkDeletedMessage(result));
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` caught only the absent-action case and let a failed delete
+      // clear the selection and report "Deleted 0 essence(s)" on top of the error toast the
+      // store already raised. The component and recipe twins in this file carry the
+      // identical guard; nothing was deleted, so nothing is announced and the selection
+      // stays put.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) {
+        // The twin of the component branch above, and for the same reason: the card survives
+        // a delete that reached nothing, so this is the only surface that can say so.
+        essenceBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
+        );
+        return false;
+      }
+      const message = essenceBulkDeletedMessage(result);
+      clearEssenceBulkSelection(message);
+      notifyInfo(message);
       return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
+      // click handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected essences:', err);
+      return false;
     } finally {
+      // The disarm lives HERE rather than in the `try` after the await: a rejection would
+      // otherwise skip it and leave an armed button that deletes on the next single click.
+      essenceBulkDeleteArmed = false;
       essenceBulkDeleting = false;
     }
   }
 
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
+  // players could craft this morning and cannot craft now — and the toast is the ONLY
+  // feedback that survives the panel unmounting on a successful delete. It is reported when
+  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
+  // 0 of them", which reads as a warning about nothing. Mirrors `componentBulkDeletedMessage`.
   function essenceBulkDeletedMessage(result) {
-    return text(
-      'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
-      'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
-    )
+    const disabled = Number(result?.recipesDisabled) || 0;
+    const template =
+      disabled > 0
+        ? text(
+            'FABRICATE.Admin.Manager.Essence.BulkEdit.DeletedWithDisabled',
+            'Deleted {count} essence(s) and rewrote {recipes} recipe(s), disabling {disabled} of them.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
+            'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
+          );
+    return template
       .replace('{count}', Number(result?.deleted) || 0)
-      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0)
+      .replace('{disabled}', disabled);
   }
 
   function selectEnvironment(environmentId = selectedEnvironment?.id) {
@@ -4342,7 +6221,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-task-edit';
   }
 
@@ -4355,7 +6234,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -4421,7 +6300,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -4483,7 +6362,7 @@
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-event-edit';
   }
 
@@ -4497,7 +6376,7 @@
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -4565,7 +6444,7 @@
     if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
     clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -4891,7 +6770,90 @@
     activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
+  }
+
+  function openWorldParties() {
+    return afterTruthyResult(confirmRouteExit('world'), () => {
+      activeTravelTab = 'parties';
+      activeView = 'world';
+    });
+  }
+
+  // World > Currency (issue 1278). No availability refusal, unlike `openWorldDowntime` below:
+  // the route is ungated because the world's coins have to be configurable before any crafting
+  // system can enable currency.
+  function openWorldCurrency() {
+    return afterTruthyResult(confirmRouteExit('world-currency'), () => {
+      activeView = 'world-currency';
+    });
+  }
+
+  function openWorldDowntime() {
+    // Issue 1257. The rail row does not render while the gate is shut, so this refusal is for
+    // every OTHER caller — a restored token, a future deep link, a test — and it is stated on
+    // the navigation rather than only on the markup for the same reason
+    // `openWorldTravelDestination` states its own destination allowlist.
+    if (!worldDowntimeAvailable) return;
+    return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
+      railGroupUserExpanded.worldDowntime = true;
+      activeView = 'world-downtime';
+    });
+  }
+
+  // The rail child and the studio card's button are two triggers for ONE navigation, so
+  // both land here: select the preview, then commit the route.
+  function openWorldDowntimePreview(tabId) {
+    // Issue 1257: the same refusal as the parent entry above, for the same reason.
+    if (!worldDowntimeAvailable) return;
+    // The ACTIVE tab set, never a fixed list: whoever holds the surface decides what exists.
+    if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
+    // RE-ACTIVATION, not navigation. Clicking the sub-item for the tab already on screen used
+    // to do nothing at all, because Core had nothing to navigate to — but a companion whose
+    // tab is a list that drills into an editor does: the GM asking for a screen they are
+    // notionally already on means "take me back up to it".
+    //
+    // Core cannot act on that itself. The drill-down is inside the companion's own target and
+    // Core neither knows the level nor could restore it, so the click is OFFERED to the mount
+    // through a handler it registered, and Core's own behaviour is unchanged when no companion
+    // took it. That handler is what makes this DISTINGUISHABLE from a first mount, which is
+    // the property the seam needs: a re-activation pops one level, a mount initialises, and a
+    // signal a companion had to disambiguate by remembering whether it had mounted before
+    // would be wrong the first time a remount followed a drill-down.
+    //
+    // Deliberately NOT routed through `confirmRouteExit`: no route is being exited and no
+    // Core draft is at risk. Whether the companion's own unsaved work should stop it is the
+    // companion's question to ask, inside its handler.
+    if (isWorldDowntimeRoute && worldDowntimeTabId === tabId) {
+      downtimeChromeChannel.reselect();
+      return;
+    }
+    // The destination TAB travels as the route-exit subject id, because a Downtime tab is
+    // precisely the "same view token, different subject" case that parameter exists for. Without
+    // it a companion's navigation guard could not tell this apart from the parent rail item
+    // re-entering the route the GM is already on, which navigates nowhere and must not prompt.
+    return afterTruthyResult(confirmRouteExit('world-downtime', tabId), () => {
+      worldDowntimeTabId = tabId;
+      railGroupUserExpanded.worldDowntime = true;
+      activeView = 'world-downtime';
+    });
+  }
+
+  // World > Travel (issue 1282). No availability refusal: the route is ungated, exactly like
+  // World > Currency and unlike experimental-gated Downtime.
+  function openWorldTravelDestination(destination = 'realms') {
+    if (!['realms', 'map'].includes(destination)) return;
+    return afterTruthyResult(confirmRouteExit('world-travel', destination), () => {
+      worldTravelTab = destination;
+      railGroupUserExpanded.worldTravel = true;
+      activeView = 'world-travel';
+    });
+  }
+
+  function activateWorldTravelParent() {
+    railGroupUserExpanded.worldTravel = true;
+    if (isWorldTravelRoute) return;
+    openWorldTravelDestination('realms');
   }
 
   function openGatheringSection(tabId = 'environments') {
@@ -4901,7 +6863,7 @@
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -4952,19 +6914,10 @@
 
   function activateGatheringParent() {
     if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       return;
     }
     openGatheringSection('environments');
-  }
-
-  function toggleGatheringMenu(event) {
-    event?.stopPropagation?.();
-    if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
-      return;
-    }
-    gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
   // Crafting nav group handlers (issue 511), mirroring the gathering group. Route
@@ -4975,13 +6928,13 @@
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
     });
   }
 
   function activateCraftingParent() {
     if (isCraftingRoute) {
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       return;
     }
     openCraftingSection('recipes');
@@ -5059,7 +7012,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
       recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
         worldItemOptions = options || [];
       });
@@ -5163,15 +7116,6 @@
     const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
     const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
     if (newId) editRecipeItem(newId);
-  }
-
-  function toggleCraftingMenu(event) {
-    event?.stopPropagation?.();
-    if (isCraftingRoute) {
-      craftingMenuExpanded = true;
-      return;
-    }
-    craftingMenuExpanded = !craftingMenuExpanded;
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -5755,14 +7699,6 @@
     return normalized || 'general';
   }
 
-  // Reference counting delegates to the pure `buildVocabularyUsage` helper (issue
-  // 689), which — unlike the pre-689 inline count — also credits a tag for every
-  // recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, so a
-  // tag only ever used as an ingredient filter no longer reads as "Unused".
-  function buildTagCategoryUsage(system, recipes, items) {
-    return buildVocabularyUsage(recipes, items);
-  }
-
   function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
     const customRows = uniqueSorted(categories || []).map((category) => {
@@ -5852,12 +7788,16 @@
   }
 </script>
 
-<div class="fabricate-manager" data-manager-view={currentView}>
+<div
+  class="fabricate-manager"
+  data-manager-view={currentView}
+  data-world-travel-tab={worldTravelTabAttribute}
+>
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
-    It answers "which crafting system am I editing, and how does it resolve?" from
-    every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
-    text — hence max-width + ellipsis + title) and never a theme or product name.
+    Its right-hand end answers "how does the selected system resolve?" from every screen.
+    Its gold badge is the PREMIUM signal, and it appears only when a companion module has
+    registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
   {#if !isToolStudioRoute}
     <div
@@ -5868,19 +7808,30 @@
       <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
       strip, but the Foundry window's own title bar already names the app — a second
-      copy inside the window was duplicated chrome (issue 643). The gold SYSTEM badge
-      is now the left-most element, and the resolution status stays right-aligned.
+      copy inside the window was duplicated chrome (issue 643).
+
+      The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
+      1185): the rail's crafting-system card already names the selected system on every
+      screen, so the strip was repeating it. The slot now carries the one thing nothing
+      else in the chrome says — that a premium companion module is installed and connected
+      — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
+      loud signal is stated exactly once.
     -->
-      {#if selectedSystem}
+      {#if premiumInstalled}
         <span
           class="manager-titlebar-badge"
-          data-manager-titlebar-system
-          title={selectedSystem.name}
+          data-manager-titlebar-premium
+          title={text(
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}
           aria-label={text(
-            'FABRICATE.Admin.Manager.Titlebar.SystemBadge',
-            'Selected crafting system'
-          )}>{selectedSystem.name}</span
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
         >
+      {/if}
+      {#if selectedSystem}
         <span
           class="manager-titlebar-status"
           data-manager-titlebar-status
@@ -5895,6 +7846,13 @@
   {/if}
 
   {#if !isToolStudioRoute}
+    <!--
+      Two children, always: the heading block and the trailing actions. The Downtime route
+      briefly led this header with a 42px glyph tile from the prototype, and it was removed
+      (issue 1185) because no other Manager route has one — consistency across the app beats
+      parity with one screen's mockup. It is also why `.manager-header`'s `space-between` can
+      be trusted again: a third child parked the heading in the middle of the row.
+    -->
     <header class="manager-header">
       <div class="manager-heading">
         <nav
@@ -5904,11 +7862,53 @@
           <button type="button" onclick={() => selectSystemAndShowBrowser()}
             >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
           >
-          {#if selectedSystem && currentView !== 'systems'}
+          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute && !isWorldTravelRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={() => editSystem(selectedSystem.id)}
               >{selectedSystem.name}</button
             >
+          {/if}
+          {#if isWorldRoute || isWorldDowntimeRoute || isWorldCurrencyRoute || isWorldTravelRoute}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!--
+              `World.Heading` is the RAIL's micro-label and is authored in caps for the
+              letter-spaced treatment there. A breadcrumb carries no `text-transform`, so
+              reusing it printed a literal "WORLD" mid-trail; this crumb has its own
+              Title Case key and the rail keeps its shout.
+            -->
+            <span data-breadcrumb-world
+              >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
+            >
+            {#if isWorldCurrencyRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}</span>
+            {/if}
+            {#if isWorldTravelRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}</span>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span data-breadcrumb-world-travel-tab={worldTravelTab}
+                >{worldTravelTab === 'map'
+                  ? text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')
+                  : text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}</span
+              >
+            {/if}
+            {#if isWorldDowntimeRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <!--
+                The LEAF crumb names the tab, so it belongs to whoever owns the tab. The
+                crumb above it names the Downtime ROUTE, which Core owns in the rail too.
+              -->
+              <span data-breadcrumb-downtime-tab={worldDowntimeTabId}
+                >{downtimeChrome(
+                  'breadcrumb',
+                  worldDowntimeTabId,
+                  downtimeTabText(activeDowntimeTab, 'label')
+                )}</span
+              >
+            {/if}
           {/if}
           {#if currentView === 'recipes'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -6080,9 +8080,16 @@
                 text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span
             >
           {/if}
-          {#if currentView === 'checks'}
+          {#if isChecksRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                `FABRICATE.Admin.Manager.Checks.Tabs.${checksActiveTab[0].toUpperCase()}${checksActiveTab.slice(1)}`,
+                checksActiveTab
+              )}</span
+            >
           {/if}
           {#if currentView === 'system-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -6119,6 +8126,29 @@
               <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
             </div>
           </div>
+        {:else if isWorldDowntimeRoute && downtimeHeaderArtwork}
+          <!-- A companion's drill-down identity, rendered in CORE'S header rather than inside
+             the companion's panel. It reuses the recipe editor's heading block wholesale —
+             same classes, same `Medallion`, same 44px — because the point is that a
+             companion's editor is indistinguishable from one of Fabricate's own, and a
+             parallel block would be a second implementation of the identity header that
+             agreed with the first only until one of them changed.
+
+             `image` and `icon` are validated as mutually exclusive, so `Medallion` never has
+             to choose: with `image` set it renders the picture, and with only `icon` set `src`
+             is empty and it falls back to the glyph. The default glyph is the Downtime
+             route's own, so a companion that names neither still cannot reach this branch. -->
+          <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
+            <Medallion
+              src={downtimeHeaderArtwork.image ?? ''}
+              icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
+              size={44}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={viewTitle()}>{viewTitle()}</h1>
+              <p class="manager-subtitle" data-downtime-chrome-subline>{viewSubtitle()}</p>
+            </div>
+          </div>
         {:else if currentView !== 'tool-edit'}
           <h1 class="manager-title">{viewTitle()}</h1>
           <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -6149,9 +8179,88 @@
           </div>
         {/if}
       </div>
-      {#if currentView !== 'tools' && currentView !== 'tool-edit'}
+      <!--
+        World > Currency renders NO page-header actions (issue 1278). Its own two actions, Add
+        currency unit and Seed presets, live on the card header where they always did and where
+        the read-only provider gating that hides them is computed. Without this exclusion the
+        route falls through to the final `{:else}` below and offers Import / Export / Create —
+        which act on CRAFTING SYSTEMS, so "Create" on the currency page would create a crafting
+        system and "Export" would sit disabled against a selected-system id the route does not
+        even have.
+      -->
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldCurrencyRoute}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
-          {#if currentView === 'recipes'}
+          {#if currentView === 'world-downtime'}
+            {#if downtimeCoreFallback}
+              <!--
+                The design puts this promotional pill at the top of every Downtime screen, in
+                ADDITION to the hero's Patreon CTA. It is inert in the mockup — a fixed canvas
+                has nowhere to go — but a shipped control labelled "Unlock with Premium" that
+                does nothing is dead UI, so it carries the same subscription link as the hero.
+                It stays Core's own markup rather than a public action descriptor: its premium
+                treatment is Core copy about Core's product, not a shape to ask a companion for.
+              -->
+              <a
+                class="manager-button manager-downtime-unlock"
+                data-downtime-unlock
+                href={PATREON_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i class="fas fa-crown" aria-hidden="true"></i>
+                <span
+                  >{text(
+                    'FABRICATE.Admin.Manager.World.Downtime.Unlock',
+                    'Unlock with Premium'
+                  )}</span
+                >
+              </a>
+            {:else}
+              <!--
+                The status chip leads the group, exactly where every Core editor puts its own
+                "Unsaved" chip, and renders through the SAME `Chip` primitive with the same
+                `truncate` — a companion's staged-changes indicator has to be the manager's
+                one chip, not a lookalike. Its text is already localized: Core renders the
+                strings a companion gives it, as it does for `title` and `subtitle`.
+              -->
+              {#if downtimeHeaderStatus}
+                <Chip
+                  tone={downtimeHeaderStatus.tone}
+                  truncate
+                  data-downtime-chrome-status
+                  title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
+                  >{downtimeHeaderStatus.label}</Chip
+                >
+              {/if}
+              {#each downtimeHeaderActions as action (action.id)}
+                {#if action.href}
+                  <a
+                    class={managerHeaderActionClass(action)}
+                    data-manager-header-action={action.id}
+                    href={action.href}
+                    title={action.tooltip}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </a>
+                {:else}
+                  <button
+                    type="button"
+                    class={managerHeaderActionClass(action)}
+                    data-manager-header-action={action.id}
+                    title={action.tooltip}
+                    disabled={action.disabled === true}
+                    onclick={() => runDowntimeHeaderAction(action)}
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </button>
+                {/if}
+              {/each}
+            {/if}
+          {:else if currentView === 'recipes'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -6278,7 +8387,7 @@
             />
           {:else if currentView === 'tags'}
             <!-- no header actions for the tags view -->
-          {:else if currentView === 'checks'}
+          {:else if isChecksRoute}
             {#if checksDirty}
               <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
             {/if}
@@ -6291,7 +8400,7 @@
             >
               <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
               ></i>
-              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
             </button>
           {:else if currentView === 'essences'}
             <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
@@ -6318,7 +8427,7 @@
               saveLabel={essenceEditSaveLabel()}
               onBack={cancelEssenceEdit}
             />
-          {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'tasks'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -6333,7 +8442,7 @@
                 )}</span
               >
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -6348,34 +8457,33 @@
                 )}</span
               >
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
+          {:else if currentView === 'world'}
             <button
               type="button"
               class="manager-button is-primary"
               onclick={() => store.createParty?.()}
-              disabled={!canShowEnvironments || $viewState.travelSaving}
+              disabled={$viewState.travelSaving}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
+              <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'realms'}
+          {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
             <button
               type="button"
               class="manager-button is-primary"
               onclick={async () => {
                 const created = await store.createRealmQuick?.(
-                  selectedSystemId,
                   text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
                 );
                 if (typeof created === 'string' && created) selectedTravelRealmId = created;
               }}
-              disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}
+              disabled={$viewState.travelSaving}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
-            <!-- Map Region Links tab has no create action. -->
+          {:else if isWorldTravelRoute}
+            <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
           {:else if currentView === 'environments'}
             <button
               type="button"
@@ -6603,7 +8711,7 @@
     </header>
   {/if}
 
-  <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
+  <div class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}>
     <aside
       class="manager-rail"
       aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
@@ -6638,19 +8746,14 @@
                 type="button"
                 class="manager-rail-toggle manager-scope-collapse"
                 data-manager-rail-toggle
-                aria-pressed={railCollapsed}
-                aria-label={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-                title={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                aria-pressed={railCollapsedDisplay}
+                aria-label={railToggleLabel}
+                title={railToggleTitle}
+                disabled={railLockedOpen}
+                aria-disabled={railLockedOpen}
                 onclick={toggleManagerRail}
               >
-                <i
-                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
-                  aria-hidden="true"
-                ></i>
+                <i class={railToggleIcon} aria-hidden="true"></i>
               </button>
             </div>
             <select
@@ -6699,19 +8802,14 @@
                 type="button"
                 class="manager-rail-toggle manager-scope-collapse"
                 data-manager-rail-toggle
-                aria-pressed={railCollapsed}
-                aria-label={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-                title={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                aria-pressed={railCollapsedDisplay}
+                aria-label={railToggleLabel}
+                title={railToggleTitle}
+                disabled={railLockedOpen}
+                aria-disabled={railLockedOpen}
                 onclick={toggleManagerRail}
               >
-                <i
-                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
-                  aria-hidden="true"
-                ></i>
+                <i class={railToggleIcon} aria-hidden="true"></i>
               </button>
             </div>
             <h2 class="manager-title">
@@ -6747,16 +8845,22 @@
               >
             {/if}
           </button>
-          <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div
-            class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}
-          >
+          <!--
+            Crafting group is unconditional as of issue 745 (v1.3 headline).
+
+            The Tool Studio used to force this group open (`|| isToolStudioRoute`, issue
+            784) even though Tools is a top-level rail entry and has never been a Crafting
+            child. That pinned the group open on a screen that is not in it and left its
+            chevron inert — one of the five faces of the "refuses to minimize" report
+            (issue 1185). The rule is uniform now: only a Crafting SUB-ITEM locks it.
+          -->
+          <div class={`manager-nav-group ${railGroupExpanded.crafting ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
               id="manager-nav-crafting"
               aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
+              aria-expanded={railGroupExpanded.crafting}
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
@@ -6765,24 +8869,31 @@
               >
               <span class="manager-nav-count">{craftingNavCount}</span>
             </button>
+            <!--
+              Locked ⇒ genuinely `disabled`, with the reason on the control. A collapse that
+              would hide the screen the GM is standing on is the ONE case the rule forbids,
+              and a chevron that silently swallowed the click is what made the old behaviour
+              read as a bug rather than a constraint.
+            -->
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={craftingMenuExpanded || isToolStudioRoute
+              aria-label={railGroupExpanded.crafting
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
               aria-controls="manager-crafting-submenu"
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
-              onclick={toggleCraftingMenu}
+              aria-expanded={railGroupExpanded.crafting}
+              disabled={railGroupLockedOpen.crafting}
+              aria-disabled={railGroupLockedOpen.crafting}
+              title={railGroupLockedOpen.crafting ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('crafting', event)}
             >
               <i
-                class={craftingMenuExpanded || isToolStudioRoute
-                  ? 'fas fa-chevron-up'
-                  : 'fas fa-chevron-down'}
+                class={railGroupExpanded.crafting ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if craftingMenuExpanded || isToolStudioRoute}
+            {#if railGroupExpanded.crafting}
               <div
                 class="manager-nav-submenu"
                 id="manager-crafting-submenu"
@@ -6880,25 +8991,106 @@
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`}
-            aria-current={currentView === 'checks' ? 'page' : undefined}
-            onclick={() => setView('checks')}
-          >
-            <i class="fas fa-dice-d20" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+          <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
+              id="manager-nav-checks"
+              aria-current={isChecksRoute ? 'page' : undefined}
+              aria-expanded={railGroupExpanded.checks}
+              onclick={activateChecksParent}
             >
-          </button>
+              <i class="fas fa-dice-d20" aria-hidden="true"></i>
+              <span class="manager-nav-label"
+                >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+              >
+              <!-- The parent badge is an ISSUE COUNT, not a record count, so it wears the
+                   pill treatment and names its unit. A collapsed rail still renders it —
+                   that is the only signal left when the children are hidden. -->
+              {#if checksNavCount > 0}
+                <span
+                  class="manager-nav-issue-badge"
+                  data-checks-nav-issues="checks"
+                  role="img"
+                  aria-label={checksIssueName(checksNavCount)}>{checksNavCount}</span
+                >
+              {/if}
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              aria-label={railGroupExpanded.checks
+                ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
+                : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
+              aria-controls="manager-checks-submenu"
+              aria-expanded={railGroupExpanded.checks}
+              disabled={railGroupLockedOpen.checks}
+              aria-disabled={railGroupLockedOpen.checks}
+              title={railGroupLockedOpen.checks ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('checks', event)}
+            >
+              <i
+                class={railGroupExpanded.checks ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if railGroupExpanded.checks}
+              <div
+                class="manager-nav-submenu"
+                id="manager-checks-submenu"
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
+              >
+                {#each checksNavItems as checksItem (checksItem.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem ${currentView === checksItem.view ? 'is-active' : ''}`}
+                    id={`manager-checks-nav-${checksItem.id}`}
+                    data-checks-nav-item={checksItem.id}
+                    aria-current={currentView === checksItem.view ? 'page' : undefined}
+                    onclick={() => setView(checksItem.view)}
+                  >
+                    <i class={checksItem.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label"
+                      >{text(checksItem.labelKey, checksItem.labelFallback)}</span
+                    >
+                    <!-- THREE distinguishable markers can land in this column, and they must
+                         not be confusable: a record-count numeral (`.manager-nav-count`,
+                         which Checks never has), an ISSUE badge (a pill naming its unit),
+                         and an UNSAVED marker (a different SHAPE with its own name, not the
+                         same dot in another colour). -->
+                    {#if checksItem.dirty}
+                      <span
+                        class="manager-nav-dirty-marker"
+                        data-checks-nav-dirty={checksItem.id}
+                        role="img"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.Checks.Nav.Unsaved',
+                          'Unsaved changes'
+                        )}
+                      ></span>
+                    {/if}
+                    {#if checksItem.issueCount > 0}
+                      <span
+                        class="manager-nav-issue-badge"
+                        data-checks-nav-issues={checksItem.id}
+                        role="img"
+                        aria-label={checksIssueName(checksItem.issueCount)}
+                        >{checksItem.issueCount}</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           {#if canShowEnvironments}
-            <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
+            <div class={`manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}`}>
               <button
                 type="button"
                 class="manager-nav-button manager-nav-parent"
                 id="manager-nav-gathering"
                 aria-current={isGatheringRoute ? 'page' : undefined}
-                aria-expanded={gatheringMenuExpanded}
+                aria-expanded={railGroupExpanded.gathering}
                 onclick={activateGatheringParent}
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
@@ -6910,19 +9102,22 @@
               <button
                 type="button"
                 class="manager-nav-toggle"
-                aria-label={gatheringMenuExpanded
+                aria-label={railGroupExpanded.gathering
                   ? text('FABRICATE.Admin.Manager.Nav.CollapseGathering', 'Collapse gathering menu')
                   : text('FABRICATE.Admin.Manager.Nav.ExpandGathering', 'Expand gathering menu')}
                 aria-controls="manager-gathering-submenu"
-                aria-expanded={gatheringMenuExpanded}
-                onclick={toggleGatheringMenu}
+                aria-expanded={railGroupExpanded.gathering}
+                disabled={railGroupLockedOpen.gathering}
+                aria-disabled={railGroupLockedOpen.gathering}
+                title={railGroupLockedOpen.gathering ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('gathering', event)}
               >
                 <i
-                  class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  class={railGroupExpanded.gathering ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                   aria-hidden="true"
                 ></i>
               </button>
-              {#if gatheringMenuExpanded}
+              {#if railGroupExpanded.gathering}
                 <div
                   class="manager-nav-submenu"
                   id="manager-gathering-submenu"
@@ -6934,9 +9129,9 @@
                   {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
                     <button
                       type="button"
-                      class={`manager-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
+                      class={`manager-nav-subitem ${isGatheringRoute && displayedGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
                       id={`manager-gathering-nav-${gatheringItem.id}`}
-                      aria-current={isGatheringRoute && activeGatheringTab === gatheringItem.id
+                      aria-current={isGatheringRoute && displayedGatheringTab === gatheringItem.id
                         ? 'page'
                         : undefined}
                       onclick={() => openGatheringSection(gatheringItem.id)}
@@ -6971,10 +9166,386 @@
             <span class="manager-nav-count">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
           </button>
         {/each}
+        <section
+          class="manager-world-nav"
+          data-world-nav-section
+          aria-labelledby="manager-world-heading"
+        >
+          <div class="manager-world-heading-row">
+            <h2 id="manager-world-heading">
+              {text('FABRICATE.Admin.Manager.World.Heading', 'WORLD')}
+            </h2>
+            <span id="manager-world-scope">
+              {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
+            </span>
+          </div>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${isWorldRoute ? 'is-active' : ''}`}
+            id="manager-world-nav-parties"
+            data-world-nav-item="parties"
+            aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
+            aria-current={isWorldRoute ? 'page' : undefined}
+            onclick={openWorldParties}
+          >
+            <i class="fas fa-users" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
+            </span>
+            <span class="manager-nav-count">{travelParties.length}</span>
+          </button>
+          <!--
+            World > Travel (issue 1282). A GROUP, not a leaf, for the reason Downtime is one:
+            the route has two destinations — Realms and Map Region Links — and the rail is
+            where this Manager has always put a route's destinations. The group moved here
+            wholesale from the selected-system rail, because realms are world geography and a
+            crafting system now only decides whether it PARTICIPATES.
+
+            UNGATED, like Parties and Currency: the library has to be authorable before any
+            system opts into it.
+          -->
+          <div
+            class={`manager-nav-group manager-world-travel-group ${railGroupExpanded.worldTravel ? 'is-expanded' : ''}`}
+            data-world-travel-section
+          >
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelRoute ? 'is-active' : ''}`}
+              id="manager-world-nav-travel"
+              data-world-nav-item="travel"
+              aria-label={text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
+              aria-current={isWorldTravelRoute ? 'page' : undefined}
+              aria-controls="manager-travel-submenu"
+              aria-expanded={railGroupExpanded.worldTravel}
+              onclick={activateWorldTravelParent}
+            >
+              <i class="fas fa-route" aria-hidden="true"></i>
+              <span class="manager-nav-label">
+                {text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
+              </span>
+              <span class="manager-nav-count">{worldRealms.length}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              id="manager-travel-toggle"
+              data-world-travel-toggle
+              aria-label={railGroupExpanded.worldTravel
+                ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
+                : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
+              aria-controls="manager-travel-submenu"
+              aria-expanded={railGroupExpanded.worldTravel}
+              disabled={railGroupLockedOpen.worldTravel}
+              aria-disabled={railGroupLockedOpen.worldTravel}
+              title={railGroupLockedOpen.worldTravel ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('worldTravel', event)}
+            >
+              <i
+                class={railGroupExpanded.worldTravel ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if railGroupExpanded.worldTravel}
+              <div
+                class="manager-nav-submenu"
+                id="manager-travel-submenu"
+                data-world-travel-submenu
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.World.TravelDestinations',
+                  'Travel destinations'
+                )}
+              >
+                <button
+                  type="button"
+                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'realms' ? 'is-active' : ''}`}
+                  id="manager-travel-nav-realms"
+                  data-world-travel-item="realms"
+                  aria-current={isWorldTravelRoute && worldTravelTab === 'realms'
+                    ? 'page'
+                    : undefined}
+                  onclick={() => openWorldTravelDestination('realms')}
+                >
+                  <i class="fas fa-mountain-sun" aria-hidden="true"></i>
+                  <span class="manager-nav-label">
+                    {text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'map' ? 'is-active' : ''}`}
+                  id="manager-travel-nav-map"
+                  data-world-travel-item="map"
+                  aria-current={isWorldTravelRoute && worldTravelTab === 'map' ? 'page' : undefined}
+                  onclick={() => openWorldTravelDestination('map')}
+                >
+                  <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+                  <span class="manager-nav-label">
+                    {text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')}
+                  </span>
+                </button>
+              </div>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${isWorldCurrencyRoute ? 'is-active' : ''}`}
+            id="manager-world-nav-currency"
+            data-world-nav-item="currency"
+            aria-label={text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
+            aria-current={isWorldCurrencyRoute ? 'page' : undefined}
+            onclick={openWorldCurrency}
+          >
+            <i class="fas fa-coins" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
+            </span>
+            <span class="manager-nav-count">{selectedCurrencyUnits.length}</span>
+          </button>
+          <!--
+            Downtime is a GROUP, not a leaf: the design nests the same four previews under it
+            that Core's own tab strip offers, each carrying a premium padlock. The structure
+            follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
+            so the collapsed 56px rail hides the labels, the toggle and the whole submenu
+            without a rule of its own, and the premium badge rides `.manager-nav-count` for
+            the same reason.
+
+            THE WHOLE GROUP IS EXPERIMENTAL-GATED (issue 1257), parent row, disclosure toggle
+            and submenu alike, and everything premium that rides them goes with it: the
+            `.manager-nav-count` PREMIUM badge is a child of the parent button, the padlocks
+            are children of the sub-items, and the PREMIUM PREVIEW callout is a child of the
+            submenu. Nothing outside this group names Downtime — the title-bar badge answers
+            "is a companion module registered at all" across BOTH registries and is not this
+            route's signal, so it stays.
+          -->
+          {#if worldDowntimeAvailable}
+            <div
+              class={`manager-nav-group manager-world-downtime-group ${railGroupExpanded.worldDowntime ? 'is-expanded' : ''}`}
+              data-world-downtime-section
+            >
+              <button
+                type="button"
+                class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
+                id="manager-world-nav-downtime"
+                data-world-nav-item="downtime"
+                title={downtimeCoreFallback
+                  ? text(
+                      'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
+                      'Unlock Downtime Studio with Fabricate Premium'
+                    )
+                  : text(
+                      'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
+                      'Downtime Studio is unlocked by Fabricate Premium'
+                    )}
+                aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+                aria-current={isWorldDowntimeRoute ? 'page' : undefined}
+                aria-controls="manager-downtime-submenu"
+                aria-expanded={railGroupExpanded.worldDowntime}
+                onclick={openWorldDowntime}
+              >
+                <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+                <span class="manager-nav-label">
+                  {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+                </span>
+                <!--
+                The chip is MUTED, never removed, once a companion holds the surface (issue
+                1185): with premium installed the title bar carries the loud gold signal, and
+                two shouts of the same word is one too many — but the rail still has to say
+                which route premium provides. `is-installed` re-tones it to a quiet accent
+                marker and leaves its geometry alone.
+              -->
+                <span
+                  class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                  data-world-nav-premium
+                  data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
+                  >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
+                >
+              </button>
+              <button
+                type="button"
+                class="manager-nav-toggle"
+                id="manager-downtime-toggle"
+                data-world-downtime-toggle
+                aria-label={railGroupExpanded.worldDowntime
+                  ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
+                  : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
+                aria-controls="manager-downtime-submenu"
+                aria-expanded={railGroupExpanded.worldDowntime}
+                disabled={railGroupLockedOpen.worldDowntime}
+                aria-disabled={railGroupLockedOpen.worldDowntime}
+                title={railGroupLockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('worldDowntime', event)}
+              >
+                <i
+                  class={railGroupExpanded.worldDowntime
+                    ? 'fas fa-chevron-up'
+                    : 'fas fa-chevron-down'}
+                  aria-hidden="true"
+                ></i>
+              </button>
+              {#if railGroupExpanded.worldDowntime}
+                <div
+                  class="manager-nav-submenu"
+                  id="manager-downtime-submenu"
+                  data-world-downtime-submenu
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.World.Downtime.NavSections',
+                    'Downtime previews'
+                  )}
+                >
+                  {#each downtimeNavItems as item (item.id)}
+                    <!--
+                    `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213).
+                    With no tab strip over a companion's screens this button is the only
+                    control naming the active screen, so the two fields the seam requires have
+                    to be consumed by it or Core would validate them and throw them away.
+                    `aria-label` REPLACES the visible label as the button's accessible name —
+                    the same contract the player seam's rail button already ships — so a
+                    provider's `accessibleName` must contain the label's text. In core-fallback
+                    it stays `undefined`: Core's preview keeps its strip, which is where Core's
+                    own accessible names and keyboard-visible tooltips already live, and this
+                    change touches nothing in that mode.
+                  -->
+                    <button
+                      type="button"
+                      class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
+                      id={downtimeNavItemId(item.id)}
+                      bind:this={downtimeNavNodes[item.id]}
+                      data-world-downtime-item={item.id}
+                      title={downtimeTabText(item, 'tooltip')}
+                      aria-label={downtimeCoreFallback
+                        ? undefined
+                        : downtimeTabText(item, 'accessibleName')}
+                      aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
+                        ? 'true'
+                        : undefined}
+                      onclick={() => openWorldDowntimePreview(item.id)}
+                    >
+                      <i class={item.icon} aria-hidden="true"></i>
+                      <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
+                        >{downtimeTabText(item, 'label')}</span
+                      >
+                      <!--
+                      The padlock and the premium note below advertise CORE'S preview. A
+                      companion owning the surface has nothing locked, so neither renders.
+                    -->
+                      {#if downtimeCoreFallback}
+                        <span class="manager-nav-lock" data-world-downtime-lock
+                          ><i class="fas fa-lock" aria-hidden="true"></i></span
+                        >
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+                {#if downtimeCoreFallback}
+                  <p class="manager-nav-callout" data-world-downtime-callout>
+                    <span class="manager-nav-callout-kicker">
+                      <i class="fas fa-lock" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
+                    </span>
+                    {text(
+                      'FABRICATE.Admin.Manager.World.Downtime.RailNote',
+                      'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
+                    )}
+                  </p>
+                {/if}
+              {/if}
+            </div>
+          {/if}
+        </section>
       </nav>
     </aside>
 
-    {#if currentView === 'environments'}
+    {#if currentView === 'world-downtime'}
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}
+      >
+        <WorldDowntimeExtensionHost
+          bind:this={downtimeExtensionHost}
+          bind:activeTabId={worldDowntimeTabId}
+          provider={downtimeProvider}
+          tabs={downtimeTabs}
+          context={worldDowntimeContext}
+          navLabelId={downtimeNavLabelId}
+          emitHook={managerExtensions?.emitHook}
+          chromeChannel={downtimeChromeChannel}
+          onProviderFault={noteDowntimeProviderFault}
+        />
+      </main>
+    {:else if isWorldCurrencyRoute}
+      <!--
+        World > Currency renders its own `manager-main` straight from the root, following the
+        Downtime route rather than Parties: Parties reuses `EnvironmentsBrowserView` as its
+        container, which is a leftover from when it was a Travel tab and not a shape to copy.
+        There is no right-hand inspector — the unit editors expand in place, as they did on the
+        Settings tab they came from.
+      -->
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency')}
+      >
+        <WorldCurrencyTab
+          currencyUnits={selectedCurrencyUnits}
+          {currencyPresetsSupported}
+          {currencySpendStrategy}
+          {currencyProviderId}
+          {currencyMacros}
+          {currencyProviderOptions}
+          {onAddCurrencyUnit}
+          {onUpdateCurrencyUnit}
+          {onDeleteCurrencyUnit}
+          {onReorderCurrencyUnit}
+          {onAddCurrencySubUnit}
+          {onUpdateCurrencySubUnit}
+          {onDeleteCurrencySubUnit}
+          {onSeedCurrencyPresets}
+          {onSetCurrencySpendStrategy}
+          {onSetCurrencyProvider}
+          {onSetCurrencyMacro}
+          {onClearCurrencyMacro}
+        />
+      </main>
+    {:else if isWorldTravelRoute}
+      <!--
+        World > Travel renders its own `manager-main` straight from the root, following
+        Currency and Downtime rather than Parties: Parties reuses `EnvironmentsBrowserView`
+        as its container, which is a leftover from when it was a Travel tab and not a shape
+        to copy.
+
+        Unlike Currency it KEEPS the right-hand inspector, because the realm detail pane IS
+        the authoring surface here — currency's unit editors expand in place, whereas a realm
+        is renamed, described and deleted from the inspector.
+      -->
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.TravelTitle', 'World Travel')}
+      >
+        {#if worldTravelTab === 'map'}
+          <GatheringMapLinksTab
+            sceneRegions={mapCurrentSceneRegions}
+            sceneUuid={$viewState.currentSceneUuid || ''}
+            selectedRegionUuid={selectedMapRegionUuid}
+            regions={worldRealms}
+            saving={$viewState.travelSaving === true}
+            onSelect={(uuid) => (selectedMapRegionUuid = uuid)}
+            onSetLink={(sceneRegionUuid, realmId) =>
+              store.setMapRegionLink?.(sceneRegionUuid, realmId)}
+          />
+        {:else}
+          <GatheringRealmsTab
+            realms={worldRealms}
+            selectedRealmId={selectedTravelRealmId}
+            environments={worldTravelEnvironmentOptions}
+            saving={$viewState.travelSaving === true}
+            onSelectRealm={(id) => (selectedTravelRealmId = id)}
+            onAddEnvironment={(envId, realmId) =>
+              store.setEnvironmentRealmMembership?.(envId, realmId, true)}
+            onRemoveEnvironment={(envId, realmId) =>
+              store.setEnvironmentRealmMembership?.(envId, realmId, false)}
+          />
+        {/if}
+      </main>
+    {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
         environments={environmentList}
         environmentsLoading={$viewState.environmentsLoading}
@@ -6989,9 +9560,9 @@
         sceneOptions={selectedSystem?.sceneOptions || []}
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
-        {activeGatheringTab}
-        {activeTravelTab}
-        onSelectTravelTab={selectTravelTab}
+        activeGatheringTab={isWorldRoute ? 'travel' : displayedGatheringTab}
+        activeTravelTab={isWorldRoute ? 'parties' : activeTravelTab}
+        worldParties={isWorldRoute}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
@@ -7023,24 +9594,15 @@
         onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
         onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
         onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
-        gatheringRealmSettings={$viewState.gatheringRealmSettings || { enabled: false }}
-        onSetGatheringRealmsEnabled={(sys, enabled) =>
-          store.setGatheringRealmsEnabled?.(sys, enabled)}
         onPickImagePath={services?.pickImagePath}
         {travelParties}
-        travelSelectedPartyId={selectedTravelPartyId}
         travelSaving={$viewState.travelSaving === true}
         travelError={$viewState.travelError}
         travelFieldErrors={$viewState.travelFieldErrors || {}}
         travelActorOptions={$viewState.actorOptions || []}
-        travelSystemRealms={$viewState.selectedSystemRealms || []}
-        travelSelectedRealmId={selectedTravelRealmId}
-        onSelectRealm={(id) => (selectedTravelRealmId = id)}
-        onAddEnvironmentToRealm={(envId, realmId) =>
-          store.setEnvironmentRealmMembership?.(envId, realmId, true)}
-        onRemoveEnvironmentFromRealm={(envId, realmId) =>
-          store.setEnvironmentRealmMembership?.(envId, realmId, false)}
-        onSelectParty={(id) => store.selectParty?.(id)}
+        {worldRealms}
+        {partyRealmOverridesAvailable}
+        {partyRealmOverridesUnavailableHint}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
         onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
@@ -7056,17 +9618,6 @@
         onClearStaleTravelActor={(id) => store.clearStaleTravelActor?.(id)}
         onDropStaleOverrideRealm={(id, sys, realmId) =>
           store.dropStaleOverrideRealm?.(id, sys, realmId)}
-        onCreateRealmQuick={(sys, name) => store.createRealmQuick?.(sys, name)}
-        onRenameRealm={(sys, id, name) => store.renameRealm?.(sys, id, name)}
-        onToggleRealmEnabled={(sys, id, enabled) => store.toggleRealmEnabled?.(sys, id, enabled)}
-        onUpdateRealm={(sys, id, patch) => store.updateRealm?.(sys, id, patch)}
-        onDeleteRealm={(sys, id) => store.deleteRealm?.(sys, id)}
-        travelCurrentSceneRegions={mapCurrentSceneRegions}
-        travelCurrentSceneUuid={$viewState.currentSceneUuid || ''}
-        mapSelectedRegionUuid={selectedMapRegionUuid}
-        onSelectMapRegion={(uuid) => (selectedMapRegionUuid = uuid)}
-        onSetMapRegionLink={(sceneRegionUuid, realmId) =>
-          store.setMapRegionLink?.(sceneRegionUuid, realmId)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main
@@ -7080,7 +9631,7 @@
             eventSelectionMode={selectedGatheringRules.eventSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
-            realmRecords={$viewState.selectedSystemRealms || []}
+            realmRecords={worldRealms}
             realmsEnabled={gatheringRealmsEnabled}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}
@@ -7097,24 +9648,49 @@
           />
         </section>
       </main>
-    {:else if currentView === 'checks' && selectedSystem}
+    {:else if isChecksRoute && selectedSystem}
       <main
         class="manager-main manager-environment-edit-main"
         aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}
       >
-        <section class="manager-environment-editor-shell">
+        <!-- `data-checks-shell` drops the shared editor shell's 12px padding for this route
+             only (issue 1096). The prototype's studio runs edge to edge inside the app
+             window and puts every inset on the pane itself; the shell's padding, the
+             workspace gap and the panel's own inset were stacking into dead space at the
+             body's edges. Marked on the SHELL rather than styled from a descendant, because
+             the padding belongs to the shell and a child cannot remove it. -->
+        <section class="manager-environment-editor-shell" data-checks-shell>
           <ChecksView
+            {foundrySystemId}
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-            alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
+            alchemyCheckMode={alchemyCheckModeDraft}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
-            craftingCheckModifiers={selectedSystem?.craftingCheck?.checkModifiers || []}
+            salvageConsumption={selectedSystem?.salvageCraftingCheck?.consumption || null}
+            craftingFailureResultPolicy={selectedSystem?.craftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            salvageFailureResultPolicy={selectedSystem?.salvageCraftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            gatheringFailureResultPolicy={selectedSystem?.gatheringCraftingCheck
+              ?.failureResultPolicy || 'perRecord'}
+            modifiers={selectedSystem?.modifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
             craftingMaxModifierPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
+            salvageDefaultModifierPolicy={selectedSystem?.salvageCraftingCheck
+              ?.defaultModifierPolicy || 'addAll'}
+            salvageDefaultModifierIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds ||
+              []}
+            salvageMaxModifierPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
+            gatheringDefaultModifierPolicy={selectedSystem?.gatheringCraftingCheck
+              ?.defaultModifierPolicy || 'addAll'}
+            gatheringDefaultModifierIds={selectedSystem?.gatheringCraftingCheck
+              ?.defaultModifierIds || []}
+            gatheringMaxModifierPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ??
+              null}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
@@ -7129,6 +9705,11 @@
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             features={selectedSystem?.features || {}}
             activation={checkActivation}
+            activity={checksActiveTab}
+            requestedSection={checksActiveSection}
+            requestedSectionNonce={checksSectionRequestNonce}
+            dirty={checksDirty}
+            dirtyActivities={checksDirtyActivities}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
             {onUpdateCraftingCheckProgressive}
@@ -7137,13 +9718,27 @@
             {onUpdateSalvageCheckProgressive}
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
-            onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
-            onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
-            onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
-            {onUpdateAlchemyFlags}
-            onTabChange={(tab) => {
-              checksActiveTab = tab;
+            onSetAlchemyCheckMode={(m) => {
+              alchemyCheckModeDraft = m;
             }}
+            onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            onUpdateSalvageConsumption={(patch) => store.saveSalvageCheckConsumption?.(patch)}
+            onUpdateCraftingFailureResultPolicy={(policy) =>
+              store.saveCraftingCheckFailureResultPolicy?.(policy)}
+            onUpdateSalvageFailureResultPolicy={(policy) =>
+              store.saveSalvageCheckFailureResultPolicy?.(policy)}
+            onUpdateGatheringFailureResultPolicy={(policy) =>
+              store.saveGatheringCheckFailureResultPolicy?.(policy)}
+            onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
+            onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
+            onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
+            {onUpdateAlchemyFlags}
+            onOpenActivity={(activity, section) => {
+              checksActiveSection = section || 'roll';
+              checksSectionRequestNonce += 1;
+              setView(`checks-${activity}`);
+            }}
+            onOpenModifierLibrary={showSystemModifiers}
             {onToggleCheckActive}
           />
         </section>
@@ -7161,7 +9756,13 @@
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
-        characterModifierLibrary={selectedGatheringCharacterModifiers}
+        characterModifierLibrary={selectedSystemModifiers}
+        checkModifierOptions={selectedSystem?.modifiers || []}
+        gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
+          'addAll'}
+        gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
+        gatheringModifierDefaultIds={selectedSystem?.gatheringCraftingCheck?.defaultModifierIds ||
+          []}
         libraryTools={selectedGatheringSystemTools}
         environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
@@ -7218,8 +9819,8 @@
         essenceOptions={selectedSystem?.features?.essences === true
           ? selectedSystem?.essenceDefinitions || []
           : []}
-        currencyUnits={selectedSystem?.requirements?.currency?.units || []}
-        currencyEnabled={selectedSystem?.requirements?.currency?.enabled === true}
+        currencyUnits={selectedCurrencyUnits}
+        currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onOpenSystems={selectSystemAndShowBrowser}
@@ -7247,6 +9848,8 @@
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
         onToggleEssenceEnabled={toggleEssenceEnabled}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('essences', selectionClearedAnnouncement())}
         bind:browserState={essenceBrowserState}
       />
     {:else if currentView === 'essence-edit' && selectedSystem}
@@ -7295,6 +9898,11 @@
           {salvageOutcomeNames}
           {salvageCheckEnabled}
           {salvageCheckTiers}
+          checkModifierOptions={selectedSystem?.modifiers || []}
+          salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
+            'addAll'}
+          salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
+          salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
           {salvageCheckDcMode}
           {salvageCheckDc}
           componentOptions={salvageComponentOptions}
@@ -7344,6 +9952,8 @@
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('components', selectionClearedAnnouncement())}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
@@ -7367,7 +9977,7 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
-        craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
+        craftingModifierOptions={selectedSystem?.modifiers || []}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
         craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
@@ -7378,6 +9988,7 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}
@@ -7473,6 +10084,8 @@
         onEditRecipe={(id) => editRecipe(id)}
         onToggleEnabled={(id, enabled, options) => toggleRecipeEnabled(id, enabled, options)}
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('recipes', selectionClearedAnnouncement())}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
       <main
@@ -7497,13 +10110,15 @@
             }}
             reseedNonce={systemDetailsReseedNonce}
             onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
-            characterModifierLibrary={selectedGatheringCharacterModifiers}
-            {characterModifierPresetsSupported}
-            {onAddCharacterModifier}
-            {onUpdateCharacterModifier}
-            {onDeleteCharacterModifier}
-            {onReorderCharacterModifier}
-            {onSeedCharacterModifierPresets}
+            modifierLibrary={selectedSystemModifiers}
+            modifierPresetsSupported={characterModifierPresetsSupported}
+            {foundrySystemId}
+            onAddModifier={onAddCharacterModifier}
+            onUpdateModifier={onUpdateCharacterModifier}
+            onDeleteModifier={onDeleteCharacterModifier}
+            onReorderModifier={onReorderCharacterModifier}
+            onSeedModifierPresets={onSeedCharacterModifierPresets}
+            requestedSectionNonce={requestedSystemModifierSectionNonce}
             characterPrerequisiteLibrary={selectedCharacterPrerequisites}
             {characterPrerequisitePresetsSupported}
             {onAddCharacterPrerequisite}
@@ -7511,25 +10126,9 @@
             {onDeleteCharacterPrerequisite}
             {onReorderCharacterPrerequisite}
             {onSeedCharacterPrerequisitePresets}
-            currencyUnits={selectedCurrencyUnits}
-            {currencyPresetsSupported}
-            {currencySpendStrategy}
-            {currencyProviderId}
-            {currencyMacros}
-            {currencyProviderOptions}
-            {onAddCurrencyUnit}
-            {onUpdateCurrencyUnit}
-            {onDeleteCurrencyUnit}
-            {onReorderCurrencyUnit}
-            {onAddCurrencySubUnit}
-            {onUpdateCurrencySubUnit}
-            {onDeleteCurrencySubUnit}
-            {onSeedCurrencyPresets}
-            {onSetCurrencySpendStrategy}
-            {onSetCurrencyProvider}
-            {onSetCurrencyMacro}
-            {onClearCurrencyMacro}
             onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
+            onToggleGatheringRealms={(next) =>
+              store.setGatheringRealmsEnabled?.(selectedSystemId, next)}
             onToggleTime={(next) => store.toggleRequirement?.('time', next)}
           />
         </section>
@@ -7561,7 +10160,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
@@ -7638,8 +10237,13 @@
             dataAttr="data-tags-evidence"
             dataValue="reference-safe"
           />
-        {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
-          {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
+          <!-- `world-travel` belongs in this list even though it renders its own `manager-main`:
+             the travel inspector is a BRANCH of the chain nested inside here, so leaving the
+             route out makes that branch unreachable and the aside falls through to nothing.
+             The symptom is silent — the route commits, its panel renders, and only the detail
+             pane is missing, which is why only the view lab caught it. -->
+        {:else if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
+          {#if (currentView === 'environments' && displayedGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
             {#if selectedGatheringTask}
               {#if currentView !== 'gathering-task-edit'}
                 <section class="manager-inspector-card" data-gathering-task-inspector>
@@ -8150,8 +10754,8 @@
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                                 'Search character modifiers to add'
                               )}
-                              disabled={selectedGatheringCharacterModifiers.length === 0}
-                              data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                              disabled={selectedSystemModifiers.length === 0}
+                              data-tooltip={selectedSystemModifiers.length === 0
                                 ? text(
                                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                     'Add a modifier to the system library first to reference it here.'
@@ -8376,7 +10980,7 @@
                 )}
               />
             {/if}
-          {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
+          {:else if (currentView === 'environments' && displayedGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
             {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
               <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
                 <div class="manager-drop-inspector-scroll">
@@ -8559,8 +11163,8 @@
                             'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                             'Search character modifiers to add'
                           )}
-                          disabled={selectedGatheringCharacterModifiers.length === 0}
-                          data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                          disabled={selectedSystemModifiers.length === 0}
+                          data-tooltip={selectedSystemModifiers.length === 0
                             ? text(
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                 'Add a modifier to the system library first to reference it here.'
@@ -8898,7 +11502,7 @@
                 )}
               />
             {/if}
-          {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'settings'}
             <section
               class="manager-inspector-card manager-gathering-rules-card"
               data-gathering-inspector-rules
@@ -9384,121 +11988,19 @@
                 </div>
               </div>
             </section>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+          {:else if isWorldTravelRoute}
             <section
               class="manager-inspector-card manager-travel-inspector"
               data-gathering-inspector-travel
-              data-travel-inspector={activeTravelTab}
+              data-travel-inspector={worldTravelTab}
+              aria-label={worldTravelTab === 'map'
+                ? text(
+                    'FABRICATE.Admin.Manager.Travel.MapLinksInspector',
+                    'Selected map region link'
+                  )
+                : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm')}
             >
-              {#if activeTravelTab === 'parties'}
-                {#if selectedTravelParty}
-                  <div class="manager-inspector-title-row">
-                    <span class="manager-inspector-icon" aria-hidden="true">
-                      {#if selectedTravelParty.travelActor?.img}
-                        <img
-                          class="manager-travel-parties-thumb"
-                          src={selectedTravelParty.travelActor.img}
-                          alt=""
-                        />
-                      {:else}
-                        <i class="fas fa-people-group"></i>
-                      {/if}
-                    </span>
-                    <div class="manager-inspector-copy">
-                      <p class="manager-kicker">
-                        {text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}
-                      </p>
-                      <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
-                    </div>
-                  </div>
-
-                  <section class="manager-inspector-card">
-                    <h3 class="manager-card-title">
-                      {text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}
-                    </h3>
-                    {#if selectedTravelParty.currentRealmEvidence.realms.length > 0}
-                      <ul class="manager-travel-evidence-realms">
-                        {#each selectedTravelParty.currentRealmEvidence.realms as realm (realm.id)}
-                          <li>
-                            {realm.name}
-                            {#if !realm.enabled}
-                              <Chip tone="disabled"
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Travel.DisabledRealmChip',
-                                  'Disabled'
-                                )}</Chip
-                              >
-                            {/if}
-                          </li>
-                        {/each}
-                      </ul>
-                    {:else}
-                      <p class="manager-muted">
-                        {text(
-                          'FABRICATE.Admin.Manager.Travel.EvidenceNoRealms',
-                          'No current realm set for this system.'
-                        )}
-                      </p>
-                    {/if}
-                  </section>
-
-                  <div class="manager-travel-inspector-actions">
-                    {#if selectedTravelParty.enabled}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-on"
-                        disabled={$viewState.travelSaving === true}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
-                      >
-                        <i class="fas fa-toggle-on" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span
-                        >
-                      </button>
-                    {:else}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-off"
-                        disabled={$viewState.travelSaving === true ||
-                          !selectedTravelParty.travelActorUuid}
-                        title={selectedTravelParty.travelActorUuid
-                          ? undefined
-                          : text(
-                              'FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor',
-                              'Assign a travel actor to enable this party.'
-                            )}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
-                      >
-                        <i class="fas fa-toggle-off" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span
-                        >
-                      </button>
-                    {/if}
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
-                      disabled={$viewState.travelSaving === true}
-                      onclick={() => store.deleteParty?.(selectedTravelParty.id)}
-                    >
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                      <span
-                        >{text(
-                          'FABRICATE.Admin.Manager.Travel.Parties.Delete',
-                          'Delete party'
-                        )}</span
-                      >
-                    </button>
-                  </div>
-                {:else}
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder',
-                      'Select a party to see its details.'
-                    )}
-                  </p>
-                {/if}
-              {:else if activeTravelTab === 'realms'}
+              {#if worldTravelTab === 'realms'}
                 {#if selectedTravelRealm}
                   <div class="manager-inspector-title-row">
                     <span class="manager-inspector-icon" aria-hidden="true">
@@ -9520,7 +12022,7 @@
                       type="button"
                       class="manager-button is-danger"
                       disabled={$viewState.travelSaving === true}
-                      onclick={() => store.deleteRealm?.(selectedSystemId, selectedTravelRealm.id)}
+                      onclick={() => store.deleteRealm?.(selectedTravelRealm.id)}
                     >
                       <i class="fas fa-trash" aria-hidden="true"></i>
                       <span
@@ -9536,8 +12038,7 @@
                     <RealmNameField
                       name={selectedTravelRealm.name}
                       disabled={$viewState.travelSaving === true}
-                      onRename={(name) =>
-                        store.renameRealm?.(selectedSystemId, selectedTravelRealm.id, name)}
+                      onRename={(name) => store.renameRealm?.(selectedTravelRealm.id, name)}
                     />
                   </section>
 
@@ -9610,7 +12111,7 @@
                     )}
                   </p>
                 {/if}
-              {:else if activeTravelTab === 'map'}
+              {:else if worldTravelTab === 'map'}
                 {#if selectedMapRegion}
                   <section class="manager-inspector-card manager-map-link-region-card">
                     <div class="manager-inspector-title-row">
@@ -9648,7 +12149,7 @@
                       )}
                     </h3>
                     {#if selectedMapRegion.linkedRegionId}
-                      {@const linkedRealm = travelSystemRealms.find(
+                      {@const linkedRealm = worldRealms.find(
                         (realm) => realm.id === selectedMapRegion.linkedRegionId
                       )}
                       <ul class="manager-travel-region-parties">
@@ -9708,7 +12209,7 @@
                       <p class="manager-muted">
                         {text(
                           'FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion',
-                          'No party travel markers are in this map region.'
+                          'No party travel actors are in this map region.'
                         )}
                       </p>
                     {/if}
@@ -10012,10 +12513,11 @@
               applying={essenceBulkApplying}
               deleting={essenceBulkDeleting}
               deleteArmed={essenceBulkDeleteArmed}
+              deleteOutcome={essenceBulkDeleteOutcome}
               onDraftChange={(next) => stageEssenceBulkDraft(next)}
               onClearSelection={() => clearEssenceBulkSelection()}
               onApply={() => applyEssenceBulkEdit()}
-              onArmDelete={() => (essenceBulkDeleteArmed = true)}
+              onArmDelete={() => armEssenceBulkDelete()}
               onDisarmDelete={() => (essenceBulkDeleteArmed = false)}
               onDelete={(ids) => deleteSelectedEssences(ids)}
             />
@@ -10158,9 +12660,16 @@
               selectedCards={componentBulkSelectedCards}
               draft={componentBulkDraft}
               applying={componentBulkApplying}
+              deleting={componentBulkDeleting}
+              deleteArmed={componentBulkDeleteArmed}
+              deleteImpact={componentBulkDeleteImpact}
+              deleteOutcome={componentBulkDeleteOutcome}
               onDraftChange={(next) => stageComponentBulkDraft(next)}
               onClearSelection={() => clearComponentBulkSelection()}
               onApply={() => applyComponentBulkEdit()}
+              onArmDelete={() => armComponentBulkDelete()}
+              onDisarmDelete={() => (componentBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedComponents(ids)}
             />
           {:else if selectedComponent}
             <ComponentBrowserInspector
@@ -10288,9 +12797,16 @@
               blockedCount={recipeBulkBlockedCount}
               draft={recipeBulkDraft}
               applying={recipeBulkApplying}
+              deleting={recipeBulkDeleting}
+              deleteArmed={recipeBulkDeleteArmed}
+              deleteImpact={recipeBulkDeleteImpact}
+              deleteOutcome={recipeBulkDeleteOutcome}
               onDraftChange={(next) => stageRecipeBulkDraft(next)}
               onClearSelection={() => clearRecipeBulkSelection()}
               onApply={() => applyRecipeBulkEdit()}
+              onArmDelete={() => armRecipeBulkDelete()}
+              onDisarmDelete={() => (recipeBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedRecipes(ids)}
             />
           {:else}
             <RecipeBrowserInspector
@@ -10583,4 +13099,34 @@
     content={importReportContent}
     onClose={() => (importReportContent = null)}
   />
+
+  <!--
+    THE MANAGER'S ONE PERSISTENT LIVE REGION (issue 1157). It is the LAST child of
+    `.fabricate-manager` and is never conditionally rendered, so it outlives every view, every
+    browser and every bulk panel — which is the whole point: the actions it reports are the
+    ones that destroy the surface they were performed from.
+
+    It is EMPTY on mount. A region inserted into the DOM together with its text is not
+    announced by most screen readers, so the region has to be there first and the text has to
+    arrive later.
+
+    The child is KEYED ON THE ANNOUNCEMENT OBJECT, which `announceBulkSelectionEmptied`
+    replaces on every call. That is what makes "Selection cleared." speak the SECOND time:
+    re-inserting identical text announces nothing, so the node is destroyed and recreated
+    rather than having its text rewritten, and each announcement is a genuine insertion.
+    `aria-atomic` then has the region read as one sentence rather than as a diff.
+
+    `.visually-hidden` is declared under `.fabricate-manager` in `styles/fabricate.css`, which
+    this element is inside; do not lift this region out of that root.
+  -->
+  <p
+    class="visually-hidden"
+    aria-live="polite"
+    aria-atomic="true"
+    data-manager-bulk-selection-announce
+  >
+    {#key bulkSelectionAnnouncement}{#if bulkSelectionAnnouncement?.text}<span
+          >{bulkSelectionAnnouncement.text}</span
+        >{/if}{/key}
+  </p>
 </div>

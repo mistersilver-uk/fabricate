@@ -88,15 +88,35 @@ CraftingSystem = {
     // Salvage reuses the crafting check sub-object shapes (so the GM Checks-tab
     // editors are shared); the active one is selected by salvageResolutionMode. The
     // simple/routed default DC is the sub-object's `dc`; a per-component override
-    // lives on Component.salvage.dcOverride. Salvage has no recipes, so the simple
-    // `tiers`/`dcMode`/`macroUuid` and routed `tiers` are persisted but not authored.
+    // lives on Component.salvage.dcOverride. Salvage has no recipes, so salvage DC
+    // RESOLUTION reads no `tiers`, `dcMode` or `macroUuid` on either slot (the routed
+    // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
+    // arithmetic over the per-component override and the slot's own `dc`. That is a
+    // statement about DC resolution ALONE and not a licence to drop the fields:
+    // `simple.tiers` is the preset source for the per-component salvage DC control and
+    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
+    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // renders a tier table (the Checks tab mounts the simple editor with its DC-source
+    // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
+    // is authored there.
     simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
+
+    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the library is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
 
   // Present only when features.gathering is true. System-level gathering check
@@ -111,7 +131,65 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
+
+    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the library is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
+
+  // THE ONE named modifier library for the WHOLE system (issue 1117). It has moved twice:
+  // out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select
+  // over the same entries so it can belong to no one activity; and then, in `1.23.0`, it
+  // ABSORBED the gathering character-modifier library
+  // (`gatheringConfig.systems[systemId].characterModifiers`), because a named actor-driven
+  // expression is ONE concept and authoring it twice let a GM define "Medicine" as two
+  // unrelated records that could disagree. Both migrations delete the old key.
+  //
+  // THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
+  // `min`/`max` clamp a CHECK modifier's contribution — the resolved number for a flat
+  // entry, and the ROLLED result for a rolling one — while a gathering drop-row
+  // reference carries its OWN `min`/`max` that clamp its contribution independently.
+  // `isRollExpression` is DERIVED from the expression on every normalize and never read
+  // from the input, so a persisted or imported flag cannot contradict the expression
+  // beside it.
+  //
+  // Each `expression` is a roll-data fragment evaluated against the acting character
+  // (missing/failed → 0). `icon`, `min` and `max` are attached ONLY when authored, so
+  // absence round-trips as key-absent and means unbounded — a bound of `0` is a real
+  // bound, which is why the guard is `Number.isFinite` on an explicitly-guarded value
+  // rather than truthiness. An authored `min > max` is preserved VERBATIM and is a
+  // BLOCKING readiness issue (`modifierBoundsInverted`): that entry contributes 0 until
+  // it is repaired, matching gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS` posture.
+  // A finite bound that no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the
+  // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
+  // contains the entry to 0. Two issue ids rather than one cause with two readings: the
+  // repairs differ and `1e21` is not an inversion.
+  // A ROLL-SHAPED expression is legal here and legal in a CHECK (issue 1118). A gathering
+  // drop row evaluates the expression and applies the result as a percentage-point delta;
+  // a check appends the DICE to its roll formula, so the authored variance survives to the
+  // roll and shows on the card. The bounds above clamp the ROLLED result for such an entry,
+  // in the formula. `isRollExpression` is therefore a DISPLAY classification and never a
+  // gate: the blocking `modifierRollExpression` readiness issue issue 1117 raised is
+  // RETIRED.
+  //
+  // An entry with an EMPTY expression is KEPT rather than dropped: the library has an "Add
+  // modifier" button, and an entry that vanished on save the moment it was created would
+  // make that button appear broken. It is still a runtime misconfiguration wherever it is
+  // referenced.
+  //
+  // Absent = empty library, so every activity's contribution is nothing and no term is
+  // appended.
+  modifiers?: {
+    id: string, label: string, expression: string, isRollExpression: boolean,
+    icon?: string, min?: number, max?: number
+  }[],  // default []
 
   craftingCheck: {
     // `enabled` is ONLY the on/off toggle for optional checks (simple/alchemy
@@ -140,7 +218,7 @@ CraftingSystem = {
     // outcome tiers live on routed.relativeOutcomes / routed.fixedOutcomes.
     outcomes?: string[],           // default ["fail", "pass"]
 
-    // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
+    // Per-resolution-mode check sub-objects authored in the GM Checks studio; the
     // active one is selected by resolutionMode. (Shapes: SimpleCheck / RoutedCheck /
     // CheckBreakage defined below.)
     // Slot ownership: `simple` is the SHARED optional pass/fail crafting-check slot
@@ -157,34 +235,38 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // Per-recipe check-modifier catalogue (issues 770, 1055). A crafting-owned named
-    // catalogue (NOT gathering's characterModifiers — a different aggregate) appended
-    // to the check roll automatically. Each `expression` is a roll-data
-    // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
-    // catalogue + addAll rule = a scalar of 0, which appends no term at all.
-    checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
+    // THE SELECTION TRIPLE, and only it (issues 1095, 1117). The LIBRARY moved UP to
+    // `CraftingSystem.modifiers` — see the system shape above — because salvage and
+    // gathering now select over the same entries; the `1.22.0` migration relocates it and
+    // DELETES this level's `checkModifiers` key. The identical triple appears on
+    // `salvageCraftingCheck` and `gatheringCraftingCheck`, emitted by ONE shared
+    // derivation so the three whitelist rebuilds cannot drift.
+    //
     // The COMBINATION RULE, owned by the SYSTEM alone (issue 1055). It states BOTH how
     // the eligible values reduce to one number AND who selects them:
-    //   addAll      — sum the system's own default set. Nobody selects.
-    //   highest     — max(...) of the system's own default set. Nobody selects.
-    //   byRecipe    — "Recipe picks": the RECIPE author selects, at recipe-edit time.
+    //   addAll      — sum this activity's own default set. Nobody selects.
+    //   highest     — max(...) of this activity's own default set. Nobody selects.
+    //   bySubject   — the record being resolved selects, at authoring time: the recipe on
+    //                 crafting, the component on salvage, the gathering task on gathering.
+    //                 Rendered "By recipe" / "By component" / "By gathering task".
     //   playerPicks — the PLAYER selects, at roll time.
-    // `byRecipe` is a first-class rule, NOT a delegation of authority: a recipe chooses
+    // `bySubject` is a first-class rule, NOT a delegation of authority: a subject chooses
     // WHICH modifiers apply, never HOW they combine. Both selecting rules SUM what was
     // picked and are bounded by `maxModifierPicks` below. An unrecognized value falls
-    // back to "addAll"; a recipe never overrides this field. `playerPicks` resolves
+    // back to "addAll"; a subject never overrides this field. The pre-1095 `byRecipe` is a
+    // legacy READ alias for `bySubject` and is never re-emitted. `playerPicks` resolves
     // deterministically to the best legal selection whenever the roll-time prompt is not
-    // offered (resolution-modes/spec.md).
-    defaultModifierPolicy?: "addAll" | "highest" | "byRecipe" | "playerPicks",  // default "addAll"
+    // offered (resolution-modes/spec.md), and is available on all three activities.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
     defaultModifierIds?: string[],  // default []; catalogue entries applied by default
-    // The cap on how many modifiers a SELECTING rule (`byRecipe`, `playerPicks`) may
-    // pick; meaningless under `addAll`/`highest`, and stored system-wide regardless of
-    // the current rule so flipping between the two selecting rules does not destroy it.
+    // The cap on how many modifiers a SELECTING rule (`bySubject`, `playerPicks`) may
+    // pick; meaningless under `addAll`/`highest`, and stored regardless of the current
+    // rule so flipping between the two selecting rules does not destroy it.
     // PRESERVES ABSENCE — only a positive integer is attached, so `null`, `0`, `2.5` and
     // junk all normalize to the SAME shape, key absent. Absence means UNLIMITED
-    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`craftingModifierResolver.js`)
-    // and never defaulted at this shape: a system never asked the question must not
-    // silently acquire a bound that truncates recipe picks already on disk. See
+    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`checkModifierResolver.js`)
+    // and never defaulted at this shape: a check never asked the question must not
+    // silently acquire a bound that truncates subject picks already on disk. See
     // resolution-modes/spec.md §Check Source and the `1.20.0` migration below.
     maxModifierPicks?: number,  // positive integer; default: key absent = unlimited
   },
@@ -203,6 +285,8 @@ CraftingSystem = {
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
+  //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
+  //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
@@ -342,12 +426,13 @@ CraftingSystem = {
       enabled: boolean, // default true
     },
 
+    // PARTICIPATION ONLY. The coin ladder, the spend strategy, the selected provider and
+    // the GM macro set are WORLD scope (see CurrencyConfig below): a world runs exactly
+    // ONE Foundry game system, so there is exactly one way actors store coins and two
+    // crafting systems cannot meaningfully disagree about how to read the same actor's
+    // purse. This block says only whether THIS system charges the world's currency.
     currency: {
-      enabled: boolean,
-      spendStrategy: "actorProperty" | "actorInventory" | "macro", // default "actorProperty"
-      providerId: string,                     // default ""; selected preconfigured provider (actorInventory)
-      macros: { canAfford: string, increment: string, decrement: string }, // default all ""; currency macro UUIDs (macro)
-      units: CurrencyUnit[],
+      enabled: boolean, // default false
     },
   },
 
@@ -355,8 +440,7 @@ CraftingSystem = {
   // NOTE: a Gathering Realm is the Fabricate geography concept; it is distinct from a
   // Foundry Scene Region (RegionDocument / Region Behaviour), which a realm maps to
   // many-to-one through sceneMappings[].sceneRegionUuid.
-  gatheringRealms?: GatheringRealm[],          // default []; was gatheringRegions
-  gatheringRealmSettings?: GatheringRealmSettings, // defaults: enabled false, revealMode "manual", modifierVisibility "visible"
+  gatheringRealmSettings?: GatheringRealmSettings, // { enabled } only; default false. The realm library, reveal mode and modifier visibility are world scope — see TravelConfig
 }
 ```
 
@@ -404,7 +488,11 @@ CraftingSystem = {
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
-14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in.
+14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
+    A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
+    `enabled` decides consumption only — whether the party's current location gates this system's environments, what its UI shows, and whether its environments offer the realm controls — so the world's realms stay authorable and resolvable whether or not any system has opted in.
+    The normalizer is an allowlist rebuild that does not emit `gatheringRealms`, `gatheringRegions` or `gatheringRegionSettings`, so the first system save after the `1.27.0` migration is what removes a stale per-system copy.
+    That omission is destructive by design and is why the migration must run before any system save.
     A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour).
     Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed.
     The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids).
@@ -415,12 +503,14 @@ CraftingSystem = {
     Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (world setting `fabricate.gatheringParties`; see the Gathering Party requirements in `gathering-and-harvesting`) and are excluded from system import/export.
     Beyond the `system` object and its realms, per-system gathering environments (the `gatheringEnvironments` world setting) and the per-system `gatheringConfig` slice (rules, conditions, vocabularies, economy, reusable tasks, reusable events, character modifiers) ride along with crafting-system import/export; the runtime-versus-authoring boundary, migration, reference reporting, and copy-mode rebinding rules are defined in `import-export` (Specification 010).
     The `gatheringParties` exclusion above still holds.
-15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
+15. `CurrencyConfig.units[]` — the WORLD currency configuration (see the CurrencyConfig section) — defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
+    A crafting system owns no `units[]` of its own; it contributes only `requirements.currency.enabled`, and the runtime composes the two at one chokepoint (`getCurrencyRequirementConfig`), taking `enabled` from the system and everything else from the world config.
 16. Currency unit profiles must be acyclic.
     Each connected conversion branch must resolve to exactly one terminal base unit.
-17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
-18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; normalized currency requirements do not emit them. (The new `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
-19. `requirements.currency.spendStrategy` selects how currency is read and spent.
+17. Legacy `provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
+    The resolution belongs to `normalizeWorldCurrencyConfig` rather than to the crafting-system normalizer, because a legacy block can now only reach normalization through the world config — carried up by the `1.26.0` migration or by the export upcast.
+18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; the normalized world currency config does not emit them. (The `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
+19. `CurrencyConfig.spendStrategy` selects how currency is read and spent, once per world.
     It is one of **three peer top-level strategies** — `"actorProperty"` (default), `"actorInventory"`, or `"macro"`; any other value normalizes to `"actorProperty"`.
     A legacy nested config (`"actorInventory"` with the retired `inventoryMode === "macro"`) maps forward to the peer `"macro"` strategy on normalization; `inventoryMode` is never re-emitted.
     The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding).
@@ -434,8 +524,8 @@ CraftingSystem = {
     A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
     The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
-    The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
-20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
+    The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
     Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
     Absent fields back-compat default to `""`/empty macros with no migration.
     The retired `inventoryMode` field is never emitted.
@@ -480,12 +570,13 @@ CraftingSystem = {
     The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
     This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
+    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117): the library is `CraftingSystem.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` and `1.23.0` migrations' before-any-load ordering is load-bearing rather than incidental.
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
     The post-shim reading is the whole rule and not a refinement of it (issue 1094): a stored `@craftingmod` IS authored and is NOT usable, because `stripRetiredModifierPlaceholder` reduces it to `''`, and so is any formula whose placement of that placeholder the shim refuses (`1d20 * @craftingmod`, `max(@craftingmod, 2)`, `(2 + @craftingmod + 4) * 3`).
     `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` apply the shim BEFORE their emptiness test, `checksReadiness` derives `hasRollFormula` from the same post-shim value, and `CraftingEngine._runCraftingCheck` gates every runner on `checkUsable` rather than on a raw `rollFormula` — so readiness, the inert-cause projection, the recipe editor and the engine cannot disagree about whether a check works.
-    Check-modifier CONTRIBUTION is independent of the formula's text: the resolved scalar is APPENDED as one `+ N[Modifiers]` term, so a usable formula always carries it and no placeholder is authored, spent or forgotten.
+    Check-modifier CONTRIBUTION is independent of the formula's text: the resolved contribution is APPENDED as flavoured `[Modifiers]` terms — one `+ N` term carrying the flat sum, plus one `+ (…)` dice term per rolling entry — so a usable formula always carries it and no placeholder is authored, spent or forgotten.
     The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
     Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
     The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
@@ -497,7 +588,7 @@ CraftingSystem = {
     **Stepping is disposition-preserving:** under a forced outcome the array in play is the ranked SUBSET of tiers sharing the forced disposition, so `data.success` and the final tier's own `success` can never disagree; with no forced outcome it is the whole ranked list and both `success` and `breakTools` follow the final tier.
     A `null` matched tier steps nothing, `target` included.
     Tier order is derived in exactly ONE place (`rankedRoutedOutcomes` in `src/systems/checkRoll.js`), consumed by the forced reroute, the `minOutcomeId` gate and the step pass alike: ascending by `dc` (relative) or `start` (fixed), non-finite ranks dropped, and the FIRST authored tier kept among equal ranks; callers locate a tier in it by ID, never by object identity.
-    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (non-overlap is only a `rangeOverlap` readiness warning), so two fixed tiers sharing a `start` compare equal and the craft passes.
+    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (`rangeOverlap` is a `critical` READINESS issue, never an ENFORCEMENT — readiness reports it, the normalizer still persists it and the roll path still runs), so two fixed tiers sharing a `start` compare equal and the craft passes.
     Full semantics — including the acknowledged rolled-tier/final-tier asymmetry and the relationship to `clampToNearest` — are in `resolution-modes` § Routed Tier Stepping.
 
 32. **The persisted `tierStep` effect and the runtime `data.tierStepApplied` evidence are different shapes and deliberately different names**, exactly as `natStepping` and `data.natStep` were.
@@ -510,6 +601,34 @@ CraftingSystem = {
     Gathering emits it from the shared runner but threads it to no chat surface.
     Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
     It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
+
+33. **System-level modifier library.** `CraftingSystem.modifiers` is the ONE named modifier library for the whole system: an ordered array of `{ id, label, expression, isRollExpression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, `icon` / `min` / `max` attached only when authored, and `isRollExpression` DERIVED from the expression on every normalize.
+    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers).
+    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`).
+    An entry with an empty expression is kept, not dropped, because the authoring surface can create one.
+    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
+    `min` / `max` clamp that entry's CONTRIBUTION, so a bound means the same thing under every combination rule: the resolved value for a flat expression, and the ROLLED result for a rolling one, the latter expressed in the formula as `min(max((1d8), -1), 6)`.
+    Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
+    An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
+    A bound that is finite but NOT expressible as a dice-grammar `Constant` — `1e21`, `1e-7` — is the SECOND blocking bounds fault, `modifierBoundsUnsafe` (also `critical`), and contains that entry to 0 in the same way; it is a separate issue id rather than a second cause on the first, because the repairs differ and `1e21` is not an inversion.
+    The expressibility test is the same `isDecimalSafeTermValue` the term emit asks, so the clamp and the emit cannot disagree about which numbers a formula can carry.
+
+34. **Subject-level modifier picks.** Under the `bySubject` combination rule the pick lives on the record being resolved: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds`, `GatheringTask.checkModifierIds`.
+    All three preserve an AUTHORED EMPTY array as a real pick of zero, distinct from absent, keyed on `Array.isArray` at entry so a malformed member cannot flip an authored empty set back to inherit.
+    All three are truncated to `maxModifierPicks` at the resolver rather than only at the picker, so lowering the cap never leaves a record rolling more modifiers than the system permits and never destroys its stored picks.
+    **The id COERCION is one rule for all three subjects** (`normalizeCheckModifierIds`, `src/utils/checkModifierPicks.js`): ids are TRIMMED, non-string members are dropped rather than coerced, duplicates are dropped and authored order is preserved.
+    Trimming is part of the shape rather than a nicety, and its absence was a live divergence: a per-subject filter that rejected a whitespace-only id but kept `' med '` untrimmed made one authored id resolve against the catalogue on salvage and gathering and be dropped as unknown on crafting.
+    **`GatheringTask` is rebuilt by THREE whitelist normalizers, not two, and all three must emit `checkModifierIds`.**
+    Two are the mirrored LIBRARY rebuilds — `normalizeLibraryTask` (`GatheringRichStateService.js`) and `_normalizeGatheringTask` (`adminStore.js`) — and either one omitting the key loses the field on save, silently and in one direction only.
+    The third is the ENGINE-FACING rebuild `_libraryTaskToRuntimeTask` (`GatheringRichStateService.js`), which projects a library task into the runtime task `GatheringEngine` resolves against, and its failure mode is DIFFERENT and strictly harder to see: the pick persists correctly, both library normalizers are correct, and the pick is simply never read at roll time, so `bySubject` silently resolves the activity's default set for every task.
+    A world satisfying the two-rebuild reading exactly can therefore still have `bySubject` wholly broken on gathering.
+
+35. **Failure-result policy.** `failureResultPolicy` (`'never' | 'perRecord' | 'always'`) is present on ALL THREE activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — and answers exactly one question: may a FAILED check produce a result at all.
+    It is the ORTHOGONAL axis to failure CONSUMPTION (`recipes-and-steps` §Failure Consumption Policy), which answers what a failed attempt costs; gathering carries the produce axis and no consume axis.
+    It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as declarations of intent rather than as a second branch.
+    All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
+    An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -579,6 +698,91 @@ Requirements:
    I/O — so it is unit-testable and reusable from both the synchronous visibility
    hot-path and the GM overview view.
 
+## CurrencyConfig
+
+### Purpose
+
+Define the WORLD currency configuration: the one coin ladder a world has, how coins are read and spent, the selected provider, and the GM macro set.
+
+Currency is world scope rather than per crafting system because a world runs exactly ONE Foundry game system, so there is exactly one way actors store coins.
+Two crafting systems cannot meaningfully disagree about how to read the same actor's purse, yet the per-system model invited a GM to configure the ladder repeatedly and let two systems disagree.
+What a crafting system still owns is a single boolean — `requirements.currency.enabled`, whether it PARTICIPATES — which is deliberately NOT duplicated here, because a world-level flag and a system-level flag could then disagree.
+
+It is persisted as the `fabricate.currencyConfig` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `CurrencyConfigStore` is the persistence shell and `normalizeWorldCurrencyConfig` is the normalizer.
+
+```ts
+type CurrencyConfig = {
+  spendStrategy: "actorProperty" | "actorInventory" | "macro"; // default "actorProperty"
+  providerId: string; // default ""; meaningful only under actorInventory, always persisted
+  macros: { canAfford: string; increment: string; decrement: string }; // default all ""; meaningful only under macro
+  units: CurrencyUnit[]; // default []
+};
+```
+
+### Requirements
+
+1. The config carries **no** `enabled` key.
+   Participation is a per-crafting-system decision (`requirements.currency.enabled`), and keeping the flag out of this shape is what stops the two scopes from ever contradicting each other.
+2. `spendStrategy`, `providerId`, `macros`, and the `units[]` profile rules are unchanged in substance by the move to world scope — only their owner changed.
+   `CraftingSystem` requirements 15-20 define them and the `CurrencyUnit` section defines a unit; this section does not restate them.
+3. Normalization is total and non-throwing.
+   `normalizeWorldCurrencyConfig` always emits all four keys, drops an unusable unit entry (a non-object, or one resolving to an empty id) rather than repairing it while normalizing every usable entry to the canonical `CurrencyUnit` shape, maps a legacy `provider === "system"` + `systemAdapter` block forward to the matching seeded profile and spend strategy (requirement 17), and never re-emits the legacy `provider`, `systemAdapter`, or `inventoryMode` inputs.
+   It is `normalizeCurrencyConfig` minus `enabled`, so the world shape and the legacy per-system shape cannot drift apart.
+4. **Persistence is NOT gated on profile validity, and that is deliberate.**
+   A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
+   The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
+5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
+   Validity is resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
+6. The one structural refusal the store makes is a sub-unit edit that would self-reference or create a cycle, because that corrupts the graph every reader walks rather than merely leaving the ladder incomplete.
+   Deleting a unit additionally strips every `contains[]` entry pointing at it, so a deletion never leaves a dangling edge for a reader to defend against.
+7. **Unit `id`s are stable and are never rewritten**, because recipe currency options (`Ingredient.match.unit`) and salvage currency requirements (`CurrencyRequirement.unit`) store unit ids rather than labels, so a dropped or re-keyed unit orphans every reference to it.
+   Every reconciliation of two ladders is therefore keyed by `id` and is reference-preserving: the `1.26.0` migration UNIONS units by id across every crafting system (the first system wins an id collision), and import merges an incoming ladder by id with the DESTINATION definition winning (see `import-export`).
+8. Exactly one runtime chokepoint composes the two scopes.
+   `getCurrencyRequirementConfig` takes `enabled` from the crafting system and `units` / `spendStrategy` / `providerId` / `macros` from this config, reaching each through a seam (`getCraftingSystemManager`, `getCurrencyConfig`) with a `game.fabricate` global fallback.
+   No affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
+   The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
+
+## TravelConfig
+
+### Purpose
+
+Define the WORLD travel configuration: the one realm library a world has, how realms are revealed to players, and whether realm modifiers are disclosed.
+
+Travel is world scope rather than per crafting system because realms are geography.
+Northreach Vale is the same valley whether a character is there to gather herbs or to quarry stone, yet the per-system model made a GM running two systems author it twice, link the same Foundry Scene Region to both copies, and reveal it to a character twice — and let the two copies then disagree.
+The engine conceded as much: its listing realm context gave up entirely and reported no realm whenever more than one realm-enabled system existed, because it could not say which system's answer was the real one.
+What a crafting system still owns is a single boolean — `gatheringRealmSettings.enabled`, whether it PARTICIPATES — which is deliberately NOT duplicated here, because a world-level flag and a system-level flag could then disagree.
+
+It is persisted as the `fabricate.travelConfig` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `GatheringRealmStore` is the persistence shell and `normalizeTravelConfig` is the normalizer.
+
+```ts
+type TravelConfig = {
+  revealMode: "manual" | "onPartyTokenEntry" | "alwaysVisible"; // default "manual"
+  modifierVisibility: "visible" | "gmOnly";                     // default "visible"
+  realms: GatheringRealm[];                                     // default []
+};
+```
+
+### Requirements
+
+1. The config carries **no** `enabled` key.
+   Participation is a per-crafting-system decision (`gatheringRealmSettings.enabled`), and keeping the flag out of this shape is what stops the two scopes from ever contradicting each other.
+   A reader that takes participation from here is reading the wrong object.
+2. `revealMode`, `modifierVisibility` and the `GatheringRealm` record are unchanged in substance by the move to world scope — only their owner changed, and `craftingSystemId` is dropped because a world realm has no owner.
+   `gathering-and-harvesting` defines their semantics; this section does not restate them.
+3. Normalization is total and non-throwing, always emitting all three keys.
+4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
+   Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+5. The store publishes its cache BEFORE awaiting the write.
+   Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
+   The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.
+   The cost is a cache briefly ahead of the setting if the write rejects, which the next load recovers; a lost update is not recoverable at all.
+6. Pointing a Foundry Scene Region at a realm is a SINGLE write (`setSceneRegionLink`), because a region maps to at most one realm and so the move must both detach and attach.
+   A read-modify-write loop over the realm list would lose every iteration but the last.
+7. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
+   The difference is that an exported environment's realm gating names a realm id that is unusable unless the realm arrives with it, whereas no exported record references a party.
+
 ## CurrencyUnit
 
 ### Purpose
@@ -587,7 +791,7 @@ Define one actor-backed currency denomination and its optional sub-unit breakdow
 
 ```ts
 type CurrencyUnit = {
-  id: string; // stable internal reference used by CurrencyRequirement.unit
+  id: string; // stable internal reference used by CurrencyRequirement.unit and Ingredient.match.unit
   label: string;
   abbreviation: string;
   icon: string;
@@ -602,7 +806,8 @@ type CurrencyUnit = {
 
 ### Requirements
 
-1. `id` is stable after creation and is the value stored by salvage currency requirements.
+1. `id` is stable after creation and is the value stored by salvage currency requirements and recipe currency options.
+   A unit lives in the world `CurrencyConfig.units[]`, not on a crafting system.
 2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
    `abbreviation` is **optional** and defaults to the empty string when unauthored.
    It is **never** defaulted to, or persisted as, the unit `id`.
@@ -612,7 +817,7 @@ type CurrencyUnit = {
    A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
-6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `requirements.currency.spendStrategy`:
+6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `CurrencyConfig.spendStrategy`:
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
@@ -872,8 +1077,12 @@ Represent one curated item entry available to recipes and salvage operations.
    In `simple` salvage mode a component's salvage has exactly one success result group (`role !== 'failure'`) plus at most one reserved `role: 'failure'` group, the failure group tolerated only when `salvageCraftingCheck.simple.rollFormula` is authored; no additional groups are permitted.
    `salvage.enabled` is clamped to `false` in `simple` mode when there is no success group (a failure-only config cannot be enabled).
    Routed mode keeps "one or more"; progressive keeps "exactly one".
-   This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards via `slice(0, 1)`, with no role filter).
-   The reserved-failure tolerance is a data-model / validation allowance only: salvage Simple awards `slice(0, 1)` and never routes to a failure group.
+   This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards ON SUCCESS via `slice(0, 1)`, with no role filter).
+   **The reserved-failure tolerance is a LIVE CAPABILITY, governed by `salvageCraftingCheck.failureResultPolicy` (issue 1098).**
+   Its previous reading — a data-model / validation allowance only, with salvage Simple never awarding or routing to a failure group — is RETRACTED.
+   When the policy permits results on failure, the salvage failure branch resolves the reserved group and awards it.
+   **Both clamps are unchanged, and the ordering guarantee becomes MORE load-bearing, not less:** the SUCCESS branch still selects `resultGroups[0]` by INDEX, so the FAILURE branch selects the reserved group **by ROLE and never by index**, returning nothing when none is authored — an index-based failure selection would award the full success salvage output on a failed check.
+   The `enabled` clamp — a Simple config with no success group cannot be enabled — is unchanged.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
@@ -904,6 +1113,20 @@ Represent one curated item entry available to recipes and salvage operations.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
+    12a.
+    Every bulk component-import path — compendium pack import, folder import, and the folder-mapping commit — must persist its whole run with a SINGLE `craftingSystems` world-setting write, and the number of writes must not grow with the number of imported items or with the number of mapped folders.
+    Each write replaces the entire setting and is replicated to every connected client, so a per-item write makes a bulk import quadratic in corpus size.
+    The bound covers the per-folder category/tag set-apply as well as the item import: a mapping commit that imports across several folders still writes once in total, not once per folder.
+    Batching must not change any per-item outcome: the same added / updated / skipped classification, the same counts, the same aggregated broken-source fallbacks, the same durable role-flag stamp on each source document, and the same overwrite-on-redrop application of a folder's mapping to already-present components.
+    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing at all.
+    An item that fails part-way through a run must still surface its error to the caller, and the items imported before it must be carried by the run's single write rather than lost.
+    A single-item import is its own batch of one and must persist immediately.
+    The bound is on the number of PERSISTENCE OPERATIONS a run issues, not on the identity of the key it writes, so a backend that addresses records individually inherits it unchanged.
+    It is satisfied today by the single `craftingSystems` write named above.
+    The bound gains a DIFFERENTIAL-COST half, which an operation count does not imply: a run that NAMES the systems it touched must not diff another system's records.
+    A bare whole-corpus flush is explicitly NOT a violation of that half.
+    A run that names nothing is telling the repository it does not know what moved, which is exactly what a deferred-persistence batch flushes with, and narrowing it would drop the in-place mutations such a batch relies on being flushed.
+    What the whole-corpus flush costs is a COMPARISON rather than a write: it diffs every system's extracted records against the index, emitting no extra write and no extra replication.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -978,11 +1201,14 @@ Recipe = {
 
   // The recipe author's PICK of crafting-check modifiers (issues 770, 1055). Absent
   // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
-  // the eligible id subset reduced to the scalar appended to the check roll (unknown ids
+  // the eligible id subset reduced to the contribution appended to the check roll (unknown ids
   // dropped at resolution against the live catalogue, and the survivors truncated to
-  // `craftingCheck.maxModifierPicks`). It is honoured ONLY under the system's `byRecipe`
-  // ("Recipe picks") combination rule; under `addAll`, `highest` and `playerPicks` a
-  // stored pick sits here and is not consulted at all.
+  // `craftingCheck.maxModifierPicks`, and each clamped to its own entry's `min`/`max`).
+  // It is honoured ONLY under the system's `bySubject` combination rule — rendered "By
+  // recipe" on this activity; under `addAll`, `highest` and `playerPicks` a stored pick
+  // sits here and is not consulted at all.
+  // ITS SIBLINGS ARE `Component.salvage.checkModifierIds` AND `GatheringTask.checkModifierIds`
+  // (issue 1095): the same authoredness rule, on the other two activities' subjects.
   // IT CARRIES NO RULE. A recipe chooses WHICH modifiers apply, never HOW they combine,
   // so the combination rule is the system's alone. Older data may carry a `policy` key
   // from the era when a recipe could override it; `Recipe._normalizeCraftingModifier`
@@ -1032,8 +1258,10 @@ Recipe = {
   // Identifies the source pack (the payload's system.id when present, else the created
   // system id) so a later reinstall can prune recipes the pack dropped without touching
   // GM-authored recipes. Normalized to object-or-null by the Recipe constructor (a
-  // malformed value normalizes to null), emitted by toJSON(), null for hand-authored
-  // recipes, re-stamped on every import, and retained across GM edits.
+  // malformed value normalizes to null), null for hand-authored recipes, re-stamped on
+  // every import, and retained across GM edits. OMITTED from toJSON() when null
+  // (requirement 18) — the never-prune guard is the RECONSTRUCTED null, which absence
+  // rebuilds, not the presence of the key on the wire.
   importSource: { systemId: string, importedAt: number } | null,
 }
 ```
@@ -1077,17 +1305,18 @@ Recipe = {
     It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
     An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
     13a. `craftingModifier` is the recipe author's optional PICK of crafting-check modifiers (issues 770, 1055): `{ modifierIds? } | null`, defaulting to `null` (picked nothing; inherit the system's `defaultModifierIds`).
-    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `byRecipe` ("Recipe picks") value.
+    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `bySubject` value (rendered "By recipe" on this activity).
+    **The same `Array.isArray`-at-entry authoredness rule now governs `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`** (issue 1095), which are the salvage and gathering subjects of the same rule; all three share one attach so the four normalizers that emit them cannot drift.
     The normalizer keeps a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object carrying no AUTHORED `modifierIds` array, round-trips to `null`.
     A legacy `policy` key — persisted when a recipe could still override the rule — is DROPPED by the normalizer, so it never round-trips out through `toJSON()`, and an object carrying only a `policy` normalizes to `null` because it holds no pick.
     That drop is a normalizer-level erasure, not a migration: the `1.20.0` migration deliberately leaves the raw key on disk (see `destructive-changes-and-migrations/spec.md`), and it is inert either way because `resolveModifierPolicy` reads only the system field.
     `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, so nothing is appended to the roll), never collapsing to `null` (inherit).
     Keying on the filtered length instead would flip malformed import data from _inherit_ to _no modifiers_, which is the unsafe direction.
-    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `byRecipe` it is ignored outright, and under `byRecipe` it is truncated to `craftingCheck.maxModifierPicks`.
+    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `bySubject` it is ignored outright, and under `bySubject` it is truncated to `craftingCheck.maxModifierPicks`.
     See resolution-modes/spec.md §Check Source.
-    An unrecognized `defaultModifierPolicy` falls back to `addAll` at system level (`CraftingSystemManager._normalizeCheckModifierConfig`), which is the only level a rule exists at.
-    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `byRecipe` reuses this same `modifierIds` list.
-    Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
+    An unrecognized `defaultModifierPolicy` falls back to `addAll` at the activity-check level (`CraftingSystemManager._normalizeCheckModifierSelection`), which is the only level a rule exists at.
+    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `bySubject` reuses this same `modifierIds` list.
+    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.modifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
     A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
@@ -1102,7 +1331,8 @@ Recipe = {
     The legacy scalars `recipe.recipeItemId` and `recipe.linkedRecipeItemUuid` are never inputs to image resolution; their remaining non-image consumers are unaffected.
     Shipped code meets that chokepoint rule at every user-visible surface as of issue 887, which retired the borrow from the four `src/systems` resolvers — `InventoryListingBuilder`'s used-by index (which no longer has a second resolver at all), the inline block in `CraftingListingBuilder`, `CraftingEngine._resolveRecipePromptImg`, and `RunJournalBuilder._resolveCraftingRunImg` — and removed the injected `getRecipeItemImg` port that existed solely to feed one of them.
     `RecipeManager.resolveRecipeIcon` and `resolveRecipeIconAsync` still re-derive it under `src/systems`, ordering it the other way — an authored non-default `img` wins outright and the borrow outranks only the default — but both are caller-less, so no surface resolves through them.
-    The one re-derivation inside `src/ui` is `buildRecipeGraph` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
+    The one re-derivation inside `src/ui` is `createRecipeGraphIndex` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
+    Issue 1082 moved that expression out of `buildRecipeGraph` and into the retained index every graph query now reads; the resolution itself is unchanged.
     It carries no user impact today, because the Graph surface is an unimplemented placeholder gated behind `fabricate.experimentalFeatures` (issue 442).
 17. A UI draft seeded from the recipe-browser projection carries DERIVED, non-model fields — `recipeItemId`, `recipeItemIds`, `recipeItemName` and `recipeItemSourceUuid` — for display only (issue 978).
     A save must OMIT them from the update payload rather than writing them, and must never write them as `null`: `RecipeManager.updateRecipe` merges over the persisted record, so omission preserves the persisted value while an explicit `null` would destroy the scalar maintained for the standalone alchemy formula-item cohort.
@@ -1111,7 +1341,21 @@ Recipe = {
     `recipe.recipeItemId` is authored ONLY by migration and by `CraftingSystemManager._migrateLegacyRecipeItems`, never by the editor.
     A recipe that is a book member through `RecipeItemDefinition.recipeIds[]` and carries no `linkedRecipeItemUuid` has its leaked scalar cleared by that same un-gated pass, which is idempotent because a cleared recipe is not a re-stamp candidate.
     The repair is deliberately unreachable while the system's `membershipResolvesByRecipeIds` marker is unset, because no recipe is then a member by `recipeIds` and the scalar is still the membership source for `getRecipeItemDefinitionsContaining` and `_getRecipeObjectsReferencingRecipeItemDefinition`.
-    Those two membership reads, and their `adminStore` mirrors `_recipeItemDefinitionsContaining` and `_enrichRecipeItemLibrary`, are each gated on that marker rather than on any per-read inference over the arrays, so a leaked scalar never resurrects phantom book membership — its only live consequence was the image borrow in requirement 16.
+    That forward read, the reverse read, and the book-side `adminStore` derivation `_enrichRecipeItemLibrary` are each gated on that marker rather than on any per-read inference over the arrays, so a leaked scalar never resurrects phantom book membership — its only live consequence was the image borrow in requirement 16.
+    The forward read has ONE implementation for every reader that asks it — the recipe browser's row projection included, which formerly carried a copy of the rule with no `linkedRecipeItemUuid` leg and could therefore name different books from the delete impact statement on an un-migrated world.
+18. `Recipe.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the flat top-level `results` alias unconditionally (issue 1087).
+    A recipe is rewritten whole on every mutation, replicated to every client, and stringified twice more by `RecipeManager.reload()`'s change comparison, so an always-emitted default is paid once per recipe on every one of those.
+    Absence and the written default already mean the same thing on read, which is what makes the omission a pure write-side reduction: it needs no migration, loses nothing on downgrade, and does not change what any stored recipe means.
+    On a 10,000-recipe corpus the alias accounts for ~10% of the serialized bytes and the defaults for ~26%, together ~36% (23.75 MB to 15.23 MB).
+    Three fields are deliberately NOT omitted, and the reasons are the rule rather than exceptions to it.
+    `complex` is DERIVED from the authored shape when absent (`_deriveComplex`), not defaulted, so omitting a stored `false` can reconstruct as `true`.
+    `metadata` is rebuilt from `Date.now()` and the current user's name when absent, which is not the value that was omitted.
+    `enabled: true` is omittable by the model and NOT by its readers: `SignatureValidator.validateSystem` scopes the alchemy signature-collision scan with a truthy `recipe?.enabled` over payloads handed to it straight from `toJSON()` by `CraftingSystemManager._assertNoAlchemySignatureCollisions` and `collectAlchemySignatureBlockers`, so omitting the default would empty that scan and silently retire the save-block.
+    `allowPlayerResultReorder: true` IS omitted, and the difference is instructive: absence has been a live on-disk state for it since issue 651 declined to seed it by migration, so every reader already asks `!== false`.
+    Whether a default may be omitted is therefore a property of the field's READERS, audited per field, and the omission set is a hand-maintained mirror of the constructor guarded mechanically by `tests/recipe-serialization-payload.test.js`.
+    The rule reaches the NESTED rows as well as the top-level ones (issue 1135).
+    A result group emits `checkOutcomeIds` only when it names at least one routed outcome tier, at recipe level and step level alike, through the one serializer both emitters share; `_normalizeResultGroups` rebuilds `[]` from absence and the only two arbiters that read it — `ResolutionModeService`'s routed-group filters — treat an omitted key and `[]` identically.
+    The nested ingredient rows are recorded under § IngredientSet, § IngredientGroup and § Ingredient, whose omissions are far larger than the recipe's own: on the corpus this rule was measured against, everything removable is 36.89% of a simple serialized corpus and 58.79% of a rich one, and the whole `ingredientSets` subtree is 54.66% / 93.68% of it.
 
 ### Validation Guidance
 
@@ -1284,6 +1528,18 @@ IngredientSet = {
    Ingredient-set Tool ids are active only when the owning Crafting System uses `routedByIngredients` and the set's trim-normalized name is non-empty.
    Outside that boundary the ids remain serialized for lossless round-tripping but are ignored by craftability, execution, inventory `requiredFor` projections, Recipe complexity, and admin Tool counts.
    For an active set, the applicable Tool set is the distinct union of recipe-level, active-step, and ingredient-set-level `toolIds`, resolved against the per-system Tools library; ids that miss the library are logged and dropped.
+5. `IngredientSet.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the flat `ingredients` alias unconditionally (issue 1135).
+   This is the same rule as Recipe requirement 18, applied to the set: absence and the written default already mean the same thing on read, so the omission needs no migration, loses nothing on downgrade, and does not change what any stored set means.
+   The omitted set is `name`, `essences`, `toolIds`, `resultMapping` and `resultGroupId`; `id` and `ingredientGroups` are never omitted, being the set's identity and its authored shape.
+   `name` is the one candidate with a SEMANTIC reader and is therefore the one that proves the rule: `toolCheckBonus` treats a non-empty set name as "this set's Tool prerequisites are active" under `routedByIngredients`, exactly the `enabled`-shaped hazard requirement 18 exists for, and it survives omission only because the written default `''` is already the falsy side of that predicate — had the default been a non-empty sentinel, omitting it would have silently deactivated every set's Tools.
+   `SignatureValidator` reads `set.name || null` and falls back to the set position for absence and `''` alike.
+   Absence of `essences` is already a live on-disk state, because the 1.17.0 migration deletes the key outright once it has folded each positive entry into an essence option.
+   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
+6. Every writer that rewrites a serialized ingredient set — the component-delete cascade, the essence-delete cascade, and the tag-vocabulary cascade — MUST resolve the flat `ingredients` alias rather than carry it through a `{ ...set }` spread or recompute it (issue 1135).
+   The rule is: DROP the alias when the source set carries `ingredientGroups`, and KEEP the filtered legacy array when it does not.
+   Both halves are load-bearing.
+   Re-emitting it puts a write-retired alias back one cascade at a time, producing a corpus that is not lossy but is mixed — most sets alias-free, cascade-touched sets carrying a stale one — which is the issue-1036 resurrection hazard in latent form.
+   Dropping it unconditionally destroys a flat-authored set's ONLY ingredient data and removes the `set.ingredients?.length` leg of the retention filter that keeps such a set alive at all.
 
 ## IngredientGroup
 
@@ -1307,6 +1563,9 @@ IngredientGroup = {
 2. A group is satisfied when any one option is satisfied.
 3. All groups in an `IngredientSet` must be satisfied.
 4. OR-group semantics are always enabled and are not controlled by a feature toggle.
+5. `IngredientGroup.toJSON()` emits exactly `{id, name, options}`, and omits none of its own keys; the payload reduction at group level comes entirely from its OPTIONS, which are filtered by the Ingredient omission table (issue 1135).
+   `checkOutcomeIds` is NOT an ingredient-group field and never has been — it lives on `ResultGroup`, and its omission is recorded under Recipe requirement 18.
+   The group's own `name` is a further omission candidate (`data.name || ''`, read only through `typeof === 'string' && trim()` guards) but is deliberately out of scope for issue 1135, whose omissions are exactly the fields its per-field reader audit covered.
 
 ## Ingredient
 
@@ -1332,7 +1591,7 @@ Ingredient = {
     tagMatch?: "any" | "all", // default "any"
 
     // type = "currency"
-    unit?: string,    // a configured requirements.currency.units[].id
+    unit?: string,    // a configured CurrencyConfig.units[].id (world scope)
     amount?: number,  // positive cost in that unit
 
     // type = "essence"
@@ -1352,13 +1611,21 @@ Ingredient = {
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
-7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost.
+7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
    A currency option matches no inventory item and contributes no alchemy signature.
 8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
    It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
    An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
    An essence option is resolved inside its ingredient set's single essence block rather than in its own author position (see §Essence-Alternative Consumption), so its funding is pooled with every other essence option in the set.
    The player selects the held **items** that fund the block through the `essenceAllocation` channel, rather than picking one option per essence requirement as they would for a component/tag group.
+9. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
+   Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
+   The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
+   `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
+   Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
+   `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
+   `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
+   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -1367,7 +1634,7 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
 1. Selection is **items-first, currency-fallback** per group.
    Every non-currency option is tried first; the first item-satisfiable option wins even if a currency option is authored earlier (items strictly beat currency).
    Only if no item option satisfies does the resolver choose the first AFFORDABLE currency option in author order among the group's currency options.
-2. Affordability is evaluated against the crafting actor through the same currency profile/spend strategy the system configures (`actorProperty` / `actorInventory` / `macro`).
+2. Affordability is evaluated against the crafting actor through the world's currency profile and spend strategy (`actorProperty` / `actorInventory` / `macro`), which the system's toggle only admits or refuses.
    The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends.
    With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
 3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated per terminal base unit — **before** any item or currency mutation.
@@ -1379,7 +1646,7 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
    A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
-   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
+   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the resolved world currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
    This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
 
 ### Essence-Alternative Consumption (Craft-Time)
@@ -1427,7 +1694,9 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Scope is the **enabled** recipes in the crafting system.
    `SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
-   The invariant is _"the set of **enabled** recipes is collision-free"_: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
+   The invariant is _"the set of **enabled** recipes is collision-free"_: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through one scan scope, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
+   That scan may be served from a report compiled once per revision rather than re-run per question, provided the report is invalidated by every change that can alter a signature — the recipes of the system, the system's own component/tag/essence definitions, and any in-place rewrite of a stored recipe — and provided a candidate evaluated incrementally against it yields the conflicts, in the order, a full `validateSystem` scan of the same substituted corpus would have reported.
+   `validateSystem` remains the unpruned oracle the cached path is answerable to.
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
    - direct component matches (`match.type === "component"`)
@@ -1436,10 +1705,20 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 5. Ingredient groups may resolve to the same component ID when inventory quantity is sufficient to satisfy the aggregate quantity across those groups.
 6. Any overlapping satisfiable signatures between ingredient sets in the same system are invalid.
 7. Save is blocked for any collision among enabled recipes in the system, including when editing an unrelated recipe.
-8. Import behavior is partial:
-   - non-conflicting recipes are imported,
-   - conflicting recipes are rejected,
-   - one aggregated conflict report is returned at completion.
+8. The scan MUST evaluate the candidate recipe as though its activation had already landed — the enabled cohort it is scanned against is the stored one with the candidate SUBSTITUTED for its stored copy, or APPENDED when no stored recipe carries its id.
+   Both arrangements are required, because a candidate reaches the gate at two different moments: an enable transition (`updateRecipe`, `canActivateRecipe`) validates a candidate whose stored copy is still disabled or still carries the pre-edit ingredient sets, while a create or import (`createRecipe`, `importRecipes`) validates a candidate that is not stored at all and is persisted only after the gate passes.
+   A conflict is reported as a pair of recipe ids and then filtered to the ones naming the candidate, so a candidate missing from the scanned cohort can never be named and the gate answers "no collision" for every candidate whatever its signature.
+   Which recipes a new recipe may collide with is therefore identical on all four paths, and a first-time collision is refused at the moment it is introduced rather than only at the next reconciliation.
+   An appended candidate takes the cohort position persisting it would give it — after every stored recipe — so the conflicts it reports carry the order and the pair orientation an audit of the post-create cohort would have produced.
+9. A recipe refused by the gate is never persisted enabled, and each entry path refuses it in its own idiom:
+   - a strict `createRecipe` REJECTS, so the caller fixes the collision before the recipe exists;
+   - a drafting `createRecipe` (`allowIncomplete`) is BORN DISABLED, the same outcome any other activation failure already produces for a draft;
+   - `importRecipes` SKIPS AND REPORTS the recipe rather than throwing, so one ambiguous recipe never aborts the recipes around it.
+10. Import behavior is partial:
+    - non-conflicting recipes are imported,
+    - conflicting recipes are rejected,
+    - one aggregated conflict report is returned at completion.
+    A recipe rejected SOLELY for a signature collision is reported under its own reason, distinct from the malformed-recipe reason, because it is authored correctly and is refused only for the company it keeps; a recipe that is both malformed and colliding is reported as malformed, the fault to fix first.
 
 ## Tool
 
@@ -1542,9 +1821,11 @@ Tool = {
    Resolution failure, missing creation API, a throw, and null/empty creation preserve the original and are not reported as `replaced`.
    Component targets receive managed Component identity, while direct Item targets preserve source Item identity without fabricated Component identity.
 8. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
-9. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
-   The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
-   Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
+9. A **virtual-present** Tool injected by a canvas Tool station (system-scoped via `presentTools = { systemId, componentIds, toolIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+   The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`, because both id kinds are per-system.
+   Virtual presence is keyed by the station's **library `toolId`** as well as any linked `componentId`, so an item-sourced Tool participates on the same terms as a component-linked one (issue 1119).
+   Keying on `componentId` alone is invalid: a station built from an item-sourced Tool then resolves to no payload at all, and the activation is refused — silently, in the shipped 1.8.0 behaviour — even though the station places and renders correctly.
+   A station whose Tool cannot be resolved denies activation with a routed, player-facing reason; it never answers a click with no response.
 10. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
     Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
     Tools have no legacy scalar identity tier.
@@ -1559,12 +1840,19 @@ Tool = {
     The upsert rejects non-Item Documents, stages the description/name/image/source snapshots, clears only a changed old Tool role leaf, stamps the new leaf, and persists one normalized Tool atomically.
 12. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
     Tool **usage/breakage** selection matches by durable identity against the Tool's own identity per requirement 10.
+    EVERY surface that answers "is this owned item a Tool, and which Tool is it" resolves through that shared matcher — the crafting and gathering tool gates, the canvas item-drop resolver, and the player Inventory listing (`InventoryListingBuilder`).
+    Consulting `componentId` alone is invalid, for the same reason requirement 13 gives for display: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver finds nothing for a Tool whose identity is fully populated.
+    That asymmetry — stated for display but left unstated for identity — is why the player Inventory kept a component-only projection through both issue 561 and issue 976, listing no row at all for an owned item-sourced Tool (issue 1119).
+    A surface that resolves PRESENCE must use the wide matcher rather than the narrow durable-identity gate, so an item that satisfies the crafting tool gate is never absent from the surfaces that report what the player is carrying.
 13. A Tool's displayed name and image resolve by ONE precedence at every surface: the user-authored `label` (trimmed) when non-empty, then the registration display snapshot (`name` / `img`), then the linked managed component's `name` / `img` when `componentId` resolves, then a localized fallback name and the generic `icons/svg/item-bag.svg` sentinel.
     The snapshot outranks the linked component deliberately, because a Tool that is also a managed component keeps `componentId` populated (requirement 1) and its own snapshot is the more specific identity.
     Consulting `componentId` alone is invalid: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver renders the fallback name and the item-bag sentinel for a Tool whose identity is fully populated (issue 976).
     A surface that renders the Tool's description resolves it the same way — the snapshot `description` first, then the linked component's — because the same omission blanks a populated description.
     `label` is never substituted into the snapshot and the snapshot is never written back to `label`; they are distinct fields per requirement 1.
-    The reference implementation is `toolDisplayName` / `toolDisplayImage` / `toolDescription` (`src/ui/svelte/apps/manager/tools/toolStudio.js`); a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
+    The reference implementation is `resolveToolDisplayName` / `resolveToolDisplayImage` / `resolveToolDescription` (`src/models/toolDisplay.js`), which `toolStudio.js` re-exports unchanged; a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
+    The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
+    Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
+    Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
 
 ### Validation Matrix
 
@@ -1628,7 +1916,8 @@ ResultGroup = {
   // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
-  // alchemy tiered). Empty for non-tiered groups.
+  // alchemy tiered). Empty for non-tiered groups, and OMITTED from the serialized
+  // payload when empty (issue 1135; see Recipe requirement 18).
   checkOutcomeIds?: string[],
   results: Result[],
 }
@@ -1905,14 +2194,12 @@ Requirements:
 
 ```js
 Actor.flags.fabricate.discoveredGatheringRealms = {        // was discoveredGatheringRegions
-  [systemId: string]: {
-    [realmId: string]: {                                   // was regionId
-      discoveredAt: number,
-      source: "manual" | "partyToken" | "import" | "api",
-      partyId?: string,
-      sceneUuid?: string,        // Foundry bridge — NOT renamed
-      sceneRegionUuid?: string,  // Foundry bridge — NOT renamed
-    },
+  [realmId: string]: {                                     // was [systemId][realmId]
+    discoveredAt: number,
+    source: "manual" | "partyToken" | "import" | "api",
+    partyId?: string,
+    sceneUuid?: string,        // Foundry bridge — NOT renamed
+    sceneRegionUuid?: string,  // Foundry bridge — NOT renamed
   },
 }
 ```
@@ -1920,13 +2207,20 @@ Actor.flags.fabricate.discoveredGatheringRealms = {        // was discoveredGath
 Requirements:
 
 1. The flag is actor-scoped and world-local so realm knowledge follows the character across party changes.
-2. `systemId` must refer to the crafting system that owns the realm; `realmId` must refer to a `GatheringRealm` in that system.
-   Discovery writes validate this before persisting.
+2. Discovery is WORLD-WIDE and is keyed by `realmId` alone.
+   Realms are geography, so knowing one is knowledge of the world: a character who has found Northreach Vale has found it, whichever crafting system they were serving at the time.
+   `realmId` must refer to a `GatheringRealm` in the world library, and discovery writes validate that before persisting.
 3. `discoveredAt` must be a timestamp and `source` must be one of the listed values.
 4. Reads never throw on a stale `partyId`; missing or stale realm ids must not disclose secret realm names to non-GM users.
-5. Because this is an actor flag (not a world setting), it is **not** rewritten by the `1.1.0` migration runner.
-   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
-6. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).
+5. Because this is an actor flag (not a world setting), it is **not** rewritten by the migration runner, which reaches two corpora and four world settings and has no actor access at all.
+   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback, flatten a legacy `[systemId][realmId]` map on read, and every write persists only the current shape, upgrading each actor lazily.
+   That is the same mechanism the earlier `discoveredGatheringRegions` rename used, for the same reason.
+   Two details make the lazy upgrade safe.
+   The DISCRIMINATOR is `discoveredAt`: every entry has one and no `systemId` bucket ever does, so an object carrying a numeric `discoveredAt` is a realm entry and any other object is a legacy bucket.
+   And a HALF-UPGRADED map is reachable in normal use rather than hypothetical — upgrade an actor, write, then discover a second realm, and the map holds both shapes at once until the next full read — so the flattener handles a mixed map rather than assuming one shape.
+6. On a collision between two legacy buckets the EARLIEST `discoveredAt` wins.
+   Discovery records the first time a character saw a place; a later duplicate recorded under another crafting system is not a re-discovery.
+7. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).
 
 ## Run Journal Projection
 
@@ -2388,26 +2682,45 @@ They are unrelated mechanisms.
 
 ### Dynamic DC Macro Contract
 
-A configured dynamic DC macro receives one payload object containing:
+The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
+Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
+Both resolve their DC through `CraftingEngine._resolveSimpleCheckDc`, which is the sole caller of `CraftingEngine._resolveCheckAnchorDc` and the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol.
+The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
+Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
+No DC-resolution path outside the crafting check reads any of the three.
+They are not inert for that reason.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+`macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
+
+Before the configured macro runs, `_resolveCheckAnchorDc` computes an **anchor DC** for the crafting check slot being resolved.
+The anchor is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
+`CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
+`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+
+When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved DC and no macro runs.
+When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
 
 - `recipe`
 - `craftingSystem`
 - `craftingActor`
 - `candidateIngredientSet`
+- `anchorDc` — the anchor DC resolved above, before the macro runs
 
 Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
 The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
 This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
 
 Fabricate applies `Number(result)` to the macro's return value.
-When the coerced value is finite, Fabricate truncates it to an integer and uses it as the dynamic DC.
-An absent configured macro, a thrown error, or a result whose numeric coercion is non-finite falls back to the configured static DC.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's DC.
+An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor DC in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
 
 The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
 This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
-Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the dynamic DC fallback above.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor-DC fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
@@ -2491,6 +2804,291 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
 
+**Reverse-compensating a delete cannot restore document identity.**
+Value and key presence are restorable; a document's `_id` and its `_stats` are not.
+`_stats.systemId` and `_stats.systemVersion` are captured at creation, so a compensated delete-then-recreate produces a document that is not the document it replaced even when the restored value is byte-identical.
+
+## Destructive Pass Safety
+
+Crafting definitions are persisted in `world` settings, one whole-array key per entity class.
+This section governs the destructive passes that prune durable state against those records; it constrains no record's contents.
+
+**Corpus order is not semantic.**
+No consumer may depend on the order records are returned in.
+
+### Valid Id Basis
+
+A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derives its "still valid" answer from — the valid recipe, system, component and salvage-component id sets a cleanup pass builds before pruning anything that names an id outside them.
+
+**A destructive pass runs only when its Valid Id Basis is known-complete.**
+A pass whose basis is incomplete does not see a live record, concludes the thing naming it is stale, and deletes durable state that was never stale.
+
+**The requirement is scoped to the KIND of prune, not to the moment it runs.**
+A **corpus-derived** prune asks "is this id still in the live corpus?" and removes everything that is not.
+It infers a deletion from an ABSENCE, so it is governed by this requirement wherever it runs — at startup, and equally in the flag cleanup a GM triggers by deleting a recipe, deleting a set of recipes, deleting a crafting system, re-importing a compendium pack, or changing a system's resolution mode.
+Those mutation-time paths recompute the same id sets from the same live managers and call the same destructive collaborators, so the loss is identical and the trigger is more ordinary than a boot.
+A **subject-targeted** prune asks instead "does this name one of the ids the caller just removed?".
+Those ids are positively known, and no missing corpus can make a just-deleted id valid again, so a subject-targeted prune needs no Valid Id Basis and MUST NOT be gated on one.
+
+**A gated mutation-time pass that prunes ACTOR-SCOPED durable state MUST name a subject-targeted fallback whenever the mutation removed something**, and the fallback runs in the refused sweep's place.
+Without it the gate trades a data-loss defect for a flag leak: the actor flags the mutation itself orphaned are the reason the cleanup path exists, nothing else re-derives them, and nothing would detect their absence.
+What a refusal gives up is therefore only the hunt for orphans of UNKNOWN origin, which the startup pass reconciles on the next known-complete boot.
+A mutation that removed nothing — an import, or the public orphaned-flag entry point called with no id set — has no fallback and needs none: an omitted sweep there removes nothing and leaks nothing.
+
+**A pass that prunes only world- or user-scoped PREFERENCES is exempt from the fallback requirement, and the exemption is stated because the obvious justification for it is false.**
+"Nothing there names a subject" is not true of the preference sweep: a crafting-system deletion holds the removed system id and the removed recipe ids, and `lastManagedCraftingSystem`, `lastAlchemySystem` and the `recipe:` / `salvage:` keys of the progressive-order map are all targetable from them.
+The exemption is that the cost of leaving a stale preference is bounded and self-healing where the cost of leaving a stale actor flag is not.
+A preference names something that no longer exists; the next read corrects it, and the startup `stale preferences` pass reconciles it on the next known-complete boot.
+Against that, a targeted preference prune would add a fresh write — to a `user`-scoped replicated document, no less — on a path whose defining condition is that this client cannot describe the world it is writing to.
+A pass claiming this exemption MUST say which of the two reasons it is claiming, so that a future pass cannot inherit it by resembling this one.
+
+**Every id set a corpus-derived pass is given MUST be derived from the corpus, never defaulted away.**
+A pass handed an empty set for one entity class prunes every key scoped to that class on every run, which is this requirement's own failure mode reached with no conversion involved at all.
+A pass that rewrites ONE store keyed by several entity classes is declared on the UNION of those classes and MUST NOT be decomposed, because it replaces the whole store and an incomplete basis for any one class would wipe the keys of the others.
+
+**What makes a basis known-complete.**
+Each entity class's corpus arrives as a single whole-array read, which either yields the corpus or fails: there is no partial state a reader could hold and mistake for the whole.
+A basis is therefore known-complete when every id set the pass will prune against was derived from a completed corpus read of the classes the pass declares, and it is NOT known-complete for a class whose id set was defaulted, omitted or supplied by a caller that did not read that class.
+The requirement is stated over the DERIVATION rather than over any storage fact, because the storage fact it once turned on is gone and a requirement that names one would be vacuous.
+
+**A pass whose declared entity kind is not established MUST be omitted, and establishment MUST be positive.**
+A basis stated as a negation fails open: "this kind is not incomplete" is true of an absent entry, a renamed key and a threading typo alike.
+The builder therefore requires each declared kind to be positively true, and a pass that declares no kind at all is omitted rather than run.
+
+**Migration currency MUST NOT be an input, and neither MUST the identity of the client running the pass.**
+A whole-array corpus cannot be partial whatever the migration version says, so gating a pass on it buys no hazard reduction — and it costs a permanent silent omission, because `migrationVersion` is world-scoped and the migration pass is primary-GM-only.
+Gating on it would omit every destructive pass on EVERY client for the whole window between a GM upgrade and its migration pass, and permanently on any world whose GM has not booted since.
+"This client did not run the migration pass" MUST NOT be an input for the same reason, stated separately because it is the shape the mistake usually takes.
+It is true on every non-primary client on every boot, including a fully converted and fully migrated healthy world, so it would omit the destructive passes on every player client permanently.
+The primary GM cannot cover for that, because some pruned state is `user`-scoped and only that user's own client can prune it.
+A non-primary client on a fully converted, fully migrated world therefore DOES run the destructive passes.
+
+**The gate is applied by OMITTING the pass from the pass list, never by throwing from inside it.**
+A guard that throws from inside a pass arrives after the destructive work has already landed, and both doors then swallow it: the startup maintenance runner catches every throw into a failure label, and the mutation-time system-scoped cleanup catches each block's throw into a console line so that a teardown is never left half-done.
+The pass list MUST therefore be constructed by a pure, exported builder that the composition site calls, so the omission is directly assertable.
+A pass that declares no basis MUST be omitted, so that a destructive pass cannot ship ungated by omitting its declaration.
+**Both doors MUST share that one builder.**
+Two independently written gates on the same collaborators drift, and the half that drifts is the half nobody is looking at; the mutation-time composition site therefore supplies its own pass-to-entity-kind declarations to the same builder rather than restating the partition.
+
+**An omission MUST be reported.**
+Neither door's caller reads what its runner returns — the startup runner returns only FAILED labels and its caller discards them, and the mutation-time callers discard the outcome entirely — so a gate that omitted every pass is otherwise indistinguishable from a run that found nothing to prune.
+The report names the omitted passes and the entity kinds that decided them.
+It MUST NOT fail the operation it reports on: an omitted pass is what this gate exists to survive, so it must not stop a boot and must not fail a GM's delete.
+
+**One destructive door remains OUTSIDE this requirement, and it is not safe.**
+The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+It is recorded here so that this gate is not read as making it safe.
+The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
+
+**Distinguished from _membership basis_.**
+`ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
+_Valid Id Basis_ names the DATA a decision rests on, which is a different sense of the same noun, so the qualifier is mandatory here too and the bare noun is never used for this concept.
+
+## Runtime Read Indexes and Revision Tokens
+
+Runtime read indexes and revision tokens are **derived, in-memory, per-client state**.
+They change no persisted shape, are never serialized, never cross the wire, and are rebuildable in full from the authoritative persisted definitions.
+A client that discarded every one of them would answer every question identically, only slower.
+
+### Runtime Read Indexes
+
+The runtime managers MAY retain `Map`-backed read indexes over a crafting system's definition arrays — components, first-class tools, essence definitions and recipe-item definitions — so that identity resolution, name-fallback matching and reverse book-membership lookups are constant-time rather than a linear scan per owned item.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **System-scoped** | An index is derived from ONE system's candidate array and MUST NOT be keyed globally. Component, tool and recipe-item ids are unique only within a system — a copy-imported system deliberately preserves its origin's ids — so a globally-keyed index would resolve an item to a definition in a system it does not belong to. |
+| **Precedence-preserving** | An indexed lookup MUST return exactly the definition the equivalent `Array.find()` returned. Id, exact-name and folded-name facets are therefore first-insert-wins in array order, source-reference lookups take the EARLIEST matching candidate in array order (not the first matching reference), and membership buckets keep array order. |
+| **Case semantics are held apart** | The exact-name and case-folded name facets are separate. The read/craft sites match case-INSENSITIVELY and the salvage/destroy site matches case-SENSITIVELY, deliberately; one folded facet cannot serve both, and collapsing them would let bulk destroy delete items belonging to a differently-cased component. |
+| **Telemetry-preserving** | A name-only match MUST still emit the deprecation telemetry defined for the name fallback — once per `(system, definition, item name)`, for the matched definition only. An index that resolves faster but stops emitting it removes the signal that tells a GM their items are unstamped. |
+| **Explicitly invalidated** | An index derived from array `A` is valid while `A` is the same object, has the same length, and carries the same index revision. Any in-place mutation of `A` — replacing or reordering an element, or rewriting an INDEXED FIELD of an element (`id`, `name`, `registeredItemUuid`, `originItemUuid`, `aliasItemUuids`, `recipeIds`) — MUST advance that array's index revision. Rebuilding the array is itself sufficient. |
+| **Reuse is licensed by record equality alone** | A reload MAY keep a retained record — and with it every definition array that record owns — in place of the freshly parsed one, so that a client whose corpus did not change keeps its indexes. It MAY do so ONLY for a record its corpus delta reports STRUCTURALLY EQUAL in full. A record reported changed MUST take the freshly parsed arrays, and no weaker licence (an unchanged id set, an unchanged length, an unchanged count of systems) MAY stand in for record equality: those admit a same-object, same-length array whose elements were replaced, which is precisely what the index revision clause exists to catch and what array identity and length cannot see. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+An index is a cache, so a stale index is a correctness defect that presents as a data defect.
+Tests MUST cover invalidation directly: a definition added, renamed, deleted and reordered through the manager's own API must each be visible to the very next resolution, including the constant-length element replacement that neither array identity nor length can detect.
+
+### Revision Tokens
+
+A **revision token** is an opaque non-negative integer, monotonically increasing within one scope of one manager, starting at `0`.
+Its value carries no meaning; the only supported operation is `===` against a token the same consumer read earlier from the same scope.
+It is per-client and per-process: it is never persisted, never replicated, and carries no meaning on another client.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **Managers mint, consumers read** | Only the recipe and crafting-system managers advance a token. A consumer holds a token and compares it; it never advances one. |
+| **Three granularities, all published** | Every mutation advances the ENTITY scope (`recipes`, `systems`), the affected crafting system's scope, and the `facts:<invalidation domain>:<systemId>` scope of every fact class it moved. A consumer that can attribute its cache to one system watches the narrow scope and is untouched by an edit elsewhere; a consumer that cannot watches the entity scope; a consumer that depends on SOME of a system's fact classes and not others watches the fact scope. The noun is **entity scope**, never "domain scope": _domain_ names an invalidation domain below, and one constant carrying both senses is an ambiguity a consumer resolves silently and wrongly. |
+| **A move advances both systems** | A recipe moved between crafting systems advances the scopes of the system it left AND the system it joined, because a consumer watching the former must also stop trusting its cache. |
+| **Comparable without serializing the corpus** | Change detection MUST NOT serialize the whole collection. A reload that finds no change MUST advance no token, and MUST answer that question by short-circuiting record-wise comparison rather than by hashing or stringifying the corpus. |
+| **Remote edits arrive as local reloads** | A remote edit reaches a client as a replicated setting change; the client's `reload()` detects it and advances the LOCAL token, which is what a local consumer needs. |
+| **A reload advances only what moved** | A reload MUST advance only the scopes of the records its corpus delta reports changed, pairing records by ID rather than by position — index pairing reports every record after an insertion as changed, which is the over-broad invalidation this contract exists to remove, on the one path that runs on every connected client. A change the delta cannot attribute to individual records — a reordering, which is a change because order is significant — MUST advance every system rather than none. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Invalidation Domains
+
+An **invalidation domain** is a CLASS OF FACT a crafting-data change can belong to.
+It exists for exactly one purpose: to decide which derived read models a change obliges a client to rebuild.
+
+It is not the DDD bounded context `DOMAIN.md` calls the domain, and it is not the entity scope of a revision token.
+It is also deliberately not called `presentation`: that noun already names a LAYER across this repository, and the fact class covering names, images and categories is `labelling`.
+
+There are seven, and the set is closed.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Domain | Facts it covers |
+| --- | --- |
+| `labelling` | Names, images, categories, tags and sort keys |
+| `narrative` | All authored prose CARRIED ON THE CRAFTING-DATA CHANNEL — recipe, step, system, component, tool and recipe-item descriptions. The qualifier is load-bearing and the unqualified reading is a trap. Gathering realm and task prose are outside it: a realm description is classified under domains the gathering store DOES consume, task prose travels on the gathering-environments channel instead, and that store consumes no `narrative` — so filing either here would leave it unable to reach the only surface that renders it. Teaser prose is outside it too: the whole teaser object is gate configuration and is classified `access-and-knowledge`, prose included, so that one fact has one answer |
+| `materials-and-yield` | Ingredient sets and groups, set essences, results, steps |
+| `resolution-config` | Tools, currency alternatives, checks, resolution modes, tool breakage, modifiers and requirements |
+| `component-definitions` | Component, tool and essence definitions |
+| `access-and-knowledge` | Teasers in whole (their prose included), recipe-item definitions, and the authored configuration gating learning and discovery — visibility mode, recipe visibility, character prerequisites, per-recipe grants and locks. A viewer's own learned and discovered state is NOT here: it lives in actor flags rather than in a definition record, and the field classification covers top-level keys of a persisted record only |
+| `held-inventory` | Actor-held items |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **One authored mapping** | Which read-model stores CONSUME each domain is authored once, and the store-to-domain transpose is derived from it. Authoring both admits a drift no gate can see, and a test comparing two derivations of one table asserts nothing. |
+| **A consumer set is an UPPER BOUND** | Naming a store as a domain's consumer says that store MAY need rebuilding when that class of fact moves. It is NOT a claim that every field of every projection that store publishes reads that fact. Store-granular routing cannot express anything finer, and stating it as a dependency would contradict _Summary Projections_ below, which is normative that cheap availability consults no tool, check, knowledge or currency. |
+| **Attribution accompanies every mutation** | Every site that mutates stored definitions MUST name the domains it moved. Saying nothing is legal and means EVERY domain, so a site that forgets is over-broad rather than stale — and because that failure is silent, the sites MUST be counted by a test rather than trusted. |
+| **Replicated changes are attributed from the delta** | A client that did not write derives its domains from the corpus delta's changed FIELD names through a field-to-domain classification. The classification is complete in both directions: every field a persisted record can carry is classified, and no classified field is one no projection produces. |
+| **The batch attribution is per record** | A change naming several records MUST attribute domains per record. A flat union applies every listed domain to every listed record, which is the over-broad invalidation this contract exists to remove, at batch scale. |
+| **Unattributable means EVERYTHING** | A change no domain can be attributed to — a corpus reordering, an unrecognised payload, a field the classification does not name — MUST invalidate every consumer. Over-broad invalidation is a performance defect; a stale read model is a correctness one. |
+| **Coalesced per batch** | A batch or import MUST produce ONE invalidation boundary carrying every record's attribution, not one per record and not one per storage leg. |
+| **A consumer set is CLOSED OVER DERIVED GATES** | A store that consumes a derived gate consumes every domain feeding that gate's INPUTS, not merely the domains of the gate's output. A consumer column derived from direct fact reads cannot see a gate, because the store reads the gate's boolean and never reads the facts behind it — and the resulting under-consumption produces a well-formed, correctly attributed change that no fail-safe can catch. Every store's set MUST therefore be closed over the system-validity gate, the recipe-access evaluation, the cheap-availability projection and the browse-status derivation. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Closing the five stores over those four gates moves exactly one of them.
+`crafting`, `inventory` and `alchemy` consume all seven domains already, so no closure can widen them.
+`journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
+`gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
+
+`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
+
+The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
+A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.
+
+## Summary Projections
+
+A **summary** is the cheap, serializable row shape a browse surface pages, filters, sorts and counts BEFORE hydrating any expensive detail.
+Like the read indexes above it is derived, in-memory, per-client state: it changes no persisted shape, is never serialized to a setting or a flag, and is rebuildable in full from the authoritative definitions plus one inventory snapshot.
+
+There is exactly ONE summary shape per entity, and every browse surface — the player crafting listing and the GM manager browsers alike — MUST consume it rather than define its own.
+The two audiences MAY differ in which FIELDS they carry, and MUST NOT differ in how a shared field is DERIVED.
+A surface that needs a field this contract does not define amends the contract; it does not define a second shape.
+
+The projection is a per-entity function over VALUES, and it performs no cohort selection of its own.
+Choosing WHICH entities to project — and, for a player audience, projecting only recipes the visibility evaluation made visible — belongs to the calling surface, which also supplies each recipe's own access result.
+A summary built with no access result is unredacted and reads as available, which is correct for a visible recipe and a disclosure for one that is not; see `recipe-visibility/spec.md` § Summary Projection Disclosure.
+
+### RecipeSummary
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Audience | Source |
+| --- | --- | --- |
+| `id` | shared | `Recipe.id` |
+| `name` | shared | `Recipe.name` |
+| `img` | shared | `Recipe.img`, resolved through the shared recipe-image default (Foundry's generic item bag is the "no image" sentinel). NEVER the containing book's artwork — see `## Recipe` requirement 16. `ComponentSummary.img` is deliberately NOT defaulted this way: the sentinel is a recipe-icon rule, and a component has no equivalent |
+| `systemId` | shared | `Recipe.craftingSystemId` — the RECIPE's own field, never the id of whatever system object the projection was handed |
+| `systemName` | shared | The owning `CraftingSystem.name`, off the system the caller supplies. The caller resolves that system through the per-system runtime read index; the projection never looks one up |
+| `category` | shared | `Recipe.category`, normalized to the reserved `general` bucket when absent |
+| `categoryLabel` | shared | The display form of `category`, through the ONE shared recipe-category label helper: a GM-authored category is surfaced verbatim and only the reserved `general` bucket is localized. This is the single exception to "a summary carries tokens, the surface localizes", and it is admitted because it breaks neither thing that rule protects. The localization seam is OPTIONAL — omitted, the helper answers its own default — so no caller is forced to acquire i18n. And no sort keys on it: every non-`general` label IS its token, and the one surface that orders category labels pins `general` outside the comparator, so the ordering is language-independent. It is served here rather than re-derived per surface because `category` and `categoryLabel` are one field with two facets, and deriving the second facet in each consumer is exactly the divergence this contract exists to prevent |
+| `tags` | shared | `Recipe.tags`, trimmed and deduped in authored order |
+| `browseStatus` | shared | The single browse-status precedence rule below |
+| `availability` | shared | The single cheap-availability rule below, or `null` |
+| `redaction` | shared | `{ redacted, hiddenFields }` derived from the visibility access result |
+| `audience` | shared | The contract the row was built under, `gm` or `player` |
+| `locked` | GM only | `Recipe.locked`. Authoring state; it says nothing a player can act on and MUST NOT cross to a player client |
+| `enabled` | GM only | `Recipe.enabled`, absent reading as ON per the model default. Authoring state for the same reason `locked` is, and it would be a constant `true` on a player summary in any case, since the visibility service never surfaces a disabled recipe to one |
+| `favourite` | player only | That viewer's stored favourite recipe ids. It is per-VIEWER, and the GM manager has no viewer to read it for, so a `false` there would assert something untrue rather than something absent |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The GM browsers' SORT keys are NOT served by this contract yet, and the gap is recorded rather than left to be discovered.
+The recipe browser sorts on activation-blocked state, check DC, ingredient count and result count; the component browser sorts on salvage result-group count.
+Sorting runs over the whole filtered cohort before pagination, so those values cannot be deferred to a page-row tier — a browser built on summaries alone would render name order under a "DC" label, silently.
+They are omitted rather than guessed because two of them are owned elsewhere (the cached alchemy signature report, and the check-resolution path) and none can be validated without its consuming surface.
+Adding a caller-supplied field for each is the intended amendment and belongs in the change that can prove the shape.
+
+### ComponentSummary
+
+A component carries no teaser gate, no knowledge gate and no per-viewer state, so its summary has NO audience split.
+That is a finding rather than an omission: a later surface needing an audience-specific component field amends this contract explicitly rather than assuming an axis that does not exist today.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Source |
+| --- | --- |
+| `id` | `Component.id` |
+| `name` | `Component.name` |
+| `img` | `Component.img` |
+| `systemId` | Supplied by the caller, NOT read off the component. Component ids are unique only within a system, so a summary that could not name its system would be ambiguous the moment two systems were browsed together |
+| `category` | `Component.category`, normalized to the reserved `general` bucket when absent |
+| `tags` | `Component.tags`, trimmed and deduped in authored order |
+| `essences` | `Component.essences`, projected to an id-ordered list of `{ id, quantity, name }` with the display name resolved through the per-system essence-definition index. Non-positive quantities are dropped |
+| `salvageEnabled` | `Component.salvage.enabled` |
+| `held` | `{ quantity, stacks }` for this component from the inventory snapshot's per-system tallies, or `null`. As with the cheap-availability rule, `null` is "not asked" and is deliberately distinct from a held quantity of zero |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### The cheap-availability rule
+
+One rule answers "does this actor plausibly have the materials for this recipe?", and both surfaces consume it rather than each deriving one.
+It reads the inventory snapshot's per-system component quantities, per-tag quantities and essence totals, and nothing else.
+
+This is the same rule the inventory snapshot introduced as the **indexed availability projection**.
+"Cheap availability" and "indexed availability projection" name one rule with one implementation; a second name for it is not a second rule, and no surface may hold a second implementation.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **It is an UPPER BOUND** | A positive answer means nothing in the tallies rules the recipe out; contended requirements drawing on the same held stacks are counted for each independently, so exact evaluation may still refuse. A negative answer is definitive, because a requirement the totals cannot cover cannot be covered by any assignment of them either. |
+| **The imprecision is carried, not laundered** | The result carries an explicit optimism marker so a consumer cannot read it as exact by accident, and a surface presents a positive answer as "looks makeable", never as "you can make this". Exactness stays at craft time. |
+| **Tools, checks, knowledge and currency are not consulted** | Each can only ever make a recipe LESS craftable, so ignoring them keeps the result an upper bound. A surface needing them asks the paths that own them. |
+| **"Not asked" is distinct from "unavailable"** | A surface with no actor in view — the GM browser projects definitions rather than one actor's view of them — receives `null`, and MUST NOT be rendered as a material shortfall. An unresolvable recipe answers `null` for the same reason: an index miss must not present as a recipe with no requirements, which the empty-requirements case would otherwise report as plausible. |
+| **Cost is per SNAPSHOT, not per row** | Per-system tallies are resolved once per snapshot, so projecting a page of summaries walks the held inventory once and performs one component-identity resolution per held document, not one per row. |
+| **A multi-step recipe is read from its FIRST execution step** | An explicit multi-step recipe carries its requirements on `steps[]` and leaves its top-level ingredient sets empty, so a rule reading only the top level would treat every stepped recipe as having no requirements and answer "plausible" against an empty inventory. That is not the documented optimism — optimism is being wrong about contention, not blind to a whole recipe class. The FIRST step is used, not the actor's active step, because that is what the detail surface's requirement rail shows; a summary pointed at a mid-run step would disagree with the inspector opened from it. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Browse-status precedence
+
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
+The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
+
+The browse status is a SHARED field, so the rule that derives it is one rule for both audiences.
+Its exhaustion INPUT is nevertheless empty for a GM, because a GM bypasses the knowledge gate that produces exhaustion at all; a GM-audience row is therefore never exhausted.
+That is a property of the knowledge gate rather than an audience-dependent derivation, and it is the distinction to hold: the rule may not branch on audience, and an input the gate never produces for that audience is not a branch.
+
+### What a summary MUST NOT contain, and MUST NOT call
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Prohibition | Rule |
+| --- | --- |
+| **No exact craftability** | Building any number of summaries MUST invoke exact craftability evaluation and ingredient selection ZERO times. This is a counter-asserted invariant, not a guideline: it is the property the paging surfaces depend on, and the one most likely to erode silently behind a helpfully-named private method. |
+| **No redacted content** | A summary crossing to a player client carries no field the recipe's teaser hides, and no signal DERIVED from one. |
+| **No localized text, with ONE enumerated exception** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. The single exception is `RecipeSummary.categoryLabel`, admitted on the terms its field row above records: the localization seam is OPTIONAL, so no caller is forced to acquire i18n, and nothing sorts on it. The exception is enumerated rather than general — a surface needing a second localized field amends this row and states why the same two tests pass, and MUST NOT read `categoryLabel` as a precedent that summaries may localize. |
+| **No documents** | Only ids, plain strings, numbers, booleans and arrays of those, so a summary is serializable and cheap to hold by the page. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The prohibition on exact evaluation is also enforced structurally: the projection accepts VALUES — a definition, a system, a snapshot, an access result — and never a manager or a listing builder, so there is no collaborator present to call either function on.
+Tests MUST cover the counted invariant over a run of N summaries, and MUST prove the counter non-vacuous rather than reporting a green baseline forever.
+
 ## Behavioural Ownership
 
 - Resolution mode semantics and mode validation: `resolution-modes/spec.md`
@@ -2507,6 +3105,12 @@ A single Foundry atomic or batched document operation does not require applicati
 - Legacy aliases in write output (`toJSON`) are transitional and scheduled for removal once migration coverage is confirmed.
 - Runtime writers MAY temporarily dual-emit documented transitional aliases during compatibility windows.
 - No new legacy aliases may be introduced unless explicitly added to this policy section with a removal plan.
+- **Retiring an alias from the WRITE path is a separate decision from retiring it from the READ path**, and the two are recorded in different tables below.
+  An alias may stop being emitted the moment no production path reads it off a serialized payload; it may stop being ACCEPTED only when no data in the wild can still carry it, which for anything a world, an exported system file or third-party content may hold is never.
+  A write-retired alias therefore keeps a permanent inbound shim and belongs in § Write-Retired Aliases (Read Permanently), not in § Retired Aliases (Fully Removed) — the latter's "strip on import/export" rule would delete exactly the data the shim exists to recover.
+- A serialized payload MAY omit a field whose absence its own constructor rebuilds to the identical value, and absence then carries the same meaning the written default carried.
+  This is a write-side reduction, not a schema change: no migration is required and no downgrade loses data, because every reader that already handled the default keeps reading the same value.
+  It is legitimate only where NO reader distinguishes the two, which is a property of the readers and must be audited per field rather than assumed from the constructor (see Recipe requirement 18).
 
 ### Canonical Fields
 
@@ -2568,17 +3172,29 @@ The following legacy aliases are accepted by constructors and normalization func
 The following aliases are currently emitted in `toJSON()` / normalization output alongside their canonical counterparts.
 These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
 
-- `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
-- `essences` (emitted by `IngredientSet.toJSON` as `essences: this.essences`, `{}` post-migration; superseded by essence ingredient options — one-release window)
+- `systemItemId` (emitted alongside `componentId` in Tool and Result; `Ingredient.toJSON` no longer emits it — see § Write-Retired Aliases)
+- `essences` (emitted by `IngredientSet.toJSON` only when the legacy map carries at least one entry, which post-migration is never; superseded by essence ingredient options — one-release window)
 - `essences` (CraftingSystem: derived id-string array equal to `essenceDefinitions.map(def => def.id)`, emitted alongside canonical `essenceDefinitions`; stripped on export by `stripTransitionalAliases` and re-derived after component deletion — not a Record, never feature-gated)
-- `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
-- `results` (emitted alongside `resultGroups` in Recipe)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)
 - `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
 - UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)
 
 These transitional aliases exist solely for UI code paths that have not yet been updated.
 They do not represent the canonical data contract and must not be relied upon by new code.
+
+### Write-Retired Aliases (Read Permanently)
+
+The following aliases are **no longer emitted** by `toJSON()` / normalization output and **must never be re-introduced on the write path**, while their read fallbacks are PERMANENT and must not be removed by a later alias cleanup.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Alias                        | Write Retired By | Read Fallback                            | Why the read stays                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` (flat array, Recipe) | #1087 | `Recipe._normalizeResultGroups`, which wraps each flat result into a single-result group when `resultGroups` is absent or empty | It duplicated `resultGroups[].results` wholesale and was ~10% of a representative recipe payload, paid on every write and every socket replication. Worlds, exported system files and third-party content authored before the retirement carry it as their only result data and cannot all be reached by a migration, so accepting it is not a window that closes. Import reference remapping and `migrateComponentId` keep traversing it for the same reason. |
+| `ingredients` (flat array, IngredientSet) | #1135 | `IngredientSet._legacyIngredientsToGroups`, which wraps each flat ingredient into a single-option group when `ingredientGroups` is absent or empty; plus the FOUR projections that perform the same `{options: [ingredient]}` synthesis on raw json — `RecipeManager._displayGroups` and `RecipeManager._validateTagPlaceholders`, `adminRecipeRowProjection._ingredientCountForSet`, and `inventorySnapshot.groupsOf` | It was a DERIVED first-option-per-group projection of `ingredientGroups` — never authored, and strictly lossy, since a two-option group surfaced only its first option — and it was 19.89% of a simple serialized corpus and 21.13% of a rich one. The read fallback is permanent because it is reachable only for a pre-groups payload where the flat array is the set's ONLY ingredient data: a world, an exported system file or third-party content authored before ingredient groups existed. Stripping it on import would therefore delete a recipe's entire input requirement, which is why it must never be listed under § Retired Aliases (Fully Removed). The in-memory `IngredientSet#ingredients` property is unchanged and is what every runtime reader of the alias sees. |
+| `systemItemId` (Ingredient) | #1135 | Every fallback in `models/match/matchTypes.js` — `normalizeMatch`'s bare-field read, `getComponentId`, and the ingredient-reference id extraction — each of which reads `componentId` first and falls back to `systemItemId`. That file is the largest cluster but NOT the whole set: seven more ingredient-scoped `componentId \|\| systemItemId` reads live outside it, in `Recipe.isSimpleRecipe`, `CraftingEngine`'s prepared-step consumed summary, `InventoryListingBuilder._optionConsumedComponentIds`, `importReferenceResolver`'s `remapIngredientRef` and `reportIngredientRef`, `recipeGraphBuilder.extractComponentIds` (which reads it on grouped options AND on the flat alias), and `recipeComponentReferences`'s `isDeletedLegacy`. Re-derive the list mechanically before any cleanup — grep `systemItemId` under `src/` and keep the reads whose subject is an ingredient option or a flat `set.ingredients` row, discarding the Result, Tool and gathering-drop reads of the same-named alias | On an `Ingredient` it was a byte-for-byte duplicate of `componentId` on the SAME object, so it never distinguished anything on the wire. The read fallback is permanent for the same reason as `results`: a payload written before `componentId` existed carries the alias as its only component reference, and the 1.13.0 `migrateComponentId` pass cannot reach content outside the world. `Tool.toJSON` and `Result.toJSON` still emit it and stay in § Transitional Write Aliases; only `Ingredient` retires. `src/ui/recipeIngredientGroups.js` also writes it, and is DEAD — an orphaned draft serializer with no importer anywhere in the repository — so it is not a missed retirement site. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Retired Aliases (Fully Removed)
 
@@ -2594,6 +3210,6 @@ The following aliases **must not be emitted by new code** and must be stripped o
 Tests must include:
 
 - Backward-compatible read tests: constructing models from legacy-only data (e.g., `systemItemId` without `componentId`) must produce correct canonical state.
-- Canonical-write assertions: `toJSON()` output must include all canonical fields with correct values.
+- Canonical-write assertions: `toJSON()` output must include all canonical fields with correct values, except where a model documents an omitted-when-default set (Recipe requirement 18), which is instead asserted as "omitted for a defaulted model, emitted for a non-default value, and reconstructed identically from absence".
 - Migration idempotency: running the `migrateComponentId` migration on already-migrated data must produce identical output.
 - Round-trip integrity: `Model.fromJSON(model.toJSON())` must preserve all canonical fields.

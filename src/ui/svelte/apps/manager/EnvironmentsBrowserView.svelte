@@ -13,10 +13,7 @@
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
-  import GatheringTravelTabs from './GatheringTravelTabs.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
-  import GatheringRealmsTab from './GatheringRealmsTab.svelte';
-  import GatheringMapLinksTab from './GatheringMapLinksTab.svelte';
 
   let {
     environments = [],
@@ -34,7 +31,7 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     activeTravelTab = 'parties',
-    onSelectTravelTab = () => {},
+    worldParties = false,
     services = null,
     selectedTaskId = '',
     selectedEventId = '',
@@ -66,40 +63,32 @@
     onAddGatheringVocabularyValue = () => {},
     onUpdateGatheringVocabularyValue = () => {},
     onDeleteGatheringVocabularyValue = () => {},
-    gatheringRealmSettings = { enabled: false },
-    onSetGatheringRealmsEnabled = () => {},
-    // The suppressed props below (the image-picker wire plus the Travel CRUD callbacks) have
-    // NO reader in this component, and the parent (CraftingSystemManagerRoot) wires a real
-    // store call into every one of them. The consumer that used to read them,
-    // GatheringTravelView.svelte, is imported by nothing under src/, so party
-    // create/enable/delete and all realm CRUD are currently unreachable from the manager's
-    // Travel tab. (Party RENAME is the exception and carries no suppression: `onRenameParty`
-    // is forwarded to the live parties tab below.) Deleting these destructures would leave
+    // The suppressed props below (the image-picker wire plus the remaining Travel CRUD
+    // callbacks) have no reader in the retained World content. The PARTY callbacks are no
+    // longer among them: issue 1182 rebuilt World > Parties as a card list that renders
+    // create, enable and delete per card, so `onCreateParty`, `onSetPartyEnabled`,
+    // `onDeleteParty`, `travelError` and `travelFieldErrors` are all forwarded to the live
+    // Parties region below and carry no suppression. Deleting the remaining
+    // destructures would leave
     // the parent attributes wired to nothing and erase the evidence — Svelte silently ignores
     // a prop the child does not destructure, so no test would fail. They are kept and
-    // suppressed until issue 920 reconnects the surface.
+    // suppressed until their corresponding controls reconnect the surface.
     // eslint-disable-next-line no-unused-vars
     onPickImagePath = null,
     travelParties = [],
-    travelSelectedPartyId = '',
     travelSaving = false,
-    // eslint-disable-next-line no-unused-vars
     travelError = null,
-    // eslint-disable-next-line no-unused-vars
     travelFieldErrors = {},
     travelActorOptions = [],
-    travelSystemRealms = [],
-    travelSelectedRealmId = '',
-    onSelectRealm = () => {},
-    onAddEnvironmentToRealm = () => {},
-    onRemoveEnvironmentFromRealm = () => {},
-    onSelectParty = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
+    // The WORLD's realm library (issue 1282), read here only by the party override picker.
+    // Realm AUTHORING moved to World > Travel, which renders `GatheringRealmsTab` and
+    // `GatheringMapLinksTab` straight from the Manager root.
+    worldRealms = [],
+    partyRealmOverridesAvailable = false,
+    partyRealmOverridesUnavailableHint = '',
     onCreateParty = () => {},
     onRenameParty = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onSetPartyEnabled = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onDeleteParty = () => {},
     onAddPartyMember = () => {},
     onRemovePartyMember = () => {},
@@ -108,27 +97,12 @@
     onClearPartyTravelActor = () => {},
     onSetPartyRealmOverride = () => {},
     onClearPartyRealmOverride = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
+    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onRemoveStaleMember = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
+    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onClearStaleTravelActor = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
+    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onDropStaleOverrideRealm = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
-    onCreateRealmQuick = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
-    onRenameRealm = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
-    onToggleRealmEnabled = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
-    onUpdateRealm = () => {},
-    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
-    onDeleteRealm = () => {},
-    travelCurrentSceneRegions = [],
-    travelCurrentSceneUuid = '',
-    mapSelectedRegionUuid = '',
-    onSelectMapRegion = () => {},
-    onSetMapRegionLink = () => {},
   } = $props();
 
   let searchTerm = $state('');
@@ -187,16 +161,6 @@
       hintFallback: 'Browse reusable events before attaching them to environments.',
     },
     {
-      id: 'travel',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel',
-      labelFallback: 'Travel',
-      icon: 'fas fa-route',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
-      titleFallback: 'Travel and parties',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
-      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.',
-    },
-    {
       id: 'settings',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings',
       labelFallback: 'Settings',
@@ -229,17 +193,6 @@
 
   const environmentList = $derived(environments || []);
   // Lightweight projection for the Realms tab membership editor.
-  const realmEnvironmentOptions = $derived(
-    environmentList.map((environment) => ({
-      id: environment.id,
-      name: environment.name,
-      img: environment.img || '',
-      enabled: environment.enabled !== false,
-      includedRealmIds: Array.isArray(environment.includedRealmIds)
-        ? environment.includedRealmIds
-        : [],
-    }))
-  );
   const selectedGatheringSystemConfig = $derived(
     gatheringConfig?.systems?.[selectedSystemId] || {}
   );
@@ -269,7 +222,6 @@
   const activeGatheringTabConfig = $derived(
     gatheringTabs.find((tab) => tab.id === activeGatheringTab) || gatheringTabs[0]
   );
-  const realmsEnabled = $derived(gatheringRealmSettings?.enabled === true);
   const biomeOptions = $derived(
     uniqueSorted(
       environmentList.flatMap((environment) =>
@@ -714,12 +666,21 @@
   }
 
   function gatheringHeaderTitle() {
+    if (activeGatheringTab === 'travel' && worldParties) {
+      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    }
     const titleKey = activeGatheringTabConfig?.titleKey;
     if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
     return text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments');
   }
 
   function gatheringHeaderHint() {
+    if (activeGatheringTab === 'travel' && worldParties) {
+      return text(
+        'FABRICATE.Admin.Manager.World.PartiesHint',
+        'Create and manage parties shared across every crafting system.'
+      );
+    }
     const hintKey = activeGatheringTabConfig?.hintKey;
     if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
     return text(
@@ -736,7 +697,9 @@
   <section class="manager-section-header">
     <div class="manager-heading">
       <p class="manager-kicker">
-        {selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+        {worldParties
+          ? text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system')
+          : selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
       </p>
       <h2 class="manager-title">{gatheringHeaderTitle()}</h2>
       <p class="manager-subtitle">{gatheringHeaderHint()}</p>
@@ -1178,46 +1141,33 @@
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
-    <div class="manager-gathering-panel manager-travel-view" data-manager-travel-view>
-      <GatheringTravelTabs activeTab={activeTravelTab} onSelect={onSelectTravelTab} />
-
+    <div
+      class="manager-gathering-panel manager-travel-view"
+      class:is-parties-pane={activeTravelTab === 'parties'}
+      data-manager-travel-view
+    >
       {#if activeTravelTab === 'parties'}
         <GatheringPartiesTab
           parties={travelParties}
           systemId={selectedSystemId}
-          systemRealms={travelSystemRealms}
-          selectedPartyId={travelSelectedPartyId}
+          systemRealms={worldRealms}
           actorOptions={travelActorOptions}
           saving={travelSaving}
-          {onSelectParty}
+          {travelError}
+          {travelFieldErrors}
+          realmOverridesAvailable={partyRealmOverridesAvailable}
+          realmOverridesUnavailableHint={partyRealmOverridesUnavailableHint}
+          {onCreateParty}
           onSetRealmOverride={onSetPartyRealmOverride}
           onClearRealmOverride={onClearPartyRealmOverride}
           {onRenameParty}
+          {onSetPartyEnabled}
+          {onDeleteParty}
           onAddMember={onAddPartyMember}
           onRemoveMember={onRemovePartyMember}
           onMoveMember={onMovePartyMember}
           onSetTravelActor={onSetPartyTravelActor}
           onClearTravelActor={onClearPartyTravelActor}
-        />
-      {:else if activeTravelTab === 'realms'}
-        <GatheringRealmsTab
-          realms={travelSystemRealms}
-          selectedRealmId={travelSelectedRealmId}
-          environments={realmEnvironmentOptions}
-          saving={travelSaving}
-          {onSelectRealm}
-          onAddEnvironment={onAddEnvironmentToRealm}
-          onRemoveEnvironment={onRemoveEnvironmentFromRealm}
-        />
-      {:else if activeTravelTab === 'map'}
-        <GatheringMapLinksTab
-          sceneRegions={travelCurrentSceneRegions}
-          sceneUuid={travelCurrentSceneUuid}
-          selectedRegionUuid={mapSelectedRegionUuid}
-          regions={travelSystemRealms}
-          saving={travelSaving}
-          onSelect={onSelectMapRegion}
-          onSetLink={onSetMapRegionLink}
         />
       {/if}
     </div>
@@ -1229,58 +1179,6 @@
       aria-labelledby="manager-gathering-nav-settings"
     >
       <GatheringEconomyView {services} systemId={selectedSystemId} />
-
-      <section
-        class="manager-condition-panel manager-realm-toggle-panel"
-        data-gathering-realm-toggle-panel
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Environment.RealmToggle.Title',
-          'Travel & Realms'
-        )}
-      >
-        <header class="manager-condition-panel-header">
-          <span class="manager-condition-panel-title">
-            <i class="fas fa-route" aria-hidden="true"></i>
-            <span
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.RealmToggle.Title',
-                'Travel & Realms'
-              )}</span
-            >
-          </span>
-          <button
-            type="button"
-            class={`manager-status-toggle ${realmsEnabled ? 'is-on' : 'is-off'}`}
-            data-gathering-realm-toggle
-            aria-pressed={realmsEnabled}
-            aria-label={realmsEnabled
-              ? text(
-                  'FABRICATE.Admin.Manager.Environment.RealmToggle.Disable',
-                  'Disable Travel & Realms'
-                )
-              : text(
-                  'FABRICATE.Admin.Manager.Environment.RealmToggle.Enable',
-                  'Enable Travel & Realms'
-                )}
-            onclick={() => onSetGatheringRealmsEnabled?.(selectedSystemId, !realmsEnabled)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true">
-              <span class="manager-status-toggle-knob"></span>
-            </span>
-            <span class="manager-status-toggle-label">
-              {realmsEnabled
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
-            </span>
-          </button>
-        </header>
-        <p class="manager-condition-panel-hint">
-          {text(
-            'FABRICATE.Admin.Manager.Environment.RealmToggle.Hint',
-            'Enabling this reveals the Travel tab, where you build realms and place parties, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering.'
-          )}
-        </p>
-      </section>
 
       {#each [{ kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition }, { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }] as condition (condition.kind)}
         <section

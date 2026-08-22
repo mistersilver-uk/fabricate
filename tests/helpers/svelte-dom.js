@@ -17,6 +17,7 @@
  *   });
  */
 
+import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 
 /** @type {Window | null} */
@@ -159,4 +160,45 @@ export function teardownDOM() {
     _window.close();
     _window = null;
   }
+}
+
+/**
+ * A short, safe description of a DOM element: tag name plus the attributes a selector would
+ * have matched on. Never walks into children, parents or the owner document.
+ *
+ * @param {Element} element
+ * @returns {string}
+ */
+function describeElement(element) {
+  const attributes = Array.from(element.attributes || [])
+    .map((attribute) => (attribute.value ? `${attribute.name}="${attribute.value}"` : attribute.name))
+    .join(' ');
+  return `<${element.tagName.toLowerCase()}${attributes ? ` ${attributes}` : ''}>`;
+}
+
+/**
+ * Assert that `selector` matches nothing under `root`.
+ *
+ * NEVER hand a live happy-dom node to `node:assert`. When such an assertion FAILS, assert
+ * renders both operands with `inspect(value, { depth: 1000, getters: true, sorted: true })`,
+ * and a happy-dom element's own enumerable state reaches its children, its parents and its
+ * owner document. The rendered string grows roughly 3.3x per level of depth — on a bare
+ * twelve-node chain that is already 10 MB at depth 8 — so on a mounted application tree the
+ * message allocates without bound and takes the machine down with it. The failure only ever
+ * appears while someone is developing a regression, which is the worst possible moment for it.
+ *
+ * This helper compares a SHORT description instead, so a failure reports the offending element
+ * legibly and in constant space.
+ *
+ * @param {ParentNode | null | undefined} root
+ * @param {string} selector
+ * @param {string} [message]
+ */
+export function assertNoElement(root, selector, message) {
+  const found = root?.querySelector(selector) ?? null;
+  assert.equal(
+    found === null ? null : describeElement(found),
+    null,
+    message || `expected no element matching ${selector}`
+  );
 }

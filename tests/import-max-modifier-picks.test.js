@@ -113,14 +113,16 @@ test('prepareForImport caps a legacy playerPicks bundle at one pick', () => {
   );
 });
 
-test('prepareForImport leaves a byRecipe bundle unbounded and its recipe picks intact', () => {
+test('prepareForImport leaves a subject-selecting bundle unbounded and its picks intact', () => {
+  // The rule token is rewritten by the `1.22.0` upcast (issue 1095); what THIS case owns
+  // is that `1.20.0` stamps no cap on a subject-selecting rule and destroys no pick.
   const packData = prepareForImport(
     legacyBundle({
       system: exportedSystem({ defaultModifierPolicy: 'byRecipe' }),
       recipes: [exportedRecipe({ modifierIds: ['med', 'alch'] })],
     })
   );
-  assert.equal(packData.system.craftingCheck.defaultModifierPolicy, 'byRecipe');
+  assert.equal(packData.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   assert.equal(Object.hasOwn(packData.system.craftingCheck, MAX_PICKS), false);
   assert.deepEqual(packData.recipes[0].craftingModifier, { modifierIds: ['med', 'alch'] });
 });
@@ -160,7 +162,7 @@ test('importing a legacy playerPicks bundle creates a system carrying the stampe
   assert.equal(created[0].craftingCheck[MAX_PICKS], 1);
 });
 
-test('importing a byRecipe bundle creates it unbounded', async () => {
+test('importing a subject-selecting bundle creates it unbounded', async () => {
   const created = [];
   const importer = new CompendiumImporter(makeSystemManager({ created }), makeRecipeManager());
   await importer.importFromPackData(
@@ -229,17 +231,20 @@ test('a non-overwrite import of an existing system writes nothing at all', async
 // Round trip
 // ---------------------------------------------------------------------------
 
-test('export -> import round-trips the authored cap, the byRecipe rule and every recipe pick', async () => {
+test('export -> import round-trips the authored cap, the bySubject rule and every subject pick', async () => {
   const source = {
     id: 'sys-round',
     name: 'Round Trip',
     components: [],
+    // The library is SYSTEM-level since issue 1095 and named `modifiers` since issue 1117,
+    // and `buildExportPayload` deep-clones the system, so it round-trips for free once
+    // `_normalizeSystem` emits it there.
+    modifiers: [
+      { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
+      { id: 'alch', label: 'Alchemy', expression: '@alch' },
+    ],
     craftingCheck: {
-      checkModifiers: [
-        { id: 'med', label: 'Medicine', expression: '@med' },
-        { id: 'alch', label: 'Alchemy', expression: '@alch' },
-      ],
-      defaultModifierPolicy: 'byRecipe',
+      defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['med'],
       [MAX_PICKS]: 2,
     },
@@ -278,7 +283,12 @@ test('export -> import round-trips the authored cap, the byRecipe rule and every
     2,
     'an authored cap survives the round trip — it is not re-derived as 1'
   );
-  assert.equal(created[0].craftingCheck.defaultModifierPolicy, 'byRecipe');
+  assert.equal(created[0].craftingCheck.defaultModifierPolicy, 'bySubject');
+  // The library and its ABSENCE-PRESERVING bounds survive at the system level.
+  assert.deepEqual(created[0].modifiers, [
+    { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
+    { id: 'alch', label: 'Alchemy', expression: '@alch' },
+  ]);
   const byId = new Map(createdRecipes.map((recipe) => [recipe.id, recipe]));
   assert.deepEqual(byId.get('r-set').craftingModifier, { modifierIds: ['med'] });
   assert.deepEqual(

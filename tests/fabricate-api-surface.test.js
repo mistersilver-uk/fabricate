@@ -4,28 +4,109 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
 const mainSource = readFileSync(mainPath, 'utf8');
+
+/**
+ * Assert one public hook namespace is on the aggregate, correctly named, and documented.
+ *
+ * Shared by the two namespaces rather than copied per namespace: the Jekyll API reference
+ * hand-lists these names, so it is a MIRROR of `config/hooks.js` and mirrors rot silently — a
+ * renamed constant would leave third parties subscribing to a string nothing publishes, with
+ * nothing failing until someone read the page.
+ *
+ * @param {string} domain Hook domain segment (`manager`, `player`).
+ * @param {Readonly<Record<string, string>>} namespace The exported constant bag.
+ */
+function assertHookNamespace(domain, namespace) {
+  const documented = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
+  assert.ok(
+    mainSource.includes('HOOKS: FABRICATE_HOOKS'),
+    'game.fabricate.api.HOOKS should publish the whole aggregate'
+  );
+  assert.equal(FABRICATE_HOOKS[domain], namespace, `the ${domain} namespace is on the aggregate`);
+  const names = Object.values(namespace);
+  assert.ok(names.length > 0, `expected at least one ${domain} hook`);
+  const convention = new RegExp(`^fabricate\\.${domain}\\.[a-z][A-Za-z]*$`);
+  for (const name of names) {
+    assert.match(
+      name,
+      convention,
+      `${name} should follow the fabricate.<domain>.<eventCamelCase> convention`
+    );
+    assert.ok(documented.includes(`\`${name}\``), `${name} should be documented in docs/api`);
+  }
+}
+
+/**
+ * Assert one page-session extension registry is imported once and bound to the public API.
+ *
+ * @param {string} name Registry export name.
+ * @param {string} modulePath Module specifier as `main.js` writes it.
+ */
+function assertRegistryBind(name, modulePath) {
+  assert.ok(
+    mainSource.includes(`import { ${name} } from '${modulePath}';`),
+    `main.js should import the ${name} page-session registry singleton`
+  );
+  assert.ok(
+    mainSource.includes(`${name}.bindPublicApi(game.fabricate.api);`),
+    `game.fabricate.api should receive the stable public registration object from ${name}`
+  );
+  assert.equal(
+    (mainSource.match(new RegExp(`const ${name}`, 'g')) || []).length,
+    0,
+    'bindFabricateGlobal must not recreate the registry during init/ready replay'
+  );
+}
+
+test('every public manager hook is namespaced, reachable on the API, and documented', () => {
+  assertHookNamespace('manager', MANAGER_HOOKS);
+});
+
+test('every public player hook is namespaced, reachable on the API, and documented', () => {
+  assertHookNamespace('player', PLAYER_HOOKS);
+});
+
+test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
+  assertRegistryBind('managerExtensions', './ui/managerExtensions.js');
+});
+
+test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
+  assertRegistryBind('playerExtensions', './ui/playerExtensions.js');
+});
 
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
   assert.ok(
     mainSource.includes('async deleteRecipe(recipeId)'),
     'Fabricate should expose a deleteRecipe method on the main game.fabricate API object'
   );
+  // Issue 1132: it routes through the CASCADING set primitive rather than the
+  // `RecipeManager` leaf, so the public API and the GM studio cannot disagree about what
+  // deleting a recipe reaches. Its return value changed from `undefined` to the result
+  // object at the same time.
   assert.ok(
-    mainSource.includes('return await this.recipeManager.deleteRecipe(recipeId);'),
-    'Fabricate.deleteRecipe should delegate to RecipeManager.deleteRecipe'
+    mainSource.includes(
+      'return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);'
+    ),
+    'Fabricate.deleteRecipe should route through CraftingSystemManager.deleteRecipes'
   );
 });
 
 test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
-  assert.ok(
-    mainSource.includes("import { handleFabricateSettingChange } from './config/settingChangeBridge.js'"),
+  // Matched as a pattern rather than a literal line, so an added or removed named import
+  // from the same module cannot fail an assertion whose subject is the wiring. What must
+  // hold is that main.js takes the handler from the bridge module.
+  assert.match(
+    mainSource,
+    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
     'main.js should import the setting-change bridge'
   );
   assert.ok(
-    mainSource.includes('handleFabricateSettingChange(key, {'),
+    mainSource.includes('handleFabricateSettingChange(key, fabricateSettingChangeTargets())'),
     'the updateSetting hook should invoke the bridge with the changed key'
   );
   assert.ok(
@@ -75,10 +156,32 @@ test('Fabricate gates matured timed gathering runs to the primary GM', () => {
 });
 
 test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
+  // BOTH seams are pinned. `getCraftingSystem` resolves one system; `getCraftingSystemManager`
+  // (issue 1072) is the manager itself, which the twelve paths that used to read
+  // `game.fabricate` inline now route through — including `_validateSignatures`. Losing that
+  // second line would silently send those paths back to the `ready`-hook global, where they
+  // cannot be instrumented, cached or indexed by the performance programme.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,?\s*\}\)/s,
-    'RecipeManager production initialization should receive the live crafting-system resolver'
+    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
+    'RecipeManager production initialization should receive the live crafting-system resolver and manager'
+  );
+});
+
+test('Fabricate wires the world currency config into both currency readers', () => {
+  // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
+  // per-system `enabled` flag with the world's ladder. Both readers must therefore hold the
+  // store: RecipeManager for craftability projection, CraftingEngine for the afford gate and
+  // the spend/refund paths. Without it they fall back to the `game.fabricate` global, which is
+  // exactly the un-instrumentable path issue 1072 removed.
+  assert.ok(
+    mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
+    'main.js should construct the world currency config store'
+  );
+  assert.match(
+    mainSource,
+    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*this\.currencyConfigStore/,
+    'CraftingEngine should receive the world currency config store'
   );
 });
 
@@ -120,8 +223,10 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   // realm/travel subsystem is disabled for the target system, reading the
   // single shared predicate so the gate never drifts from the engine/resolver.
   assert.ok(
-    mainSource.includes("import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"),
-    'main.js imports the shared isGatheringRealmsEnabled predicate'
+    mainSource.includes(
+      "import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"
+    ),
+    'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
   );
   // Each guard resolves the system via craftingSystemManager and bails before doing work.
   assert.ok(
@@ -139,8 +244,13 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
 });
 
 test('Fabricate registers a GM-only discipline on realm mutators', () => {
-  // The reveal mutator validates realm membership via the owning system snapshot.
-  assert.ok(mainSource.includes('validateRealmInSystem: system'), 'reveal validates realm belongs to system');
+  // The reveal mutator validates the realm against the WORLD library (issue 1282). `systemId`
+  // survives on the public method as the GATE — whether that system surfaces travel at all —
+  // and no longer as the thing the realm must belong to.
+  assert.ok(
+    mainSource.includes('validateRealmExists: this.gatheringRealmStore?.get?.()'),
+    'reveal validates the realm exists in the world travel config'
+  );
 });
 
 test('game.fabricate.api exposes the canonical realm class + deprecated alias', () => {
@@ -156,4 +266,36 @@ test('game.fabricate.gathering exposes the canonical realm helpers', () => {
   assert.ok(mainSource.includes('getLocationForActor: (options) => fabricate.getGatheringLocationForActor(options)'), 'getLocationForActor helper');
   assert.ok(mainSource.includes('setPartyRealmOverride: (options) => fabricate.setGatheringPartyRealmOverride(options)'), 'setPartyRealmOverride helper');
   assert.ok(mainSource.includes('revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options)'), 'revealRealmForActor helper');
+});
+
+test('Fabricate wires the crafting listing builder with a component resolver (issue 1075)', () => {
+  // The builder's privilege gates and matching logic are unit-tested directly, but the
+  // composition that hands them a resolver is not: without this line every crafting row's
+  // owned-material tally silently reads as if the player owns nothing, and no existing
+  // test goes red.
+  assert.ok(
+    mainSource.includes("import { findMatchingComponent } from './utils/essenceResolver.js';"),
+    'main.js should import the same component resolver InventoryListingBuilder matches with'
+  );
+  assert.ok(
+    mainSource.includes('resolveComponentForItem: findMatchingComponent,'),
+    'the crafting listing builder should receive the component resolver, or every player row silently reads "missing materials"'
+  );
+});
+
+test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
+  // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
+  // summary rows (issue 1075). The builder's `buildRecipeDetail` re-evaluation is unit-tested
+  // directly, but nothing else pins that this method actually routes there rather than, say,
+  // re-deriving a summary row or returning a stale cached value.
+  assert.ok(
+    mainSource.includes(
+      'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
+    ),
+    'main.js should expose hydrateCraftingRecipe on the Fabricate API object'
+  );
+  assert.ok(
+    mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
+    "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
+  );
 });

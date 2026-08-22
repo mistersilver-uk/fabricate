@@ -30,6 +30,12 @@ import { buildImportReportContent } from '../systems/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
+import { managerExtensions } from './managerExtensions.js';
+// The title bar's companion signal reports the MODULE, so it reads BOTH registries (issue
+// 1198). This is a second subscription to the player registry from a different application,
+// which is not the failure "one subscriber per registry" guards against: that rule exists
+// because two subscribers WITHIN ONE WINDOW can disagree about what that window renders.
+import { playerExtensions } from './playerExtensions.js';
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import {
   KNOWLEDGE_MESSAGES,
@@ -122,6 +128,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   _services = null;
   _confirmDiscardDirtyEssenceDraft = null;
   _confirmDiscardDirtyToolDraft = null;
+  _confirmDowntimeCompanionNavigation = null;
   // Foundry user CRUD hook registrations, torn down on close, that keep the
   // per-recipe restriction allow-list current when players change while open.
   _userHooks = null;
@@ -159,6 +166,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
       getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
+      getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,
       getGatheringRealmStore: () => game?.fabricate?.getGatheringRealmStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getCurrentSceneRegions: () =>
@@ -236,8 +244,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // Issue 1024: the GM who ticks a new player-character actor type is the one
         // GUARANTEED to be looking at stale data — the settings sidebar sits over an
         // open manager — so the Access, Knowledge and party rosters must republish.
-        const playerCharacterTypeListener = (...args) =>
-          callback('playerCharacterTypes', ...args);
+        const playerCharacterTypeListener = (...args) => callback('playerCharacterTypes', ...args);
         hooks.on('fabricate.craftingSystemsChanged', systemListener);
         hooks.on('fabricate.recipesChanged', recipeListener);
         hooks.on('fabricate.playerCharacterTypesChanged', playerCharacterTypeListener);
@@ -322,6 +329,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .map((actor) => this._describeAccessActor(actor))
           .filter((actor) => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // The raw actor DOCUMENTS, not a projection (issue 1132). `adminStore` builds the
+      // learned-knowledge index through the shared `buildLearnedRecipeActorIndex`, which
+      // reads each actor's flags through `getFabricateFlag` and filters by `isOwner` —
+      // neither survives `_describeAccessActor`'s projection, and the store must not reach
+      // `game.*` itself. Unsorted and unfiltered on purpose: the shared selector owns the
+      // scope, so a second filter here could only make the two disagree.
+      getWorldActors: () => Array.from(game.actors?.contents || game.actors || []),
       // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
       // linked Item previews after drag-and-drop.
       getWorldItemOptions: () =>
@@ -639,6 +653,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
     return {
       store: this._adminStore,
+      managerExtensions,
+      playerExtensions,
       services: {
         importSingleManagedItemFromDrop,
         pickImagePath: this._services.pickImagePath,
@@ -705,7 +721,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         },
         // Commit the mapping modal's per-folder decisions: import each non-skipped
         // folder's items, then apply that folder's category/tags to the freshly imported
-        // component set via the shared set-apply primitive (one save() per folder).
+        // component set via the shared set-apply primitive. The whole run — every folder's
+        // items and every folder's set-apply — costs ONE `craftingSystems` write (issue
+        // 1086), not one per item plus one per folder.
         commitImportFolderMapping: async (systemId, decisions) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           if (!systemId) {
@@ -780,18 +798,16 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               );
               return;
             }
-            let added = 0;
-            let updated = 0;
-            let skipped = 0;
-            const sourceFallbacks = [];
-            for (const itemUuid of itemUuids) {
-              const result = await systemManager.addItemFromUuid(systemId, itemUuid);
-              if (result.action === 'added') added++;
-              else if (result.action === 'updated') updated++;
-              else skipped++;
-              if (Array.isArray(result.sourceFallbacks))
-                sourceFallbacks.push(...result.sourceFallbacks);
-            }
+            // One unmapped decision — no category, no tags — is exactly this flat folder
+            // import, so it delegates to the shared commit loop rather than carrying a
+            // second copy of it. That is what gives the plain folder drop the single
+            // batched `craftingSystems` write the mapping commit has (issue 1086): this
+            // branch used to save the whole corpus once per imported item.
+            const { added, updated, skipped, sourceFallbacks } = await applyFolderImportDecisions(
+              systemManager,
+              systemId,
+              [{ itemUuids }]
+            );
             ui.notifications.info(
               localize('FABRICATE.Admin.Items.FolderImportSummary', {
                 added,
@@ -930,6 +946,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         },
         registerToolDirtyGuard: (guard) => {
           this._confirmDiscardDirtyToolDraft = typeof guard === 'function' ? guard : null;
+        },
+        // A mounted Downtime companion's veto over the window close. Same registration shape
+        // as the two Core guards above, and one deliberate difference in what it returns:
+        // `undefined` means "no companion holds a guard", which is what lets `close` skip the
+        // await entirely rather than pay a microtask for a question nobody is asking.
+        registerDowntimeCompanionGuard: (guard) => {
+          this._confirmDowntimeCompanionNavigation = typeof guard === 'function' ? guard : null;
         },
         // Gathering economy authoring + manual state controls (GM-only).
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
@@ -1351,15 +1374,31 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     if (this._userHooks) return;
     const reproject = () => this._adminStore?.refreshAccessRosters?.();
     const reprojectKnowledge = () => this._adminStore?.scheduleKnowledgeRefresh?.();
+    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
+    // before this the learned-recipe index the Recipe Studio's delete card counts through
+    // was rebuilt only by a full `refresh()`. With the studio open, a player learning from
+    // a scroll left the card understating "Will be forgotten by N characters" (issue 1132,
+    // review round). Marking is deliberately all this does: `updateActor` fires for EVERY
+    // module's flag writes, so rebuilding the index here would be a world walk per foreign
+    // write, and republishing to make it visible would re-derive the whole manager on the
+    // same cadence. The store rebuilds on the next read that needs it.
+    const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();
     const reprojectOnActorCrud = () => {
       reproject();
+      markLearnerIndexStale();
       reprojectKnowledge();
     };
     const reprojectOnRelevantActorChange = (_actor, changed) => {
       const diff = changed || {};
+      // `ownership` also moves the WRITABLE-actor set the index is built over, so it marks
+      // the index stale as well as re-projecting the access rosters.
+      if ('ownership' in diff) markLearnerIndexStale();
       if ('ownership' in diff || 'name' in diff || 'img' in diff) reproject();
       // Learned recipes, usage counts and learn counts all live under `flags`.
-      if ('flags' in diff) reprojectKnowledge();
+      if ('flags' in diff) {
+        markLearnerIndexStale();
+        reprojectKnowledge();
+      }
     };
     // An Item embedded in a COMPENDIUM Actor also has an Actor parent and could
     // never change the projection. `Document#pack` falls back to `this.parent?.pack`,
@@ -1399,6 +1438,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     // confirmation dialog cannot be serviced. Normal user-initiated closes keep
     // every dirty-draft guard below.
     if (!options?.force) {
+      // The companion is asked FIRST. Core's own guards below can SAVE — an environment
+      // draft, a tool draft — and a save that lands for a close the companion then refuses
+      // would have written world data for a window that stayed open. Asking the companion
+      // first means a veto writes nothing at all.
+      //
+      // The `undefined` test is not defensive tidying: with no companion guard registered the
+      // call returns `undefined` and this line short-circuits WITHOUT awaiting, so the close
+      // chain is byte-for-byte the chain that shipped for every GM who has no companion
+      // mounted — which is every GM on the free module, on every route but one.
+      const canCloseCompanion = this._confirmDowntimeCompanionNavigation?.();
+      if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;
+
       const canCloseTool = await this._confirmDiscardDirtyToolDraft?.();
       if (canCloseTool === false) return this;
 
@@ -1417,7 +1468,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
     this._confirmDiscardDirtyEssenceDraft = null;
     this._confirmDiscardDirtyToolDraft = null;
+    this._confirmDowntimeCompanionNavigation = null;
     this._unregisterUserHooks();
+    // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()`
+    // unmounts the Svelte root, so its mount target is still connected.
+    this._svelteComponent?.disposeDowntimeProviderBeforeRemoval?.();
     if (this._adminStore) {
       this._adminStore.destroy();
       this._adminStore = null;

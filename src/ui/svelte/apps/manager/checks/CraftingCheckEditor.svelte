@@ -24,8 +24,13 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import CheckDcMacroCard from './CheckDcMacroCard.svelte';
+  import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -43,19 +48,68 @@
   // instances omit this prop entirely (defaulting to relative-with-DC). It scopes the
   // fixed-type DC hiding to `routedByCheck + fixed` (which matches by value range, so
   // the DC is meaningless); every other case keeps showing the DC field.
+  // `section` (issue 1096) selects which of this editor's cards render, so the Checks
+  // Studio's five-section strip hosts the SAME editor rather than a per-section fork.
+  // Empty renders every card, which is what every caller outside the studio still gets.
+  //
+  // `previewLabel` USED to be absent here, and the reason it was absent has expired. Issue
+  // 1096 could not supply one — what a previewed record IS, and which one is selected, were
+  // the outcome simulator's decisions and the simulator did not exist — so the strip was
+  // drawn against the check's own DC and said so. Issue 1097 ships that simulator, and the
+  // record it previews against is the SAME selection this card's PREVIEW AGAINST offers.
+  // ONE selection, not two: the strip and the readout beside it must never be describing
+  // different records, so the state is the route's and this control reports upward.
   let {
     value = null,
     showTiers = true,
     breakageAuthority = 'toolSpecific',
     resolutionMode = null,
+    section = '',
+    foundrySystemId = '',
+    // The activity's own word for the thing a check is rolled for, for the Difficulty
+    // card's `{record}` copy. A default keeps the editor mountable in isolation; hard-coding
+    // one activity's noun is how a gathering screen comes to talk about recipes.
+    recordNoun = 'recipe',
+    // The check modifiers this check APPLIES and the rule that combines them, for the
+    // formula card's `WHAT ACTUALLY GETS ROLLED` inset. Resolved by the caller from the
+    // activity's whole modifier context, which is the same derivation the Modifiers
+    // section counts from — an editor re-deriving it would be a second opinion.
+    appliedModifiers = [],
+    modifierPolicy = 'addAll',
+    // The PREVIEW AGAINST binding (issue 1097). `previewRecords` is the route's own record
+    // list — `{ id, label }`, the same one the rail's simulator previews against — and
+    // `previewDcOverride` / `previewLabel` are the selected record's DC and name.
+    previewRecords = [],
+    previewRecordId = '',
+    previewDcOverride = null,
+    previewLabel = '',
+    onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
-  // Fixed-type routed-by-check checks match by value range, so DC + the meet/exceed
-  // comparison are meaningless there; hide both (CheckFormulaFields' showDc gate wraps
-  // both). Any other case (relative type, salvage/gathering) keeps the DC.
-  const hideDc = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
+  const shows = (id) => !section || section === id;
+  // ── THE ONE CONDITION under which this check has no anchor (issue 1096) ─────────────
+  //
+  // A `routedByCheck` check of `fixed` type matches a roll against ABSOLUTE value ranges.
+  // There is no DC in that arrangement — nothing to meet or exceed, and nothing for a
+  // recipe's difficulty tier to move — so three surfaces are withheld together and for one
+  // reason: the `Difficulty` card, the recipe difficulty tier list, and the Outcomes
+  // section's `PREVIEW AGAINST` selector.
+  //
+  // BOTH HALVES ARE LOAD-BEARING, and the gate is named rather than spelled out at three
+  // call sites so it cannot drift into three slightly different conditions:
+  //
+  //  - `fixed` ALONE is not enough. Salvage and gathering reuse this editor without a
+  //    system resolution mode, and their fixed checks keep a DC (see `showTiers={false}`
+  //    at those call sites) — so widening this to "any fixed check" would take the
+  //    difficulty away from a check that has one.
+  //  - `routedByCheck` ALONE is not enough either. A relative routed check is defined by
+  //    its DC: every tier threshold is an offset from it.
+  //
+  // `tests/components/crafting-check-anchor-gate.test.js` pins the condition on all four
+  // corners, so narrowing it or widening it fails rather than shipping.
+  const bandsAreAbsolute = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
   // Outcome options for the CheckTriggers outcomeTier condition — both tier lists
   // carry an id + name; the active list is the one the editor is showing.
   const breakageOutcomeOptions = $derived(
@@ -85,7 +139,7 @@
     },
     {
       value: 'fixed',
-      icon: 'fas fa-ruler-horizontal',
+      icon: 'fas fa-ruler',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
       fallback: 'Fixed',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
@@ -165,51 +219,325 @@
   function rowInvalid(index) {
     return !!conflicts && (conflicts.overlapping.has(index) || conflicts.invalid.has(index));
   }
+
+  // ── The band strip (issue 1096) ──────────────────────────────────────────────────
+  //
+  // A VISUALISATION of the tier list above; the steppers in the rows stay the control of
+  // record. Bands are handed over in ABSOLUTE track values whatever the type underneath,
+  // because a strip that had to read two authored shapes would be two components wearing
+  // one name — relative offsets are resolved against the previewed DC here.
+  //
+  // Band identity is carried by a THEME TOKEN, not by a persisted colour: outcome tiers carry
+  // no authored colour today, and inventing one would be a persisted-shape change this work
+  // does not own. The strip's `color` prop takes the value verbatim, so an authored swatch can
+  // replace this later with no strip change.
+  //
+  // FIVE HUES, WALKED BY POSITION IN VALUE ORDER. The band a tier gets is decided by where it
+  // sits in the ordered list — first tier takes the first tone, last tier the last — and NOT by
+  // its `success` flag. Two reasons, and the second is the one that was wrong before.
+  //
+  // A flag has two values, so a flag-derived colour paints two of a five-tier check's bands
+  // identically; per-band identity is the whole reason this control refuses the full-track
+  // gradient exemption, so that is a defect and not a preference. Ranking WITHIN each family
+  // fixed the duplication but not the reading: on a three-tier check the one failure tier is a
+  // family of ONE and took the family's strongest tone, so the strip ran mid, dark, light — the
+  // darkest band in the MIDDLE, and the failure lighter than the first success. Walking one
+  // ramp across the whole list is what makes the strip read left-to-right as escalating.
+  //
+  // The ramp does not need to re-state the success/failure split, because the row beneath every
+  // band already does: each tier row carries a Success/Failure pill, and the boundary handles
+  // name both tiers. A colour is a weaker carrier of that fact than the words already on screen.
+  // ── PREVIEW AGAINST (issue 1096) ────────────────────────────────────────────────
+  //
+  // The record the bands are DRAWN against. It is the bands' own control and lives in
+  // their card; the rail's separate "Preview as" chooses an ACTOR and is issue 1097's.
+  // Two controls, two subjects, and conflating them is what left this one missing.
+  //
+  // NEVER PERSISTED: choosing a record to look at is not an edit to the system, and
+  // writing it into the check would make a GM's viewport a saved field every other GM
+  // then inherits.
+  //
+  // BUT NOT LOCAL EITHER, WHERE A ROUTE OWNS IT (issue 1097). The Checks Studio's rail now
+  // reads the SAME record — the outcome preview rolls against it and the odds histogram
+  // enumerates against it — so a second copy of the selection here would let the strip and
+  // the readout beside it describe different records on one screen. When the route supplies
+  // `previewRecords` its `previewRecordId` is the authority and this control reports upward;
+  // when it does not (the characterization mounts, any caller outside the Studio) the local
+  // fallback below keeps the control live rather than inert. Exactly one of the two is ever
+  // read, so there is no two-way binding to fall out of step.
+  //
+  // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute`, the one named gate
+  // this editor uses for all three anchored surfaces. A `routedByCheck + fixed` check's
+  // bands are absolute roll values that no recipe DC can move, so a control offering to
+  // re-anchor them would be a promise the model cannot keep. Every OTHER case shows it,
+  // including a fixed salvage or gathering check, which keeps its DC.
+  let localPreviewRecordId = $state('');
+  const recipeTiers = $derived(Array.isArray(value?.tiers) ? value.tiers : []);
+  const routeOwnsPreview = $derived(previewRecords.length > 0);
+
+  const previewAgainstOptions = $derived(
+    routeOwnsPreview
+      ? previewRecords
+      : [
+          {
+            id: '',
+            label: text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainstDefault',
+              'Default · DC {dc}'
+            ).replace('{dc}', String(Number(value?.dc ?? 0) || 0)),
+          },
+          ...recipeTiers.map((tier) => ({
+            id: tier.id,
+            label: `${tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier')} · ${text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')} ${Number(tier.dc ?? 0) || 0}`,
+          })),
+        ]
+  );
+  const showPreviewAgainst = $derived(!bandsAreAbsolute && previewAgainstOptions.length > 1);
+  const selectedPreviewRecordId = $derived(
+    routeOwnsPreview ? previewRecordId : localPreviewRecordId
+  );
+  const previewTier = $derived(
+    routeOwnsPreview ? null : recipeTiers.find((tier) => tier.id === localPreviewRecordId) || null
+  );
+  // The DC the relative bands are resolved against: the PREVIEWED RECORD's, falling back to
+  // the check's own default. A relative band's absolute position is a function of that
+  // number, which is exactly why the strip announces both readings — switching records moves
+  // every tick with no data change at all.
+  const previewDc = $derived.by(() => {
+    const supplied = Number(previewDcOverride);
+    if (routeOwnsPreview && Number.isFinite(supplied)) return supplied;
+    return previewTier ? Number(previewTier.dc ?? 0) || 0 : Number(value?.dc ?? 0) || 0;
+  });
+
+  function selectPreviewRecord(id) {
+    localPreviewRecordId = id;
+    onSelectPreviewRecord(id);
+  }
+
+  // The two segments of the per-tier outcome toggle. Hoisted rather than rebuilt per row:
+  // the option list is identical for every tier, and a per-row literal would be N copies
+  // of one contract for the duplication gate to count.
+  const outcomeSegments = $derived([
+    { value: 'success', fallback: successOnLabel, variant: 'success' },
+    { value: 'failure', fallback: successOffLabel, variant: 'danger' },
+  ]);
+
+  // The same shape for the `checkDriven`-only tool-breakage choice. `keep` is the benign
+  // option, so it takes the success tint and `break` takes danger.
+  const breakToolsSegments = $derived([
+    { value: 'keep', fallback: breakOffLabel, variant: 'success' },
+    { value: 'break', fallback: breakOnLabel, variant: 'danger' },
+  ]);
+
+  // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and it is mixed into an OPAQUE base for
+  // exactly that reason.
+  //
+  // Each band carries its tier's NAME at 0.72rem/600 — normal-size text, so WCAG AA wants
+  // 4.5:1 against whatever the band paints. An earlier ramp mixed into `--fab-surface-raised`,
+  // which is TRANSLUCENT in every theme, so the mix percentage doubled as an opacity: the fill
+  // lightened as the ramp climbed and the ink fell to 1.74:1. Mixed into `--fab-bg-0` the
+  // painted colour is a pure function of the theme's own tokens, independent of whatever the
+  // strip is stacked on, which is what makes any claim about it measurable at all.
+  //
+  // Each tone brings its OWN ink — `--fab-<tone>-text`, the ink each family already ships for
+  // its soft fill — rather than one `--fab-text` for the whole strip. That is what buys the
+  // headroom: a single ink forces every band to stay under one luminance ceiling, and it was
+  // that ceiling, not the hues, that held the previous ramp to a 4.64:1 floor. Measured across
+  // all five tones, all seven palettes and every band count, the floor is now 7.12:1
+  // (`hearth-herb`, danger) — see the AA gate in tests/components/manager-layout.test.js.
+  const BAND_TONES = ['danger', 'warning', 'success', 'info', 'accent'];
+  const BAND_TONE_MIX = 26;
+  const BAND_TONE_BASE = 'var(--fab-bg-0)';
+
+  /**
+   * The tone for the band at `position` of `count`, in value order.
+   *
+   * A single band takes the MIDDLE tone: with nothing to escalate against, an end of the ramp
+   * would be a claim about a tier list that has no shape.
+   *
+   * Counts above five reuse a tone — five stops cannot give six bands six hues — so a six-tier
+   * check paints two adjacent bands alike. That is the cost of the five-stop ramp and it is
+   * stated here rather than hidden; the tier rows below still name every tier.
+   */
+  function toneFor(position, count) {
+    if (count <= 1) return BAND_TONES[Math.floor(BAND_TONES.length / 2)];
+    return BAND_TONES[Math.round((position * (BAND_TONES.length - 1)) / (count - 1))];
+  }
+
+  function bandFill(tone) {
+    return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
+  }
+
+  const bandStripBands = $derived.by(() => {
+    const rows = outcomes.map((outcome, index) => ({
+      id: outcome.id,
+      index,
+      name: outcome.name,
+      success: outcome.success === true,
+      from: type === 'fixed' ? Number(outcome.start) : previewDc + Number(outcome.dc),
+      to: type === 'fixed' ? Number(outcome.end) : null,
+    }));
+    // Value order, which is the order the strip DRAWS in — not the authored order, which a GM
+    // listing Masterwork first has authored high-to-low. A plain object keyed by the authored
+    // index rather than a `Map`: `svelte/prefer-svelte-reactivity` rejects a mutable built-in
+    // `Map` inside a component, and nothing here needs reactivity.
+    const ordered = [...rows].sort(
+      (a, b) => (Number.isFinite(a.from) ? a.from : 0) - (Number.isFinite(b.from) ? b.from : 0)
+    );
+    const toneByIndex = {};
+    ordered.forEach((row, position) => {
+      toneByIndex[row.index] = toneFor(position, ordered.length);
+    });
+    return rows.map((row) => {
+      const tone = toneByIndex[row.index];
+      return {
+        ...row,
+        color: bandFill(tone),
+        ink: `var(--fab-${tone}-text)`,
+        swatch: `var(--fab-${tone})`,
+      };
+    });
+  });
+
+  // The key to the strip, on the tier ROW: the band's tone at FULL STRENGTH, as a dot. Without
+  // it the ramp is a pattern with no legend and no way to tell which row moved which band. The
+  // dot shows the undiluted tone rather than the band's 26% fill because it carries no text, so
+  // nothing about it is bounded by contrast — and a 12px pale mix would read as no colour.
+  const bandSwatchById = $derived(
+    Object.fromEntries(bandStripBands.map((band) => [band.id, band.swatch]))
+  );
+
+  /**
+   * Apply one boundary move. The strip has already resolved WHICH authored field(s) the
+   * handle writes and clamped the value against its neighbours; this only has to persist
+   * the patch it describes — including the FIXED case's coupled pair, which is written as
+   * one `emit` so a half-applied move can never be observed.
+   */
+  function applyBandStripChange(patch) {
+    if (patch?.binding === 'fixed') {
+      emit({
+        [outcomesKey]: outcomes.map((outcome, index) => {
+          if (index === patch.index) return { ...outcome, end: patch.end };
+          if (index === patch.nextIndex) return { ...outcome, start: patch.start };
+          return outcome;
+        }),
+      });
+      return;
+    }
+    if (patch?.binding === 'relative') {
+      emit({
+        [outcomesKey]: outcomes.map((outcome, index) =>
+          index === patch.index ? { ...outcome, dc: patch.dc } : outcome
+        ),
+      });
+    }
+  }
 </script>
 
 <div class="manager-checks-editor" data-crafting-check-editor>
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
-    </h3>
-    <RadioCardGroup
-      legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
-      legend="Check type"
-      options={TYPE_OPTIONS}
-      selectedValue={type}
-      groupName="crafting-check-type"
-      columns={2}
-      optionDataAttr="data-check-type-option"
-      onChange={setType}
-    />
-  </section>
+  <!-- Check type anchors the OUTCOME tiers (offsets from the recipe's DC, or absolute
+       value ranges), so it sits with them rather than with the roll. -->
+  {#if shows('outcomes')}
+    <section class="manager-inspector-card manager-checks-card" data-check-type-card>
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.TypeLead',
+              'How the outcome tiers are anchored. Both tier lists are kept, so switching never discards the other.'
+            )}
+          </p>
+        </div>
+      </div>
+      <div class="manager-checks-card-body">
+        <RadioCardGroup
+          legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
+          legend="Check type"
+          options={TYPE_OPTIONS}
+          selectedValue={type}
+          groupName="crafting-check-type"
+          columns={2}
+          optionDataAttr="data-check-type-option"
+          onChange={setType}
+        />
+      </div>
+    </section>
+  {/if}
 
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-    </h3>
-    <CheckFormulaFields
+  {#if shows('roll')}
+    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
+              'Rolled once per attempt.'
+            )}
+          </p>
+        </div>
+      </div>
+      <div class="manager-checks-card-body">
+        <CheckFormulaFields
+          rollFormula={value?.rollFormula || ''}
+          {appliedModifiers}
+          {modifierPolicy}
+          {recordNoun}
+          placeholder="1d20"
+          {foundrySystemId}
+          onChange={emit}
+        />
+      </div>
+    </section>
+
+    <!-- DIFFICULTY, in its own card (issue 1096), WITH its DC-source chooser. A routed
+         RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
+         one by construction and offering the number without its source was incoherent; the
+         engine already resolved this slot's base DC through the same
+         `_resolveSimpleCheckDc` path, so only the field was missing.
+
+         `bandsAreAbsolute` — routed + fixed — is the one state with no DC at all, and it is
+         the SAME named gate the tier list and `PREVIEW AGAINST` read rather than a fourth
+         spelling of the condition. -->
+    {#if !bandsAreAbsolute}
+      <CheckDifficultyCard
+        showDcSource
+        dc={value?.dc ?? 15}
+        thresholdMode={value?.thresholdMode || 'meet'}
+        dcMode={value?.dcMode || 'static'}
+        {recordNoun}
+        onChange={emit}
+      />
+    {/if}
+  {/if}
+
+  {#if shows('triggers')}
+    <CheckTriggers
+      value={value?.checkBreakage || null}
       rollFormula={value?.rollFormula || ''}
-      dc={value?.dc ?? 15}
-      thresholdMode={value?.thresholdMode || 'meet'}
-      showDc={!hideDc}
-      placeholder="1d20"
-      onChange={emit}
+      kind="routed"
+      outcomeOptions={breakageOutcomeOptions}
+      showBreakTools={checkDriven}
+      onChange={(checkBreakage) => emit({ checkBreakage })}
     />
-  </section>
+  {/if}
 
-  <CheckTriggers
-    value={value?.checkBreakage || null}
-    rollFormula={value?.rollFormula || ''}
-    kind="routed"
-    outcomeOptions={breakageOutcomeOptions}
-    showBreakTools={checkDriven}
-    onChange={(checkBreakage) => emit({ checkBreakage })}
-  />
-
-  {#if showTiers && type === 'relative'}
-    <section class="manager-inspector-card" data-routed-tiers>
+  <!-- The tier list renders under BOTH DC modes: the macro is handed the selected tier's DC
+       as its anchor and returns the final number, so the two COMPOSE rather than compete. -->
+  {#if showTiers && !bandsAreAbsolute && shows('roll')}
+    <!-- `manager-checks-card`, not the bare shared `.manager-inspector-card` shell — that
+         generic contract pads on TOP of `CheckRecipeTiers`' own card-body padding (issue
+         1096 follow-up), inset the tier rows past the Difficulty card's radio cards and
+         BASE DC / COMPARISON row above. `SimpleCraftingCheckEditor`'s `data-static-dc`
+         wrapper already carries both classes; this is that same contract. -->
+    <section class="manager-inspector-card manager-checks-card" data-routed-tiers>
       <CheckRecipeTiers
+        anchorsBands
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
         onChange={(tiers) => emit({ tiers })}
@@ -217,144 +545,262 @@
     </section>
   {/if}
 
-  <section class="manager-inspector-card">
-    <div class="manager-checks-card-head">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}
-      </h3>
-      <button type="button" class="manager-button" data-add-outcome onclick={addOutcome}>
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddOutcome', 'Add outcome')}</span>
-      </button>
-    </div>
+  {#if !bandsAreAbsolute && shows('roll') && value?.dcMode === 'dynamic'}
+    <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
+  {/if}
 
-    {#if outcomes.length === 0}
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes',
-          'No outcome tiers yet. Add the tiers this check routes results into.'
-        )}
-      </p>
-    {:else}
-      <div
-        class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? '' : 'is-no-break'}`}
-        role="table"
-        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}
-      >
-        <div class="manager-checks-outcome-head" role="row">
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span
-          >
-          {#if type === 'relative'}
-            <span role="columnheader">{dcLabel}</span>
-          {:else}
-            <span role="columnheader">{startLabel}</span>
-            <span role="columnheader">{endLabel}</span>
-          {/if}
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span
-          >
-          {#if checkDriven}
-            <span role="columnheader"
-              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span
-            >
-          {/if}
-          <span
-            role="columnheader"
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}
-          ></span>
+  {#if shows('outcomes')}
+    <!-- ONE card, as the prototype has it: the strip and the tier rows it draws are the
+         same subject, and splitting them into two cards put a card border between a band
+         and the row that moves it. -->
+    <section class="manager-inspector-card manager-checks-card" data-outcome-bands>
+      <!-- STACKED and full-width, like every other studio card head, on the maintainer's
+           instruction. It was `is-inline`, which sets the description on the title's line and
+           pushes it hard right; with the head action gone there is nothing on that line to
+           set it against, and a right-aligned sentence squeezed into the half-width the title
+           leaves reads as a caption for the title rather than as the card's lead.
+
+           The head action went with it: ONE add control, the full-width dashed one at the
+           foot of the list, which is where the list ends and where a new tier appears. -->
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsLead',
+              'Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.'
+            )}
+          </p>
         </div>
-
-        {#each outcomes as outcome, index (outcome.id)}
-          <div
-            class={`manager-checks-outcome-row ${rowInvalid(index) ? 'is-invalid' : ''}`}
-            role="row"
-            data-outcome-row={outcome.id}
-            data-outcome-id={outcome.id}
-          >
-            <input
-              data-outcome-name
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}
-              value={outcome.name || ''}
-              oninput={(event) => updateOutcome(outcome.id, { name: event.currentTarget.value })}
-            />
-
-            <!-- `fill` rather than the inline default: these are pinned 102px subgrid
-                 tracks beside a 36px name field, and an inline-flex island would leave the
-                 numeric columns a different height and width from every sibling on the row.
-                 `allowUnset` is deliberately absent — a tier threshold has no "unset"
-                 meaning, so 0 is the real value and is shown as 0.
-                 Every `data-*` hook goes through `inputProps` so it lands on the real
-                 `<input>`: on the wrapper it would resolve to a `<div>` and break both the
-                 mounted `.value` reads and Playwright's `fill()` / `inputValue()`. -->
-            {#if type === 'relative'}
-              <Stepper
-                fill
-                value={outcome.dc ?? 0}
-                {...stepperLabels(dcLabel)}
-                inputProps={{ 'data-outcome-dc': '' }}
-                onChange={(dc) => updateOutcome(outcome.id, { dc })}
-              />
-            {:else}
-              <Stepper
-                fill
-                value={outcome.start ?? 0}
-                {...stepperLabels(startLabel)}
-                inputProps={{ 'data-outcome-start': '' }}
-                onChange={(start) => updateOutcome(outcome.id, { start })}
-              />
-              <Stepper
-                fill
-                value={outcome.end ?? 0}
-                {...stepperLabels(endLabel)}
-                inputProps={{ 'data-outcome-end': '' }}
-                onChange={(end) => updateOutcome(outcome.id, { end })}
-              />
-            {/if}
-
-            <button
-              type="button"
-              class={`manager-checks-state-pill ${outcome.success === true ? 'is-positive' : 'is-negative'}`}
-              data-outcome-success
-              aria-pressed={outcome.success === true}
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-              onclick={() => updateOutcome(outcome.id, { success: !(outcome.success === true) })}
-            >
-              {outcome.success === true ? successOnLabel : successOffLabel}
-            </button>
-
-            {#if checkDriven}
-              <button
-                type="button"
-                class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}
-                data-outcome-break
-                aria-pressed={outcome.breakTools === true}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
-                  'Break tools'
-                )}
-                onclick={() =>
-                  updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
-              >
-                {outcome.breakTools === true ? breakOnLabel : breakOffLabel}
-              </button>
-            {/if}
-
-            <button
-              type="button"
-              class="manager-icon-button is-danger"
-              data-remove-outcome
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome',
-                'Remove outcome'
-              )}
-              onclick={() => removeOutcome(outcome.id)}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
-          </div>
-        {/each}
       </div>
-    {/if}
-  </section>
+      <div class="manager-checks-card-body is-roomy">
+        {#if showPreviewAgainst}
+          <div class="manager-checks-preview-against" data-preview-against>
+            <span class="manager-checks-preview-against-label" id="checks-preview-against-label">
+              {text('FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst', 'Preview against')}
+            </span>
+            <select
+              data-preview-against-select
+              aria-labelledby="checks-preview-against-label"
+              value={selectedPreviewRecordId}
+              onchange={(event) => selectPreviewRecord(event.currentTarget.value)}
+            >
+              {#each previewAgainstOptions as option (option.id)}
+                <option value={option.id}>{option.label}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+        <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS. Both rendered
+             unconditionally, and both say something FALSE when there are none: the strip
+             cannot resolve an empty set, so it fell back to "these tiers leave a gap or
+             overlap" about tiers that do not exist, and the hint invited a GM to drag a band
+             edge on a strip with no edges. The zero state's own sentence and its add control
+             are below, and they are the whole message that state has. -->
+        {#if outcomes.length > 0}
+          <ThresholdBandStrip
+            binding={type === 'fixed' ? 'fixed' : 'relative'}
+            bands={bandStripBands}
+            {previewDc}
+            {previewLabel}
+            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            boundaryLabel={(band, nextBand) =>
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
+                'Threshold between {from} and {to}'
+              )
+                .replace('{from}', band?.name || '')
+                .replace('{to}', nextBand?.name || '')}
+            fallbackNote={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
+              'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
+            )}
+            dataAttr="data-outcome-band-strip"
+            onChange={applyBandStripChange}
+          />
+          <p class="manager-muted" data-outcome-band-strip-hint>
+            <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
+                 about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
+                 separates it from the paragraphs of prose elsewhere on the screen. -->
+            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
+              'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
+            )}
+          </p>
+        {/if}
+
+        {#if outcomes.length === 0}
+          <p class="manager-muted" data-outcomes-empty>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes',
+              'No outcome tiers yet. Add the tiers this check routes results into.'
+            )}
+          </p>
+        {:else}
+          <!-- A FLEX LIST, not a subgrid table. There are no column headers, because every
+             control on the row states its own subject: the stepper carries the threshold
+             label as its accessible name, and the segmented toggle names both options. -->
+          <div
+            class="manager-checks-tier-list"
+            role="list"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle',
+              'Outcome tiers'
+            )}
+          >
+            {#each outcomes as outcome, index (outcome.id)}
+              <div
+                class={`manager-checks-tier-row ${rowInvalid(index) ? 'is-invalid' : ''}`}
+                role="listitem"
+                data-outcome-row={outcome.id}
+                data-outcome-id={outcome.id}
+              >
+                <!-- The KEY to the strip above: this row's band in that band's own tone. Not
+                   an icon and not a control — the row's accessible name comes from the Name
+                   field beside it, so this is decorative to a screen reader and the
+                   information it adds is the visual pairing sighted GMs need. -->
+                <span
+                  class="manager-checks-tier-swatch"
+                  data-outcome-swatch={outcome.id}
+                  style={`--fab-outcome-swatch: ${bandSwatchById[outcome.id] || 'var(--fab-surface-active)'};`}
+                  aria-hidden="true"
+                ></span>
+                <input
+                  class="manager-checks-tier-name"
+                  data-outcome-name
+                  aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}
+                  value={outcome.name || ''}
+                  oninput={(event) =>
+                    updateOutcome(outcome.id, { name: event.currentTarget.value })}
+                />
+
+                <!-- `fill` plus a WIDTH from the layout context, which is the one thing a
+                   layout context may take from this primitive. `allowUnset` is deliberately
+                   absent — a tier threshold has no "unset" meaning, so 0 is the real value
+                   and is shown as 0. Every `data-*` hook goes through `inputProps` so it
+                   lands on the real `<input>`: on the wrapper it would resolve to a `<div>`
+                   and break both the mounted `.value` reads and Playwright's `fill()`. -->
+                {#if type === 'relative'}
+                  <div class="manager-checks-tier-stepper">
+                    <Stepper
+                      fill
+                      value={outcome.dc ?? 0}
+                      {...stepperLabels(dcLabel)}
+                      inputProps={{ 'data-outcome-dc': '' }}
+                      onChange={(dc) => updateOutcome(outcome.id, { dc })}
+                    />
+                  </div>
+                {:else}
+                  <div class="manager-checks-tier-stepper is-narrow">
+                    <Stepper
+                      fill
+                      value={outcome.start ?? 0}
+                      {...stepperLabels(startLabel)}
+                      inputProps={{ 'data-outcome-start': '' }}
+                      onChange={(start) => updateOutcome(outcome.id, { start })}
+                    />
+                  </div>
+                  <div class="manager-checks-tier-stepper is-narrow">
+                    <Stepper
+                      fill
+                      value={outcome.end ?? 0}
+                      {...stepperLabels(endLabel)}
+                      inputProps={{ 'data-outcome-end': '' }}
+                      onChange={(end) => updateOutcome(outcome.id, { end })}
+                    />
+                  </div>
+                {/if}
+
+                <!-- A SEGMENTED TOGGLE, not a pill that swaps its own label. The click-in-place
+                   pill showed only the state the tier is IN, so a GM could not tell whether
+                   the word was a reading or the verb that would change it. -->
+                <SegmentedControl
+                  density="compact"
+                  options={outcomeSegments}
+                  value={outcome.success === true ? 'success' : 'failure'}
+                  groupName={`outcome-success-${outcome.id}`}
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess',
+                    'Success'
+                  )}
+                  dataAttr="data-outcome-success"
+                  optionDataAttr="data-outcome-success-option"
+                  onChange={(next) => updateOutcome(outcome.id, { success: next === 'success' })}
+                />
+
+                <!-- KEPT, and gated, on purpose. The prototype authors tool breakage on a
+                   TRIGGER, and `CheckTriggers` already ships that control here. But the
+                   MATCHED TIER's own `breakTools` is read by `checkRoll.js` when a routed
+                   check resolves, so under `checkDriven` this is the only authoring surface
+                   for a live engine field and deleting it would strand persisted data. Under
+                   the default `toolSpecific` authority the row is exactly the prototype's
+                   five elements. -->
+                {#if checkDriven}
+                  <SegmentedControl
+                    density="compact"
+                    options={breakToolsSegments}
+                    value={outcome.breakTools === true ? 'break' : 'keep'}
+                    groupName={`outcome-break-${outcome.id}`}
+                    ariaLabel={text(
+                      'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
+                      'Break tools'
+                    )}
+                    dataAttr="data-outcome-break"
+                    optionDataAttr="data-outcome-break-option"
+                    onChange={(next) => updateOutcome(outcome.id, { breakTools: next === 'break' })}
+                  />
+                {/if}
+
+                <ManagerButton
+                  role="danger"
+                  class="manager-checks-tier-remove"
+                  data-remove-outcome
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome',
+                    'Remove outcome'
+                  )}
+                  onclick={() => removeOutcome(outcome.id)}
+                >
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                </ManagerButton>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        <!-- OUTSIDE the `{#if}`, and that is the fix rather than the layout (issue 1097
+             follow-up, maintainer report). This control used to be the last child of
+             `.manager-checks-tier-list`, which only renders when there is at least one row —
+             so a check with ZERO outcome tiers displayed "No outcome tiers yet. Add the tiers
+             this check routes results into." and NOTHING to press. An instruction with no way
+             to follow it is a dead end, and it is the state every routed check starts in: a
+             fresh routed-by-check crafting check and an alchemy check switched to `tiered`
+             both land here with nothing authored.
+
+             Placed BENEATH the empty sentence, not beside it, because that is what the two
+             siblings in this same studio already do — `CheckRecipeTiers` and `CheckTriggers`
+             each close their `{#if}` and then render the dashed control as the next child, so
+             the action that grows the list sits where the list ends in both states. Its
+             `margin-top` is the list's own 6px gap, so the populated state is pixel-unchanged
+             by the move. -->
+        <ManagerButton
+          role="dashed"
+          class="manager-checks-outcome-add"
+          data-add-outcome-tier
+          onclick={addOutcome}
+        >
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.AddOutcomeTier',
+              'Add outcome tier'
+            )}</span
+          >
+        </ManagerButton>
+      </div>
+    </section>
+  {/if}
 </div>

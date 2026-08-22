@@ -240,9 +240,29 @@
 
      TWO SUPPORTED CONFIGURATIONS DO NOT PIN. Both are accepted, and neither is a
      regression — `origin/main` behaves identically in each:
-      - THE ESSENCE STUDIO. `EssenceBulkEditPanel` closes this shell and renders its delete
-        card as a SIBLING, so the shell does not span that rail's scrollable height and
-        Apply un-pins there.
+      - A STUDIO THAT RENDERS A SIBLING DELETE CARD. `EssenceBulkEditPanel` closes this shell
+        and renders its delete card AFTER it, so the shell does not span that rail's
+        scrollable height and Apply un-pins there. `ComponentBulkEditPanel` is the second
+        such studio (issue 1129) and un-pins for the identical reason; this is a shape, not
+        an Essence Studio quirk, so a third sibling-delete panel needs no new entry here.
+
+        WHAT IS STILL GUARANTEED, AND WHERE THE BOUND IS (issue 1132). "Un-pinned" is not
+        "unbounded". A sibling shortens `.fab-bulk-edit-panel`, which is this dock's
+        CONTAINING BLOCK, so at maximum scroll the dock clamps to the PANEL's padding-box
+        bottom instead of the rail's — measured at −142px on a staged recipe panel and −154px
+        on a component panel. That is a rhythm regression, not a reachability one: Apply never
+        leaves the scrollport, it merely stops being glued to the bottom edge. The requirement
+        that survives is therefore the reachability one — APPLY'S BORDER BOX STAYS WHOLLY
+        INSIDE THE SCROLLPORT AT EVERY SCROLL OFFSET — and it holds only WHILE THE SIBLING IS
+        SHORTER THAN THE SCROLLPORT. A taller sibling scrolls Apply off the TOP, which is
+        issue 1015's original symptom and is NOT accepted.
+
+        That is a gate, not prose: `tests/components/bulk-edit-dock-pinning.test.js` mounts a
+        real `BulkDeleteCard` after this shell and asserts exactly those two things, with the
+        shorter-than-scrollport bound asserted first so the case cannot go vacuous. Do not
+        move a delete card INSIDE this shell to "fix" the un-pin — placed after the dock it
+        would leave the dock stuck out of flow OVER the card at maximum scroll, and it would
+        contradict both studios' shipped layout.
       - A `fabricate-manager` CONTAINER AT 1120px OR NARROWER. There,
         `@container fabricate-manager (max-width: 1120px)` in `styles/fabricate.css` gives
         `.manager-body` `grid-auto-rows: max-content` + `overflow-y: auto`, so the BODY

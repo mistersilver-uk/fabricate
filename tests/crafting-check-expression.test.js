@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateNumericExpression } from '../src/systems/craftingModifierResolver.js';
+import { evaluateNumericExpression } from '../src/systems/checkModifierResolver.js';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -511,8 +511,8 @@ describe('stripRetiredModifierPlaceholder', () => {
 //
 // The shim lives in `craftingCheckExpression.js` and not in `checkRoll.js` for one
 // reason: the usability readers must call it, and `checkRoll.js` already imports FROM
-// `craftingModifierResolver.js`, so siting it there closes the cycle
-// `checkRoll.js -> craftingModifierResolver.js -> checkRoll.js`.
+// `checkModifierResolver.js`, so siting it there closes the cycle
+// `checkRoll.js -> checkModifierResolver.js -> checkRoll.js`.
 //
 // This is asserted on SOURCE TEXT because it cannot be asserted any other way. ESM live
 // bindings mean the cycle may resolve fine under `node --test` by hoisting luck, while the
@@ -534,7 +534,7 @@ describe('the retirement shim module placement (AF1)', () => {
 
   it('keeps both usability readers clear of the roll stack', () => {
     for (const reader of [
-      'src/systems/craftingModifierResolver.js',
+      'src/systems/checkModifierResolver.js',
       'src/systems/salvageCheckUsability.js',
     ]) {
       const imports = importsOf(sourceOf(reader));

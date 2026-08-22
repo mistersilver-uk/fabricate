@@ -27,6 +27,24 @@
  */
 
 /**
+ * The recommended downgrade action after an aborted migration pass.
+ *
+ * A complete sentence in each register rather than a template with a value interpolated into
+ * it, so the console guidance and the GM dialog cannot drift apart and neither can leak an
+ * internal token into a GM-facing string.
+ *
+ * @type {{promptKey: string, promptFallback: (version: string) => string,
+ *   consoleSentence: (version: string) => string}}
+ */
+export const DOWNGRADE_ADVICE = Object.freeze({
+  promptKey: 'FABRICATE.Migration.Recovery.Downgrade',
+  promptFallback: (version) =>
+    `Recommended: downgrade Fabricate to version ${version} to keep using your existing data without manual remediation.`,
+  consoleSentence: (version) =>
+    `downgrade Fabricate to version ${version} to continue using your existing data without manual remediation.`,
+});
+
+/**
  * Stable action keys for the two prompt buttons. `KEEP` is the default choice.
  * @type {{ KEEP: string, FIX_AND_RETRY: string }}
  */
@@ -114,11 +132,16 @@ export function buildMigrationRecoveryPrompt(
  * @returns {string}
  */
 function buildContent({ t, label, downgradeTarget, failures }) {
+  // Scoped to THIS PASS, deliberately. "A failed migration leaves your data unchanged" is not
+  // true in general: a NON-FATAL migration error is logged and the pass continues, so the next
+  // migration's success advances the version past the failed one and the pass writes. What is
+  // true here is narrower and still worth saying — the aborted pass returns before the first
+  // write, so nothing was persisted.
   const intro = `<p>${escapeHtml(
     t(
       'FABRICATE.Migration.Recovery.Intro',
       {},
-      'A Fabricate data migration could not complete. Your existing data has been kept unchanged.'
+      "A Fabricate data migration could not complete. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy."
     )
   )}</p>`;
 
@@ -130,9 +153,9 @@ function buildContent({ t, label, downgradeTarget, failures }) {
 
   const downgrade = `<p>${escapeHtml(
     t(
-      'FABRICATE.Migration.Recovery.Downgrade',
+      DOWNGRADE_ADVICE.promptKey,
       { version: downgradeTarget },
-      `Recommended: downgrade Fabricate to version ${downgradeTarget} to keep using your existing data without manual remediation.`
+      DOWNGRADE_ADVICE.promptFallback(downgradeTarget)
     )
   )}</p>`;
 

@@ -209,8 +209,14 @@ export const CHECK_MODIFIER_TERM_LABEL = 'Modifiers';
  * The term is SKIPPED rather than clamped or rounded: a check modifier is the GM's
  * arithmetic, and silently substituting a different number would be worse than
  * contributing nothing.
+ *
+ * EXPORTED for `checkModifierResolver.resolveModifierBounds` (issue 1095), which asks the
+ * same question of an authored `min`/`max`: a bound the grammar cannot express clamps the
+ * SUM into a value this function then refuses, dropping the whole term and with it every
+ * other modifier's contribution. Asking one function keeps the clamp and the emit from
+ * disagreeing about which numbers are expressible.
  */
-function isDecimalSafeTermValue(value) {
+export function isDecimalSafeTermValue(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return false;
   return !String(Math.abs(numeric)).includes('e');
@@ -241,4 +247,51 @@ export function appendCheckModifierTerm(
 ) {
   const terms = isDecimalSafeTermValue(value) ? [{ value: Number(value), label }] : [];
   return appendToolBonusTerms(formula, terms);
+}
+
+/**
+ * Append the ROLLING check modifiers to a formula, one flavoured term each
+ * (`1d20 + 2[Modifiers] + (1d4)[Modifiers]`), after {@link appendCheckModifierTerm} has
+ * appended the flat sum (issue 1118).
+ *
+ * ONE TERM PER ENTRY, where the flat modifiers collapse into one. A flat modifier's
+ * contribution is a number, so summing several of them loses nothing; a rolling one's is a
+ * distribution, and folding two of them into a single term would hide which entry each die
+ * came from on the chat card and in `roll.dice`. The split also contains a fault: a fragment
+ * this function refuses drops that entry alone, where a refused member of a summed term
+ * would take every other modifier with it.
+ *
+ * The fragments arrive ALREADY PARENTHESISED and already clamped by
+ * `checkModifierResolver.resolveCheckModifierContribution`, which is what makes appending
+ * safe: an authored expression may carry its own flavour (`1d4[fire]`), and
+ * `1d4[fire][Modifiers]` is a SYNTAX ERROR on 14.365 while `(1d4[fire])[Modifiers]` parses
+ * and rolls. This function therefore emits the fragment verbatim rather than re-wrapping or
+ * re-labelling it.
+ *
+ * The label is the same fixed ASCII literal the flat term carries — see
+ * {@link CHECK_MODIFIER_TERM_LABEL} — so a GM-authored modifier NAME can never be tokenized
+ * as a phantom die group by `parsePlainDiceGroups`. The dice in these terms are real dice
+ * the GM authored; that is exactly why a fake one from a label would be indistinguishable.
+ *
+ * @param {string} formula
+ * @param {string[]} fragments Clamped, parenthesised roll fragments in eligible order.
+ * @param {string} [label]
+ * @returns {string} The formula with one term appended per fragment, or the trimmed formula
+ *   unchanged when there are none.
+ */
+export function appendCheckModifierRollTerms(
+  formula,
+  fragments,
+  label = CHECK_MODIFIER_TERM_LABEL
+) {
+  const base = String(formula || '').trim();
+  if (!base) return base;
+  const suffix = sanitizeTermLabel(label);
+  let result = base;
+  for (const fragment of Array.isArray(fragments) ? fragments : []) {
+    const text = typeof fragment === 'string' ? fragment.trim() : '';
+    if (!text) continue;
+    result += ` + ${text}${suffix ? `[${suffix}]` : ''}`;
+  }
+  return result;
 }

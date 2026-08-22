@@ -277,7 +277,7 @@
                   >
                     {text(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty',
-                      'No realms yet. Create realms in the Travel tab first.'
+                      'No realms yet. Create them under World > Travel first \u2014 they are shared by every crafting system.'
                     )}
                   </p>
                 {:else}

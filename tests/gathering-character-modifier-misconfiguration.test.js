@@ -3,35 +3,37 @@ import assert from 'node:assert/strict';
 
 import { makeRichState, makeEngine, makeFakeActor, environment } from './helpers/gathering.js';
 
-function configFor({ entries = [], events = [] } = {}) {
+// The modifier library moved onto the crafting SYSTEM (issue 1117); the gathering config
+// no longer carries one, so `makeRichState({ modifiers })` builds it and returns `system`.
+function configFor({ events = [] } = {}) {
   return {
     systems: {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        characterModifiers: entries,
         events
       }
     }
   };
 }
 
-function environmentWithLibrary(service) {
+function environmentWithLibrary(service, system) {
   const composed = service.composeEnvironment({
     id: 'env-test',
     craftingSystemId: 'system-test',
     tasks: []
-  }, { id: 'system-test' });
+  }, system);
   composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
 test('missing library modifier aborts attempt with diagnostic', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [],
     rolls: [100],
     evaluateExpression: () => 0
   });
-  const env = environmentWithLibrary(service);
+  const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'gone', operator: '+' }] }] },
     environment: env,
@@ -46,12 +48,13 @@ test('missing library modifier aborts attempt with diagnostic', async () => {
 });
 
 test('min > max aborts attempt with diagnostic', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
     evaluateExpression: () => 1
   });
-  const env = environmentWithLibrary(service);
+  const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+', min: 5, max: 0 }] }] },
     environment: env,
@@ -62,12 +65,13 @@ test('min > max aborts attempt with diagnostic', async () => {
 });
 
 test('non-finite expression resolution aborts', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
     evaluateExpression: () => null
   });
-  const env = environmentWithLibrary(service);
+  const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }] }] },
     environment: env,
@@ -78,12 +82,13 @@ test('non-finite expression resolution aborts', async () => {
 });
 
 test('expression returning NaN aborts with CHARACTER_MODIFIER_NON_FINITE', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', label: 'Strength', expression: '@s' }] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
     evaluateExpression: () => Number.NaN
   });
-  const env = environmentWithLibrary(service);
+  const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }] }] },
     environment: env,
@@ -94,8 +99,9 @@ test('expression returning NaN aborts with CHARACTER_MODIFIER_NON_FINITE', async
 });
 
 test('aborted attempts do not consume nodes/stamina/attempt-limit', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [],
     rolls: [100],
     evaluateExpression: () => 0
   });

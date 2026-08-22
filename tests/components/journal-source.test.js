@@ -30,7 +30,9 @@ function resolveLangKey(key) {
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
     assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
-    assert.ok(rootSource.includes("tab.id === 'journal'"), 'branches on the journal tab');
+    // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
+    // and carries the bare tab id separately, so a Core branch reads the bare id.
+    assert.ok(rootSource.includes("tab.tabId === 'journal'"), 'branches on the journal tab');
     assert.ok(rootSource.includes('<JournalView {services} />'), 'renders JournalView with services');
     assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
   });
@@ -54,12 +56,28 @@ describe('JournalView layout + effects', () => {
     // Pin the reflow contract (container seam + narrow-width single-column
     // breakpoint), not the exact fr/minmax track literal — the column ratios are
     // tunable design details that should not break this wiring guard.
+    const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
+
     assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
     assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
     assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
     assert.ok(
-      viewSource.includes('@container fabricate-journal (max-width: 900px)'),
-      'reflows to a single column below the narrow breakpoint'
+      viewSource.includes(narrowBreakpoint),
+      'uses the shared reachable 960px narrow breakpoint'
+    );
+    assert.ok(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
+      'reflows to a single column at the narrow breakpoint'
+    );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column-left\s*\{\s*overflow:\s*visible;/,
+      'the stacked grid does not clip the first list header beneath the player bar'
+    );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column\s*\{\s*min-height:\s*220px;/,
+      'the stacked grid retains the 220px minimum despite desktop flex defaults'
     );
   });
 

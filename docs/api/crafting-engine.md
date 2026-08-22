@@ -47,7 +47,7 @@ When `craft()` is called, the engine:
 5. **Applies failure consumption policy.**
    If the check fails, consumes ingredients and/or applies tool breakage according to `craftingCheck.consumption` settings.
    By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`breakToolsOnFail: false`, renamed from the legacy `consumeCatalystsOnFail`).
-   See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
+   See [Failure consumption policy]({% link crafting-checks.md %}#failure-consumption-policy).
 6. **Resolves result groups.**
    Determines which result group(s) to create based on mode and check result.
 7. **Consumes ingredients.**
@@ -104,8 +104,14 @@ When an optional check has no roll formula to run, the engine treats it as a no-
 ### Dynamic DC Macro
 
 The simple pass/fail check can compute its DC from a macro instead of a static value.
-When `simple.dcMode` is `"dynamic"`, the engine runs the macro at `system.craftingCheck.simple.macroUuid` and uses its returned number as the DC.
-If the macro is absent or throws, the engine falls back to the static DC.
+Before the macro runs, Fabricate resolves an anchor DC: the recipe's selected difficulty tier's DC when `recipe.checkTierId` names a tier that still exists, and the check's configured static `dc` otherwise.
+When `simple.dcMode` is `"dynamic"`, the engine runs the macro at `system.craftingCheck.simple.macroUuid`, passes it that anchor DC, and uses the macro's returned number as the DC.
+If the macro is absent or throws, the engine falls back to the anchor DC.
+
+The routed check's `system.craftingCheck.routed` slot carries the same DC source chooser and DC macro, with the macro at `system.craftingCheck.routed.macroUuid`.
+It resolves through the same anchor-then-macro path the simple slot uses, so the anchor-DC prose above applies to it unchanged.
+A routed relative check's tier thresholds (`dc + outcome.dc`) shift with the resolved DC exactly as the simple check's DC does.
+A routed fixed check has no DC and does not offer the DC source chooser.
 This dynamic-DC macro is the only macro the crafting check still uses, and it only computes the DC.
 It never resolves the check outcome itself.
 
@@ -117,6 +123,7 @@ console.log('Fabricate Dynamic DC inputs', {
   craftingSystem: scope.craftingSystem,
   craftingActor: scope.craftingActor,
   candidateIngredientSet: scope.candidateIngredientSet,
+  anchorDc: scope.anchorDc,
 });
 
 return scope.candidateIngredientSet ? 17 : 15;
@@ -127,6 +134,7 @@ Use `scope` as the recommended payload identifier.
 `scope.craftingSystem` is the normalized crafting system object.
 `scope.craftingActor` is the crafting `Actor`.
 `scope.candidateIngredientSet` is the selected ingredient set, or `null` when no set is selected.
+`scope.anchorDc` is the anchor DC described above, resolved before the macro runs.
 
 Fabricate also provides `context` and `args` as aliases of the identical object.
 The aliases have object identity, so `scope === context && context === args` is `true`.
@@ -136,7 +144,7 @@ Fabricate provides none of those native locals.
 
 Fabricate evaluates `Number(result)` on the return value.
 When that number is finite, Fabricate truncates it to an integer and uses it as the DC.
-An absent Macro, a thrown error, or a non-finite result falls back to the configured static DC.
+An absent Macro, a thrown error, or a non-finite result all leave the anchor DC in force.
 
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available to the Macro.
 Fabricate directly evaluates the Script Macro command instead of calling native `Macro#execute`.

@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -16,11 +17,6 @@ let createActorBarStore;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
 
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
@@ -133,11 +129,18 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // formatter, which imports the foundryCalendar helpers.
     copyModule('src/ui/svelte/util/formatDuration.js');
     copyModule('src/systems/foundryCalendar.js');
+    // GatheringView routes its crafting-data subscription through the invalidation-domain
+    // taxonomy (issue 1078 part B1); omitting it HANGS this suite (# cancelled).
+    copyModule('src/systems/invalidationDomains.js');
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
+    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
+    // primitive `ui-integration/spec.md` names. A hand-rolled harness that omits it HANGS
+    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
+    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');

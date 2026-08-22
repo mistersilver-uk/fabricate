@@ -6,6 +6,10 @@ stats.html
 *.log
 .DS_Store
 .vscode/
+# JetBrains AIR agent scratch. The tool excludes this through its own file under AppData, which
+# only git can see -- so without an entry here every repo-level tool that walks the tree (the
+# Markdown gate among them) lints a developer's scratch plans and fails only on their machine.
+.air/
 *.zip
 # Foundry e2e: ignore runtime data but track world fixtures
 .foundry-e2e/worlds/*/data/
@@ -22,6 +26,15 @@ stats.html
 .foundry-e2e/cache/
 # Harvested Foundry window chrome for the View Lab (proprietary; never commit)
 /.foundry-chrome/
+# Class-2 benchmark run records: wall clock + heap + machine envelope (issue 1071).
+# Machine-DEPENDENT and never asserted, so they must not be committed — the committed,
+# machine-invariant half lives in benchmarks/baselines/ and is tracked.
+/.benchmarks/
+# Class-2 Foundry perf run records and Chrome traces (issue 1073). Wall clock and heap measured
+# inside a live Foundry: machine-, build- and browser-dependent, never asserted, never committed.
+# Kept apart from issue 1071's /.benchmarks/ on purpose — these two sets of numbers have DIFFERENT
+# comparability rules, and one directory would invite comparing across them.
+/.foundry-perf/
 # Assembled data directory for Docker mount (contains symlinks)
 .foundry-e2e/data/
 test-results/

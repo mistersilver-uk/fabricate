@@ -189,7 +189,14 @@ function bindModifierPickCap(dialog, maxPicks) {
  * row is a flex row, so an icon-less or value-less catalogue entry that omitted either
  * would collapse its gutter and misalign against its siblings.
  *
- * @param {{id?: string, label?: string, icon?: string, value?: unknown}} modifier
+ * THE CHIP PREFERS THE DESCRIPTOR'S OWN `display` (issue 1118). A check modifier may roll,
+ * and a rolling one's `value` is `null` while its `average` is a number the roll can never
+ * produce — a `1d4` chipped as `+2.5` would be a promise the dice cannot keep. The resolver
+ * builds `display` (`+1d4`, `+min(max(1d8, -1), 6)`, or the signed number for a flat entry)
+ * beside the resolution it describes, so the chip and the appended term are one derivation.
+ * {@link formatSigned} remains the fallback for a descriptor built before that field.
+ *
+ * @param {{id?: string, label?: string, icon?: string, value?: unknown, display?: unknown}} modifier
  * @param {{inputType: 'radio'|'checkbox', preSelected: Set<string>, unnamedLabel: string}} context
  * @returns {string}
  */
@@ -202,7 +209,11 @@ function renderModifierOption(modifier, { inputType, preSelected, unnamedLabel }
   // so an unnamed modifier would otherwise render as icon + chip only and announce as
   // bare "+3". Fall back to a localized placeholder name.
   const label = modifier?.label || unnamedLabel;
-  const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(modifier?.value))}</span>`;
+  const chipText =
+    typeof modifier?.display === 'string' && modifier.display !== ''
+      ? modifier.display
+      : formatSigned(modifier?.value);
+  const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(chipText)}</span>`;
   return (
     `<label class="fabricate-roll-prompt__modifier-option">` +
     `<input type="${inputType}" name="craftingModifier" value="${id}"${checked} />` +

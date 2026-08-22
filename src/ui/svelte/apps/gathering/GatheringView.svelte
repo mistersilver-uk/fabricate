@@ -19,6 +19,7 @@
     subscribeCraftingDataChange,
     subscribeGatheringDataChange,
   } from '../../util/foundryBridge.js';
+  import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -292,7 +293,23 @@
   // A GM editing/saving a crafting system can change the gathering tasks, tools, or
   // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
   // bridge (see subscribeCraftingDataChange).
-  $effect(() => subscribeCraftingDataChange(() => load(true)));
+  //
+  // Scoped to the FIVE invalidation domains the gathering listing depends on (issue 1078
+  // part B1). Three are its own content — system and realm names, component/tool definitions
+  // and access configuration — and two are there for something this view renders none of: the
+  // listing runs the SYSTEM-VALIDITY GATE, which hides a whole system's environments from a
+  // non-GM viewer on a missing routed/progressive/alchemy check formula (`resolution-config`)
+  // or an alchemy signature collision (`materials-and-yield`).
+  //
+  // Taken from the DERIVED transpose rather than listed here, so this view and the player shell
+  // cannot disagree about what `gathering` consumes. `held-inventory` is deliberately absent:
+  // the item subscription above is scoped to the SELECTED actor, which is narrower and correct,
+  // and adding the domain would double-subscribe this view to every item change.
+  $effect(() =>
+    subscribeCraftingDataChange(() => load(true), {
+      domains: STORE_DOMAINS[INVALIDATION_STORES.GATHERING],
+    })
+  );
 
   // Resource-node counts live on the environment and are written by the active GM —
   // including the depletion caused by THIS player's own attempt, which lands after
@@ -451,12 +468,14 @@
     color: var(--fab-text);
   }
 
-  /* Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable.
+     Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
      reflow into a single vertical stack so the view stays usable on a narrow
      window instead of overflowing or clipping the side columns. The grid scrolls
      vertically in this mode; each column gets a sensible minimum height so its
      content is not crushed. */
-  @container fabricate-gathering (max-width: 900px) {
+  @container fabricate-gathering (max-width: 960px) {
     .gathering-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);

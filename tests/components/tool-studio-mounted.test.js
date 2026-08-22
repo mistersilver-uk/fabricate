@@ -17,6 +17,9 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/config/flags.js',
     'src/models/Ingredient.js',
+    // Ingredient filters its payload through the shared omitted-when-default machinery
+    // (issue 1135). Same rule as every other entry here: omit it and the suite hangs.
+    'src/models/reconstructibleDefaults.js',
     'src/models/IngredientGroup.js',
     'src/models/Tool.js',
     'src/models/match/matchTypes.js',
@@ -35,6 +38,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
+    // so the engines and chat cards can reuse it too (issue 1119).
+    'src/models/toolDisplay.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
@@ -49,6 +55,10 @@ const harness = createMountedComponentHarness({
     // tab bar and the behavior preview all render it.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
+    // Studio header both render through it; an omission HANGS this suite rather than
+    // failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator

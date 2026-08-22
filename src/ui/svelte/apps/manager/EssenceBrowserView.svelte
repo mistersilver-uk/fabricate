@@ -56,6 +56,12 @@
     onSelectEssence = () => {},
     onEditEssence = () => {},
     onToggleEssenceEnabled = () => {},
+    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear is
+    // still this browser's — the selection is its state — but the FEEDBACK is not: emptying
+    // the selection unmounts the bulk panel and the Clear button that was pressed, so focus
+    // and the announcement have to be handled by something that outlives both. Optional, so
+    // a standalone mount still clears exactly as it did.
+    onSelectionCleared = null,
     browserState = $bindable(null),
   } = $props();
 
@@ -184,8 +190,11 @@
     ui.bulkSelectedEssenceIds = setEssenceSelection(bulkSelectedIds, model.filteredIds, true);
   }
 
+  // The write comes FIRST, so the owner's callback runs with Svelte's flush already queued
+  // ahead of the focus hop it schedules.
   function clearBulkSelection() {
     ui.bulkSelectedEssenceIds = new Set();
+    onSelectionCleared?.();
   }
 
   // The counts the model computes ARE rendered, on the control they describe. Each is how
@@ -247,8 +256,15 @@
 </script>
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
+       (issue 1157). Emptying the bulk selection unmounts the panel and the Clear that was
+       pressed, and the manager root puts the keyboard here: an inert element, so Space still
+       scrolls, with an accessible name that says where the GM now is and the whole selection
+       register one Tab away. The root addresses it through `data-essence-toolbar`. -->
   <section
     class="manager-toolbar manager-essence-toolbar"
+    tabindex="-1"
+    data-essence-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
     <div class="manager-essence-filter-row">

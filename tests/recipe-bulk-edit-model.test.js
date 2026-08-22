@@ -33,6 +33,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { resolveActiveCraftingCheckFormula } from '../src/systems/checkModifierResolver.js';
 import * as sharedSelection from '../src/utils/bulkSelectionModel.js';
 import { createRecipeBrowserState } from '../src/utils/recipeBrowserModel.js';
 import {
@@ -266,7 +267,8 @@ describe('recipe bulk edit model — countRecipeBookMembership', () => {
   // would disable Remove for a book the GM can see on every one of those rows.
   //
   // The rows below are what `_buildRecipeList` projects for such a system:
-  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which IS basis-aware.
+  // `recipeItemIds` comes from `recipeItemDefinitionsContaining` (`utils/recipeItemMembership.js`),
+  // which takes the basis as a parameter and is therefore basis-aware.
   // `tests/recipe-book-membership-basis.test.js` proves that projection against a real
   // legacy-basis store; this case proves the counter reads it rather than the definition.
   it('reads each row\'s basis-aware recipeItemIds, never a definition\'s own recipeIds', () => {
@@ -426,8 +428,20 @@ describe('recipe bulk edit model — describeRecipeCheckTierAxis', () => {
       reason: 'fixed',
     },
     {
-      why: 'an unrecognised mode is defensive, and reachable only by passing null directly',
+      // REACHABLE, and by an ordinary authoring choice: `resolveActiveCraftingCheckFormula`
+      // returns a `null` slot for an alchemy system at `alchemy.checkMode: 'none'`, which is
+      // a well-formed system. It must not be told its resolution mode is unrecognised.
+      why: 'this resolution mode rolls no crafting check at all',
       axis: { craftingCheckMode: null, craftingCheck: { simple: { tiers } }, tierOptions: tiers },
+      reason: 'noCheck',
+    },
+    {
+      why: 'a mode outside the canonical set is defensive, and reachable only by omission',
+      axis: {
+        craftingCheckMode: undefined,
+        craftingCheck: { simple: { tiers } },
+        tierOptions: tiers,
+      },
       reason: 'unrecognisedMode',
     },
     {
@@ -462,6 +476,29 @@ describe('recipe bulk edit model — describeRecipeCheckTierAxis', () => {
     // Open gate, no tiers — available is false, and the reason says which of the two it is.
     assert.equal(describeRecipeCheckTierAxis({ ...simple, tierOptions: [] }).available, false);
     assert.equal(describeRecipeCheckTierAxis({ ...routed, tierOptions: [] }).reason, 'noTiers');
+  });
+
+  // The reachability claim, taken from the REAL producer of `craftingCheckMode` rather than
+  // from a `null` this suite typed itself. If `resolveActiveCraftingCheckFormula` ever stops
+  // returning a `null` slot for alchemy-`none`, or the gate stops distinguishing it, this
+  // fails — which is the only way the JSDoc's "reachable" claim stays honest.
+  it('reports noCheck for the alchemy system the resolver gives a null slot', () => {
+    const system = {
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'none' },
+      craftingCheck: { simple: { dcMode: 'static', rollFormula: '1d20', tiers } },
+    };
+    const slot = resolveActiveCraftingCheckFormula(system).slot;
+    assert.equal(slot, null, 'alchemy at checkMode none rolls no check');
+    assert.deepEqual(
+      describeRecipeCheckTierAxis({
+        craftingCheck: system.craftingCheck,
+        craftingCheckMode: slot,
+        tierOptions: [],
+      }),
+      { available: false, reason: 'noCheck' },
+      'a well-formed system must never be told its resolution mode is unrecognised'
+    );
   });
 
   it('is total over malformed input rather than throwing at a browser render', () => {

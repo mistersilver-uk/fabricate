@@ -38,7 +38,7 @@ When `CraftingSystem.resolutionMode` changes:
 1. Delete all recipes in the system.
 2. Apply the same clean-up as mode change.
    This clean-up covers all three actor- and user-scoped stores keyed by the deleted system: crafting runs (both active and history) via the runs clean-up; learned-recipe flags via the learned-recipes clean-up; and per-user progressive-ordering and stale-reference preferences via the preferences clean-up.
-   For performance and reliability, once all recipes have been deleted this clean-up is performed as a single bulk pass across all actors per store, not a per-recipe sequential clean-up that fans out to one flag write per recipe per actor.
+   For performance and reliability, once all recipes have been deleted this clean-up is performed as a single bulk pass per store across the actors the deleting client may write, not a per-recipe sequential clean-up that fans out to one flag write per recipe per actor.
    Batching how the clean-up runs does not narrow which categories it covers.
    The deliberately-orphaned per-actor `discoveryProgress` flag remains out of scope.
 3. Remove the system from persisted settings.
@@ -48,10 +48,26 @@ When `CraftingSystem.resolutionMode` changes:
 
 ### Delete Recipe
 
+Deleting a recipe is a confirmed destructive record rewrite across recipe items and characters, not a silent orphaning.
+It has both a single-recipe and a SET form, and the two perform the same cascade.
+
 1. Remove recipe from persisted recipes.
 2. Remove run records referencing the recipe.
-3. Remove learned flags for that recipe from all actors.
+3. Remove learned flags for that recipe from the actors the deleting client may write.
 4. Remove recipe-specific UI preference data.
+5. Remove the deleted recipe's id from every recipe item definition whose `recipeIds[]` contained it, so no membership entry points at a recipe that no longer exists.
+   The basis is explicit rather than inferred: on a system whose `membershipResolvesByRecipeIds` marker is unset, membership resolves through the recipe's own legacy scalar and therefore dies with the recipe, so no definition is rewritten and none is left dangling.
+   The prune's WRITE neither sets that monotone marker nor consults it to decide what to rewrite — an unauthored, irreversible basis flip is not an acceptable side effect of a deletion the GM authored for another reason — while the basis-aware figure in clause 6 does read it, which is why clause 5 is a statement about the write and not about the capability.
+6. Both forms state their impact before the GM commits, and both report the same arithmetic: how many recipes will be deleted, how many recipe items will no longer contain them, and how many characters will lose the learned knowledge.
+   The recipe-item figure counts DISTINCT recipe items — two selected recipes in one recipe item is one recipe item — and it is basis-aware, so it may exceed the number of definitions the write actually rewrites.
+   The character figure counts DISTINCT actors resolved through the same writable-actor scope clause 3 cascades over.
+   It counts the actors THIS deletion makes forget something; clause 3's clean-up removes every learned entry naming a recipe that no longer exists, so on a world carrying pre-existing orphans it touches a superset of them.
+7. Deletion is WARNED, not BLOCKED: no recipe is refused or skipped on account of the recipe items containing it or the characters who have learned it.
+8. Every GM-initiated recipe deletion routes through one shared body, so the entry points cannot disagree about what deleting a recipe reaches.
+   Two paths are exempt and both are recorded on the leaf delete itself: deleting a whole crafting system, where the recipe items go with the system that holds them, and the compendium importer's orphan-prune phase, where the pack owns the whole definition set it has just written and the phase deliberately batches to a single recipes write.
+   An overwrite import that changes a system's resolution mode still cascades, transitively through the resolution-mode migration.
+9. A recipe item's `caps.learn.prerequisiteIds` and a teaser's `fragments[].recipeIds` are deliberately NOT pruned: both are authored content an unrelated delete must not silently rewrite, and the Required Knowledge gate fails open on a dangling prerequisite.
+   The accepted consequence is recorded rather than discovered later — because that gate SKIPS a dangling prerequisite rather than clearing it, a retained id re-arms if a keep-mode pack reinstall re-mints a recipe under the same id.
 
 ### Delete a Referenced Category or Tag
 
@@ -63,6 +79,7 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
 4. Deleting a referenced item tag strips the tag from the `tags` of every component carrying it, and from every recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, before the tag is dropped from the vocabulary.
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
+6. Reassigning every carrying component to `general`, and stripping a deleted tag from every carrying component, each persist as part of the single crafting-systems write that drops the vocabulary entry — never one write per carrying component.
 
 ### Delete Essence Definition
 
@@ -144,6 +161,8 @@ On recipe import:
    - non-conflicting recipes are imported,
    - conflicting recipes are rejected.
 2. If target system mode is `alchemy`, signature uniqueness collisions are treated as conflicts.
+   A recipe not yet held by the manager is evaluated as though it were already stored and enabled, so a collision an import would INTRODUCE is caught at import rather than only by the next reconciliation (see `data-models/spec.md` §Alchemy Signature Uniqueness).
+   Such a recipe is skipped and reported under its own conflict reason rather than throwing, and the recipes around it still import.
 3. The import operation must emit one aggregated conflict report at completion.
 4. The import operation must emit one terminal notification summary and must not emit per-recipe create or update notifications.
 
@@ -166,13 +185,13 @@ For systems in `alchemy` mode:
 - Remove run entries that reference missing recipe IDs.
 - Remove run entries for recipes in deleted systems.
 - Runs cleanup should be executed after every destructive operation and during startup migration.
-- During a Delete Crafting System operation this clean-up runs as one bulk pass per store across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass across the actors the deleting client may write, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Learned Recipes Clean-up
 
-- Remove learned entries for missing recipe IDs.
+- Remove learned entries for missing recipe IDs, from the actors the running client may write.
 - Keep valid learned entries even if the visibility mode changes.
-- During a Delete Crafting System operation this clean-up runs as one bulk pass across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass across those actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Preferences Clean-up
 
@@ -200,10 +219,14 @@ The action's stated purpose and its confirmation prompt must name description re
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives a five-key `{ recipes, systems, gatheringConfig, environments, gatheringParties }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, and `GATHERING_PARTIES` settings) and returns the transformed payload **or a subset of its keys**.
+- Each migration receives a six-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, and `CURRENCY_CONFIG` settings) and returns the transformed payload **or a subset of its keys**.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
+- A migration MUST NOT depend on corpus order.
+`data-models/spec.md` § Destructive Pass Safety already declares corpus order non-semantic; this states the consequence for migrations.
+A migration MUST derive nothing from record position, and any cross-record reconciliation MUST produce a set-equal result under permutation.
+A migration that accumulates references into a list MAY produce a permuted list; that list is a set and no consumer may depend on its order.
 - Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
 
 ### Startup Migration Flow
@@ -219,7 +242,7 @@ On module initialization (on the primary-GM client):
 2. Filter the migration registry for entries where `migration.version > migrationVersion` using numeric semver comparison.
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
-5. Read all five current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, and `fabricate.gatheringParties`.
+5. Read all six current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, and `fabricate.currencyConfig`.
 6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
 8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
@@ -230,10 +253,20 @@ On module initialization (on the primary-GM client):
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist each of the five settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`).
-13. Each of the five write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+12. Persist each of the six settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`).
+13. Each of the six write-on-change comparisons is independent, so an unchanged setting is never rewritten.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
+
+**The recipe writeback is ordered first.**
+The 0.6.0 migration writes `toolIds` onto recipes and the tool bodies onto systems, so a systems write issued after a failed recipes write leaves a dangling reference the re-run cannot reconstruct: the source fields have already been consumed.
+A tear in the recipes leg MUST therefore abandon the remaining writes rather than continue.
+The ordering exists to minimise the set of cross-setting states a tear can produce, not to protect the version: the version bump is unconditionally last in every ordering.
+
+**The corpus read and writeback MUST be error-contained.**
+The pass MUST contain a read or write failure, persist nothing further, leave `fabricate.migrationVersion` un-advanced, and report to the GM.
+It MUST NOT let the rejection escape the module's readiness callback: the hook dispatcher's error handling is synchronous, so a rejection from an asynchronous callback fires no error hook, shows no notification, and leaves the readiness promise unsettled with no managers constructed.
+A write-failure report MUST instruct a reload, because the migrations have already transformed the session's own setting values while nothing was persisted; a read failure MUST NOT, because it refuses before any migration runs.
 
 ### Per-Migration Error Handling
 
@@ -248,8 +281,13 @@ On module initialization (on the primary-GM client):
 
 When a migration pass aborts, Fabricate must provide explicit GM guidance:
 
-1. Print a clear console header: `Fabricate | Migration aborted. Existing data has been kept unchanged.`
-2. Print a recommended downgrade target version (`downgradeTo`) so the GM can continue using existing data without immediate manual remediation.
+1. Print a clear console header scoped to the pass that aborted: `Fabricate | Migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy.`
+The assurance states that THIS PASS persisted nothing.
+It MUST NOT be phrased as a claim that a failed migration leaves data unchanged — a non-fatal migration error is logged and the pass continues, advancing the version past the failed migration and writing — and MUST NOT be phrased so it reads as an assurance about the multi-setting writeback or a storage conversion, neither of which is all-or-nothing.
+It is a claim about STORED data: a setting's value is initialized once and handed back by reference, so an in-place migration transforms the session's own copy and a reload is what discards it.
+The assurance and the downgrade advice MUST be changed together and MUST NOT be split across revisions: "your data is unchanged" beside "downgrade to keep using it" reads as "safe to go back", when on a converted world the truth is "intact, and unreadable by the build you are going back to".
+2. Print a recommended downgrade action: downgrade to the recorded `downgradeTo` version to keep using the existing data without manual remediation.
+It MUST be a complete localized sentence rather than a template with a value interpolated into a GM-facing string, and the console guidance and the GM dialog MUST select it from the same source so the two cannot drift apart.
 3. Print explicit, per-document fix instructions for each failure:
    - document type (`recipe` or `craftingSystem`)
    - document ID/name
@@ -265,10 +303,11 @@ Because `migrationVersion` is unchanged on abort, the pending migrations re-run 
 
 The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry.
 The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The layout reaches both surfaces from the value the pass already resolved, never from a second read: a re-read at guidance time can report a layout a remote conversion moved mid-pass, and the message must describe the pass that just failed.
 
 ### Write-on-Change Persistence
 
-- Each of the five migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
+- Each of the six migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
 - On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
 - On aborted migration passes, `migrationVersion` is unchanged.
@@ -290,6 +329,12 @@ They are deprecated and must not be introduced for new fields.
 - During the transitional window, persisted settings MAY still include documented transitional aliases when written by runtime managers.
 This does not invalidate migration correctness.
 - Each migration entry in the registry should document which legacy aliases it retires from persisted data.
+- **Retiring an alias from the WRITE path requires no migration and no registry entry when its READ fallback is retained.**
+  Every normalizer in this codebase is an allowlist rebuild, so a key it stops emitting is dropped from a record the next time that record is saved: the persisted shape converges lazily with no pass over the world, and a record never re-saved keeps the alias and keeps being read through the fallback.
+  Such a change is not downgrade-lossy either — an older build reads the canonical field it always preferred — so it MUST NOT be declared `downgradeLosesData`, which would put a false loss warning in front of a GM at the Keep/Downgrade prompt.
+  The retirement of the Recipe flat `results` alias (issue 1087) is the worked example: no migration, no registry entry, no downgrade loss, and a permanent inbound shim (`data-models/spec.md § Write-Retired Aliases (Read Permanently)`).
+- The same holds for a payload that stops emitting a field whose absence its constructor rebuilds to the identical value: absence and the written default already mean the same thing, so there is nothing to migrate and nothing a downgrade can lose.
+  The obligation moves to the audit instead — a reader that distinguishes absent from the default is a defect the omission would expose, and it MUST be found before the field is omitted rather than after (`data-models/spec.md` requirement 18).
 - Cross-reference: full alias tables are maintained in `data-models/spec.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
 ### Resolution-Model Migration (Pre-Release)
@@ -445,7 +490,7 @@ A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satis
 ### Modifier Pick Cap Migration (`1.20.0`, `downgradeTo: '1.19.0'`, pure, clone-first, idempotent)
 
 Issue 1055 generalizes the crafting-check combination rule.
-`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules (`byRecipe`, `playerPicks`), which both SUM what was picked.
+`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks` — the third renamed `bySubject` by `1.22.0`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules, which both SUM what was picked.
 `resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED.
 The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`) reads and returns both the `craftingSystems` and `recipes` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload, so even a hypothetical throw would leave the pre-migration checkpoint untouched — and throws no `FatalMigrationError`.
 
@@ -453,12 +498,15 @@ The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`
    Every system already on that rule carries no cap, because the field did not exist when it was authored, so without this stamp the upgrade would silently widen each one from "pick one" to "pick everything" and jump its check-modifier scalar from `max(...)` to the full sum.
    The migration writes back the bound those systems always had, exactly once.
 2. **The other three rules are deliberately left absent, i.e. unlimited.** `addAll` and `highest` do not select at all, so a cap means nothing to them and stamping one would only leak a bound into any later switch to a selecting rule.
-   `byRecipe` ("Recipe picks") is the other selecting rule, but its historical behaviour was NOT single-pick: a recipe already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a recipe's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
+   `byRecipe` (renamed `bySubject` by `1.22.0`) is the other selecting rule, but its historical behaviour was NOT single-pick: a record already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a subject's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
    Unlimited is the only value that preserves them, and a GM who wants a bound can set one.
-3. **`byRecipe` is NOT mapped or retired, at either level.** It is a first-class combination rule — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` is valid data that must survive untouched.
+3. **`byRecipe` is NOT mapped or retired BY THIS MIGRATION, at either level — and that was the correct call for this release.** The rule was first-class then and had no activity-independent name — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` was valid data that had to survive untouched.
+   **The `1.22.0` *System Check-Modifier Catalogue Migration* below supersedes this deliberately, not by oversight** (issue 1095): once salvage and gathering select over the same catalogue the rule's label stopped being "Recipe picks", so the token is renamed to `bySubject` and `normalizeModifierPolicy` accepts the old spelling as a never-re-emitted READ alias.
+   `1.20.0` still leaves it alone: rewriting it here as well would make two gates answer differently about one field, and this one runs first.
 4. **The stamp is conditional on purpose.** It fires only where the cap is still unbounded (`resolveMaxModifierPicks` reports `Infinity`), so an authored cap always wins.
    That is what makes the migration idempotent under re-run without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so `lastRunVersion` is `0.0.0` and every migration runs on every lab build — an unconditional write would overwrite an authored cap and corrupt the exact frame that case exists to capture.
-5. **It does not seed a missing `craftingCheck` block.** `checkModifiers` lives inside `craftingCheck`, so a system without that block has no catalogue, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+5. **It does not seed a missing `craftingCheck` block.** At this point in the ladder the library still lives inside `craftingCheck` — `1.22.0` below moves it to `CraftingSystem.checkModifiers` and `1.23.0` merges that into `CraftingSystem.modifiers` — so a system without that block has no library, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+   **The reasoning survives the move unchanged**, and `1.22.0` follows it for salvage and gathering for the same reason: an absent selection normalizes to `addAll` with an empty id set, which is a no-op.
    Precedent: the *Progressive Reorder-Flag Retirement Migration* above makes the same call for the same reason — no storage churn for zero observable change.
 6. **The recipe payload is read and returned unchanged, on purpose.** Recipes are the other half of this feature's data, so returning them makes the deliberate no-op explicit rather than leaving a reader to wonder whether they were forgotten; the runner compares each setting's JSON against its pre-pass snapshot before writing, so an unchanged clone persists nothing.
    In particular a recipe's legacy `craftingModifier.policy` is NOT stripped here: the resolver no longer consults it, so it is inert, and leaving it on disk is what keeps the downgrade below lossless.
@@ -469,11 +517,11 @@ The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`
 
 **Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (`applyMaxModifierPicks`, shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the cap is a new field on an OLD schema version and its absence is orthogonal to the envelope version.
 An export bundle carries exactly one system, so the shared per-system transform is applied directly with no grouping.
-It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels.
+It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels by THIS transform (the `1.22.0` upcast, which runs after it, is what rewrites the token).
 
 **A recipe's picks are never destroyed by a cap.** Lowering `maxModifierPicks` below what a recipe already picked leaves that recipe's stored `craftingModifier.modifierIds` exactly where it was — only how many of them the resolver HONOURS changes, `resolveEligibleModifierIds` keeping the first N in authored order.
 Raising the cap again re-applies the rest immediately, with nothing to re-enter.
-Switching the system away from `byRecipe` likewise leaves every recipe's stored pick intact and simply stops consulting it.
+Switching the system away from the subject-selecting rule likewise leaves every recipe's stored pick intact and simply stops consulting it.
 The recipe editor's picker truncates its own seed to the cap and refuses an add at the cap, but that is a UI affordance layered on top of the resolver's truncation, never the invariant.
 
 ### Check-Modifier Placeholder Retirement Migration (`1.21.0`, `downgradeTo: '1.20.0'`, pure, clone-first, idempotent)
@@ -525,6 +573,178 @@ The per-system counts are discarded there on purpose: the GM notice reports what
 
 **The runtime shim is the fail-safe, not a second migration.** `stripRetiredModifierPlaceholder` (`src/utils/craftingCheckExpression.js`) removes any placeholder that survives — hand-edited, imported, or seeded by a fixture — at the head of `evaluateCheckRoll` and `resolveCheckFormulaDisplay`, and inside `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` BEFORE their emptiness test.
 Its rule is normative in `resolution-modes/spec.md` §Check Source.
+
+### System Check-Modifier Catalogue Migration (`1.22.0`, `downgradeTo: '1.21.0'`, pure, clone-first, idempotent)
+
+Issue 1095 lifts the check-modifier catalogue out of `craftingCheck` and up to the system, so salvage and gathering can select over the same entries, and renames the `byRecipe` combination rule to its activity-independent name `bySubject`.
+The `1.22.0` settings-data migration (`src/migration/migrateSystemCheckModifierCatalogue.js`) reads and returns the `craftingSystems` payload as pure, clone-first data — it mutates only its own clones, never the runner's payload — and throws no `FatalMigrationError`.
+
+1. **It moves an ARRAY-valued `craftingCheck.checkModifiers` to `CraftingSystem.checkModifiers` and deletes the old key.** The old key is deleted rather than aliased, so there is exactly one location and nothing to keep in sync.
+   The deletion is **conditional on the legacy value being an `Array`**, and deliberately so: a non-array value there is not a catalogue, so moving it is impossible and deleting it would be a REPAIR — this migration destroying data it has decided it cannot read, on the one code path where the GM has no surviving copy.
+   It is left exactly as authored instead, which also keeps the migration's no-throw guarantee resting on one rule ("a malformed system or check is skipped rather than repaired — normalization is the normalizer's job") rather than on an exception to it.
+2. **The move is GUARDED.** An authored system-level catalogue always wins and is never clobbered; an array-valued legacy key is still deleted, so a half-migrated system converges rather than carrying two catalogues that could disagree.
+   **A skipped non-array legacy value converges too, by a different route:** `_normalizeCraftingCheck` is an allowlist rebuild that no longer emits `checkModifiers` at all, so the residue is dropped the next time that system is saved, and nothing reads it in the meantime.
+   Convergence therefore does not depend on this migration deleting it.
+   The guard is also what makes the migration idempotent without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so every migration runs on every lab build, and `tests/view-lab/world/labContent.js` deliberately GOES ON authoring its catalogue at the OLD location so the lab build IS a live exercise of this transform and its frames render post-migration data.
+3. **It rewrites `craftingCheck.defaultModifierPolicy === 'byRecipe'` to `'bySubject'`**, independently of the move — a system may carry the rule with no catalogue at all, and the token must still stop being re-emitted.
+   `normalizeModifierPolicy` accepts `byRecipe` as a never-re-emitted READ alias, so a world that somehow misses this migration still behaves correctly; rewriting it here is what stops the alias becoming permanent.
+4. **It deliberately seeds NOTHING onto a salvage or gathering check that has no block**, matching the no-storage-churn decisions `migrateMaxModifierPicks` and the *Progressive Reorder-Flag Retirement Migration* already record: an absent selection normalizes to `addAll` with an empty id set, which resolves to a scalar of 0 and appends no term.
+5. **The per-system transform is SHARED with the export-payload upcast** (`applySystemCheckModifierCatalogue`), not reimplemented; `migrateExportPayload` applies it branch-independently, and AFTER the `1.21.0` transform, whose inert count reads the catalogue at its pre-move location.
+6. **Mutated setting key:** `craftingSystems`, and only it.
+7. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/main.js`) and is gated to the primary GM.
+   `_normalizeCraftingCheck` is an ALLOWLIST REBUILD that no longer emits `checkModifiers`, so had any save run first, the catalogue would have been DELETED rather than relocated — silently, with no error and no recoverable copy.
+8. **The downgrade LOSES the catalogue.** `1.21.0`'s `_normalizeCheckModifierConfig` is an allowlist that never saw a system-level `checkModifiers`, so a downgraded world drops it on the first read and every check modifier stops contributing to every roll until a GM re-authors it.
+   It is **the first entry in this registry whose downgrade is not lossless**, and the warning is carried in the registry entry's **`label` STRING** — the one string a GM ever reads about this migration, rendered by `migrationRecoveryPrompt` beside the very Downgrade button it is about.
+   A source comment would state the same fact to the wrong reader at the wrong moment.
+9. **A world upgraded but not yet re-saved has a stated GAP, and it is ACCEPTED rather than closed.** The migration is GM-gated and runs at init, so a PLAYER who loads the world before the primary GM's pass reads a system whose catalogue still sits at `craftingCheck.checkModifiers`; `buildCheckModifierContext` reads only `system.modifiers`, so that client resolves a scalar of `0` and appends no term.
+   There is deliberately NO runtime read alias for the old location, and the properties that make that acceptable are stated rather than assumed: the state **cannot be persisted** (a player writes no system settings), it **self-heals** the moment the GM's migration lands and `updateSetting` propagates, and it is **the same shape every earlier RELOCATING migration in this registry has** — none of them carries a read alias either.
+   It is deliberately **asymmetric with `1.21.0`**, which DOES carry a runtime backstop (`stripRetiredModifierPlaceholder`), and the asymmetry is the point: an unstripped `@craftingmod` makes a formula fail to roll AT ALL and is reachable from hand-edits, imports and fixtures that no migration ever sees, whereas an unrelocated catalogue only under-applies a bonus and is reachable only in the window before one GM-gated pass.
+
+### Unified Modifier Library Migration (`1.23.0`, `downgradeTo: '1.22.0'`, pure, clone-first, idempotent)
+
+Issue 1117 merges the TWO modifier libraries a crafting system authored into one.
+`CraftingSystem.checkModifiers` (put there by `1.22.0`) and `gatheringConfig.systems[systemId].characterModifiers` differed only in which optional fields each consumer honoured, and nothing in the domain distinguished them — "a named actor-driven expression" is one concept — so authoring it twice let a GM define Medicine as two unrelated records that could silently disagree.
+The `1.23.0` settings-data migration (`src/migration/migrateUnifyModifierLibraries.js`) reads and returns the `craftingSystems` and `gatheringConfig` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload — and throws no `FatalMigrationError`.
+
+**It is a NEW forward migration, not an amendment to `1.22.0`.** `1.22.0` is released and may already have run in a GM's world, so rewriting it would leave `migrationVersion` at `1.22.0` with the OLD transform applied and the new one unreachable.
+
+1. **It merges both libraries into `CraftingSystem.modifiers` and deletes BOTH old keys**, in ONE order: check entries first in their authored order, then gathering entries in theirs.
+   The check library's order was already meaningful to a rolled check, and appending is the only merge that preserves both source orders.
+2. **AN ID AUTHORED IN BOTH LIBRARIES IS RESOLVED DETERMINISTICALLY, never by last-write-wins.**
+   The CHECK entry keeps the id; the colliding gathering entry is re-keyed to `<id>-gathering`, then `<id>-gathering-2`, `-3`, … until one is free.
+   The rule is **"rename the side whose every reference is in scope"**, which is a fact about the data rather than a preference between the two libraries: the gathering library's ids are referenced only from `tasks[].dropRows[].characterModifiers[]`, `tasks[].staminaCostModifiers[]` and `events[].characterModifiers[]` — all inside the same `gatheringConfig` block this migration is already rewriting, so renaming it is a CLOSED rewrite — while the check library's ids are referenced from `Recipe.craftingModifier.modifierIds` in the separate `recipes` world setting, which this migration never sees.
+   The suffix search reads only the set of ids already taken, and entries are visited in their authored array order, so the output is a pure function of the input: re-running on the same world yields the same ids, and two GMs upgrading the same world land in the same place.
+3. **EVERY reference to a re-keyed entry is rewritten in the same pass.** A rename with a missed reference site is not a partial success — the row would name an id the library no longer carries, and the gathering runtime reports that as a misconfigured attempt.
+4. **The per-system collision COUNT is reported to the GM** through the transient `_unifiedModifierCollisions` field, which the runner captures for the one-time notice and strips before persisting.
+   A re-key is a visible rename in the authoring surface, so the GM is told which systems it happened in rather than discovering it.
+   A clean merge is silent.
+5. **A malformed legacy value is SKIPPED, not deleted**, the same call `1.22.0` makes and for the same reason: deleting a value the migration has decided it cannot read is a REPAIR, on the one code path where the GM has no surviving copy.
+   The allowlist rebuilds drop the residue on the next save anyway.
+6. **The merge is GUARDED.** An authored `CraftingSystem.modifiers` always wins and is never clobbered; the legacy keys are still retired, so a half-migrated system converges rather than carrying libraries that could disagree.
+   That is what makes the migration idempotent without relying on the version gate, and the View Lab depends on it directly: `tests/view-lab/world/labContent.js` deliberately goes on authoring BOTH libraries at their pre-migration locations — including a real id collision — so every lab build is a live exercise of this transform.
+7. **It seeds NOTHING onto a system carrying neither library**, matching the no-storage-churn decisions `1.22.0` and `migrateMaxModifierPicks` already record.
+8. **The per-system transform is SHARED with the export-payload upcast** (`applyUnifiedModifierLibrary`), not reimplemented; `migrateExportPayload` applies it branch-independently and AFTER `applySystemCheckModifierCatalogue`.
+   That order is **observable, not merely symmetrical**: a pre-`1.22.0` bundle carries its catalogue at `craftingCheck.checkModifiers` and this transform reads only the system-level key, so running it first would merge an empty catalogue and then retire it, silently dropping every check modifier in the bundle.
+9. **Mutated setting keys:** `craftingSystems` and `gatheringConfig`.
+10. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/main.js`) and is gated to the primary GM.
+    Both `CraftingSystemManager._normalizeModifierLibrary` and the gathering config normalizer are ALLOWLIST REBUILDS that no longer emit the old keys, so had any save run first, BOTH libraries would have been DELETED rather than merged — silently, with no error and no recoverable copy.
+11. **The downgrade LOSES BOTH libraries**, and is declared `downgradeLosesData: true` with the loss named in the registry entry's **`label` STRING** — the one string a GM ever reads about this migration, rendered by `migrationRecoveryPrompt` beside the very Downgrade button it is about.
+    `1.22.0`'s normalizers are allowlists that never saw `CraftingSystem.modifiers`, so a downgraded world drops the merged library on the first read: every check modifier stops contributing to every roll AND every gathering drop row, event and stamina cost loses the entry it references.
+    That is strictly more loss than `1.22.0`'s own lossy downgrade, which is why it is declared and named again rather than inherited.
+12. **The pre-save window is the same ACCEPTED gap `1.22.0` records**, with the same properties: a player loading the world before the primary GM's pass reads a system whose libraries still sit at their old keys, resolves a check-modifier scalar of `0`, and reports a gathering drop-row reference as missing; the state cannot be persisted by a player, self-heals when the GM's pass lands, and carries no runtime read alias for exactly the reasons `1.22.0` states.
+
+### Failure-Result Policy Seed Migration (`1.25.0`, `downgradeTo: '1.24.0'`, pure, clone-first, idempotent)
+
+Issue 1098 gives every activity check a `failureResultPolicy` whose normalize-on-read default is `perRecord` — a value that PERMITS a failed check to produce an authored failure result.
+The `1.25.0` settings-data migration (`src/migration/migrateSeedFailureResultPolicy.js`) writes `failureResultPolicy: 'never'` onto every `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` block that already exists on disk.
+
+1. **Its entire purpose is that NO UPGRADED WORLD CHANGES BEHAVIOUR**, and the hazard is concrete rather than theoretical.
+   A salvage component may legally persist a reserved `role: 'failure'` result group carrying results — `_normalizeSalvage` tolerates one whenever the Simple salvage check has an authored roll formula — and until this issue it awarded **nothing**, in every world, always.
+   Without the seed, the upgrade would silently turn it on and every failed salvage would start handing out loot the GM authored for a capability that did not exist.
+   Only NEWLY-CREATED systems get the `perRecord` default; the GM opts in deliberately, per activity, per system.
+2. **It seeds NOTHING onto a check block that does not exist**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `migrateRetireProgressiveAllowPlayerReorder` and the `1.22.0` catalogue migration already record.
+   An absent block has no authored failure output to award and no surface to observe the policy on; it picks up the read-time default the first time the GM authors that check, which is a system they are creating rather than one they are upgrading.
+3. **An already-present value always wins**, and the guard is key PRESENCE rather than validity: deciding the absent case is this migration's only job, so a value this build would normalize away is still not overwritten.
+   That is what makes it idempotent without relying on the version gate, and the View Lab depends on it directly — it boots the real runner over its fixtures with no `migrationVersion`, so every migration runs on every lab build.
+4. **The per-system transform is SHARED with the export-payload upcast** (`applySeededFailureResultPolicy`), applied branch-independently, so an imported bundle lands exactly where a migrated world does — and a bundle written by a post-1098 build already carries an authored policy, which the guard above is what stops a round trip from resetting.
+5. **It reports nothing and therefore adds no key to the runner's three return literals.** Unlike `1.21.0` it needs no GM notice, because its entire observable effect is that nothing observable changes.
+6. **Mutated setting key:** `craftingSystems`, and only it.
+7. **The runner's before-any-load ordering is load-bearing**, as it is for `1.22.0` and `1.23.0`: all three check normalizers are ALLOWLIST REBUILDS, so a save running first would emit the `perRecord` default onto every check — and this migration would then correctly decline to overwrite it, permanently locking in the very behaviour change it exists to prevent.
+8. **The downgrade is CLEAN, and is deliberately NOT declared `downgradeLosesData`.**
+   `1.24.0`'s normalizers do not emit `failureResultPolicy`, so the key is dropped on the next save — and since that release has no failure-result capability at all, nothing changes behaviourally.
+   It is the first entry since `1.21.0` of which that is true, and the rule `1.22.0` established is about naming a REAL loss in the label rather than about every entry claiming one.
+
+### Currency World-Scope Migration (`1.26.0`, `downgradeTo: '1.25.0'`, pure, non-mutating, idempotent)
+
+Issue 1278 moves the whole currency configuration — the coin ladder, the spend strategy, the selected provider and the GM macro set — off every crafting system's `requirements.currency` block and into the `currencyConfig` WORLD setting, leaving each system only `requirements.currency.enabled`.
+The `1.26.0` settings-data migration (`src/migration/migrateCurrencyToWorldScope.js`) reads the `craftingSystems` and `currencyConfig` payloads and returns both; it mutates neither input, and it throws no `FatalMigrationError` — every level is guarded, and a malformed system, requirements block or unit is SKIPPED rather than repaired, because repair is the normalizer's job.
+
+1. **Without it, every upgraded world silently loses its currency**, which is why it is not optional cleanup.
+   The reader (`getCurrencyRequirementConfig`) no longer looks at the system block at all, so an unmigrated world would present an empty ladder and every authored currency cost would stop resolving.
+2. **Units are UNION-MERGED across every system, keyed by unit `id`, first system wins a collision.**
+   The union is not arbitrary: recipe currency options (`match.unit`) and salvage currency requirements store unit **ids**, so a dropped unit orphans every reference to it and taking the union preserves the most references.
+   Keying by `id` rather than by label is what makes the merge reference-preserving at all.
+   On an id collision the earlier system's definition wins, because choosing either is arbitrary and "first" is at least deterministic and order-stable across re-runs.
+3. **The scalars cannot be unioned, so they are ADOPTED from the first system that had currency ENABLED.**
+   A system with currency switched off never configured `spendStrategy` / `providerId` / `macros` deliberately, so preferring an enabled system's choice is the one signal available.
+   If no system has currency enabled, the first system carrying any currency block supplies them, so a world where every system is switched off still keeps the strategy its GM configured rather than reverting to `actorProperty`; failing that, the normalizer's defaults apply.
+   The legacy `provider` / `systemAdapter` / `inventoryMode` inputs are carried across verbatim rather than resolved here, because the shared normalizer (`normalizeWorldCurrencyConfig`) already knows how to map them forward.
+4. **It is genuinely lossy when two systems disagree, and the label says so.**
+   Only one strategy, provider and macro set survives, so the registry entry's **`label` STRING** — the one string a GM ever reads about this migration — names that outcome and tells them to check World > Currency afterwards.
+5. **Every system's block is rewritten to `{ enabled }`, with no guard of its own.**
+   That leg needs none, because it is already idempotent: a system reduced to `{ enabled }` has nothing left to strip, and the transform returns such a system BY REFERENCE rather than rebuilding an equal copy, so the runner's per-setting change detection stays honest.
+6. **The world-config leg IS guarded, and the guard is load-bearing.**
+   Once the world ladder carries units it is authoritative and is never re-merged, because a second pass must not re-impose stale system blocks over a ladder the GM has since edited — they may have deliberately deleted a unit.
+7. **It seeds NOTHING onto a world that never used currency**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `1.22.0` and `1.25.0` already record.
+   When there was nothing to lift the migration returns the ORIGINAL stored object rather than a freshly-built `{ units: [] }`, because the runner detects change by JSON comparison and emitting the latter over a stored `{}` would register as a change and write the setting in every world that has never used currency — churn showing up as an unexplained write in an otherwise no-op upgrade.
+8. **The runner's before-any-load ordering is load-bearing**, and more sharply here than for `1.22.0`, `1.23.0` or `1.25.0`.
+   `CraftingSystemManager._normalizeCurrencyConfig` is now an ALLOWLIST REBUILD emitting `{ enabled }` and nothing else, so had any system save run before the pass, the ladder, strategy, provider and macros would have been DELETED rather than lifted — silently, with no error and no recoverable copy.
+9. **The transforms are SHARED with the export-payload upcast** (`buildWorldCurrencyConfig` and `stripSystemCurrencyConfig`), not reimplemented; `migrateExportPayload` applies them branch-independently.
+   An export carries one system, so the union degenerates there to that system's own ladder — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a unit is carried across.
+10. **Mutated setting keys:** `currencyConfig` (created) and `craftingSystems` (shrunk).
+    This is the migration that took the runner's payload from five settings to six; `currencyConfig` is read, snapshotted, passed, change-detected and written back exactly like the five that preceded it.
+11. **The `currencyConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 8's is.
+    Systems are the SOURCE of the lift and `currencyConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldCurrencyConfig` lifts nothing, and requirement 7's no-churn guard correctly declines to write — so the ladder, strategy, provider and macros are gone with no error and no recoverable copy.
+    Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world ladder, requirement 6's guard keeps it, and the shrink it re-applies is idempotent by construction.
+12. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+    `1.25.0` reads currency only from the crafting system, so a downgraded world would find no configuration at all and every authored currency cost would stop resolving until the GM re-authored it per system.
+    A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.26.0`, so the pass does not re-run, and `CraftingSystemManager._normalizeCurrencyConfig`'s allowlist rebuild discards the re-authored ladder on that system's next save.
+    The re-upgrade path is therefore re-authoring at World > Currency, not re-authoring per system.
+
+### Travel World-Scope Migration (`1.27.0`, `downgradeTo: '1.26.0'`, pure, non-mutating, idempotent)
+
+Issue 1282 moves the whole travel configuration — the realm library, the reveal mode, the modifier visibility and the Foundry Scene Region links nested inside each realm as `sceneMappings[]` — off every crafting system and into the `travelConfig` WORLD setting, leaving each system only `gatheringRealmSettings.enabled`.
+It also collapses each party's per-system realm override into one.
+The `1.27.0` settings-data migration (`src/migration/migrateTravelToWorldScope.js`) reads the `craftingSystems`, `gatheringParties` and `travelConfig` payloads and returns all three; it mutates none of them, and it throws no `FatalMigrationError` — every level is guarded, and a malformed system, party or realm is SKIPPED rather than repaired, because repair is the normalizer's job.
+
+1. **Without it, every upgraded world silently loses its realms**, which is why it is not optional cleanup.
+   No reader looks at the system block any more, so an unmigrated world would present an empty library, every environment's realm gating would stop resolving, and every Scene Region link would be gone.
+2. **Realms are UNION-MERGED across every system, keyed by realm `id`, first system wins a collision.**
+   The union is not arbitrary: environments (`includedRealmIds` / `excludedRealmIds`), party overrides and actor discovery flags all store realm **ids**, so a dropped realm orphans every reference to it and taking the union preserves the most references.
+   Keying by `id` rather than by name is what makes the merge reference-preserving at all, and is why two systems that both authored "Northreach Vale" keep both records rather than being silently fused.
+3. **A collision is REPORTED, never re-keyed.**
+   Ids are `randomID()`, so a collision can only arise from a hand edit or a copy-import that skipped id rebinding — but re-keying the loser would orphan every reference to it, which is the precise harm requirement 2 exists to prevent, so the first wins and the discarded copy is reported.
+4. **The scalars cannot be unioned, so they are ADOPTED from the first system that had travel ENABLED.**
+   A system with the toggle off never configured `revealMode` / `modifierVisibility` deliberately, so preferring an enabled system's choice is the one signal available.
+   If no system has travel enabled, the first system carrying any settings block supplies them, so a world where every system is switched off still keeps the reveal mode its GM configured rather than silently reverting to `manual` — which would start hiding realm names from players with no error anywhere.
+5. **Parties collapse to ONE override, keeping the entry with the highest `updatedAt`.**
+   A party is one set of tokens standing in one place, so a per-system map modelled it as being in several places at once.
+   Unlike `1.26.0`, which had to settle for "first wins because picking either is arbitrary", there is a real signal here: the most recent entry is the GM's latest statement of where the party is.
+   A `mode: "none"` entry records that the GM CLEARED the override for one system, which is not a statement about where the party is, so a real manual placement outranks a cleared one however recently it was cleared.
+6. **Environments are deliberately untouched.**
+   Under first-wins every realm id survives, so `includedRealmIds` / `excludedRealmIds` need no rewrite and adding one would be pure churn.
+   One consequence is worth naming: an environment citing a realm that belonged to a DIFFERENT system was previously invalid-but-inert, because validation ran only at save boundaries and only against the owning system.
+   It becomes valid and live, so it starts gating.
+   That is reachable only by hand edit or copy-import, but it is a real behaviour change on upgrade.
+7. **Every system's block is rewritten to `{ enabled }`, with no guard of its own.**
+   That leg needs none, because it is already idempotent: a system reduced to `{ enabled }` has nothing left to strip, and the transform returns such a system BY REFERENCE rather than rebuilding an equal copy, so the runner's per-setting change detection stays honest.
+   The legacy pre-`1.1.0` `gatheringRegions` and `gatheringRegionSettings` keys are dropped by the same leg, so they cannot resurrect the library.
+8. **The world-config leg IS guarded, and the guard is load-bearing.**
+   Once the world library carries realms it is authoritative and is never re-merged, because a second pass must not re-impose stale system blocks over a library the GM has since edited — they may have deliberately deleted a realm.
+   This is reachable in normal use: a legacy export re-imported over an already-migrated world resets the systems, because the import path does not re-run migrations inline.
+9. **It seeds NOTHING onto a world that never used travel**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `1.22.0`, `1.25.0` and `1.26.0` already record.
+   When there was nothing to lift the migration returns the ORIGINAL stored object rather than a freshly-built `{ realms: [] }`, because the runner detects change by JSON comparison and emitting the latter over a stored `{}` would register as a change and write the setting in every world that has never used travel.
+10. **The runner's before-any-load ordering is load-bearing**, in the same way requirement 8 of `1.26.0` is, and with more to lose.
+    `CraftingSystemManager._normalizeSystem` is an ALLOWLIST REBUILD that no longer emits `gatheringRealms` at all, so had any system save run before the pass, the whole library AND every `sceneMappings` entry would have been DELETED rather than lifted — silently, with no error and no recoverable copy.
+    This is also why the change lands as one atomic commit: the normalizer change and the migration cannot be separated by even one release.
+11. **The transforms are SHARED with the export-payload upcast** (`buildWorldTravelConfig` and `stripSystemTravelConfig`), not reimplemented; `migrateExportPayload` applies them branch-independently.
+    An export carries one system, so the union degenerates there to that system's own library — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a realm is carried across.
+12. **The actor discovery flag CANNOT be migrated here, and the reason is structural rather than a choice.**
+    The runner reaches two corpora and four world settings and has no actor access at all, so `flags.fabricate.discoveredGatheringRealms` is re-keyed LAZILY on read instead.
+    That is the same mechanism the `1.1.0` region-to-realm rename used, and it is specified in `data-models` (*Discovered Gathering Realms Flag*).
+13. **Mutated setting keys:** `travelConfig` (created), `craftingSystems` (shrunk) and `gatheringParties` (overrides collapsed).
+    This is the migration that took the runner's payload from six settings to seven; `travelConfig` is read, snapshotted, passed, change-detected and written back exactly like the six that preceded it.
+14. **The `travelConfig` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 11 of `1.26.0` is.
+    Systems are the SOURCE of the lift and `travelConfig` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Write the source first and a tear between the two destroys the configuration irrecoverably: `migrationVersion` stays behind, the re-run finds systems already reduced to `{ enabled }`, `buildWorldTravelConfig` lifts nothing, and requirement 9's no-churn guard correctly declines to write — so the library and every Scene Region link are gone with no error and no recoverable copy.
+    Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world library, requirement 8's guard keeps it, and the shrink it re-applies is idempotent by construction.
+15. **Each of those four legs is mutation-checked** — suppressing the payload read, the writeback, the writeback ORDER, or requirement 8's idempotence guard must each turn a test red.
+    A silent leg is the failure mode that destroys worlds, and it is not detectable by a green suite that never exercised the leg at all.
+16. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+    `1.26.0` reads realms only from the crafting system, so a downgraded world would find no library at all, every environment's realm gating would stop resolving, and every Scene Region link would need re-authoring per system.
+    A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.27.0`, so the pass does not re-run, and the allowlist rebuild discards the re-authored library on that system's next save.
+    The re-upgrade path is therefore re-authoring at World > Travel, not re-authoring per system.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 

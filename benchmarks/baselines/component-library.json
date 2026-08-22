@@ -1,0 +1,225 @@
+{
+  "profile": "component-library",
+  "harnessVersion": 2,
+  "seed": 1071,
+  "description": "THE COMPONENT-LIBRARY AXIS. 1,000 / 5,000 / 10,000 components as nested prefixes of ONE library, against a pinned 1,000-stack inventory (70% resolving to NO component) and a pinned 6-recipe corpus.",
+  "construction": "literal payloads; the listing cases hydrate the pinned 6-recipe corpus",
+  "requiresNodeModules": false,
+  "ceiling": "The inventory is pinned at 1,000 stacks and the corpus at 6 recipes BY DESIGN: this profile varies the library and nothing else, and its counterpart axes are held-inventory (items, pinned library) and simple-corpus (recipes, pinned library). Reading the three together is what makes cost = a*components + b*items two independent slopes rather than one aggregate number. Bounded at 10,000 components because the point is the SLOPE, and a third point already fixes it.",
+  "scale": {
+    "components": 10000,
+    "componentSeries": [
+      1000,
+      5000,
+      10000
+    ],
+    "recipes": 6,
+    "heldStacks": 1000,
+    "unmatchedRatio": 0.7,
+    "sourceActorCount": 2
+  },
+  "inventoryMix": [
+    {
+      "stacks": 1000,
+      "unmatched": 700,
+      "durable": 200,
+      "sourceRef": 100,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 2
+    }
+  ],
+  "checksums": {
+    "corpus": "5370ca89c2ec18a4",
+    "components": "b64ce194c23b564b",
+    "inventory": "561fbcd3aac327b9"
+  },
+  "cases": {
+    "craftingListing.buildListing.library@1000": {
+      "description": "The player crafting SUMMARY phase against this library size — the corpus-wide browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing varying across the series is component count.",
+      "counts": {
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 334,
+        "identityCandidatesExamined": 1300,
+        "identityIndexBuilds": 2,
+        "sourceActor0ItemsReads": 1,
+        "sourceActor0ItemsScanned": 333,
+        "sourceActor1ItemsReads": 1,
+        "sourceActor1ItemsScanned": 333,
+        "listedRecipes": 6,
+        "availableRecipes": 6
+      }
+    },
+    "inventoryListing.buildListing.library@1000": {
+      "description": "The Inventory tab open against this library size, same pinned inventory.",
+      "counts": {
+        "componentCandidatesExamined": 2000,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 668,
+        "identityCandidatesExamined": 1300,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 666,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 666,
+        "rows": 300,
+        "componentRows": 300
+      }
+    },
+    "craftingListing.buildRecipeDetail.library@1000": {
+      "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
+      "counts": {
+        "componentCandidatesExamined": 2000,
+        "craftingActorItemsReads": 4,
+        "craftingActorItemsScanned": 1336,
+        "identityCandidatesExamined": 6206,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 4,
+        "sourceActor0ItemsScanned": 1332,
+        "sourceActor1ItemsReads": 4,
+        "sourceActor1ItemsScanned": 1332,
+        "hydratedSets": 1,
+        "craftableSets": 1,
+        "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@1000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 1000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 1500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
+      }
+    },
+    "craftingListing.buildListing.library@5000": {
+      "description": "The player crafting SUMMARY phase against this library size — the corpus-wide browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing varying across the series is component count.",
+      "counts": {
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 334,
+        "identityCandidatesExamined": 5300,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 1,
+        "sourceActor0ItemsScanned": 333,
+        "sourceActor1ItemsReads": 1,
+        "sourceActor1ItemsScanned": 333,
+        "listedRecipes": 6,
+        "availableRecipes": 6
+      }
+    },
+    "inventoryListing.buildListing.library@5000": {
+      "description": "The Inventory tab open against this library size, same pinned inventory.",
+      "counts": {
+        "componentCandidatesExamined": 10000,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 668,
+        "identityCandidatesExamined": 5300,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 666,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 666,
+        "rows": 300,
+        "componentRows": 300
+      }
+    },
+    "craftingListing.buildRecipeDetail.library@5000": {
+      "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
+      "counts": {
+        "componentCandidatesExamined": 10000,
+        "craftingActorItemsReads": 4,
+        "craftingActorItemsScanned": 1336,
+        "identityCandidatesExamined": 10206,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 4,
+        "sourceActor0ItemsScanned": 1332,
+        "sourceActor1ItemsReads": 4,
+        "sourceActor1ItemsScanned": 1332,
+        "hydratedSets": 1,
+        "craftableSets": 1,
+        "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@5000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 5000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 5500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
+      }
+    },
+    "craftingListing.buildListing.library@10000": {
+      "description": "The player crafting SUMMARY phase against this library size — the corpus-wide browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing varying across the series is component count.",
+      "counts": {
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 334,
+        "identityCandidatesExamined": 10300,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 1,
+        "sourceActor0ItemsScanned": 333,
+        "sourceActor1ItemsReads": 1,
+        "sourceActor1ItemsScanned": 333,
+        "listedRecipes": 6,
+        "availableRecipes": 6
+      }
+    },
+    "inventoryListing.buildListing.library@10000": {
+      "description": "The Inventory tab open against this library size, same pinned inventory.",
+      "counts": {
+        "componentCandidatesExamined": 20000,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 668,
+        "identityCandidatesExamined": 10300,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 666,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 666,
+        "rows": 300,
+        "componentRows": 300
+      }
+    },
+    "craftingListing.buildRecipeDetail.library@10000": {
+      "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
+      "counts": {
+        "componentCandidatesExamined": 20000,
+        "craftingActorItemsReads": 4,
+        "craftingActorItemsScanned": 1336,
+        "identityCandidatesExamined": 15206,
+        "identityIndexBuilds": 1,
+        "sourceActor0ItemsReads": 4,
+        "sourceActor0ItemsScanned": 1332,
+        "sourceActor1ItemsReads": 4,
+        "sourceActor1ItemsScanned": 1332,
+        "hydratedSets": 1,
+        "craftableSets": 1,
+        "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@10000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 10000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 10500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
+      }
+    }
+  }
+}

@@ -9,18 +9,25 @@
  * deliberately outside the `npm test` glob: browser flake must never surface as `# cancelled`
  * in the main suite.
  *
- * A CHANGE TO THIS FILE SELECTS EVERY PUBLISHABLE CASE, and that is a decision rather than an
- * oversight (issue 1049). Two of the lab's other inputs are narrowed from their own diff — the case
- * registry per case literal, `labActors.js` per fixture table — and the obvious next move is to
- * narrow this one too, on the grounds that argument parsing and the step vocabulary cannot change a
- * pixel while the render path can. That distinction is not drawable from a diff of this module.
- * `runSteps`' verb table, `assertViewportFits`, the console-error gate, the readiness wait and the
- * `frame.screenshot()` call are interleaved here, and `commandApps` reads `process.argv` and drives
- * the render in the same function — so a region map over this file would have to cut through the
- * middle of a function, and a wrong cut fails in the silent direction: a run that photographs a
- * corpus its own driver just changed and publishes it as unaffected. The narrowings that do exist
- * are the ones whose regions are declarative data with a readership that can be read off the render
- * path; this file is neither.
+ * A CHANGE TO THIS FILE SELECTS SURFACE COVERAGE — one frame of every route and tab the lab
+ * renders, not one region of it — and that is a decision rather than an oversight (issue 1049).
+ * Three of the lab's other inputs are narrowed from their own diff — the case registry per case
+ * literal, `labActors.js` per fixture table, `mount.js` per marked region — and the obvious next
+ * move is to narrow this one too, on the grounds that argument parsing and the step vocabulary
+ * cannot change a pixel while the render path can. That distinction is not drawable from a diff of this module. `runSteps`' verb table,
+ * `assertViewportFits`, the console-error gate, the readiness wait and the `frame.screenshot()`
+ * call are interleaved here, and `commandApps` reads `process.argv` and drives the render in the
+ * same function — so a region map over this file would have to cut through the middle of a
+ * function, and a wrong cut fails in the silent direction: a run that photographs frames its own
+ * driver just changed and publishes them as unaffected. The narrowings that do exist are the ones
+ * whose regions are declarative data with a readership that can be read off the render path; this
+ * file is neither.
+ *
+ * Coverage rather than the whole corpus is the OTHER half of that decision (`LAB_SURFACE_CASES` in
+ * `scripts/lib/viewLabCases.js`). What a change to this driver has to prove is that the driver
+ * still drives: that both windows still mount, every route and tab is still reachable, and a frame
+ * is still written for every surface. Re-photographing all 246 states to establish that bought a
+ * twenty-five minute job and a wall of frames nobody read.
  *
  * Commands:
  *   chrome    capture the empty window chrome for every app - the fidelity baseline
@@ -44,6 +51,7 @@ import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCac
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
 import { publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
+import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -77,6 +85,14 @@ const TOLERATED_WARNINGS = [
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 const READY_TIMEOUT_MS = 20_000;
+// Playwright's default `page.goto` timeout is 30s, and that is NOT enough for the FIRST
+// navigation against a cold Vite server: the dep optimiser has to build the lab's whole
+// module graph before it serves anything, measured at ~90s in a fresh checkout. Every case
+// then failed at `page.goto` before rendering a pixel, which reads as "the View Lab is
+// broken" rather than "the server was still warming up" — it cost one round to diagnose.
+// Subsequent navigations are served from the warm cache and finish in well under a second,
+// so this ceiling only ever binds once per run.
+const NAVIGATION_TIMEOUT_MS = 150_000;
 
 /**
  * Vite is loaded through an indirect specifier so that neither a static nor a literal dynamic
@@ -125,6 +141,7 @@ async function startLabServer() {
  * 155-frame capture costs a whole run.
  */
 const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
+const PRESS_KEYS = ['Enter', 'Space'];
 
 /**
  * The verbs a `modifiers` step may NOT carry. `selectOption`, `fill`, `setInputFiles` and
@@ -133,7 +150,7 @@ const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
  * name. That is the failure class every other guard in this runner exists to prevent, so the
  * pairing is rejected rather than dropped.
  */
-const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll'];
+const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];
 
 /**
  * Drive a case to its named view state.
@@ -155,6 +172,7 @@ const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll'];
  *   { selector, fill: 'text' }         type into it, which is the only way to reach a dirty form
  *   { selector, scroll: true }         scroll it into view inside its own overflow container
  *   { selector, upload: json }         choose a file on a native file input
+ *   { selector, press: 'Enter' }       activate it with Enter or Space
  *
  * @param {import('playwright').Page} page The lab page.
  * @param {Array<string|object>} steps Ordered steps.
@@ -202,7 +220,7 @@ async function runSteps(page, steps, label, scratch) {
         }
       }
 
-      // Five verbs, because a click alone cannot reach every state the smoke photographs. The smoke
+      // Six verbs, because a click alone cannot reach every state the smoke photographs. The smoke
       // itself drives these surfaces with `selectOption` and `fill`; a click-only runner leaves those
       // states permanently out of reach no matter how many stable hooks exist, which is not a
       // fixture problem and cannot be solved by fixture work.
@@ -235,6 +253,14 @@ async function runSteps(page, steps, label, scratch) {
         // `.application` does NOT scroll nested overflow containers, so a card that never scrolled
         // into view is simply absent from the frame while every assertion still passes.
         await target.scrollIntoViewIfNeeded();
+      } else if ('press' in step) {
+        if (!PRESS_KEYS.includes(step.press)) {
+          throw new Error(
+            `${label}: step for "${step.selector}" names unknown key ${JSON.stringify(step.press)} — ` +
+              `press accepts ${PRESS_KEYS.join(', ')}`
+          );
+        }
+        await target.press(step.press);
       } else {
         await target.click(modifiers ? { modifiers } : {});
       }
@@ -272,12 +298,64 @@ function escapeForRegExp(value) {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
+/**
+ * Navigate a throwaway page once so Vite's dependency optimiser builds the lab's module
+ * graph BEFORE any case is timed. Measured at ~90s in a fresh checkout, against a
+ * Playwright default of 30s — so without this the first case fails at its readiness wait
+ * having rendered nothing, and the run reports the harness as broken.
+ *
+ * Deliberately swallows its own failure: this is a warm-up, not a check. If the server is
+ * genuinely unreachable the first real case will say so with its own, accurate message,
+ * and a warm-up that could abort the run would be a second thing to diagnose.
+ *
+ * @param {import('playwright').Browser} browser
+ * @param {string} baseUrl
+ * @returns {Promise<void>}
+ */
+async function warmUpLabServer(browser, baseUrl) {
+  const context = await browser.newContext(BROWSER_CONTEXT);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}${MOUNT_PATH}`, {
+      waitUntil: 'load',
+      timeout: NAVIGATION_TIMEOUT_MS,
+    });
+  } catch {
+    // Intentionally ignored — see above.
+  } finally {
+    await context.close();
+  }
+}
+
 async function renderPage(
   browser,
   baseUrl,
-  { appId, query, label, steps = [], expectView = null, expectTab = null, expectSelector = null }
+  {
+    appId,
+    query,
+    label,
+    steps = [],
+    expectView = null,
+    expectTab = null,
+    expectSelector = null,
+    expectLayout = null,
+    expectAttributes = [],
+    expectVisible = null,
+    expectContained = [],
+    expectCenterHit = null,
+    expectClick = null,
+    expectNoHorizontalOverflow = null,
+    expectOverflowY = null,
+    expectScrollable = null,
+  }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
+  // Every wait in this harness, not only the ones that name a timeout: against a COLD Vite
+  // server the dep optimiser rebuilds the lab's module graph before it serves anything, so
+  // the first case's readiness wait blows Playwright's 30s default long before the page is
+  // able to answer. Raising only `page.goto` moved the failure to `waitForFunction` rather
+  // than fixing it. A warm run never approaches this ceiling — see `warmUpLabServer`.
+  context.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
   const page = await context.newPage();
   // `mkdtemp` rather than a fixed name in `tmpdir()`: the old path was predictable, and a harness
   // that writes a predictable path in a shared directory is a symlink-swap away from writing
@@ -324,7 +402,10 @@ async function renderPage(
 
   try {
     const search = new URLSearchParams({ app: appId, ...query }).toString();
-    await page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, { waitUntil: 'load' });
+    await page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, {
+      waitUntil: 'load',
+      timeout: NAVIGATION_TIMEOUT_MS,
+    });
     // These two callbacks are serialized into the PAGE, not run here, so they reach for
     // `globalThis.document` - the Node lint scope has no `document` binding.
     await page.waitForFunction(
@@ -395,6 +476,107 @@ async function renderPage(
         );
       }
     }
+
+    for (const expectation of expectAttributes) {
+      const actual = await page.locator(expectation.selector).getAttribute(expectation.name);
+      if (actual !== expectation.value) {
+        throw new Error(
+          `${label}: expected ${expectation.selector} ${expectation.name}="${expectation.value}", got "${actual}".`
+        );
+      }
+    }
+
+    if (expectVisible) {
+      const visible = await page.locator(expectVisible).isVisible();
+      if (!visible) throw new Error(`${label}: expected ${expectVisible} to be visibly rendered.`);
+    }
+
+    for (const expectation of expectContained) {
+      const contained = await page.evaluate(({ container, target }) => {
+        const outer = globalThis.document.querySelector(container);
+        const inner = globalThis.document.querySelector(target);
+        if (!outer || !inner) return false;
+        const outerBox = outer.getBoundingClientRect();
+        const innerBox = inner.getBoundingClientRect();
+        return (
+          innerBox.width > 0 &&
+          innerBox.height > 0 &&
+          innerBox.left >= outerBox.left &&
+          innerBox.right <= outerBox.right &&
+          innerBox.top >= outerBox.top &&
+          innerBox.bottom <= outerBox.bottom
+        );
+      }, expectation);
+      if (!contained) {
+        throw new Error(
+          `${label}: ${expectation.target} is clipped or extends outside ${expectation.container}.`
+        );
+      }
+    }
+
+    if (expectCenterHit) {
+      const hit = await page.evaluate((selector) => {
+        const element = globalThis.document.querySelector(selector);
+        if (!element) return false;
+        const box = element.getBoundingClientRect();
+        const target = globalThis.document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2
+        );
+        return target === element || element.contains(target);
+      }, expectCenterHit);
+      if (!hit)
+        throw new Error(`${label}: ${expectCenterHit} does not own its centre pointer target.`);
+    }
+
+    if (expectClick) {
+      const clickTarget = page.locator(expectClick);
+      await clickTarget.evaluate((element) => {
+        element.dataset.viewLabPointerClicks = '0';
+        element.addEventListener('click', (event) => {
+          event.preventDefault();
+          element.dataset.viewLabPointerClicks = String(
+            Number(element.dataset.viewLabPointerClicks) + 1
+          );
+        });
+      });
+      await clickTarget.click();
+      const clicked = await clickTarget.evaluate((element) => {
+        return element.dataset.viewLabPointerClicks === '1';
+      });
+      if (!clicked) throw new Error(`${label}: ${expectClick} did not accept an actual click.`);
+    }
+
+    if (expectNoHorizontalOverflow) {
+      const selectors = Array.isArray(expectNoHorizontalOverflow)
+        ? expectNoHorizontalOverflow
+        : [expectNoHorizontalOverflow];
+      for (const selector of selectors) {
+        const overflows = await page
+          .locator(selector)
+          .evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+        if (overflows) throw new Error(`${label}: ${selector} overflows horizontally.`);
+      }
+    }
+
+    if (expectScrollable) {
+      const scrollable = await page.locator(expectScrollable).evaluate((element) => {
+        const style = globalThis.getComputedStyle(element);
+        return /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight;
+      });
+      if (!scrollable)
+        throw new Error(`${label}: ${expectScrollable} is not vertically scrollable.`);
+    }
+
+    if (expectOverflowY) {
+      const ownsVerticalOverflow = await page.locator(expectOverflowY).evaluate((element) => {
+        return /auto|scroll/.test(globalThis.getComputedStyle(element).overflowY);
+      });
+      if (!ownsVerticalOverflow)
+        throw new Error(`${label}: ${expectOverflowY} does not own vertical overflow.`);
+    }
+
+    await assertViewLabLayout(page, expectLayout, label);
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
@@ -621,8 +803,17 @@ async function commandApps() {
 
   const server = await startLabServer();
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+  // Pay Vite's cold dep-optimise ONCE, on a throwaway page, before any case is timed.
+  // Without it the first case absorbs a ~90s server build inside its own readiness wait and
+  // fails at whatever ceiling that wait happens to name — which reads as "the View Lab is
+  // broken" rather than "the server was still warming up", and cost a full round to
+  // diagnose. A warm server answers in well under a second, so this is a one-off cost, and
+  // a failure here is deliberately NOT fatal: it means the run proceeds and the first case
+  // reports the real error rather than this one.
+  await warmUpLabServer(browser, server.baseUrl);
   const rendered = [];
   const failures = [];
+  const distinctEvidence = new Map();
   try {
     for (const viewCase of cases) {
       try {
@@ -644,7 +835,30 @@ async function commandApps() {
           // query that produced the frame.
           expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
           expectSelector: viewCase.expectSelector ?? null,
+          expectLayout: viewCase.expectLayout ?? null,
+          expectAttributes: viewCase.expectAttributes ?? [],
+          expectVisible: viewCase.expectVisible ?? null,
+          expectContained: viewCase.expectContained ?? [],
+          expectCenterHit: viewCase.expectCenterHit ?? null,
+          expectClick: viewCase.expectClick ?? null,
+          expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
+          expectOverflowY: viewCase.expectOverflowY ?? null,
+          expectScrollable: viewCase.expectScrollable ?? null,
         });
+        if (viewCase.distinctEvidenceGroup) {
+          const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];
+          const duplicate = prior.find((entry) => entry.buffer.equals(buffer));
+          if (duplicate) {
+            throw new Error(
+              `evidence frame is byte-identical to ${duplicate.id} in distinct group ` +
+                `'${viewCase.distinctEvidenceGroup}'`
+            );
+          }
+          distinctEvidence.set(viewCase.distinctEvidenceGroup, [
+            ...prior,
+            { id: viewCase.id, buffer },
+          ]);
+        }
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({
           id: viewCase.id,

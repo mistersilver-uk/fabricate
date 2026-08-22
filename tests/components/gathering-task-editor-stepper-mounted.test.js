@@ -32,6 +32,14 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-task-stepper-',
   rawModules: [
+    // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
+    // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
+    'src/systems/checkModifierResolver.js',
+    'src/systems/salvageCheckUsability.js',
+    'src/utils/checkModifierPicks.js',
+    'src/systems/toolCheckBonus.js',
+    'src/utils/craftingCheckExpression.js',
+    'src/utils/rollExpressionAverage.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
@@ -46,6 +54,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
+    // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
+    'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/ModifierPillSelect.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,

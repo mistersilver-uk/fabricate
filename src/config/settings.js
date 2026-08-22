@@ -21,6 +21,19 @@ export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 export const SETTING_KEYS = Object.freeze({
   RECIPES: 'recipes',
   CRAFTING_SYSTEMS: 'craftingSystems',
+  // Issue 1278: the world-scoped currency configuration — the coin ladder, the spend
+  // strategy, the selected provider and the GM macro set. It is world scope because a
+  // world runs exactly ONE Foundry game system, so there is exactly one way actors store
+  // coins; two crafting systems cannot meaningfully disagree about how to read the same
+  // actor's purse. Each crafting system keeps only `requirements.currency.enabled`, which
+  // decides whether that system PARTICIPATES in the world's currency, not what it is.
+  CURRENCY_CONFIG: 'currencyConfig',
+  // Issue 1282: the world-scoped travel configuration — the realm library, the reveal mode and
+  // the modifier visibility. It is world scope because realms are GEOGRAPHY: the same valley is
+  // the same valley whichever crafting system a character is there to serve, so two systems
+  // cannot meaningfully disagree about where a party is standing. Each crafting system keeps
+  // only `gatheringRealmSettings.enabled`, which decides whether it PARTICIPATES.
+  TRAVEL_CONFIG: 'travelConfig',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -112,6 +125,20 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: Array,
     default: [],
+  },
+  [SETTING_KEYS.CURRENCY_CONFIG]: {
+    name: 'Currency Configuration',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.TRAVEL_CONFIG]: {
+    name: 'Travel Configuration',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
   },
   [SETTING_KEYS.GATHERING_ENVIRONMENTS]: {
     name: 'Gathering Environments',

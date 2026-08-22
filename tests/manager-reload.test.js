@@ -10,6 +10,7 @@ const env = installFoundryEnv();
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
+const { REVISION_SCOPES } = await import('../src/systems/revisionTokens.js');
 
 let idSeq = 0;
 function makeRecipeData(overrides = {}) {
@@ -68,17 +69,36 @@ describe('CraftingSystemManager.reload', () => {
     assert.equal(mgr.getSystem('s2')?.name, 'Beta');
   });
 
-  it('drops a removed system on reload', () => {
+  it('drops a removed system on reload, and advances only its scope', () => {
     env.settings.set(SETTING_KEYS.CRAFTING_SYSTEMS, [
       { id: 's1', name: 'Alpha' },
       { id: 's2', name: 'Beta' },
     ]);
     const mgr = new CraftingSystemManager(new RecipeManager());
     mgr.reload();
+    const before = {
+      s1: mgr.revision(REVISION_SCOPES.system('s1')),
+      s2: mgr.revision(REVISION_SCOPES.system('s2')),
+    };
+
     env.settings.set(SETTING_KEYS.CRAFTING_SYSTEMS, [{ id: 's1', name: 'Alpha' }]);
     assert.equal(mgr.reload(), true);
+
     assert.equal(mgr.getSystems().length, 1);
     assert.equal(mgr.getSystem('s2'), null);
+    // The delete leg of the narrow advance. `revisionTokens` names delete among the mutations
+    // that MUST advance the narrow scope, and asserting only the ids and the count leaves an
+    // advance that walked changed-and-added entries alone indistinguishable from a correct one.
+    assert.notEqual(
+      mgr.revision(REVISION_SCOPES.system('s2')),
+      before.s2,
+      'a consumer still holding a cache for the deleted system must stop trusting it'
+    );
+    assert.equal(
+      mgr.revision(REVISION_SCOPES.system('s1')),
+      before.s1,
+      'and the surviving system is untouched by its neighbour going away'
+    );
   });
 });
 

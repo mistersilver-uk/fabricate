@@ -413,6 +413,7 @@ export async function applyToolUsageAndBreakage({
     : await tool.evaluateBreakage({ actor, item, evaluateExpression });
   const entry = {
     componentId: tool.componentId,
+    toolId: tool.id ?? null,
     itemRef,
     mode: breakageResult.mode,
     broken: breakageResult.broken,
@@ -500,6 +501,7 @@ export function createToolBreakageRuntime({
           if (authority === 'checkDriven') {
             planned.push({
               componentId: model.componentId,
+              toolId: model.id ?? null,
               itemRef: null,
               mode: model.breakage?.mode ?? null,
               broken: false,
@@ -540,6 +542,7 @@ export function createToolBreakageRuntime({
         }
         const entry = {
           componentId: model.componentId,
+          toolId: model.id ?? null,
           itemRef,
           mode: breakageResult.mode,
           broken: breakageResult.broken,
@@ -591,6 +594,7 @@ export function createToolBreakageRuntime({
           if (authority === 'checkDriven') {
             evidence.push({
               componentId: tool.componentId,
+              toolId: tool.id ?? null,
               itemRef: null,
               mode: tool.breakage?.mode ?? null,
               broken: false,

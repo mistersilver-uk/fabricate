@@ -10,6 +10,7 @@ import {
   fakeSalvageRunManager,
   fakeRichStateService,
   fakeRecipeVisibilityService,
+  settingsStore,
 } from './helpers/craftingSystemDeleteHarness.js';
 
 // Three recipes belong to the system being deleted; one belongs to a system that
@@ -50,7 +51,7 @@ test('deleteSystem bulk-cleans learned-recipe flags in a single pass across all 
   globalThis.game = {
     user: { isGM: true },
     actors: [actorA, actorB],
-    settings: { get: () => '', set: async () => {} },
+    settings: settingsStore().accessors,
     fabricate: {
       getGatheringEnvironmentStore: () => fakeEnvironmentStore(calls),
       getGatheringRunManager: () => fakeGatheringRunManager(calls),
@@ -68,7 +69,6 @@ test('deleteSystem bulk-cleans learned-recipe flags in a single pass across all 
   manager.initialized = true;
   manager.save = async () => {};
   manager.systems.set('sys-delete', manager._normalizeSystem({ id: 'sys-delete', name: 'Bulk' }));
-
   await manager.deleteSystem('sys-delete');
 
   // Exactly ONE bulk learned-recipe pass, not one per deleted recipe.
@@ -120,7 +120,7 @@ test('deleteSystem survives a throwing learned-recipe cleanup and still tears do
     globalThis.game = {
       user: { isGM: true },
       actors: [{ id: 'actor-a', learned: { 'recipe-a': true } }],
-      settings: { get: () => '', set: async () => {} },
+      settings: settingsStore().accessors,
       fabricate: {
         getGatheringEnvironmentStore: () => fakeEnvironmentStore(calls),
         getGatheringRunManager: () => fakeGatheringRunManager(calls),
@@ -140,7 +140,6 @@ test('deleteSystem survives a throwing learned-recipe cleanup and still tears do
       'sys-delete',
       manager._normalizeSystem({ id: 'sys-delete', name: 'Resilient' })
     );
-
     await manager.deleteSystem('sys-delete');
 
     // The throw is caught and logged, not propagated.

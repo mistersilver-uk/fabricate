@@ -31,6 +31,8 @@ const panel = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/componentCategories.js',
     // The pure selection + staging model. Omitting it throws loudly in this shared
     // harness — the hand-rolled suites are the ones that hang instead.
@@ -53,6 +55,11 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+    // The set delete's arm/confirm control (issue 1129) and the shared card that now renders
+    // it (issue 1132). Both are STATIC imports of the component under test; omitting either
+    // HANGS this suite as `# cancelled` rather than failing it.
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
   ],
@@ -453,4 +460,274 @@ describe('ComponentBulkEditPanel section visibility (issue 772)', () => {
       );
     });
   }
+});
+
+// ── The armed set delete (issue 1129) ────────────────────────────────────────────────
+//
+// The panel does NOT compute the impact — it is handed one, because "how many recipes will be
+// disabled" depends on the whole selection against real recipe bodies (see
+// `adminStore.describeComponentDelete`). So these tests feed an impact literal and pin what
+// the GM is SHOWN and what the two clicks DO. The arithmetic itself is pinned in
+// `tests/component-delete-impact.test.js`.
+
+function deleteCard(root) {
+  return root.querySelector('[data-component-bulk-delete-card]');
+}
+
+function deleteButton(root) {
+  return deleteCard(root).querySelector('.manager-button.is-danger');
+}
+
+function impactRow(root, row) {
+  return deleteCard(root).querySelector(`[data-component-bulk-impact-row="${row}"]`);
+}
+
+function impactText(root, row) {
+  return impactRow(root, row).textContent.trim();
+}
+
+function impactOf(overrides = {}) {
+  return {
+    deletable: 3,
+    deletableIds: ['c1', 'c2', 'c3'],
+    recipesRewritten: 2,
+    recipesDisabled: 1,
+    ...overrides
+  };
+}
+
+/** Mount with the delete wiring the root supplies, recording what the confirm hands back. */
+async function mountWithDelete(props = {}) {
+  const calls = { armed: 0, disarmed: 0, deleted: [] };
+  const mounted = await mountPanel({
+    deleteImpact: impactOf(),
+    ...props,
+    onArmDelete: () => { calls.armed += 1; },
+    onDisarmDelete: () => { calls.disarmed += 1; },
+    onDelete: (ids) => { calls.deleted.push(ids); }
+  });
+  return { ...mounted, calls };
+}
+
+describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
+  it('states the impact BEFORE the action is armed', async () => {
+    const { root } = await mountWithDelete();
+
+    assert.ok(deleteCard(root), 'the delete card renders with the panel');
+    assert.equal(
+      deleteButton(root).getAttribute('data-armed'),
+      'false',
+      'the control starts unarmed'
+    );
+    // LITERAL, whole-row equality rather than "contains a number". A row asserted with
+    // `/2 recipes/` keeps passing after the sentence around the number changes meaning — and
+    // this card's whole job is the sentence, not the digit.
+    assert.equal(impactText(root, 'components'), '3 components will be deleted.');
+    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
+    assert.equal(
+      impactText(root, 'disabled'),
+      '1 of those recipes is enabled today and will be disabled.'
+    );
+  });
+
+  it('omits a ZERO row rather than stating "0 recipes will be rewritten"', async () => {
+    // The commonest selection there is: components no recipe names. Two noughts under one
+    // real fact is noise, and it buries the number the button acts on.
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ recipesRewritten: 0, recipesDisabled: 0 })
+    });
+
+    assert.equal(
+      impactText(root, 'components'),
+      '3 components will be deleted.',
+      'the components row is unconditional — the card must still state what the button does'
+    );
+    assert.ok(!impactRow(root, 'recipes'), 'no zero rewrite row');
+    assert.ok(!impactRow(root, 'disabled'), 'no zero disable row');
+    assert.ok(
+      !deleteCard(root).textContent.includes('0 '),
+      'and no stray zero anywhere in the card'
+    );
+  });
+
+  it('keeps the rewrite row when only the DISABLE count is zero', async () => {
+    // The two rows are gated independently: rewriting recipes without disabling any is the
+    // ordinary outcome, and gating them together would hide it.
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 0 })
+    });
+
+    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
+    assert.ok(!impactRow(root, 'disabled'), 'but nothing is disabled, so nothing says so');
+  });
+
+  it('associates the impact list with the button, and announces the arm', async () => {
+    // Proximity is not association: without `aria-describedby` a screen-reader user arriving
+    // at the control hears its name and nothing about the consequence, unless they happened
+    // to read the list on the way past.
+    const { root } = await mountWithDelete();
+    const described = deleteButton(root).getAttribute('aria-describedby');
+
+    assert.ok(described, 'the button names a description');
+    const list = deleteCard(root).querySelector(`#${described}`);
+    assert.ok(Boolean(list), 'and it resolves to an element inside the card');
+    assert.equal(list.getAttribute('data-component-bulk-impact'), '');
+
+    const live = deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
+    assert.ok(Boolean(live), 'the armed state has a live region');
+    assert.equal(live.getAttribute('aria-live'), 'polite');
+    assert.equal(live.textContent.trim(), '', 'which says nothing while the control is idle');
+  });
+
+  it('announces the consequence when the owner arms it, and the CANCELLATION on disarm', async () => {
+    const { root } = await mountWithDelete();
+    const live = () => deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
+
+    await panel.setProps({ deleteArmed: true });
+    flushSync();
+    assert.match(live().textContent, /3 component\(s\)/, 'it names what confirming would do');
+    assert.match(live().textContent, /again/i, 'and that a SECOND activation is the delete');
+
+    // Escape and click-away both disarm while the button still HOLDS FOCUS and change its
+    // accessible name under it — which is the whole reason this region exists. Emptying it
+    // announced nothing, so the one gesture that CANCELS a destructive action was the only
+    // one that said nothing at all (issue 1132, review round). The text still changes, so a
+    // re-arm is still announced.
+    await panel.setProps({ deleteArmed: false });
+    flushSync();
+    assert.equal(live().textContent.trim(), 'Delete cancelled. Nothing was deleted.');
+
+    await panel.setProps({ deleteArmed: true });
+    flushSync();
+    assert.match(live().textContent, /again/i, 'and a RE-arm still announces');
+  });
+
+  it('gives the ARMED control a name containing its visible label (WCAG 2.5.3)', async () => {
+    // A speech-input user says what they can read. "Confirm deleting 3 component(s)…" does
+    // not contain "Confirm delete", so the armed half of a destructive two-step control could
+    // not be activated by voice.
+    const { root } = await mountWithDelete({ deleteArmed: true });
+    const button = deleteButton(root);
+    const visible = button.querySelector('span').textContent.trim();
+
+    assert.equal(visible, 'Confirm delete');
+    assert.ok(
+      button.getAttribute('aria-label').startsWith(visible),
+      `"${button.getAttribute('aria-label')}" must open with "${visible}"`
+    );
+    assert.match(button.getAttribute('aria-label'), /3 component\(s\) and 2 recipe\(s\)/);
+    // It ENDS with the irreversibility, like its recipe sibling — the only one of the three
+    // that stated it. This panel carries no standing hint, so the armed accessible name is
+    // the only place a screen-reader user is told a component delete is permanent; essence
+    // remains the one outlier, deliberately left alone (issue 1132, review round 2).
+    assert.match(button.getAttribute('aria-label'), /cannot be undone/i);
+  });
+
+  it('reports three numbers that are three different questions', async () => {
+    // Deleting 5 components, rewriting 2 recipes, disabling 1 of those two: no number is
+    // derivable from another, and the disabled count is a SUBSET of the rewritten count.
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ deletable: 5, recipesRewritten: 2, recipesDisabled: 1 })
+    });
+
+    assert.match(impactText(root, 'components'), /5 components/);
+    assert.match(impactText(root, 'recipes'), /2 recipes/);
+    assert.match(impactText(root, 'disabled'), /^1 of those recipes/);
+  });
+
+  it('RECOMPUTES when the selection changes', async () => {
+    const { root } = await mountWithDelete();
+    assert.match(impactText(root, 'recipes'), /2 recipes will be rewritten/);
+
+    await panel.setProps({
+      deleteImpact: impactOf({ deletable: 1, deletableIds: ['c1'], recipesRewritten: 7, recipesDisabled: 0 })
+    });
+    flushSync();
+
+    assert.match(impactText(root, 'components'), /1 component will be deleted/);
+    assert.match(impactText(root, 'recipes'), /7 recipes will be rewritten/);
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const { root, calls } = await mountWithDelete();
+
+    deleteButton(root).click();
+    flushSync();
+    assert.equal(calls.armed, 1, 'the first click ARMS');
+    assert.equal(calls.deleted.length, 0, 'the first click writes NOTHING');
+
+    // The owner holds the armed token, so re-render with it set the way the root would.
+    await panel.setProps({ deleteArmed: true });
+    flushSync();
+    assert.equal(deleteButton(root).getAttribute('data-armed'), 'true');
+
+    deleteButton(root).click();
+    flushSync();
+    assert.deepEqual(calls.deleted, [['c1', 'c2', 'c3']], 'the second click deletes the SELECTION');
+  });
+
+  it('hands the confirm the impact ids rather than re-deriving them', async () => {
+    const { root, calls } = await mountWithDelete({
+      deleteImpact: impactOf({ deletable: 2, deletableIds: ['only-a', 'only-b'] }),
+      deleteArmed: true
+    });
+
+    deleteButton(root).click();
+    flushSync();
+    assert.deepEqual(calls.deleted, [['only-a', 'only-b']]);
+  });
+
+  it('states every number in the singular, not a bare plural after "1"', async () => {
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({
+        deletable: 1,
+        deletableIds: ['c1'],
+        recipesRewritten: 1,
+        recipesDisabled: 1
+      })
+    });
+
+    assert.match(impactText(root, 'components'), /^1 component will be deleted\./);
+    assert.match(impactText(root, 'recipes'), /^1 recipe will be rewritten\./);
+    assert.ok(
+      !impactText(root, 'components').includes('1 components'),
+      'never "1 components"'
+    );
+    assert.ok(!impactText(root, 'recipes').includes('1 recipes'), 'never "1 recipes"');
+    assert.match(deleteButton(root).textContent, /Delete 1 component(?!s)/);
+  });
+
+  it('is disabled when nothing is deletable, and while a delete is in flight', async () => {
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 })
+    });
+    assert.equal(deleteButton(root).disabled, true, 'nothing to delete');
+
+    await panel.setProps({ deleteImpact: impactOf(), deleting: true });
+    flushSync();
+    assert.equal(deleteButton(root).disabled, true, 'inert rather than double-writing');
+  });
+
+  it('is a real button rather than a dialog trigger', async () => {
+    // The carve-out that lets this arm INSTEAD of raising a confirmDialog is paired with the
+    // impact statement above; if the control ever became a dialog trigger the pairing would
+    // be silently pointless.
+    const { root } = await mountWithDelete();
+    const button = deleteButton(root);
+
+    assert.equal(button.tagName, 'BUTTON');
+    assert.equal(button.getAttribute('type'), 'button');
+    assert.equal(button.getAttribute('data-arm-token'), 'delete-components');
+    assert.ok(button.getAttribute('aria-label'), 'it carries the consequence sentence');
+  });
+
+  it('sits BELOW the panel shell, not inside its Apply card', async () => {
+    // A destructive action inside the shell would read as a second way of applying the
+    // staged edit.
+    const { root } = await mountWithDelete();
+    const shell = root.querySelector('[data-component-bulk-panel]');
+
+    assert.ok(shell, 'the shell renders');
+    assert.ok(!shell.contains(deleteCard(root)), 'the delete card is a sibling of the shell');
+  });
 });

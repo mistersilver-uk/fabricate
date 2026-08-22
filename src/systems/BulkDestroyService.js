@@ -37,6 +37,8 @@
  * so such a run fails when it resumes.
  */
 
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
+
 import { readStackQuantity } from './itemStackQuantity.js';
 
 /**
@@ -114,8 +116,7 @@ export class BulkDestroyService {
     const system = this.getCraftingSystem?.(target?.systemId) ?? null;
     if (!system) return buildRow(target, null, BULK_DESTROY_SKIP_REASONS.unknownSystem);
 
-    const component =
-      (system.components || []).find((entry) => entry?.id === target?.componentId) || null;
+    const component = findById(getDefinitionIndex(system.components), target?.componentId);
     if (!component) {
       return buildRow(target, null, BULK_DESTROY_SKIP_REASONS.unknownComponent);
     }

@@ -27,12 +27,19 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 
 // A recipe-manager mock that records migration calls. Recipes are plain JSON; the
 // `updateRecipe` path records the migrated `resultSelection` so tests can assert
-// the matrix outcome, and `deleteRecipe` records deletions.
+// the matrix outcome, and the delete paths record deletions.
+//
+// `deleteRecipes` is the batch primitive the mode migration routes through since issue
+// 1132, and this double is deliberately NOT looser than the real one: it skips an id that
+// resolves to no recipe (rather than deleting a phantom), returns the same
+// `{deleted, recipeIds, recipes}` shape, and counts its own single flag pass so a
+// per-recipe fan-out regression is visible here.
 function makeRecipeManager(recipes = []) {
   let mutableRecipes = recipes.map((r) => ({ ...r }));
   const deleted = [];
   const updated = [];
   let signatureChecks = 0;
+  let flagPasses = 0;
 
   return {
     getRecipes(filters = {}) {
@@ -40,6 +47,9 @@ function makeRecipeManager(recipes = []) {
         return mutableRecipes.filter((recipe) => recipe.craftingSystemId === filters.craftingSystemId);
       }
       return mutableRecipes;
+    },
+    getRecipe(recipeId) {
+      return mutableRecipes.find((recipe) => recipe.id === recipeId) || null;
     },
     async updateRecipe(recipeId, updates) {
       updated.push({ recipeId, updates });
@@ -51,11 +61,27 @@ function makeRecipeManager(recipes = []) {
       deleted.push(recipeId);
       mutableRecipes = mutableRecipes.filter((recipe) => recipe.id !== recipeId);
     },
+    async deleteRecipes(recipeIds) {
+      const resolved = [...recipeIds].filter((id) =>
+        mutableRecipes.some((recipe) => recipe.id === id)
+      );
+      const removed = mutableRecipes.filter((recipe) => resolved.includes(recipe.id));
+      deleted.push(...resolved);
+      mutableRecipes = mutableRecipes.filter((recipe) => !resolved.includes(recipe.id));
+      return { deleted: resolved.length, recipeIds: resolved, recipes: removed };
+    },
+    async cleanupOrphanedRecipeFlags() {
+      flagPasses += 1;
+    },
     async disableSignatureConflicts() {
       signatureChecks += 1;
       return [];
     },
     _notifyRecipesChanged() {},
+    notifyRecipesChanged() {},
+    getFlagCleanupPassCount() {
+      return flagPasses;
+    },
     getDeletedRecipeIds() {
       return [...deleted];
     },
@@ -390,7 +416,7 @@ test('out of routedByIngredients does NOT clobber an already-authored routed slo
   assert.equal(check.routed.dc, 25);
 });
 
-test('a dynamic-DC simple check moved into routedByCheck loses its dynamic DC (routed has no dcMode)', async () => {
+test('a dynamic-DC simple check moved into routedByCheck KEEPS its dynamic DC (issue 1096)', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
@@ -407,10 +433,11 @@ test('a dynamic-DC simple check moved into routedByCheck loses its dynamic DC (r
 
   const routed = manager.getSystem('sys-1').craftingCheck.routed;
   assert.equal(routed.rollFormula, '1d20');
-  // The routed slot carries no dcMode/macroUuid; the dynamic DC is lost and the
-  // copied static routed.dc is whatever lingered in the simple slot (13 here).
-  assert.equal('dcMode' in routed, false, 'routed slot has no dcMode');
-  assert.equal(routed.dc, 13, 'copied static DC lingers from the simple slot (GM should re-author)');
+  // The routed slot carries dcMode/macroUuid now (issue 1096), so the move no longer
+  // silently reverts a dynamic check to whatever static DC lingered in the simple slot.
+  assert.equal(routed.dcMode, 'dynamic', 'the DC source travels with the formula');
+  assert.equal(routed.macroUuid, 'Macro.abc', 'the macro link travels with it');
+  assert.equal(routed.dc, 13, 'the static DC still travels, as the anchor the macro receives');
 });
 
 test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check config', async () => {
