@@ -1258,6 +1258,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // Only a CAPPED book consumes learn budget, so only a capped book can
         // release any on erase.
         sourceCapped: sourceCaps?.learn?.limitLearning === true,
+        // The GM-grant pair (issue 1289), carried RAW and uncoerced. This literal is a
+        // hand-built allowlist, so a field it does not name never reaches
+        // `learnedRecipeSource` at all — both must be here or neither rung can render.
+        // They are deliberately not defaulted: the ladder tests `granted === true` and
+        // `typeof grantedBy === 'string'` strictly, and a `String(...)`/`|| ''` here
+        // would coerce a hostile value into a plausible-looking one before it got there.
+        granted: entry?.granted,
+        grantedBy: entry?.grantedBy,
       });
     }
     return { learnedRecipes, otherSystemCount, orphanCount };
