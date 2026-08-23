@@ -82,6 +82,14 @@ function documentLabel(document) {
  * say) indistinguishable from a craft-time auto-learn entry, and rendering as "Learned by
  * crafting" is precisely the false provenance this member exists to remove.
  *
+ * `granted` COLLIDES BY NAME with `evaluateKnowledgeAccess`'s own `granted`, and the two are
+ * unrelated. That one is an access DECISION computed per viewer per evaluation — "may this
+ * reader craft this recipe right now" — and is never persisted; this one is a PERSISTED fact
+ * about how an entry came to exist, read only by the GM Knowledge surface's source ladder.
+ * They meet in no expression, but they do appear in adjacent code, so a reader who assumes
+ * `knowledge.granted` and `entry.granted` are the same field is reading two different
+ * questions as one.
+ *
  * ### Idempotency
  *
  * Decided through {@link readLearnedRecipeEntries}, NEVER a bare `learnedMap[recipe.id]`

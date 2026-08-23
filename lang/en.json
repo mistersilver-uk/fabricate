@@ -5787,7 +5787,7 @@
           "BehaviourHeading": "Alchemy behaviour",
           "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply whatever alchemy check mode is set on The roll section.",
           "LearnOnCraft": "Learn a recipe when its ingredients are matched",
-          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and the only source of discovery under Global visibility.",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and under Global visibility the only source of discovery a player can reach for themselves; a GM can still grant a recipe directly.",
           "ConsumeOnFail": "Consume ingredients on a failed brew",
           "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
           "ShowAttemptHistory": "Show attempt history to players",
