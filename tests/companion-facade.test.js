@@ -505,6 +505,10 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
       callSite: 'gmAction',
       formula: '1d20',
       dc: 15,
+      // `interactive: true` is what makes the prompt count below an assertion rather than a
+      // decoration. Defaulted false, the dialog is off the path entirely and the caller's own
+      // prompt could not have been called whatever the delegator did.
+      interactive: true,
       actor: impostor,
       prompt: () => {
         hostilePrompt.calls += 1;
@@ -538,6 +542,7 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
     // `prompt` is a LEGITIMATE key of the composed bag, so a key-set assertion alone cannot
     // see a caller's function installed under it. Identity can.
     assert.equal(bag.rollOptions.prompt, checkSeams.prompt, 'the SEAM prompt, by identity');
+    assert.equal(checkCalls.prompt, 1, 'reachability: the seam prompt IS opened on this path');
     assert.equal(hostilePrompt.calls, 0, "and the caller's own prompt was never called");
   });
 });
@@ -981,6 +986,15 @@ describe('the harness copies are faithful to src/main.js', () => {
         body.includes('this._companionCheckSeams()'),
         `${label} obtains its seams from the one hoisted bag, never a restated literal`
       );
+      // The refusal is built by THIS member's own builder, and the gate outcome wins over
+      // readiness. Both halves are one substitution away from a cross-member vocabulary leak
+      // — `bulkCheckDecisionResult(...)` here answers a non-GM in the BULK member's words and
+      // in its answer SHAPE — and the behavioural cases that would catch it all run against
+      // the mirror, so production's copy is pinned where it is written.
+      assert.ok(
+        body.includes('return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);'),
+        `${label} must answer its OWN refusal shape, with the gate outcome ahead of readiness`
+      );
     }
   });
 
@@ -1009,6 +1023,100 @@ describe('the harness copies are faithful to src/main.js', () => {
         `${label} must not read an actorId it does not declare`
       );
       assert.ok(body.includes('this._companionCheckSeams()'), `${label} lost the hoisted seams`);
+      assert.ok(
+        body.includes('return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);'),
+        `${label} must answer its OWN refusal shape, with the GM refusal ahead of readiness`
+      );
+    }
+  });
+
+  /**
+   * The eight seams the ONE bag binds, each to the collaborator production actually ships.
+   *
+   * `[key, the exact binding, what the wrong binding does in production]`.
+   */
+  const SEAM_BINDINGS = [
+    [
+      'isElectedExecutor',
+      'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
+      'every connected GM client executes a broadcast call, rolling N different totals into ' +
+        'N companion instances — the exact harm the single-executor rule exists to prevent',
+    ],
+    [
+      'hasDiceEngine',
+      "hasDiceEngine: () => typeof globalThis.Roll === 'function'",
+      'engineUnavailable becomes unreachable, and a client with no dice engine dispatches ' +
+        'to a runner that cannot roll',
+    ],
+    [
+      'localize',
+      "resolved !== '' && resolved !== key ? resolved : fallback",
+      'a chat flavour reading `FABRICATE.Check.Roll.DefaultLabel check (DC 15)`, because ' +
+        'the bridge answers the KEY for a missing string exactly as Foundry does',
+    ],
+    ['prompt', 'prompt: promptCheckRoll', 'the BULK dialog opens for a single roll'],
+    ['promptBulk', 'promptBulk: promptBulkCheckRoll', 'the single-roll dialog opens for a batch'],
+    [
+      'runPassFail',
+      'runPassFail: runFormulaPassFail',
+      'a graded check dispatches the PROGRESSIVE runner: the dc is ignored and the member ' +
+        'answers `rolled` rather than checkPassed/checkFailed, at every DC, forever',
+    ],
+    [
+      'runProgressive',
+      'runProgressive: runFormulaProgressive',
+      'an ungraded roll is graded against an undefined dc',
+    ],
+    [
+      'buildRollOptions',
+      'buildRollOptions: buildInteractiveRollOptions',
+      'the roll options are composed by something other than the one builder that derives ' +
+        'the speaker from the resolved actor',
+    ],
+  ];
+
+  it('AC-5 — the ONE seam bag binds every seam to the collaborator production ships', () => {
+    // PRODUCTION ONLY, and that asymmetry is the whole reason this assertion exists rather
+    // than an oversight. `bothTexts` has nothing to compare here: the harness mirror
+    // SUBSTITUTES the bag for an injected one, by design, because every seam in it is a
+    // Foundry collaborator the harness has none of. `src/main.js` is never imported by any
+    // unit test either — this suite reads it as TEXT — so with the bag substituted in the
+    // mirror and unread in production, all eight bindings were held correct by nothing.
+    //
+    // What the existing pins prove is that a bag is CALLED (`this._companionCheckSeams()`
+    // appears in both delegator bodies). They say nothing about what is IN it, and ESLint
+    // catches a misspelled identifier but never a swap between two real ones. Each row below
+    // is a single substitution that otherwise survives the entire suite.
+    //
+    // D12 hoisted the bag to one private to keep the mirror's duplicated run down, and that
+    // removed even the second copy a reviewer could have diffed it against — which is why
+    // the two new members needed this pin where the shipped two did not.
+    const bag = mainMethodSource('_companionCheckSeams() {');
+    const keys = [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key);
+    assert.deepEqual(
+      keys,
+      SEAM_BINDINGS.map(([key]) => key),
+      'the bag binds exactly these eight seams — a dropped one leaves the leaf reading undefined'
+    );
+    // Non-vacuity, in the shape ROLL_ACTOR_CHECK_GATE_KEYS' own pins already use: a slice that
+    // silently shrank to nothing would satisfy `deepEqual([], [])` above only if the expected
+    // list were empty too, but the substring checks below would pass over a short string.
+    assert.ok(bag.length > 400, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
+    // Whitespace-normalized, and each binding matched with its TRAILING SEPARATOR left off,
+    // so the claims survive a reformat of `src/main.js`. That is a live possibility rather
+    // than a hypothetical: the file is currently OUTSIDE the `format:check` globs, and
+    // Prettier's `trailingComma: 'es5'` would add a comma to the last property here and wrap
+    // the ~165-character `rollActorCheck` signature the moment it is brought inside them.
+    // The lookahead is what keeps the match a whole binding — `runFormulaPassFailToo` is a
+    // different function, and a bare `includes` could not tell them apart.
+    const squashed = bag.replaceAll(/\s+/g, ' ');
+    for (const [key, binding, harm] of SEAM_BINDINGS) {
+      const whole = new RegExp(`${binding.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`);
+      assert.match(
+        squashed,
+        whole,
+        `${key} is no longer bound as \`${binding}\`, so in production ${harm}`
+      );
     }
   });
 
