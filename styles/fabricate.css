@@ -11266,10 +11266,19 @@
 
 /* Extra separation between the trailing controls, on top of the row's 12px gap: these are
    four unrelated affordances (a read-only fact, a deep link, a reorder rocker and a
-   delete), and packed at 8px they read as one undifferentiated clump. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-reorder,
-.fabricate-manager .manager-salvage-stage-row > .manager-icon-button,
+   delete), and packed at 8px they read as one undifferentiated clump.
+
+   The three salvage selectors now go through `.manager-salvage-stage-line` (issue 1286),
+   keeping `.manager-salvage-stage-row` ahead of it so each compound still outranks the
+   shared `.manager-salvage-stage-edit` rule below, which declares `margin: 0`. That
+   wrapper is `display: contents` on every row, so it matches exactly the controls this
+   rule already matched and no stage row moves; what it buys is that a row which ALSO draws
+   a complication band no longer hands this 4px to the BAND's own Edit link, which belongs
+   to the band's eyebrow rather than to the row's trailing cluster. The recipe selectors are
+   untouched — that row nests its controls in `.manager-recipe-option-controls`. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-edit,
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-reorder,
+.fabricate-manager .manager-salvage-stage-row > .manager-salvage-stage-line > .manager-icon-button,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-edit,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-reorder,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-result-remove {

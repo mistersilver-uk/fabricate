@@ -1443,17 +1443,25 @@
                       draggingStageIndex = null;
                     }}
                   >
-                    <span class="manager-salvage-stage-grip" aria-hidden="true"
-                      ><i class="fas fa-grip-vertical"></i></span
-                    >
-                    <span
-                      class="manager-salvage-result-ordinal"
-                      data-salvage-result-ordinal={String(stageIndex + 1)}
-                      aria-hidden="true">{stageIndex + 1}</span
-                    >
-                    {@render salvageComponentPicker(salvageStageGroup.id, result)}
+                    <!-- The stage's own LINE (issue 1286). `display: contents` unless this row
+                       draws a complication band, so on every other stage the grip, the ordinal,
+                       the picker and the trailing cluster are the ROW's flex items exactly as
+                       they were before this element existed, and every rule keyed on
+                       `.manager-salvage-stage-row` still matches them. With a band the line
+                       becomes the real row and takes the padding the row gives up, which is what
+                       lets the band below it run edge to edge. -->
+                    <div class="manager-salvage-stage-line">
+                      <span class="manager-salvage-stage-grip" aria-hidden="true"
+                        ><i class="fas fa-grip-vertical"></i></span
+                      >
+                      <span
+                        class="manager-salvage-result-ordinal"
+                        data-salvage-result-ordinal={String(stageIndex + 1)}
+                        aria-hidden="true">{stageIndex + 1}</span
+                      >
+                      {@render salvageComponentPicker(salvageStageGroup.id, result)}
 
-                    <!-- NO QUANTITY HERE (issue 676). Progressive is an ordered list of
+                      <!-- NO QUANTITY HERE (issue 676). Progressive is an ordered list of
                        INDIVIDUAL results: the award loop charges this entry's difficulty
                        once and awards it once, so "two of X" is authored by listing X
                        twice, never by a count. The ENGINE enforces it —
@@ -1463,146 +1471,47 @@
                        The control was removed only AFTER that, so this hides nothing a
                        world can still be awarded. -->
 
-                    <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
+                      <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
                        editor owns its save lifecycle; this surface is editing a
                        different component. The "Edit" link is the way to change it. -->
-                    <span
-                      class="manager-salvage-result-difficulty"
-                      data-salvage-result-difficulty={salvageResultDifficulty(
-                        result.componentId
-                      ) === null
-                        ? ''
-                        : String(salvageResultDifficulty(result.componentId))}
-                      ><!-- The fallback must MATCH the lang value, or the two disagree and the
+                      <span
+                        class="manager-salvage-result-difficulty"
+                        data-salvage-result-difficulty={salvageResultDifficulty(
+                          result.componentId
+                        ) === null
+                          ? ''
+                          : String(salvageResultDifficulty(result.componentId))}
+                        ><!-- The fallback must MATCH the lang value, or the two disagree and the
                        fallback silently describes a string nobody ever sees: `lang/en.json`
                        resolves `DifficultyUnset` to "No difficulty", so the literal "DC —"
                        here only ever rendered in a test with no i18n loaded. The recipe
                        stage row (issue 676) reads the same, which is the point. -->
-                      {salvageResultDifficulty(result.componentId) === null
-                        ? text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
-                            'No difficulty'
-                          )
-                        : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
-                    >
+                        {salvageResultDifficulty(result.componentId) === null
+                          ? text(
+                              'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
+                              'No difficulty'
+                            )
+                          : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
+                      >
 
-                    {#if result.componentId}
-                      <!-- Opens the referenced YIELD component's editor — the IN-MANAGER
+                      {#if result.componentId}
+                        <!-- Opens the referenced YIELD component's editor — the IN-MANAGER
                          component-edit view, not the standalone SvelteComponentEditorApp
                          window. Component -> component navigation is guarded
                          (confirmComponentRouteExit deliberately has no component-edit
                          bypass), so a dirty draft prompts rather than being discarded. -->
-                      <button
-                        type="button"
-                        class="manager-salvage-stage-edit"
-                        data-salvage-result-edit={result.componentId}
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
-                          'Edit {name}'
-                        ).replace('{name}', salvageComponentName(result.componentId))}
-                        title={text(
-                          'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
-                          'Set on this component in its editor'
-                        )}
-                        onclick={() => onOpenComponent(result.componentId)}
-                        disabled={saving}
-                      >
-                        <span
-                          >{text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
-                            'Edit'
-                          )}</span
-                        >
-                        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                      </button>
-                    {/if}
-
-                    <!-- Drag is an ENHANCEMENT; the chevrons are the accessible reorder
-                       path and are what a keyboard user gets. Disabled at the ends. -->
-                    <span class="manager-salvage-stage-reorder">
-                      <button
-                        type="button"
-                        class="manager-salvage-stage-move"
-                        data-salvage-stage-up
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveUp',
-                          'Move up'
-                        )}
-                        disabled={saving || stageIndex === 0}
-                        onclick={() => moveSalvageStage(stageIndex, -1)}
-                        ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
-                      >
-                      <button
-                        type="button"
-                        class="manager-salvage-stage-move"
-                        data-salvage-stage-down
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveDown',
-                          'Move down'
-                        )}
-                        disabled={saving || stageIndex === salvageStages.length - 1}
-                        onclick={() => moveSalvageStage(stageIndex, 1)}
-                        ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
-                      >
-                    </span>
-
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
-                        'Remove result'
-                      )}
-                      data-remove-salvage-result
-                      onclick={() => removeSalvageStage(result.id)}
-                      disabled={saving}
-                    >
-                      <i class="fas fa-xmark" aria-hidden="true"></i>
-                    </button>
-                  </li>
-
-                  <!-- ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ────────────────────
-                     A SIBLING of the row, not a child of it. The prototype draws it
-                     immediately after the row's closing tag as a tucked, indented,
-                     left-ruled band deliberately OUTSIDE the row's card, and
-                     `.manager-salvage-stage-list` is already `flex-direction: column`, so
-                     the band is simply the list's next child. That is what leaves
-                     `.manager-salvage-stage-row`'s rule untouched — it is JOINED with
-                     `.manager-recipe-result-row.is-reorderable` (the join is deliberate, and
-                     recorded as such in styles/fabricate.css), so relaxing it to fit a band
-                     inside would re-shape every progressive stage row in BOTH studios.
-
-                     `role="presentation"` because this is not a stage: it annotates the one
-                     above it, and a list item here would have a screen reader count one more
-                     stage than the award loop ever spends down. -->
-                  {#if stageComplications.length > 0}
-                    <li
-                      class="manager-salvage-stage-complications"
-                      role="presentation"
-                      data-salvage-stage-complications={result.componentId}
-                    >
-                      <div class="manager-salvage-stage-complications-head">
-                        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                        <span class="manager-salvage-stage-complications-title"
-                          >{stripTitle(stageComplications.length, result.componentId)}</span
-                        >
-                        <!-- The ONLY route to changing any of this, exactly as the row's DC
-                             badge above is: a complication belongs to the referenced
-                             component, whose own editor owns its save lifecycle. Its label
-                             names complications so it is distinguishable from the row's own
-                             Edit link, which targets the same component for its DC. -->
                         <button
                           type="button"
                           class="manager-salvage-stage-edit"
-                          data-salvage-stage-complications-edit={result.componentId}
+                          data-salvage-result-edit={result.componentId}
                           aria-label={text(
-                            'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                            'Edit complications on {name}'
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
+                            'Edit {name}'
                           ).replace('{name}', salvageComponentName(result.componentId))}
                           title={text(
-                            'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                            'Edit complications on {name}'
-                          ).replace('{name}', salvageComponentName(result.componentId))}
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
+                            'Set on this component in its editor'
+                          )}
                           onclick={() => onOpenComponent(result.componentId)}
                           disabled={saving}
                         >
@@ -1614,32 +1523,147 @@
                           >
                           <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
                         </button>
-                      </div>
-                      <!-- No `severityLabel`: this prototype draws severity as the coloured
+                      {/if}
+
+                      <!-- Drag is an ENHANCEMENT; the chevrons are the accessible reorder
+                       path and are what a keyboard user gets. Disabled at the ends. -->
+                      <span class="manager-salvage-stage-reorder">
+                        <button
+                          type="button"
+                          class="manager-salvage-stage-move"
+                          data-salvage-stage-up
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveUp',
+                            'Move up'
+                          )}
+                          disabled={saving || stageIndex === 0}
+                          onclick={() => moveSalvageStage(stageIndex, -1)}
+                          ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
+                        >
+                        <button
+                          type="button"
+                          class="manager-salvage-stage-move"
+                          data-salvage-stage-down
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveDown',
+                            'Move down'
+                          )}
+                          disabled={saving || stageIndex === salvageStages.length - 1}
+                          onclick={() => moveSalvageStage(stageIndex, 1)}
+                          ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
+                        >
+                      </span>
+
+                      <button
+                        type="button"
+                        class="manager-icon-button is-danger"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
+                          'Remove result'
+                        )}
+                        data-remove-salvage-result
+                        onclick={() => removeSalvageStage(result.id)}
+                        disabled={saving}
+                      >
+                        <i class="fas fa-xmark" aria-hidden="true"></i>
+                      </button>
+                    </div>
+
+                    <!-- ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ────────────────────
+                     INSIDE the stage row and FULL-BLEED, which is how the Recipe Studio draws
+                     the same band (see `recipe/RecipeResultItemRow.svelte`). The row and the
+                     band are ONE card: one border, one radius, and the band's `border-top` as
+                     the divider between them rather than a second box below the first.
+
+                     THIS OVERRIDES THE COMPONENT STUDIO PROTOTYPE, deliberately. That document
+                     tucks the band 5px under the row, indents it past the grip and gives it its
+                     own `0 9px 9px 0` border, so the two studios drew one fact two ways — which
+                     is the drift the joined stage-row rule was written to end (issue 676). The
+                     maintainer ruled for the attached treatment, so the prototype's detached
+                     band is a SUPERSEDED design rather than a fidelity target; the ruling is
+                     recorded in tmp/progressive-component-complications/component-studio.parity.mjs.
+
+                     Attaching it costs the shared rule nothing. `.manager-salvage-stage-row` is
+                     JOINED with `.manager-recipe-result-row.is-reorderable` (the join is
+                     deliberate, and recorded as such in styles/fabricate.css), so relaxing it to
+                     fit a band inside would re-shape every progressive stage row in BOTH
+                     studios. Instead the row hands its padding to
+                     `.manager-salvage-stage-line` and becomes a column ONLY under
+                     `:has(.manager-salvage-stage-complications)` — see the scoped rules at the
+                     foot of this file. A stage with no band matches neither selector, its line
+                     stays `display: contents`, and it renders exactly as it did before.
+
+                     `role="presentation"` stays. It is no longer load-bearing against the list
+                     — the band lives inside the stage's own `<li>` now, rather than being a
+                     second one — but the band annotates the stage above it and must never be
+                     announced as a stage of its own, so the annotation stays to stop the next
+                     move of this markup from re-creating that bug. -->
+                    {#if stageComplications.length > 0}
+                      <div
+                        class="manager-salvage-stage-complications"
+                        role="presentation"
+                        data-salvage-stage-complications={result.componentId}
+                      >
+                        <div class="manager-salvage-stage-complications-head">
+                          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                          <span class="manager-salvage-stage-complications-title"
+                            >{stripTitle(stageComplications.length, result.componentId)}</span
+                          >
+                          <!-- The ONLY route to changing any of this, exactly as the row's DC
+                             badge above is: a complication belongs to the referenced
+                             component, whose own editor owns its save lifecycle. Its label
+                             names complications so it is distinguishable from the row's own
+                             Edit link, which targets the same component for its DC. -->
+                          <button
+                            type="button"
+                            class="manager-salvage-stage-edit"
+                            data-salvage-stage-complications-edit={result.componentId}
+                            aria-label={text(
+                              'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
+                              'Edit complications on {name}'
+                            ).replace('{name}', salvageComponentName(result.componentId))}
+                            title={text(
+                              'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
+                              'Edit complications on {name}'
+                            ).replace('{name}', salvageComponentName(result.componentId))}
+                            onclick={() => onOpenComponent(result.componentId)}
+                            disabled={saving}
+                          >
+                            <span
+                              >{text(
+                                'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
+                                'Edit'
+                              )}</span
+                            >
+                            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                        <!-- No `severityLabel`: this prototype draws severity as the coloured
                            dot alone, which is the row's severity TILE. The Recipe Studio's
                            strip draws the word too, and passes it. -->
-                      {#each stageComplications as complication (complication.id)}
-                        <ComplicationSummaryRow
-                          variant="readonly-gm"
-                          nameEmphasis="inline"
-                          name={complication.name}
-                          severity={complication.severity}
-                          visibility={complication.visibility}
-                          playerLabel={text(
-                            'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
-                            'Player'
-                          )}
-                          playerTitle={text(
-                            'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
-                            'Shown to the player when it fires.'
-                          )}
-                          triggerSentence={complicationStripSummary(complication)}
-                          dataAttr="data-salvage-stage-complication"
-                          dataValue={complication.id}
-                        />
-                      {/each}
-                    </li>
-                  {/if}
+                        {#each stageComplications as complication (complication.id)}
+                          <ComplicationSummaryRow
+                            variant="readonly-gm"
+                            nameEmphasis="inline"
+                            name={complication.name}
+                            severity={complication.severity}
+                            visibility={complication.visibility}
+                            playerLabel={text(
+                              'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
+                              'Player'
+                            )}
+                            playerTitle={text(
+                              'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
+                              'Shown to the player when it fires.'
+                            )}
+                            triggerSentence={complicationStripSummary(complication)}
+                            dataAttr="data-salvage-stage-complication"
+                            dataValue={complication.id}
+                          />
+                        {/each}
+                      </div>
+                    {/if}
+                  </li>
                 {/each}
               </ul>
             {:else}
@@ -2051,19 +2075,72 @@
      rule. Theme-ROOT tokens only (`--fab-warning*`, never a `--fab-mv2-*` alias), on
      `Chip.svelte`'s note, so the band renders the same wherever this row shape is reused.
 
-     Geometry is the prototype's, verbatim: `margin: -2px 0 2px 30px` tucks the band up
-     against the row it annotates and indents it past the grip + ordinal, and the
-     `0 9px 9px 0` radius plus the 2px left rule make it read as hanging OFF that row
-     rather than as another stage in the list. */
+     THE BAND IS ATTACHED, and that overrides the prototype. The Component Studio document
+     draws it detached — tucked 5px below the row, indented 30px past the grip, behind its
+     own `0 9px 9px 0` border — so the two studios drew one fact two ways. The maintainer
+     ruled for the Recipe Studio's treatment, row and band as ONE card, so the prototype's
+     detached geometry is a superseded design rather than a fidelity target. Nothing the
+     parity spec MEASURES on this band moves: its fill, its `border-top`, its 0 top-left
+     radius, its 8px/11px padding and its 6px gap are the prototype's values still. What
+     goes is the margin, the surrounding border and the right-hand radii — the three
+     declarations that made it a second box. */
+
+  /* Scoped by `:has()` to rows that actually draw a band, so it joins nothing and moves no
+     stage row in either studio. `.manager-salvage-stage-row` is JOINED with
+     `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css (deliberate, and
+     recorded there), and avoiding a change to that rule is the whole reason this is a
+     `:has()` and not a relaxation.
+
+     The row sheds its padding onto its own line and clips itself, so the band runs edge to
+     edge and its `border-top` reads as a card DIVIDER — inset by the card's padding
+     instead, that rule drew as a short line floating inside the card. `overflow: hidden`
+     is also what keeps the band's warning fill inside the card's 8px radius. It cannot
+     clip the row's component picker: `SearchablePopover` portals its popover to the
+     manager host rather than rendering it in flow. */
+  .manager-salvage-stage-row:has(.manager-salvage-stage-complications) {
+    flex-direction: column;
+    align-items: stretch;
+    /* `gap: 0` is load-bearing, not tidying. The joined rule declares `gap: var(--fab-space-3)`
+       for the 12px BETWEEN a stage's controls, and turning the row into a column re-aims that
+       12px at the seam between the line and the band — which left the band's `border-top`
+       floating under 12px of card fill and reading as a stray rule rather than as this card's
+       divider. The line restates the 12px on its own axis, where it belongs. */
+    gap: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  /* `display: contents` in the common case, which is every stage whose yield authors no
+     salvage complication: collapsed, the grip, the ordinal, the picker and the trailing
+     cluster are the ROW's flex items exactly as they were before this wrapper existed. */
+  .manager-salvage-stage-line {
+    display: contents;
+  }
+
+  /* With a band the line becomes the real row, and takes the padding and the 12px gap the
+     joined rule gave up above — restated here because it is now the LINE that must draw
+     them. Its own `align-items: center` is what keeps the grip and the ordinal centred
+     against the line they label rather than against the whole card. */
+  .manager-salvage-stage-row:has(.manager-salvage-stage-complications) .manager-salvage-stage-line {
+    display: flex;
+    gap: var(--fab-space-3);
+    align-items: center;
+    min-width: 0;
+    padding: var(--fab-space-chip) var(--fab-space-2);
+  }
+
+  /* NO margin and NO radius: the `border-top` IS the divider between the band and the line
+     above it, and a divider only reads as one when the two surfaces meet. The 2px
+     `--fab-warning` left rule stays — it is what marks this band as the stage's warning
+     annotation rather than as more of the stage — and now runs the band's full height
+     against the card's own border instead of floating in the list's gutter. */
   .manager-salvage-stage-complications {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin: -2px 0 2px 30px;
     padding: 8px 11px;
-    border: 1px solid var(--fab-warning-border);
+    border-top: 1px solid var(--fab-warning-border);
     border-left: 2px solid var(--fab-warning);
-    border-radius: 0 9px 9px 0;
     background: var(--fab-warning-soft);
   }
 

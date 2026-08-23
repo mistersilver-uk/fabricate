@@ -460,24 +460,63 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       'and it is bound to the component that owns the complications'
     );
 
-    // THE PLACEMENT RULING: a SIBLING of the row, not a child of it. The row's rule is
-    // JOINED with the Recipe Studio's `.manager-recipe-result-row.is-reorderable`, so a band
-    // nested inside would have needed that shared rule relaxed and would have re-shaped every
-    // progressive stage row in BOTH studios.
-    const children = [...list.children];
-    const rowIndex = children.indexOf(target.querySelector('[data-salvage-result="res-1"]'));
-    assert.ok(rowIndex !== -1, 'the stage row is a direct child of the list');
+    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, so the two draw
+    // as ONE card the way the Recipe Studio's do. It used to be the list's next sibling —
+    // the Component Studio prototype's detached treatment — and the maintainer superseded
+    // that. What made the sibling shape attractive is still true and is still honoured:
+    // `.manager-salvage-stage-row` is JOINED with the Recipe Studio's
+    // `.manager-recipe-result-row.is-reorderable`, so nothing here relaxes that rule. The
+    // row turns into a column only under `:has(.manager-salvage-stage-complications)`, which
+    // a band-less row cannot match — the assertion below this one is what pins that.
+    const row = target.querySelector('[data-salvage-result="res-1"]');
     // `assert.ok` on the identity, never `assert.equal(node, node)`: on failure
     // `node:assert` serialises a mounted element's circular tree to build its diff and the
     // heap dies, which surfaces as a `# cancelled` suite with no message at all.
-    assert.ok(children[rowIndex + 1] === found[0], "the strip is the list's NEXT child");
+    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
     assert.ok(
-      !found[0].closest('.manager-salvage-stage-row'),
-      'and it is outside the row entirely, so the row keeps its shared geometry'
+      [...list.children].every((child) => child.matches('.manager-salvage-stage-row')),
+      'and the list itself holds nothing but stage rows, so no band is a stage of its own'
     );
-    // Not a stage: a listitem here would have a screen reader count one more stage than the
-    // award loop ever spends down.
+    // The row's own controls moved into `.manager-salvage-stage-line`, which is what lets the
+    // row shed its padding to the line and let the band bleed. The band is NOT in that line:
+    // it is the line's sibling, or its `border-top` could never be the card's divider.
+    const line = row.querySelector('.manager-salvage-stage-line');
+    assert.ok(line, 'the row wraps its own controls in a line');
+    assert.ok(
+      line.querySelector('[data-salvage-result-edit]') &&
+        line.querySelector('[data-salvage-result-difficulty]'),
+      "the row's picker cluster and its trailing controls are the LINE's children"
+    );
+    assert.ok(
+      found[0].parentElement === row,
+      "and the band is the row's own child, beside that line rather than inside it"
+    );
+    // Not a stage: it annotates the one above it, and announcing it as a stage would have a
+    // screen reader count one more stage than the award loop ever spends down.
     assert.equal(found[0].getAttribute('role'), 'presentation');
+    harness.remount();
+  });
+
+  it('1286: a stage row with no complications grows no wrapper state, so it is unchanged', async () => {
+    // The constraint the attached band had to respect: `.manager-salvage-stage-row` is JOINED
+    // with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so anything
+    // that re-shaped the row itself would have moved every progressive stage row in BOTH
+    // studios. Everything the band needs is scoped to `:has(.manager-salvage-stage-complications)`,
+    // and this pins the DOM half of that: the second stage draws no band, so it cannot match.
+    const target = await harness.mount(complicatedProps());
+    const plain = target.querySelector('[data-salvage-result="res-2"]');
+    assert.ok(plain, 'the yield that authors no complication still renders its stage');
+    assert.equal(
+      plain.querySelectorAll('[data-salvage-stage-complications]').length,
+      0,
+      'and draws no band, so the `:has()` that re-shapes the row cannot match it'
+    );
+    // `display: contents` on the line is what keeps this row's flex items the ROW's own. The
+    // markup is identical for both rows; only the band's presence differs.
+    assert.ok(
+      plain.querySelector('.manager-salvage-stage-line'),
+      'the line wraps its controls exactly as the banded row does'
+    );
     harness.remount();
   });
 
