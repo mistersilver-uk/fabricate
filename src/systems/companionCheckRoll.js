@@ -294,15 +294,15 @@ export async function rollActorCheck(request, seams) {
   // raw total anyway is what stops a later change that admits triggers from silently
   // redefining a published field.
   const total = result.data.total;
-  return checkRollResult(
-    outcome,
-    { label, total },
-    {
-      total,
-      diceGroups: result.data.diceGroups,
-      resolvedFormula: result.data.resolvedFormula ?? null,
-    }
-  );
+  // The graded strings name the DC they were measured against; the ungraded one cannot, so
+  // the bag is built per arm rather than uniformly. `assertMessageDataCovers` derives the
+  // requirement from the STRING, so a placeholder added to either without an author here
+  // fails at the answers that already carry the key.
+  return checkRollResult(outcome, graded ? { label, total, dc } : { label, total }, {
+    total,
+    diceGroups: result.data.diceGroups,
+    resolvedFormula: result.data.resolvedFormula ?? null,
+  });
 }
 
 /**
@@ -366,7 +366,7 @@ export async function resolveBulkCheckDecision(request, seams) {
   // a pre-resolved choice rather than as a cancellation.
   return bulkCheckDecisionResult(
     COMPANION_OUTCOMES.decided,
-    { count: covered.length },
+    { count: covered.length, total: formulas.length },
     {
       choice: {
         bonus: choice.bonus,
