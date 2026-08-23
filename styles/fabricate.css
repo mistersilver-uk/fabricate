@@ -11214,6 +11214,16 @@
   background: var(--fab-mv2-bg);
 }
 
+/* A recipe stage row that draws a complication strip becomes taller than its own line, and
+   `align-items: center` on the joined rule above would then centre the grip and the ordinal
+   against the WHOLE card rather than beside the line they label (issue 1286). This is
+   additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
+   and moves no existing stage row in either studio — the join above stays the one place
+   the two surfaces share values. */
+.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications) {
+  align-items: flex-start;
+}
+
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is
    `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×)
    but wrong here: a stage row carries four more controls, so a greedy field took ~85% of
