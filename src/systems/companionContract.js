@@ -677,9 +677,16 @@ export function normalizeGrantedBy(value) {
  *
  * Frozen data assembled at module load, so `bindFabricateGlobal` assigns it and nothing
  * more, and so its version is readable before any collaborator exists.
+ *
+ * `callSites` is published for the same stated reason `outcomes` is: a caller should be able
+ * to read a SYMBOL rather than write a bare string. It matters more here than there, because
+ * `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has —
+ * `invalidCallSite` is the whole of a typo's punishment, and nothing else tells the author
+ * they mistyped a literal they were instructed to write by hand.
  */
 export const COMPANION_CONTRACT = Object.freeze({
   schemaVersion: COMPANION_CONTRACT_SCHEMA_VERSION,
   members: COMPANION_MEMBERS,
   outcomes: COMPANION_OUTCOMES,
+  callSites: COMPANION_CALL_SITES,
 });

@@ -255,16 +255,27 @@ function affordabilityAnswer(outcome, affordable, messageData = null) {
   return expected;
 }
 
-test('the descriptor publishes exactly the three contract fields, frozen', () => {
+test('the descriptor publishes exactly the four contract fields, frozen', () => {
   assert.ok(Object.isFrozen(COMPANION_CONTRACT), 'the descriptor is frozen');
-  assert.deepEqual(Object.keys(COMPANION_CONTRACT), ['schemaVersion', 'members', 'outcomes']);
+  assert.deepEqual(Object.keys(COMPANION_CONTRACT), [
+    'schemaVersion',
+    'members',
+    'outcomes',
+    'callSites',
+  ]);
   assert.equal(COMPANION_CONTRACT.schemaVersion, COMPANION_CONTRACT_SCHEMA_VERSION);
   assert.equal(Number.isInteger(COMPANION_CONTRACT_SCHEMA_VERSION), true);
   assert.ok(COMPANION_CONTRACT_SCHEMA_VERSION >= 1, 'a published version starts at 1');
   assert.equal(COMPANION_CONTRACT.members, COMPANION_MEMBERS);
   assert.equal(COMPANION_CONTRACT.outcomes, COMPANION_OUTCOMES);
+  // `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has,
+  // and the docs' worked examples are what an author copies. Publishing the pair is what lets
+  // them read `COMPANION.callSites.broadcast` instead of retyping a literal whose only
+  // punishment for a typo is `invalidCallSite`.
+  assert.equal(COMPANION_CONTRACT.callSites, COMPANION_CALL_SITES);
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.members), 'the member table is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.outcomes), 'the outcome vocabulary is frozen');
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.callSites), 'the call-site pair is frozen');
 });
 
 test('the member table is exactly the declared set at its declared promise tiers', () => {
@@ -386,6 +397,40 @@ test('every outcome message key resolves to a string leaf in lang/en.json', () =
     /\{detail\}/,
     "a failed roll carries the runner's free text as messageData.detail"
   );
+  // `assertMessageDataCovers` derives its requirement FROM the string, which makes it a
+  // one-way guard: it catches a string that GAINS a placeholder and is blind to one that
+  // LOSES it. These are the other direction. Dropping `{count}` from `Decided` would leave
+  // every answer's bag over-supplied and silently correct, while a GM reads a sentence that
+  // no longer says how much of their batch was covered.
+  assert.match(
+    localizedString(BULK_CHECK_DECISION_MESSAGE_KEYS.decided),
+    /\{count\}[\s\S]*\{total\}/,
+    'a settled decision names how many of how many checks it covers, count first'
+  );
+  for (const outcome of ['checkPassed', 'checkFailed']) {
+    assert.match(
+      localizedString(CHECK_ROLL_MESSAGE_KEYS[outcome]),
+      /\{label\}[\s\S]*\{total\}[\s\S]*\{dc\}/,
+      `the graded ${outcome} names the DC it was measured against`
+    );
+  }
+  assert.match(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.rolled),
+    /\{label\}[\s\S]*\{total\}/,
+    'the ungraded answer names no DC, because it was measured against none'
+  );
+  assert.doesNotMatch(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.rolled),
+    /\{dc\}/,
+    'and must not, because the ungraded arm supplies no dc to interpolate'
+  );
+  // The two graded strings are otherwise IDENTICAL but for one word, so nothing above can see
+  // them swapped in `lang/en.json` — and swapped, every passing check reports itself as a
+  // failure to the GM's chat log. The word is the only thing that distinguishes them.
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /passed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /failed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /failed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /passed/);
   // The three refusals the FACADE DELEGATOR answers with are emitted before any label has
   // been resolved, so a placeholder in one of them would put literal braces in front of a GM
   // with nothing able to supply them. Same for the two the call-site gate answers with.
@@ -689,6 +734,15 @@ test('an undeclared outcome degrades to each new member own generic refusal', ()
     Object.values(BULK_CHECK_DECISION_MESSAGE_KEYS).includes(bulk.message),
     false,
     'and it is not one of the seven, so no outcome is minted for a path no member can reach'
+  );
+  // "Not one of the seven" and "resolves to a string" are both satisfied by ANY other
+  // member's key — `FABRICATE.Check.Roll.RollFailed` passes both — and that would be a
+  // cross-member vocabulary leak on exactly the path this deviation exists to reason about:
+  // the bulk member telling a GM its decision "could not be rolled". The namespace is the
+  // claim, so the namespace is what is pinned.
+  assert.ok(
+    bulk.message.startsWith('FABRICATE.Check.BulkDecision.'),
+    `the bulk member's generic refusal must speak in its OWN namespace, got ${bulk.message}`
   );
 });
 

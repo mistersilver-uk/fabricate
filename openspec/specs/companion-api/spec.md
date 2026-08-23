@@ -22,7 +22,7 @@ The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, th
 
 ## The Published Contract
 
-Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.COMPANION`, a frozen `{ schemaVersion, members, outcomes }` descriptor.
+Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.COMPANION`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
 
 `schemaVersion` is readable from **Fabricate's own `init` hook onward**, and for the whole of `setup` and `ready`, before any collaborator exists.
 It is **not** guaranteed readable from another package's `init`.
@@ -155,6 +155,9 @@ Nothing in the request or the environment distinguishes a GM's deliberate click 
 `gmAction` declares a single-client, user-initiated GM action and is gated on `isGM` alone: there is no duplicate-execution risk, and requiring election would lock out the assistant GMs the surface already admits.
 `broadcast` declares a handler that fires on every connected client and is additionally gated on the elected executor.
 `invalidCallSite` covers **both** a missing and an unrecognised declaration, because "not declared" is wrong for the second.
+
+The accepted pair is **published on the descriptor** as `COMPANION.callSites`, on the same rule that publishes `COMPANION.outcomes`: a caller reads a symbol rather than writing a bare string.
+The rule binds harder here than there, because `callSite` is the contract's one required, no-default, refused-on-mismatch input, so `invalidCallSite` is the entirety of a typo's feedback and a documented worked example that instructs an author to hand-write the literal is the surface that produces the typo.
 
 The refusal **is** the enforcement.
 The shipped internal `caller` discriminator is required of an internal call site, so a forgetful one is caught by Fabricate's own tests; `callSite` is required of an **external** caller on a member that may never throw, which is why an unrecognised value is a first-class outcome rather than a thrown error.

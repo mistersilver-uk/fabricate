@@ -575,7 +575,8 @@ if (!contract) return;                    // Fabricate has not loaded yet — re
 if (contract.schemaVersion !== 1) return; // A version this companion does not understand.
 ```
 
-The descriptor is frozen data with exactly three fields — `schemaVersion`, `members`, and `outcomes` — and it is assigned when Fabricate's own `init` listener runs, before any service exists.
+The descriptor is frozen data with exactly four fields — `schemaVersion`, `members`, `outcomes`, and `callSites` — and it is assigned when Fabricate's own `init` listener runs, before any service exists.
+`outcomes` and `callSites` are both published so you can read a **symbol** rather than write a bare string; `callSites` matters most, because `callSite` is the one required input with no default, and `invalidCallSite` is the whole of a typo's punishment.
 
 {: .warning }
 > **Read the version in `setup` or `ready`, never in your own `init`.**
@@ -665,16 +666,18 @@ If you want a system's modifiers applied, route a real craft or salvage instead.
 > Foundry's dice resolver cannot do that: closing it fulfils the roll with a random face indistinguishable from a typed one.
 
 ```javascript
+const { callSites, outcomes } = game.fabricate.api.COMPANION;
+
 const result = await game.fabricate.rollActorCheck({
   actorId: actor.id,
-  callSite: 'gmAction',        // or 'broadcast'; REQUIRED, and there is no default
+  callSite: callSites.gmAction, // or callSites.broadcast; REQUIRED, and there is no default
   formula: '1d20 + @prof',
-  dc: 15,                      // omit for an ungraded roll that just answers the total
-  compare: 'meet',             // 'meet' (default) or 'exceed'
-  label: 'Downtime: Research', // optional; defaults to a localized activity noun
-  interactive: true            // default false — no dialog, no chat post
+  dc: 15,                       // omit for an ungraded roll that just answers the total
+  compare: 'meet',              // 'meet' (default) or 'exceed'
+  label: 'Downtime: Research',  // optional; defaults to a localized activity noun
+  interactive: true             // default false — no dialog, no chat post
 });
-if (result.outcome === 'cancelled') return;         // the GM dismissed the prompt: do nothing
+if (result.outcome === outcomes.cancelled) return;  // the GM dismissed the prompt: do nothing
 if (!result.success) return ui.notifications.warn(game.i18n.format(result.message, result.messageData ?? {}));
 if (result.passed) applyReward(result.total);
 ```
@@ -688,19 +691,22 @@ A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
 Declare `broadcast` from any handler that fires on every connected client, and Fabricate refuses `notElected` on every client but the elected GM's.
 Declaring `gmAction` from a synced hook **bypasses that gate entirely** and puts the single-executor obligation back on you.
+The two accepted values are published as `game.fabricate.api.COMPANION.callSites`, so read `callSites.broadcast` rather than retyping the literal: a mistyped string is refused as `invalidCallSite` and nothing else tells you it was a typo.
 
 `resolveBulkCheckDecision` is for the case where you will roll for several characters at once and want to ask the GM **once**:
 
 ```javascript
+const { callSites, outcomes } = game.fabricate.api.COMPANION;
+
 const decision = await game.fabricate.resolveBulkCheckDecision({
-  callSite: 'gmAction',
+  callSite: callSites.gmAction,
   formulas: characters.map((character) => character.downtimeFormula)
 });
-if (decision.outcome === 'cancelled') return;
+if (decision.outcome === outcomes.cancelled) return;
 for (const index of decision.covered) {
   await game.fabricate.rollActorCheck({
     actorId: characters[index].id,
-    callSite: 'gmAction',
+    callSite: callSites.gmAction,
     formula: characters[index].downtimeFormula,
     dc: 15,
     interactive: true,
