@@ -31,10 +31,16 @@
  * `effectRollTotal` are client-supplied outcome facts the GM cannot verify, so the GM
  * card presents them as the acting client's CLAIM rather than as GM-attested.
  *
- * ONE MESSAGE PER RESOLUTION. Every complication of one resolution rides a single
- * message with an array payload — a 25-row bulk salvage emits one message, not 25.
- * Per-row emits would collide with the rate limiter head-on, silently refusing rows on
- * a path the player never sees; batching also fixes emit ordering GM-side.
+ * ONE MESSAGE PER ADDRESSED (SYSTEM, ACTOR) PAIR. Every complication of one resolution
+ * rides a single message with an array payload, and a bulk run batches its rows the same
+ * way — but it batches per addressed pair rather than per RUN, because the payload names
+ * one crafting system and one actor and BOTH are authorization inputs: the GM re-reads
+ * the authored complication from that system's record and re-authorizes that actor
+ * against the attested sender. Neither can be per-entry without moving the authorization
+ * decision onto the wire. So the ordinary bulk run — one actor, one system — emits one
+ * message however many rows it carries, and a run deliberately fanned out across N pairs
+ * emits N. Per-ROW emits would collide with the rate limiter head-on, silently refusing
+ * rows on a path the player never sees; batching also fixes emit ordering GM-side.
  *
  * This module is the PURE half of the channel: the routing decision (payload validation,
  * who applies, GM-on-GM local apply, per-sender throttle, per-context de-duplication) AND
@@ -61,14 +67,32 @@ export const COMPLICATION_DELIVER = 'complicationDeliver';
 /**
  * Complication messages one sender may deliver per window before the GM starts refusing.
  *
- * Sized for the legitimate worst case, which is NOT one message per fired complication:
- * a resolution emits exactly one message however many complications it carries, and a
- * bulk salvage of any size emits one. The bound therefore has to cover deliberate,
- * one-at-a-time player resolutions plus the one case that emits several in a burst — a
- * collapsed crafting chain, which recurses per step and so emits once per step. 30 in a
- * minute leaves room for several long chains and still makes a scripted flood useless.
+ * ## Derived from the SELECTION CAP, not from "one message per run"
+ *
+ * It is not one message per fired complication — a resolution emits one message however
+ * many complications it carries. But it is not one per RUN either: a bulk run batches per
+ * addressed `(craftingSystemId, actorUuid)` pair, because both are authorization inputs
+ * (see the module docblock). The legitimate worst case is therefore a bulk selection
+ * fanned all the way out — one target per pair — which at the bulk selection cap of 25
+ * targets is 25 messages for ONE player gesture.
+ *
+ * A player may reasonably make several such gestures inside one 60-second window, so the
+ * bound starts at roughly three fully fanned-out runs (75) and adds headroom for what
+ * else is legitimately in flight beside them: deliberate one-at-a-time crafts and
+ * salvages, one message each, and a collapsed crafting chain, which recurses into
+ * `craft()` per step and so relays once per step.
+ *
+ * 100 in a minute covers that and still makes a scripted flood useless. The previous 30
+ * was derived from the retired premise that a bulk run of any size emits exactly one
+ * message: two fanned-out runs spent 50 against it and silently dropped the tail, which
+ * is the failure the batching exists to close.
+ *
+ * The 25 is stated in prose and NOT imported from `BulkSalvageService`: this module is the
+ * pure half of a socket channel and must not take a dependency on a crafting service to
+ * describe its own budget. If the selection cap moves, this reasoning is what has to be
+ * re-read — which is why it is written down rather than computed.
  */
-export const COMPLICATION_RATE_LIMIT = 30;
+export const COMPLICATION_RATE_LIMIT = 100;
 
 /** Rolling window for {@link COMPLICATION_RATE_LIMIT}, in milliseconds. */
 export const COMPLICATION_RATE_WINDOW_MS = 60_000;

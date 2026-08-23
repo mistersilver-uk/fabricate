@@ -2355,7 +2355,9 @@ class Fabricate {
       // other collaborator here, because the writer is composed during `initialize()` and
       // this service is cached. The service collects each row's addressing-only requests and
       // hands them over as one message per addressed (system, actor) pair, rather than the
-      // engine emitting per row against a limiter sized for one.
+      // engine emitting per ROW. The pair is the batching unit because both halves of it are
+      // GM-side authorization inputs; `COMPLICATION_RATE_LIMIT` is sized against the
+      // fanned-out pair count a 25-target selection can produce, not against the row count.
       deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
       // Key-only, matching every card module's `localize` contract; the aggregate card
       // substitutes its own counts.

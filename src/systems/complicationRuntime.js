@@ -40,9 +40,10 @@
  * card it never posts.
  *
  * The requests come back on the return value rather than being emitted from here. Bulk salvage
- * batches every row's requests into ONE socket message — per-row emits would collide head-on
- * with the GM-side rate limiter, which is sized for human gathering speed — so the caller owns
- * the emit and this function owns the decision.
+ * batches its rows into one socket message per addressed `(craftingSystemId, actorUuid)` pair
+ * — per-ROW emits would collide head-on with the GM-side rate limiter, which is sized against
+ * the fanned-out PAIR count a capped selection can produce and not against its row count — so
+ * the caller owns the emit and this function owns the decision.
  *
  * ## Both halves of the audience split live here, deliberately
  *

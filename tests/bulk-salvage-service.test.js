@@ -1184,15 +1184,19 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
     assert.deepEqual(
       calls.map((call) => call.options.deferComplicationDelivery),
       [true, true, true],
-      'without this each row emits its own socket message against a limiter sized for one'
+      'without this each row emits its own socket message, spending 25 units of the sender ' +
+        'budget on one gesture against a limiter sized for the fanned-out PAIR count'
     );
   });
 
   it('relays a 25-row run as ONE message, never 25', async () => {
-    // The GM-side limiter is 30 messages per 60s, sized on the written assumption that a
-    // bulk salvage of any size relays one. At `BULK_MAX_ITEMS` a per-row relay puts a
-    // second run inside that window over budget and silently loses its tail, on a path the
-    // player never sees.
+    // ONE message because this run is one addressed `(craftingSystemId, actorUuid)` pair,
+    // which is the unit the relay batches by — not because a bulk run relays one whatever
+    // it addresses. A run genuinely spanning pairs relays one per pair, and that is asserted
+    // separately below. What is refused here is a per-ROW relay: at `BULK_MAX_ITEMS` it
+    // would spend 25 units of the sender's budget on a single gesture rather than 1, and the
+    // GM-side limiter (`COMPLICATION_RATE_LIMIT`) is sized against the fanned-out pair
+    // count, not against the row count.
     const delivered = [];
     // 25 DISTINCT components on ONE system for ONE actor: the pre-flight refuses a repeated
     // `(actor, system, component)` as a duplicate, so a fixture queueing the same target 25

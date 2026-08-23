@@ -406,6 +406,75 @@ test('a flood from one sender is throttled, and a refused message costs no budge
   assert.equal(applied.length, COMPLICATION_RATE_LIMIT + 1);
 });
 
+test('1286: the budget admits the FANNED-OUT worst case a legitimate player can produce', () => {
+  // The limiter is sized from the bulk SELECTION CAP, not from "one message per run". A
+  // bulk run relays one message per addressed `(craftingSystemId, actorUuid)` pair, because
+  // both are GM-side authorization inputs — so a selection fanned all the way out is 25
+  // messages for ONE player gesture, and a player may make several such gestures inside one
+  // 60-second window while ordinary crafts and a collapsed chain relay beside them.
+  //
+  // This is asserted as BEHAVIOUR rather than as `COMPLICATION_RATE_LIMIT === 100`, which
+  // would only restate the constant. It is what caught the old 30: two fanned-out runs spent
+  // 50 against it and the tail was refused silently, on a path the player never sees.
+  const BULK_SELECTION_CAP = 25; // BulkSalvageService's BULK_MAX_ITEMS, stated not imported:
+  // this module is the pure half of a socket channel and must not depend on a crafting
+  // service to describe its own budget.
+  const FANNED_OUT_RUNS = 3;
+  const COLLAPSED_CHAIN_STEPS = 5;
+  const ONE_AT_A_TIME = 10;
+
+  const allowSender = createComplicationRateLimiter({ now: () => 0 });
+  const refused = [];
+  let sequence = 0;
+  const route = (overrides) => {
+    sequence += 1;
+    const ok = routeComplicationDeliveryMessage(
+      message({ resolutionId: `resolution-${sequence}`, ...overrides }),
+      {
+        isActiveGM: () => true,
+        senderId: 'user-1',
+        allowSender,
+        applyComplications: () => {},
+      }
+    );
+    if (!ok) refused.push(sequence);
+    return ok;
+  };
+
+  for (let run = 0; run < FANNED_OUT_RUNS; run += 1) {
+    for (let pair = 0; pair < BULK_SELECTION_CAP; pair += 1) {
+      route({ craftingSystemId: `system-${pair}`, actorUuid: `Actor.a${pair}` });
+    }
+  }
+  for (let step = 0; step < COLLAPSED_CHAIN_STEPS; step += 1) route({});
+  for (let resolution = 0; resolution < ONE_AT_A_TIME; resolution += 1) route({});
+
+  assert.deepEqual(
+    refused,
+    [],
+    `the legitimate worst case is ${FANNED_OUT_RUNS} fanned-out bulk runs of ` +
+      `${BULK_SELECTION_CAP} pairs plus a ${COLLAPSED_CHAIN_STEPS}-step chain and ` +
+      `${ONE_AT_A_TIME} single resolutions, and none of it may be refused`
+  );
+  assert.equal(sequence, 90, 'and that worst case is what was actually driven');
+});
+
+test('1286: the budget is still FINITE, so a scripted flood is still useless', () => {
+  const allowSender = createComplicationRateLimiter({ now: () => 0 });
+  const route = (index) =>
+    routeComplicationDeliveryMessage(message({ resolutionId: `flood-${index}` }), {
+      isActiveGM: () => true,
+      senderId: 'user-1',
+      allowSender,
+      applyComplications: () => {},
+    });
+
+  for (let index = 0; index < COMPLICATION_RATE_LIMIT; index += 1) {
+    assert.equal(route(index), true, `delivery ${index} is inside the budget`);
+  }
+  assert.equal(route(COMPLICATION_RATE_LIMIT), false, 'and the next one is not');
+});
+
 test('a batched bulk salvage costs one unit of budget, not one per row', () => {
   const applied = [];
   const allowSender = createComplicationRateLimiter({ now: () => 0, limit: 2 });
