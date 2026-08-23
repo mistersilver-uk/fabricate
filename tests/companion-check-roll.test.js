@@ -385,6 +385,32 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
     assert.equal(post?.options?.rollMode, 'blindroll', 'and the roll mode reached the chat post');
   });
 
+  it('treats a decision carrying confirmed:TRUE as a decision, and still rolls', async () => {
+    // The other half of AC-7's `confirmed` claim, and the COMMON one: the design's whole
+    // argument is about a caller that forwarded a whole prompt answer, and a prompt answer is
+    // usually a confirmation. Without this cell the guard can be widened from
+    // `confirmed === false` to `confirmed !== undefined` — a single substitution — and every
+    // forwarded confirmation silently becomes a cancellation that rolls nothing, forever.
+    installChat();
+    const rolls = installRoll();
+    const { seams, calls } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(
+      request({
+        dc: 15,
+        interactive: true,
+        rollDecision: { bonus: '+3', rollMode: 'blindroll', advantage: 'advantage', confirmed: true },
+      }),
+      seams
+    );
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
+    assert.equal(calls.prompt.length, 0, 'a supplied decision still opens no dialog');
+    const [rolled] = rolls.constructions;
+    assert.match(rolled, /2d20kh1/, 'and the decision still drove the roll it was handed to');
+    assert.match(rolled, /\(\+3\)/);
+  });
+
   it('treats a hand-built decision carrying confirmed:false as a cancel', async () => {
     // Constructed BY HAND rather than obtained from the prompt, because this is the assertion
     // that proves the `confirmed`-strip is load-bearing. A decision carries NO `confirmed` key
@@ -509,6 +535,77 @@ describe('AC-20 — the bulk prompt is told the WHOLE batch, not the usable subs
     assert.equal(calls.promptBulk[0].count, 4, 'the batch is what the player queued');
     assert.equal('subjects' in calls.promptBulk[0], false, 'and no thumbnail strip is claimed');
     assert.deepEqual(result.covered, [0, 2]);
+    // The two VALUES, and not merely their presence. `assertMessageDataCovers` proves the bag
+    // supplies every placeholder the string interpolates and says nothing about what it
+    // supplies: swapping `count` and `total` satisfies it in full and renders "covering 4 of
+    // 2 checks" in front of a GM. The fixture is deliberately asymmetric (2 of 4) so the swap
+    // is visible at all.
+    assert.deepEqual(
+      result.messageData,
+      { count: 2, total: 4 },
+      'count is the COVERED subset and total is the whole batch, in that assignment'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-14 (bulk half) — a HOSTILE request to the member that reads no actor
+// ---------------------------------------------------------------------------
+
+describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever formulas is', () => {
+  // AC-14 is `rollActorCheck`-only, so the `Array.isArray` guard on `request.formulas` — the
+  // single line that keeps this member's "a `stable` member NEVER THROWS" promise — is
+  // asserted by nothing. Every other case in this file hands it a real array. Drop the guard
+  // and each of these three throws a `TypeError` out of a `stable` member: a string has no
+  // `.entries()` that yields `[index, formula]` pairs the way an array does, and a plain
+  // object and a number have no `.entries()` at all.
+  for (const formulas of ['1d20', { 0: '1d20' }, 42, true, undefined, null]) {
+    it(`refuses rather than throwing for formulas ${JSON.stringify(formulas) ?? 'undefined'}`, async () => {
+      installChat();
+      installRoll();
+      const { seams, calls } = makeSeams();
+
+      const result = await resolveBulkCheckDecision({ callSite: 'gmAction', formulas }, seams);
+
+      assertBulkAnswerShape(result);
+      assert.equal(result.outcome, COMPANION_OUTCOMES.nothingToDecide);
+      assert.equal(result.success, true, 'there being nothing to decide is a correct answer');
+      assert.deepEqual(result.covered, [], 'and it claims coverage of nothing');
+      assert.equal(result.allowAdvantage, false);
+      assert.equal(calls.promptBulk.length, 0, 'and no dialog is opened about a non-batch');
+    });
+  }
+
+  it('reads only callSite and formulas, however much else the request carries', async () => {
+    installChat();
+    installRoll();
+    const { seams, calls } = makeSeams();
+
+    const result = await resolveBulkCheckDecision(
+      {
+        callSite: 'gmAction',
+        formulas: ['1d20', '2d10'],
+        // The keys a caller might expect to matter, and the ones that would matter if the
+        // request were spread anywhere: this member takes no actor and no `interactive`.
+        actorId: 'ghost',
+        interactive: false,
+        count: 99,
+        allowAdvantage: true,
+        subjects: [{ img: 'nope.webp' }],
+        promptBulk: () => ({ confirmed: false }),
+      },
+      seams
+    );
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.decided, "the caller's promptBulk is unread");
+    assert.equal(calls.promptBulk.length, 1);
+    assert.deepEqual(
+      Object.keys(calls.promptBulk[0]),
+      ['allowAdvantage', 'count'],
+      'the dialog is told exactly two things, both DERIVED from the formulas'
+    );
+    assert.equal(calls.promptBulk[0].count, 2, 'the batch size, never the caller-supplied one');
+    assert.equal(calls.promptBulk[0].allowAdvantage, false, 'derived: a 2d10 cannot honour it');
   });
 });
 
@@ -728,14 +825,21 @@ describe('AC-14 — nothing a caller supplies reaches the runner or the roll opt
     installRoll();
     const hostilePrompt = { calls: 0 };
 
-    const clean = makeSeams();
-    await rollActorCheck(request({ dc: 15 }), clean.seams);
+    // `interactive: true` and the REAL runners on both halves, deliberately. With
+    // `interactive` defaulted false and a spy runner, NOTHING in this case could have called
+    // a prompt whatever the code did, so `hostilePrompt.calls === 0` was true by
+    // construction and asserted nothing. Interactive + real runner puts the dialog on the
+    // path: the SEAM prompt is called once, which is what makes "the caller's own was called
+    // zero times" a statement about the code rather than about the fixture.
+    const clean = makeSeams({ real: true });
+    await rollActorCheck(request({ dc: 15, interactive: true }), clean.seams);
     const [cleanBag] = clean.calls.runPassFail;
+    assert.equal(clean.calls.prompt.length, 1, 'reachability: the seam prompt IS on this path');
 
-    const hostile = makeSeams();
+    const hostile = makeSeams({ real: true });
     await rollActorCheck(
       {
-        ...request({ dc: 15 }),
+        ...request({ dc: 15, interactive: true }),
         // Every key the composed bag legitimately carries, plus the two that would let a
         // caller bypass the dialog or impersonate another actor in chat.
         prompt: () => {
@@ -775,6 +879,51 @@ describe('AC-14 — nothing a caller supplies reaches the runner or the roll opt
       { alias: 'Idrin', actor: 'actor-1' },
       'the speaker is derived from the RESOLVED actor, never taken from the request'
     );
+  });
+});
+
+describe('AC-14 — the rollDecision the caller forwards is read as THREE NAMED KEYS', () => {
+  it('cannot widen the nested decision either, however much it carries', async () => {
+    // The third level, and the one the hostile case above cannot reach: a `rollDecision` is
+    // refused outright for a non-interactive roll, so the criterion's own hostile request —
+    // which carries none — leaves this level entirely unpinned. Replacing the three named
+    // reads with `{ ...rollDecision }` is a single substitution that survives every other
+    // case in this file, and it reopens exactly the hole the outer key discipline closes:
+    // the decision bag is threaded straight onto `rollOptions`, where the evaluator reads it.
+    installChat();
+    installRoll();
+    const { seams, calls } = makeSeams();
+
+    await rollActorCheck(
+      request({
+        dc: 15,
+        interactive: true,
+        rollDecision: {
+          bonus: '+3',
+          rollMode: 'blindroll',
+          advantage: 'advantage',
+          // The same two smuggles the outer level refuses, one level down.
+          prompt: () => ({ confirmed: true }),
+          speaker: { alias: 'Somebody Else', actor: 'actor-99' },
+          confirmed: true,
+          interactive: false,
+        },
+      }),
+      seams
+    );
+
+    const [bag] = calls.runPassFail;
+    assert.deepEqual(
+      Object.keys(bag.rollOptions.rollDecision),
+      ['bonus', 'rollMode', 'advantage'],
+      'the decision is read as three NAMED keys, so nothing else the caller attached survives'
+    );
+    assert.deepEqual(bag.rollOptions.rollDecision, {
+      bonus: '+3',
+      rollMode: 'blindroll',
+      advantage: 'advantage',
+    });
+    assert.equal(bag.rollOptions.prompt, seams.prompt, 'and the SEAM prompt still stands');
   });
 });
 
@@ -949,12 +1098,18 @@ describe('AC-18 — the default label composes with the template that appends " 
 // ---------------------------------------------------------------------------
 
 describe('AC-19 — a formula the retirement shim empties is refused, never rolled', () => {
-  for (const formula of ['@craftingmod', 'max(@craftingmod, 2)']) {
+  // `'   '` is the cell that makes the `.trim()` in `resolveUsableCheckFormula` load-bearing
+  // rather than decorative. The shim answers a whitespace formula VERBATIM — it empties
+  // `@craftingmod` and refuses `max(@craftingmod, 2)`, but three spaces are neither — so
+  // without the trim the emptiness test sees a non-empty string, the formula reaches the
+  // runner, and a graded check answers `checkFailed` with `total: 0`: a FABRICATED failure
+  // against the DC, indistinguishable to a caller from a real one.
+  for (const formula of ['@craftingmod', 'max(@craftingmod, 2)', '   ']) {
     for (const [arm, extra] of [
       ['graded', { dc: 15 }],
       ['ungraded', {}],
     ]) {
-      it(`${arm}: ${formula} answers noFormula and reaches no runner`, async () => {
+      it(`${arm}: ${JSON.stringify(formula)} answers noFormula and reaches no runner`, async () => {
         installChat();
         installRoll();
         const { seams, calls } = makeSeams();
@@ -970,6 +1125,25 @@ describe('AC-19 — a formula the retirement shim empties is refused, never roll
       });
     }
   }
+
+  it('is ORDERED: an unusable formula answers noFormula even with NO dice engine', async () => {
+    // The two pre-dispatch gates are ordered, and the order is spec-normative: "you gave me
+    // nothing to roll" is the better answer than "this client cannot roll" when both are
+    // true. Every other case in this suite holds at most ONE of the two facts wrong, so
+    // swapping the two gates is invisible to all of them — this is the only cell in which
+    // both are false at once, and so the only one that can see the order at all.
+    installChat();
+    installRoll();
+    const { seams, calls } = makeSeams({ hasDiceEngine: () => false });
+
+    const result = await rollActorCheck(request({ formula: '@craftingmod', dc: 15 }), seams);
+
+    assertCheckAnswerShape(result);
+    assert.equal(result.outcome, COMPANION_OUTCOMES.noFormula);
+    assert.notEqual(result.outcome, COMPANION_OUTCOMES.engineUnavailable);
+    assert.equal(calls.runPassFail.length, 0);
+    assert.equal(calls.runProgressive.length, 0);
+  });
 
   it('the bulk filter excludes an unusable entry from covered AND from allowAdvantage', async () => {
     installChat();
