@@ -27,7 +27,7 @@ Fabricate publishes exactly one named, versioned contract for outbound behaviour
 `schemaVersion` is readable from **Fabricate's own `init` hook onward**, and for the whole of `setup` and `ready`, before any collaborator exists.
 It is **not** guaranteed readable from another package's `init`.
 Foundry dispatches `init` listeners in module-script execution order, which is ordered by the `library` manifest flag and then by world module-collection order, and `relationships.requires` does not influence that order.
-Fabricate declares no `library` flag, by decision: that flag is a claim about what the package *is* rather than a load-order knob, and it would not close the hole anyway, since ordering among equal-priority packages is still world-collection order.
+Fabricate declares no `library` flag, by decision: raising one WOULD close the hole against an ordinary companion, since Foundry's package sort is stable and every `library`-flagged package's scripts run before any non-`library` package's — but the flag is a claim about what the package *is*, "no user-facing functionality," which Fabricate is not, so setting it would misdescribe the package and would additionally reorder Fabricate ahead of the game system; that trade is declined regardless, and the residual gap against another `library: true` package would remain in any case.
 
 A companion MUST therefore read the version in `setup` or `ready`.
 A companion that reads it at `init` MUST treat an absent `game.fabricate` as *Fabricate has not loaded yet* and retry — never as *this Fabricate has no contract*, and never as a trigger for a degraded path.
