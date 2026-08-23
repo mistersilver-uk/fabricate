@@ -2093,7 +2093,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Components', { selector: '.manager-icon-button[aria-label^="Edit"]' }],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      // The complications section and the two rows it renders (issue 1286). Both rows are
+      // reachable only through this editor today, so this is the frame that shows a change
+      // to them; without a claim, `mapChangedFilesToCases` would select an unrelated frame.
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-component-edit-salvage',
