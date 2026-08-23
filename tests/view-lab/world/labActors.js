@@ -359,7 +359,9 @@ const RECIPE_ITEM_COPIES = {
  *
  * `sourceItemUuid` is what decides which rung of the source ladder a row renders on: a uuid the
  * actor still owns reads as the owned copy, a uuid it does not reads as the book's DEFINITION name
- * (`lostCopy`), and no uuid at all reads as an auto-learn.
+ * (`lostCopy`), and no uuid at all reads as an auto-learn, a labelled GM grant or a label-less GM
+ * grant — the last three discriminated by `granted === true` and then by whether `grantedBy` is a
+ * usable string (issue 1289).
  */
 const LEARNED_RECIPES = {
   // The crafting actor learns EXACTLY the two progressive recipes and nothing else.
@@ -393,6 +395,27 @@ const LEARNED_RECIPES = {
     'hb-r-salve': { sourceItemUuid: 'Item.hb-book', learnedAt: 1_123_200 },
     // An auto-learn: no source at all, so the ladder falls to its bottom rung.
     'hb-r-grind': { sourceItemUuid: null, learnedAt: 1_209_500 },
+    // The two GM-grant rungs (issue 1289). BOTH are seeded, and one entry would not do:
+    // the label-less rung is the common case — a caller with nothing meaningful to say
+    // passes no label rather than its own module id — and with only the labelled entry
+    // here it would appear in no published frame at all. They sit beside the auto-learn
+    // on purpose, because "Learned by grant" against "Learned by crafting" is the pair a
+    // GM has to tell apart at 0.62rem, and the frame is the only evidence that they read
+    // as different rows rather than as one restated.
+    //
+    // `hb-r-tincture` and `hb-r-antitoxin` are chosen because they are members of NO
+    // recipe-item definition (`HERBALISM_RECIPE_ITEMS` confines membership to the unheld
+    // `hb-book`), so neither moves a Books & Scrolls `learnedByCount`; and because
+    // `evaluateKnowledgeAccess` reads `hasLearned` off the CRAFTING actor alone — Brenna
+    // — while Idrin contributes owned items only, so neither reveals a recipe to the
+    // player listing and page one of the A→Z recipe browser is byte-identical.
+    'hb-r-tincture': {
+      sourceItemUuid: null,
+      learnedAt: 1_214_000,
+      granted: true,
+      grantedBy: 'Greenwarden Milestones',
+    },
+    'hb-r-antitoxin': { sourceItemUuid: null, learnedAt: 1_216_400, granted: true },
   },
   'lab-actor-vosk': {
     // STILL sourced by an owned `total`-scope copy — the ordering hazard.
