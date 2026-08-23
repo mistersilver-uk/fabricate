@@ -5030,13 +5030,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     //
     // The reorderable stage list this case is named for is unaffected: the band is drawn INSIDE
     // the stage row, so the counterpart's own condition still holds around it.
+    // The SUBJECT is stage 1, not the panel, and that is forced rather than stylistic: claim 2 is
+    // an absence INSIDE a row, and writing it as `:has(row:not(:has(band)))` nests one `:has()`
+    // inside another, which Chromium rejects outright as an invalid selector — the case then dies
+    // at capture with a SyntaxError rather than failing an assertion. Hanging claims 1 and 3 off
+    // the panel as an ancestor and letting stage 1 be the subject keeps all three claims with no
+    // `:has()` inside any other `:has()`.
     expectSelector:
       '[data-inventory-salvage-panel="progressive"]' +
       ':has([data-progressive-stage="hb-salv-alembic-r2"] ' +
       '[data-progressive-stage-complications][data-progressive-stage-complication-tense="forecast"] ' +
       '[data-progressive-stage-complication="hb-comp-dust-cloud"])' +
-      ':has([data-progressive-stage="hb-salv-alembic-r1"]:not(:has([data-progressive-stage-complications])))' +
-      ':not(:has([data-progressive-stage-complication="hb-comp-dust-spoiled"]))',
+      ':not(:has([data-progressive-stage-complication="hb-comp-dust-spoiled"]))' +
+      ' [data-progressive-stage="hb-salv-alembic-r1"]' +
+      ':not(:has([data-progressive-stage-complications]))',
   }),
   playerCase({
     id: 'player-salvage-no-check',
