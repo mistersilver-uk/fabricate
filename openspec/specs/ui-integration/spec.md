@@ -11,6 +11,7 @@ Domain behaviour is defined in:
 - `recipe-visibility/spec.md`
 - `destructive-changes-and-migrations/spec.md`
 - `gathering-and-harvesting/spec.md`
+- `companion-api/spec.md`
 
 Global rule: if a system feature is disabled, controls for that feature are hidden.
 
@@ -2564,6 +2565,11 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
+- **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
+A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens this dialog and no other — never the subject player's client, and never a relayed one.
+Its chat flavor and its dialog titles are built from the caller's own `label`, defaulted to a **localized activity noun** so that no flavor can render `undefined` and none can render a doubled "check check".
+Its bulk prompt's item count is the caller's **whole batch**, not the usable subset, so a batch in which some formulas cannot roll still reads as the number of things the player queued.
+A dismissal is reported to the caller as `cancelled` with **zero mutation**, which is the property that capability exists to preserve.
 - **Crafting-only "Check modifier" group.**
 When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
 The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
