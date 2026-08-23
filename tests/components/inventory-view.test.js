@@ -76,6 +76,9 @@ const harness = createMountedComponentHarness({
     // HANGS this suite (# cancelled), and a speculative entry throws outright.
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
+    // The "What could go wrong" group card (issue 1286). `InventoryBulkPanel` imports it
+    // statically, and it renders the shared `ComplicationSummaryRow` already listed above.
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',

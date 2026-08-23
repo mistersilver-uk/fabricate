@@ -421,6 +421,10 @@
         "Fired": "This happened",
         "NotFired": "This didn't happen",
         "More": "+{count} more",
+        "Title": "What could go wrong",
+        "Count": "{count} could fire",
+        "OrderNote": "Your order decides how far the roll reaches.",
+        "ResultEyebrow": "Result {position} · {name} · DC {difficulty}",
         "SeverityMinor": "Minor",
         "SeverityMajor": "Major",
         "SeveritySevere": "Severe"

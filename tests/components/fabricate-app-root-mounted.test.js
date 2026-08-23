@@ -155,6 +155,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
