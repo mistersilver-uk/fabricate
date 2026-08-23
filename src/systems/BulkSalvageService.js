@@ -33,8 +33,13 @@
  * silently executing twice.
  */
 
+// The PLAYER forecast projection, and the trigger-id read that keeps it honest. Both are
+// import-free leaves, so the "what could go wrong" preview costs this service no closure.
+import { forecastComplications } from '../utils/complicationPlan.js';
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
+import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
+import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
 import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
 import { awardedQuantityOf } from './componentStacking.js';
@@ -212,6 +217,13 @@ export class BulkSalvageService {
    *   the run still FIRES every row's complications — the firing is the engine's and happens
    *   whatever this service does — and simply relays none of them, which is the same drop a
    *   world with no connected GM already takes.
+   * @param {Function} [options.getPlayerResultOrder] `({scope, id}) => string[]|null`, the
+   *   executing user's stored progressive result order — the SAME seam
+   *   `CraftingEngine` captures onto a run record at start, and read with the same
+   *   `salvage:<systemId>:<componentId>` id. Consumed by {@link BulkSalvageService#forecast}
+   *   only; the run path never reads it here, because the order a row is resolved against is
+   *   the one its own run captured. Omitted means the forecast reads the authored order,
+   *   which is what an unwired caller got before.
    * @param {Function} [options.localize] Key-only localization lookup.
    * @param {number} [options.maxItems] Defensive selection bound; see
    *   {@link BULK_MAX_ITEMS}.
@@ -222,6 +234,7 @@ export class BulkSalvageService {
     promptRollDecision = null,
     postChatMessage = null,
     deliverComplications = null,
+    getPlayerResultOrder = null,
     localize = (key) => key,
     maxItems = BULK_MAX_ITEMS,
   } = {}) {
@@ -230,6 +243,8 @@ export class BulkSalvageService {
     this.promptRollDecision = promptRollDecision;
     this.postChatMessage = postChatMessage;
     this.deliverComplications = deliverComplications;
+    this.getPlayerResultOrder =
+      typeof getPlayerResultOrder === 'function' ? getPlayerResultOrder : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this.maxItems = Number.isFinite(maxItems) && maxItems > 0 ? maxItems : BULK_MAX_ITEMS;
   }
@@ -295,6 +310,135 @@ export class BulkSalvageService {
     this._deliverComplications(entries);
     const posted = await this._postAggregateCard(entries, decision.rollDecision);
     return { cancelled: false, items, counts: countBy(items), posted };
+  }
+
+  /**
+   * The PRE-RUN complication forecast for a bulk selection (issue 1286): what could go
+   * wrong, per queued component, before anything is rolled or committed.
+   *
+   * ## It reuses pre-flight rather than filtering the targets itself
+   *
+   * The forecast must describe the run that would actually happen, so it is built over
+   * {@link BulkSalvageService#_preflight}'s classification and contributes only RUNNABLE
+   * rows. That is what makes it respect the selection cap for free: the 26th selected
+   * target is refused by POSITION as `bulkLimit`, so it is absent from the preview exactly
+   * as it will be absent from the run — and so are the duplicate, unknown-system,
+   * feature-disabled, unknown-component and salvage-disabled rows. A second filter here
+   * would be a second cap, and the two would drift.
+   *
+   * ## Progressive only, and in the PLAYER'S order
+   *
+   * Complications fire from an ordered progressive stage list; every other salvage mode
+   * returns null plan inputs from the engine, so a forecast for one would promise a
+   * consequence nothing can deliver. Within a row the stages are read in the player's
+   * stored order through the same `applyPlayerResultOrder` reconciliation the engine
+   * captures onto the run record, honouring `allowPlayerResultReorder: false` the same way
+   * — so the preview lists a row's complications in the order the roll will be spent down.
+   *
+   * ## What "per component" means, and what the count counts
+   *
+   * One group per queued `(systemId, componentId)`, in queue order: two selected rows of
+   * the same component on two actors are one warning, not two. Inside a group, entries are
+   * deduped on `(result componentId, complicationId)` — which is precisely the runtime's
+   * own firing dedupe key, so a component staged five times contributes one entry rather
+   * than five. `count` is the total of those entries and is therefore a count of DISTINCT
+   * warnings, not of predicted firings: each queued row is its own resolution, so the same
+   * complication could genuinely fire once per row, and a preview headline that said so
+   * would be arithmetic rather than a warning.
+   *
+   * Nothing here is an audience decision of this service's own: the entries come from the
+   * player forecast projection, which is where the `gmOnly` filter lives, and this service
+   * must not grow a second copy of that rule.
+   *
+   * THE SURFACE IS NOT SHIPPED. `ui-integration/spec.md` marks the bulk "What could go
+   * wrong" block PLANNED; this is the projection it will read.
+   *
+   * @param {Array<{actorId: string, actorName: string, systemId: string,
+   *   componentId: string}>} targets the selection, in the order the player sees it.
+   * @returns {{count: number, components: Array<{systemId: string|null,
+   *   componentId: string|null, name: string, img: string,
+   *   complications: Array<{id: string|null, name: string, description: string,
+   *     severity: string, visibility: string, componentId: string,
+   *     componentName: string}>}>}}
+   */
+  forecast(targets = []) {
+    const groups = new Map();
+    let count = 0;
+    for (const entry of this._preflight(targets)) {
+      if (entry.outcome !== null) continue;
+      const key = `${entry.target?.systemId}\n${entry.target?.componentId}`;
+      if (groups.has(key)) continue;
+      const complications = this._forecastComplicationsFor(entry);
+      if (complications.length === 0) continue;
+      count += complications.length;
+      groups.set(key, {
+        systemId: entry.target?.systemId ?? null,
+        componentId: entry.target?.componentId ?? null,
+        name: entry.item.name,
+        img: entry.item.img,
+        complications,
+      });
+    }
+    return { count, components: [...groups.values()] };
+  }
+
+  /**
+   * One runnable row's ordered progressive stage results, or `[]` when the row cannot
+   * produce a stage list at all.
+   *
+   * Mirrors `CraftingEngine._resolveProgressiveSalvageAward`'s ordering half exactly: the
+   * FIRST result group, reordered by the player's stored order unless the GM pinned the
+   * authored one. It stops short of the award loop, which needs a rolled budget this
+   * forecast deliberately does not have.
+   *
+   * @private
+   */
+  _forecastStageResults(entry) {
+    const salvage = entry.component?.salvage ?? null;
+    const groups = Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [];
+    const authored = Array.isArray(groups[0]?.results) ? groups[0].results : [];
+    if (authored.length === 0) return authored;
+    if (salvage?.allowPlayerResultReorder === false) return authored;
+    // The id space is `<systemId>:<componentId>` because component ids are not globally
+    // unique; it must match the store's write key and the engine's capture key exactly, or
+    // the forecast quietly reads the authored order while the run reads the player's.
+    const ordered = this.getPlayerResultOrder({
+      scope: 'salvage',
+      id: `${entry.target?.systemId}:${entry.target?.componentId}`,
+    });
+    return applyPlayerResultOrder(authored, ordered);
+  }
+
+  /**
+   * The player-visible complications one runnable row could fire, in stage order, deduped
+   * on the runtime's own `(componentId, complicationId)` firing key.
+   *
+   * The component a stage names is the one it PRODUCES, never the component being
+   * salvaged — a complication is authored on the yield.
+   *
+   * @private
+   */
+  _forecastComplicationsFor(entry) {
+    const { mode, config, unsupportedMode } = resolveSalvageCheck(entry.system);
+    if (unsupportedMode || mode !== 'progressive') return [];
+    const results = this._forecastStageResults(entry);
+    if (results.length === 0) return [];
+    const componentIndex = getDefinitionIndex(entry.system?.components);
+    const checkTriggerIds = checkTriggerIdsOf(config?.checkBreakage);
+    const seen = new Set();
+    const forecast = [];
+    for (const result of results) {
+      const componentId = result?.componentId || result?.systemItemId || null;
+      const component = componentId ? findById(componentIndex, componentId) : null;
+      const entries = forecastComplications(component, { activity: 'salvage', checkTriggerIds });
+      for (const complication of entries) {
+        const pair = `${componentId}\n${complication.id}`;
+        if (seen.has(pair)) continue;
+        seen.add(pair);
+        forecast.push({ ...complication, componentId, componentName: component?.name || '' });
+      }
+    }
+    return forecast;
   }
 
   /**

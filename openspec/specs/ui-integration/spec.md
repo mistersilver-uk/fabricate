@@ -2826,6 +2826,12 @@ Read every requirement below as "when the strip lands, it MUST".
 
 The strip renders a component's complications inside its own stage row, and it is to be a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it does today, and the crafting and salvage bodies are both to pass it so neither gets a private copy of the treatment.
 
+**The data is published on the stage row, and the strip MUST NOT re-derive any of it.**
+Both progressive read-models attach the player projection to the stage rows they already publish — `InventoryListingBuilder._buildSalvage` for salvage and `CraftingListingBuilder._buildProgressiveStages` for crafting — through the one shared `attachStageComplications` helper, so the audience filter, the activity gate and the could-never-fire exclusion are all decided builder-side against the same records the engine fires from.
+A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed; the presence of the DATA is still never the switch, only the caller's opt-in.
+The projection is attached TO the row rather than published beside it because the player's reorder is applied downstream of the builder, and a parallel list keyed by result id would desynchronise at exactly that point.
+Marking the fired tense onto an already-attached list is the paired `markFiredStageComplications`, which only ever MARKS what the forecast already published and can therefore never surface a record the forecast withheld.
+
 - The strip has **two tenses**, and one filter cannot serve both.
   Before any roll it is a **forecast** — the `visibility: 'visible'` complications this component COULD fire in this activity, read from the player forecast projection, with no roll and no run.
   After a resolution it additionally marks which of them **fired**.
@@ -3270,7 +3276,8 @@ The player's route to salvage.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure (PLANNED).**
   The panel's progressive body is to render the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
-  That strip is the planned player surface described there; this build ships the projection it reads and the GM authoring that fills it, and no strip.
+  That strip is the planned player surface described there; this build ships the projection it reads — attached per stage to `salvage.stages[]`, filtered against salvage's OWN progressive check block — and the GM authoring that fills it, and no strip.
+  The projection is published only for a progressive salvage, because every other mode resolves without an ordered stage list and so can fire nothing.
   The audience rules in the rest of this bullet are normative TODAY for every projection a player surface may read, and normative for the strip when it lands.
   A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
   A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
@@ -3285,6 +3292,8 @@ The player's route to salvage.
 - **Bulk complication forecast (PLANNED).**
   The bulk panel is to render a pre-run **"What could go wrong"** block above the queue, titled by a count of what could fire and drawn from the player **forecast** projection, exactly as the prototype draws it.
   Nothing under the bulk panel draws complication content today; the projection ships and the block does not.
+  `BulkSalvageService.forecast(targets)` is that projection: it classifies the selection through the SAME pre-flight the run uses, so it inherits the selection cap and every skip reason by construction rather than by a second filter; it reads each runnable row's stages in the player's stored order under the same `salvage:<systemId>:<componentId>` key the engine captures onto a run record; and it returns one group per queued `(systemId, componentId)` in queue order.
+  Entries within a group are deduped on `(result componentId, complicationId)` — the runtime's own firing key — and the headline count is a count of DISTINCT warnings rather than of predicted firings, because each queued row is its own resolution and the same complication can genuinely fire once per row.
   It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
   It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
   The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.

@@ -45,6 +45,10 @@
  */
 
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
+// The player-visible per-stage complication forecast (issue 1286), attached to the stage
+// rows this builder already publishes. An import-free leaf, on the same grounds as
+// `progressiveStageThresholds` beneath it.
+import { attachStageComplications } from '../utils/progressiveStageComplications.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
@@ -1223,7 +1227,7 @@ export class CraftingListingBuilder {
       awardMode: this._progressiveAwardMode(system, mode),
     });
 
-    return results.map((result, index) => {
+    const stages = results.map((result, index) => {
       const componentId = result?.componentId || result?.systemItemId;
       const component = componentId ? byId.get(componentId) : null;
       const difficulty = costFor(result);
@@ -1239,6 +1243,24 @@ export class CraftingListingBuilder {
         // loop skips): the row omits the badge rather than showing a wrong number.
         threshold: thresholds[index] ?? null,
       };
+    });
+
+    // FORECAST-ONLY, and that is a property of crafting rather than an omission: the fired
+    // record is defined on the salvage RUN record, and the immediate crafting path writes
+    // no run, so there is nothing for `markFiredStageComplications` to read here. Nothing
+    // is marked fired, which is also the un-rolled state — no crafting stage ever claims a
+    // complication fired.
+    //
+    // Identity-preserving, so a recipe whose result components author no player-visible
+    // complication publishes the stage rows it published before issue 1286.
+    return attachStageComplications(stages, {
+      componentById: byId,
+      activity: 'crafting',
+      // The RECIPE's progressive check block, read the same way
+      // `CraftingEngine._resolveCraftingCheckBreakage` reads it for this mode. Reaching for
+      // `salvageCraftingCheck` here would filter the forecast against another activity's
+      // trigger id space.
+      checkBreakage: system?.craftingCheck?.progressive?.checkBreakage ?? null,
     });
   }
 

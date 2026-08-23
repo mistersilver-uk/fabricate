@@ -528,6 +528,11 @@ Without that name a player reading "you missed the iron ingot" against an output
 
 Fire order is the ordered stage list's own order: the player's reordered list for crafting, the order captured onto the run at start for salvage, and the authored order for gathering, which has no reorder feature.
 
+The two halves of that rule read differently on a player surface, and both readings are normative.
+EVALUATION is per result entry, so a component staged five times is FORECAST on all five: a player reordering the list has to see, on each entry, what that entry could cost them.
+FIRING is once per `(componentId, complicationId)`, so the fired mark lands on exactly one of those five — the occurrence the fired record names — and the other four keep reading not-fired.
+A surface that collapsed the forecast to one entry per component would hide the cost of the very reordering the list exists for, and one that marked every occurrence would claim a `1d6` complication rolled five times.
+
 #### Documented consequences
 
 These follow from the model above and are recorded rather than fixed.

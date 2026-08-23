@@ -8,6 +8,7 @@ import {
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
+import { authoredComplication } from './helpers/complicationFixtures.js';
 
 // A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the
 // engine actually rolls against (`_resolveSimpleCheckDc`), so the parity assertions
@@ -1158,5 +1159,91 @@ describe('CraftingListingBuilder — progressive stages (F1)', () => {
       ],
     });
     assert.equal(recipe.progressiveStages.length, 3, 'the showResults true branch');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Progressive component complications (issue 1286) — the PLAYER forecast, which the
+// crafting read-model publishes on the same stage rows the stage list already renders.
+// ---------------------------------------------------------------------------
+
+describe('CraftingListingBuilder — progressive complication forecast (1286)', () => {
+  const systemWith = (complications) => ({
+    ...makeSystem(),
+    resolutionMode: 'progressive',
+    craftingCheck: {
+      simple: {},
+      routed: {},
+      progressive: { rollFormula: '2d6', awardMode: 'equal' },
+    },
+    components: [
+      { id: 'c1', name: 'Iron Sword', img: 'icons/sword.webp', difficulty: 3, complications },
+      { id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp', difficulty: 5 },
+    ],
+  });
+
+  const GROUPS = [
+    {
+      id: 'g1',
+      name: 'Stages',
+      checkOutcomeIds: [],
+      results: [
+        { id: 'r1', componentId: 'c1' },
+        { id: 'r2', componentId: 'c2' },
+        { id: 'r3', componentId: 'c1' },
+      ],
+    },
+  ];
+
+  const stagesFor = (complications) =>
+    buildOne({
+      system: systemWith(complications),
+      entries: [{ recipe: makeRecipe({ resultGroups: GROUPS }), access: { reason: 'ok' } }],
+    }).recipe.progressiveStages;
+
+  it('attaches the forecast per RESULT ENTRY, never once per component', () => {
+    const stages = stagesFor([authoredComplication()]);
+    assert.deepEqual(
+      stages.map((stage) => (stage.complications ?? []).map((entry) => entry.name)),
+      [['Shrapnel'], [], ['Shrapnel']],
+      'the same component staged twice is warned about on both entries'
+    );
+    assert.ok(!('complications' in stages[1]), 'and the untouched entry keeps no key');
+  });
+
+  it('never claims a crafting stage FIRED: crafting has no run record to read one from', () => {
+    const stages = stagesFor([authoredComplication()]);
+    assert.deepEqual(
+      stages.flatMap((stage) => (stage.complications ?? []).map((entry) => entry.fired)),
+      [false, false],
+      'forecast-only, which is also the un-rolled state'
+    );
+  });
+
+  it('drops a gmOnly complication and leaves the stage rows byte-identical', () => {
+    const none = stagesFor([]);
+    const gmOnly = stagesFor([authoredComplication({ visibility: 'gmOnly' })]);
+    assert.equal(JSON.stringify(gmOnly), JSON.stringify(none));
+    assert.deepEqual(Object.keys(none[0]), [
+      'id',
+      'componentId',
+      'name',
+      'img',
+      'difficulty',
+      'threshold',
+    ]);
+  });
+
+  it('REDACTION: a teaser that hides results surfaces no forecast either', () => {
+    const { recipe } = buildOne({
+      system: systemWith([authoredComplication()]),
+      entries: [
+        {
+          recipe: makeRecipe({ resultGroups: GROUPS }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['results'] } },
+        },
+      ],
+    });
+    assert.deepEqual(recipe.progressiveStages, []);
   });
 });

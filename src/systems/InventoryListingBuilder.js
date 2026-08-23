@@ -67,6 +67,11 @@ import {
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
+// The player-visible per-stage complication forecast, attached to the stage rows this
+// builder already publishes. Another deliberately import-free leaf (its one import is the
+// pure `complicationPlan.js`), so the audience filter reaches the panel without the
+// complication RUNTIME's import closure following it.
+import { attachStageComplications } from '../utils/progressiveStageComplications.js';
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
 // A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
@@ -1448,7 +1453,11 @@ export class InventoryListingBuilder {
    * mode.
    *
    * The panel is presentational: mode, usability, DC, thresholds and stage ordering
-   * are all decided here, against the same fields the engine dispatches on.
+   * are all decided here, against the same fields the engine dispatches on. Progressive
+   * component complications (issue 1286) join that list: which of a stage's complications
+   * a player may be told about is decided HERE, through the pure player projection, and a
+   * panel filtering an authored list in Svelte would reintroduce exactly the disclosure
+   * this builder-side filter exists to prevent.
    *
    * @param {object} args
    * @param {object} args.system  The owning crafting system.
@@ -1528,6 +1537,15 @@ export class InventoryListingBuilder {
     });
     const toolsAvailable = toolStates.every((tool) => tool.available === true);
 
+    // Progressive-only, because progressive is the only mode that HAS stages: the engine
+    // fires complications from an ordered stage list and returns null plan inputs for every
+    // other salvage mode, so a forecast on a `simple` or `routed` panel would promise a
+    // consequence nothing can deliver.
+    const stages =
+      mode === 'progressive' && !misconfigured
+        ? this._salvageStages({ system, salvage, componentById })
+        : [];
+
     return {
       enabled: true,
       mode,
@@ -1557,10 +1575,20 @@ export class InventoryListingBuilder {
         mode === 'routed' && !misconfigured
           ? this._salvageRoutedOutcomes({ salvage, config, routedType, component, componentById })
           : [],
-      stages:
-        mode === 'progressive' && !misconfigured
-          ? this._salvageStages({ system, salvage, componentById })
-          : [],
+      // Each row's player-visible complication FORECAST rides on the row itself (see
+      // `attachStageComplications`), so the store's reorder carries it and a panel never
+      // has to rejoin it. Identity-preserving: a component authoring none — which is every
+      // component predating issue 1286 — gets the array and the rows it got before.
+      stages: attachStageComplications(stages, {
+        componentById,
+        activity: 'salvage',
+        // Salvage's OWN active check block, never the recipe's. `config` is already
+        // `salvageCraftingCheck[mode]`, and `_resolveSalvageCheckBreakage` reads its
+        // `checkBreakage` off exactly this object, so the ids the forecast filters on are
+        // the ids the firing will match against. Unguarded by mode because `stages` is
+        // empty for every mode but progressive, and an empty list forecasts nothing.
+        checkBreakage: config?.checkBreakage ?? null,
+      }),
       // SALVAGE'S OWN award mode (`salvageCraftingCheck.progressive.awardMode`),
       // independently authored from the recipe's. Surfaced because a stage threshold is
       // a property of its POSITION, so reordering invalidates the baked values and the
