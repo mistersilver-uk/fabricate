@@ -36,6 +36,12 @@ const harness = createMountedComponentHarness({
     // are import-free, so copying them verbatim resolves the compiled store's graph.
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
+    // And these three since issue 1286: the store marks the fired complication tense onto
+    // the stage rows through `progressiveStageComplications`, whose own closure is
+    // `complicationPlan` -> `componentComplications`.
+    'src/utils/progressiveStageComplications.js',
+    'src/utils/complicationPlan.js',
+    'src/utils/componentComplications.js',
   ],
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [

@@ -312,6 +312,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/progressiveStageThresholds.js',
   // The player's stored stage order is reconciled against the authored list here.
   'src/utils/progressiveResultOrder.js',
+  // Same rule, issue 1286: both progressive read-models attach each stage's player
+  // complication forecast through this leaf, and `inventoryStore` marks the fired tense
+  // with its sibling export. It is a leaf but for `complicationPlan.js`, which is itself a
+  // leaf but for the frozen complication vocabularies — so these three entries close it.
+  'src/utils/progressiveStageComplications.js',
+  'src/utils/complicationPlan.js',
+  'src/utils/componentComplications.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 

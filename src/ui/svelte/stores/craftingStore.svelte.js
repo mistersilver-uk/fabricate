@@ -301,6 +301,25 @@ export function createCraftingStore({ services } = {}) {
   // with the top row claiming a higher bar than the row beneath. Recomputing through the
   // SAME helper the builder used (pinned by an oracle against the award loop) is what
   // keeps the badge and the award in step.
+  //
+  // THE PLAYER COMPLICATION PROJECTION RIDES ALONG, AND CRAFTING IS FORECAST-ONLY (issue
+  // 1286). `CraftingListingBuilder._buildProgressiveStages` attaches each stage's
+  // player-visible forecast to the row through `attachStageComplications`, and the spread
+  // below carries it across the reorder for free — which is the whole reason the
+  // projection hangs ON the row rather than beside it, since a parallel list keyed by
+  // result id would desynchronise at exactly this point.
+  //
+  // There is deliberately NO fired-tense pass here, and one must not be added. The fired
+  // record is defined on the SALVAGE RUN record; the immediate crafting path writes none,
+  // so this surface has nothing to read and inventing a second carrier for it is out of
+  // scope. Every entry therefore reads `fired: false`, which is also the honest pre-roll
+  // state. Nor may a component re-derive the tense from a stage being short: `match` and
+  // the condition roll mean a missed stage need not have fired anything.
+  //
+  // No audience filter belongs here either. The rows arrive already redacted — the
+  // `visibility: 'visible'` filter, the activity gate and the could-never-fire exclusion
+  // all ran builder-side against the same records the engine fires from — so a second copy
+  // of that rule in the store or in a panel is only an opportunity for the two to drift.
   const orderedProgressiveStages = $derived.by(() => {
     const stages = Array.isArray(selectedRecipe?.progressiveStages)
       ? selectedRecipe.progressiveStages

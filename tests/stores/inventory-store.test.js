@@ -50,6 +50,11 @@ describe('inventoryStore', () => {
     // copying them verbatim is enough for the compiled store's imports to resolve.
     compiler.copyPlain('src/utils/progressiveResultOrder.js');
     compiler.copyPlain('src/utils/progressiveStageThresholds.js');
+    // And the fired-tense marker's closure (issue 1286):
+    // progressiveStageComplications -> complicationPlan -> componentComplications.
+    compiler.copyPlain('src/utils/progressiveStageComplications.js');
+    compiler.copyPlain('src/utils/complicationPlan.js');
+    compiler.copyPlain('src/utils/componentComplications.js');
     ({ createInventoryStore } = await compiler.load(
       'src/ui/svelte/stores/inventoryStore.svelte.js'
     ));
