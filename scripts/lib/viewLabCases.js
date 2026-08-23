@@ -2093,15 +2093,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Components', { selector: '.manager-icon-button[aria-label^="Edit"]' }],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      // The complications section and the two rows it renders (issue 1286). Both rows are
-      // reachable only through this editor today, so this is the frame that shows a change
-      // to them; without a claim, `mapChangedFilesToCases` would select an unrelated frame.
-      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
-    ],
+    // The three complication components are claimed by the four `*-complications-*` and
+    // `*-salvage-stage-strip` cases below, NOT here (issue 1286). This case runs on the
+    // default system, `lab-smithing`, which resolves crafting, salvage and gathering
+    // non-progressively — and `ComponentComplicationsSection`'s own gate is "some activity in
+    // this system is progressive", so the section renders nothing at all in this frame. A
+    // claim here would route a change to those files at a photograph that provably cannot
+    // contain them, which is the unrelated-evidence failure the registry's own orphan check
+    // exists to prevent and which no mechanical gate catches: the files ARE in the mounted
+    // closure, so both directions of `view-lab-source-coverage` pass either way.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
     id: 'manager-component-edit-salvage',
@@ -2167,6 +2168,176 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
+
+  // ── PROGRESSIVE COMPONENT COMPLICATIONS (issue 1286) ──────────────────────────────────────────
+  //
+  // Five frames, and every one of them is on `lab-herbalism` because no other lab system can draw
+  // any of them: `ComponentComplicationsSection` gates itself on "some activity in this system
+  // resolves progressively", and herbalism is the world's only progressive system on any axis.
+  // The default system, `lab-smithing`, renders the section not at all — which is why
+  // `manager-component-edit-normal` above deliberately does NOT claim these files.
+  //
+  // All five are `reaches: 'beyond'` with no smoke labels: the live Foundry smoke walks no
+  // complication authoring, no progressive salvage editor strip and no Recipe Studio stage strip,
+  // so there is no counterpart to fall short of. That is the honest declaration, not a way around
+  // the `exact` collision rule — these five have distinct steps and would not collide anyway.
+  //
+  // The fixture is what makes each state reachable, and it is authored in
+  // `tests/view-lab/world/labContent.js` rather than reached by clicking: Ground Reagent carries
+  // two complications, Frostcap Mushroom one, and Empty Vial — stage ONE of both progressive
+  // lists — carries none, so both strips draw a bare row above two annotated ones.
+  managerCase({
+    id: 'manager-component-complications-empty',
+    label: 'Manager — Component complications empty',
+    // The section's EMPTY state, which is `EmptyState`'s new `inline` variant (issue 1286) and
+    // exists on no other screen: the stack flips to a row and the 46px icon tile is released
+    // into a bare glyph, neither of which `is-compact` does. Empty Vial is the component that
+    // authors none, so this is the one editor in a progressive system that draws it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-empty-vial"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-complications-section]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The empty state ITSELF, not merely the section: a component that silently acquired a
+    // complication would still render the section and would publish the populated list under a
+    // case whose whole subject is that there is nothing to list.
+    expectSelector: '.fabricate-manager [data-complications-section] [data-complications-empty]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-component-complications-collapsed',
+    label: 'Manager — Component complications collapsed',
+    // The resting list: two summary rows, both closed. It is the frame that shows the row
+    // anatomy — severity tile, name, generated trigger sentence, Player pill, severity chip and
+    // the activity glyph run — and the two rows differ on every one of those axes on purpose.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-complications-section]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // A ROW, and specifically the authoring variant. `ComplicationSummaryRow` renders three
+    // variants off one scaffold, so asserting the shared class alone would pass on the read-only
+    // strip this screen also draws further up.
+    expectSelector:
+      '.fabricate-manager [data-complications-section] [data-complication-row="authoring"]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-component-complications-expanded',
+    label: 'Manager — Component complications expanded',
+    // The OPEN row, which is where the section's whole authoring surface lives: the identity
+    // strip, the Applies-to chips, and the When and Then cards with six `ComplicationEffectRow`
+    // instances between them. `hb-comp-dust-cloud` is opened rather than its sibling because it
+    // is the one whose condition roll AND effect roll are both enabled — the revealed input
+    // strips render only when their row is on, so opening the other would photograph six
+    // collapsed heads and none of the controls.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
+      // The LAST row of the When card, so `scrollIntoViewIfNeeded` — which lands its anchor near
+      // the bottom edge — puts the whole card and the identity strip above it in one frame.
+      { selector: '[data-complication-roll-condition]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // `aria-expanded`, not merely the presence of the detail: a disclosure that silently stopped
+    // toggling would leave the row closed and publish the collapsed frame under this name.
+    expectSelector:
+      '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
+      '[data-complication-disclosure][aria-expanded="true"]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-component-complications-salvage-stage-strip',
+    label: 'Manager — Component complications salvage stage strip',
+    // The READ-ONLY strip under a progressive salvage stage row. `hb-cracked-alembic` is the
+    // world's only progressive-salvage component, and its three stages are Empty Vial (no
+    // complications), Ground Reagent (two) and Frostcap Mushroom (one) — so one frame carries
+    // the bare row, the two-row band and the one-row band together, which is what makes the
+    // band's PLACEMENT legible: it hangs off the row it annotates rather than sitting in the
+    // list as another stage.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-salvage-stage-complications]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-salvage-stage-complications] [data-complication-row="readonly-gm"]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-complications-stage-strip',
+    label: 'Manager — Recipe complications stage strip',
+    // The Recipe Studio's counterpart, and the reason it is a SEPARATE frame rather than the
+    // same one photographed twice: the two strips are deliberately asymmetric. The Component
+    // Studio hangs the band OUTSIDE the stage row, tucked and left-ruled; the Recipe Studio
+    // draws it INSIDE the stage card as an own-line section. Both are the prototypes' own rule,
+    // and a single frame could not show that the two disagree on purpose.
+    //
+    // `hb-r-grind` produces the same three components in the same order as the salvage list
+    // above, so the bare-stage adjacency reads identically on both surfaces.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-result-complications]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager [data-recipe-result-complications] [data-complication-row="readonly-gm"]',
+    kinds: ['manager', 'recipes', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultItemRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+    ],
+  }),
+
   managerCase({
     id: 'manager-checks-gathering',
     label: 'Manager — Checks gathering',

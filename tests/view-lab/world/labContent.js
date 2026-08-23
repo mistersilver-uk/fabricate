@@ -339,6 +339,136 @@ const SMITHING_COMPONENTS = [
   }),
 ];
 
+/**
+ * The PROGRESSIVE COMPONENT COMPLICATIONS the lab authors (issue 1286).
+ *
+ * ## Why herbalism, and why these three components
+ *
+ * `lab-herbalism` is the world's only system with a progressive mode anywhere, so it is the
+ * only system in which `ComponentComplicationsSection` renders at all — its own gate is
+ * "some activity in this system resolves progressively", and smithing, alchemy, jewelry and
+ * runework all fail it. Every complication frame is therefore a herbalism frame.
+ *
+ * The three carriers are chosen so that ONE authored set feeds all four GM surfaces:
+ *
+ *   - `hb-cracked-alembic` is the world's progressive-SALVAGE component, and its ordered
+ *     stages are Empty Vial → Ground Reagent → Frostcap Mushroom;
+ *   - `hb-r-grind` is the world's progressive-CRAFTING recipe, and its ordered results are
+ *     the SAME three components in the same order.
+ *
+ * So authoring on Ground Reagent and Frostcap Mushroom draws a strip under stages 2 and 3 of
+ * both the Component Studio's salvage list and the Recipe Studio's stage card, and Empty Vial
+ * — which authors NONE — leaves stage 1 bare in both. That adjacency is the placement ruling
+ * the prototype makes and is the reason one stage is deliberately left empty: a strip under
+ * every row would prove nothing about where the band hangs.
+ *
+ * ## The shape is the PERSISTED one, verbatim
+ *
+ * `_normalizeComponent` runs `authoredComplications` over this on every lab boot, and that is
+ * an allowlist rebuild. Authoring the full literal — every vocabulary token, both nested
+ * effect records, `checkTrigger` explicitly `null` — means the normalized value is byte-equal
+ * to what is written here, so a frame shows the fixture rather than a repair of it.
+ *
+ * ## `checkTrigger` is `null` on every one of them, and that is a WORLD constraint
+ *
+ * `complicationTriggerOptions` is built from `checkBreakage.triggers` on the three PROGRESSIVE
+ * check blocks, and this world authors triggers on exactly one block — runework's ROUTED
+ * crafting check — under a recorded decision that seeding the salvage and herbalism blocks
+ * would rewrite already-captured Checks frames for no extra evidence (see `ROUTED_CHECK`).
+ * That decision stands here: a trigger clause naming an id this system does not own is inert
+ * by contract, and authoring one would photograph the "Trigger no longer exists" degrade
+ * rather than the picker. The trigger row therefore renders in its off, empty-picker state,
+ * which is the honest state for a system with no authored progressive trigger.
+ *
+ * ## Visibility, deliberately mixed
+ *
+ * Two are `visible` and one is `gmOnly`, because the Player pill and its absence are the same
+ * row treatment read two ways — and because `gmOnly` is the DEFAULT, so a fixture where every
+ * complication were visible would photograph the exception and never the rule. The `gmOnly`
+ * one is also the only one enabled for gathering, which no lab system resolves progressively,
+ * so the "· not progressive" chip annotation and the dimmed activity glyph both appear.
+ */
+const GROUND_REAGENT_COMPLICATIONS = [
+  {
+    id: 'hb-comp-dust-cloud',
+    name: 'Choking dust',
+    description:
+      'The reagent goes up in a fine bitter cloud. Everyone at the bench coughs through the next exchange.',
+    // SEVERE, and the severity is chosen rather than picked: the parity spec measures this
+    // row's severity tile and pill against the prototype's first summary row, whose seed
+    // record is `severe`, and a severity token is what selects the whole colour family. Two
+    // rows carrying different severities would report every colour on both as drift, which is
+    // a fact about two fixtures rather than about the design.
+    severity: 'severe',
+    // VISIBLE, so the Player pill is on screen. It is the exception rather than the rule —
+    // see the header note on why the set is mixed. It also matches the prototype's first row,
+    // for the same reason the severity does: the pill's own treatment is measured.
+    visibility: 'visible',
+    activities: { crafting: true, salvage: true, gathering: false },
+    match: 'any',
+    when: { stageAwarded: true, stagePartial: false, stageMissed: true, checkTrigger: null },
+    // BOTH effect rows enabled, which is what makes the expanded authoring frame show the
+    // revealed input strips at all: `ComplicationEffectRow` renders its `children` only when
+    // the row is on, so a fixture with everything off photographs six collapsed heads.
+    rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: true, expr: '1d4', label: 'Choking dust' },
+  },
+  {
+    id: 'hb-comp-dust-spoiled',
+    name: 'Spoiled batch',
+    description:
+      'What comes off the pestle is grey and inert. It measures as the real thing and behaves as chalk.',
+    severity: 'minor',
+    visibility: 'gmOnly',
+    // The gathering axis is on, and no lab system resolves gathering progressively, so this
+    // is the one row that draws the dimmed activity glyph and the "· not progressive" chip.
+    activities: { crafting: true, salvage: true, gathering: true },
+    match: 'all',
+    when: { stageAwarded: true, stagePartial: false, stageMissed: false, checkTrigger: null },
+    rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: false, expr: '1d6', label: '' },
+  },
+];
+
+const FROSTCAP_COMPLICATIONS = [
+  {
+    id: 'hb-comp-frostcap-shatter',
+    name: 'The cap shatters',
+    description:
+      'The fungus is more ice than flesh by now. Handled short of its stage it bursts across the bench.',
+    // The THIRD severity token, so all three of `ComplicationSummaryRow`'s severity families —
+    // info, warning and danger — are on one screen: this band and Ground Reagent's two rows
+    // sit in the same salvage list, and a fixture that authored one token would leave two of
+    // the three tile treatments depicted nowhere.
+    severity: 'major',
+    // Visible, because it is the complication that fires on the HALTED stage of the resolved
+    // run `labRunStates.js` seeds, and `firedComplications` is written with
+    // `publicComplications` — a `gmOnly` one could not appear there at all.
+    visibility: 'visible',
+    activities: { crafting: true, salvage: true, gathering: false },
+    match: 'any',
+    when: { stageAwarded: false, stagePartial: false, stageMissed: true, checkTrigger: null },
+    rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: true, expr: '2d6', label: 'Freezing shards' },
+  },
+];
+
+/**
+ * The ordered stages of `hb-cracked-alembic`'s progressive salvage, with EXPLICIT result ids.
+ *
+ * `_normalizeSalvageResult` mints `result.id || foundry.utils.randomID()`, so an unauthored
+ * result gets a fresh id on every lab boot. That was harmless while nothing referenced one;
+ * `labRunStates.js` now seeds a resolved run whose `resultOrder` and `firedComplications`
+ * name these stages by id, and a run pointing at ids the world minted this morning would
+ * reconcile against nothing — the strip would claim no stage fired while the record said two
+ * did. Naming them here is what makes that record stable across boots.
+ */
+export const CRACKED_ALEMBIC_STAGE_IDS = Object.freeze({
+  vial: 'hb-salv-alembic-r1',
+  reagent: 'hb-salv-alembic-r2',
+  frostcap: 'hb-salv-alembic-r3',
+});
+
 const HERBALISM_COMPONENTS = [
   component('hb-moonleaf', 'Moonleaf', 'commodities/flowers/blooms-purple.webp', {
     categories: ['Herbs'],
@@ -362,7 +492,15 @@ const HERBALISM_COMPONENTS = [
     'hb-frostcap',
     'Frostcap Mushroom',
     'consumables/mushrooms/campanulate-bell-shiny-blue.webp',
-    { categories: ['Herbs'], tags: ['fungus'], difficulty: 4, essences: { water: 2 } }
+    {
+      categories: ['Herbs'],
+      tags: ['fungus'],
+      difficulty: 4,
+      essences: { water: 2 },
+      // The LAST stage of both progressive lists, and the one a mid-range roll cannot
+      // afford — so it is the missed stage the seeded run in `labRunStates.js` halts on.
+      complications: FROSTCAP_COMPLICATIONS,
+    }
   ),
   component('hb-emberbloom', 'Emberbloom', 'commodities/flowers/blooms-pink.webp', {
     categories: ['Herbs'],
@@ -376,6 +514,11 @@ const HERBALISM_COMPONENTS = [
     'consumables/potions/bottle-round-corked-blue.webp',
     { categories: ['Bases'], tags: ['solvent'], difficulty: 1, essences: { water: 1 } }
   ),
+  // DELIBERATELY carries no `complications`, and that absence is load-bearing twice over. It
+  // is stage ONE of both progressive lists, so both GM strips draw a bare stage row above two
+  // annotated ones — the placement ruling the prototype makes, which a fixture that authored a
+  // complication on every stage could not depict. It is also the component the empty-state
+  // frame edits, so `EmptyState`'s new `inline` variant has a screen to be photographed on.
   component('hb-empty-vial', 'Empty Vial', 'consumables/potions/bottle-bulb-empty-glass.webp', {
     categories: ['Bases'],
     tags: ['vessel'],
@@ -385,6 +528,10 @@ const HERBALISM_COMPONENTS = [
     categories: ['Bases'],
     tags: ['prepared'],
     difficulty: 2,
+    // TWO complications on one component, because a strip with a single row cannot show the
+    // band's own stacking gap and because the collapsed authoring list needs a second row to
+    // be a list at all.
+    complications: GROUND_REAGENT_COMPLICATIONS,
   }),
   component(
     'hb-healing-potion',
@@ -445,10 +592,24 @@ const HERBALISM_COMPONENTS = [
           {
             id: 'hb-salv-alembic',
             name: 'Stripped glassware',
+            // IDs are AUTHORED rather than minted — see CRACKED_ALEMBIC_STAGE_IDS for why a
+            // run record that names a stage cannot survive a per-boot random id.
             results: [
-              { componentId: 'hb-empty-vial', quantity: 2 },
-              { componentId: 'hb-mortar-dust', quantity: 1 },
-              { componentId: 'hb-frostcap', quantity: 1 },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.vial,
+                componentId: 'hb-empty-vial',
+                quantity: 2,
+              },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.reagent,
+                componentId: 'hb-mortar-dust',
+                quantity: 1,
+              },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.frostcap,
+                componentId: 'hb-frostcap',
+                quantity: 1,
+              },
             ],
           },
         ],
