@@ -53,6 +53,23 @@ export default defineConfig(({ command }) => {
         // Vite has to be allowed to read outside this repo. Scoped to that one directory
         // rather than opened up, and omitted entirely when premium is not checked out.
         fs: { allow: ['.', ...(premiumSourceRoot() ? [premiumSourceRoot()] : [])] },
+        // WATCH ONLY THE SOURCE. Everything below is gitignored, read-only, and enormous, and
+        // chokidar costs one inotify handle PER FILE against a budget of 65,536 for the whole
+        // user session on a stock Linux box. `.worktrees/` alone holds a full checkout per agent
+        // lane — over 130,000 files here — so the dev server cannot start at all while any lane
+        // exists: it dies with `ENOSPC ... watch '<some>.hbs'` naming a file in another
+        // worktree's system cache, which reads as a Vite bug rather than a watch-budget one.
+        // None of these trees is ever edited, so watching them buys nothing at any price.
+        watch: {
+          ignored: [
+            '**/.worktrees/**',
+            '**/.foundry-e2e/**',
+            '**/.foundry-chrome/**',
+            '**/ui-screenshot-artifact/**',
+            '**/test-results/**',
+            '**/dist/**',
+          ],
+        },
         proxy: {
           '/socket.io': { target: 'http://localhost:30000', ws: true },
         },
