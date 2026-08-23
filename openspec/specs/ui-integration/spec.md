@@ -2849,6 +2849,20 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The band is explicitly NOT draggable.
   Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
 - The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (§Component Studio requirement 16).
+- **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
+  Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
+  The band's own fill and top rule change with the tense; the tile does not.
+- **The badge's copy is tensed, and a resolved stage does not still forecast.**
+  Before a resolution the badge reads in the future tense ("this can go wrong"); after one, a complication that did NOT fire reads a past-tense negative.
+  A row that still says "this can go wrong" beneath a spent roll asserts something that is no longer true, and the player has no way to tell it from a row that is genuinely still pending.
+  The design prototype does say it — its `fired` flag is derived from a stage being short, so a recovered stage keeps its forecast copy — and this rule deliberately overrides it.
+- **The player row renders the authored DESCRIPTION, and it WRAPS.**
+  The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
+  It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
+  It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
+- **The band is not a drag source and carries no destructive or navigational control.**
+  Pre-roll the salvage list is reorderable and the row IS a drag source, so a mousedown inside the prose would start a drag rather than a text selection.
+  It also carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
 - **The progressive CRAFTING surface is forecast-only.** The fired record is defined on the salvage run record, and crafting has no run record on the immediate path; inventing a second carrier for it is out of scope here.
 
 **Progressive salvage deltas.**
@@ -3297,6 +3311,12 @@ The player's route to salvage.
   It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
   It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
   The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.
+  There is **one group card per QUEUED ENTRY** — the component being salvaged — and not one per complication-bearing result component: the queue is what the player selected and what the run acts on, so a block grouped any other way could not be read against the queue directly above it.
+  The rows inside a group are that entry's stages' player-visible complications, in the **player's stored order**, and each row's position badge is its position in that ORDER rather than its index among the rows — a stage that authors no complication leaves a gap, which is what makes the number readable against the ordered list on the single-item panel.
+  Each row states its position, the result it hangs off and that result's DC in **one localized string** in the row's own metadata slot, never as a separate ordinal tile beside the severity tile: an ordinal tile plus a severity tile plus a wrapping name is three leading boxes in the 300px column the stacked stage layout exists to protect.
+  The group card states whether the order shown is the **player's own** or the **GM's authored** one, and that fact MUST come from the projection rather than be inferred from the reorder permission — a player who MAY reorder and has not is looking at the GM's order, and telling them otherwise is a false claim about their own arrangement.
+  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the six-call-site scaffold exists so the second one costs props rather than a component.
+  It renders **no excluded-results note**, on the § Progressive Salvage Deltas rule that no player progressive surface builds any part of the exclusion vocabulary.
 - **Bulk yield preview.**
   The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.
   A no-check `simple` row's results are **guaranteed**; a checked `simple` row's same results are **possible**.
