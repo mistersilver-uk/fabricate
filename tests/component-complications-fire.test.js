@@ -19,7 +19,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { evaluateSideRoll } from '../src/systems/checkRoll.js';
-import { fireComplications, gmComplications } from '../src/systems/complicationRuntime.js';
+import {
+  buildGmComplicationCardContent,
+  fireComplications,
+  gmComplications,
+  rollGmComplicationEffect,
+} from '../src/systems/complicationRuntime.js';
 import { planComplications } from '../src/utils/complicationPlan.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
@@ -541,4 +546,305 @@ test('1286: gmComplications projects the authored record but never the macro uui
 test('1286: gmComplications tolerates an empty or absent fired list', () => {
   assert.deepEqual(gmComplications(undefined), []);
   assert.deepEqual(gmComplications([]), []);
+});
+
+// ── The GM side: the effect roll the acting client deliberately did not make ──
+
+test('1286: the elected GM ROLLS the gmOnly effect roll the acting client skipped', async (t) => {
+  t.after(uninstallRoll);
+  const { constructed, messages } = installRoll({ totals: { '2d6': 9 } });
+  installChatMessage({ v14: false });
+
+  const rolled = await rollGmComplicationEffect({
+    complication: complication({
+      visibility: 'gmOnly',
+      name: 'Curse',
+      effectRoll: { enabled: true, expr: '2d6', label: 'Curse damage' },
+    }),
+    actor: ACTOR,
+    speaker: { actor: 'Actor.hero' },
+  });
+
+  assert.deepEqual(
+    constructed,
+    ['2d6'],
+    'without this the acting client’s "the GM rolls it" is a claim nothing discharges'
+  );
+  assert.equal(rolled.requested, true);
+  assert.equal(rolled.total, 9);
+  assert.equal(rolled.posted, true);
+  assert.equal(
+    messages[0].options.rollMode,
+    'gmroll',
+    'EXPLICIT: core.rollMode is scope client, so on the GM’s client the fallback is the GM’s own selector'
+  );
+  assert.equal(messages[0].messageData.flavor, 'Curse damage');
+});
+
+test('1286: the GM side refuses to roll a VISIBLE complication, the mirror of the acting client', async (t) => {
+  t.after(uninstallRoll);
+  const { constructed } = installRoll({ totals: { '2d6': 9 } });
+  installChatMessage({ v14: false });
+
+  const rolled = await rollGmComplicationEffect({
+    complication: complication({
+      visibility: 'visible',
+      effectRoll: { enabled: true, expr: '2d6' },
+    }),
+    actor: ACTOR,
+  });
+
+  assert.deepEqual(
+    constructed,
+    [],
+    'a visible roll belongs to the player’s own client and its dice'
+  );
+  assert.equal(rolled.requested, true, 'the GM authored one; it was simply not rolled HERE');
+  assert.equal(rolled.total, null);
+  assert.equal(rolled.posted, false);
+});
+
+test('1286: a GM-side effect roll that blows up is contained and reported as unrolled', async (t) => {
+  t.after(uninstallRoll);
+  const original = console.error;
+  console.error = () => {};
+  t.after(() => {
+    console.error = original;
+  });
+  installRoll({ throwOn: ['2d6??'] });
+  installChatMessage({ v14: false });
+
+  const rolled = await rollGmComplicationEffect({
+    complication: complication({
+      visibility: 'gmOnly',
+      effectRoll: { enabled: true, expr: '2d6??' },
+    }),
+    actor: ACTOR,
+  });
+
+  assert.equal(rolled.requested, true);
+  assert.equal(rolled.total, null);
+  assert.ok(rolled.error, 'the failure is reported on the return, never thrown at the delivery');
+});
+
+test('1286: a complication with no authored effect roll asks the GM for nothing', async (t) => {
+  t.after(uninstallRoll);
+  const { constructed } = installRoll();
+  installChatMessage({ v14: false });
+
+  const rolled = await rollGmComplicationEffect({
+    complication: complication({ visibility: 'gmOnly' }),
+    actor: ACTOR,
+  });
+
+  assert.deepEqual(constructed, []);
+  assert.equal(rolled.requested, false);
+});
+
+// ── The GM-only card ─────────────────────────────────────────────────────────
+
+/** One GM card row, in the shape `main.js` composes from `gmComplications` plus the report. */
+function gmRow(overrides = {}) {
+  return {
+    name: 'Curse',
+    description: 'The ingot cracks.',
+    severity: 'major',
+    visibility: 'gmOnly',
+    componentName: 'Iron Ingot',
+    effectRoll: null,
+    claimed: { bucket: null, effectRollTotal: null },
+    macro: null,
+    ...overrides,
+  };
+}
+
+test('1286: an empty GM card builds NO content, so no empty message is created', () => {
+  assert.equal(buildGmComplicationCardContent({ entries: [] }), '');
+  assert.equal(buildGmComplicationCardContent(), '');
+  assert.equal(buildGmComplicationCardContent({ entries: null }), '');
+});
+
+test('1286: the GM card names the complication the GM authored, with its own actor', () => {
+  const content = buildGmComplicationCardContent({
+    entries: [gmRow()],
+    actorName: 'Aldric',
+    reporterName: 'Player One',
+  });
+
+  assert.ok(content.includes('Curse'));
+  assert.ok(content.includes('Iron Ingot'));
+  assert.ok(content.includes('The ingot cracks.'));
+  assert.ok(content.includes('Aldric'));
+  assert.ok(content.includes('Player One'));
+  assert.ok(
+    content.includes('data-fabricate-complication-severity="major"'),
+    'every attribute this card writes is double-quoted'
+  );
+});
+
+test('1286: a hostile authored description cannot inject markup into the GM card', () => {
+  const content = buildGmComplicationCardContent({
+    entries: [
+      gmRow({
+        name: '<script>alert(1)</script>',
+        description: '<img src=x onerror="alert(1)">',
+        componentName: 'Iron" onmouseover="evil()',
+      }),
+    ],
+    actorName: '<b>Aldric</b>',
+  });
+
+  assert.equal(content.includes('<script>'), false);
+  assert.equal(content.includes('<img'), false);
+  assert.equal(
+    content.includes('onerror="'),
+    false,
+    'the attribute-opening quote is escaped, so the handler never becomes one'
+  );
+  assert.equal(content.includes('<b>Aldric</b>'), false);
+  assert.ok(content.includes('&lt;script&gt;'), 'it is rendered as text, not dropped silently');
+  assert.ok(content.includes('&quot;'), 'the quote that would escape an attribute is escaped');
+});
+
+test('1286: the acting client’s bucket and total are presented as an unverified CLAIM', () => {
+  const content = buildGmComplicationCardContent(
+    {
+      entries: [gmRow({ claimed: { bucket: 'halted', effectRollTotal: 4 } })],
+    },
+    (key) =>
+      ({
+        'FABRICATE.Chat.GmComplication.Unverified': 'Reported by the acting client',
+        'FABRICATE.Chat.GmComplication.Stage': 'Stage',
+        'FABRICATE.Chat.GmComplication.Bucket.halted': 'Stopped here',
+        'FABRICATE.Chat.GmComplication.EffectRoll': 'Effect roll',
+      })[key] ?? key
+  );
+
+  assert.ok(
+    content.includes('Reported by the acting client'),
+    'the GM cannot re-derive the bucket or the total, so the card must not state them flat'
+  );
+  assert.ok(content.includes('Stage: Stopped here'));
+  assert.ok(content.includes('Effect roll: 4'));
+
+  const noClaim = buildGmComplicationCardContent(
+    { entries: [gmRow({ claimed: { bucket: 'halted', effectRollTotal: null } })] },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRoll' ? 'Effect roll' : key)
+  );
+  assert.equal(
+    noClaim.includes('Effect roll'),
+    false,
+    'Number(null) is 0, so a coercing test would report an absent claim as a rolled zero'
+  );
+});
+
+test('1286: a macro that did not resolve to a script macro is REPORTED, not only logged', () => {
+  const content = buildGmComplicationCardContent(
+    { entries: [gmRow({ macro: { status: 'skipped', macroUuid: 'Compendium.pack.Macro.abc' } })] },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.MacroSkipped' ? 'Macro skipped' : key)
+  );
+
+  assert.ok(content.includes('Macro skipped: Compendium.pack.Macro.abc'));
+});
+
+test('1286: a macro that threw is reported, and one that ran adds no noise', () => {
+  const failed = buildGmComplicationCardContent(
+    { entries: [gmRow({ macro: { status: 'failed', macroUuid: 'Macro.x' } })] },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.MacroFailed' ? 'Macro failed' : key)
+  );
+  assert.ok(failed.includes('Macro failed: Macro.x'));
+
+  const ran = buildGmComplicationCardContent({
+    entries: [gmRow({ macro: { status: 'ran', macroUuid: 'Macro.x' } })],
+  });
+  assert.equal(ran.includes('Macro.x'), false, 'a macro that simply worked is not news');
+});
+
+test('1286: the GM-rolled effect roll is reported with its formula and its total', () => {
+  const content = buildGmComplicationCardContent(
+    {
+      entries: [gmRow({ effectRoll: { requested: true, total: 9, formula: '2d6', posted: true } })],
+    },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRoll' ? 'Effect roll' : key)
+  );
+  assert.ok(content.includes('Effect roll: 2d6 = 9'));
+
+  const failed = buildGmComplicationCardContent(
+    {
+      entries: [
+        gmRow({ effectRoll: { requested: true, total: null, formula: '2d6??', posted: false } }),
+      ],
+    },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRollFailed' ? 'Effect roll failed' : key)
+  );
+  assert.ok(failed.includes('Effect roll failed: 2d6??'));
+});
+
+test('1286: a VISIBLE complication on the GM card says the player saw it too', () => {
+  const seen = buildGmComplicationCardContent(
+    { entries: [gmRow({ visibility: 'visible' })] },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.PlayerVisible' ? 'Shown to the player' : key)
+  );
+  assert.ok(seen.includes('Shown to the player'));
+
+  const hidden = buildGmComplicationCardContent(
+    { entries: [gmRow({ visibility: 'gmOnly' })] },
+    (key) => (key === 'FABRICATE.Chat.GmComplication.PlayerVisible' ? 'Shown to the player' : key)
+  );
+  assert.equal(hidden.includes('Shown to the player'), false);
+});
+
+test('1286: a severity outside the vocabulary resolves no key rather than rendering one', () => {
+  const content = buildGmComplicationCardContent({
+    entries: [gmRow({ severity: 'constructor' })],
+  });
+  assert.equal(
+    content.includes('FABRICATE.Admin.Manager.Component.Complications.Severity.constructor'),
+    false,
+    'a label key interpolated from an authored token would render as garbage forever'
+  );
+  assert.ok(content.includes('data-fabricate-complication-severity="constructor"'));
+});
+
+// ── An id-less stage: unclassifiable, so it must fail toward silence ──────────
+
+test('1286: an AWARDED stage with no result id fires no stageMissed complication', async (t) => {
+  t.after(uninstallRoll);
+  installRoll();
+  installChatMessage({ v14: false });
+
+  // `resolveProgressiveAward` pushes a result into `awarded` whatever its id, and only the
+  // classifier's own id set drops it — so an id-less stage that WAS awarded is invisible in
+  // `awarded` here. Classifying it as `unreached` would fire "you missed the iron ingot" on
+  // a component the player is holding; `skipped` is the bucket that contributes to nothing.
+  const authored = complication({
+    visibility: 'visible',
+    name: 'You missed it',
+    when: { stageMissed: true },
+  });
+  const awardedWithNoId = { name: 'Iron Ingot' };
+  const plan = planComplications({
+    activity: 'salvage',
+    resolutionId: 'res-idless',
+    stages: [
+      { resultId: null, componentId: 'iron', component: { id: 'iron', complications: [authored] } },
+    ],
+    award: {
+      awarded: [awardedWithNoId],
+      partialResult: null,
+      haltedResult: null,
+      skippedResults: [],
+    },
+  });
+
+  assert.deepEqual(
+    plan.stages.map((stage) => stage.bucket),
+    ['skipped'],
+    'the partition stays total, and the bucket that contributes to nothing is the honest one'
+  );
+  assert.deepEqual(plan.firings, [], 'nothing fires on a stage this classifier cannot place');
+
+  const fired = await fireComplications({ plan, actor: ACTOR, context: {} });
+  assert.deepEqual(fired.fired, []);
+  assert.deepEqual(fired.gmRequests, []);
 });

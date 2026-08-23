@@ -37,7 +37,11 @@
  *  - `skipped`   — an invalid cost, derived by the award loop over the WHOLE ordered list, so
  *                  a misconfigured stage sitting after the halt is `skipped` and never
  *                  mistaken for `unreached`. It contributes to NOTHING: a GM misconfiguration
- *                  is not a narrative outcome.
+ *                  is not a narrative outcome. A stage carrying no resolvable result id lands
+ *                  here too, for the same reason and stated at {@link bucketFor}: it is the
+ *                  bucket for a stage this classifier cannot place, and placing one in
+ *                  `unreached` instead would accuse the player of missing a stage the award
+ *                  loop may well have granted.
  *
  * `halted` and `unreached` stay distinct even though `when.stageMissed` unions them, so a
  * later issue can offer "only the stage you nearly reached" without reopening this model, and
@@ -141,9 +145,22 @@ function readStage(stage) {
  * invalid cost after the halt is never read as `unreached`, and `partial` is tested before
  * `full` because the tail award is a member of `awarded`.
  *
- * A stage with no resolvable result id falls through to `unreached`: the partition must be
- * total (every stage lands in exactly one bucket), and the loop demonstrably did not award
- * something it could not name.
+ * ## A stage with no resolvable result id is `skipped`, deliberately
+ *
+ * The partition must be total, so an id-less stage has to land somewhere, and `skipped` is the
+ * one bucket that contributes to NOTHING. It is emphatically not `unreached`: the award loop
+ * pushes a result into `awarded` whatever its id, and only {@link idSet} drops the id-less
+ * ones, so an id-less stage that WAS awarded would classify as `unreached` and fire a
+ * `stageMissed` complication on a component the player is holding. That is the worst reading
+ * available, and it is the one an "it demonstrably did not award something it could not name"
+ * argument produces — the loop can and does award such a result; it is this classifier that
+ * cannot recognise it afterwards.
+ *
+ * `skipped` is the honest answer to a stage this function cannot classify, and it is already
+ * the bucket a stage the GM misconfigured lands in. `_normalizeSalvageResult` mints an id for
+ * every salvage result, so nothing reaches this today — but `resolution-modes/spec.md`
+ * contemplates an id-less progressive result, and a complication must fail toward silence
+ * rather than toward accusing the player of a miss.
  *
  * @param {string|null} resultId
  * @param {{skipped: Set<string>, awarded: Set<string>, partialId: string|null,
@@ -151,7 +168,7 @@ function readStage(stage) {
  * @returns {'full'|'partial'|'halted'|'unreached'|'skipped'}
  */
 function bucketFor(resultId, award) {
-  if (!resultId) return 'unreached';
+  if (!resultId) return 'skipped';
   if (award.skipped.has(resultId)) return 'skipped';
   if (resultId === award.partialId) return 'partial';
   if (award.awarded.has(resultId)) return 'full';

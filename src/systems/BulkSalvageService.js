@@ -207,6 +207,11 @@ export class BulkSalvageService {
    *   no prompt is possible, so every roll uses its base formula.
    * @param {Function} [options.postChatMessage] Posts the aggregated card. It — not
    *   this service and not the card builder — owns speaker, visibility and creation.
+   * @param {Function} [options.deliverComplications] The complication delivery writer's
+   *   `deliver({craftingSystemId, actorUuid, complications})`, already bound. Omitted means
+   *   the run still FIRES every row's complications — the firing is the engine's and happens
+   *   whatever this service does — and simply relays none of them, which is the same drop a
+   *   world with no connected GM already takes.
    * @param {Function} [options.localize] Key-only localization lookup.
    * @param {number} [options.maxItems] Defensive selection bound; see
    *   {@link BULK_MAX_ITEMS}.
@@ -216,6 +221,7 @@ export class BulkSalvageService {
     getCraftingSystem,
     promptRollDecision = null,
     postChatMessage = null,
+    deliverComplications = null,
     localize = (key) => key,
     maxItems = BULK_MAX_ITEMS,
   } = {}) {
@@ -223,6 +229,7 @@ export class BulkSalvageService {
     this.getCraftingSystem = getCraftingSystem;
     this.promptRollDecision = promptRollDecision;
     this.postChatMessage = postChatMessage;
+    this.deliverComplications = deliverComplications;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this.maxItems = Number.isFinite(maxItems) && maxItems > 0 ? maxItems : BULK_MAX_ITEMS;
   }
@@ -282,8 +289,53 @@ export class BulkSalvageService {
     }
 
     const items = entries.map((entry) => entry.item);
+    // BESIDE the aggregate card, not per row: every row's GM requests reach the elected GM
+    // as one message. Before the card, because the relay is ordered "after the award
+    // commits, before the chat card is posted" and the aggregate card is this run's card.
+    this._deliverComplications(entries);
     const posted = await this._postAggregateCard(entries, decision.rollDecision);
     return { cancelled: false, items, counts: countBy(items), posted };
+  }
+
+  /**
+   * Relay every row's complications to the elected GM as ONE message per addressed
+   * `(craftingSystemId, actorUuid)` pair (issue 1286).
+   *
+   * ## Why the grouping is by that pair and not simply "one message"
+   *
+   * The delivery payload names ONE crafting system and ONE actor, because the elected GM
+   * re-reads the authored complication from that system's record and re-authorizes that
+   * actor against the attested sender. Both are authorization inputs, so they cannot be
+   * per-entry without moving the authorization decision onto the wire. A bulk run may
+   * legitimately span actors (`salvageComponents` takes an `actorId` per target), so the
+   * honest bound is one message per distinct pair — which for the ordinary run, and for
+   * every run the rate limiter was sized against, is exactly one.
+   *
+   * Fire and forget, and guarded: the awards are committed, the run records are written and
+   * the card is about to post, so a relay failure is a lost narrative beat and must never be
+   * able to cost the player a report of what they already received.
+   *
+   * @private
+   */
+  _deliverComplications(entries) {
+    if (typeof this.deliverComplications !== 'function') return;
+    const batched = new Map();
+    for (const entry of entries) {
+      for (const request of entry.complicationRequests || []) {
+        const craftingSystemId = entry.target?.systemId ?? null;
+        const actorUuid = entry.target?.actorUuid ?? null;
+        const key = `${craftingSystemId}\n${actorUuid}`;
+        if (!batched.has(key)) batched.set(key, { craftingSystemId, actorUuid, complications: [] });
+        batched.get(key).complications.push(request);
+      }
+    }
+    for (const message of batched.values()) {
+      try {
+        this.deliverComplications(message);
+      } catch (error) {
+        console.error('Fabricate | Failed to relay bulk salvage complications:', error);
+      }
+    }
   }
 
   /**
@@ -391,7 +443,14 @@ export class BulkSalvageService {
         entry.target.actorUuid,
         entry.target.systemId,
         entry.target.componentId,
-        { interactive, rollDecision, suppressChat: true }
+        // `deferComplicationDelivery` is what makes a 25-row run ONE socket message rather
+        // than 25. The row still fires its own complications — each row is its own
+        // resolution — but the GM requests come back on the return for
+        // {@link BulkSalvageService#_deliverComplications} to batch. Without it the GM-side
+        // rate limiter, sized at 30/60s on the written assumption that "a bulk salvage of
+        // any size emits one", silently refuses the tail of a long run on a path the player
+        // never sees.
+        { interactive, rollDecision, suppressChat: true, deferComplicationDelivery: true }
       );
       const outcome = classifySalvageOutcome(result);
       const salvageRun = result?.salvageRun ?? null;
@@ -416,6 +475,17 @@ export class BulkSalvageService {
         quantity: awardedQuantityOf(created),
       }));
       item.tools = brokenToolEntries(salvageRun, entry.system);
+      // The addressing-only GM requests, held on the ENTRY rather than the item: they are
+      // not report rows and must never reach the card model. The player-visible fired
+      // complications go on the ITEM, already redacted by the engine through
+      // `publicComplications`, and gain the component name the aggregate card names them by
+      // — a bulk card lists many components, so an unattributed complication row cannot be
+      // reconciled with the results table above it.
+      entry.complicationRequests = result?.complicationRequests ?? [];
+      item.complications = (result?.complications || []).map((complication) => ({
+        ...complication,
+        componentName: item.name,
+      }));
 
       const units = consumedUnits(result, entry.component, outcome);
       item.consumed = units > 0 ? [{ name: item.name, img: item.img, quantity: units }] : [];
@@ -474,6 +544,13 @@ export class BulkSalvageService {
         results: sumChatEntriesByName(subjects.flatMap((item) => item.results)),
         consumed: sumChatEntriesByName(subjects.flatMap((item) => item.consumed)),
         tools: dedupeTools(subjects.flatMap((item) => item.tools)),
+        // Every row's PLAYER-VISIBLE complications, in run order and NOT deduped: they ride
+        // this card because a bulk salvage is not one resolution — each row has its own run
+        // record — so there is no single run to hang them on. Already redacted by the engine
+        // through `publicComplications`, so a `gmOnly` complication cannot be here even when
+        // a GM is the acting user; this service holds no audience filter of its own and must
+        // not grow one, or the disclosure guarantee would live in two places.
+        complications: subjects.flatMap((item) => item.complications || []),
       },
       this.localize
     );
@@ -524,6 +601,7 @@ function buildItem(target, component, skipReason) {
     results: [],
     consumed: [],
     tools: [],
+    complications: [],
   };
 }
 

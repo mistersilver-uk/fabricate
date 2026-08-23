@@ -25,27 +25,91 @@
  *
  * ## What this module does NOT do
  *
- * It does not run macros and it does not create chat messages for a GM-only complication.
- * Every complication macro executes on a GM client, over the complication socket, from a
- * payload that carries ADDRESSING ONLY — never a macro uuid, never chat content, never a
- * speaker — so that a forged message can do no more than fire a complication the GM themselves
- * authored. The `type === 'script'` gate and the `fromUuid` resolve therefore live where the
- * macro RUNS, on the GM client, not here: compendium ownership is GM-configurable per role, so
- * an acting player's `fromUuid` can miss a macro the GM resolves fine.
+ * It does not run macros. Every complication macro executes on a GM client, over the
+ * complication socket, from a payload that carries ADDRESSING ONLY — never a macro uuid, never
+ * chat content, never a speaker — so that a forged message can do no more than fire a
+ * complication the GM themselves authored. The `type === 'script'` gate and the `fromUuid`
+ * resolve therefore live where the macro RUNS, on the GM client, not here: compendium ownership
+ * is GM-configurable per role, so an acting player's `fromUuid` can miss a macro the GM
+ * resolves fine.
+ *
+ * It also does not CREATE chat messages. {@link buildGmComplicationCardContent} builds the
+ * GM-only card's HTML and {@link rollGmComplicationEffect} rolls a `gmOnly` complication's
+ * effect roll, but the speaker, the visibility pass and `ChatMessage.create` are the elected
+ * GM's own Foundry edge in `main.js` — for the same reason `BulkSalvageChatCard.js` builds a
+ * card it never posts.
  *
  * The requests come back on the return value rather than being emitted from here. Bulk salvage
  * batches every row's requests into ONE socket message — per-row emits would collide head-on
  * with the GM-side rate limiter, which is sized for human gathering speed — so the caller owns
  * the emit and this function owns the decision.
  *
+ * ## Both halves of the audience split live here, deliberately
+ *
+ * The acting client rolls a `visible` complication's effect roll (guard 2 of 3 below); the
+ * elected GM rolls a `gmOnly` one. Putting the two rollers side by side is what keeps
+ * {@link EFFECT_ROLL_MODE}'s two tokens honest: each looks up its OWN audience's token, so
+ * neither can be handed the other's, and the docblock that claims a `gmOnly` effect roll is
+ * "rolled and posted by the elected GM" is discharged in the same file that makes the claim.
+ *
  * @module src/systems/complicationRuntime
  */
 
 import { compareNumbersByOperatorId } from './characterPrerequisites.js';
 import { evaluateCheckRoll, evaluateSideRoll, resolveCheckFormulaDisplay } from './checkRoll.js';
+import { esc } from './CraftingChatCard.js';
 
 /** The visibility token whose effect roll the ACTING client rolls and posts publicly. */
 const VISIBLE = 'visible';
+
+/**
+ * The EXPLICIT legacy chat token each audience's effect roll posts under.
+ *
+ * Never the `core.rollMode` / `core.messageMode` fallback, on EITHER side: both are
+ * `scope: "client"`, so the fallback reads the WRITING client's own selector — a GM with
+ * Private GM Roll selected would silently hide a `visible` complication's roll, and a GM with
+ * Public Roll selected would silently publish a `gmOnly` one. The two entries are also what
+ * makes the audience split unspellable in the wrong direction: each roller looks its own token
+ * up rather than being handed one.
+ */
+const EFFECT_ROLL_MODE = Object.freeze({ visible: 'publicroll', gmOnly: 'gmroll' });
+
+/** The label key for each severity token, as a frozen map rather than an interpolated key:
+ * a key built from an authored token would resolve to garbage for anything outside the
+ * vocabulary, and this is a lookup the renderer can simply not find. */
+const SEVERITY_KEYS = Object.freeze({
+  minor: 'FABRICATE.Admin.Manager.Component.Complications.Severity.minor',
+  major: 'FABRICATE.Admin.Manager.Component.Complications.Severity.major',
+  severe: 'FABRICATE.Admin.Manager.Component.Complications.Severity.severe',
+});
+
+/** The label key for each stage bucket the acting client may CLAIM. Same frozen-map rule. */
+const BUCKET_KEYS = Object.freeze({
+  full: 'FABRICATE.Chat.GmComplication.Bucket.full',
+  partial: 'FABRICATE.Chat.GmComplication.Bucket.partial',
+  halted: 'FABRICATE.Chat.GmComplication.Bucket.halted',
+  unreached: 'FABRICATE.Chat.GmComplication.Bucket.unreached',
+  skipped: 'FABRICATE.Chat.GmComplication.Bucket.skipped',
+});
+
+/** The BEM block the GM card borrows, so it needs no new CSS and cannot regress the cards
+ * that already use it. `--gm` is an unstyled block modifier, the same "unstyled modifier
+ * lands on the base treatment" move `BulkSalvageChatCard.js`'s `--mixed` makes. */
+const GM_CARD_BLOCK = 'fabricate-craft-chat';
+
+/** The GM card's own label keys. */
+const GM_CARD_KEYS = Object.freeze({
+  title: 'FABRICATE.Chat.GmComplication.Title',
+  actor: 'FABRICATE.Chat.GmComplication.Actor',
+  reportedBy: 'FABRICATE.Chat.GmComplication.ReportedBy',
+  unverified: 'FABRICATE.Chat.GmComplication.Unverified',
+  stage: 'FABRICATE.Chat.GmComplication.Stage',
+  effectRoll: 'FABRICATE.Chat.GmComplication.EffectRoll',
+  effectRollFailed: 'FABRICATE.Chat.GmComplication.EffectRollFailed',
+  playerVisible: 'FABRICATE.Chat.GmComplication.PlayerVisible',
+  macroSkipped: 'FABRICATE.Chat.GmComplication.MacroSkipped',
+  macroFailed: 'FABRICATE.Chat.GmComplication.MacroFailed',
+});
 
 /** @param {unknown} value @returns {Array<any>} */
 function list(value) {
@@ -112,41 +176,45 @@ async function conditionMatched(rollCondition, actor) {
 }
 
 /**
- * Roll a `visible` complication's EFFECT roll on the acting client, where the player's own
- * Dice So Nice appearance applies.
+ * The shape both effect-roll sides return when nothing was rolled HERE.
  *
- * A `gmOnly` complication's effect roll is NOT rolled here: it is rolled and posted by the
- * elected GM, from the GM's own re-read of the authored record, so the player sees only
- * "<GM> rolled privately".
+ * `requested` answers "did the GM author one at all", which is a different question from
+ * "was it rolled on this client" — the acting client leaves a `gmOnly` roll requested and
+ * unrolled, and the GM side does the same for a `visible` one.
  *
- * Guarded in its own `try`/`catch` — guard 2 of 3 — so a malformed expression still leaves the
- * macro request intact.
+ * @param {object|undefined} effectRoll
+ * @param {string} expr
+ * @returns {{requested: boolean, total: null, formula: string|null, posted: false}}
+ */
+function unrolledEffect(effectRoll, expr) {
+  return {
+    requested: effectRoll?.enabled === true && expr !== '',
+    total: null,
+    formula: expr || null,
+    posted: false,
+  };
+}
+
+/**
+ * Roll ONE authored effect roll under an EXPLICIT audience token, and never throw.
  *
- * @param {object} firing
+ * Shared by both audiences so the two sides cannot drift in what they report — only in which
+ * token they pass, which is the one thing that genuinely differs.
+ *
+ * @param {object} complication the AUTHORED record (the GM's own copy, on the GM side)
  * @param {object|null} actor
- * @param {{speaker?: object}} context
+ * @param {{rollMode: string, speaker?: object}} options
  * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
  *   posted: boolean, error?: string}>}
  */
-async function runEffectRoll(firing, actor, context) {
-  const effectRoll = firing?.complication?.effectRoll;
+async function rollEffect(complication, actor, { rollMode, speaker }) {
+  const effectRoll = complication?.effectRoll;
   const expr = text(effectRoll?.expr).trim();
-  const rolledHere = firing?.complication?.visibility === VISIBLE;
-  if (effectRoll?.enabled !== true || expr === '' || !rolledHere) {
-    return {
-      requested: effectRoll?.enabled === true && expr !== '',
-      total: null,
-      formula: expr || null,
-      posted: false,
-    };
-  }
   try {
     const rolled = await evaluateSideRoll(expr, actor, {
-      // EXPLICIT, never the client's `core.rollMode` selector: a GM acting on a player's
-      // behalf with Private GM Roll selected would otherwise hide a visible complication's roll.
-      rollMode: 'publicroll',
-      flavor: text(effectRoll?.label) || text(firing?.complication?.name),
-      speaker: context?.speaker,
+      rollMode,
+      flavor: text(effectRoll?.label) || text(complication?.name),
+      speaker,
     });
     return {
       requested: true,
@@ -164,6 +232,72 @@ async function runEffectRoll(firing, actor, context) {
       error: text(error?.message),
     };
   }
+}
+
+/**
+ * Roll a `visible` complication's EFFECT roll on the acting client, where the player's own
+ * Dice So Nice appearance applies.
+ *
+ * A `gmOnly` complication's effect roll is NOT rolled here: it is rolled and posted by the
+ * elected GM through {@link rollGmComplicationEffect}, from the GM's own re-read of the
+ * authored record, so the player sees only "<GM> rolled privately".
+ *
+ * Guarded — guard 2 of 3 — so a malformed expression still leaves the macro request intact.
+ *
+ * @param {object} firing
+ * @param {object|null} actor
+ * @param {{speaker?: object}} context
+ * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
+ *   posted: boolean, error?: string}>}
+ */
+async function runEffectRoll(firing, actor, context) {
+  const complication = firing?.complication;
+  const effectRoll = complication?.effectRoll;
+  const expr = text(effectRoll?.expr).trim();
+  if (effectRoll?.enabled !== true || expr === '' || complication?.visibility !== VISIBLE)
+    return unrolledEffect(effectRoll, expr);
+  return rollEffect(complication, actor, {
+    rollMode: EFFECT_ROLL_MODE.visible,
+    speaker: context?.speaker,
+  });
+}
+
+/**
+ * Roll a `gmOnly` complication's EFFECT roll on the ELECTED GM's client, under `gmroll`.
+ *
+ * This is the other half of the split {@link runEffectRoll} states, and until it existed that
+ * statement was false in shipped source: the acting client skipped a `gmOnly` roll on the
+ * grounds that the GM would make it, and no GM-side site ever did.
+ *
+ * The disclosure is the INTENDED one rather than a leak. `ChatMessage#visible` returns true for
+ * any message carrying rolls before it tests the whisper list, so the player still sees a card;
+ * because the message is authored GM-side they are neither author nor recipient, so core
+ * substitutes its private-roll content and the player reads "&lt;GM name&gt; rolled privately".
+ * A player-authored `gmroll` would instead have rendered in that player's OWN sidebar.
+ *
+ * Symmetrical with {@link runEffectRoll} and deliberately mirror-imaged: this one refuses to
+ * roll a `visible` complication, so neither audience's roll can be made from the wrong client
+ * even if a caller addresses the wrong one.
+ *
+ * Never throws.
+ *
+ * @param {object} options
+ * @param {object} options.complication the GM's OWN copy of the authored complication
+ * @param {object|null} [options.actor] the acting actor, resolved GM-side from the addressing
+ * @param {object|null} [options.speaker] the speaker, resolved GM-side from the addressing
+ * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
+ *   posted: boolean, error?: string}>}
+ */
+export async function rollGmComplicationEffect({
+  complication,
+  actor = null,
+  speaker = null,
+} = {}) {
+  const effectRoll = complication?.effectRoll;
+  const expr = text(effectRoll?.expr).trim();
+  if (effectRoll?.enabled !== true || expr === '' || complication?.visibility === VISIBLE)
+    return unrolledEffect(effectRoll, expr);
+  return rollEffect(complication, actor, { rollMode: EFFECT_ROLL_MODE.gmOnly, speaker });
 }
 
 /**
@@ -314,4 +448,168 @@ export function gmComplications(fired) {
     matchedConditions: [...list(entry?.matchedConditions)],
     effectRoll: entry?.effectRoll ?? null,
   }));
+}
+
+/**
+ * Whether a roll total is a NUMBER worth reporting.
+ *
+ * `Number(null)` is `0` and `Number(undefined)` is `NaN`, so a coercing test would report an
+ * absent total as a rolled zero — which on this card would state an outcome that never
+ * happened, once for the acting client's absent claim and once for a roll that failed. Both
+ * absences must read as "not rolled", so the type is asked BEFORE the finiteness.
+ *
+ * @param {unknown} total
+ * @returns {boolean}
+ */
+function isReportableTotal(total) {
+  return typeof total === 'number' && Number.isFinite(total);
+}
+
+/**
+ * The notes one GM card row carries under its name, already escaped and in reading order.
+ *
+ * Three separate jobs, and the order is what makes them readable as a sentence about ONE
+ * complication: what the GM authored (severity, audience), what the acting client CLAIMS about
+ * the outcome, and what this GM client actually did with the macro.
+ *
+ * `bucket` and `effectRollTotal` are the acting client's unverifiable claim — the GM cannot
+ * re-derive either, because the award happened on the acting client — so they are labelled as
+ * reported rather than stated flat. That labelling is required by
+ * `openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY", not
+ * a presentational choice.
+ *
+ * @param {object} entry one row of {@link buildGmComplicationCardContent}'s model
+ * @param {(key: string) => string} loc
+ * @returns {Array<string>} escaped HTML fragments
+ */
+function gmComplicationNotes(entry, loc) {
+  const notes = [];
+  const severityKey = SEVERITY_KEYS[text(entry?.severity)];
+  const authored = [
+    severityKey ? esc(loc(severityKey)) : '',
+    entry?.visibility === VISIBLE ? esc(loc(GM_CARD_KEYS.playerVisible)) : '',
+  ].filter(Boolean);
+  if (authored.length > 0) notes.push(authored.join(' · '));
+
+  const bucketKey = BUCKET_KEYS[text(entry?.claimed?.bucket)];
+  const claimedTotal = entry?.claimed?.effectRollTotal;
+  const claim = [
+    bucketKey ? `${esc(loc(GM_CARD_KEYS.stage))}: ${esc(loc(bucketKey))}` : '',
+    isReportableTotal(claimedTotal)
+      ? `${esc(loc(GM_CARD_KEYS.effectRoll))}: ${esc(claimedTotal)}`
+      : '',
+  ].filter(Boolean);
+  if (claim.length > 0) notes.push(`${esc(loc(GM_CARD_KEYS.unverified))} — ${claim.join(' · ')}`);
+
+  const effect = entry?.effectRoll;
+  if (effect?.requested === true) {
+    notes.push(
+      isReportableTotal(effect.total)
+        ? `${esc(loc(GM_CARD_KEYS.effectRoll))}: ${esc(effect.formula)} = ${esc(effect.total)}`
+        : `${esc(loc(GM_CARD_KEYS.effectRollFailed))}: ${esc(effect.formula)}`
+    );
+  }
+
+  // The macro miss is REPORTED here rather than only to the console, because
+  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" states that a uuid
+  // which does not resolve to a script macro "is skipped and reported on the GM-facing output":
+  // compendium ownership is GM-configurable per role, so a broken link is a real GM-facing case
+  // and a console warning on the ONE client that can fix it is not a report.
+  const macroKey =
+    { skipped: GM_CARD_KEYS.macroSkipped, failed: GM_CARD_KEYS.macroFailed }[
+      text(entry?.macro?.status)
+    ] ?? null;
+  if (macroKey) notes.push(`${esc(loc(macroKey))}: ${esc(entry?.macro?.macroUuid)}`);
+  return notes;
+}
+
+/**
+ * Render one GM card row.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} loc
+ * @returns {string}
+ */
+function renderGmComplication(entry, loc) {
+  const parts = [`<span class="${GM_CARD_BLOCK}__complication-name">${esc(entry?.name)}</span>`];
+  if (entry?.componentName)
+    parts.push(
+      `<span class="${GM_CARD_BLOCK}__complication-source">${esc(entry.componentName)}</span>`
+    );
+  if (entry?.description)
+    parts.push(
+      `<span class="${GM_CARD_BLOCK}__complication-description">${esc(entry.description)}</span>`
+    );
+  const notes = gmComplicationNotes(entry, loc).map(
+    (note) => `<span class="${GM_CARD_BLOCK}__complication-note">${note}</span>`
+  );
+  return [
+    `<li class="${GM_CARD_BLOCK}__item ${GM_CARD_BLOCK}__item--complication" data-fabricate-complication-severity="${esc(entry?.severity)}">`,
+    `<span class="${GM_CARD_BLOCK}__label">${parts.join(' — ')}</span>`,
+    ...notes,
+    '</li>',
+  ].join('');
+}
+
+/**
+ * Build the GM-ONLY complication card's HTML for one delivered resolution (issue 1286).
+ *
+ * ## Why this is not `renderComplications`
+ *
+ * That renderer's whole contract is "the caller has already redacted", and its row is the
+ * three player-safe strings. This row must additionally mark the acting client's unverifiable
+ * CLAIM as a claim, report the GM-side effect roll, and report a macro that was skipped or
+ * threw — none of which may ever reach a player surface. Widening the one shared renderer to
+ * carry them would put GM-only fields inside the function every player-facing card calls,
+ * which is exactly the ambiguity the audience split exists to remove. It borrows that
+ * renderer's BEM block and its `esc`, so the markup and the escaping rule stay single-sourced.
+ *
+ * ## Escaping
+ *
+ * Every authored string routes through `esc` and every attribute is double-quoted. Fabricate
+ * imports third-party crafting systems, so a hostile definition can carry a complication whose
+ * name or description is markup, and this card is built from the GM's own copy of that
+ * definition rather than from anything the player sent.
+ *
+ * Returns `''` for an empty model, so the caller creates NO message rather than an empty one.
+ *
+ * @param {object} model
+ * @param {Array<{name: string, description: string, severity: string, visibility: string,
+ *   componentName: string, effectRoll: ?object,
+ *   claimed: ?{bucket: ?string, effectRollTotal: ?number}, macro: ?{status: string,
+ *   macroUuid: ?string}}>} [model.entries] one row per delivered complication, projected
+ *   through {@link gmComplications} and augmented with the GM-side outcome.
+ * @param {string} [model.actorName] the acting actor, resolved GM-side from the addressing.
+ * @param {string} [model.reporterName] the SERVER-ATTESTED sender's user name.
+ * @param {(key: string) => string} [localize] key-only lookup; defaults to identity.
+ * @returns {string} HTML, or '' when there is nothing to report.
+ */
+export function buildGmComplicationCardContent(
+  { entries = [], actorName = '', reporterName = '' } = {},
+  localize = (key) => key
+) {
+  const rows = list(entries);
+  if (rows.length === 0) return '';
+  const loc = (key) => localize(key) ?? key;
+  const subtitle = [
+    actorName ? `${esc(loc(GM_CARD_KEYS.actor))}: ${esc(actorName)}` : '',
+    reporterName ? `${esc(loc(GM_CARD_KEYS.reportedBy))}: ${esc(reporterName)}` : '',
+  ].filter(Boolean);
+  return [
+    `<div class="${GM_CARD_BLOCK} ${GM_CARD_BLOCK}--gm">`,
+    `<header class="${GM_CARD_BLOCK}__header">`,
+    `<div class="${GM_CARD_BLOCK}__title">${esc(loc(GM_CARD_KEYS.title))}</div>`,
+    subtitle.length > 0
+      ? `<div class="${GM_CARD_BLOCK}__subtitle">${subtitle.join(' · ')}</div>`
+      : '',
+    '</header>',
+    `<section class="${GM_CARD_BLOCK}__section ${GM_CARD_BLOCK}__section--complications">`,
+    `<ul class="${GM_CARD_BLOCK}__grid">`,
+    ...rows.map((entry) => renderGmComplication(entry, loc)),
+    '</ul>',
+    '</section>',
+    '</div>',
+  ]
+    .filter(Boolean)
+    .join('');
 }

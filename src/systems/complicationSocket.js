@@ -36,10 +36,20 @@
  * Per-row emits would collide with the rate limiter head-on, silently refusing rows on
  * a path the player never sees; batching also fixes emit ordering GM-side.
  *
- * This module is the PURE routing decision (payload validation, who applies, GM-on-GM
- * local apply, per-sender throttle, per-context de-duplication). It touches no Foundry
- * global: `main.js` registers the handler, mints the resolution id, and injects the
- * thin Foundry edges (`game.socket.emit`, `game.users.activeGM`, the apply body).
+ * This module is the PURE half of the channel: the routing decision (payload validation,
+ * who applies, GM-on-GM local apply, per-sender throttle, per-context de-duplication) AND
+ * the pure half of the GM-side apply (the authored re-read, the `script` discriminant, the
+ * macro scope, and the per-entry isolation loop). It touches no Foundry global: `main.js`
+ * registers the handler, mints the resolution id, and injects the thin Foundry edges
+ * (`game.socket.emit`, `game.users.activeGM`, `fromUuid`, `MacroExecutor.run`,
+ * `ChatMessage.create`).
+ *
+ * The apply half lives HERE rather than in `main.js` for the reason this split exists at
+ * all: `src/main.js` cannot be imported under `node --test`, so anything left there can
+ * only be pinned by source-TEXT assertions, and a source pin cannot tell an exact id match
+ * apart from a match with a positional fallback. The addressing-only contract is the one
+ * property of this channel that must be driven with real inputs, so the functions that
+ * enforce it are importable.
  */
 
 import { COMPLICATION_ACTIVITIES } from '../utils/componentComplications.js';
@@ -352,4 +362,152 @@ export function createComplicationDeliveryDedupe({ limit = COMPLICATION_DEDUPE_L
     if (seen.size > limit) seen.delete(seen.values().next().value);
     return true;
   };
+}
+
+/**
+ * Re-read ONE addressed complication from a client's OWN components (issue 1286).
+ *
+ * This is the whole point of the addressing-only payload: the macro uuid, the name, the
+ * description, the severity and the visibility all come from the elected GM's own copy of
+ * the `craftingSystems` world setting, and an addressing that names no such component or
+ * no such complication resolves to `null` and is DROPPED. A forged message can therefore
+ * do no more than fire a complication the GM themselves authored.
+ *
+ * ## Exact id match, with NO positional fallback
+ *
+ * The `find` has no `?? components[0]` / `?? authored[0]` tail and must never grow one.
+ * With one, a payload naming a complication id that does not exist would fire the GM's
+ * FIRST authored complication on that component — running a macro the GM never addressed,
+ * from an id the sender chose. That is the exact behaviour
+ * `openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY"
+ * forbids when it says such a payload is dropped, and it is why this function is importable
+ * rather than pinned by a text search of `main.js`.
+ *
+ * @param {Array<object>} components the components of the addressed crafting system, as
+ *   THIS client holds them
+ * @param {{componentId?: string, complicationId?: string}} [entry] the addressing
+ * @returns {{component: object, complication: object}|null}
+ */
+export function findAuthoredComplication(components, { componentId, complicationId } = {}) {
+  const wantedComponent = trimString(componentId);
+  const wantedComplication = trimString(complicationId);
+  if (!wantedComponent || !wantedComplication) return null;
+  const held = Array.isArray(components) ? components : [];
+  const component = held.find((candidate) => candidate?.id === wantedComponent);
+  if (!component) return null;
+  const authored = Array.isArray(component.complications) ? component.complications : [];
+  const complication = authored.find((candidate) => candidate?.id === wantedComplication);
+  return complication ? { component, complication } : null;
+}
+
+/**
+ * Whether a resolved Macro document may be EXECUTED as a complication's macro.
+ *
+ * A CALL-SITE check, for the reason `recipes-and-steps/spec.md` § Essence Property Macros
+ * requirement 7 gives: `command` is a required string on a chat macro too and the Macro
+ * type defaults to `chat`, so an imported system or a hand-edited world setting can carry a
+ * uuid naming a chat macro whose command is not valid JavaScript. `MACRO_TYPES` is exactly
+ * `{SCRIPT, CHAT}`, so this is a COMPLETE discriminant rather than a sample of one.
+ *
+ * @param {object|null} macro
+ * @returns {boolean}
+ */
+export function isRunnableComplicationMacro(macro) {
+  return Boolean(macro) && macro.type === 'script' && typeof macro.command === 'string';
+}
+
+/**
+ * The macro scope for a complication, built from the GM-side re-read.
+ *
+ * `MacroExecutor` binds only `('context','args','scope')` under `"use strict"`, so every
+ * other name a macro author reaches for resolves as a global ON THE EXECUTING CLIENT — and
+ * that client is now a GM rather than the acting player. `game.user.character` is the GM's
+ * (normally none), `canvas` is whatever scene the GM is viewing, the token selection is the
+ * GM's, and `game.user.isGM` is TRUE, so a macro branching on it flips. The speaker, the
+ * acting actor and its token are therefore supplied EXPLICITLY, resolved by the caller from
+ * the addressing. A complication macro that needs the acting player's own client — any UI
+ * prompt — cannot work.
+ *
+ * `bucket`, `resultId` and `effectRollTotal` are the acting client's CLAIM about the
+ * outcome, which the GM cannot verify; they are passed as reported and never acted on.
+ *
+ * @param {object} args
+ * @returns {object}
+ */
+export function buildComplicationMacroContext({
+  craftingSystemId,
+  component,
+  complication,
+  entry,
+  actor,
+  token = null,
+  speaker = null,
+  senderUser,
+  resolutionId,
+} = {}) {
+  return {
+    kind: 'componentComplication',
+    craftingSystemId,
+    activity: entry?.activity,
+    resolutionId,
+    resultId: entry?.resultId,
+    bucket: entry?.bucket,
+    effectRollTotal: entry?.effectRollTotal,
+    component: { id: component?.id ?? entry?.componentId, name: component?.name ?? '' },
+    complication: {
+      id: complication?.id,
+      name: complication?.name,
+      severity: complication?.severity,
+      visibility: complication?.visibility,
+    },
+    actor,
+    token,
+    speaker,
+    requestingUser: senderUser,
+  };
+}
+
+/**
+ * Resolve every addressed complication against THIS client's own components and run the
+ * injected executor for each, in order, containing one entry's failure from the next.
+ *
+ * ## Three properties, all of them assertable from here
+ *
+ * 1. **Dropped, not defaulted.** An entry whose component or complication does not resolve
+ *    contributes nothing and runs nothing — see {@link findAuthoredComplication}.
+ * 2. **Isolated.** The executor is awaited inside a `try`, so a macro that throws costs the
+ *    resolution neither the entries after it nor the GM card: the row survives with a null
+ *    report. Dropping that `await` would leave the loop looking correct while turning a
+ *    contained GM-side failure into an unhandled rejection, which is why the report is
+ *    asserted rather than merely the iteration count.
+ * 3. **Sequential.** `Promise.all` would run every macro concurrently against one GM
+ *    client's document state, which is the argument `BulkSalvageService` already makes for
+ *    its own rows.
+ *
+ * @param {object} options
+ * @param {Array<object>} [options.components] this client's components for the system
+ * @param {Array<object>} [options.complications] the validated addressing entries
+ * @param {(args: {component: object, complication: object, entry: object}) =>
+ *   (object|Promise<object>)} [options.execute] the Foundry-side effect for one entry
+ * @returns {Promise<Array<{component: object, complication: object, entry: object,
+ *   report: object|null}>>} one row per entry that RESOLVED, in delivery order
+ */
+export async function applyAuthoredComplications({
+  components = [],
+  complications = [],
+  execute = null,
+} = {}) {
+  const applied = [];
+  for (const entry of Array.isArray(complications) ? complications : []) {
+    const authored = findAuthoredComplication(components, entry);
+    if (!authored) continue;
+    let report = null;
+    try {
+      report = (await execute?.({ ...authored, entry })) ?? null;
+    } catch (error) {
+      console.error('Fabricate | A complication failed to apply on the GM client', error);
+    }
+    applied.push({ ...authored, entry, report });
+  }
+  return applied;
 }
