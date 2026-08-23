@@ -20,21 +20,23 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  CRAFTING_APP_RAW_MODULES,
+  CRAFTING_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-stage-complications-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: [
-    // The shared summary row the band renders, and the two leaves it reaches. Omitting any
-    // of these HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/components/RowDisclosure.svelte',
-  ],
+  // The SHARED crafting lists, not a hand-rolled minimum. A bespoke list omits the component
+  // under test's own compiled artefact and every leaf it reaches, and the omission HANGS the
+  // suite (# cancelled) rather than failing it — which is how it reached the driver green.
+  // The shared constants already carry `ProgressiveStageList` and the band's three modules.
+  rawModules: CRAFTING_APP_RAW_MODULES,
+  compiledModules: CRAFTING_APP_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
 });
 
