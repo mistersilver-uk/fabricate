@@ -72,10 +72,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
+    // The player complication projection (issue 1286). Reached TWICE from this tree:
+    // CraftingListingBuilder attaches the crafting forecast, and `inventoryStore` marks
+    // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
+    'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
+    'src/utils/componentComplications.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/definitionIndex.js',
     'src/utils/objectPath.js',
+    'src/utils/progressiveStageComplications.js',
     'src/utils/progressiveStageThresholds.js',
     'src/utils/recipeCategories.js',
     'src/utils/rollExpressionAverage.js',

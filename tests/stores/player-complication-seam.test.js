@@ -271,17 +271,14 @@ async function loadedCraftingStore(complications) {
 describe('the player complication seam', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-complication-seam-');
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    // The fired-tense marker's whole closure:
-    // progressiveStageComplications -> complicationPlan -> componentComplications.
-    compiler.copyPlain('src/utils/progressiveStageComplications.js');
-    compiler.copyPlain('src/utils/complicationPlan.js');
-    compiler.copyPlain('src/utils/componentComplications.js');
-    ({ createInventoryStore } = await compiler.load(
+    // `loadWithClosure`, not `load` + a copy list: this suite loads BOTH player stores, so
+    // a hand-maintained list would have to track two import graphs, and an omission in
+    // either is reported as `cancelled` with `fail 0` rather than as a failure. The walker
+    // copies what the modules actually import.
+    ({ createInventoryStore } = await compiler.loadWithClosure(
       'src/ui/svelte/stores/inventoryStore.svelte.js'
     ));
-    ({ createCraftingStore } = await compiler.load(
+    ({ createCraftingStore } = await compiler.loadWithClosure(
       'src/ui/svelte/stores/craftingStore.svelte.js'
     ));
   });
@@ -581,16 +578,20 @@ describe('the player complication seam', () => {
   describe('a component authoring no complications', () => {
     const bare = () => salvageSystem({ shardComplications: [], dustComplications: [] });
 
+    // DEEP equality, deliberately, and not `===`. The three modules in this chain each
+    // return their input BY IDENTITY when they change nothing, and that contract is real
+    // and is pinned directly on the pure modules in `progressive-stage-complications.test.js`.
+    // It is simply not observable from OUT HERE: `listing` is `$state`, so Svelte hands
+    // every reader a deep reactive proxy of the builder's objects rather than the objects.
+    // An `assert.equal` here would therefore fail against a perfectly correct store, which
+    // is why it is not the assertion — the claim this layer can honestly make is that the
+    // published rows are byte-for-byte what the builder published.
     it('publishes the stage rows it published before this feature existed', async () => {
       const { store, stages } = await loadedSalvageStore({ system: bare() });
 
-      // Identity, not deep equality: `attachStageComplications` returns its input array by
-      // identity when nothing attached, `applyPlayerResultOrder` returns its input when no
-      // order is stored, and `markFiredStageComplications` returns its input when nothing
-      // fired. An unaffected component therefore never leaves the builder's own array.
-      assert.equal(store.orderedSalvageStages, stages);
+      assert.deepEqual(store.orderedSalvageStages, stages);
       assert.deepEqual(
-        stages.map((stage) => Object.keys(stage)),
+        store.orderedSalvageStages.map((stage) => Object.keys(stage)),
         Array.from({ length: 4 }, () => [
           'id',
           'componentId',
@@ -609,7 +610,11 @@ describe('the player complication seam', () => {
 
       await salvageWith(store, services, []);
 
-      assert.equal(store.orderedSalvageStages, stages, "still the builder's own array");
+      assert.deepEqual(store.orderedSalvageStages, stages, 'unchanged by the resolution');
+      assert.ok(
+        store.orderedSalvageStages.every((stage) => !('complications' in stage)),
+        'and a resolution that marked nothing did not invent the key either'
+      );
       assert.deepEqual(store.salvageResult.firedComplications, []);
     });
   });
