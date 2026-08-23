@@ -756,6 +756,7 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/checks/checkPreview.js',
     'src/ui/svelte/apps/manager/checks/checkOdds.js',
     'src/systems/checkRoll.js',
+    'src/systems/bulkChatVisibility.js',
     'src/utils/progressiveAward.js',
     // The progressive PREVIEW SANDBOX derivation (issue 1097). THREE importers put it in
     // this root's static graph: the root's own `cloneProgressiveCheck`, `ChecksView` and
