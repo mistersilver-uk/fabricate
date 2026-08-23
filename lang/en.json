@@ -2555,8 +2555,11 @@
             "NewName": "New complication",
             "PlayerPill": "Player",
             "PlayerPillTitle": "Shown to the player when it fires.",
-            "StripTitle": "Complications on {name}",
+            "StripTitle": "{count} complications on {name}",
+            "StripTitleOne": "1 complication on {name}",
             "StripEdit": "Edit complications on {name}",
+            "ActivityProgressiveCount": "{activity} uses progressive resolution in this system \u2014 {count} complications.",
+            "ActivityProgressiveCountOne": "{activity} uses progressive resolution in this system \u2014 1 complication.",
             "Activity": {
               "gathering": "Gathering",
               "salvage": "Salvage",
