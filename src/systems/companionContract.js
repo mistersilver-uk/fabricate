@@ -333,10 +333,13 @@ export const AFFORDABILITY_MESSAGE_KEYS = Object.freeze({
 /**
  * `rollActorCheck`'s outcome -> localization key table (issue 1293).
  *
- * The namespace is `FABRICATE.Check.Roll.*`, not `FABRICATE.Companion.*`. Every top-level
+ * The namespace is `Check.Roll.*` and NOT a `Companion` one. (Both written without their
+ * dotted `FABRICATE.` prefix on purpose, following the shipped note on the grant's table: a
+ * partial key literal in a comment is captured by the localization guards as a namespace BASE,
+ * and a base declared only by a comment is a reference nothing renders.) Every top-level
  * namespace in `lang/en.json` names WHAT IT IS ABOUT — `Knowledge`, `Currency`, `Chat`,
  * `Gathering`, `Tool`, `System`, `Alchemy` — never WHO IS ASKING, and `grantRecipeKnowledge`
- * uses `FABRICATE.Knowledge.Grant.*` for exactly that reason.
+ * uses the `Knowledge.Grant.*` namespace for exactly that reason.
  *
  * `RollFailed` is the one string that interpolates `messageData.detail`, which is where the
  * runner's FREE TEXT is carried so that `message` stays a localization key. It is also this

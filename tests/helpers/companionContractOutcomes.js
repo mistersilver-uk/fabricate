@@ -93,6 +93,29 @@ export function assertMessageDataCovers(result, label = 'the answer') {
 }
 
 /**
+ * Assert an answer's `message` is a value in THAT MEMBER's own frozen key table.
+ *
+ * The `stable` tier's central invariant, asserted on a REAL ANSWER rather than on the table.
+ * `assertLocalizationKey` proves a message resolves to a string leaf, and the vocabulary
+ * reconciliation in `companion-contract.test.js` proves each table's keys are declared — but
+ * neither can see a member that answers with ANOTHER member's key, which would report a failed
+ * check in the words of a failed grant while passing both.
+ *
+ * Shared by all four `stable` members, which is why it lives here rather than in one suite.
+ *
+ * @param {object} result the answer under test
+ * @param {object} messageKeys the member's own outcome -> key table
+ * @param {string} [label] what the answer is, for the failure message
+ */
+export function assertMessageIsFromTable(result, messageKeys, label = 'the answer') {
+  const owned = new Set(Object.values(messageKeys));
+  assert.ok(
+    owned.has(result?.message),
+    `${label} answered ${String(result?.message)} for outcome ${String(result?.outcome)}, which is not a value in this member's OWN key table`
+  );
+}
+
+/**
  * Assert a contract answer WHOLE: frozen, exactly the expected fields, and a resolvable
  * message key.
  *

@@ -222,6 +222,16 @@ export async function rollActorCheck(request, seams) {
   if (rollDecision && !interactive) {
     return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
   }
+  // A decision that says the GM DECLINED is a decline, and it is honoured before anything is
+  // gated or dispatched. The documented decision shape carries no `confirmed` key — it is the
+  // prompt's answer MINUS that flag, and stripping it is what keeps the evaluator from reading
+  // a bulk decision as a cancellation — so a caller that forwarded a whole prompt answer has
+  // handed over a refusal. Reading it as a fourth NAMED key rather than spreading the object
+  // is what keeps that from also widening what a caller can inject: `confirmed` is honoured,
+  // and nothing else the caller attached is.
+  if (rollDecision?.confirmed === false) {
+    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
+  }
 
   // Two pre-dispatch gates, in this order. `noFormula` first because "you gave me nothing to
   // roll" is the better answer than "this client cannot roll" when both are true; the order is
