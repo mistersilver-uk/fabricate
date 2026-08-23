@@ -510,9 +510,14 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
  * gated variant that evaluates without posting is one argument away. The reason is the rule
  * above, not an inability to separate them.
  *
- * The residual: with the toggle off the GM loses `MacroSkipped` / `MacroFailed` from chat.
- * `runComplicationMacro` already `console.warn`s and `console.error`s both, so that degrades to
- * the console rather than vanishing.
+ * The toggle is NARROWER than "the card is chat", and deliberately so. What it suppresses is
+ * the result NARRATION Fabricate composes about its own resolutions; it has never been a
+ * request to stop being told that a configuration is broken. A `macroUuid` that does not
+ * resolve to a script macro is a configuration error only the GM can repair, and
+ * `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" requires it to be
+ * "reported on the GM-facing output" without qualifying that on any toggle. So this predicate
+ * does not veto the card: {@link postGmComplicationCard} consults it to choose which ROWS the
+ * card is built from, and a faulted row is reported whichever way it answers.
  *
  * Read from THIS client's own copy of the world setting, like every other GM-side re-read on
  * this path, and defaulted CLOSED for a system that does not resolve — an addressing that
@@ -523,6 +528,24 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
  */
 function complicationChatOutputEnabled(craftingSystemId) {
   return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
+}
+
+/**
+ * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome.
+ *
+ * `skipped` is a `macroUuid` that did not resolve to a script macro — a broken link, a pack
+ * this client cannot see, or a `chat`-type macro authored where a `script` was meant. `failed`
+ * is a script macro whose body threw. Both are the GM's OWN authorship to repair, and both are
+ * invisible everywhere else: the acting client is never told, and {@link runComplicationMacro}'s
+ * `console.warn` and `console.error` reach only the elected GM's dev tools. `none` (no macro
+ * authored) and `ran` are outcomes rather than faults and report nothing on their own.
+ *
+ * @param {{report?: {macro?: {status?: string}}}} row One applied-complication row.
+ * @returns {boolean}
+ */
+function hasComplicationMacroFault(row) {
+  const status = row?.report?.macro?.status;
+  return status === 'skipped' || status === 'failed';
 }
 
 /**
@@ -542,11 +565,40 @@ function complicationChatOutputEnabled(craftingSystemId) {
  * be unreadable. One whisper per resolution is the price; the alternative is a report the GM
  * cannot act on.
  *
+ * ## `features.chatOutput` selects the ROWS; it does not veto the card
+ *
+ * The toggle suppresses per-resolution NARRATION — a card carrying a row for every
+ * complication this GM was asked to run. It is not a request to stop being told that a macro
+ * link is broken. `recipes-and-steps/spec.md` § "The `script` gate is a call-site check"
+ * states without qualification that a uuid which does not resolve to a script macro "is
+ * skipped and reported on the GM-facing output", and this card is the only GM-facing output
+ * there is; a gate that vetoed the card outright left that report in the elected GM's console,
+ * which is the very thing {@link runComplicationMacro}'s docblock refuses to call a report.
+ *
+ * So the gate chooses the SET OF ROWS the card is built from: every delivered row when the
+ * system narrates, and the faulted rows ALONE when it does not. A GM who switched narration
+ * off and has a broken link is whispered a card naming exactly the complications whose macros
+ * did not run, and nothing about the ones that did. `failed` joins `skipped` in
+ * {@link hasComplicationMacroFault} because a macro body that threw is equally the GM's own
+ * authorship to repair and equally invisible anywhere else.
+ *
+ * A surviving row is NOT re-projected for that case, and the residual is stated rather than
+ * hidden: it still carries the acting client's claimed stage and this client's effect roll,
+ * which are narration. That is accepted for two reasons. A fault row naming only a uuid could
+ * not be acted on — the GM has to locate that complication, on that component, in the editor
+ * to fix it — so the identity fields have to survive anyway; and a second, hand-rolled row
+ * model would sit in `main.js`, which cannot be imported under `node --test` and could
+ * therefore only ever be pinned by a text search. The bound that matters is met: this is one
+ * row per broken link, not one card per resolution.
+ *
  * ## Four steps, in an order that is load-bearing
  *
- * 1. **The `chatOutput` gate first**, so a system whose GM turned narration off costs this
- *    client nothing at all — see {@link complicationChatOutputEnabled}. It gates the CARD and
- *    never the macro, which has already run by the time this is called.
+ * 1. **The `chatOutput` gate first, over the ROW SET rather than over the card** — see
+ *    {@link complicationChatOutputEnabled} and the section above. A gated-off system with
+ *    nothing faulted still costs this client nothing at all: the selection is taken from
+ *    `applied` itself, so that case returns before the projection and before any
+ *    localization. The gate has never reached the macro, which has already run by the time
+ *    this is called.
  * 2. **Speaker before the visibility pass.** `applyBulkChatVisibility` states as a caller
  *    contract that `chatData.speaker` is already set, so the speaker is built onto `chatData`
  *    at its construction rather than after it. (V14's `applyMode` reads `speaker.actor` only
@@ -572,12 +624,21 @@ function complicationChatOutputEnabled(craftingSystemId) {
  */
 async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
   try {
-    if (!complicationChatOutputEnabled(craftingSystemId)) return null;
+    // The toggle SELECTS rows; it does not veto the card. A configuration error is reported
+    // whatever it says, narration is not. The filter runs over `applied` rather than over the
+    // projected entries so that the suppressed case — gate off, nothing faulted — still
+    // returns before any projection or localization, which is what made an early gate worth
+    // having in the first place.
+    const delivered = Array.isArray(applied) ? applied : [];
+    const reported = complicationChatOutputEnabled(craftingSystemId)
+      ? delivered
+      : delivered.filter((row) => hasComplicationMacroFault(row));
+    if (reported.length === 0) return null;
     // `gmComplicationCardEntries` — the GM-facing projection (the counterpart to
     // `publicComplications`, and deliberately the only one that may carry an authored
     // description or a severity to a GM surface) augmented with what THIS client did, which
     // is the half no projection of the acting client's report could ever hold.
-    const entries = gmComplicationCardEntries(applied);
+    const entries = gmComplicationCardEntries(reported);
     const content = buildGmComplicationCardContent(
       { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
       (key) => game.i18n?.localize?.(key) ?? key

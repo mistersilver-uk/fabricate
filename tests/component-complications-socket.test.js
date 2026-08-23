@@ -857,13 +857,13 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
   // The ARGUMENTS are the pin, not the call. Each of the five can be dropped on its own with
   // the call itself — and therefore the assertion above, and every other assertion in this
   // file — still intact, and each drop breaks the card in a different way that no suite would
-  // see: without `craftingSystemId` the chatOutput gate reads a system that does not resolve,
-  // closes for EVERY system, and no GM complication card is ever posted again; without
-  // `applied` the card defaults to no rows, `buildGmComplicationCardContent` returns '' and
-  // nothing is created; without `speaker` `applyBulkChatVisibility`'s stated caller contract
-  // is broken and the whisper speaks as nobody; and without `actor` or `senderUser` the card
-  // loses the subtitle naming whose resolution it reports, which is the only thing that makes
-  // a GM whisper reconcilable with the table's own card.
+  // see: without `craftingSystemId` the chatOutput selection reads a system that does not
+  // resolve, closes for EVERY system, and no GM complication card is ever posted again;
+  // without `applied` the card defaults to no rows, `buildGmComplicationCardContent` returns
+  // '' and nothing is created; without `speaker` `applyBulkChatVisibility`'s stated caller
+  // contract is broken and the whisper speaks as nobody; and without `actor` or `senderUser`
+  // the card loses the subtitle naming whose resolution it reports, which is the only thing
+  // that makes a GM whisper reconcilable with the table's own card.
   const cardCall = /await postGmComplicationCard\(\{([^}]*)\}\)/.exec(withoutComments(apply));
   assert.ok(cardCall, 'the GM card is called with a single options object');
   assert.deepEqual(
@@ -878,7 +878,7 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
 
   const card = withoutComments(mainFunctionBody('postGmComplicationCard'));
   assert.ok(
-    card.includes('gmComplicationCardEntries(applied)'),
+    card.includes('gmComplicationCardEntries(reported)'),
     'the row model is the pure projection in complicationRuntime.js, not a hand-rolled map ' +
       'here: main.js cannot be imported under node --test, so an inline map could only be ' +
       'pinned by text and a text pin cannot tell applied[index] from applied[0]'
@@ -934,15 +934,16 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
   // here any more, and that is the point of moving it.
 });
 
-test('1286: the GM card obeys the system OWN chatOutput toggle, and the macro does not', () => {
+test('1286: the GM card consults the system OWN chatOutput toggle, and the macro does not', () => {
   const card = withoutComments(mainFunctionBody('postGmComplicationCard'));
   assert.ok(
-    card.includes('if (!complicationChatOutputEnabled(craftingSystemId)) return null;'),
-    'features.chatOutput is a per-system GM toggle and this card is unambiguously chat: ' +
-      'every sibling poster (CraftingEngine, GatheringEngine, BulkSalvageService) consults it'
+    card.includes('complicationChatOutputEnabled(craftingSystemId)'),
+    'features.chatOutput is a per-system GM toggle and the narration this card carries is ' +
+      'exactly what every sibling poster (CraftingEngine, GatheringEngine, ' +
+      'BulkSalvageService) suppresses with it'
   );
   assert.ok(
-    card.indexOf('complicationChatOutputEnabled') < card.indexOf('buildGmComplicationCardContent'),
+    card.indexOf('complicationChatOutputEnabled') < card.indexOf('gmComplicationCardEntries'),
     'the gate is the first thing the card does, so a system that narrates nothing costs ' +
       'this client no projection and no localization either'
   );
@@ -971,6 +972,67 @@ test('1286: the GM card obeys the system OWN chatOutput toggle, and the macro do
       mainFunctionBody('applyComplicationDelivery').indexOf('postGmComplicationCard'),
     'and the gate cannot reach the macro anyway: the delivery has already run when the card ' +
       'is asked for'
+  );
+});
+
+test('1286: a broken macro link is reported even when the system narrates nothing', () => {
+  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" is UNCONDITIONAL:
+  // a uuid that does not resolve to a script macro "is skipped and reported on the GM-facing
+  // output". This card is the ONLY GM-facing output there is, so a gate that vetoed it
+  // outright left that report in the elected GM's browser console — which the runner's own
+  // docblock already refuses to call a report. `features.chatOutput` suppresses result
+  // NARRATION; it is not a request to stop being told that a macro link is broken.
+  const card = withoutComments(mainFunctionBody('postGmComplicationCard')).replaceAll(/\s+/g, ' ');
+
+  // Direction one — gate OFF with a faulted row: the card is still built, from the fault rows.
+  // The backreference is load-bearing. Both branches must read the SAME delivered rows, or the
+  // gated-off branch could filter some other collection and report nothing after all.
+  assert.ok(
+    /const reported = complicationChatOutputEnabled\(craftingSystemId\) \? (\w+) : \1\.filter\(\(row\) => hasComplicationMacroFault\(row\)\);/.test(
+      card
+    ),
+    'the toggle selects the ROWS the card is built from and must not veto the card, or a ' +
+      'configuration error the GM alone can fix is reported nowhere but one client console'
+  );
+
+  // Direction two — gate OFF with nothing faulted: still suppressed, and established without
+  // paying for the projection, which is the whole reason the gate is consulted first.
+  assert.ok(
+    card.includes('if (reported.length === 0) return null;'),
+    'a GM who switched narration off and has nothing broken is whispered nothing at all'
+  );
+  assert.ok(
+    card.indexOf('if (reported.length === 0) return null;') <
+      card.indexOf('gmComplicationCardEntries'),
+    'and that costs no projection and no localization to establish'
+  );
+
+  // What the fault-only card carries: the faulted rows, not the narration the GM switched off.
+  assert.equal(
+    /gmComplicationCardEntries\(applied\)|gmComplicationCardEntries\(delivered\)/.test(card),
+    false,
+    'projecting the full delivery would rebuild the whole narration card for a run whose ' +
+      'only reportable fact was a broken link'
+  );
+
+  const fault = withoutComments(mainFunctionBody('hasComplicationMacroFault')).replaceAll(
+    /\s+/g,
+    ' '
+  );
+  assert.ok(
+    fault.includes('const status = row?.report?.macro?.status;'),
+    'the fault is read from what THIS client did with the macro, never from the payload'
+  );
+  for (const status of ['skipped', 'failed'])
+    assert.ok(
+      fault.includes(`status === '${status}'`),
+      `a macro reported as ${status} is the GM's own authorship to repair: a uuid that did ` +
+        'not resolve and a body that threw are both invisible to everyone else'
+    );
+  assert.equal(
+    /'ran'|'none'/.test(fault),
+    false,
+    'an outcome is not a fault — a macro that ran, or was never authored, forces no card'
   );
 });
 

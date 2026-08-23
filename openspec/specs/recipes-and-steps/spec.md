@@ -469,6 +469,7 @@ That call site is the **GM-side apply body**, not the acting client.
 Compendium ownership is GM-configurable per role, so an acting player's resolution of a uuid can miss a macro the GM resolves fine; gating on the acting client would silently drop a valid macro and make the "report the miss on the GM-facing output" rule incoherent.
 The uuid is resolved at the gate AND again inside the runner, deliberately: settling "is this a script macro at all" before entering the try is the only way to distinguish a broken GM link, which is silent, from a macro that blew up, which is reported.
 A uuid that does not resolve to a script macro is skipped and reported on the GM-facing output, because pack ownership is a real GM-facing case.
+That report rides the GM-only complication card, which is posted for a skipped or failed macro even when the addressed system's `features.chatOutput` is off and then carries the faulted complications alone, because that toggle suppresses the result narration Fabricate composes and never the report of a configuration only the GM can repair.
 
 ### No GM connected: DROP, not block
 
