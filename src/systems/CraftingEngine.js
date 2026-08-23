@@ -515,10 +515,11 @@ export class CraftingEngine {
    * @param {boolean} [options.deliver=true] Whether to hand the GM requests to the
    *   delivery writer HERE. A batching caller passes `false` and emits the collected
    *   requests itself — the one case is bulk salvage, whose rows are one resolution each
-   *   but must reach the GM as ONE socket message: the GM-side rate limiter is sized on
-   *   the stated assumption that "a bulk salvage of any size emits one"
-   *   (`complicationSocket.js`), so a per-row emit would silently drop the tail of a long
-   *   run. The firing itself still happens per row; only the emit is deferred.
+   *   but must reach the GM batched — one message per addressed (system, actor) pair, so a
+   *   run is bounded by the 25-row selection cap rather than by its row count. The GM-side
+   *   rate limit in `complicationSocket.js` is derived from that bound, so a per-row emit
+   *   would silently drop the tail of a long run. The firing itself still happens per row;
+   *   only the emit is deferred.
    * @returns {Promise<?object>} `fireComplications`'s return, or null when nothing ran.
    */
   async _fireComponentComplications({

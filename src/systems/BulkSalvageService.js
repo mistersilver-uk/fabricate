@@ -446,10 +446,11 @@ export class BulkSalvageService {
         // `deferComplicationDelivery` is what makes a 25-row run ONE socket message rather
         // than 25. The row still fires its own complications — each row is its own
         // resolution — but the GM requests come back on the return for
-        // {@link BulkSalvageService#_deliverComplications} to batch. Without it the GM-side
-        // rate limiter, sized at 30/60s on the written assumption that "a bulk salvage of
-        // any size emits one", silently refuses the tail of a long run on a path the player
-        // never sees.
+        // {@link BulkSalvageService#_deliverComplications} to batch. Batching is what keeps a
+        // run inside the GM-side rate limit: the relay sends one message per addressed
+        // (system, actor) pair, so a fanned-out selection is bounded by the 25-row cap rather
+        // than by the row count. A per-row emit would silently refuse the tail of a long run
+        // on a path the player never sees.
         { interactive, rollDecision, suppressChat: true, deferComplicationDelivery: true }
       );
       const outcome = classifySalvageOutcome(result);
