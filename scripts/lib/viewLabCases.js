@@ -4492,6 +4492,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the rows are drawn by `KnowledgeLearnedRow.svelte`, and before this the directory
     // pattern appeared only on `manager-knowledge-narrow`, which takes no actor and no tab
     // step and therefore opens on Recipe items with no learned row in frame at all.
+    //
+    // It also names `SvelteCraftingSystemManagerApp.svelte.js`: the `granted`/`grantedBy`
+    // allowlist that `_collectKnowledgeLearnedEntries` hands to the row ladder lives there,
+    // has no unit coverage, and this frame is its only evidence, so a later edit that drops
+    // `granted` from the allowlist must recapture this case rather than fail silently. That
+    // file is broad, so this case will also select on unrelated edits to it — an accepted
+    // trade for closing the silent-regression gap (issue 1289).
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -4504,6 +4511,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
     ],
   }),
   managerCase({
