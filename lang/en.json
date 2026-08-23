@@ -1266,6 +1266,7 @@
       }
     },
     "Chat": {
+      "Complications": "Complications",
       "CraftSuccess": "Crafting Successful",
       "CraftFailure": "Crafting Failed",
       "Actor": "Crafter",
