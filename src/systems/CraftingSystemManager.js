@@ -22,6 +22,7 @@ import {
   normalizeComponentCategory,
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
+import { authoredComplications } from '../utils/componentComplications.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import {
   advanceDefinitionRevision,
@@ -2089,6 +2090,15 @@ export class CraftingSystemManager {
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
       difficulty:
         Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
+      // Progressive component complications (issue 1286) sit TOP-LEVEL, directly after
+      // `difficulty` — the other field that spans all three progressive activities — and
+      // deliberately NOT under `salvage`: a complication fires for a component's part in
+      // progressive crafting, salvage OR gathering, and `salvage` is only valid when
+      // `features.salvage` is true, which is exactly where a crafting-output complication
+      // would need it. The attach is absence-preserving, so a component that authored none
+      // (which is every component that predates the feature) keeps NO key and needs no
+      // migration. An authored empty list normalizes to that same absence.
+      ...authoredComplications(item.complications),
       // Salvage config is always normalized and preserved on the component so the
       // `features.salvage` toggle is non-destructive: turning salvage off hides and
       // skips it (UI/validation/runtime gate on the flag) but never deletes authored
