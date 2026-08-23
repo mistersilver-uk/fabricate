@@ -4805,10 +4805,15 @@ test('1289 the observability predicate matches the reveal switch, arm by arm', (
     ['alchemy global', system({ resolutionMode: 'alchemy', visibilityMode: 'global' }), true],
     ['alchemy knowledge', system({ resolutionMode: 'alchemy', visibilityMode: 'knowledge' }), true],
     [
-      'alchemy teaser falls to the default arm, which DOES read the learned map',
+      // Over a flat `item` mode, NOT a flat `global` one. `global` already satisfies "not
+      // restricted and not item" on its own, so a global fixture never exercises teaser
+      // resolution on this arm at all and passes identically with the teaser rule deleted.
+      // Layered over `item` the row bites: teaser wins, and the arm reads the learned map for
+      // a mode that otherwise would not.
+      'alchemy teaser OVER a flat item mode falls to the default arm, which DOES read the learned map',
       system({
         resolutionMode: 'alchemy',
-        visibilityMode: 'global',
+        visibilityMode: 'item',
         recipeVisibility: { listMode: 'teaser' }
       }),
       true

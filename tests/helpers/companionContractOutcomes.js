@@ -58,6 +58,41 @@ export function assertLocalizationKey(key, label = 'message') {
 }
 
 /**
+ * Assert an answer's `messageData` supplies every placeholder its `message` interpolates.
+ *
+ * `message` is a localization KEY, and Foundry's `format()` leaves an unsupplied `{name}` in
+ * the rendered string VERBATIM. So an answer whose data bag is missing one shows a GM
+ * "{actor} already knows {recipe}, so nothing was written." with the braces intact — a
+ * user-visible defect that no key-set, type or freeze assertion can see, because the answer is
+ * perfectly well formed. Two of these shipped past the whole suite (issue 1289): dropping the
+ * bag from the `alreadyKnown` answer, and from `systemNotFound`.
+ *
+ * Derived from the STRING rather than from a per-outcome table, so a placeholder added to an
+ * existing string fails at whichever answers already carry that key rather than waiting for
+ * someone to remember a table.
+ *
+ * A `message` that does not resolve is left alone here: {@link assertLocalizationKey} owns that
+ * failure, and reporting it twice would bury the cause.
+ *
+ * @param {object} result the answer under test
+ * @param {string} [label] what the answer is, for the failure message
+ */
+export function assertMessageDataCovers(result, label = 'the answer') {
+  const template = localizedString(result?.message);
+  if (typeof template !== 'string') return;
+  const placeholders = new Set(
+    [...template.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(([, name]) => name)
+  );
+  const data = result?.messageData ?? {};
+  const missing = [...placeholders].filter((name) => !(name in data));
+  assert.deepEqual(
+    missing,
+    [],
+    `${label} interpolates ${missing.join(', ')} but carries no such messageData, so a GM reads the braces verbatim`
+  );
+}
+
+/**
  * Assert a contract answer WHOLE: frozen, exactly the expected fields, and a resolvable
  * message key.
  *
@@ -76,4 +111,5 @@ export function assertContractResult(result, expected) {
     `unexpected answer for outcome ${String(result?.outcome)}`
   );
   assertLocalizationKey(result.message, `the ${String(result?.outcome)} message`);
+  assertMessageDataCovers(result, `the ${String(result?.outcome)} answer`);
 }

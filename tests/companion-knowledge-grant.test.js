@@ -38,10 +38,11 @@ const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilit
 const { LEARNED_RECIPES_FLAG_KEY, getFabricateFlag, setFabricateFlag } = await import(
   '../src/config/flags.js'
 );
-const { COMPANION_OUTCOMES, GRANTED_BY_MAX_LENGTH } = await import(
+const { COMPANION_OUTCOMES, GRANTED_BY_MAX_LENGTH, KNOWLEDGE_GRANT_MESSAGE_KEYS } = await import(
   '../src/systems/companionContract.js'
 );
 const { readLearnedRecipeEntries } = await import('../src/systems/recipeKeyedFlagEntries.js');
+const { assertContractResult } = await import('./helpers/companionContractOutcomes.js');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -388,7 +389,15 @@ test('1289 C6 a recipe whose system does not resolve refuses systemNotFound', as
 
   const result = await grantRecipeKnowledge({ actor, recipeId: orphan.id }, seams);
 
-  assert.equal(result.outcome, COMPANION_OUTCOMES.systemNotFound);
+  // Asserted WHOLE, not by outcome alone. `Grant.SystemNotFound` reads "No crafting system
+  // found for {recipe}.", so a refusal that dropped its interpolation bag would still carry
+  // the right outcome and the right key while showing a GM the braces (issue 1289 C3).
+  assertContractResult(result, {
+    success: false,
+    outcome: COMPANION_OUTCOMES.systemNotFound,
+    message: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.systemNotFound],
+    messageData: { recipe: orphan.name, actor: actor.name },
+  });
   assertNoWrites(actor, 'an unresolvable system');
 });
 

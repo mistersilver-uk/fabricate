@@ -144,6 +144,41 @@ const REFUSED_GRANTED_BY = Object.freeze([
   Object.freeze({ label: 'a boxed String', input: new String('x'), outcome: 'invalidGrantedBy' }),
 ]);
 
+/**
+ * The interpolation bag each outcome's STRING needs, spelled the way the members supply it.
+ *
+ * `message` is a localization key and Foundry's `format()` leaves an unsupplied `{name}`
+ * verbatim, so an answer that omits one shows a GM the braces. The shared
+ * `assertMessageDataCovers` checks that for every answer; these tables are what let the loops
+ * below build an answer that is COMPLETE rather than one no member would ever emit.
+ *
+ * Deliberately LITERAL, not derived from the strings. Deriving the bag from the very text the
+ * completeness assertion reads would make that assertion a tautology at exactly the two loops
+ * that walk every outcome — whereas written out, a placeholder added to a string with no
+ * author here fails instead.
+ */
+const GRANT_MESSAGE_DATA = Object.freeze({
+  granted: Object.freeze({ recipe: 'Balm', actor: 'Idrin' }),
+  alreadyKnown: Object.freeze({ recipe: 'Balm', actor: 'Idrin' }),
+  systemNotFound: Object.freeze({ recipe: 'Balm', actor: 'Idrin' }),
+  knowledgeNotObservable: Object.freeze({
+    recipe: 'Balm',
+    actor: 'Idrin',
+    visibilityMode: 'global',
+    resolutionMode: 'simple',
+  }),
+  grantedByTooLong: Object.freeze({ max: GRANTED_BY_MAX_LENGTH }),
+});
+
+/** The same, for `checkAffordability`. `detail` carries the currency layer's free text. */
+const AFFORDABILITY_MESSAGE_DATA = Object.freeze({
+  affordable: Object.freeze({ actor: 'Idrin', amount: 1, unit: 'gp' }),
+  notAffordable: Object.freeze({ actor: 'Idrin', amount: 1, unit: 'gp' }),
+  unitNotFound: Object.freeze({ unit: 'quatloo' }),
+  ladderInvalid: Object.freeze({ detail: 'a cycle' }),
+  checkUnavailable: Object.freeze({ detail: 'a cycle' }),
+});
+
 function grantAnswer(outcome, messageData = null) {
   const expected = {
     success: GRANT_SUCCESSES.includes(outcome),
@@ -342,8 +377,9 @@ test('the 64-character boundary refuses rather than truncating', () => {
 
 test('knowledgeGrantResult answers success for granted and alreadyKnown alone', () => {
   for (const outcome of Object.keys(KNOWLEDGE_GRANT_MESSAGE_KEYS)) {
-    const result = knowledgeGrantResult(outcome);
-    assertContractResult(result, grantAnswer(outcome));
+    const messageData = GRANT_MESSAGE_DATA[outcome] ?? null;
+    const result = knowledgeGrantResult(outcome, messageData);
+    assertContractResult(result, grantAnswer(outcome, messageData));
     assert.equal(
       result.success,
       GRANT_SUCCESSES.includes(outcome),
@@ -379,7 +415,11 @@ test('a grant answer omits messageData entirely when there is none', () => {
 
 test('affordabilityResult derives affordable from the outcome and never guesses', () => {
   for (const [outcome, affordable] of AFFORDABILITY_ANSWERS) {
-    assertContractResult(affordabilityResult(outcome), affordabilityAnswer(outcome, affordable));
+    const messageData = AFFORDABILITY_MESSAGE_DATA[outcome] ?? null;
+    assertContractResult(
+      affordabilityResult(outcome, messageData),
+      affordabilityAnswer(outcome, affordable, messageData)
+    );
   }
 });
 
@@ -389,8 +429,11 @@ test('an affordability refusal answers affordable null, never a confident false'
   );
   assert.ok(refusals.length >= 7, 'every non-answer outcome is covered');
   for (const outcome of refusals) {
-    const result = affordabilityResult(outcome, { detail: 'why' });
-    assertContractResult(result, affordabilityAnswer(outcome, null, { detail: 'why' }));
+    // `detail` rides on EVERY refusal, not only the two that interpolate it, so the bag is
+    // still proven to cross the boundary untouched; the per-outcome entry only completes it.
+    const messageData = { detail: 'why', ...AFFORDABILITY_MESSAGE_DATA[outcome] };
+    const result = affordabilityResult(outcome, messageData);
+    assertContractResult(result, affordabilityAnswer(outcome, null, messageData));
     assert.equal(result.affordable, null, `${outcome} must not read as "the actor is short"`);
     assert.equal(result.success, false, `${outcome} means the question could not be answered`);
   }
@@ -406,12 +449,17 @@ test('an outcome a member does not declare degrades to that member’s own gener
     outcome: 'someOutcomeFromALaterVersion',
     message: KNOWLEDGE_GRANT_MESSAGE_KEYS.grantFailed,
   });
-  const affordability = affordabilityResult(COMPANION_OUTCOMES.granted);
+  // The generic affordability refusal interpolates `detail`, which is why
+  // `AFFORDABILITY_MESSAGE_KEYS` documents it as a bag its caller MUST supply: degrading to
+  // that key without one would put a literal `{detail}` in front of a GM.
+  const detail = Object.freeze({ detail: 'an outcome from a later version' });
+  const affordability = affordabilityResult(COMPANION_OUTCOMES.granted, detail);
   assertContractResult(affordability, {
     success: false,
     affordable: null,
     outcome: COMPANION_OUTCOMES.granted,
     message: AFFORDABILITY_MESSAGE_KEYS.checkUnavailable,
+    messageData: detail,
   });
 });
 
