@@ -111,7 +111,27 @@ function coerceBoolean(value) {
   return true;
 }
 
-function compareNumbers(actual, expected, op) {
+/**
+ * Compare two numbers with one of the SIX NUMERIC operator ids in
+ * {@link PREREQUISITE_OPERATORS} (`eq`, `neq`, `gt`, `gte`, `lt`, `lte` — the
+ * entries whose `valueless` is `false`).
+ *
+ * Numeric-only by design: the three valueless ids (`isTrue`, `isFalse`,
+ * `exists`) have no numeric reading and return `false` here, as does any
+ * unknown id. A caller offering a numeric comparison to a GM must therefore
+ * filter the vocabulary with {@link isValuelessOperator} rather than hand-list
+ * six ids, and must not route a valueless operator here expecting a pass.
+ *
+ * Exported so every consumer of a "compare a number against a comparand"
+ * gate reads ONE operator table instead of restating the switch.
+ *
+ * @param {number} actual The resolved left-hand number.
+ * @param {string} op Operator id.
+ * @param {number} expected The comparand.
+ * @returns {boolean} `true` when the comparison holds; `false` for the three
+ *   valueless ids and for any unknown id.
+ */
+export function compareNumbersByOperatorId(actual, op, expected) {
   switch (op) {
     case 'eq': {
       return actual === expected;
@@ -173,7 +193,7 @@ export function evaluatePrerequisite(rollData, prereq, { warn = defaultWarn } = 
       return coerceBoolean(raw) === false;
     }
     default: {
-      return compareNumbers(coerceNumber(raw), coerceNumber(prereq?.value), op);
+      return compareNumbersByOperatorId(coerceNumber(raw), op, coerceNumber(prereq?.value));
     }
   }
 }
