@@ -1,6 +1,6 @@
 /**
- * game.fabricate.resetActorKnowledge — the GM-only interim knowledge-reset access
- * path (issue 773), the macro/console lever until #785 ships the Knowledge tab.
+ * game.fabricate.resetActorKnowledge — the GM-only knowledge-reset access path
+ * (issue 773), the macro/console lever beside the Knowledge tab's own reset control.
  *
  * WHY A REPRODUCTION (and not the real `Fabricate` class): `src/main.js` imports the
  * global stylesheet and Svelte UI at module load, so it cannot be imported under
@@ -9,28 +9,42 @@
  * guard pins the real `src/main.js` method so weakening the GM gate, the
  * actorId-not-uuid resolution, the per-system/all delegation, or the never-throw
  * `{ success, message }` shape fails this suite.
+ *
+ * ## What issue 1289 changed here, and what it deliberately did not
+ *
+ * The GM gate and the actor resolution moved OUT of this method into the shared
+ * `_requireGmActor` preamble, so that one authorization rule exists once rather than a
+ * third time. The four behavioural cases below are UNCHANGED by that refactor — which is
+ * the whole proof that it was behaviour-preserving, and why they are worth reading before
+ * the source-contract guard.
+ *
+ * The reproduction therefore extends the shared facade harness rather than carrying its own
+ * copy of the preamble: a second copy in this file would be the very duplication the
+ * refactor removed, and it could drift from production while these four cases stayed green.
+ * The guard at the foot of the file is what pins the delegation itself.
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+
+import {
+  FabricateFacadeUnderTest,
+  mainMethodSource,
+} from './helpers/fabricateFacadeHarness.js';
 
 // --- Faithful reproduction of Fabricate#resetActorKnowledge ------------------
-class ResetKnowledgeFacade {
+class ResetKnowledgeFacade extends FabricateFacadeUnderTest {
   constructor(recipeVisibilityService) {
-    this.recipeVisibilityService = recipeVisibilityService;
+    super({ recipeVisibilityService });
   }
 
   async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
-    if (globalThis.game.user?.isGM !== true) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };
-    }
-    const actor = globalThis.game.actors?.get?.(actorId);
-    if (!actor) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };
-    }
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly',
+      noActorKey: 'FABRICATE.Knowledge.Reset.NoActor',
+    });
+    if (gate.outcome) return { success: false, message: gate.message };
+    const actor = gate.actor;
     const service = this.recipeVisibilityService;
     const result = systemId
       ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
@@ -122,31 +136,68 @@ test('773 facade: no systemId delegates to the all-systems reset', async () => {
 // SOURCE-CONTRACT guard — pin the real src/main.js method.
 // ---------------------------------------------------------------------------
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN_SOURCE = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const RESET =
+  'async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {';
+const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
 
-test('SOURCE CONTRACT: resetActorKnowledge is GM-gated, actorId-resolved, and delegates by scope', () => {
-  const body = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('async resetActorKnowledge({'));
+test('SOURCE CONTRACT: resetActorKnowledge delegates its gate and delegates by scope', () => {
+  // BOUNDED to this method alone. The previous form sliced `MAIN_SOURCE` from the method's
+  // first character to the END OF THE FILE, which is harmless for a "must contain" claim and
+  // silently vacuous for a "must NOT contain" one — every helper the rest of the class
+  // legitimately uses is inside an unbounded slice. The absence assertions below are the
+  // reason this suite could not keep that form once the gate moved out of the method.
+  const body = mainMethodSource(RESET);
+
   assert.ok(
-    body.includes("if (game.user?.isGM !== true) {") &&
-      body.includes("return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };"),
-    'the explicit GM gate is present up front'
+    body.includes('const gate = this._requireGmActor(actorId, {') &&
+      body.includes("gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly'") &&
+      body.includes("noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'"),
+    'the gate is delegated to the shared preamble, with THIS member\'s own refusal strings'
   );
   assert.ok(
-    body.includes('const actor = game.actors?.get?.(actorId);'),
-    'the actor is resolved by actorId via game.actors.get (never a uuid)'
+    body.includes('if (gate.outcome) return { success: false, message: gate.message };'),
+    'a refused gate returns the { success, message } facade convention, never a throw'
   );
-  assert.ok(
-    body.includes("return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };"),
-    'a missing actor returns NoActor'
-  );
+  for (const inlined of ['game.user?.isGM', 'game.actors?.get?.(']) {
+    assert.equal(
+      body.includes(inlined),
+      false,
+      `\`${inlined}\` is still inlined here; the point of the preamble is that this rule ` +
+        'exists once, and a re-inlined copy is how the keys drift apart again'
+    );
+  }
   assert.ok(
     body.includes('service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })') &&
       body.includes('service.forgetAllLearnedRecipes(actor, { freeLearnBudget })'),
     'delegates to the per-system or all-systems reset by scope'
   );
   assert.ok(
-    body.slice(0, body.indexOf('\n  }')).includes("message: 'FABRICATE.Knowledge.Reset.Success'"),
+    body.includes("message: 'FABRICATE.Knowledge.Reset.Success'"),
     'a success returns the Success outcome with { success, message } (never throws)'
+  );
+});
+
+test('SOURCE CONTRACT: both gates resolve INSIDE _requireGmActor, in that order', () => {
+  // The refactor is only behaviour-preserving if the gates it removed from the method above
+  // still exist somewhere, in the same order, and neither the four behavioural cases nor the
+  // absence assertions above can see that: the cases would pass against a preamble that
+  // dropped a gate for a GM fixture, and an absence assertion is satisfied BY a deletion.
+  const preamble = mainMethodSource(PREAMBLE);
+
+  const gmAt = preamble.indexOf('if (game.user?.isGM !== true) {');
+  const actorAt = preamble.indexOf('const actor = this._resolveCraftingActor(actorId);');
+  assert.ok(gmAt >= 0, 'the GM gate is the preamble\'s first test');
+  assert.ok(actorAt >= 0, 'the actor is resolved through the ownership-gated resolver');
+  assert.ok(gmAt < actorAt, 'GM before actor: a non-GM must never reach an actor resolution');
+  assert.ok(
+    preamble.includes('outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey') &&
+      preamble.includes('outcome: COMPANION_OUTCOMES.noActor, message: noActorKey'),
+    'each refusal answers with the CALLER\'s key, which is why the keys are parameters'
+  );
+  assert.equal(
+    preamble.includes('this.ready') || preamble.includes('_requireReady'),
+    false,
+    'readiness is tested per member AFTER this preamble: `_requireReady()` throws, and a ' +
+      'ready-first preamble would make a pre-`ready` non-GM call throw where it returns gmOnly'
   );
 });
