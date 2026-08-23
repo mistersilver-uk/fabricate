@@ -92,6 +92,15 @@ export const COMPLICATION_DELIVER = 'complicationDeliver';
  * describe its own budget. If the selection cap moves, this reasoning is what has to be
  * re-read — which is why it is written down rather than computed.
  */
+/*
+ * The message count is not the only term in a sender's GM-side ceiling.
+ * `COMPLICATION_DELIVERY_MAX_ENTRIES` bounds each message, so the worst case an authenticated
+ * sender can put in front of the elected GM is the product of the two — each entry able to cost
+ * one `ChatMessage.create` and one `MacroExecutor.run`. Raising either raises that product.
+ * It is bounded abuse rather than a new hazard: the GM re-reads every complication from its own
+ * world setting, so a forger can only replay complications the GM authored, and the rate limiter
+ * is charged per message and applied last so a refused payload costs a sender nothing.
+ */
 export const COMPLICATION_RATE_LIMIT = 100;
 
 /** Rolling window for {@link COMPLICATION_RATE_LIMIT}, in milliseconds. */

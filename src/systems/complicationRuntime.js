@@ -179,7 +179,12 @@ async function conditionMatched(rollCondition, actor) {
 /**
  * The shape both effect-roll sides return when nothing was rolled HERE.
  *
- * ## `requested` and `attempted` answer DIFFERENT questions, and the card needs both
+ * ## `requested` and `attempted` answer DIFFERENT questions
+ *
+ * Since the card moved to `attempted`, `requested` has NO production reader left — it is
+ * retained because it is the honest answer to its own question and the two are trivially
+ * confusable, so dropping it would invite a future reader to key the card on the wrong one
+ * again. Tests assert both.
  *
  * `requested` answers "did the GM author one at all", which is a different question from
  * "was it rolled on this client" — the acting client leaves a `gmOnly` roll requested and

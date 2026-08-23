@@ -496,8 +496,23 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
  * complication card is unambiguously chat, so it consults it too; a GM who turned Fabricate's
  * narration off would otherwise still be whispered a card per resolution.
  *
- * The MACRO is deliberately not gated by this: a macro is not chat, and the gate would
- * silently disable authored world effects along with the narration.
+ * NEITHER the macro NOR the effect roll is gated by this, and the rule is card-vs-dice-message
+ * rather than chat-vs-not-chat. `features.chatOutput` has only ever gated the cards Fabricate
+ * composes about its own resolutions; it has never gated a die. `evaluateCheckRoll` posts a
+ * crafting check roll on `options.interactive` alone (`checkRoll.js`), so a `chatOutput: false`
+ * system already puts check rolls in chat with no card, and gating a complication's effect roll
+ * would make this one path stricter than every other roll in the module. The effect roll is not
+ * orphaned without the card either: its message carries `flavor: effectRoll.label ||
+ * complication.name`, so the GM can attribute it.
+ *
+ * Note the argument is NOT "the roll and its posting are one call, so gating would suppress the
+ * roll itself". That is false here — `evaluateSideRoll` takes an explicit `post` option and a
+ * gated variant that evaluates without posting is one argument away. The reason is the rule
+ * above, not an inability to separate them.
+ *
+ * The residual: with the toggle off the GM loses `MacroSkipped` / `MacroFailed` from chat.
+ * `runComplicationMacro` already `console.warn`s and `console.error`s both, so that degrades to
+ * the console rather than vanishing.
  *
  * Read from THIS client's own copy of the world setting, like every other GM-side re-read on
  * this path, and defaulted CLOSED for a system that does not resolve — an addressing that
