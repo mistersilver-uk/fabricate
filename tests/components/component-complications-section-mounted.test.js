@@ -41,6 +41,10 @@ const summaryRowSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'),
   'utf8'
 );
+const effectRowSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte'),
+  'utf8'
+);
 
 /**
  * The declaration body of one CSS rule in a component's scoped `<style>`.
@@ -399,6 +403,88 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       macro.querySelector('.fab-complication-effect-reveal'),
       'yet its controls are always reachable, which is what `control="none"` means'
     );
+  });
+
+  it('draws "Tell the player" as the prototype’s inline PILL, not as a row', async () => {
+    // It shares a line with Name and Severity in the prototype: a fixed 34px control sized
+    // to its own content, not a full-width row of its own. Drawn in the `condition` form it
+    // took a condition’s padding and stretched across the remainder of the field row, and
+    // `align-items: flex-start` on a switch row with NO detail line left the label riding
+    // high of the knob and the whole control hanging proud of the 34px inputs beside it.
+    // This was the largest single contributor to the region’s parity gap.
+    const { target } = await mountSection({
+      complications: [complication({ visibility: 'visible' })],
+    });
+    await openFirstRow(target);
+    const pill = target.querySelector('[data-complication-visibility]');
+    assert.ok(pill.classList.contains('is-form-pill'), 'the pill is its own geometry');
+    assert.equal(
+      pill.classList.contains('is-form-condition') || pill.classList.contains('is-form-effect'),
+      false,
+      'and not either of the two row shapes'
+    );
+
+    // The geometry itself: the harness mounts markup rather than a stylesheet, so the block
+    // is read the way `manager-layout.test.js` reads `Chip.svelte`'s.
+    const block = blockIn(effectRowSource, '.fab-complication-effect.is-form-pill');
+    assert.match(block, /height:\s*34px/, 'flush with the inputs it shares a line with');
+    assert.match(block, /padding:\s*0 12px/);
+    assert.match(block, /border-radius:\s*9px/);
+    assert.match(block, /width:\s*max-content/, 'sized to its content, never to the field');
+    assert.match(block, /align-items:\s*center/, 'a one-line switch centres against its knob');
+
+    // The head centres too, or the copy still rides high inside a centred pill.
+    assert.match(
+      effectRowSource,
+      /\.fab-complication-effect\.is-form-pill \.fab-complication-effect-head/,
+      'the pill takes the centred head, the same one the effect form takes'
+    );
+  });
+
+  it('draws an EFFECT row’s revealed strip FLUSH, because it has no control column', async () => {
+    // The 24px indent aligns a revealed strip with its head's copy, PAST a leading
+    // checkbox — and an effect row has no checkbox: its control is the switch on the far
+    // side, and the macro row (`control="none"`) has no control at all. So the indent
+    // referred to a column that does not exist, and the prototype draws the effect-roll
+    // reveal and the macro drop zone flush with the row's own padding.
+    assert.match(
+      blockIn(
+        effectRowSource,
+        '.fab-complication-effect.is-form-effect .fab-complication-effect-reveal'
+      ),
+      /margin-left:\s*0/,
+      'the effect form cancels the indent'
+    );
+    // Non-vacuity: a CONDITION row keeps it, because a condition head really does open with
+    // a checkbox and its revealed inputs read as belonging under the label.
+    assert.match(
+      blockIn(effectRowSource, '.fab-complication-effect-reveal'),
+      /margin:\s*10px 0 0 24px/,
+      'the base indent survives for the form that has a control column'
+    );
+
+    const { target } = await mountSection({
+      // The effect roll must be ON for its strip to be revealed at all; the macro row has
+      // no flag and reveals unconditionally.
+      complications: [complication({ effectRoll: { enabled: true, expr: '1d6', label: '' } })],
+    });
+    await openFirstRow(target);
+    for (const selector of [
+      '[data-complication-effect-roll]',
+      '[data-complication-macro] .fab-complication-effect',
+    ]) {
+      const row = target.querySelector(selector);
+      assert.ok(row.classList.contains('is-form-effect'), `${selector} is an effect row`);
+      assert.ok(
+        row.querySelector('.fab-complication-effect-reveal'),
+        `${selector} reveals a strip for the rule to apply to`
+      );
+      assert.equal(
+        row.querySelector('input[type="checkbox"]'),
+        null,
+        'and it has no checkbox, which is why the indent referred to nothing'
+      );
+    }
   });
 
   it('lets the panel GRID own the spacing around the Add control', async () => {

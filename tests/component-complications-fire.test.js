@@ -22,6 +22,7 @@ import { evaluateSideRoll } from '../src/systems/checkRoll.js';
 import {
   buildGmComplicationCardContent,
   fireComplications,
+  gmComplicationCardEntries,
   gmComplications,
   rollGmComplicationEffect,
 } from '../src/systems/complicationRuntime.js';
@@ -571,6 +572,7 @@ test('1286: the elected GM ROLLS the gmOnly effect roll the acting client skippe
     'without this the acting client’s "the GM rolls it" is a claim nothing discharges'
   );
   assert.equal(rolled.requested, true);
+  assert.equal(rolled.attempted, true, 'the roll happened HERE, which is what the card reports');
   assert.equal(rolled.total, 9);
   assert.equal(rolled.posted, true);
   assert.equal(
@@ -600,6 +602,12 @@ test('1286: the GM side refuses to roll a VISIBLE complication, the mirror of th
     'a visible roll belongs to the player’s own client and its dice'
   );
   assert.equal(rolled.requested, true, 'the GM authored one; it was simply not rolled HERE');
+  assert.equal(
+    rolled.attempted,
+    false,
+    'DECLINED BY AUDIENCE, not failed: the GM card renders a failure line off this field, and ' +
+      'a `visible` complication carrying a macro reaches this side for the macro alone'
+  );
   assert.equal(rolled.total, null);
   assert.equal(rolled.posted, false);
 });
@@ -623,6 +631,7 @@ test('1286: a GM-side effect roll that blows up is contained and reported as unr
   });
 
   assert.equal(rolled.requested, true);
+  assert.equal(rolled.attempted, true, 'attempted and FAILED, which the card must distinguish');
   assert.equal(rolled.total, null);
   assert.ok(rolled.error, 'the failure is reported on the return, never thrown at the delivery');
 });
@@ -639,6 +648,7 @@ test('1286: a complication with no authored effect roll asks the GM for nothing'
 
   assert.deepEqual(constructed, []);
   assert.equal(rolled.requested, false);
+  assert.equal(rolled.attempted, false);
 });
 
 // ── The GM-only card ─────────────────────────────────────────────────────────
@@ -763,7 +773,11 @@ test('1286: a macro that threw is reported, and one that ran adds no noise', () 
 test('1286: the GM-rolled effect roll is reported with its formula and its total', () => {
   const content = buildGmComplicationCardContent(
     {
-      entries: [gmRow({ effectRoll: { requested: true, total: 9, formula: '2d6', posted: true } })],
+      entries: [
+        gmRow({
+          effectRoll: { requested: true, attempted: true, total: 9, formula: '2d6', posted: true },
+        }),
+      ],
     },
     (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRoll' ? 'Effect roll' : key)
   );
@@ -772,12 +786,86 @@ test('1286: the GM-rolled effect roll is reported with its formula and its total
   const failed = buildGmComplicationCardContent(
     {
       entries: [
-        gmRow({ effectRoll: { requested: true, total: null, formula: '2d6??', posted: false } }),
+        gmRow({
+          effectRoll: {
+            requested: true,
+            attempted: true,
+            total: null,
+            formula: '2d6??',
+            posted: false,
+          },
+        }),
       ],
     },
     (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRollFailed' ? 'Effect roll failed' : key)
   );
   assert.ok(failed.includes('Effect roll failed: 2d6??'));
+});
+
+test('1286: a roll this side DECLINED by audience is not reported as a roll that failed', () => {
+  // The reachable case, from three independent editor controls: a complication that is
+  // `visible`, carries a macro, AND authors an effect roll. `needsGmClient` is true because
+  // of the macro, so the delivery lands here; `rollGmComplicationEffect` then refuses by
+  // audience — the roll belongs to the acting player's own dice, and the total it produced
+  // is already on the card as the acting client's claim. Keyed on `requested`, the card
+  // stated "Effect roll: 4" and "Effect roll failed: 1d6" two lines apart.
+  const localize = (key) =>
+    ({
+      'FABRICATE.Chat.GmComplication.EffectRoll': 'Effect roll',
+      'FABRICATE.Chat.GmComplication.EffectRollFailed': 'Effect roll failed',
+      'FABRICATE.Chat.GmComplication.Unverified': 'Reported by the acting client',
+    })[key] ?? key;
+
+  const declined = buildGmComplicationCardContent(
+    {
+      entries: [
+        gmRow({
+          visibility: 'visible',
+          claimed: { bucket: null, effectRollTotal: 4 },
+          effectRoll: {
+            requested: true,
+            attempted: false,
+            total: null,
+            formula: '1d6',
+            posted: false,
+          },
+          macro: { status: 'ran', macroUuid: 'Macro.x' },
+        }),
+      ],
+    },
+    localize
+  );
+
+  assert.equal(
+    declined.includes('Effect roll failed'),
+    false,
+    'this side did not attempt the roll, so it has no failure to report'
+  );
+  assert.ok(
+    declined.includes('Reported by the acting client') && declined.includes('Effect roll: 4'),
+    'the acting client’s total still stands, and still stands as an unverified claim'
+  );
+
+  // Non-vacuity: the same row, with the roll actually attempted here and failed, DOES report.
+  const attempted = buildGmComplicationCardContent(
+    {
+      entries: [
+        gmRow({
+          visibility: 'visible',
+          claimed: { bucket: null, effectRollTotal: 4 },
+          effectRoll: {
+            requested: true,
+            attempted: true,
+            total: null,
+            formula: '1d6',
+            posted: false,
+          },
+        }),
+      ],
+    },
+    localize
+  );
+  assert.ok(attempted.includes('Effect roll failed: 1d6'));
 });
 
 test('1286: a VISIBLE complication on the GM card says the player saw it too', () => {
@@ -847,4 +935,98 @@ test('1286: an AWARDED stage with no result id fires no stageMissed complication
   const fired = await fireComplications({ plan, actor: ACTOR, context: {} });
   assert.deepEqual(fired.fired, []);
   assert.deepEqual(fired.gmRequests, []);
+});
+
+// ── The GM card's ROW MODEL, driven with rows that disagree ──────────────────
+
+/** One `applyAuthoredComplications` row, as the GM-side apply hands it to the card. */
+function appliedRow(overrides = {}) {
+  return {
+    component: { id: 'iron', name: 'Iron Ingot' },
+    complication: complication({ name: 'Curse', description: 'It cracks.', severity: 'major' }),
+    entry: { resultId: 'r1', componentId: 'iron', bucket: 'full', effectRollTotal: null },
+    report: { effect: null, macro: null },
+    ...overrides,
+  };
+}
+
+test('1286: every card row carries its OWN bucket, total and macro outcome', () => {
+  // The whole reason this projection is a pure export rather than an inline map in
+  // `main.js`: the augmentation used to pair a projected row with `applied[index]`, and
+  // `main.js` cannot be imported under `node --test`, so a text pin could not tell
+  // `applied[index]` from `applied[0]` — under which every row would report row zero's
+  // stage, its claimed total and its macro outcome. Two rows that disagree on all three.
+  const entries = gmComplicationCardEntries([
+    appliedRow({
+      component: { id: 'iron', name: 'Iron Ingot' },
+      complication: complication({ name: 'Curse' }),
+      entry: { resultId: 'r1', componentId: 'iron', bucket: 'full', effectRollTotal: 4 },
+      report: { effect: null, macro: { status: 'ran', macroUuid: 'Macro.a' } },
+    }),
+    appliedRow({
+      component: { id: 'mithril', name: 'Mithril Plate' },
+      complication: complication({ name: 'Shatter' }),
+      entry: { resultId: 'r2', componentId: 'mithril', bucket: 'halted', effectRollTotal: 11 },
+      report: { effect: null, macro: { status: 'skipped', macroUuid: 'Macro.b' } },
+    }),
+  ]);
+
+  assert.deepEqual(
+    entries.map((row) => [row.name, row.componentName, row.claimed.bucket]),
+    [
+      ['Curse', 'Iron Ingot', 'full'],
+      ['Shatter', 'Mithril Plate', 'halted'],
+    ]
+  );
+  assert.deepEqual(
+    entries.map((row) => row.claimed.effectRollTotal),
+    [4, 11]
+  );
+  assert.deepEqual(
+    entries.map((row) => row.macro?.status),
+    ['ran', 'skipped']
+  );
+});
+
+test('1286: the card row carries the GM-side effect roll, and never the macro uuid', () => {
+  const [row] = gmComplicationCardEntries([
+    appliedRow({
+      complication: complication({ name: 'Curse', macroUuid: 'Macro.secret' }),
+      report: {
+        effect: { requested: true, attempted: true, total: 9, formula: '2d6', posted: true },
+        macro: { status: 'ran', macroUuid: 'Macro.secret' },
+      },
+    }),
+  ]);
+
+  assert.deepEqual(row.effectRoll, {
+    requested: true,
+    attempted: true,
+    total: 9,
+    formula: '2d6',
+    posted: true,
+  });
+  assert.ok(!('macroUuid' in row), 'the row is the GM-facing PROJECTION, not the authored record');
+  assert.ok(!('complication' in row));
+  assert.equal(row.visibility, 'gmOnly', 'the authored audience still reaches the card');
+});
+
+test('1286: a row the GM side could not augment still renders, and claims nothing', () => {
+  const [row] = gmComplicationCardEntries([{ component: null, complication: null, entry: null }]);
+  assert.deepEqual(row.claimed, { bucket: null, effectRollTotal: null });
+  assert.equal(row.macro, null);
+  assert.equal(row.effectRoll, null);
+  assert.deepEqual(gmComplicationCardEntries(undefined), []);
+  assert.deepEqual(gmComplicationCardEntries([]), []);
+});
+
+test('1286: the card row falls back to the ADDRESSED component id when the re-read has none', () => {
+  const [row] = gmComplicationCardEntries([
+    appliedRow({
+      component: {},
+      entry: { resultId: 'r1', componentId: 'iron', bucket: 'full', effectRollTotal: null },
+    }),
+  ]);
+  assert.equal(row.componentId, 'iron');
+  assert.equal(row.componentName, '');
 });

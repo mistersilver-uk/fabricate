@@ -178,17 +178,29 @@ async function conditionMatched(rollCondition, actor) {
 /**
  * The shape both effect-roll sides return when nothing was rolled HERE.
  *
+ * ## `requested` and `attempted` answer DIFFERENT questions, and the card needs both
+ *
  * `requested` answers "did the GM author one at all", which is a different question from
  * "was it rolled on this client" — the acting client leaves a `gmOnly` roll requested and
  * unrolled, and the GM side does the same for a `visible` one.
  *
+ * `attempted` answers the second question, and it exists because the GM card cannot be
+ * written from the first. A `visible` complication that ALSO carries a macro is delivered
+ * to the GM client (the macro is what needs it), and this side then declines the roll by
+ * audience — so `requested` is true, no roll happened here, and a card keyed on
+ * `requested` alone would report the acting client's total on one line and "the roll
+ * failed" two lines below it. Declined-by-audience and attempted-and-failed are separate
+ * states, so they are separate fields rather than one field read two ways.
+ *
  * @param {object|undefined} effectRoll
  * @param {string} expr
- * @returns {{requested: boolean, total: null, formula: string|null, posted: false}}
+ * @returns {{requested: boolean, attempted: false, total: null, formula: string|null,
+ *   posted: false}}
  */
 function unrolledEffect(effectRoll, expr) {
   return {
     requested: effectRoll?.enabled === true && expr !== '',
+    attempted: false,
     total: null,
     formula: expr || null,
     posted: false,
@@ -203,9 +215,12 @@ function unrolledEffect(effectRoll, expr) {
  *
  * @param {object} complication the AUTHORED record (the GM's own copy, on the GM side)
  * @param {object|null} actor
+ * Every return carries `attempted: true`: reaching this function IS the attempt, and the
+ * failure branch is precisely the state the GM card reports as a failed roll.
+ *
  * @param {{rollMode: string, speaker?: object}} options
- * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
- *   posted: boolean, error?: string}>}
+ * @returns {Promise<{requested: boolean, attempted: true, total: number|null,
+ *   formula: string|null, posted: boolean, error?: string}>}
  */
 async function rollEffect(complication, actor, { rollMode, speaker }) {
   const effectRoll = complication?.effectRoll;
@@ -218,6 +233,7 @@ async function rollEffect(complication, actor, { rollMode, speaker }) {
     });
     return {
       requested: true,
+      attempted: true,
       total: rolled.engine ? rolled.total : null,
       formula: rolled.formula ?? expr,
       posted: rolled.posted,
@@ -226,6 +242,7 @@ async function rollEffect(complication, actor, { rollMode, speaker }) {
     console.error('Fabricate | Complication effect roll failed', error);
     return {
       requested: true,
+      attempted: true,
       total: null,
       formula: expr,
       posted: false,
@@ -247,8 +264,8 @@ async function rollEffect(complication, actor, { rollMode, speaker }) {
  * @param {object} firing
  * @param {object|null} actor
  * @param {{speaker?: object}} context
- * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
- *   posted: boolean, error?: string}>}
+ * @returns {Promise<{requested: boolean, attempted: boolean, total: number|null,
+ *   formula: string|null, posted: boolean, error?: string}>}
  */
 async function runEffectRoll(firing, actor, context) {
   const complication = firing?.complication;
@@ -285,8 +302,8 @@ async function runEffectRoll(firing, actor, context) {
  * @param {object} options.complication the GM's OWN copy of the authored complication
  * @param {object|null} [options.actor] the acting actor, resolved GM-side from the addressing
  * @param {object|null} [options.speaker] the speaker, resolved GM-side from the addressing
- * @returns {Promise<{requested: boolean, total: number|null, formula: string|null,
- *   posted: boolean, error?: string}>}
+ * @returns {Promise<{requested: boolean, attempted: boolean, total: number|null,
+ *   formula: string|null, posted: boolean, error?: string}>}
  */
 export async function rollGmComplicationEffect({
   complication,
@@ -451,6 +468,59 @@ export function gmComplications(fired) {
 }
 
 /**
+ * The GM card's ROW MODEL for one delivered resolution: the GM-facing projection of what
+ * the GM authored, augmented with what THIS client actually did about it.
+ *
+ * ## Why it is here rather than in `main.js`
+ *
+ * `main.js` cannot be imported under `node --test`, so everything that lived in its card
+ * function could only ever be pinned by a text search — and a text search cannot tell
+ * `applied[index]` apart from `applied[0]`, which would report every row's stage, total and
+ * macro outcome as row zero's. Assembling the model here leaves the Foundry edge holding
+ * only the speaker, the visibility pass and `ChatMessage.create`, and lets a suite drive
+ * this with two rows that disagree.
+ *
+ * ## One row at a time, deliberately
+ *
+ * Each row is projected on its own rather than by zipping a projected array back against
+ * `applied` by index. The augmentation and the projection then cannot drift apart, and the
+ * index that made the mis-pairing spellable does not exist.
+ *
+ * The CLAIM is kept in its own `claimed` sub-object because the GM cannot re-derive either
+ * field — the award happened on the acting client — so the card labels it as reported
+ * rather than stating it flat (`openspec/specs/recipes-and-steps/spec.md` § "The relay
+ * payload carries ADDRESSING ONLY").
+ *
+ * @param {Array<{component?: object, complication?: object, entry?: object,
+ *   report?: {effect?: object, macro?: object}}>} applied
+ *   {@link ../systems/complicationSocket.js applyAuthoredComplications}'s return.
+ * @returns {Array<object>} one card row per applied entry, in delivery order
+ */
+export function gmComplicationCardEntries(applied) {
+  return list(applied).map((row) => {
+    const [projected] = gmComplications([
+      {
+        resultId: row?.entry?.resultId ?? null,
+        componentId: row?.component?.id ?? row?.entry?.componentId ?? null,
+        componentName: row?.component?.name ?? '',
+        complicationId: row?.complication?.id ?? null,
+        complication: row?.complication,
+        bucket: row?.entry?.bucket ?? null,
+        effectRoll: row?.report?.effect ?? null,
+      },
+    ]);
+    return {
+      ...projected,
+      claimed: {
+        bucket: row?.entry?.bucket ?? null,
+        effectRollTotal: row?.entry?.effectRollTotal ?? null,
+      },
+      macro: row?.report?.macro ?? null,
+    };
+  });
+}
+
+/**
  * Whether a roll total is a NUMBER worth reporting.
  *
  * `Number(null)` is `0` and `Number(undefined)` is `NaN`, so a coercing test would report an
@@ -501,8 +571,13 @@ function gmComplicationNotes(entry, loc) {
   ].filter(Boolean);
   if (claim.length > 0) notes.push(`${esc(loc(GM_CARD_KEYS.unverified))} — ${claim.join(' · ')}`);
 
+  // `attempted`, never `requested`. `requested` is true for an authored roll this client
+  // DECLINED by audience — a `visible` complication carrying a macro reaches the GM client
+  // for the macro's sake, and its roll belongs to the acting player's dice. Reading
+  // `requested` here rendered "the roll failed" directly under the acting client's claimed
+  // total for that exact case, so the card stated an outcome and its own contradiction.
   const effect = entry?.effectRoll;
-  if (effect?.requested === true) {
+  if (effect?.attempted === true) {
     notes.push(
       isReportableTotal(effect.total)
         ? `${esc(loc(GM_CARD_KEYS.effectRoll))}: ${esc(effect.formula)} = ${esc(effect.total)}`

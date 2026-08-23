@@ -38,7 +38,7 @@ import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGa
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
 import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
-import { buildGmComplicationCardContent, gmComplications, rollGmComplicationEffect } from './systems/complicationRuntime.js';
+import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
@@ -488,6 +488,29 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
 }
 
 /**
+ * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286).
+ *
+ * `features.chatOutput` is a per-system GM toggle and every other Fabricate chat poster
+ * consults it — `CraftingEngine#_postCraftChatMessage`, its salvage sibling,
+ * `GatheringEngine`'s poster and `BulkSalvageService#_postAggregateCard`. The GM
+ * complication card is unambiguously chat, so it consults it too; a GM who turned Fabricate's
+ * narration off would otherwise still be whispered a card per resolution.
+ *
+ * The MACRO is deliberately not gated by this: a macro is not chat, and the gate would
+ * silently disable authored world effects along with the narration.
+ *
+ * Read from THIS client's own copy of the world setting, like every other GM-side re-read on
+ * this path, and defaulted CLOSED for a system that does not resolve — an addressing that
+ * names no system on this client has nothing to narrate about.
+ *
+ * @param {string} craftingSystemId
+ * @returns {boolean}
+ */
+function complicationChatOutputEnabled(craftingSystemId) {
+  return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
+}
+
+/**
  * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly`
  * complication (issue 1286).
  *
@@ -504,18 +527,26 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
  * be unreadable. One whisper per resolution is the price; the alternative is a report the GM
  * cannot act on.
  *
- * ## Three steps, in an order that is load-bearing
+ * ## Four steps, in an order that is load-bearing
  *
- * 1. **Speaker first.** `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor`
- *    unguarded, so a visibility pass over speaker-less data throws for a GM whose client
- *    default is In-Character.
- * 2. **Visibility before `create`**, through `applyBulkChatVisibility` with an EXPLICIT
+ * 1. **The `chatOutput` gate first**, so a system whose GM turned narration off costs this
+ *    client nothing at all — see {@link complicationChatOutputEnabled}. It gates the CARD and
+ *    never the macro, which has already run by the time this is called.
+ * 2. **Speaker before the visibility pass.** `applyBulkChatVisibility` states as a caller
+ *    contract that `chatData.speaker` is already set, so the speaker is built onto `chatData`
+ *    at its construction rather than after it. (V14's `applyMode` reads `speaker.actor` only
+ *    inside its `ic` branch, which the literal `'gmroll'` below cannot reach — the ordering
+ *    is the module's contract, not a live crash on this call site.)
+ * 3. **Visibility before `create`**, through `applyBulkChatVisibility` with an EXPLICIT
  *    `gmroll` — never `core.rollMode`, which is `scope: "client"` and would be the GM's own
  *    selector. The legacy `rollMode` CREATE OPTION is honoured only for a message carrying
  *    rolls and this card carries none, so passing it to `create` would post the card publicly.
- * 3. **`create` inside the same guard**, so a token the running Foundry cannot map throws
+ * 4. **`create` inside the same guard**, so a token the running Foundry cannot map throws
  *    BEFORE the message exists. Failing closed matters here in a way it does not for the bulk
  *    card: a GM-only card that could not be made GM-only must not be posted at all.
+ *
+ * The row MODEL is `gmComplicationCardEntries`, in `complicationRuntime.js`, so that a suite
+ * can drive it with rows that disagree; what is left here is the Foundry edge only.
  *
  * The whole body is contained, because a complication is strictly downstream of a committed
  * award and a chat failure must never propagate — and there is nothing to propagate it TO: the
@@ -524,33 +555,14 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
  * @param {object} args
  * @returns {Promise<object|null>} the created message, or null when none was posted.
  */
-async function postGmComplicationCard({ actor, speaker, senderUser, applied = [] }) {
+async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
   try {
-    // `gmComplications` — the GM-facing projection, the counterpart to `publicComplications`
-    // and deliberately the only one that may carry an authored description or a severity to a
-    // GM surface. Its rows are augmented with what THIS client did, which is the half no
-    // projection of the acting client's report could ever hold.
-    const entries = gmComplications(
-      applied.map(({ component, complication, entry, report }) => ({
-        resultId: entry?.resultId ?? null,
-        componentId: component?.id ?? entry?.componentId ?? null,
-        componentName: component?.name ?? '',
-        complicationId: complication?.id ?? null,
-        complication,
-        bucket: entry?.bucket ?? null,
-        effectRoll: report?.effect ?? null
-      }))
-    ).map((row, index) => ({
-      ...row,
-      // The acting client's UNVERIFIABLE claim, kept in its own sub-object so the card can
-      // label it as one rather than presenting it as GM-attested
-      // (`recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY").
-      claimed: {
-        bucket: applied[index]?.entry?.bucket ?? null,
-        effectRollTotal: applied[index]?.entry?.effectRollTotal ?? null
-      },
-      macro: applied[index]?.report?.macro ?? null
-    }));
+    if (!complicationChatOutputEnabled(craftingSystemId)) return null;
+    // `gmComplicationCardEntries` — the GM-facing projection (the counterpart to
+    // `publicComplications`, and deliberately the only one that may carry an authored
+    // description or a severity to a GM surface) augmented with what THIS client did, which
+    // is the half no projection of the acting client's report could ever hold.
+    const entries = gmComplicationCardEntries(applied);
     const content = buildGmComplicationCardContent(
       { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
       (key) => game.i18n?.localize?.(key) ?? key
@@ -594,7 +606,18 @@ async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid
   const senderUser = game.users?.get?.(senderId) ?? null;
   if (!senderUser) return null;
   const actor = resolveComplicationActor(actorUuid);
-  if (!actor || typeof actor.testUserPermission !== 'function') return null;
+  // Failing CLOSED is right — nothing may run against an actor whose permissions cannot be
+  // asked — but the drop has to be VISIBLE. `fromUuidSync` resolves a compendium uuid to a
+  // plain index entry, which carries no `testUserPermission` at all, so a perfectly
+  // well-formed delivery addressed at a compendium actor is refused here with no roll, no
+  // macro, no card and, until this line, no trace anywhere for the one client that could
+  // diagnose it.
+  if (!actor || typeof actor.testUserPermission !== 'function') {
+    console.warn('Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document', {
+      senderId, actorUuid
+    });
+    return null;
+  }
   // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first
   // disjunct reads `actor.isOwner` — `isGatheringActorSelectableByUser` included —
   // resolves that disjunct against the AMBIENT `game.user`, which on the elected GM's
@@ -616,7 +639,7 @@ async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid
       craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
     })
   });
-  await postGmComplicationCard({ actor, speaker, senderUser, applied });
+  await postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied });
   return applied;
 }
 

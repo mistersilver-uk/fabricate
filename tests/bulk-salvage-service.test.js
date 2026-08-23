@@ -10,6 +10,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   BULK_MAX_ITEMS,
@@ -1344,6 +1346,26 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
 
     assert.equal(result.posted, true, 'the awards are committed; a lost beat is not a lost item');
     assert.equal(posted.length, 1);
+  });
+
+  it('relays BEFORE the aggregate card is posted, which is only prose until it is asserted', () => {
+    // `run()` states the ordering — "after the award commits, before the chat card is
+    // posted" — as the reason the relay sits where it does, and the relay is fire-and-forget
+    // while the card is awaited, so moving `_deliverComplications` below `_postAggregateCard`
+    // leaves every other assertion in this file green. The ordering is load-bearing: the GM
+    // whisper reports what a resolution did, and a table reading its result card before the
+    // GM has been told is the wrong way round.
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../src/systems/BulkSalvageService.js'),
+      'utf8'
+    );
+    const start = source.indexOf('  async run({');
+    assert.notEqual(start, -1, 'BulkSalvageService should declare run()');
+    const body = source.slice(start, source.indexOf('\n  }\n', start));
+    const relay = body.indexOf('this._deliverComplications(entries)');
+    const card = body.indexOf('this._postAggregateCard(entries');
+    assert.ok(relay !== -1 && card !== -1, 'both calls are in run() itself');
+    assert.ok(relay < card, 'the relay must precede the card');
   });
 
   it('runs, and relays nothing, with no delivery seam wired at all', async () => {

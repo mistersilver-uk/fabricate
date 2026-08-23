@@ -114,20 +114,27 @@ function englishTemplate(_key, fallback) {
 }
 
 /**
- * Substitute `{name}` placeholders. Deliberately not a regex over the DATA: an authored
- * dice expression may legitimately contain braces (`@abilities.int.mod` does not, but a
- * system's shorthand might), and replacing placeholder-by-placeholder means authored text
- * is never rescanned for a placeholder of its own.
+ * Substitute `{name}` placeholders, in ONE pass over the TEMPLATE.
+ *
+ * One pass is what makes "authored text is never rescanned" true rather than merely
+ * intended. An authored dice expression may legitimately contain braces (a system's
+ * shorthand might), and a loop that replaced one placeholder at a time re-exposed whatever
+ * it had just written to every LATER placeholder: filling `{expr}` with the literal text
+ * `{value}` and then filling `{value}` rewrote the expression the GM authored into the
+ * comparand beside it.
+ *
+ * A placeholder the data does not name is left ALONE rather than emptied, so a localized
+ * template that reaches for a slot this builder does not supply degrades to visible text
+ * instead of silently losing a word.
+ *
  * @param {string} template
  * @param {Record<string, string>} [data]
  * @returns {string}
  */
 function fill(template, data = {}) {
-  let filled = String(template ?? '');
-  for (const [name, value] of Object.entries(data)) {
-    filled = filled.split(`{${name}}`).join(String(value ?? ''));
-  }
-  return filled;
+  return String(template ?? '').replaceAll(/\{(\w+)\}/g, (placeholder, name) =>
+    Object.hasOwn(data, name) ? String(data[name] ?? '') : placeholder
+  );
 }
 
 /**

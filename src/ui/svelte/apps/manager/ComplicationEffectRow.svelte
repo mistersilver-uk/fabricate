@@ -40,14 +40,15 @@
    - on: whether the row is enabled. The revealed `children` strip renders ONLY when it is,
      which is the prototype's rule and is also what keeps a disabled effect's inputs out of
      the tab order. Ignored when `control` is `none`, per above.
-   - form: the row's GEOMETRY — `condition` (the default) or `effect`. See the note below.
+   - form: the row's GEOMETRY — `condition` (the default), `effect` or `pill`. See the
+     note below.
    - onTone: what the ON state means — `neutral` (the default: chosen among peers) or
      `accent` (a deliberate, singular choice). See the note below.
    - tone: the glyph's colour family — `danger`, `warning`, `success`, `accent`, `info` or
      `subtle` (the default). Colour only; it never changes the row.
    - label: the control's accessible name, falling back to `title`.
 
-  ## TWO GEOMETRIES, ONE PRIMITIVE (`form`)
+  ## THREE GEOMETRIES, ONE PRIMITIVE (`form`)
 
   The prototype draws its condition rows and its effect rows to two different specs: a
   condition is `padding: 9px 11px`, radius 8, `align-items: flex-start`, and TRANSPARENT
@@ -57,11 +58,13 @@
   item in a checklist, and the always-on fill is what says so. The right-hand switch also
   centres against a two-line copy block rather than hanging at its top.
 
-  It is stated as a `form` PROP rather than derived from `control`, even though the two
-  correlate perfectly in this section today: "Tell the player" is a `switch` that is
-  neither of these shapes (the prototype makes it a 34px inline pill sharing a row with
-  Name and Severity), so deriving would have silently re-shaped it. Its pill geometry
-  remains a recorded deviation — this component draws it in the `condition` form.
+  `pill` is the third: "Tell the player" is not a row at all in the prototype but a fixed
+  34px inline control sharing a line with Name and Severity, sized to its own content
+  (`width: max-content`) rather than filling the field it sits in. It is the reason `form`
+  is a PROP rather than something derived from `control` — it is a `switch`, like the
+  effect rows, and deriving would have drawn it as one. It also centres: a switch row with
+  no `detail` is one line of copy against a 20px knob, so `flex-start` left the label
+  riding high of the knob and the whole control hanging proud of the fields beside it.
 
   ## `onTone` — WHAT AN ON STATE MEANS
 
@@ -102,7 +105,10 @@
   // is PAINTED as enabled, and whether its children are reachable.
   const enabled = $derived(control !== 'none' && on === true);
   const revealed = $derived(control === 'none' || on === true);
-  const formClass = $derived(form === 'effect' ? 'is-form-effect' : 'is-form-condition');
+  // Declared geometries only, on the same rule as `tone`: an unknown `form` falls back to
+  // the condition shape rather than rendering an unstyled row.
+  const FORMS = new Set(['condition', 'effect', 'pill']);
+  const formClass = $derived(FORMS.has(form) ? `is-form-${form}` : 'is-form-condition');
   const onToneClass = $derived(onTone === 'accent' ? 'is-on-accent' : 'is-on-neutral');
 </script>
 
@@ -189,6 +195,21 @@
     background: var(--fab-bg-1);
   }
 
+  /* A PILL: a fixed-height inline control on a field row, not a row of its own. It is
+     sized to its content rather than to the field, so it sits beside Name and Severity
+     the way the prototype draws it instead of stretching across the remainder. The
+     explicit `height` (rather than padding alone) is what keeps it flush with the 34px
+     inputs it shares that line with. */
+  .fab-complication-effect.is-form-pill {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: var(--fab-bg-1);
+  }
+
   /* An enabled row takes the stronger edge, so the set of chosen conditions reads at a
      glance without reading each control; a condition also lifts onto the raised surface,
      which an effect row is already sitting on. */
@@ -213,7 +234,8 @@
     margin: 0;
   }
 
-  .fab-complication-effect.is-form-effect .fab-complication-effect-head {
+  .fab-complication-effect.is-form-effect .fab-complication-effect-head,
+  .fab-complication-effect.is-form-pill .fab-complication-effect-head {
     gap: 11px;
     align-items: center;
   }
@@ -293,5 +315,13 @@
     gap: 7px;
     align-items: center;
     margin: 10px 0 0 24px;
+  }
+
+  /* …but ONLY where that column exists. The indent aligns the strip with the head's copy,
+     past a leading checkbox — and an effect row has no checkbox: its control is the switch
+     on the FAR side. So the 24px indented the strip under nothing, and the prototype draws
+     the effect-roll reveal and the macro drop zone flush with the row's own padding. */
+  .fab-complication-effect.is-form-effect .fab-complication-effect-reveal {
+    margin-left: 0;
   }
 </style>

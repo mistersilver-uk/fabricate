@@ -593,6 +593,7 @@
               </div>
               <ComplicationEffectRow
                 control="switch"
+                form="pill"
                 on={complication.visibility === 'visible'}
                 onTone="accent"
                 icon="fas fa-eye"
