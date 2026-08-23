@@ -37,6 +37,7 @@ import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessa
 import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
+import { createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
@@ -160,6 +161,14 @@ const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 // Separate budget for the blind-start relay (issue 901) so a burst of gathers and
 // a burst of starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
+// Third budget, for the complication relay (issue 1286). Charged per MESSAGE, and one
+// resolution — including a whole bulk salvage — emits exactly one.
+const complicationDeliveryRateLimiter = createComplicationRateLimiter();
+// Suppresses a complication re-delivered to THIS context. Module scope for the same
+// reason the limiters are: a per-message set would remember nothing. It cannot cover an
+// elected GM with the world open in two tabs — two realms, two sets — which is a stated,
+// accepted residual rather than an oversight (see `complicationSocket.js`).
+const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
 
 // The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
 // could not be read, or could not be written. One complete localized sentence per reason,
@@ -361,6 +370,169 @@ async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, ta
     interactableRef,
     interactive: false
   });
+}
+
+/**
+ * Resolve an addressed actor synchronously, or `null` when it names nothing reachable.
+ *
+ * @param {string} actorUuid
+ * @returns {object|null}
+ */
+function resolveComplicationActor(actorUuid) {
+  const resolve = globalThis.fromUuidSync;
+  if (typeof resolve !== 'function' || !actorUuid) return null;
+  try { return resolve(String(actorUuid)) ?? null; } catch (_) { return null; }
+}
+
+/**
+ * Re-read one addressed complication from THIS client's own `craftingSystems` record.
+ *
+ * This is the whole point of the addressing-only payload: the macro uuid, the name, the
+ * description, the severity and the visibility come from the GM's own world setting, and
+ * an addressing that names no such component or no such complication resolves to `null`
+ * and is dropped. A forged message can therefore do no more than fire a complication the
+ * GM themselves authored.
+ *
+ * @param {string} craftingSystemId
+ * @param {{ componentId?: string, complicationId?: string }} entry
+ * @returns {{ component: object, complication: object }|null}
+ */
+function findAuthoredComplication(craftingSystemId, { componentId, complicationId } = {}) {
+  const components = fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
+  const component = components.find(candidate => candidate?.id === componentId) ?? null;
+  const authored = Array.isArray(component?.complications) ? component.complications : [];
+  const complication = authored.find(candidate => candidate?.id === complicationId) ?? null;
+  return complication ? { component, complication } : null;
+}
+
+/**
+ * The macro scope for a complication, resolved GM-SIDE from the addressing.
+ *
+ * `MacroExecutor` binds only `('context','args','scope')` under `"use strict"`, so every
+ * other name a macro author reaches for resolves as a global ON THE EXECUTING CLIENT —
+ * and that client is now a GM rather than the acting player. `game.user.character` is the
+ * GM's (normally none), `canvas` is whatever scene the GM is viewing, the token selection
+ * is the GM's, and `game.user.isGM` is TRUE, so a macro branching on it flips. The speaker,
+ * the acting actor and its token are therefore supplied explicitly. A complication macro
+ * that needs the acting player's own client — any UI prompt — cannot work.
+ *
+ * `bucket`, `resultId` and `effectRollTotal` are the acting client's CLAIM about the
+ * outcome, which the GM cannot verify; they are passed as reported, never acted on.
+ *
+ * @param {object} args
+ * @returns {object}
+ */
+function buildComplicationMacroContext({ craftingSystemId, component, complication, entry, actor, senderUser, resolutionId }) {
+  const token = actor?.token ?? actor?.getActiveTokens?.(false, true)?.[0] ?? null;
+  return {
+    kind: 'componentComplication',
+    craftingSystemId,
+    activity: entry.activity,
+    resolutionId,
+    resultId: entry.resultId,
+    bucket: entry.bucket,
+    effectRollTotal: entry.effectRollTotal,
+    component: { id: component?.id ?? entry.componentId, name: component?.name ?? '' },
+    complication: {
+      id: complication.id,
+      name: complication.name,
+      severity: complication.severity,
+      visibility: complication.visibility
+    },
+    actor,
+    token,
+    speaker: globalThis.ChatMessage?.getSpeaker?.({ actor, token }) ?? null,
+    requestingUser: senderUser
+  };
+}
+
+/**
+ * Run one complication's authored macro on this (elected GM) client. Never throws: one
+ * bad complication must not cost a resolution its other complications.
+ *
+ * The `type === 'script'` gate is a CALL-SITE check and this is the call site — the Macro
+ * type defaults to `chat`, `command` is a required string on a chat macro too, and an
+ * imported system or a hand-edited world setting never passes through the editor's drop
+ * handler. It sits HERE rather than on the acting client because compendium ownership is
+ * GM-configurable per role, so a player's `fromUuid` can miss a macro the GM resolves
+ * fine, which would silently drop a valid macro. The uuid is resolved here AND again
+ * inside `MacroExecutor.run` for the reason the essence-property macro records: only
+ * settling "is this a script macro at all" before the try can tell a broken link (silent)
+ * from a macro that blew up (reported).
+ *
+ * @param {object} args
+ * @returns {Promise<*>} The macro's return value, or `null`.
+ */
+async function runComplicationMacro({ craftingSystemId, component, complication, entry, actor, senderUser, resolutionId }) {
+  const macroUuid = complication.macroUuid;
+  if (!macroUuid) return null;
+  let macro;
+  try {
+    macro = await fromUuid(macroUuid);
+  } catch {
+    macro = null;
+  }
+  if (!macro || macro.type !== 'script' || typeof macro.command !== 'string') {
+    console.warn(
+      `Fabricate | Complication "${complication.name || complication.id}" names a macro that could not be resolved to a script macro and was skipped (${macroUuid})`
+    );
+    return null;
+  }
+  try {
+    return await MacroExecutor.run(macroUuid, buildComplicationMacroContext({
+      craftingSystemId, component, complication, entry, actor, senderUser, resolutionId
+    }));
+  } catch (error) {
+    console.error(`Fabricate | Complication macro failed (${macroUuid})`, error);
+    return null;
+  }
+}
+
+/**
+ * ELECTED-GM edge for a relayed complication delivery (issue 1286).
+ *
+ * Runs strictly downstream of an award the acting client has already committed, so it
+ * never influences one and never reports back: the acting client has returned. What it
+ * adds is AUTHORITY — the macro runs on a GM client, from the complication the GM's own
+ * world setting holds.
+ *
+ * The `senderId` is Foundry's server-attested socket sender, never a payload field, and
+ * the actor is re-authorized against THAT user rather than against this client's own
+ * ambient permissions. Each complication is isolated: one that resolves to nothing is
+ * dropped and the rest still run.
+ *
+ * @param {object} payload Validated delivery request plus the attested sender.
+ * @returns {Promise<object[]|null>} The complications applied, or null when refused.
+ */
+async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid, resolutionId, complications = [] } = {}) {
+  const senderUser = game.users?.get?.(senderId) ?? null;
+  if (!senderUser) return null;
+  const actor = resolveComplicationActor(actorUuid);
+  if (!actor || typeof actor.testUserPermission !== 'function') return null;
+  // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first
+  // disjunct reads `actor.isOwner` — `isGatheringActorSelectableByUser` included —
+  // resolves that disjunct against the AMBIENT `game.user`, which on the elected GM's
+  // client (the only client that runs this) owns every actor in the world. Such a
+  // predicate passes for a sender who owns nothing and never consults the sender at all,
+  // reintroducing exactly the escalation the addressing-only contract exists to remove.
+  // The shipped blind-gather relay has that defect today (issue 1288); do not copy it.
+  if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
+    console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
+      senderId, actorUuid
+    });
+    return null;
+  }
+  const applied = [];
+  for (const entry of complications) {
+    const authored = findAuthoredComplication(craftingSystemId, entry);
+    if (!authored) continue;
+    await runComplicationMacro({
+      craftingSystemId, component: authored.component, complication: authored.complication,
+      entry, actor, senderUser, resolutionId
+    });
+    applied.push(entry);
+  }
+  return applied;
 }
 
 /**
@@ -915,6 +1087,33 @@ class Fabricate {
     gatheringEngine.installBlindRunRelay({
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
+    });
+    // A complication's GM-only card and its macro must happen on a GM client: a player
+    // cannot author a message as the GM (it would render in the player's own sidebar),
+    // and a macro run on the acting client would carry the acting client's authority.
+    // Relayed over the same `module.fabricate` channel, addressing only — the elected GM
+    // re-reads the authored complication from its own `craftingSystems` record (issue
+    // 1286). On the elected GM's own client the writer applies locally, because a
+    // broadcast excludes the emitter.
+    this.complicationDeliveryWriter = createComplicationDeliveryWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      hasActiveGM: () => !!game.users?.activeGM,
+      // Unlike the blind-start relay this DROPS rather than blocks: a complication is
+      // strictly downstream of a committed award, so refusing it would strand a
+      // completed craft. The award, the player-facing card and the run record are
+      // already written and stay unaffected; only the GM-only card and the macro are
+      // lost, and there is no store to defer them into.
+      onUnroutable: ({ resolutionId }) => console.warn(
+        'Fabricate | Complications were not delivered: no active GM is connected to run them',
+        { resolutionId }
+      ),
+      // Minted here rather than inside the socket module, which touches no Foundry
+      // global. `randomID` and not `Math.random()`.
+      mintResolutionId: () => globalThis.foundry?.utils?.randomID?.(),
+      emitComplications: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      // The local-apply branch (this client IS the elected GM) has no socket sender to
+      // attest, so supply the current user — who is, on that branch, the acting user.
+      applyComplications: (payload) => applyComplicationDelivery({ senderId: game.user?.id, ...payload })
     });
     // Housekeeping that drops entries naming deleted content. Each pass is
     // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
@@ -3674,6 +3873,32 @@ Hooks.once('ready', async () => {
           // here or it lands as an unhandled rejection on the GM's client.
           Promise.resolve(applyGatheringBlindStart(args))
             .catch(error => console.warn('Fabricate | Blind gathering start failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
+    // Same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only
+    // card and the macro must run on a GM client, from the complication the GM's OWN
+    // `craftingSystems` record holds. Addressing only — nothing on the wire names a
+    // macro, a visibility or any content. Guarded for the same reason as the routes
+    // above: a throw here must not starve the Interactable payload.
+    try {
+      routeComplicationDeliveryMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        // Applied LAST of the refusal gates, so a malformed or unauthenticated message
+        // never consumes a sender's budget. Charged per MESSAGE: one resolution — a whole
+        // bulk salvage included — emits exactly one.
+        allowSender: complicationDeliveryRateLimiter,
+        // An elected GM holding two sockets in ONE context receives the same message
+        // twice; two tabs are two contexts and remain a stated, accepted residual.
+        isFreshDelivery: complicationDeliveryDedupe,
+        applyComplications: (args) => {
+          // Nothing awaits a socket handler, so a rejected apply must be caught here or
+          // it lands as an unhandled rejection on the GM's client.
+          Promise.resolve(applyComplicationDelivery(args))
+            .catch(error => console.warn('Fabricate | Complication delivery failed', error));
         }
       });
     } catch (_error) {
