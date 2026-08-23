@@ -14,7 +14,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`globalThis.fabricate`** (alias: `fabricate`).
   Convenience functions for macros.
 - **`game.fabricate.api`**.
-  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names).
+  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names — and `COMPANION`, the versioned [companion contract](#companion-contract)).
 
 All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires:
 
@@ -83,6 +83,11 @@ game.fabricate.getGatheringEconomy({ systemId }) // Gathering economy block
 game.fabricate.setGatheringEconomy({ systemId, economy }) // GM-only economy update
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
 game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget }) // GM-only reset of one actor's learned recipes (one system, or all systems when systemId is null)
+game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy }) // GM-only recipe-knowledge grant, no owned book required (companion contract)
+game.fabricate.checkAffordability({ actorId, unitId, amount }) // GM-only world-scoped affordability answer (companion contract)
+game.fabricate.getCurrencyConfigStore()     // World currency configuration store (null before ready)
+game.fabricate.getActorPropertyCoinSpender() // Coin spender for the actorProperty strategy (null before ready)
+game.fabricate.getActorInventoryCoinSpender() // Coin spender for the actorInventory strategy (null before ready)
 game.fabricate.getResolutionModeService()   // Mode validation and resolution
 ```
 
@@ -558,6 +563,98 @@ The committed catalogue itself is an artifact because CI has no Foundry install 
 What that does not do is re-check itself.
 Nothing runs the generator when Foundry bumps its bundled Font Awesome, so the committed snapshot ages: names added in a newer bundle are absent from the Foundry 14 vocabulary until someone regenerates it, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of a different glyph.
 If you render a name from this list and get a blank glyph, that is the check to make.
+
+## Companion Contract
+
+`game.fabricate.api.COMPANION` is Fabricate's named, versioned contract for outbound **behavioural** consumption — the capabilities a companion module needs to settle a downtime activity against an actor.
+It is the behavioural sibling of the two navigation seams below, which are outbound **UI contribution** rather than consumption.
+
+```javascript
+const contract = game.fabricate?.api?.COMPANION;
+if (!contract) return;                    // Fabricate has not loaded yet — retry, do not degrade.
+if (contract.schemaVersion !== 1) return; // A version this companion does not understand.
+```
+
+The descriptor is frozen data with exactly three fields — `schemaVersion`, `members`, and `outcomes` — and it is assigned when Fabricate's own `init` listener runs, before any service exists.
+
+{: .warning }
+> **Read the version in `setup` or `ready`, never in your own `init`.**
+> Foundry dispatches `init` listeners in module-script execution order, ordered by the `library` manifest flag and then world module-collection order; `relationships.requires` does not influence that order, and Fabricate declares no `library` flag.
+> A companion sorting before Fabricate therefore reads `undefined` at its own `init`.
+> Treat an absent `game.fabricate` as *Fabricate has not loaded yet* — never as *this Fabricate has no contract*, and never as a trigger for a degraded path.
+
+### The Members
+
+Every member is declared at exactly one promise tier, and nothing outside this set is contract however reachable it is.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Member | Promise | Read from | What it answers |
+|:-------|:--------|:----------|:----------------|
+| `schemaVersion` | `stable` | the `COMPANION` descriptor | The contract version, as a number. Readable before any service exists. |
+| `grantRecipeKnowledge` | `stable` | `game.fabricate` | `({ actorId, recipeId, grantedBy })` teaches one actor one recipe with no owned book required. GM-gated, idempotent, and it refuses where a learned entry would be invisible to the player. |
+| `checkAffordability` | `stable` | `game.fabricate` | `({ actorId, unitId, amount })` answers whether an actor can afford a cost against the **world** coin ladder. GM-gated, ladder-aware, single-unit, and it writes nothing. |
+| `getCurrencyConfigStore` | `handle` | `game.fabricate` | The world currency configuration store Fabricate itself uses, or `null` before readiness. Read it as `getCurrencyConfigStore()?.get?.() ?? null`, because `.get()` on the `null` throws. |
+| `getActorPropertyCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorProperty` strategy, or `null` before readiness. |
+| `getActorInventoryCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorInventory` strategy, or `null` before readiness. |
+| `getCraftingEngine` | `handle` | `game.fabricate` | The live crafting engine, or `null` before readiness. |
+| `getCraftingEngine().findComponentItems` | `handle` | the crafting engine | `(actor, component, system)` finds an actor's existing stacks of a component, so an award can **stack** rather than duplicate. See its carve-outs below. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### What Each Promise Tier Guarantees
+
+A `stable` member guarantees its **name, its arguments, and its result shape**.
+It never throws: it refuses in the same shape it succeeds in, carrying a stable `outcome` token beside a `message` that is **always a localization key**.
+Where a lower layer produces free text — a broken coin ladder, a macro's own error — that text rides in `messageData.detail` so `message` stays localizable.
+
+A `handle` member guarantees only the **accessor's name**, and that it answers the object Fabricate itself uses or `null` before readiness.
+It guarantees **nothing about that object's method surface** beyond a declared carve-out.
+`CraftingEngine` has hundreds of methods and no reviewer can promise them all, so the honest promise is the handle rather than the surface.
+
+`getCraftingEngine().findComponentItems` is the one carve-out, and it is stated in full because a companion that guards only against a null actor still crashes.
+It takes **documents, not ids**; its third argument is a crafting-system **object**, not an id; and it **throws on a null actor and on a null component**, with only the system argument tolerant.
+
+### Calling A `stable` Member
+
+Every `stable` behavioural member takes an **`actorId`**, never an actor uuid, and resolves it through Fabricate's own ownership gate.
+Both are **GM-gated**, and both refuse rather than throw before the module is ready.
+The gate order is **GM → actor → readiness**, in that order, because the readiness check throws and must run after the refusals that may not.
+
+```javascript
+const result = await game.fabricate.grantRecipeKnowledge({
+  actorId: actor.id,
+  recipeId,
+  grantedBy: 'Downtime: Research'   // optional; refused, never truncated, max 64 characters
+});
+if (!result.success) return ui.notifications.warn(game.i18n.format(result.message, result.messageData ?? {}));
+const alreadyKnew = result.outcome === game.fabricate.api.COMPANION.outcomes.alreadyKnown;
+```
+
+An already-known recipe answers `success: true` with the `alreadyKnown` outcome and performs **no write**, because an automation tick may legitimately re-run.
+Branch on the **outcome** to tell *granted now* from *already knew*, never on the boolean.
+
+`checkAffordability` answers `{ success, affordable, outcome, message }`.
+`success: false` means the question could not be **answered** — an unknown unit, a non-positive amount, an empty or invalid ladder, an unreachable spender — and `affordable` is then `null` rather than a confident `false`.
+A shortfall is `success: true` with `affordable: false`, which is what keeps *tell the player they are short* apart from *tell the GM their ladder is broken*.
+
+### The Outcome Vocabulary
+
+`COMPANION.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
+Branch on `success` first and treat an unrecognised `outcome` as a generic refusal — an exhaustive `switch` is a caller bug, not a contract breach.
+
+### The Compatibility Promise
+
+While `schemaVersion` is unchanged, every member keeps its name, keeps accepting the arguments documented here, and keeps answering in the documented shape.
+A member may gain an optional argument or an additional result field; it may not lose one, change the meaning of one, or begin throwing where it returned a result.
+A **new** member may be added without a version change, because adding one cannot break a companion that does not call it.
+Removing a member, renaming one, or narrowing what one accepts is a `schemaVersion` bump, announced in the release notes, with the previous member retained as a deprecated delegate for at least one minor release.
+Nothing outside the declared set is contract, however reachable it is.
+
+{: .warning }
+> **Elect a single executor before acting on an answer.**
+> A companion invoking any member from a handler that fires on **every connected client** — a synced hook such as `updateWorldTime`, or a socket broadcast — must check `game.users.activeGM?.id === game.user?.id` first.
+> Reading is harmless; acting on the read from N clients is not, and `grantRecipeKnowledge` under N clients is N writes.
 
 ## Subscribing To Gathering Hooks
 

@@ -671,6 +671,28 @@ describe('alchemyGlobalNoDiscovery', () => {
     assert.match(issue.message, /Known list/);
   });
 
+  it('scopes the claim to what a player can reach, because a GM grant is a second writer', () => {
+    // Issue 1289 makes `game.fabricate.grantRecipeKnowledge` a SECOND writer of
+    // `learnedRecipes`, and the alchemy `default:` reveal arm reads that map
+    // unconditionally — `learnOnCraft` gates only the brew-discovery union. So a granted
+    // entry under Global alchemy with auto-learn off IS revealed, and a validator telling
+    // the GM that no player will EVER see a recipe would be lying about the feature the
+    // same release ships. The warning is retained; only its claim is scoped.
+    const system = alchemySystem({ learnOnCraft: false }, { visibilityMode: 'global' });
+    const issue = evaluateSystemValidation(system, { recipes: [] }).issues.find(
+      (entry) => entry.code === 'alchemyGlobalNoDiscovery'
+    );
+
+    assert.match(issue.message, /Known list/, 'the substring other assertions key on survives');
+    assert.match(issue.message, /unless a GM grants it/, 'the escape hatch is named');
+    assert.match(issue.message, /brewing or a GM grant/, 'and so is the second reveal source');
+    assert.doesNotMatch(
+      issue.message,
+      /ever see a recipe/,
+      'the absolute claim is withdrawn: a GM grant reveals under exactly this pairing'
+    );
+  });
+
   it('stays silent when learnOnCraft is on, or under any other visibility mode', () => {
     const on = evaluateSystemValidation(
       alchemySystem({ learnOnCraft: true }, { visibilityMode: 'global' }),

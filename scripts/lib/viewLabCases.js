@@ -4480,8 +4480,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-knowledge-learned-lost-copy'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // The same character on the other tab: her learned entries name a book she no longer holds,
-    // so each row falls to the DEFINITION-name rung and carries the no-refund clause.
+    // The same character on the other tab, and the only frame that renders a learned ROW.
+    // Two of her entries name a book she no longer holds, so they fall to the
+    // DEFINITION-name rung; the other three have no source at all and split three ways —
+    // auto-learn, a labelled GM grant and a label-less one (issue 1289) — which is what
+    // makes this one frame the evidence that the three read as different rows. Every
+    // source-less row carries the no-refund clause, because no source copy means no learn
+    // budget to give back.
+    //
+    // `sourceMatches` names the knowledge component DIRECTORY as well as the view root:
+    // the rows are drawn by `KnowledgeLearnedRow.svelte`, and before this the directory
+    // pattern appeared only on `manager-knowledge-narrow`, which takes no actor and no tab
+    // step and therefore opens on Recipe items with no learned row in frame at all.
+    //
+    // It also names `SvelteCraftingSystemManagerApp.svelte.js`: the `granted`/`grantedBy`
+    // allowlist that `_collectKnowledgeLearnedEntries` hands to the row ladder lives there,
+    // has no unit coverage, and this frame is its only evidence, so a later edit that drops
+    // `granted` from the allowlist must recapture this case rather than fail silently. That
+    // file is broad, so this case will also select on unrelated edits to it — an accepted
+    // trade for closing the silent-regression gap (issue 1289).
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -4491,7 +4508,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'knowledge'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-knowledge-party-pool-warning',

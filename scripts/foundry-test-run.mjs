@@ -4855,6 +4855,13 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
  * resolve a still-held source copy and decrement a party-pool key this fixture never
  * incremented.
  *
+ * The companion-contract step's throwaway actor is deleted here too, and deleting the
+ * DOCUMENT is what makes its granted entry go with it — a learned flag has no independent
+ * existence. That is the whole reason the step creates its own actor rather than granting
+ * onto a fixture character and undoing it: the only published undo is `resetActorKnowledge`,
+ * which sweeps every learned id for the system, clears their discovery progress and
+ * decrements learn budgets.
+ *
  * @param {import('playwright').Page} page
  * @param {{systemId: string, fixture: object|null}} options
  */
@@ -4896,6 +4903,9 @@ async function restoreKnowledgeFixture(page, { systemId, fixture }) {
     }
     for (const itemId of fixture.sourceItemIds || []) {
       await game.items.get(itemId)?.delete().catch(() => {});
+    }
+    if (fixture.contractActorId) {
+      await game.actors.get(fixture.contractActorId)?.delete().catch(() => {});
     }
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, fixture });
@@ -5077,6 +5087,160 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-narrow');
   await setManagerWindowSize(page, { width: 1280, height: 900 });
+}
+
+/**
+ * Create the throwaway actor the companion-contract step grants onto (issue 1289).
+ *
+ * A THROWAWAY, and never one of the fixture's own characters, because the only published
+ * lever that would undo a grant is `resetActorKnowledge` — and that sweeps EVERY learned id
+ * for the system, wipes the swept ids' discovery progress and decrements learn budgets. Run
+ * against a fixture character it would silently destroy the seeded state the frames above
+ * depend on, inside a section whose whole contract is that it is persisted-net-zero. A
+ * document the section created is one the section can simply delete.
+ *
+ * Created AFTER the captures rather than in `setupKnowledgeFixture`, because a new player
+ * character joins the Knowledge roster and would appear as an extra row in every frame this
+ * section publishes. Its id is written into the fixture record the moment it exists, so
+ * `restoreKnowledgeFixture` deletes it even if the verification below throws.
+ *
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string>} the created actor's id
+ */
+async function createCompanionContractActor(page) {
+  return page.evaluate(async () => {
+    const types = Array.from(game.documentTypes?.Actor || []);
+    const type = types.includes('character') ? 'character' : types[0];
+    if (!type) throw new Error('Companion contract step found no creatable Actor type');
+    const actor = await Actor.create({ name: 'Smoke Companion Contract Target', type });
+    if (!actor?.id) throw new Error('Companion contract step could not create its throwaway actor');
+    return actor.id;
+  });
+}
+
+/**
+ * Prove `game.fabricate.api.COMPANION` in a REAL world (issue 1289, criterion 17).
+ *
+ * Three claims no unit test can make, because `src/main.js` cannot be imported under
+ * `node --test` and every suite that pins it is therefore a text scan or a faithful copy:
+ *
+ *  1. The descriptor is actually PUBLISHED on the live global, and its version is a number.
+ *  2. Every declared member resolves through its own declared `host` and `path` against the
+ *     real facade and the real crafting engine — including the two rows that are not facade
+ *     functions at all (a number on the descriptor, and a method on the object a `handle`
+ *     accessor returns).
+ *  3. A grant against a real Actor document and a real knowledge-mode crafting system
+ *     succeeds, persists the four documented scalars through Foundry's own flag write, and a
+ *     repeat answers `alreadyKnown` — which is the idempotency read going through the shared
+ *     entry-boundary reader rather than a bare map index.
+ *
+ * The fixture characters' flags, their copies' learn counts and the world party-learn pool
+ * are snapshotted around the whole step and compared, so a grant that reached anything other
+ * than its own throwaway actor fails here rather than in some later run's unrelated frame.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, recipeId: string, fixture: object}} options
+ */
+async function verifyCompanionContract(page, { systemId, recipeId, fixture }) {
+  return page.evaluate(async ({ systemId, recipeId, fixture }) => {
+    const actorId = fixture.contractActorId;
+    const GRANTED_BY = 'Foundry smoke: companion contract';
+    const readFlag = (document, key) => document?.getFlag('fabricate', `fabricate.${key}`) ?? null;
+
+    // Everything this step is committed NOT to touch, in one string.
+    const snapshot = () => JSON.stringify({
+      actors: [
+        fixture.chipStatesActorId,
+        fixture.partyPoolActorId,
+        fixture.learnedOnlyActorId,
+        fixture.untrackedActorId,
+      ].map((id) => {
+        const actor = game.actors.get(id);
+        return {
+          id,
+          learnedRecipes: readFlag(actor, 'learnedRecipes'),
+          discoveryProgress: readFlag(actor, 'discoveryProgress'),
+        };
+      }),
+      learnCounts: Object.entries(fixture.ownedByKey || {}).map(([key, owned]) => {
+        const item = game.actors.get(owned.actorId)?.items?.get(owned.itemId);
+        return [key, readFlag(item, 'recipeItemLearning'), readFlag(item, 'recipeItemUsage')];
+      }),
+      // The `total`-scope party budget is a WORLD setting, so a stray decrement would leak
+      // out of this section entirely.
+      partyLearnPool: game.settings.settings?.has?.('fabricate.recipeItemPartyLearnPool')
+        ? game.settings.get('fabricate', 'recipeItemPartyLearnPool')
+        : null,
+    });
+    const before = snapshot();
+
+    const contract = game.fabricate?.api?.COMPANION;
+    if (!contract) throw new Error('game.fabricate.api.COMPANION is not published on the live global');
+    if (typeof contract.schemaVersion !== 'number') {
+      throw new Error(`COMPANION.schemaVersion is ${typeof contract.schemaVersion}, expected a number`);
+    }
+    if (!Object.isFrozen(contract)) throw new Error('COMPANION is published unfrozen');
+
+    // Resolve THROUGH the declared host and path rather than assuming a facade function:
+    // two of the eight rows are not one.
+    const hosts = {
+      contract,
+      facade: game.fabricate,
+      craftingEngine: game.fabricate.getCraftingEngine(),
+    };
+    for (const member of contract.members) {
+      const host = hosts[member.host];
+      if (!host) throw new Error(`COMPANION member ${member.name} declares unresolvable host ${member.host}`);
+      const resolved = host[member.path];
+      const expected = member.kind === 'value' ? 'number' : 'function';
+      if (typeof resolved !== expected) {
+        throw new Error(
+          `COMPANION member ${member.name} resolved to ${typeof resolved} through ${member.host}.${member.path}; expected ${expected}`
+        );
+      }
+    }
+
+    // Fail here, naming the cause, if an earlier phase ever moves the smoke system off its
+    // `knowledge` default — otherwise the grant below refuses and reads as a product defect.
+    const system = game.fabricate.getCraftingSystemManager().getSystem(systemId);
+    if (game.fabricate.getRecipeVisibilityService().isLearnedKnowledgeObservable(system) !== true) {
+      throw new Error(`Companion contract step needs an observable system; ${systemId} is not one`);
+    }
+
+    const granted = await game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy: GRANTED_BY });
+    if (granted?.success !== true || granted?.outcome !== 'granted') {
+      throw new Error(`Grant against a real actor answered ${JSON.stringify(granted)}`);
+    }
+
+    const entry = readFlag(game.actors.get(actorId), 'learnedRecipes')?.[recipeId];
+    if (
+      !entry ||
+      entry.granted !== true ||
+      entry.grantedBy !== GRANTED_BY ||
+      entry.sourceItemUuid !== null ||
+      !Number.isFinite(Number(entry.learnedAt))
+    ) {
+      throw new Error(`The granted entry did not persist as four scalars: ${JSON.stringify(entry)}`);
+    }
+
+    const repeat = await game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy: GRANTED_BY });
+    if (repeat?.success !== true || repeat?.outcome !== 'alreadyKnown') {
+      throw new Error(`A repeat grant answered ${JSON.stringify(repeat)}; expected alreadyKnown`);
+    }
+
+    const after = snapshot();
+    if (before !== after) {
+      throw new Error(
+        `The companion contract step changed fixture state it does not own.\nbefore: ${before}\nafter:  ${after}`
+      );
+    }
+    return {
+      schemaVersion: contract.schemaVersion,
+      memberCount: contract.members.length,
+      grantedOutcome: granted.outcome,
+      repeatOutcome: repeat.outcome,
+    };
+  }, { systemId, recipeId, fixture });
 }
 
 async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actorId, fixture }) {
@@ -10379,7 +10543,18 @@ async function main() {
               chipStatesActorId: cleanup.crafterId,
               partyPoolActorId: cleanup.travelMemberId,
             }),
-            exercise: (fixture) => exerciseKnowledgeSurface(page, { fixture }),
+            exercise: async (fixture) => {
+              await exerciseKnowledgeSurface(page, { fixture });
+              // The companion contract's runtime proof (issue 1289, criterion 17) runs LAST
+              // and on a throwaway actor of its own, so it can neither disturb a frame above
+              // nor the fixture characters those frames photograph.
+              fixture.contractActorId = await createCompanionContractActor(page);
+              await verifyCompanionContract(page, {
+                systemId: craftingSetup.systemId,
+                recipeId: craftingSetup.healingPotionRecipeId,
+                fixture,
+              });
+            },
             restore: (fixture) => restoreKnowledgeFixture(page, {
               systemId: craftingSetup.systemId,
               fixture,

@@ -59,7 +59,20 @@ You link each macro by dragging it from the Foundry macro directory onto a drop 
   Link it if you want cancelled crafts to give the coins back.
 
 Each macro receives the currency cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
-If a macro reports failure or stops with an error, Fabricate stops the craft before any ingredients are consumed.
+If a macro reports failure or stops with an error during a craft, Fabricate stops the craft before any ingredients are consumed.
+
+#### Which question your macro is being asked
+
+Your **Can afford macro** answers two different questions, and the context it receives says which one.
+
+- During a craft, `caller` is `"craft"`, and the context also carries the `recipe` and the `craftingSystem` being crafted from.
+- When another module asks whether a character can afford a cost outside a craft — a companion settling a downtime activity, say — `caller` is `"award"`, and both `recipe` and `craftingSystem` are `null`, because that question has no recipe and belongs to no crafting system.
+
+Check `caller` before you read anything craft-specific.
+A macro that reads the recipe's name without checking stops with an error on an award question, and Fabricate then reports that the question could not be answered rather than reporting a well-funded character as unable to pay.
+That is the honest outcome, but a macro that guards on `caller` gives a real answer instead.
+
+Every context Fabricate builds carries `caller`; today only the **Can afford macro** is ever asked the award question.
 
 ## Defining currency units
 

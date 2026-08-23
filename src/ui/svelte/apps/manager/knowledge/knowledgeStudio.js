@@ -17,6 +17,12 @@
 // import-free leaf, so it keeps this module pure and adds no mounted-harness edge
 // beyond the one raw-module entry each Knowledge suite lists.
 import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+// The companion contract's own bound on a `grantedBy` label. Imported rather than
+// restated: the write path REFUSES a longer label using this number, and a display
+// clamp keyed on a second, hand-copied 64 would drift silently the day either moves.
+// `companionContract.js` is itself import-free, so this stays a pure leaf-to-leaf edge
+// and costs each Knowledge mounted harness one raw-module entry.
+import { GRANTED_BY_MAX_LENGTH } from '../../../../../systems/companionContract.js';
 
 /** The two inner tabs of the Knowledge surface. */
 export const KNOWLEDGE_TAB_RECIPE_ITEMS = 'recipeItems';
@@ -42,6 +48,12 @@ export const LEARNED_SOURCE_OWNED_COPY = 'ownedCopy';
 export const LEARNED_SOURCE_LOST_COPY = 'lostCopy';
 export const LEARNED_SOURCE_UUID = 'uuid';
 export const LEARNED_SOURCE_AUTO_LEARN = 'autoLearn';
+// The two GM-grant kinds (issue 1289). They are DISTINCT kinds rather than one kind
+// with an empty `name`, because the kind is rendered into `data-knowledge-source` and
+// is therefore the only selector a test or a capture can address a row by: collapsing
+// them would leave the label-less grant — the common case — unaddressable.
+export const LEARNED_SOURCE_GRANTED = 'granted';
+export const LEARNED_SOURCE_GRANTED_UNLABELLED = 'grantedUnlabelled';
 
 const DEFAULT_RECIPE_ITEM_IMAGE = 'icons/svg/item-bag.svg';
 
@@ -170,21 +182,76 @@ export function usesChipState(caps = {}) {
 }
 
 /**
+ * Clamp a `grantedBy` label to what a learned row may display.
+ *
+ * CLAMP, not re-clamp: the write path REFUSES an over-length label rather than
+ * truncating it (`normalizeGrantedBy`), so nothing has clamped this value before —
+ * the flag is public and another module can write straight past that refusal.
+ *
+ * The bound is INCLUSIVE of the ellipsis: the rendered label never exceeds
+ * `GRANTED_BY_MAX_LENGTH` code points, so a contract-legal label renders verbatim and
+ * anything longer renders 63 code points plus `…`. A bound that excluded the ellipsis
+ * would let a label the writer refused at 65 characters render 65 glyphs anyway.
+ *
+ * Measured and sliced in CODE POINTS, never `String.prototype.slice`, which cuts
+ * between the halves of a surrogate pair and renders the remnant as tofu.
+ *
+ * @param {string} value a label already known to be a string
+ * @returns {string}
+ */
+function clampGrantedByLabel(value) {
+  const points = [...value];
+  if (points.length <= GRANTED_BY_MAX_LENGTH) return points.join('');
+  return `${points.slice(0, GRANTED_BY_MAX_LENGTH - 1).join('')}…`;
+}
+
+/**
+ * The source of a learned entry that carries NO `sourceItemUuid` — the branch every
+ * book rung has already been excluded from.
+ *
+ * The discriminant is `granted === true`, tested strictly and NOT for truth: the flag
+ * is public, so `granted: 'yes'` or `granted: 1` is a value another module can write,
+ * and a surface that read either as a GM grant would assert a provenance nothing
+ * recorded. The label is then a SECOND question, not the discriminant — a grant with
+ * no usable label is still a grant, and is the common case.
+ *
+ * `typeof grantedBy === 'string'` is likewise strict rather than coerced: `String(raw)`
+ * of an object renders "Learned by grant: [object Object]", and an array survives the
+ * entry-boundary reader's nested-record test, so coercion here would put a module's
+ * internal shape into the GM's audit line.
+ *
+ * @param {{granted?: unknown, grantedBy?: unknown}} raw
+ * @returns {{kind: string, name: string}}
+ */
+function learnedRecipeGrantSource(raw) {
+  if (raw.granted !== true) return { kind: LEARNED_SOURCE_AUTO_LEARN, name: '' };
+  const label = typeof raw.grantedBy === 'string' ? raw.grantedBy.trim() : '';
+  if (!label) return { kind: LEARNED_SOURCE_GRANTED_UNLABELLED, name: '' };
+  return { kind: LEARNED_SOURCE_GRANTED, name: clampGrantedByLabel(label) };
+}
+
+/**
  * Resolve the display source of a learned entry.
  *
  * `sourceItemUuid` is the ACTOR-OWNED item uuid and dangles forever once the copy
  * is gone, so the ladder is: still-owned copy name → the member recipe-item
  * DEFINITION name (rendered "… (copy no longer owned)", the rung that satisfies
- * the survives-source-deletion requirement) → the trailing uuid segment →
- * "Learned by crafting" for a `null` uuid (every `learnRecipeOnCraft` entry).
+ * the survives-source-deletion requirement) → the trailing uuid segment → and, for a
+ * `null` uuid, the GM-grant rungs or "Learned by crafting".
+ *
+ * The two grant rungs sit INSIDE the `!uuid` branch, which returns first. A rung
+ * placed after the uuid rungs would be dead code that a table exercising only the
+ * three uuid-bearing rungs still passes. A `grantedBy` alongside a uuid is ignored
+ * for display: a uuid-bearing entry has real book provenance, and that provenance
+ * wins.
  *
  * @param {{sourceItemUuid?: string|null, sourceOwned?: boolean, sourceItemName?: string,
- *   sourceDefinitionName?: string}} raw
+ *   sourceDefinitionName?: string, granted?: unknown, grantedBy?: unknown}} raw
  * @returns {{kind: string, name: string}}
  */
 export function learnedRecipeSource(raw = {}) {
   const uuid = raw.sourceItemUuid ? String(raw.sourceItemUuid) : '';
-  if (!uuid) return { kind: LEARNED_SOURCE_AUTO_LEARN, name: '' };
+  if (!uuid) return learnedRecipeGrantSource(raw);
   const ownedName = String(raw.sourceItemName || '').trim();
   if (raw.sourceOwned === true && ownedName) {
     return { kind: LEARNED_SOURCE_OWNED_COPY, name: ownedName };

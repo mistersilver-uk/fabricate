@@ -520,8 +520,13 @@ CraftingSystem = {
     Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today).
     Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
     When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding. - `"macro"` drives currency through GM-supplied macros.
-    Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
-    A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
+    Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem, caller }`.
+    `caller` is `"craft"` or `"award"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund, and `"award"` on the world-scoped affordability check (see the _CurrencyConfig_ section), on which `recipe` and `craftingSystem` are both `null`.
+    The token is positive on BOTH arms rather than inferred from those nulls, because a macro can test a token, while a null recipe is indistinguishable from an occasion the macro has never heard of.
+    A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player.
+    Under `caller: "craft"` a failure aborts the craft before ingredient consumption.
+    Under `caller: "award"` a macro that THREW answers a refusal DISTINGUISHABLE from a genuine shortfall: `MacroCoinSpender` marks its catch branch `thrown: true`, and the affordability check reports that the question could not be answered rather than that the actor cannot pay.
+    That marker is additive, and the craft paths — which read only `valid` and `message` — are unaffected by it.
     The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
     The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
@@ -739,9 +744,20 @@ type CurrencyConfig = {
    Every reconciliation of two ladders is therefore keyed by `id` and is reference-preserving: the `1.26.0` migration UNIONS units by id across every crafting system (the first system wins an id collision), and import merges an incoming ladder by id with the DESTINATION definition winning (see `import-export`).
 8. Exactly one runtime chokepoint composes the two scopes.
    `getCurrencyRequirementConfig` takes `enabled` from the crafting system and `units` / `spendStrategy` / `providerId` / `macros` from this config, reaching each through a seam (`getCraftingSystemManager`, `getCurrencyConfig`) with a `game.fabricate` global fallback.
-   No affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+   No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+   The one reader that is not recipe-keyed is the published affordability check of requirement 10, which reads the world half alone through the same `getCurrencyConfig` seam and composes nothing.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
+10. The published affordability check (`game.fabricate.checkAffordability`, a member of the companion contract — see `companion-api`) answers against the WORLD configuration ALONE and consults no crafting system's `requirements.currency.enabled` toggle.
+    It is structurally unable to: it resolves no crafting system and holds no system-manager seam.
+    That is the correct scope because the question it answers has no recipe — a downtime activity settled by a companion belongs to no crafting system, so there is no toggle whose answer could apply to it.
+11. It is LADDER-AWARE, so a caller supplies one `{ unitId, amount }` and performs no aggregation of its own.
+    The reader compares the actor's total base value across the whole connected branch, so 10 sp affords a 1 gp cost on a ten-silver-per-gold ladder.
+12. It resolves the unit and validates the amount BEFORE invoking any spender.
+    An unresolvable `unitId`, a non-positive or non-finite `amount`, an empty ladder and an invalid profile each answer `success: false` with a distinct outcome, and NEVER `affordable: true`.
+    The ordering is load-bearing rather than defensive: the only unknown-unit guard on the craft path lives inside the aggregation step a single-unit question skips, and skipping it prices the cost at a base value of zero, which every purse satisfies — so an unknown unit id, and an amount of zero, would each read as AFFORDABLE.
+    A refusal answers `affordable: null` rather than `false`, so "this actor is short" and "this question could not be answered" cannot collapse into the same confident no.
+13. It performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
 
 ## TravelConfig
 
@@ -2159,6 +2175,8 @@ Actor.flags.fabricate.learnedRecipes = {
   [recipeId: string]: {
     learnedAt: number,
     sourceItemUuid: string,
+    granted?: true,      // present only on a granted entry; never written `false`
+    grantedBy?: string,  // optional caller-supplied label, trimmed, at most 64 characters
   },
 }
 ```
@@ -2168,8 +2186,17 @@ Requirements:
 1. `recipeId` must reference a valid recipe.
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
-   It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and the craft-time auto-learn path writes it as `null`.
-4. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
+   It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
+   Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
+4. `granted` and `grantedBy` are optional scalars written only by the companion contract's knowledge grant (see `companion-api` and `recipe-visibility`).
+   `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
+   `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
+   The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.
+   Neither field is ever written by either book-learn path.
+   The field is named `grantedBy` rather than joining the `source*` family because every `source*` field on this entry already means THE BOOK.
+   Adding the two fields does not widen what counts as an entry: the entry boundary is still a numeric `learnedAt`, so a node carrying only `granted` yields no entry at all.
+   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-integration` _Knowledge Surface_).
+5. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
    A reader using the raw path finds nothing in a real world and silently reports zero.
 
 ### Alchemy Dead-Ends Flag

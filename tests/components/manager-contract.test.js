@@ -4,6 +4,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { classMemberSource, moduleFunctionSource } from '../helpers/boundedSource.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
@@ -3402,6 +3404,73 @@ describe('CraftingSystemManager source contract', () => {
         "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
       ),
       'the manager app imports the shared, GM-configurable player-character predicate'
+    );
+  });
+
+  // The learned-row ALLOWLIST (issue 1289). `_collectKnowledgeLearnedEntries` builds every
+  // learned row as a hand-written object literal, so a field that literal does not name never
+  // reaches the display ladder at all — the row renders whatever an earlier rung answers, with
+  // nothing failing anywhere. Deleting the `granted`/`grantedBy` pair from it survived the
+  // whole suite: the mounted Knowledge suite feeds `projectKnowledgeSnapshot` a hand-built
+  // `rawLearned` fixture, so it proves the ladder and the render but never the collection; the
+  // Foundry step opens no Knowledge row for its throwaway actor; and the View Lab frame is a
+  // screenshot, not a gate.
+  //
+  // The expected set is DERIVED from the ladder's own source rather than restated, so a field
+  // added to the ladder later cannot be forgotten here either.
+  it('names every learned-entry field the display ladder reads', () => {
+    const studioSource = readFileSync(resolve(knowledgeComponentDir, 'knowledgeStudio.js'), 'utf8');
+    // Walked to a FIXED POINT from the projection the collected rows are fed to: every
+    // `raw.<field>` that projection reads, and the same again for every function it hands the
+    // same `raw` to, at any depth. One level would miss `granted`/`grantedBy`, which
+    // `learnedRecipeSource` reads only through `learnedRecipeGrantSource`.
+    const readFields = new Set();
+    const walked = new Set();
+    const queue = ['projectLearnedRecipeRow'];
+    while (queue.length > 0) {
+      const name = queue.shift();
+      if (walked.has(name)) continue;
+      walked.add(name);
+      const body = moduleFunctionSource(studioSource, name, 'knowledgeStudio.js');
+      for (const [, field] of body.matchAll(/\braw\.([A-Za-z_$][\w$]*)/g)) readFields.add(field);
+      for (const [, callee] of body.matchAll(/\b([A-Za-z_$][\w$]*)\(raw\)/g)) queue.push(callee);
+    }
+    // A VACUITY guard, not the subject. The walk keys on the ladder's input still being named
+    // `raw` and still being read field by field; a rewrite that destructured it would leave
+    // every assertion below passing over an empty set.
+    assert.ok(
+      readFields.size >= 6,
+      `the learned-row ladder no longer reads \`raw.<field>\`, so this derivation proves nothing (found ${[...readFields].join(', ') || 'nothing'})`
+    );
+
+    const collector = classMemberSource(
+      appSource,
+      '_collectKnowledgeLearnedEntries(actor, items, context) {',
+      'SvelteCraftingSystemManagerApp.svelte.js'
+    );
+    const literalStart = collector.indexOf('learnedRecipes.push({');
+    const literalEnd = collector.indexOf('\n      });', literalStart);
+    assert.ok(
+      literalStart >= 0 && literalEnd > literalStart,
+      'the learned-row literal is locatable inside the collector, so this is not an empty slice'
+    );
+    const literal = collector.slice(literalStart, literalEnd);
+    // A field is named either as `field: value` or as the `field,` shorthand.
+    const named = new Set(
+      [...literal.matchAll(/^\s+([A-Za-z_$][\w$]*)[:,]/gm)].map(([, key]) => key)
+    );
+    for (const field of readFields) {
+      assert.ok(
+        named.has(field),
+        `the collector's allowlist drops \`${field}\`, which the learned-row ladder reads: the row falls silently to an earlier rung`
+      );
+    }
+    // Named for their own sake as well as by derivation: these two are the pair the ladder
+    // reads STRICTLY (`granted === true`, `typeof grantedBy === 'string'`), so they are also
+    // the pair a `String(...)` or `|| ''` default here would quietly make plausible.
+    assert.ok(
+      readFields.has('granted') && readFields.has('grantedBy'),
+      'the grant rungs are still part of the ladder this derivation walks'
     );
   });
 
