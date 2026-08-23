@@ -1266,27 +1266,49 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
     );
   });
 
-  it('splits by ADDRESSED PAIR, because the payload names one system and one actor', async () => {
-    // Both are GM-side AUTHORIZATION inputs — the system is what the authored complication
-    // is re-read from, the actor is what the attested sender is re-authorized against — so
-    // neither can be per-entry without moving the authorization decision onto the wire.
+  /**
+   * Run `targets`, with every row firing one request that names the system and actor it came
+   * from, and return the relayed messages. Shared by the three batch-key cases below, which
+   * differ ONLY in the `(system, actor)` shape of their targets — written once because
+   * SonarCloud counts `tests/**` for new-code duplication and three near-identical service
+   * fixtures is exactly the block that gate fails on.
+   */
+  async function relayedMessages({ systems, targets }) {
     const delivered = [];
     const service = makeService({
-      systems: [
-        bulkSystem({ id: 'sys-a', components: [ORE] }),
-        bulkSystem({ id: 'sys-b', components: [HIDE] }),
-      ],
+      systems,
       salvage: async (actorUuid, systemId, componentId) => ({
         success: true,
         results: [],
-        complicationRequests: [complicationRequest({ componentId, actorUuid })],
+        complicationRequests: [
+          complicationRequest({ craftingSystemId: systemId, componentId, actorUuid }),
+        ],
       }),
       deliverComplications: (message) => {
         delivered.push(message);
       },
     });
+    await service.run({ targets, interactive: false });
+    return delivered;
+  }
 
-    await service.run({
+  /** The addressing of each relayed message, in relay order. */
+  const addressing = (delivered) =>
+    delivered.map((message) => [message.craftingSystemId, message.actorUuid]);
+
+  /** What each relayed message actually CARRIES, read back off the requests themselves. */
+  const carried = (delivered, field) =>
+    delivered.map((message) => message.complications.map((request) => request[field]));
+
+  it('splits by ADDRESSED PAIR, because the payload names one system and one actor', async () => {
+    // Both are GM-side AUTHORIZATION inputs — the system is what the authored complication
+    // is re-read from, the actor is what the attested sender is re-authorized against — so
+    // neither can be per-entry without moving the authorization decision onto the wire.
+    const delivered = await relayedMessages({
+      systems: [
+        bulkSystem({ id: 'sys-a', components: [ORE] }),
+        bulkSystem({ id: 'sys-b', components: [HIDE] }),
+      ],
       targets: [
         bulkTarget({
           actorId: 'a1',
@@ -1301,15 +1323,83 @@ describe('BulkSalvageService.run: complications are batched, not emitted per row
           componentId: 'comp-hide',
         }),
       ],
-      interactive: false,
+    });
+
+    assert.deepEqual(addressing(delivered), [
+      ['sys-a', 'Actor.a1'],
+      ['sys-b', 'Actor.a2'],
+    ]);
+  });
+
+  // The case above varies the system AND the actor together, so it holds for a key built from
+  // either half alone. The two cases below drive the halves SEPARATELY, because collapsing
+  // this key is not bookkeeping: with the actor half gone, a run spanning two actors on one
+  // system relays ONE message whose `actorUuid` is whichever row batched first, carrying the
+  // OTHER actor's requests — so the elected GM re-authorizes actor A and then runs actor B's
+  // complications against A. That is precisely the "authorization decision on the wire" this
+  // grouping exists to prevent (`recipes-and-steps/spec.md` § "The relay payload carries
+  // ADDRESSING ONLY"). With the system half gone, the GM re-reads the authored complication
+  // from the wrong system's record instead.
+  it('relays TWO ACTORS on ONE system as two messages, each carrying only its own', async () => {
+    const delivered = await relayedMessages({
+      systems: [bulkSystem({ id: 'sys-a', components: [ORE, HIDE] })],
+      targets: [
+        bulkTarget({
+          actorId: 'a1',
+          actorUuid: 'Actor.a1',
+          systemId: 'sys-a',
+          componentId: 'comp-ore',
+        }),
+        bulkTarget({
+          actorId: 'a2',
+          actorUuid: 'Actor.a2',
+          systemId: 'sys-a',
+          componentId: 'comp-hide',
+        }),
+      ],
     });
 
     assert.deepEqual(
-      delivered.map((message) => [message.craftingSystemId, message.actorUuid]),
+      addressing(delivered),
       [
         ['sys-a', 'Actor.a1'],
-        ['sys-b', 'Actor.a2'],
-      ]
+        ['sys-a', 'Actor.a2'],
+      ],
+      'one message per actor, both naming the one system the run addressed'
+    );
+    assert.deepEqual(
+      carried(delivered, 'actorUuid'),
+      [['Actor.a1'], ['Actor.a2']],
+      'and neither message carries the other actor’s requests, or the GM would authorize ' +
+        'one actor and run the other’s complications against it'
+    );
+  });
+
+  it('relays TWO SYSTEMS for ONE actor as two messages, each carrying only its own', async () => {
+    const delivered = await relayedMessages({
+      systems: [
+        bulkSystem({ id: 'sys-a', components: [ORE] }),
+        bulkSystem({ id: 'sys-b', components: [HIDE] }),
+      ],
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-b', componentId: 'comp-hide' }),
+      ],
+    });
+
+    assert.deepEqual(
+      addressing(delivered),
+      [
+        ['sys-a', 'Actor.a1'],
+        ['sys-b', 'Actor.a1'],
+      ],
+      'one message per system, both naming the one actor the run addressed'
+    );
+    assert.deepEqual(
+      carried(delivered, 'craftingSystemId'),
+      [['sys-a'], ['sys-b']],
+      'and neither message carries the other system’s requests, or the GM would re-read ' +
+        'the authored complication from a record that does not hold it'
     );
   });
 

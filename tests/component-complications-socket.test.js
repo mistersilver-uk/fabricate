@@ -854,6 +854,28 @@ test('1286: a gmOnly complication produces a GM-only card, or it produces nothin
       'for the common case and for every macro-less complication'
   );
 
+  // The ARGUMENTS are the pin, not the call. Each of the five can be dropped on its own with
+  // the call itself — and therefore the assertion above, and every other assertion in this
+  // file — still intact, and each drop breaks the card in a different way that no suite would
+  // see: without `craftingSystemId` the chatOutput gate reads a system that does not resolve,
+  // closes for EVERY system, and no GM complication card is ever posted again; without
+  // `applied` the card defaults to no rows, `buildGmComplicationCardContent` returns '' and
+  // nothing is created; without `speaker` `applyBulkChatVisibility`'s stated caller contract
+  // is broken and the whisper speaks as nobody; and without `actor` or `senderUser` the card
+  // loses the subtitle naming whose resolution it reports, which is the only thing that makes
+  // a GM whisper reconcilable with the table's own card.
+  const cardCall = /await postGmComplicationCard\(\{([^}]*)\}\)/.exec(withoutComments(apply));
+  assert.ok(cardCall, 'the GM card is called with a single options object');
+  assert.deepEqual(
+    cardCall[1]
+      .split(',')
+      .map((argument) => argument.trim())
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right)),
+    ['actor', 'applied', 'craftingSystemId', 'senderUser', 'speaker'],
+    'every argument the card needs is passed to it'
+  );
+
   const card = withoutComments(mainFunctionBody('postGmComplicationCard'));
   assert.ok(
     card.includes('gmComplicationCardEntries(applied)'),
