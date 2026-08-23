@@ -1030,6 +1030,12 @@ CharacterPrerequisite = {
    `evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
 5. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
    The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
+   The word-token table has a THIRD consumer since issue 1286: a component complication's `rollCondition` gate.
+   All three read ONE table through the exported `compareNumbersByOperatorId(actual, op, expected)`, so a retuned operator cannot mean two things on two surfaces.
+   A complication's gate offers the **six numeric operators only** (`eq`, `neq`, `gt`, `gte`, `lt`, `lte` — the entries whose `valueless` is `false`), filtered by the shared valueless predicate rather than hand-listed: a dice total is always a number with no boolean or existence reading, and an `exists` offered against a roll total would be a complication that always fires.
+   `compareNumbersByOperatorId` returns `false` for the three valueless ids and for any unknown id, so the gate fails closed on a comparator it does not know.
+   The symbolic `CheckBreakageCondition` set stays separate for the reason above and for one more: `evaluateCheckBreakageCondition` is a pure synchronous predicate the authoring-side odds preview consumes, and a complication's condition rolls a live formula, so admitting one as a condition type would make an odds histogram roll dice while charting it.
+   The symbolic set also has no not-equals, so `neq` would have no spelling there.
 
 ## Component
 
@@ -1050,6 +1056,28 @@ Represent one curated item entry available to recipes and salvage operations.
     tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
+
+  // GM-authored progressive complications (issue 1286). TOP-LEVEL, beside `difficulty`,
+  // because the concern spans all three activities; see requirement 19. The key is ABSENT
+  // on a component that authored none, and an authored empty list normalizes to absent.
+  complications?: Array<{
+    id: string,
+    name: string,
+    description: string,
+    severity: "minor" | "major" | "severe",   // default "minor"; narrative gravity
+    visibility: "gmOnly" | "visible",         // DEFAULT "gmOnly"
+    activities: { crafting: boolean, salvage: boolean, gathering: boolean },
+    match: "any" | "all",                     // default "any"
+    when: {
+      stageAwarded: boolean,
+      stagePartial: boolean,
+      stageMissed: boolean,
+      checkTrigger: string | null,            // a CheckBreakageTrigger id, never a boolean
+    },
+    rollCondition: { enabled: boolean, expr: string, cmp: string, value: string },
+    effectRoll: { enabled: boolean, expr: string, label: string },
+    macroUuid?: string,                       // absent when unauthored
+  }>,
 
   salvage?: {
     enabled: boolean,              // default false
@@ -1151,6 +1179,37 @@ Represent one curated item entry available to recipes and salvage operations.
     Stack quantities are read through the configured stack-quantity accessor and captured **before** deleting, since a deleted document's name, image and stack size are unreadable afterwards.
 18. **Bulk salvage** consumes `salvage.ingredientQuantity` per selected row exactly as a single salvage does.
     There is no per-row quantity in the bulk gesture: each queued row is one `salvage()` call at the component's authored `ingredientQuantity`.
+19. **`complications` is TOP-LEVEL on the component and is not part of `salvage`.**
+    Two independent reasons hold it there, and the first is the deciding one.
+    A complication is scoped to a component's participation in ANY progressive activity — as a recipe result, as a salvage yield, or as a gathering drop — so a cross-activity concern parked inside `salvage`, the salvage-ACTIVITY sub-record, is an aggregate-boundary violation; the sibling that already spans all three activities is `difficulty`, the progressive DC a complication keys on, and it is correctly top-level.
+    The second reason is SPEC VALIDITY rather than data loss: requirement 4 makes `salvage` valid only when `CraftingSystem.features.salvage` is true, and a complication authored on a crafting OUTPUT component has to fire on a system with salvage switched off — precisely where a `salvage`-nested record would be spec-invalid.
+    A complication fires when the component is PRODUCED as a progressive stage, and never when the component is itself salvaged or spent; complications on the salvaged or crafted SOURCE component are a separate concern tracked as issue 1287.
+20. `complications` normalizes at the single component chokepoint and is **absence-preserving**.
+    The attach emits the key ONLY for a non-empty normalized list, so a component that authored none carries no key at all and its persisted bytes are unchanged.
+    There is **no authored-empty state**: unlike `salvage.checkModifierIds`, an empty complication list carries no meaning distinct from absence, so an authored `[]` normalizes to ABSENT.
+    No reader may distinguish an absent `complications` from an empty one, and that obligation is audited per reader rather than assumed (the omitted-when-default rule in § Canonical-Write and Legacy-Read Compatibility Policy: legitimate only where NO reader distinguishes the two, which is a property of the readers and is audited per field).
+    A member that is not a plain object is dropped; an entry with no authored `id` is minted one rather than discarded.
+21. Normalization CLAMPS the three closed vocabularies and PRESERVES every operand.
+    `severity`, `visibility` and `match` clamp to their declared token sets, because each drives a rendering treatment rather than a validated operand and no complication validator exists to report an unknown token, so an unclamped value would render as garbage indefinitely.
+    The operands — both dice expressions, the comparand, the effect label, the macro uuid and the trigger id — are preserved verbatim, never repaired and never dropped, on the same reasoning the gathering failure-outcome normalizer records: silently deleting a malformed operand makes the validator unreachable and turns an authoring mistake into silent data loss.
+    `rollCondition.value` stays a STRING because it may itself carry roll data.
+    The single alias is the comparator `ne`, which normalizes to the operator table's `neq`; that is an alias rather than a repair, and every other comparator survives verbatim for the gate to reject.
+22. `visibility` defaults to `gmOnly`.
+    Every other default on this record preserves pre-existing behaviour; there is no pre-existing behaviour here, so the default is the SAFE one, and an audience Fabricate cannot read must never resolve to "show the player".
+23. **`visibility: 'gmOnly'` is a DISCLOSURE guarantee across every Fabricate surface, and is NOT a confidentiality guarantee.**
+    A `gmOnly` complication must appear in no chat message, no view-model, no engine return read by a player and no actor-flag run record — including when a GM is the acting user.
+    It is nevertheless readable by a determined player, because `craftingSystems` is a world setting and world settings replicate UNFILTERED to every joining client.
+    This is the first Fabricate field whose VALUE is intended to be secret, and the limit is stated here and in the field documentation rather than in editor chrome; a GM authoring one must understand that the guarantee is about what Fabricate shows, not about what the client holds.
+24. **`when.checkTrigger` is a trigger id, never a boolean, and a trigger id is owned by exactly ONE activity's progressive check block.**
+    `craftingCheck.progressive`, `salvageCraftingCheck.progressive` and `gatheringCraftingCheck.progressive` each own their own `checkBreakage.triggers` id space.
+    A complication enabled for several activities therefore matches its trigger clause only in the activity that owns the named trigger, and the clause is INERT in the others.
+    An id that resolves to no trigger is likewise inert — fail-open, contributing nothing to `match` — and never a validation error.
+    The clause is an id rather than a flag because a `CheckBreakageTrigger` declares each of its three existing effects explicitly and defaulted-off: an "any trigger fires any complication" boolean would hand every already-authored trigger a fourth effect with no GM action at all.
+    A complication naming a trigger fires when that trigger's CONDITION matches the roll, regardless of that trigger's own `breakTools`, `outcome` or `tierStep` values, because a trigger's match is a fact about the roll and its three effects are independent of it.
+25. **`complications` requires no migration and is not `downgradeLosesData`.**
+    Component normalization is an allowlist rebuild, so a component's persisted shape after a save is exactly what that rebuild emits and the key is absent for a component that authored none.
+    This is the **omitted-when-default** doctrine of § Canonical-Write and Legacy-Read Compatibility Policy, whose in-file precedent is `salvage.checkModifierIds` and NOT `salvage.allowPlayerResultReorder` — the latter is stamped on both normalizer return paths and is therefore absent-reads-as-default but not byte-preserving.
+    No earlier build ever wrote this key, so the write-side alias-retirement rule does not apply; what carries over is the AUDIT obligation at requirement 20.
 
 ## Recipe
 
@@ -2336,7 +2395,9 @@ The housekeeping passes `Fabricate#initialize` runs — `CraftingRunManager.clea
 They are governed by two rules that are deliberately DIFFERENT from the `processWorldTime` gate above (issue 970).
 
 **Write scoping.** Each pass walks only the actors the CURRENT client may update (`selectWritableActors`, keyed on `Actor#isOwner`), not all of `game.actors`.
-Fabricate has no socket-to-GM relay, so a pass that writes to an actor a player does not own is refused by Foundry, and `setFabricateFlag` REJECTS on a refused update by contract rather than reporting a phantom success.
+No socket-to-GM relay carries a housekeeping write, so a pass that writes to an actor a player does not own is refused by Foundry, and `setFabricateFlag` REJECTS on a refused update by contract rather than reporting a phantom success.
+That statement is scoped to these passes and is not a claim that Fabricate has no relay at all: the blind-gathering start relay and the complication delivery relay (issue 1286) both exist, and both are REQUEST/NOTIFY channels a client uses to ask the elected GM to take an action of its own.
+Neither is available to a housekeeping write, and neither may be recruited into one, because these passes are ownership-scoped idempotent key deletions on documents the acting client already owns — routing them through a GM would trade a refused write for a message with no acknowledgement, no retry and no ordering.
 `isOwner` is unconditionally true for a GM, so a GM client still sweeps the whole world while a player sweeps only their own characters.
 An ownership scope is chosen over a primary-GM gate because these passes are idempotent key deletions rather than state advances — several clients each doing their own share is harmless, and unlike a primary-GM gate it does not make cleanup hostage to a GM ever connecting.
 The predicate FAILS CLOSED: an actor that does not answer `isOwner === true` is skipped, because a skipped cleanup is strictly less harmful than the rejected startup a permissive default would restore.
@@ -2778,6 +2839,19 @@ Returns are never spread-merged into one map first, because the returns are stri
 Two macros writing the same path is supported, resolves last-writer-wins, and is not an error.
 A path that cannot be written (for example because an intermediate segment is `null` or a primitive) is logged and skipped.
 For the essence property macro loop specifically, that failure is isolated to the essence whose macro produced the unwritable path: every other essence's macro, and the result's own macro, still runs and still applies.
+
+#### The complication macro is the one macro surface that does NOT run on the acting client
+
+A component complication's `macroUuid` (issue 1286, behaviour in `recipes-and-steps/spec.md` _Complication Macros_) shares this contract's execution SHAPE and departs from it in three stated ways.
+
+- Its input context is its own: `{ kind: 'componentComplication', craftingSystemId, activity, resolutionId, resultId, bucket, effectRollTotal, component, complication, actor, token, speaker, requestingUser }`.
+  It carries no `recipe`, no `ingredientPool` and no `resolvedEssences`, because a complication is a consequence of a progressive STAGE rather than of an item build, and it returns no property map: nothing is applied from its return.
+- Its scope is Fabricate's `('context','args','scope')` binding under `"use strict"`, not Foundry's own `#executeScript` bindings, so every other name a macro author reaches for resolves as a GLOBAL on the executing client.
+  `canUserExecute` is not consulted and `MACRO_SCRIPT` remains deliberately unconsulted.
+- **It executes on a GM client rather than on the current user's**, so that a complication's authority does not depend on whether the activity was time-gated.
+  The consequence is that `game.user.character` is the GM's (normally none), `canvas` is whatever scene the GM is viewing and may not be ready, the token selection is the GM's, and `game.user.isGM` is TRUE — so a macro branching on it flips.
+  `speaker`, `actor` and `token` are therefore supplied explicitly on the scope, resolved GM-side from the addressing; a complication macro that needs the acting player's own client, such as any UI prompt, cannot work.
+  The bypass of `canUserExecute` is justified for this surface by the addressing-only payload, the server-attested sender and the GM-side actor re-authorization stated in `recipes-and-steps/spec.md` _Complication Macros_, and NOT by the "no added authority" argument the other macro surfaces rest on, which is false of a GM client.
 
 ### Success Macro Contract (Removed in 1.8.0)
 

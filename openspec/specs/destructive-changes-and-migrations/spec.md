@@ -335,6 +335,12 @@ This does not invalidate migration correctness.
   The retirement of the Recipe flat `results` alias (issue 1087) is the worked example: no migration, no registry entry, no downgrade loss, and a permanent inbound shim (`data-models/spec.md § Write-Retired Aliases (Read Permanently)`).
 - The same holds for a payload that stops emitting a field whose absence its constructor rebuilds to the identical value: absence and the written default already mean the same thing, so there is nothing to migrate and nothing a downgrade can lose.
   The obligation moves to the audit instead — a reader that distinguishes absent from the default is a defect the omission would expose, and it MUST be found before the field is omitted rather than after (`data-models/spec.md` requirement 18).
+- **A NEW additive field whose ABSENCE is meaningful requires no migration and no registry entry either, and it inherits the audit obligation rather than the write-side-reduction rule.**
+  The write-side-reduction rule above governs a key an earlier build DID write and a later build stops writing.
+  A field no build ever wrote has no persisted state to reduce: every normalizer in this codebase is an allowlist rebuild, so a component, recipe or system that authored none simply carries no key, its persisted bytes are unchanged, and an older build reads the same absence it always read.
+  Such a field MUST NOT be declared `downgradeLosesData`, and it MUST NOT be given a seeding migration, because seeding would write the key onto every record in the world to express the state that absence already expresses.
+  What DOES apply is the audit: where absence and the field's empty or default form are declared to mean the same thing, no reader may distinguish them, and that must be verified per reader before the field ships.
+  `Component.complications` (issue 1286) is the worked example — a new top-level array, absent for every component that authored none, an authored empty list normalized to absent, no migration, no registry entry, no downgrade loss, and a per-reader audit that absent and empty are indistinguishable (`data-models/spec.md` § Component requirements 20 and 25).
 - Cross-reference: full alias tables are maintained in `data-models/spec.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
 ### Resolution-Model Migration (Pre-Release)
