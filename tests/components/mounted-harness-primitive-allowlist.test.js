@@ -72,15 +72,15 @@ const SHARED_PRIMITIVES = [
   // five hand-rolled copies of that shape as a live non-conformance, so every future
   // conversion drops it into another mounted tree — the gathering player suites already
   // pulled it in through `ChanceBar`'s rebuild, and four more sites are named debt.
-  // `RowDisclosure` is NO LONGER ON THIS LIST (issue 1096, maintainer parity round). Its
-  // one consumer was the Checks right rail's two collapsible panels, and the maintainer
-  // removed those: the prototype has no disclosure anywhere in that rail. It therefore has
-  // ZERO consumers today, which is precisely the state the reachability guard below exists
-  // to report — so it comes off the list rather than the guard being loosened for it. The
-  // component and `row-disclosure-mounted.test.js` are left in place: the collapsed TRIGGER
-  // card named in `ui-integration/spec.md` is still its intended second site, and it goes
-  // back on this list the moment something renders it. If that site is abandoned, the
-  // component is dead code and should be deleted outright.
+  // `RowDisclosure` came OFF this list at issue 1096's maintainer parity round, because the
+  // Checks right rail's two collapsible panels were removed and it was left with ZERO
+  // consumers — which is precisely the state the reachability guard below exists to report,
+  // so it came off the list rather than the guard being loosened for it. That note also said
+  // it goes back ON the moment something renders it, and issue 1286 is that moment:
+  // `ComplicationSummaryRow` is the "summary row with condition sentence, effect chip and
+  // disclosure" the component's own docblock named as its intended second site, and it is
+  // reachable from the manager root through `ComponentEditView`.
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list

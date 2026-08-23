@@ -31,6 +31,15 @@
    - title: the short statement of what is absent (omit for a one-sentence panel).
    - hint: the optional explanatory sentence beneath it.
    - compact: smaller tile and tighter padding for sidebars, popovers and inline panels.
+   - inline: the ONE-LINE form (issue 1286) — the stack becomes a ROW and the 46px icon
+     tile is released into a bare inline glyph, so the panel reads as a single sentence
+     with a leading mark rather than as a centred hero block. It is NOT a smaller
+     `compact`: `compact` keeps the tile (at 32px) and keeps the column, and a "nothing
+     goes wrong with this component yet" line sitting directly above an Add button cannot
+     afford either. The Component Studio's complications section is its first consumer;
+     the PLAYER app's own empties (`salvage-empty`, `alchemy-*-empty`,
+     `inventory-detail-empty-note`) are still a different area shell and are NOT this
+     variant's remit, as the note at the foot of this block says of the primitive at large.
    - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
      "your filters match nothing", which is not an absence of content and deliberately
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
@@ -54,6 +63,7 @@
     title = '',
     hint = '',
     compact = false,
+    inline = false,
     filtered = false,
     contextClass = '',
     dataAttr = '',
@@ -69,6 +79,7 @@
 <div
   class="manager-empty {contextClass}"
   class:is-compact={compact}
+  class:is-inline={inline}
   class:is-filtered={filtered}
   {...hookAttributes}
 >
@@ -186,6 +197,51 @@
 
   .manager-empty.is-compact h3 {
     font-size: 12px;
+  }
+
+  /* The ONE-LINE variant (issue 1286): `display:flex; align-items:center; gap:10px;
+     padding:14px 16px` with a 13px glyph, taken from the prototype's own empty. Two
+     declarations do the work, and BOTH are required — `is-compact` already makes the panel
+     smaller and would have been the cheap answer:
+
+       1. the inner stack flips from a column to a ROW, so the glyph sits beside the
+          sentence instead of above it;
+       2. the 46px icon TILE is released — width, height, radius, fill and all — into a
+          bare glyph. `is-compact` only shrinks the tile to 32px, which is a third tile
+          size, not the absence of one.
+
+     Written AFTER `.is-compact` so a caller that (wrongly) set both still gets the row.
+     The dashed edge, the border radius and the type stay exactly the shared panel's: this
+     is one vocabulary at a second density, which is the whole reason it is a variant here
+     rather than a hand-rolled dashed div in the section that needs it. */
+  .manager-empty.is-inline {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 14px 16px;
+    text-align: left;
+  }
+
+  .manager-empty.is-inline > div {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .manager-empty.is-inline > div > i {
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    background: none;
+    font-size: 13px;
+  }
+
+  /* The 280px column cap is a HERO-panel rule: it exists so a centred sentence wraps into a
+     readable measure. On one line it would clip the sentence into a narrow column beside
+     the glyph, which is the opposite of what this variant is for. */
+  .manager-empty.is-inline p {
+    max-width: none;
+    font-size: 11.5px;
   }
 
   /*

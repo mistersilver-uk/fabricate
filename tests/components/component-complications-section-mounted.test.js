@@ -1,0 +1,549 @@
+/**
+ * The Component Studio's COMPLICATIONS authoring section, mounted (issue 1286).
+ *
+ * It pins the decisions that cost a review round each, because every one of them is
+ * invisible in a screenshot and cheap to undo:
+ *
+ * - the section's own VISIBILITY GATE (no progressive activity, no section);
+ * - the sub-line, which must say a complication fires when the component is PRODUCED as a
+ *   progressive stage, must disclose that a component being salvaged or spent is not
+ *   covered (#1287), and must NOT mention player visibility of world data;
+ * - the `n/a` header pill being MUTED rather than the shipped `is-disabled` tone, which is
+ *   joined to the warning family and would paint "Salvage · n/a" as a hazard;
+ * - the TYPED body slot — an authoring row renders the generated trigger sentence, never an
+ *   authored description — and its `title`, without which a longer localized form is
+ *   invisible past the ellipsis;
+ * - the comparator vocabulary being the SIX numeric operators, filtered off the shared
+ *   prerequisite table;
+ * - the disclosure being a real `<button>` that is not nested inside another one;
+ * - the injected `random` mint, so no `Math.random()` literal enters new code (S2245).
+ *
+ * The section is a CONTROLLED component: it never mutates the array it is handed, it emits
+ * a whole new one, and the draft lives in `ComponentEditView`. So most assertions here read
+ * what `onChange` was called with rather than what the DOM did next.
+ */
+
+import { after, before, beforeEach, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  COMPONENT_EDIT_VIEW_RAW_MODULES,
+} from '../helpers/componentEditViewModules.js';
+
+const repoRoot = resolve(import.meta.dirname, '../..');
+const sectionPath = 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte';
+const sectionSource = readFileSync(resolve(repoRoot, sectionPath), 'utf8');
+
+const harness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-complications-section-',
+  rawModules: [
+    'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/dropUtils.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/utils/componentComplications.js',
+    'src/utils/complicationSummary.js',
+    'src/utils/macroReference.js',
+    'src/systems/characterPrerequisites.js',
+  ],
+  compiledModules: [
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    sectionPath,
+  ],
+  componentPath: sectionPath,
+});
+
+function flushRender() {
+  return new Promise((done) => setTimeout(done, 0));
+}
+
+const ALL_PROGRESSIVE = Object.freeze({ crafting: true, salvage: true, gathering: true });
+
+/** A normalized complication, as `authoredComplications` would emit it. */
+function complication(overrides = {}) {
+  return {
+    id: 'cx-1',
+    name: 'Slag inclusion',
+    description: 'The bar looks sound and is not.',
+    severity: 'major',
+    visibility: 'gmOnly',
+    activities: { crafting: true, salvage: false, gathering: false },
+    match: 'any',
+    when: { stageAwarded: false, stagePartial: false, stageMissed: true, checkTrigger: null },
+    rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: false, expr: '1d6', label: '' },
+    ...overrides,
+  };
+}
+
+/** Mount with the progressive gate open and a recorder on `onChange`. */
+async function mountSection(props = {}) {
+  const emitted = [];
+  const target = await harness.mount({
+    activityProgressive: ALL_PROGRESSIVE,
+    onChange: (next) => emitted.push(next),
+    ...props,
+  });
+  return { target, emitted };
+}
+
+/** Open the one authoring row's detail through the disclosure control. */
+async function openFirstRow(target) {
+  const disclosure = target.querySelector('[data-complication-disclosure]');
+  assert.ok(Boolean(disclosure), 'the row carries a disclosure control');
+  disclosure.click();
+  await flushRender();
+  return disclosure;
+}
+
+describe('1286 ComponentComplicationsSection (mounted)', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  beforeEach(() => harness.remount());
+
+  it('renders NOTHING when the system resolves no activity progressively', async () => {
+    const target = await harness.mount({
+      activityProgressive: { crafting: false, salvage: false, gathering: false },
+      complications: [complication()],
+    });
+    assert.ok(
+      !target.querySelector('[data-complications-section]'),
+      'a complication has no moment to fire in a system with no progressive resolution'
+    );
+  });
+
+  it('renders the section once ANY activity is progressive', async () => {
+    const { target } = await mountSection({
+      activityProgressive: { crafting: false, salvage: true, gathering: false },
+    });
+    const section = target.querySelector('[data-complications-section]');
+    assert.ok(Boolean(section), 'one progressive activity is enough');
+    assert.equal(
+      section.getAttribute('data-component-edit-section'),
+      'complications',
+      'the editor section hook the capture walk and the mounted suites address it by'
+    );
+  });
+
+  it('states that a complication fires on a PRODUCED stage, discloses #1287, and says nothing about player visibility of world data', async () => {
+    const { target } = await mountSection();
+    const hint = target.querySelector('[data-complications-section] .manager-muted').textContent;
+    assert.match(hint, /produced/i, 'the shipped model fires on production, not consumption');
+    assert.match(
+      hint,
+      /itself salvaged or spent/i,
+      'the deferred source-component case (#1287) is disclosed rather than left implied'
+    );
+    assert.doesNotMatch(
+      hint,
+      /world|setting|determined player|read/i,
+      'gmOnly is a DISCLOSURE guarantee; the confidentiality limit belongs in the spec, not '
+        + 'in a line of editor chrome that would read as a warning about this component'
+    );
+  });
+
+  it('renders the empty state through the shared primitive’s INLINE variant', async () => {
+    const { target } = await mountSection({ complications: [] });
+    const empty = target.querySelector('[data-complications-empty]');
+    assert.ok(Boolean(empty), 'the no-state renders through EmptyState, not a local dashed div');
+    assert.ok(
+      empty.classList.contains('is-inline'),
+      'a one-line prompt above an Add button cannot afford the centred hero panel'
+    );
+  });
+
+  it('mutes the n/a activity pill instead of routing it through the warning family', async () => {
+    const { target } = await mountSection({
+      activityProgressive: { crafting: true, salvage: false, gathering: false },
+      complications: [complication()],
+    });
+    const pill = (activity) =>
+      target.querySelector(`[data-complications-activity-pill="${activity}"]`);
+    assert.match(pill('crafting').textContent, /Crafting · 1/, 'a progressive activity counts');
+    assert.match(pill('salvage').textContent, /Salvage · n\/a/, 'a non-progressive one says so');
+    assert.ok(
+      pill('salvage').classList.contains('is-muted'),
+      'is-disabled is joined to the WARNING family and would paint this amber'
+    );
+    assert.ok(
+      !pill('salvage').classList.contains('is-disabled'),
+      'so the n/a pill must not carry that tone'
+    );
+  });
+
+  it('renders the generated TRIGGER SENTENCE as the row body, with the full string as its title', async () => {
+    const { target } = await mountSection({
+      complications: [
+        complication({
+          when: {
+            stageAwarded: false,
+            stagePartial: true,
+            stageMissed: true,
+            checkTrigger: null,
+          },
+          rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value: '1' },
+          effectRoll: { enabled: true, expr: '2d6', label: 'Shrapnel' },
+        }),
+      ],
+    });
+    const body = target.querySelector('.fab-complication-row-body');
+    const expected =
+      'When the award is missed or the award is only partly covered or 1d20 = 1 · rolls 2d6';
+    assert.equal(body.textContent, expected, 'clause order, conjunction, glyph and effect tail');
+    assert.equal(
+      body.getAttribute('title'),
+      expected,
+      'the line ellipsises rather than wrapping, so the title is the only way back to the full string'
+    );
+  });
+
+  it('never shows the row an authored DESCRIPTION in the authoring variant', async () => {
+    const { target } = await mountSection({ complications: [complication()] });
+    const row = target.querySelector('[data-complication-row]');
+    assert.equal(row.getAttribute('data-complication-row'), 'authoring');
+    assert.ok(
+      !row.textContent.includes('The bar looks sound'),
+      'the body slot is TYPED: a GM variant renders the trigger, never the description'
+    );
+  });
+
+  it('shows the Player pill only for a complication the player is told about', async () => {
+    const { target } = await mountSection({ complications: [complication()] });
+    assert.ok(
+      !target.querySelector('.fab-complication-row-line .manager-chip.is-neutral'),
+      'a gmOnly complication carries no Player pill'
+    );
+    harness.remount();
+
+    const visible = await harness.mount({
+      activityProgressive: ALL_PROGRESSIVE,
+      complications: [complication({ visibility: 'visible' })],
+    });
+    const pill = visible.querySelector('.fab-complication-row-line .manager-chip.is-neutral');
+    assert.ok(Boolean(pill), 'a visible one does');
+    assert.equal(pill.textContent, 'Player');
+  });
+
+  it('makes the disclosure a real button that is NOT nested inside another button', async () => {
+    const { target } = await mountSection({ complications: [complication()] });
+    const disclosure = target.querySelector('[data-complication-disclosure]');
+    assert.equal(disclosure.tagName, 'BUTTON', 'RowDisclosure renders a real button');
+    assert.ok(
+      !disclosure.parentElement.closest('button'),
+      'a whole-row button around it would nest buttons — invalid DOM no mounted test notices'
+    );
+    const remove = target.querySelector('[data-complication-remove]');
+    assert.equal(remove.tagName, 'BUTTON', 'and the delete control is its SIBLING, not a child');
+    assert.ok(!remove.contains(disclosure) && !disclosure.contains(remove));
+  });
+
+  it('offers exactly the six NUMERIC comparators', async () => {
+    const { target } = await mountSection({
+      // The revealed input strip renders only while the row is ON, which is also what keeps
+      // a disabled effect's inputs out of the tab order.
+      complications: [
+        complication({ rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value: '1' } }),
+      ],
+    });
+    await openFirstRow(target);
+    const select = target.querySelector('[data-complication-roll-condition-cmp]');
+    assert.ok(Boolean(select), 'the condition-roll row reveals its comparator');
+    assert.deepEqual(
+      [...select.options].map((option) => option.value),
+      ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'],
+      'a dice total has no boolean or existence reading, and `exists` would always fire'
+    );
+  });
+
+  it('labels each trigger option by the activity that OWNS it, and keeps an id that no longer resolves', async () => {
+    const { target } = await mountSection({
+      complications: [
+        complication({
+          when: {
+            stageAwarded: false,
+            stagePartial: false,
+            stageMissed: false,
+            checkTrigger: 'gone',
+          },
+        }),
+      ],
+      triggerOptions: [
+        { id: 'nat1', label: 'On a natural 1', activity: 'salvage' },
+        { id: 'nat1c', label: 'On a natural 1', activity: 'crafting' },
+      ],
+    });
+    await openFirstRow(target);
+    const select = target.querySelector('[data-complication-trigger]');
+    const labels = [...select.options].map((option) => option.textContent.trim());
+    assert.deepEqual(
+      labels.slice(0, 2),
+      ['On a natural 1 · Salvage', 'On a natural 1 · Crafting'],
+      'each check block owns its own id space, so identical labels must be distinguishable'
+    );
+    assert.ok(
+      labels.includes('Trigger no longer exists'),
+      'a dangling id is named and KEPT — inert, not silently rewritten to another trigger'
+    );
+  });
+
+  it('emits a NEW array on every edit and never mutates the one it was given', async () => {
+    const authored = [complication()];
+    const frozen = JSON.stringify(authored);
+    const { target, emitted } = await mountSection({ complications: authored });
+    await openFirstRow(target);
+
+    target
+      .querySelector('[data-complication-condition="stageAwarded"] input[type="checkbox"]')
+      .click();
+    assert.equal(emitted.length, 1, 'one emission per edit');
+    assert.equal(emitted[0][0].when.stageAwarded, true, 'the clause is set');
+    assert.equal(emitted[0][0].when.stageMissed, true, 'and its siblings are untouched');
+    assert.notEqual(emitted[0], authored, 'a whole new array');
+    assert.equal(JSON.stringify(authored), frozen, 'the input is left exactly as it arrived');
+  });
+
+  it('adds a complication whose id comes from the injected mint', async () => {
+    const { target, emitted } = await mountSection({
+      complications: [],
+      random: () => 'minted-id',
+      activityProgressive: { crafting: true, salvage: false, gathering: false },
+    });
+    target.querySelector('[data-complications-add]').click();
+    assert.equal(emitted.length, 1);
+    const [added] = emitted[0];
+    assert.equal(added.id, 'minted-id', 'the host’s mint is used, never `Math.random()`');
+    assert.equal(added.severity, 'minor', 'the MODEL’s declared default, not a second one');
+    assert.equal(added.visibility, 'gmOnly', 'the safe audience default');
+    assert.equal(added.match, 'any');
+    assert.deepEqual(
+      added.activities,
+      { crafting: true, salvage: false, gathering: false },
+      'a new complication is enabled exactly where this system can actually fire it'
+    );
+    assert.equal(added.when.stageMissed, true, 'and starts on the condition a GM usually wants');
+    assert.equal(added.when.checkTrigger, null, 'the trigger clause is an ID, never a boolean');
+  });
+
+  it('removes the complication the delete control names', async () => {
+    const { target, emitted } = await mountSection({
+      complications: [complication(), complication({ id: 'cx-2', name: 'Second' })],
+    });
+    target.querySelectorAll('[data-complication-remove]')[0].click();
+    assert.deepEqual(
+      emitted[0].map((entry) => entry.id),
+      ['cx-2'],
+      'the other survives'
+    );
+  });
+
+  it('offers the world’s script macros from the projection the store already publishes', async () => {
+    const { target } = await mountSection({
+      complications: [complication()],
+      macroOptions: [
+        { uuid: 'Macro.abc', name: 'Shrapnel Burst' },
+        { uuid: 'Macro.def', name: 'Taint the Yield' },
+      ],
+    });
+    await openFirstRow(target);
+    const browse = target.querySelector('[data-complication-macro-browse]');
+    assert.ok(Boolean(browse), 'the browse control is a separate button beside the drop target');
+    browse.click();
+    await flushRender();
+    const options = [...document.querySelectorAll('[data-popover-option]')].map((node) =>
+      node.getAttribute('data-popover-option')
+    );
+    assert.deepEqual(options, ['Macro.abc', 'Macro.def'], 'straight from `macroOptions`');
+  });
+
+  it('names a linked macro from that same projection rather than showing its uuid', async () => {
+    const { target } = await mountSection({
+      complications: [complication({ macroUuid: 'Macro.abc' })],
+      macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+    });
+    const body = target.querySelector('.fab-complication-row-body');
+    assert.match(body.textContent, /runs Shrapnel Burst$/, 'the effect tail names the macro');
+  });
+
+  it('falls back to the uuid for a linked macro the picker list cannot name', async () => {
+    // A compendium macro, or one since deleted. `resolveMacroName` fails OPEN with no
+    // resolver — outside a live world the uuid IS the best available label, and reporting
+    // "not found" there would paint every linked macro as broken in every screenshot. This
+    // also exercises the synchronous branch of that resolver inside the effect.
+    const { target } = await mountSection({
+      complications: [complication({ macroUuid: 'Compendium.pack.Macro.xyz' })],
+      macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+    });
+    await flushRender();
+    const body = target.querySelector('.fab-complication-row-body');
+    assert.match(body.textContent, /runs Compendium\.pack\.Macro\.xyz$/, 'the uuid stands in');
+  });
+
+  it('carries NO `Math.random()` literal, which is the whole reason `random` is a prop', () => {
+    // COMMENTS ARE STRIPPED FIRST, and that is not a loophole: the header docblock QUOTES
+    // the sibling idiom in order to say why this section does not use it, and a naive
+    // substring match over the whole file would fail on the explanation rather than on the
+    // code. What must not appear is the CALL.
+    const code = sectionSource
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    assert.ok(
+      !code.includes('Math.random'),
+      'every sibling section mints ids with that idiom; copying it puts S2245 in new code'
+    );
+    assert.match(
+      code,
+      /globalThis\.foundry\?\.utils\?\.randomID/,
+      'and the fallback when the host passes no mint is Foundry’s own id generator'
+    );
+  });
+});
+
+/**
+ * The HOST half (issue 1286). The section is a controlled component, so the half that
+ * decides whether a GM's work survives lives in `ComponentEditView`: the draft, the dirty
+ * signature and `buildUpdates()`.
+ *
+ * This is not belt-and-braces. The identical defect has shipped TWICE from that file — an
+ * authored field left out of the signature allowlist persisted correctly and could never be
+ * SAVED, because nothing was ever dirty and the Save button never enabled (issue 651 for
+ * `allowPlayerResultReorder`, issue 676 for `enabled`). A section that emits a perfect array
+ * into an editor that drops it on exit is the same bug a third time.
+ */
+const editorHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-complications-editor-',
+  rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
+});
+
+/** Mount the editor with a recorder on the two callbacks the manager root wires. */
+async function mountEditor(props = {}) {
+  const dirtyEvents = [];
+  const drafts = [];
+  const target = await editorHarness.mount({
+    component: { id: 'steel', name: 'Steel ingot', ...(props.component || {}) },
+    salvageResolutionMode: 'progressive',
+    random: () => 'minted-id',
+    onDirtyChange: (dirty) => dirtyEvents.push(dirty),
+    onDraftChange: (draft) => drafts.push(draft),
+    ...props,
+  });
+  return { target, dirtyEvents, drafts };
+}
+
+describe('1286 ComponentEditView — the complications draft survives Save', () => {
+  before(async () => {
+    await editorHarness.setup();
+  });
+
+  after(() => editorHarness.teardown());
+
+  beforeEach(() => editorHarness.remount());
+
+  it('lights the section up from the salvage axis this view already knows', async () => {
+    const { target } = await mountEditor();
+    assert.ok(
+      Boolean(target.querySelector('[data-component-edit-section="complications"]')),
+      'a progressive-salvage system needs no extra host wiring to reach the section'
+    );
+    editorHarness.remount();
+
+    const simple = await editorHarness.mount({
+      component: { id: 'steel' },
+      salvageResolutionMode: 'simple',
+    });
+    assert.ok(
+      !simple.querySelector('[data-component-edit-section="complications"]'),
+      'and a system with no progressive activity at all renders no section'
+    );
+  });
+
+  it('marks the editor DIRTY when a complication is added, and carries it in updates', async () => {
+    const { target, dirtyEvents, drafts } = await mountEditor();
+    assert.ok(!dirtyEvents.includes(true), 'not dirty before any edit');
+
+    target.querySelector('[data-complications-add]').click();
+    await flushRender();
+
+    assert.equal(dirtyEvents.at(-1), true, 'which is what enables Save');
+    const updates = drafts.at(-1).updates;
+    assert.equal(updates.complications.length, 1, 'the draft rides the editor’s updates');
+    assert.equal(updates.complications[0].id, 'minted-id');
+    assert.equal(
+      drafts.at(-1).complicationCount,
+      1,
+      'and the draft summary counts them, as it does groups and essences'
+    );
+  });
+
+  it('keeps complications OUT of updates.salvage — they are a top-level sibling', async () => {
+    const { target, drafts } = await mountEditor({
+      showSalvage: true,
+      component: { id: 'steel', salvage: { enabled: true, resultGroups: [] } },
+    });
+    target.querySelector('[data-complications-add]').click();
+    await flushRender();
+
+    const updates = drafts.at(-1).updates;
+    assert.ok(Array.isArray(updates.complications), 'top level');
+    assert.ok(
+      !Object.hasOwn(updates.salvage, 'complications'),
+      'a cross-activity concern inside the salvage sub-record would be spec-invalid the '
+        + 'moment the system turns salvage off'
+    );
+  });
+
+  it('emits an EMPTY array when the last complication is deleted, which is how the key is removed', async () => {
+    const { target, drafts } = await mountEditor({
+      component: {
+        id: 'steel',
+        complications: [complication()],
+      },
+    });
+    target.querySelector('[data-complication-remove]').click();
+    await flushRender();
+
+    assert.deepEqual(
+      drafts.at(-1).updates.complications,
+      [],
+      'an authored [] normalizes to ABSENT, so omitting the field would make the deletion '
+        + 'unsaveable — the issue-651 shape of defect'
+    );
+  });
+
+  it('returns to CLEAN when an edit is undone, so the exit guard does not nag over a no-op', async () => {
+    const { target, dirtyEvents } = await mountEditor();
+    target.querySelector('[data-complications-add]').click();
+    await flushRender();
+    assert.equal(dirtyEvents.at(-1), true);
+
+    target.querySelector('[data-complication-remove]').click();
+    await flushRender();
+    assert.equal(
+      dirtyEvents.at(-1),
+      false,
+      'the baseline is the cloned persisted list, so add-then-remove re-equals it'
+    );
+  });
+});

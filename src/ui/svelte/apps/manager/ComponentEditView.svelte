@@ -8,6 +8,11 @@
   import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
+  // The progressive-complications authoring section (issue 1286). It owns its OWN
+  // visibility gate — it renders nothing unless the system resolves some activity
+  // progressively — so it is imported and placed unconditionally rather than wrapped in a
+  // second predicate here that could drift out of step with it.
+  import ComponentComplicationsSection from './component/ComponentComplicationsSection.svelte';
   // The shared essence quantity card (issue 772). It lives under `components/` — the
   // BROWSER's directory — because the browser's bulk-edit panel renders it too; the
   // screenshot evidence map names it explicitly in the editor's recipe so a change to it
@@ -66,6 +71,27 @@
     // GM nothing about what this component actually rolls — the recipe picker's own note.
     salvageModifierDefaultIds = [],
     componentOptions = [],
+    // ── COMPLICATIONS (issue 1286) ──────────────────────────────────────────────
+    // Which activities THIS system resolves progressively, as
+    // `{ crafting, salvage, gathering }`. It is the complications section's own gate and
+    // its "· not progressive" annotation.
+    //
+    // `null` means "derive what this view already knows": `salvageResolutionMode` is
+    // already a prop here, so a progressive-salvage system lights the section up with no
+    // host wiring at all, while crafting and gathering — whose modes live on the system
+    // record and never reach this component — stay false until the manager root passes the
+    // whole bag. That is a narrower default than guessing, and it is honest about which of
+    // the three axes this component can actually see.
+    complicationActivities = null,
+    // `{ id, label, activity }` per named trigger on the three progressive check blocks.
+    // Each activity's check block owns its own id space, so the option is labelled by the
+    // activity that owns it.
+    complicationTriggerOptions = [],
+    // `viewState.selectedSystem.availableScriptMacros` — already `type === 'script'`-filtered
+    // and name-sorted by the store, and deliberately not a second projection.
+    macroOptions = [],
+    // The client-side id mint, injected so the section never reaches for `Math.random()`.
+    random = undefined,
     saving = false,
     // Progressive difficulty, rehomed out of the deleted right-rail inspector into the
     // body (decision 4). It is STAGED, not written on change: the value lives in the
@@ -109,10 +135,23 @@
   // here; the remaining salvage fields (enabled, ingredientQuantity, toolIds, …)
   // are preserved and spread back through buildUpdates so a save never drops them.
   let salvageDraft = $state(cloneSalvage(null));
+  // The COMPLICATIONS draft (issue 1286). A top-level sibling of `salvage`, not part of it:
+  // a complication is scoped to this component's participation in ANY progressive activity —
+  // as a recipe result, a salvage yield or a gathering drop — so parking it inside the
+  // salvage sub-record would be the aggregate-boundary violation `componentComplications.js`
+  // states at length, and `updates.salvage` would carry it onto a system whose salvage
+  // feature is off, where the shape is spec-invalid.
+  let complicationsDraft = $state([]);
   let saveFailed = $state(false);
   let lastComponentKey = $state(null);
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
+
+  // See the `complicationActivities` prop note: absent means "derive what this view knows",
+  // which is the salvage axis alone.
+  const complicationActivityProgressive = $derived(
+    complicationActivities || { salvage: salvageResolutionMode === 'progressive' }
+  );
 
   const componentKey = $derived(
     `${component?.id || ''}|${tagOptions.length}|${essenceOptions.length}`
@@ -137,6 +176,11 @@
         .sort()
         .join(','),
       showSalvage ? salvageSignature() : '',
+      // Its OWN term, like `category` and for the same reason: a complication is not a
+      // salvage field, so it does not ride `salvageSignature()`. Omit it and the issue-651 /
+      // issue-676 bug returns verbatim — the GM authors a complication, nothing is ever
+      // dirty, Save never enables, and the edit is silently discarded on exit.
+      complicationsSignature(),
       dirty ? 'dirty' : 'clean',
     ].join('')
   );
@@ -147,6 +191,7 @@
     categoryDraft = normalizeComponentCategory(component?.category);
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
+    complicationsDraft = cloneComplications(component?.complications);
     saveFailed = false;
     // The DC control's Custom… choice is transient UI state, not draft data. Reset it
     // with the drafts, or opening a second component would inherit the first's open
@@ -324,6 +369,40 @@
     return salvageSignatureOf(salvageDraft);
   }
 
+  /**
+   * Deep-clone the persisted complications into an editable draft (issue 1286).
+   *
+   * A STRUCTURAL clone, not a shallow copy: the section replaces whole entries rather than
+   * mutating them, but `when` / `rollCondition` / `effectRoll` are nested objects and a
+   * shallow copy would share them with the upstream card — so a discarded edit would
+   * already have landed on the component the browser renders.
+   *
+   * Absent normalizes to `[]` for the same reason `enabled` and `allowPlayerResultReorder`
+   * are normalized above: the dirty-check baseline is `complicationsSignatureOf(clone(
+   * component.complications))`, and comparing `[]` against `undefined` forever would leave
+   * a component whose only edit was adding and removing one complication stuck dirty.
+   * Emitting the key is a separate decision, taken in `buildUpdates()`.
+   */
+  function cloneComplications(complications) {
+    return (Array.isArray(complications) ? complications : []).map((complication) => ({
+      ...complication,
+      when: { ...complication?.when },
+      rollCondition: { ...complication?.rollCondition },
+      effectRoll: { ...complication?.effectRoll },
+      activities: { ...complication?.activities },
+    }));
+  }
+
+  // ONE list again, on `salvageSignatureOf`'s reasoning: taking the ARRAY rather than
+  // reading the draft means `isDirty()` compares the same projection of both sides.
+  function complicationsSignatureOf(complications) {
+    return JSON.stringify(complications);
+  }
+
+  function complicationsSignature() {
+    return complicationsSignatureOf(complicationsDraft);
+  }
+
   function tagsAreEqual(left, right) {
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
     if (left.length !== right.length) return false;
@@ -354,6 +433,14 @@
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
     if (showSalvage && salvageSignature() !== salvageSignatureOf(cloneSalvage(component?.salvage)))
+      return true;
+    // NOT gated on a `show*` flag. The complications section owns its own visibility gate,
+    // and a draft that differs from the persisted list is a real edit whether or not the
+    // section that produced it is on screen right now.
+    if (
+      complicationsSignature() !==
+      complicationsSignatureOf(cloneComplications(component?.complications))
+    )
       return true;
     return false;
   }
@@ -388,6 +475,12 @@
       // rather than by construction; deleting it says so.
       if (!Array.isArray(salvageDraft.checkModifierIds)) delete updates.salvage.checkModifierIds;
     }
+    // A TOP-LEVEL sibling of `salvage`, never a member of it (issue 1286). Always emitted,
+    // and always as an array: `authoredComplications` keys the persisted key on a NON-EMPTY
+    // normalized list, so an authored `[]` normalizes to ABSENT and deleting the last
+    // complication is how a GM removes the key. Omitting the field here instead would make
+    // that deletion unsaveable — the same shape of defect as issue 651.
+    updates.complications = complicationsDraft;
     return updates;
   }
 
@@ -399,6 +492,7 @@
       essenceCount: essenceDraft.filter((opt) => clampComponentEssenceQuantity(opt.quantity) > 0)
         .length,
       salvageGroupCount: showSalvage ? salvageDraft.resultGroups.length : 0,
+      complicationCount: complicationsDraft.length,
       updates: buildUpdates(),
       dirty,
     };
@@ -1760,6 +1854,25 @@
         {/if}
       </section>
     {/if}
+
+    <!-- COMPLICATIONS (issue 1286), last in the body and after Salvage, as the prototype
+         orders it: it is a consequence of how this component's stages resolve, so it reads
+         after the yields it can attach to rather than before them.
+
+         Placed UNCONDITIONALLY. The section renders nothing at all unless the system
+         resolves some activity progressively, and stating that predicate a second time here
+         is how the two drift apart. -->
+    <ComponentComplicationsSection
+      complications={complicationsDraft}
+      activityProgressive={complicationActivityProgressive}
+      triggerOptions={complicationTriggerOptions}
+      {macroOptions}
+      {random}
+      {saving}
+      onChange={(next) => {
+        complicationsDraft = next;
+      }}
+    />
 
     {#if saveFailed}
       <p class="manager-muted manager-form-warning">

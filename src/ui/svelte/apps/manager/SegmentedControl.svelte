@@ -11,9 +11,14 @@
 
   Props:
    - options: [{ value, labelKey, fallback, icon?, variant?, disabled?, count? }] — the
-     segments, in order. `variant` ('' | 'success' | 'danger' | 'neutral') tints the
-     ACTIVE segment only and defaults to the plain active tile, so a consumer that
-     sets none renders exactly as before. `disabled` is carried onto the segment's
+     segments, in order. `variant` ('' | 'success' | 'info' | 'warning' | 'danger' |
+     'neutral') tints the ACTIVE segment only and defaults to the plain active tile, so a
+     consumer that sets none renders exactly as before. `info` and `warning` (issue 1286)
+     complete the semantic ramp: the CSS declared only `success` and `danger`, so a
+     three-way minor/major/severe control — the complications section's severity picker —
+     could express exactly one of its three segments and the other two fell back to the
+     plain tile. Each is purely additive and gated on its own `is-<variant>` class, so no
+     existing consumer's markup or rendering moves. `disabled` is carried onto the segment's
      radio ITSELF, not merely onto a class: `select()` only guards `next !== value`,
      so a dimmed-but-live segment would still fire onChange. `count` renders a trailing
      tally so a segment can say how many rows choosing it would show — omitted by every
@@ -295,11 +300,30 @@
   /* Optional per-option tints for the ACTIVE segment (issue 975). `neutral` is the
      plain active tile above and deliberately declares nothing — it exists so a
      three-way good/neutral/bad control can name every segment rather than leaving
-     the middle one's intent implicit. */
+     the middle one's intent implicit.
+
+     All four coloured cells are the SAME formula — the family's `-border`, `-soft` and
+     `-text` — because a tint that reached for a different vehicle per family would be four
+     treatments rather than one ramp at four hues. */
   .manager-segment.is-active.is-success {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
     color: var(--fab-success-text);
+  }
+
+  /* INFO and WARNING (issue 1286) complete the ramp. Without them a severity control could
+     paint `severe` and nothing else, and the two unpainted segments would read as the
+     unchosen ones even while selected. */
+  .manager-segment.is-active.is-info {
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
+    color: var(--fab-info-text);
+  }
+
+  .manager-segment.is-active.is-warning {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+    color: var(--fab-warning-text);
   }
 
   .manager-segment.is-active.is-danger {
