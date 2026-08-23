@@ -1134,7 +1134,29 @@
 
   /* The two grouped cards — When and Then — sit one step INSIDE the panel on the recessed
      surface, which is what separates "the conditions" from "the consequences" without a
-     second heading level. */
+     second heading level.
+
+     THE RAMP STEP IS CHOSEN BY INDEX, NOT BY VALUE, and this is the one call in the section
+     a reader is most likely to want to re-make, so it is recorded rather than left to be
+     re-derived. The prototype's ramp and this one are OFFSET by a step in the middle: the
+     prototype's SECOND step is byte-identical to `--fab-bg-0`, and its FIRST step — the one
+     this card and the section's inputs draw — sits below every surface token any Fabricate
+     theme ships.
+
+     So a by-value re-map has nowhere to send this card. It would have to round up onto
+     `--fab-bg-0`, which is exactly where a by-value re-map also sends the ROW behind it
+     (`ComplicationSummaryRow`), and the two would collapse onto one flat fill — the
+     When/Then cards would stop being distinguishable from the row that contains them, which
+     is the opposite of what re-mapping is meant to recover.
+
+     Index-aligned they do not collapse, and the STEP is what the eye reads rather than the
+     absolute. The panel is `--fab-surface-soft` composited over the pane, which lands about
+     one step ABOVE `--fab-bg-1`, so panel → row → card reproduces the prototype's own
+     three-step recession: the row-to-card step matches its counterpart to within a couple of
+     levels per channel, and the panel-to-row step is deeper here, not shallower. Adding a
+     darker raw colour instead was ruled out for the studio as a whole in issue 676 (see the
+     mapping note in `styles/fabricate.css`): it would force a new value into all seven themes
+     and rewrite every other theme's ramp contour to correct one step in this one. */
   .fab-complication-card {
     padding: 12px;
     border: 1px solid var(--fab-border);

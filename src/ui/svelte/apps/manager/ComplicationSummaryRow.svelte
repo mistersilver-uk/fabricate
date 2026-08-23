@@ -169,6 +169,10 @@
      row renders under `.fabricate-app`, where those manager aliases are not in scope and a
      declaration referencing one silently falls back to inheritance. `Chip.svelte` records
      the rule and the failure mode in full. */
+  /* The fill is the ramp step at the row's INDEX in the prototype, not the token whose value
+     matches the prototype's row. The two ramps are offset by a step in the middle, and
+     `ComponentComplicationsSection`'s `.fab-complication-card` note records why re-mapping by
+     value collapses this row and the When/Then cards inside it onto one flat fill. */
   .fab-complication-row {
     box-sizing: border-box;
     border: 1px solid var(--fab-border);

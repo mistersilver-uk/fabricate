@@ -2545,7 +2545,7 @@ The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage E
 - The aggregate card's complication block is a **flat fired-complications section on the posted chat card**, rendered by the one renderer all four card builders share and carrying every row's FIRED complications in run order, each attributed by component name because a bulk card lists many components.
   It is **not** a forecast and has no hidden state: the card is written after the run has committed, from the already-redacted player-visible set (`publicComplications`), so a `gmOnly` complication cannot reach it even when a GM is the acting user.
   The entries are deliberately **not** de-duplicated across rows: each row is its own resolution, and collapsing two rows that fired the same complication would under-report what happened.
-  The pre-run **forecast** group card is a different surface on a different screen — see § Player Salvage Surface, _Bulk complication forecast_ — and the two must not be conflated: a chat card posted after the commit cannot be "hidden after the run commits".
+  The pre-run **forecast** group card is a PLANNED, different surface on a different screen — see § Player Salvage Surface, _Bulk complication forecast (PLANNED)_ — and the two must not be conflated: this chat section ships, that block does not, and a chat card posted after the commit could not be "hidden after the run commits" in any case.
 - A bulk row acts on the **selected** participation when its card is the inspected one, and on the primary otherwise — the same acting-participation rule §Player Salvage Surface states for a single salvage.
 - The listing is **not** reloaded from document hooks while a run is in flight.
   Each item's own item CRUD would otherwise reload the listing under the open panel roughly once per item, since the change subscription's trailing debounce coalesces nothing across items that each take a roll, a message create and up to three flag writes.
@@ -2773,6 +2773,9 @@ The salvage deltas are stated at the end of this section; everything else applie
 
 **Optional per-caller extensions.**
 The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, an optional **stacked row layout**, and an optional per-stage **complication strip**.
+**Three of those four ship today; the complication strip is PLANNED and is not yet a prop on the component.**
+It is enumerated here because this list is the enumeration contract stated below — a strip added later has to be added to this list, and recording it as planned is how "not listed means not supported" survives the gap between the authoring surface landing and the player surface following it.
+Every requirement stated for it below is normative for the surface when it lands, and asserts nothing about what renders today.
 (The per-stage **quantity** opt-in was deleted, not defaulted off: no stage renders a quantity on either surface, consistent with the "result entries carry no quantity" rule.)
 A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
 This exists so a second consumer can add rendering without re-skinning the first.
@@ -2787,9 +2790,13 @@ Stacked, the reorder controls **lead** the row and the stage's identity is a fle
 Every progressive surface, stacked rows included, shows **both** the component's progressive DC ("DC N") and the cumulative threshold ("Reach ≥N"), per the issue #675 ruling and matching `resolution-modes` §Progressive Mode Semantics.
 The "DC N" value is `component.difficulty`, which the GM authors via the stepper titled "This component's Progressive DC"; the **check-level** DC remains nonexistent (the projection resolves it to null, and a component's `dcOverride` does not shift these thresholds).
 
-**The per-stage complication strip.**
+**The per-stage complication strip (PLANNED).**
 
-The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it does today, and the crafting and salvage bodies both pass it so neither gets a private copy of the treatment.
+This whole block describes the PLANNED player surface, not a shipped one: `ProgressiveStageList.svelte` exposes no strip prop today and neither shipped body passes one.
+It is stated here, now, in the same section that owns the extension contract, because the projection the strip reads (`forecastComplications`) and the authoring surface that fills it both ship in this change, and a strip specified anywhere else would be specified away from the enumeration rule it has to obey.
+Read every requirement below as "when the strip lands, it MUST".
+
+The strip renders a component's complications inside its own stage row, and it is to be a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it does today, and the crafting and salvage bodies are both to pass it so neither gets a private copy of the treatment.
 
 - The strip has **two tenses**, and one filter cannot serve both.
   Before any roll it is a **forecast** — the `visibility: 'visible'` complications this component COULD fire in this activity, read from the player forecast projection, with no roll and no run.
@@ -2804,7 +2811,7 @@ The strip renders a component's complications inside its own stage row, and it i
 - A stage that is both awarded AND fired renders its success state chip **and** the fired band together, the band reading as a consequence of the award rather than a contradiction of it.
 - The strip is a full-bleed band INSIDE the row, so the row becomes a column with today's line wrapped.
   **That row-structure flip is gated on the strip rendering CONTENT for that stage, not on the extension being passed.**
-  Both shipped bodies pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
+  Both bodies are to pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
 - The band is explicitly NOT draggable.
   Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
 - The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (§Component Studio requirement 16).
@@ -3233,8 +3240,10 @@ The player's route to salvage.
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
-- **Complication disclosure.**
-  The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
+- **Complication disclosure (PLANNED).**
+  The panel's progressive body is to render the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
+  That strip is the planned player surface described there; this build ships the projection it reads and the GM authoring that fills it, and no strip.
+  The audience rules in the rest of this bullet are normative TODAY for every projection a player surface may read, and normative for the strip when it lands.
   A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
   A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
   A component whose only complication is `gmOnly` therefore renders in both GM read-only strips and in neither player surface.
@@ -3245,8 +3254,9 @@ The player's route to salvage.
   Certainty, not resolution mode: `simple` / `routed` / `progressive` is authoring vocabulary a player surface never uses, and the queue row already derives certainty from the row's own yield preview.
   The blocked-reason set and its first-match precedence are `essence`, `recipeItem`, `salvageDisabled`, the three `misconfiguredReason` values (`simpleMultiGroup` / `routedNoFormula` / `progressiveNoFormula`), `toolsUnavailable`, `depleted`.
   These are the already-normative ids rather than a second vocabulary, and a `toolsUnavailable` row names the missing tools.
-- **Bulk complication forecast.**
-  The bulk panel renders a pre-run **"What could go wrong"** block above the queue, titled by a count of what could fire and drawn from the player **forecast** projection, exactly as the prototype draws it.
+- **Bulk complication forecast (PLANNED).**
+  The bulk panel is to render a pre-run **"What could go wrong"** block above the queue, titled by a count of what could fire and drawn from the player **forecast** projection, exactly as the prototype draws it.
+  Nothing under the bulk panel draws complication content today; the projection ships and the block does not.
   It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
   It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
   The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.

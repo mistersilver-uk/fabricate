@@ -9,11 +9,13 @@
  * fired" — are claims about the renderer across every card that draws it, and asserting
  * them one card at a time in four suites is how three of them end up unasserted.
  */
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { chromium } from 'playwright';
 
 import { buildBulkSalvageChatContent } from '../src/systems/BulkSalvageChatCard.js';
 import { buildCraftingChatContent } from '../src/systems/CraftingChatCard.js';
@@ -491,3 +493,193 @@ for (const card of Object.keys(BUILDERS)) {
     assert.deepEqual(unquotedAttributes(html), [], 'no attribute anywhere is left unquoted');
   });
 }
+
+// ---------------------------------------------------------------------------
+// The fired-complications block, RENDERED (issue 1286)
+// ---------------------------------------------------------------------------
+
+/*
+ * WHY THIS IS A BROWSER GATE AND NOT A STRING ASSERTION.
+ *
+ * Every test above establishes that the description is in the MARKUP, and the description
+ * was in the markup while being invisible on screen. The block emits its complication row
+ * as one `__label` inside the shared `__item`, and that label is
+ * `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` inside a grid whose
+ * tracks are `minmax(140px, 1fr)`. In a chat sidebar that renders the name, the component
+ * and the whole free-prose description as a single ellipsed line, clipped partway through
+ * the NAME — so the one piece of player-facing output this feature exists to produce never
+ * reached a player, and no assertion about `html.includes(...)` could ever say so.
+ *
+ * `happy-dom` cannot see it either: it computes no cascade, so the label's overflow, the
+ * grid's track sizing and the item's width are all absent there. It takes an engine.
+ *
+ * WHAT KEEPS IT FROM GOING VACUOUS. Each case renders the SAME markup twice in the SAME
+ * page: once as shipped, and once with the `--complication` modifier stripped from the
+ * `<li>`'s class list, which is exactly the pre-fix rendering. The stripped copy is asserted
+ * to BE clipped. Without that, a gate measuring a card at some width where nothing overflows
+ * would pass whether or not the rules exist.
+ */
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const FABRICATE_CSS = readFileSync(resolve(REPO_ROOT, 'styles/fabricate.css'), 'utf8');
+const FOUNDRY_CSS = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8');
+
+/**
+ * A description of the length the feature is FOR. The authored placeholder in the editor is
+ * itself 46 characters, and a complication's prose is the sentence a GM writes for the table
+ * to hear, so a one-word description would measure a case that never occurs.
+ */
+const LONG_FIRED = Object.freeze([
+  {
+    name: 'Choking Dust Cloud',
+    description:
+      'A cloud of choking dust billows out of the grinder and fills the room, and everyone at ' +
+      'the bench must hold their breath or spend the next minute coughing.',
+    severity: 'major',
+    componentName: 'Dried Sagebrush',
+  },
+]);
+
+/** Foundry's chat sidebar, which is the width this card is actually read at. */
+const CHAT_WIDTH = 300;
+
+let browser;
+
+before(async () => {
+  browser = await chromium.launch();
+});
+
+after(async () => {
+  await browser?.close();
+});
+
+/**
+ * Strip the `--complication` element modifier from every complication `<li>`.
+ *
+ * This is the NEGATIVE CONTROL's subject and it is produced from the shipped markup rather
+ * than hand-written, so the control cannot drift away from the thing it controls for: the
+ * only difference between the two copies on the page is the class the new rules hang on.
+ *
+ * @param {string} html A rendered card.
+ * @returns {string} The same card with the modifier removed.
+ */
+function withoutComplicationModifier(html) {
+  return html.replaceAll(/ fabricate-(?:craft|gather)-chat__item--complication/g, '');
+}
+
+/**
+ * Measure one complication row in a real engine.
+ *
+ * `clipped` is read two ways because the two failures are different: a label whose content
+ * is wider than its own box (`scrollWidth`) is text the ellipsis ate, and a description box
+ * that starts beyond the label's right edge is a run pushed entirely off-screen. The
+ * pre-fix rendering does both; asserting only one would pass a partial fix.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} root The card container's id.
+ * @param {string} block The BEM block the card draws.
+ * @returns {Promise<object>} The measurements this gate asserts on.
+ */
+function measureComplication(page, root, block) {
+  return page.evaluate(
+    ([rootId, blockName]) => {
+      // Reached by the DATA ATTRIBUTE, which both copies carry, rather than by the modifier
+      // class — the control copy is defined by not having that class.
+      const item = document.querySelector(`#${rootId} [data-fabricate-complication-severity]`);
+      const list = item.parentElement;
+      const label = item.querySelector(`.${blockName}__label`);
+      const description = item.querySelector(`.${blockName}__complication-description`);
+      const labelBox = label.getBoundingClientRect();
+      const descriptionBox = description.getBoundingClientRect();
+      return {
+        carriesModifier: item.classList.contains(`${blockName}__item--complication`),
+        overflowsOwnBox: label.scrollWidth > label.clientWidth + 1,
+        descriptionEscapesLabel: descriptionBox.right > labelBox.right + 1,
+        descriptionHasArea: descriptionBox.width > 0 && descriptionBox.height > 0,
+        labelHeight: labelBox.height,
+        itemWidth: item.getBoundingClientRect().width,
+        listWidth: list.getBoundingClientRect().width,
+      };
+    },
+    [root, block]
+  );
+}
+
+for (const [card, block] of [
+  ['crafting', 'fabricate-craft-chat'],
+  ['gathering', 'fabricate-gather-chat'],
+]) {
+  test(`${card}: a fired complication's description is READABLE at chat width`, async () => {
+    const html = BUILDERS[card]({ ...NO_COMPLICATION_MODELS[card], complications: LONG_FIRED });
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+    try {
+      await page.setContent(
+        `<style>${FOUNDRY_CSS}</style><style>${FABRICATE_CSS}</style>` +
+          `<style>html,body{margin:0}</style>` +
+          `<div id="shipped" style="width:${CHAT_WIDTH}px">${html}</div>` +
+          `<div id="unstyled" style="width:${CHAT_WIDTH}px">${withoutComplicationModifier(html)}</div>`
+      );
+
+      const shipped = await measureComplication(page, 'shipped', block);
+      const unstyled = await measureComplication(page, 'unstyled', block);
+
+      // THE NEGATIVE CONTROL. The identical markup without the modifier is the rendering this
+      // gate exists to have caught; if it does not clip, nothing below is measuring anything.
+      assert.ok(
+        unstyled.overflowsOwnBox && unstyled.descriptionEscapesLabel,
+        'control: without the `--complication` modifier the row is a single clipped line, ' +
+          `measured overflow ${unstyled.overflowsOwnBox}, escaped ${unstyled.descriptionEscapesLabel}`
+      );
+
+      assert.ok(shipped.carriesModifier, 'the shipped row is the one carrying the modifier');
+      assert.ok(!unstyled.carriesModifier, 'the control row is the one that is not');
+      assert.ok(!shipped.overflowsOwnBox, 'the label holds all of its own content');
+      assert.ok(!shipped.descriptionEscapesLabel, 'the description is inside the label it is in');
+      assert.ok(shipped.descriptionHasArea, 'the description occupies a real box');
+      assert.ok(
+        shipped.labelHeight > unstyled.labelHeight,
+        `the row wraps to more than the one line it used to be: ${shipped.labelHeight}px ` +
+          `against ${unstyled.labelHeight}px`
+      );
+      assert.ok(
+        Math.abs(shipped.itemWidth - shipped.listWidth) <= 0.5,
+        `the row takes the whole grid rather than one 140px track: ${shipped.itemWidth}px ` +
+          `of ${shipped.listWidth}px`
+      );
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+/*
+ * The other half of the same claim, and the reason the rules could be added at all: they
+ * are reachable ONLY through classes a card without a fired complication never emits. The
+ * goldens above already pin the string; this pins the STYLESHEET, which the goldens cannot
+ * see. A rule that named `__item` or `__label` alone would move every card in every world.
+ */
+test('every rule the complications block adds is reached through a complication-only class', () => {
+  // Comments are removed FIRST. Prose in this sheet discusses the very classes this scan
+  // looks for, and a comment left in place would be read as a selector.
+  const complicationRules = FABRICATE_CSS.replaceAll(/\/\*[\s\S]*?\*\//g, '')
+    .split('}')
+    .map((chunk) => chunk.split('{', 1)[0].trim())
+    // Scoped to the two CHAT blocks: `styles/fabricate.css` also carries a manager rule for
+    // the Recipe Studio's own stage-complication strip, which is a different surface.
+    .filter((selector) => /-chat__(?:item--complication|complication-)/.test(selector));
+
+  assert.ok(complicationRules.length > 0, 'the rules exist at all');
+  for (const selector of complicationRules) {
+    for (const branch of selector.split(',')) {
+      assert.match(
+        branch.trim(),
+        /(__item--complication|__complication-[a-z]+)(\s|$)/,
+        `every branch of "${selector}" is gated on a complication-only class`
+      );
+    }
+  }
+});

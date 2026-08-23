@@ -20593,6 +20593,51 @@
   white-space: nowrap;
 }
 
+/* ── A FIRED COMPLICATION IS PROSE, NOT A CHIP (issue 1286) ────────────────────────
+   The base `__item` / `__label` treatment above is built for "3x Iron Ingot": the grid
+   packs items into `minmax(140px, 1fr)` tracks and the label is
+   `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`. A complication row
+   puts its NAME, the component that carries it and a free-prose DESCRIPTION into that one
+   label, so on the base treatment it renders as a single ellipsed line in a 140-250px
+   cell — clipped partway through the name, with the description, which is the only reason
+   the authoring section exists, never drawn at all.
+
+   The block deliberately emitted `--complication` with no rule on the reasoning that an
+   unstyled modifier lands safely on the base treatment. That reasoning is right for
+   regression safety and wrong for this content, so the modifier gets a rule and the
+   regression safety is kept by construction instead: EVERY selector below is reached only
+   through a class no card emits unless a complication fired, so a card without one cannot
+   move. `tests/crafting-chat-card.test.js` pins both halves — byte-identity for the
+   no-complication card, and a rendered gate that the description is actually on screen. */
+.fabricate-gather-chat__item--complication,
+.fabricate-craft-chat__item--complication {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fabricate-gather-chat__item--complication .fabricate-gather-chat__label,
+.fabricate-craft-chat__item--complication .fabricate-craft-chat__label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+/* The three runs inside that one label are separated by WEIGHT rather than by more
+   punctuation — the renderer already joins them with an em dash, and a second visual
+   separator on top of it reads as a list. The name leads; the component that carries the
+   complication is context; the description keeps the body treatment because it is the
+   sentence a GM wrote for the table to read. */
+.fabricate-gather-chat__complication-name,
+.fabricate-craft-chat__complication-name {
+  font-weight: 700;
+}
+
+.fabricate-gather-chat__complication-source,
+.fabricate-craft-chat__complication-source {
+  opacity: 0.72;
+}
+
 .fabricate-gather-chat__footer {
   display: flex;
   flex-wrap: wrap;

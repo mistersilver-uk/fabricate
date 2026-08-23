@@ -188,7 +188,11 @@
 
   /* An EFFECT: a standing affordance in the "Then" card, which is why it keeps its raised
      fill whether it is on or off. Roomier and slightly rounder than a condition, and its
-     head centres — see the geometry note in the header. */
+     head centres — see the geometry note in the header.
+
+     The fill is the ramp step at this row's INDEX in the prototype rather than the token
+     that matches its value; `ComponentComplicationsSection`'s `.fab-complication-card` note
+     records why, and why a by-value re-map flattens the section instead of deepening it. */
   .fab-complication-effect.is-form-effect {
     padding: 11px 12px;
     border-radius: 9px;
@@ -234,10 +238,18 @@
     margin: 0;
   }
 
+  /* Both roomier forms centre their head; only the EFFECT widens its gap. The pill's head
+     gap is the base 10px in the prototype (the fixture records `columnGap: 10px` on
+     `cs-visibility-row`) against the effect's 11px, and a pill is a fixed-height inline
+     control where an extra pixel between the glyph and its label is a pixel off the
+     control's own width. So `align-items` stays shared and `gap` does not. */
   .fab-complication-effect.is-form-effect .fab-complication-effect-head,
   .fab-complication-effect.is-form-pill .fab-complication-effect-head {
-    gap: 11px;
     align-items: center;
+  }
+
+  .fab-complication-effect.is-form-effect .fab-complication-effect-head {
+    gap: 11px;
   }
 
   /* Only the checkbox form makes the whole head a click target; the switch form's head is
