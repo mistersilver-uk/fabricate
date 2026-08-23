@@ -1196,7 +1196,18 @@ class Fabricate {
   }
 
   /**
-   * Get the crafting engine instance
+   * Get the crafting engine instance.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before {@link Fabricate#initialize}
+   * has run, not a promise about `CraftingEngine`'s method surface. The one carved-out
+   * exception is `findComponentItems`, declared at the same tier with its own deviations —
+   * it takes documents, not ids, and throws on a null actor or a null component.
+   *
+   * `craftingEngine` is `null` from the constructor and reassigned in `initialize()`, so this
+   * answers `null` before readiness because it is never ready-gated, not because it checks.
+   *
+   * @returns {CraftingEngine|null}
    */
   getCraftingEngine() {
     return this.craftingEngine;
@@ -1467,10 +1478,36 @@ class Fabricate {
     return this.itemPilesIntegration;
   }
 
+  /**
+   * Get the `actorInventory` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorInventoryCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorInventoryCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorInventoryCoinSpender|null}
+   */
   getActorInventoryCoinSpender() {
     return this.actorInventoryCoinSpender;
   }
 
+  /**
+   * Get the `actorProperty` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorPropertyCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorPropertyCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorPropertyCoinSpender|null}
+   */
   getActorPropertyCoinSpender() {
     return this.actorPropertyCoinSpender;
   }

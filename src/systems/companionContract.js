@@ -220,8 +220,10 @@ const SUCCESSFUL_OUTCOMES = Object.freeze([
  * base declared by a comment is a reference nothing renders.)
  * `KnowledgeNotObservable` mints a NEW key rather than reusing `LearningDisabled`, because
  * the predicate it reports is no longer learn-mode: the GM is being told that granting would
- * change nothing a player can SEE, and its `messageData` carries the resolved
- * `visibilityMode` and `resolutionMode` so a GM reading a macro's output can see why.
+ * change nothing a player can SEE, and its `messageData` carries the AUTHORED
+ * `visibilityMode` and `resolutionMode` — read directly off the system, never the predicate's
+ * internally resolved enum — so a GM reading a macro's output can see why in the words their
+ * own system editor uses.
  */
 export const KNOWLEDGE_GRANT_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.granted]: 'FABRICATE.Knowledge.Grant.Success',
