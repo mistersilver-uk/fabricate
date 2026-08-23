@@ -11,6 +11,13 @@
  *   - an async all-affordable gate over the chosen `currencySpends` (engine, before any mutation),
  *   - an async deduction over the same spends (engine, after item consumption).
  *
+ * It also answers ONE question that has no recipe at all: {@link checkWorldCurrencyAffordability},
+ * the world-scoped affordability answer the companion contract publishes as
+ * `game.fabricate.checkAffordability` (issue 1289). Everything above is recipe-keyed and reads a
+ * crafting system's participation toggle; that answer is not, and deliberately does not — a
+ * downtime activity is not a recipe and belongs to no crafting system. The two share the world
+ * ladder resolution and the spend context, and nothing else.
+ *
  * The spend math and validation stay in `currencyProfile.js`; the spenders own the actor I/O. This
  * module only wires the strategy → spender resolution and the cross-unit aggregation.
  */
@@ -19,11 +26,59 @@ import {
   MacroCoinSpender,
   buildAffordCurrencyProbe,
 } from './CoinSpenders.js';
+import { COMPANION_OUTCOMES, affordabilityResult } from './companionContract.js';
 import {
   findCurrencyUnit,
   formatCurrencyRequirement,
   validateCurrencyProfile,
 } from './currencyProfile.js';
+
+/**
+ * Resolve the WORLD half of the currency configuration — the coin ladder, how coins are read and
+ * spent, the provider, and the GM macro set (issue 1278). Every field it emits is world scope; it
+ * reads no crafting system and takes no recipe.
+ *
+ * Extracted so the two scopes are composed in exactly one place ({@link
+ * getCurrencyRequirementConfig}) while the world-only reader stays reusable by the world-scoped
+ * affordability answer (issue 1289). That answer must be UNABLE to consult a system toggle rather
+ * than merely disciplined about not doing so, and this function is what makes that structural: it
+ * has no crafting-system seam to reach.
+ *
+ * Seam-first, global-fallback (issue 1072), with `??` rather than `||` at both hops. The
+ * distinction matters at the last one: an injected seam returning `null`/`undefined` is treated as
+ * ABSENT and falls through to the global, so a seam cannot express "this world has no ladder"
+ * distinctly from "no seam was injected". That is deliberate — both resolve to `{}` here and the
+ * caller cannot tell them apart anyway, because an empty ladder and a missing one produce the same
+ * refusal downstream: an authored cost against zero units fails `validateCurrencyProfile`, so
+ * `resolveCurrencyContext` sets `error`, the probe reads false, and the spend refuses. Display
+ * agrees with execution either way. A future seam that needs the two to differ must say so with an
+ * explicit sentinel.
+ *
+ * `globalThis.game?.` rather than a bare `game.`, because this fallback is reached often:
+ * `CraftingEngine._currencySeams` returns `() => this.currencyConfigStore?.get()`, which is
+ * legitimately `undefined` whenever the store was not injected — the options bag defaults it to
+ * `null`. A bare reference throws `ReferenceError` in any context without the Foundry global, and a
+ * throw here lands on the craftability path rather than degrading to the empty ladder this line is
+ * written to return.
+ *
+ * @param {{ getCurrencyConfig?: () => object }} [seams]
+ * @returns {{ spendStrategy: string, providerId: string, macros: object, units: object[] }}
+ */
+function resolveWorldCurrencySettings(seams = {}) {
+  const world =
+    seams.getCurrencyConfig?.() ??
+    globalThis.game?.fabricate?.getCurrencyConfigStore?.()?.get() ??
+    {};
+  const spendStrategy = ['actorInventory', 'macro'].includes(world?.spendStrategy)
+    ? world.spendStrategy
+    : 'actorProperty';
+  return {
+    spendStrategy,
+    providerId: String(world?.providerId || ''),
+    macros: world?.macros && typeof world.macros === 'object' ? world.macros : {},
+    units: Array.isArray(world?.units) ? world.units : [],
+  };
+}
 
 /**
  * Resolve the effective currency config for a recipe, composed from TWO scopes.
@@ -34,10 +89,13 @@ import {
  * WORLD config (issue 1278), because a world runs exactly one Foundry game system and so has
  * exactly one way actors store coins.
  *
- * This function is the single chokepoint through which the whole runtime reads currency: the
- * engine's afford gate and spend/refund paths, `RecipeManager.evaluateCraftability`, and
- * `CraftingListingBuilder` all reach it via `resolveCurrencyContext`. Composing the two scopes
- * here is what let the config move scope without any engine logic changing.
+ * This function is the single chokepoint through which every RECIPE-KEYED currency read composes
+ * the two scopes: the engine's afford gate and spend/refund paths,
+ * `RecipeManager.evaluateCraftability`, and `CraftingListingBuilder` all reach it via
+ * `resolveCurrencyContext`. Composing the two scopes here is what let the config move scope without
+ * any engine logic changing. The one currency reader that does NOT pass through here is
+ * {@link checkWorldCurrencyAffordability}, and deliberately so: its question has no recipe, so
+ * there is no system whose toggle could answer for it.
  *
  * @param {object} recipe
  * @param {{ getCraftingSystemManager?: () => object, getCurrencyConfig?: () => object }} [seams]
@@ -57,37 +115,10 @@ export function getCurrencyRequirementConfig(recipe, seams = {}) {
   const system = systemManager?.getSystem(systemId);
   if (!system) return null;
 
-  // The world config follows the same seam-first, global-fallback rule, for the same reason.
-  //
-  // `??` rather than `||` throughout, and the distinction matters at the last hop: an injected
-  // seam that returns `null`/`undefined` is treated as ABSENT and falls through to the global,
-  // so a seam cannot express "this world has no ladder" distinctly from "no seam was injected".
-  // That is deliberate — both resolve to `{}` here and the caller cannot tell them apart anyway,
-  // because an empty ladder and a missing one produce the same refusal downstream: an authored
-  // cost against zero units fails `validateCurrencyProfile`, so `resolveCurrencyContext` sets
-  // `error`, the probe reads false, and the spend refuses. Display agrees with execution either
-  // way. A future seam that needs the two to differ must say so with an explicit sentinel.
-  //
-  // `globalThis.game?.` rather than the bare `game.` its neighbour above uses, because this
-  // fallback is reached far more often: `CraftingEngine._currencySeams` returns
-  // `() => this.currencyConfigStore?.get()`, which is legitimately `undefined` whenever the
-  // store was not injected — the options bag defaults it to `null`. A bare reference throws
-  // `ReferenceError` in any context without the Foundry global, and a throw here lands on the
-  // craftability path rather than degrading to the empty ladder this line is written to return.
-  const world =
-    seams.getCurrencyConfig?.() ??
-    globalThis.game?.fabricate?.getCurrencyConfigStore?.()?.get() ??
-    {};
-  const spendStrategy = ['actorInventory', 'macro'].includes(world.spendStrategy)
-    ? world.spendStrategy
-    : 'actorProperty';
-  const macros = world.macros && typeof world.macros === 'object' ? world.macros : {};
+  // The world half follows the same seam-first, global-fallback rule, for the same reason.
   return {
     enabled: system?.requirements?.currency?.enabled === true,
-    spendStrategy,
-    providerId: String(world.providerId || ''),
-    macros,
-    units: Array.isArray(world.units) ? world.units : [],
+    ...resolveWorldCurrencySettings(seams),
     system,
   };
 }
@@ -97,9 +128,15 @@ export function getCurrencyRequirementConfig(recipe, seams = {}) {
  * spender (injected or via the `game.fabricate` accessor); `macro` builds a per-config macro
  * spender; `actorProperty` (default) is the generic property spender.
  *
+ * `runMacro` is an optional seam on the `macro` branch alone, so a test can drive the REAL
+ * {@link MacroCoinSpender} — including its throw handling — without a Foundry macro document.
+ * Omitting it is byte-equivalent to the previous construction: the spender's own constructor falls
+ * back to `MacroExecutor.run` for anything that is not a function.
+ *
  * @param {{ spendStrategy?: string, macros?: object }} config
  * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
- *   getCraftingSystemManager?: () => object }} [seams]
+ *   getCraftingSystemManager?: () => object,
+ *   runMacro?: (uuid: string, context: object) => Promise<any> }} [seams]
  */
 export function resolveCoinSpender(config = {}, seams = {}) {
   if (config.spendStrategy === 'actorInventory') {
@@ -108,7 +145,7 @@ export function resolveCoinSpender(config = {}, seams = {}) {
     );
   }
   if (config.spendStrategy === 'macro') {
-    return new MacroCoinSpender({ macros: config.macros });
+    return new MacroCoinSpender({ macros: config.macros, runMacro: seams.runMacro });
   }
   return (
     seams.actorPropertyCoinSpender ||
@@ -235,18 +272,51 @@ export function aggregateCurrencySpends(currencySpends, profile) {
 }
 
 /**
+ * WHO is asking a currency macro its question — the discriminator carried on both the spender `ctx`
+ * and the `macroContext` a GM's macro actually receives (issue 1289).
+ *
+ * A GM authors one `canAfford` macro, and before this discriminator existed the only signal that a
+ * call was not a craft was `recipe` and `craftingSystem` arriving `null`. A macro written for
+ * crafts that dereferences `context.recipe.name` therefore threw on an award call, was swallowed by
+ * {@link MacroCoinSpender}, and reported a well-funded actor as unable to pay. A discriminator a
+ * macro can TEST beats a null it must infer, so the token is positive on BOTH arms: the craft path
+ * says `craft` rather than leaving the field absent, and a macro can branch before it touches
+ * anything craft-shaped.
+ *
+ * Declared beside the context builder, and frozen, for the reason the navigation seam declares its
+ * tone classes beside its tone list: a third caller added without a token of its own is then a
+ * syntactically visible omission rather than an `undefined` a macro silently reads as "not an
+ * award".
+ */
+export const CURRENCY_SPEND_CALLERS = Object.freeze({
+  craft: 'craft',
+  award: 'award',
+});
+
+/**
  * Build the spender `ctx` for a single aggregated requirement (the shape the property/inventory
  * spenders read, plus the macro context the {@link MacroCoinSpender} reads).
+ *
+ * `caller` is REQUIRED and is never defaulted. Defaulting it to `craft` would make an award call
+ * site that forgot to pass one indistinguishable from a craft — which is the exact confusion the
+ * discriminator exists to remove — and a macro reading `undefined` cannot tell a missing field from
+ * an unrecognised one.
+ *
+ * `config` is the composed two-scope config on the craft paths and `null` on the award path, whose
+ * question belongs to no crafting system; `craftingSystem` is therefore `null` there by
+ * construction rather than by a branch that could be forgotten.
  */
-function buildSpendContext({ profile, unit, amount, recipe, config }) {
+function buildSpendContext({ profile, unit, amount, recipe, config, caller }) {
   const requirement = { unit: unit.id, amount };
+  const craftingSystem = config?.system || null;
   return {
     profile,
     unit,
     units: profile.units,
     requirement,
     recipe,
-    craftingSystem: config?.system || null,
+    craftingSystem,
+    caller,
     macroContext: {
       actor: null,
       cost: [{ abbreviation: unit.abbreviation, amount }],
@@ -257,7 +327,8 @@ function buildSpendContext({ profile, unit, amount, recipe, config }) {
       })),
       requirement: { unit: unit.id, amount },
       recipe,
-      craftingSystem: config?.system || null,
+      craftingSystem,
+      caller,
     },
   };
 }
@@ -287,6 +358,7 @@ export async function checkCurrencySpends(craftingActor, recipe, currencySpends,
       amount: group.amount,
       recipe,
       config,
+      caller: CURRENCY_SPEND_CALLERS.craft,
     });
     ctx.macroContext.actor = craftingActor;
     const result = await spender.check(
@@ -370,6 +442,7 @@ async function applySpenderToGroup({
     amount: group.amount,
     recipe,
     config,
+    caller: CURRENCY_SPEND_CALLERS.craft,
   });
   ctx.macroContext.actor = craftingActor;
   const fallbackMessage = `Could not ${verb} currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`;
@@ -544,4 +617,166 @@ export async function refundCurrencySpends(craftingActor, recipe, currencySpends
   const result = { valid: firstFailure === null, groups: records };
   if (firstFailure) result.message = firstFailure;
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// The WORLD-scoped affordability answer (issue 1289).
+//
+// Everything above this line is recipe-keyed: it reaches a crafting system through
+// `getCurrencyRequirementConfig` and short-circuits on that system's own participation toggle.
+// A downtime activity settled by a companion is not a recipe and belongs to no crafting system, so
+// this answer reads the WORLD ladder alone and never resolves a system at all.
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a caller-supplied cost amount, REFUSING rather than coercing.
+ *
+ * A numeric string is accepted, because a companion reading an authored activity field legitimately
+ * holds one and `Number('5')` is unambiguous. Everything else is refused rather than coerced:
+ * `Number(true)` is `1`, so a coerced boolean would silently mean "one coin", and `Number([])` is
+ * `0`, which this function must distinguish from a real zero rather than merge with it.
+ *
+ * @param {*} amount
+ * @returns {number|null} the positive finite amount, or `null` when there is no usable one
+ */
+function resolveRequestedAmount(amount) {
+  const numeric =
+    typeof amount === 'number' || (typeof amount === 'string' && amount.trim() !== '')
+      ? Number(amount)
+      : NaN;
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+/**
+ * The human name of a resolved unit, through the same `abbreviation` → `label` → `id` chain
+ * {@link formatCurrencyRequirement} uses, so the contract's message and a craft-time shortfall
+ * message name the same coin the same way. Split out because the localization keys interpolate the
+ * amount and the unit into SEPARATE placeholders, which a preformatted `"1 gp"` cannot fill.
+ */
+function unitDisplayName(unit) {
+  return unit?.abbreviation || unit?.label || unit?.id || '';
+}
+
+/**
+ * Run the resolved spender's `check` and turn its answer into a contract result.
+ *
+ * Three answers, not two, and the third is the point (issue 1289). A macro that THREW is reported
+ * as `checkUnavailable` — the question could not be answered — rather than as `notAffordable`,
+ * because the shipped catch branch returned the identical `{ valid: false, message }` a genuine
+ * shortfall returns, so a GM macro broken on the award path reported a well-funded actor as unable
+ * to pay and nothing downstream could tell the two apart. {@link MacroCoinSpender} marks its catch
+ * with `thrown: true` for exactly this discrimination.
+ *
+ * A spender that throws OUTRIGHT is caught here for the same reason and, additionally, because a
+ * `stable` contract member never throws: it is called inside a GM's automation tick, after other
+ * side effects have committed, where a throw aborts work mid-flight.
+ */
+async function runWorldAffordabilityCheck({ actor, unit, amount, profile, world, seams }) {
+  const spender = resolveCoinSpender(world, seams);
+  const described = { actor: actor?.name || '', amount, unit: unitDisplayName(unit) };
+  if (typeof spender?.check !== 'function') {
+    return affordabilityResult(COMPANION_OUTCOMES.checkUnavailable, {
+      detail: `No currency spender is available for the "${world.spendStrategy}" spend strategy.`,
+    });
+  }
+
+  const ctx = buildSpendContext({
+    profile,
+    unit,
+    amount,
+    // This question has no recipe and no crafting system. Passing them as `null` is the whole
+    // reason the macro context needed a positive `caller` token.
+    recipe: null,
+    config: null,
+    caller: CURRENCY_SPEND_CALLERS.award,
+  });
+  ctx.macroContext.actor = actor || null;
+
+  let result;
+  try {
+    result = await spender.check(actor || null, { unit, amount }, ctx);
+  } catch (error) {
+    console.error('Fabricate | Currency affordability check failed', error);
+    return affordabilityResult(COMPANION_OUTCOMES.checkUnavailable, {
+      detail: error?.message || String(error),
+    });
+  }
+
+  if (result?.thrown === true) {
+    return affordabilityResult(COMPANION_OUTCOMES.checkUnavailable, {
+      detail: result.message || '',
+    });
+  }
+  if (result?.valid) return affordabilityResult(COMPANION_OUTCOMES.affordable, described);
+  // The spender's own free text is the shortfall itself ("Insufficient currency. Requires 1 gp."),
+  // so it rides as `detail` while `message` stays a localization key.
+  return affordabilityResult(COMPANION_OUTCOMES.notAffordable, {
+    ...described,
+    detail: result?.message || '',
+  });
+}
+
+/**
+ * Answer whether an actor can afford `amount` of `unitId` against the WORLD currency ladder — the
+ * behaviour published as `game.fabricate.checkAffordability` (issue 1289).
+ *
+ * **World scope, never a crafting system.** The answer consults no system's `requirements.currency`
+ * toggle, resolves no system, and calls no system-manager seam.
+ *
+ * **Single unit, deliberately.** The reader compares the actor's TOTAL base value across the whole
+ * ladder branch, so 10 sp satisfies a 1 gp cost and a caller performs no aggregation of its own.
+ *
+ * **The unit and the amount are resolved BEFORE any spender is invoked**, and that ordering is
+ * load-bearing rather than defensive. The craft path's only unknown-unit guard lives inside
+ * `aggregateCurrencySpends` (see `resolveSpendBaseUnit`), which is precisely the step a single-unit
+ * question skips. Skipping it too would compute `baseValue = 0`, hence `requiredBase = 0`, hence
+ * `copperValue >= 0`, hence `valid: true` — an unknown unit id, and an amount of zero, would both
+ * read as AFFORDABLE. So each is a refusal, and a refusal answers `affordable: null`: the builder
+ * derives that field from the outcome, so "the actor is short" and "the question could not be
+ * answered" can never collapse into the same confident `false`.
+ *
+ * Performs no write. The GM gate, the actor resolution and the readiness refusal belong to the
+ * facade member that wraps this function, which resolves the `actorId` this function is handed the
+ * document for.
+ *
+ * @param {object|null} actor - the already-resolved actor whose purse is read.
+ * @param {{ unitId?: string, amount?: number }} request
+ * @param {{ getCurrencyConfig?: () => object, actorPropertyCoinSpender?: object|null,
+ *   actorInventoryCoinSpender?: object|null,
+ *   runMacro?: (uuid: string, context: object) => Promise<any> }} [seams]
+ * @returns {Promise<Readonly<{success: boolean, affordable: boolean|null, outcome: string,
+ *   message: string, messageData?: object}>>}
+ */
+export async function checkWorldCurrencyAffordability(actor, { unitId, amount } = {}, seams = {}) {
+  // The caller's own arguments are validated first, because they are the ones whose refusal points
+  // at the call site; the world configuration is the GM's problem and is reported after.
+  const requested = resolveRequestedAmount(amount);
+  if (requested === null) return affordabilityResult(COMPANION_OUTCOMES.invalidAmount);
+
+  const world = resolveWorldCurrencySettings(seams);
+  // An empty ladder is separated from an invalid one because they are different people's problems:
+  // a world that has never been configured versus one whose configuration is broken.
+  if (world.units.length === 0) return affordabilityResult(COMPANION_OUTCOMES.ladderEmpty);
+
+  const profile = validateCurrencyProfile(world.units, {
+    spendStrategy: world.spendStrategy,
+    macros: world.macros,
+  });
+  if (!profile.valid) {
+    return affordabilityResult(COMPANION_OUTCOMES.ladderInvalid, {
+      detail: profile.errors.join('; '),
+    });
+  }
+
+  // `unitNotFound` covers both "no such unit" and the degenerate "a unit that reaches no base
+  // unit", because a caller can do nothing different about them and both would otherwise price the
+  // cost at zero. A valid profile resolves every unit, so the second half is a guard against a
+  // future resolver change rather than a state reachable today.
+  const unit = findCurrencyUnit(profile.units, unitId);
+  const baseValue = Number(profile.metadata?.get(unit?.id)?.baseValue) || 0;
+  if (!unit || baseValue <= 0) {
+    return affordabilityResult(COMPANION_OUTCOMES.unitNotFound, { unit: String(unitId ?? '') });
+  }
+
+  return runWorldAffordabilityCheck({ actor, unit, amount: requested, profile, world, seams });
 }
