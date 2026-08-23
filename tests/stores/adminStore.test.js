@@ -8091,6 +8091,129 @@ describe('createAdminStore', () => {
       ]);
     });
 
+    // ── COMPLICATIONS ON THE COMPONENT-OPTION PROJECTION (issue 1286) ──────────────────
+    //
+    // `managedItemOptions` is the feed for BOTH GM read-only complication strips — the
+    // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
+    // rows. Each of those rows draws the complications of the component it REFERENCES, never
+    // of the component being edited, so this projection is the only route either strip has.
+    // It is the same reason `difficulty` is projected here, and the same failure mode: a
+    // field omitted from this allowlist reaches the editor as `undefined` and the surface
+    // reads as unauthored rather than as a dropped projection.
+    it('managedItemOptions carries the authored complications, and preserves their absence', async () => {
+      const complications = [
+        {
+          id: 'cx-1',
+          name: 'The spring lets go',
+          severity: 'severe',
+          visibility: 'gmOnly',
+          activities: { salvage: true, crafting: true },
+          when: { stageMissed: true },
+        },
+      ];
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [
+        makeItem({ id: 'comp-1', name: 'Coiled Mainspring', complications }),
+        makeItem({ id: 'comp-2', name: 'Brass Sheet' }),
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const [withComplications, without] = get(store.viewState).selectedSystem.managedItemOptions;
+
+      assert.deepEqual(
+        withComplications.complications,
+        complications,
+        'the authored list reaches the option unredacted — the strips are a GM surface, so ' +
+          'they must NOT be fed the visible-only player projection'
+      );
+      // Absence-preserving, exactly as `difficulty` is: `authoredComplications` keys the
+      // persisted field on a NON-EMPTY array, so a component with none carries no key and
+      // this projection must not invent an empty one for it.
+      assert.equal(
+        Object.hasOwn(without, 'complications'),
+        false,
+        'a component that authors none carries no key at all'
+      );
+    });
+
+    it('the projected complications are a CLONE, so a view edit cannot reach the stored component', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [
+        makeItem({
+          id: 'comp-1',
+          complications: [{ id: 'cx-1', name: 'Metal fatigue', when: { stagePartial: true } }],
+        }),
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const [option] = get(store.viewState).selectedSystem.managedItemOptions;
+      option.complications[0].name = 'Rewritten by a view';
+
+      assert.equal(
+        sys.components[0].complications[0].name,
+        'Metal fatigue',
+        'the stored component is untouched — the strips render this list, and a projection ' +
+          'handed out by reference is a write path into world data that no dirty guard sees'
+      );
+    });
+
+    // ── SAVE → RELOAD (issues 651, 676, and now 1286) ──────────────────────────────────
+    //
+    // The failure this pins has shipped twice: a field is authored, shown, and silently
+    // discarded on save, with persistence working perfectly the whole time. `complications`
+    // is a TOP-LEVEL sibling of `salvage`, so it rides `updates` on its own and every hop
+    // between the editor and the stored component has to carry it.
+    it('updateComponent round-trips complications back onto the reloaded component options', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      sys.components = [makeItem({ id: 'comp-1', name: 'Coiled Mainspring' })];
+      // Stands in for `CraftingSystemManager.updateItem`, which spreads the updates over the
+      // stored component and re-normalizes: no allowlist, so a field reaches storage iff the
+      // caller sent it.
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateItem: async (_sysId, itemId, updates) => {
+          const index = sys.components.findIndex((component) => component.id === itemId);
+          sys.components[index] = { ...sys.components[index], ...updates };
+        },
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const authored = [
+        {
+          id: 'cx-1',
+          name: 'Shrapnel',
+          severity: 'major',
+          visibility: 'visible',
+          activities: { salvage: true },
+          when: { stageMissed: true },
+        },
+      ];
+
+      assert.equal(await store.updateComponent('comp-1', { complications: authored }), true);
+
+      // `updateComponent` refreshes before it resolves, so this IS the reloaded view.
+      const [option] = get(store.viewState).selectedSystem.managedItemOptions;
+      assert.deepEqual(
+        option.complications,
+        authored,
+        'what the editor saved is what the strips read back on the next render'
+      );
+      const card = get(store.viewState).itemCards.find((entry) => entry.id === 'comp-1');
+      assert.deepEqual(
+        card.complications,
+        authored,
+        'and the item card the editor itself re-reads its draft from carries them too — ' +
+          'without this the section would repaint empty the moment Save succeeded'
+      );
+    });
+
     it('viewState.essenceCards expose source state and component usage for manager', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();

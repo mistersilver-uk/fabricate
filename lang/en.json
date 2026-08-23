@@ -2554,6 +2554,8 @@
             "NewName": "New complication",
             "PlayerPill": "Player",
             "PlayerPillTitle": "Shown to the player when it fires.",
+            "StripTitle": "Complications on {name}",
+            "StripEdit": "Edit complications on {name}",
             "Activity": {
               "gathering": "Gathering",
               "salvage": "Salvage",

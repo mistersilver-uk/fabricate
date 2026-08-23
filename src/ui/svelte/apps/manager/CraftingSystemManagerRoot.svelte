@@ -35,6 +35,14 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
+  // ── COMPLICATIONS: the trigger picker's option labels (issue 1286) ───────────────────
+  // A check trigger carries no authored name — `_normalizeUnifiedTrigger` drops `label`
+  // deliberately — so what NAMES one is its condition sentence, and the Checks Studio's own
+  // trigger cards already build that sentence from these three modules. The complications
+  // picker reuses them rather than composing a second sentence for the same trigger.
+  import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
+  import { interpolate } from './checks/checksCopy.js';
+  import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
@@ -1055,6 +1063,90 @@
   // `_buildManagedItemOptions` already carries `id`/`name`/`img`/`description`/`category`/
   // `difficulty`, so there is one projection to keep correct instead of two.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
+
+  // ── COMPLICATIONS: the SYSTEM-scoped bag the component editor cannot derive (issue 1286) ─
+  //
+  // Which activities THIS system resolves progressively. The editor already holds
+  // `salvageResolutionMode`, so left to itself it derives the salvage axis and nothing else —
+  // which lit the complications section up for progressive-SALVAGE systems only and offered a
+  // progressive-CRAFTING system no complications at all. Crafting's and gathering's modes live
+  // on the system record and the gathering economy, neither of which reaches a component.
+  //
+  // `gatheringProgressive` is the SAME economy read `componentDifficultyAxisProgressive`
+  // makes, so the three progressive axes agree across every surface that asks. Progressive
+  // gathering is dormant pending issue 683; the section's own "· not progressive" annotation
+  // is what tells the GM a complication authored for it is stored and will not fire.
+  const complicationActivities = $derived({
+    crafting: selectedSystem?.resolutionMode === 'progressive',
+    salvage: salvageResolutionMode === 'progressive',
+    gathering: gatheringProgressive,
+  });
+
+  // The named triggers on the three PROGRESSIVE check blocks, as `{ id, label, activity }`.
+  //
+  // Each activity's check block owns its OWN trigger id space, so an option that did not name
+  // its activity would make two triggers reading "Roll total is at least 15" — one on
+  // crafting, one on salvage — indistinguishable in the picker, and a GM could not tell which
+  // one a complication was bound to.
+  //
+  // Only the PROGRESSIVE block of each activity is offered: a complication fires from a
+  // progressive stage outcome, so a trigger on the simple or routed block has no moment to
+  // reach it.
+  const complicationTriggerOptions = $derived([
+    ...complicationTriggersFor('crafting', selectedSystem?.craftingCheck?.progressive),
+    ...complicationTriggersFor('salvage', selectedSystem?.salvageCraftingCheck?.progressive),
+    ...complicationTriggersFor('gathering', selectedSystem?.gatheringCraftingCheck?.progressive),
+  ]);
+
+  /**
+   * Resolve one summary FRAGMENT to a sentence. `summariseCondition` returns
+   * `{ key, fallback, data }` and a datum may itself be a fragment (the comparator and
+   * aggregate words are), so the nested ones are localized first — the same two-step
+   * `CheckTriggers.phrase()` performs, because a one-step fill would render "[object Object]"
+   * inside the sentence.
+   */
+  function complicationTriggerPhrase(fragment) {
+    const data = Object.fromEntries(
+      Object.entries(fragment.data ?? {}).map(([key, entry]) => [
+        key,
+        entry && typeof entry === 'object' ? text(entry.key, entry.fallback) : entry,
+      ])
+    );
+    return interpolate(text(fragment.key, fragment.fallback), data);
+  }
+
+  /**
+   * The `{ id, label, activity }` options for ONE activity's progressive check block.
+   *
+   * The label is the trigger's CONDITION SENTENCE, built by the very builder the Checks
+   * Studio's trigger cards use. A trigger has no authored name, so an id would name nothing
+   * to a GM, and a second sentence composed here would drift from the Studio's the first time
+   * either is retuned. `parseDiceGroups` over the block's own roll formula is what lets a
+   * per-die condition read "Lowest of 1d20 is 1" rather than naming a group number.
+   */
+  function complicationTriggersFor(activity, block) {
+    const triggers = Array.isArray(block?.checkBreakage?.triggers)
+      ? block.checkBreakage.triggers
+      : [];
+    if (triggers.length === 0) return [];
+    const diceGroups = parseDiceGroups(block?.rollFormula || '');
+    return triggers
+      .filter((trigger) => trigger?.id)
+      .map((trigger) => ({
+        id: trigger.id,
+        activity,
+        label: complicationTriggerPhrase(
+          summariseCondition(trigger.condition ?? {}, { diceGroups })
+        ),
+      }));
+  }
+
+  // The macro picker's options. The store already publishes `availableScriptMacros`
+  // `type === 'script'`-filtered and name-sorted, so this is a pass-through and deliberately
+  // NOT a second projection: a macro a GM can link here is exactly a macro the essence
+  // property-macro picker can link, and two lists would disagree the first time either
+  // filter moved.
+  const complicationMacroOptions = $derived(selectedSystem?.availableScriptMacros || []);
 
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an
@@ -9906,6 +9998,9 @@
           {salvageCheckDcMode}
           {salvageCheckDc}
           componentOptions={salvageComponentOptions}
+          {complicationActivities}
+          {complicationTriggerOptions}
+          macroOptions={complicationMacroOptions}
           saving={componentEditSaving}
           showDifficulty={componentDifficultyShown}
           difficulty={componentDifficultyDraft}
