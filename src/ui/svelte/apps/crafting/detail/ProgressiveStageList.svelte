@@ -49,6 +49,38 @@
   unchanged. A required prop or an always-on chip would have re-skinned crafting as a
   side effect of a salvage feature.
 
+  THE PER-STAGE COMPLICATION BAND (issue 1286) is the FOURTH extension, and it is
+  default-off for the same reason. `complications` is a TENSE token rather than a
+  boolean, because the copy on a resolved row is not the copy on an un-rolled one and
+  the row data cannot say which it is: an un-fired entry looks identical before a roll
+  and after one that spared it. Salvage passes `resolved` once its run has resolved;
+  crafting passes `forecast` always, because the fired record lives on the salvage run
+  record and the immediate crafting path writes none.
+
+  The band's DATA is published on the stage row by the two builders, through the one
+  shared `attachStageComplications`: `stage.complications` is `[{ id, name, description,
+  severity, visibility, fired }]` in authored fire order, already filtered to what a
+  player may see and already marked for the resolved tense. THIS COMPONENT RE-DERIVES
+  NONE OF IT — no `forecastComplications` call, no reading of `component.complications`,
+  and above all no inferring `fired` from a stage's missed state, which `match` and the
+  condition roll make untrue. `InventoryListingBuilder._buildSalvage`'s "the panel is
+  presentational" contract covers this band exactly as it covers mode, DC and thresholds.
+
+  The band renders the FIRST complication in fire order plus a `+N more` count. The
+  inspector column is 300px — the documented reason `stacked` exists — and an unbounded
+  list turns one row into several prose paragraphs.
+
+  The ROW-STRUCTURE FLIP is gated on the band having CONTENT for that stage, never on the
+  extension being passed. Both shipped bodies pass it, so a presence gate would re-skin
+  every progressive stage row in every world — including the overwhelming majority whose
+  components author no complications at all — which is exactly the failure the opt-in rule
+  above exists to prevent.
+
+  It is NOT a snippet, and that is a departure from the plan's `stageDetail` spelling with
+  a reason: a snippet is defined in the caller, so two callers passing "the same" band is
+  two copies of its markup, which is the sixth call site's duplication arriving by another
+  route. Nothing about the band varies per caller except the tense, which is a token.
+
   NO STAGE RENDERS A QUANTITY, on either surface. A `showQuantity` opt-in existed for
   one round and the salvage caller passed it, printing a count the engine does not
   honour: the player read "Balehound Teeth ×2" and was awarded one. Progressive results
@@ -74,6 +106,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  // The ONE complication summary row, in its `player` variant — shared with the GM strips
+  // and the bulk block rather than copied. SonarCloud's copy-paste detector reads
+  // `.svelte`, and this shape has six call sites across the feature's two PRs.
+  import ComplicationSummaryRow from '../../manager/ComplicationSummaryRow.svelte';
 
   let {
     stages = [],
@@ -92,6 +128,8 @@
     // tab — where that is the only cause — byte-unchanged.
     fixedNoteKey = 'FABRICATE.App.Crafting.Detail.StageOrderFixed',
     fixedNoteFallback = 'Order set by the GM',
+    // Issue 1286, the fourth extension: `off` (default), `forecast` or `resolved`.
+    complications = 'off',
   } = $props();
 
   let dragIndex = $state(-1);
@@ -130,6 +168,69 @@
         { name, position: target + 1, total }
       )
     );
+  }
+
+  // ── The complication band (issue 1286) ────────────────────────────────────────────
+
+  // FULL key literals per severity rather than a composed `${BASE}.${severity}`:
+  // `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written down, and
+  // a composed one is a namespace base it admits without ever resolving the leaf. The GM
+  // strip states the same rule for the same reason.
+  const SEVERITY_LABELS = Object.freeze({
+    minor: ['FABRICATE.App.Complications.SeverityMinor', 'Minor'],
+    major: ['FABRICATE.App.Complications.SeverityMajor', 'Major'],
+    severe: ['FABRICATE.App.Complications.SeveritySevere', 'Severe'],
+  });
+
+  // The TENSE chip, keyed on what is actually known rather than on the stage's outcome.
+  // The prototype keeps "This can go wrong" on a stage the roll has already passed — its
+  // own `fired` flag is derived from the stage being short — and that is a tense error
+  // rather than a design: once the roll is spent, nothing can go wrong any more. `Chip`
+  // tones, so the tense reads in colour as well as in words.
+  const TENSE_BADGES = Object.freeze({
+    forecast: ['FABRICATE.App.Complications.Forecast', 'This can go wrong', 'neutral'],
+    fired: ['FABRICATE.App.Complications.Fired', 'This happened', 'warning'],
+    resolved: ['FABRICATE.App.Complications.NotFired', "This didn't happen", 'muted'],
+  });
+
+  function severityLabel(severity) {
+    const declared = SEVERITY_LABELS[severity];
+    return declared ? text(...declared) : String(severity ?? '');
+  }
+
+  /** The player-visible complications published on this row, or none when opted out. */
+  function bandEntries(stage) {
+    if (complications === 'off') return [];
+    return Array.isArray(stage?.complications) ? stage.complications : [];
+  }
+
+  /** One ENTRY's tense: what the badge says. `forecast` until a resolution has happened. */
+  function entryTense(entry) {
+    if (complications !== 'resolved') return 'forecast';
+    return entry?.fired === true ? 'fired' : 'resolved';
+  }
+
+  /**
+   * The BAND's tense: what its fill and top rule say.
+   *
+   * Read over every entry rather than off the one rendered row, so a stage that fired
+   * something reads as a stage that fired something even when the firing sits behind the
+   * `+N more` count. The band answers "did anything happen here?" and the badge answers
+   * "did THIS one?"; the two coincide wherever a stage carries one complication, which is
+   * every stage any shipped fixture draws.
+   */
+  function bandTense(entries) {
+    if (complications !== 'resolved') return 'forecast';
+    return entries.some((entry) => entry?.fired === true) ? 'fired' : 'resolved';
+  }
+
+  /** The names behind the `+N more` count, so the count is not a dead end. */
+  function overflowTitle(entries) {
+    return entries
+      .slice(1)
+      .map((entry) => entry?.name || '')
+      .filter(Boolean)
+      .join(', ');
   }
 
   function handleDrop(index) {
@@ -234,6 +335,64 @@
   {/if}
 {/snippet}
 
+<!--
+  The full-bleed band inside the stage row (issue 1286).
+
+  `draggable="false"` is REQUIRED, not decorative: pre-roll — the forecast state the band
+  exists for — the salvage list is reorderable and the row above carries
+  `draggable="true"`, so a mousedown-drag inside the prose would start a row drag instead
+  of a text selection. This component already fought the same fight for its artwork.
+
+  It carries no link and no control of any kind. A complication belongs to the component
+  the row already names, so a player has nowhere to be sent; and per
+  `openspec/specs/ui-integration/spec.md` no player progressive surface builds any part of
+  the exclusion vocabulary — no per-stage exclude toggle, no excluded-results list, no
+  hidden-result note — because exclusion would contradict the reconciliation guarantee
+  that a result is never dropped. The prototype draws one; it is not built.
+-->
+{#snippet complicationBand(stage)}
+  {@const entries = bandEntries(stage)}
+  {#if entries.length > 0}
+    {@const lead = entries[0]}
+    {@const tense = bandTense(entries)}
+    {@const badge = TENSE_BADGES[entryTense(lead)]}
+    <div
+      class="crafting-stage-complications"
+      class:is-fired={tense === 'fired'}
+      data-progressive-stage-complications
+      data-progressive-stage-complication-tense={tense}
+      draggable="false"
+    >
+      <ComplicationSummaryRow
+        variant="player"
+        nameEmphasis="inline"
+        name={lead.name}
+        severity={lead.severity}
+        severityLabel={severityLabel(lead.severity)}
+        description={lead.description}
+        statusLabel={text(badge[0], badge[1])}
+        statusTone={badge[2]}
+        bodyClamp={3}
+        dataAttr="data-progressive-stage-complication"
+        dataValue={lead.id}
+      />
+      <!-- The FIRST in fire order plus a count, never the whole list: the inspector column
+           is 300px and an unbounded list turns one row into several prose paragraphs. The
+           remaining names are the `title`, so the count is a pointer rather than a wall. -->
+      {#if entries.length > 1}
+        <span
+          class="crafting-stage-complications-more"
+          data-progressive-stage-complication-more={String(entries.length - 1)}
+          title={overflowTitle(entries) || undefined}
+          >{format('FABRICATE.App.Complications.More', '+{count} more', {
+            count: entries.length - 1,
+          })}</span
+        >
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet moveButtons(stage, index)}
   <span class="crafting-stage-move" class:is-stacked={stacked} data-progressive-stage-move>
     <button
@@ -264,6 +423,7 @@
       <div
         class="crafting-stage-row is-reorderable"
         class:is-stacked={stacked}
+        class:has-complications={bandEntries(stage).length > 0}
         data-progressive-stage={stage.id}
         data-progressive-stage-reorderable
         draggable="true"
@@ -279,41 +439,50 @@
           handleDrop(index);
         }}
       >
-        <!--
-          Wholly decorative on BOTH surfaces, so `aria-hidden` sits on the cluster
-          itself: the chevrons — the list's only keyboard-reachable reorder control —
-          end the row rather than living in here, and the ordinal restates the position
-          the live region already announces.
-        -->
-        <span
-          class="crafting-stage-handle"
-          class:is-stacked={stacked}
-          aria-hidden="true"
-          title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}
-        >
-          <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          <span class="crafting-stage-ordinal" data-progressive-stage-ordinal={String(index + 1)}
-            >{index + 1}</span
-          >
-        </span>
-        {#if stage.img}
-          <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
-               draggable, so a drag started on the artwork becomes an image drag with the
-               wrong ghost, and dropping it outside the app can navigate away. This is the
-               first drag row in the repo to contain an image — the GM's row has none. -->
-          <img
-            class="crafting-stage-img"
-            src={stage.img}
-            alt=""
+        <!-- The stage's own LINE. `display: contents` unless a band is drawn, so a row
+             without one is the card's flex items exactly as it was before this component
+             ever took a band. With one, the line becomes the real row and carries the
+             padding the CARD used to, which is what lets the band below run edge to edge:
+             a band inset by the row's padding draws its top rule as a short line floating
+             in the middle of the card rather than as a divider. -->
+        <div class="crafting-stage-line">
+          <!--
+            Wholly decorative on BOTH surfaces, so `aria-hidden` sits on the cluster
+            itself: the chevrons — the list's only keyboard-reachable reorder control —
+            end the row rather than living in here, and the ordinal restates the position
+            the live region already announces.
+          -->
+          <span
+            class="crafting-stage-handle"
+            class:is-stacked={stacked}
             aria-hidden="true"
-            draggable="false"
-          />
-        {/if}
-        <!-- The chevrons END the row on both surfaces (stacked, that is after the state
-             chip): one arrow position everywhere, matching the GM's component salvage
-             editor rather than diverging per caller. -->
-        {@render identity(stage)}
-        {@render moveButtons(stage, index)}
+            title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}
+          >
+            <i class="fas fa-grip-vertical" aria-hidden="true"></i>
+            <span class="crafting-stage-ordinal" data-progressive-stage-ordinal={String(index + 1)}
+              >{index + 1}</span
+            >
+          </span>
+          {#if stage.img}
+            <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
+                 draggable, so a drag started on the artwork becomes an image drag with the
+                 wrong ghost, and dropping it outside the app can navigate away. This is the
+                 first drag row in the repo to contain an image — the GM's row has none. -->
+            <img
+              class="crafting-stage-img"
+              src={stage.img}
+              alt=""
+              aria-hidden="true"
+              draggable="false"
+            />
+          {/if}
+          <!-- The chevrons END the row on both surfaces (stacked, that is after the state
+               chip): one arrow position everywhere, matching the GM's component salvage
+               editor rather than diverging per caller. -->
+          {@render identity(stage)}
+          {@render moveButtons(stage, index)}
+        </div>
+        {@render complicationBand(stage)}
       </div>
     {:else}
       <!-- D13: no drag handlers attached at all, and no grip glyph. The ordinal and the
@@ -322,26 +491,30 @@
       <div
         class="crafting-stage-row is-fixed"
         class:is-stacked={stacked}
+        class:has-complications={bandEntries(stage).length > 0}
         data-progressive-stage={stage.id}
         data-progressive-stage-fixed
       >
-        <span
-          class="crafting-stage-ordinal"
-          aria-hidden="true"
-          data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span
-        >
-        {#if stage.img}
-          <!-- Also non-draggable in the fixed state: the row is not a drag source, but a
-               bare <img> still is, and dragging it out of the app can navigate away. -->
-          <img
-            class="crafting-stage-img"
-            src={stage.img}
-            alt=""
+        <div class="crafting-stage-line">
+          <span
+            class="crafting-stage-ordinal"
             aria-hidden="true"
-            draggable="false"
-          />
-        {/if}
-        {@render identity(stage)}
+            data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span
+          >
+          {#if stage.img}
+            <!-- Also non-draggable in the fixed state: the row is not a drag source, but a
+                 bare <img> still is, and dragging it out of the app can navigate away. -->
+            <img
+              class="crafting-stage-img"
+              src={stage.img}
+              alt=""
+              aria-hidden="true"
+              draggable="false"
+            />
+          {/if}
+          {@render identity(stage)}
+        </div>
+        {@render complicationBand(stage)}
       </div>
     {/if}
   {/each}
@@ -380,6 +553,74 @@
 
   .crafting-stage-row.is-reorderable {
     cursor: grab;
+  }
+
+  /* ── The full-bleed complication band (issue 1286) ────────────────────────────────
+     Scoped to this component, never `styles/fabricate.css`: the band's whole point is
+     that it adds no shared rule, which is also what keeps a change here mapped to the
+     views that draw it rather than to the broad `theme-or-global-ui` screenshot recipe.
+     Theme-ROOT tokens only, on `Chip.svelte`'s note — this row renders under
+     `.fabricate-app`, where the manager's `--fab-mv2-*` aliases are not in scope. */
+
+  /* `display: contents` in the common case, so a row with no band is the flex container
+     it has always been and every rule keyed on its children still matches. */
+  .crafting-stage-line {
+    display: contents;
+  }
+
+  /* With a band the ROW becomes a column and sheds its own padding onto the line, so the
+     band can run edge to edge. `align-items: stretch` is load-bearing: the row's default
+     `center` would shrink both children to their content width in column direction, and
+     the band would stop being full-bleed while every value measured on it stayed right. */
+  .crafting-stage-row.has-complications {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .crafting-stage-row.has-complications .crafting-stage-line {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
+    padding: var(--fab-space-2);
+  }
+
+  /* NO `margin-top`. The band's `border-top` IS the divider between it and the line above,
+     and a rule only reads as a divider when the two surfaces meet — a gap in the row's own
+     fill turns it into a short line floating above a detached panel. This is the structure
+     `RecipeResultItemRow` already ships, and the player prototype draws the same one. */
+  .crafting-stage-complications {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    /* The SAME inset the line above carries, so the band's content column starts on the
+       line's left edge rather than two pixels inside it. Nothing measured on either box
+       can see that: the two boxes align on their borders whatever their padding is, and
+       the drift would only ever show up as prose that does not line up with the row it
+       belongs to. */
+    padding: var(--fab-space-2);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-overlay-light-06);
+  }
+
+  /* The TENSE lives on the band's fill and top rule, and on the row's badge — never on
+     the severity tile, which is one vocabulary across all six complication call sites. A
+     tile recoloured by tense would make one control say two things, and a `severe`
+     complication that has not fired would be indistinguishable from a `minor` one that
+     has. The un-fired resolved tense keeps the quiet fill on purpose: nothing happened,
+     so nothing should shout; its badge is what says so in words. */
+  .crafting-stage-complications.is-fired {
+    border-top-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+  }
+
+  .crafting-stage-complications-more {
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+    font-weight: 600;
   }
 
   /* D13: the grip is gone, so the cursor must not promise a drag either. */

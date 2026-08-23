@@ -51,6 +51,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The salvage tree, plus the shared stage list it reuses.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
@@ -1677,8 +1684,12 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       parts[1].hasAttribute('data-progressive-stage-move'),
       'the chevrons come LAST — the same edge they sit on in the GM salvage editor and on the crafting tab',
     );
+    // Read off the stage's own LINE rather than off the row. Since issue 1286 the row is a
+    // wrapper that MAY carry a full-bleed complication band beneath its line, so `row`'s
+    // last element child is the line (or the band), never the chevrons. The claim under
+    // test is unchanged: the chevrons end the line the stage reads on.
     assert.equal(
-      row.lastElementChild.hasAttribute('data-progressive-stage-move'),
+      row.querySelector('.crafting-stage-line').lastElementChild.hasAttribute('data-progressive-stage-move'),
       true,
       'far right: after the state chip, not merely after the identity column',
     );
@@ -2044,6 +2055,125 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+});
+
+// The player's per-stage complication band (issue 1286, PR 2), through the REAL wrapper
+// chain. What is pinned here is the TENSE FORWARDING and nothing else: the band's own rules
+// live in `progressive-stage-complications-mounted.test.js`, mounted on the shared list.
+//
+// It is a separate describe because the forwarding is the failure mode. `complications`
+// threads the same five wrapper hops `salvageOrderAnnouncement` does, and a prop dropped at
+// any hop silently defaults — here to `off`, which renders no band at all, and to `forecast`
+// after a roll, which would keep "This can go wrong" beneath a spent roll. Neither is
+// visible to an assertion that only counts stage rows.
+describe('InventoryView (mounted) — the per-stage complication band (issue 1286)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  const DUST = {
+    id: 'x-dust',
+    name: 'Choking dust',
+    description: 'A cloud of caustic dust bursts out of the vessel as it cracks open.',
+    severity: 'severe',
+    visibility: 'visible',
+    fired: false,
+  };
+
+  // The projection rides ON the stage row, exactly as `attachStageComplications` publishes
+  // it: the player's reorder is applied downstream of the builder, so a parallel list keyed
+  // by result id would desynchronise at precisely that point.
+  const bandStages = (fired) => [
+    { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 4, threshold: 4 },
+    {
+      id: 's2',
+      componentId: 'c3',
+      name: 'Slag',
+      img: null,
+      difficulty: 3,
+      threshold: 7,
+      complications: [{ ...DUST, fired }],
+    },
+  ];
+
+  function bandServices(fired, storeOverrides = {}) {
+    return salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages: bandStages(fired),
+        awardMode: 'equal',
+      }),
+      storeOverrides
+    );
+  }
+
+  const RESOLVED = {
+    systemId: 'sys',
+    componentId: 'c1',
+    state: 'success',
+    message: '',
+    awarded: [],
+    awardedComponentIds: ['c2'],
+    outcomeId: null,
+  };
+
+  const bandOf = (target) =>
+    target.querySelector('[data-progressive-stage="s2"] [data-progressive-stage-complications]');
+
+  // Declared here rather than reused: the sibling suite's `openSalvage` is scoped inside its
+  // own describe, and hoisting it into module scope would touch a block this change has no
+  // business in.
+  async function openBand(services) {
+    const target = await harness.mount({ services });
+    await settle();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    return target;
+  }
+
+  it('forwards the FORECAST tense before a roll, across every wrapper hop', async () => {
+    const { services } = bandServices(false);
+    const target = await openBand(services);
+    const band = bandOf(target);
+    assert.ok(band, 'the salvage body opts the shared list in');
+    assert.equal(band.getAttribute('data-progressive-stage-complication-tense'), 'forecast');
+    assert.ok(
+      band.querySelector('[data-progressive-stage-complication="x-dust"]'),
+      'and the authored complication reaches the row'
+    );
+    assert.ok(
+      !target.querySelector('[data-progressive-stage="s1"] [data-progressive-stage-complications]'),
+      'a stage whose component authors nothing stays the row it was'
+    );
+  });
+
+  it('forwards the RESOLVED tense after a roll, so nothing still forecasts beneath it', async () => {
+    const { services } = bandServices(false, { salvageResult: RESOLVED });
+    const target = await openBand(services);
+    assert.equal(bandOf(target).getAttribute('data-progressive-stage-complication-tense'), 'resolved');
+    assert.doesNotMatch(
+      bandOf(target).textContent,
+      /This can go wrong/,
+      'a row that still forecasts beneath a spent roll asserts something no longer true'
+    );
+  });
+
+  it('renders the success chip AND the fired band together on an awarded stage', async () => {
+    // Not a contradiction: the band reads as a CONSEQUENCE of the award. The prototype
+    // never had to draw this, because its own model derives "fired" from a stage being
+    // short — so an awarded stage could never carry a band at all.
+    const { services } = bandServices(true, {
+      salvageResult: { ...RESOLVED, awardedComponentIds: ['c2', 'c3'] },
+    });
+    const target = await openBand(services);
+    const row = target.querySelector('[data-progressive-stage="s2"]');
+    assert.equal(
+      row.querySelector('[data-progressive-stage-state]').dataset.progressiveStageState,
+      'recovered'
+    );
+    assert.equal(bandOf(target).getAttribute('data-progressive-stage-complication-tense'), 'fired');
   });
 });
 

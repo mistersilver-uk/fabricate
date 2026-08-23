@@ -120,6 +120,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',

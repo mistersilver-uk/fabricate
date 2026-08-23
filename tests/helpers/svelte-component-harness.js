@@ -369,6 +369,15 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
   // just the stage-list one.
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  // The per-stage complication band (issue 1286). `ProgressiveStageList` — already listed
+  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` and
+  // imports `RowDisclosure`. All three are in the STATIC graph whether or not a fixture
+  // draws a band, so omitting any of them HANGS every mounted crafting suite (# cancelled)
+  // rather than failing one. `Chip` and `RowDisclosure` are import-free leaves, so these
+  // three entries close it.
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
