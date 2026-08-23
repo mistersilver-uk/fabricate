@@ -1325,6 +1325,19 @@
       "CouldNotLearnRecipe": "Could not learn recipe",
       "PrerequisiteNotMet": "You must learn the required recipes first.",
       "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}.",
+      "Grant": {
+        "Success": "Granted {recipe} to {actor}.",
+        "AlreadyKnown": "{actor} already knows {recipe}, so nothing was written.",
+        "GMOnly": "Only a GM can grant recipe knowledge.",
+        "NoActor": "No such actor to grant recipe knowledge to.",
+        "NotReady": "Fabricate is still starting up, so recipe knowledge cannot be granted yet.",
+        "RecipeNotFound": "No such recipe to grant.",
+        "SystemNotFound": "No crafting system found for {recipe}.",
+        "KnowledgeNotObservable": "This crafting system never reveals learned recipes ({visibilityMode} visibility, {resolutionMode} resolution), so granting {recipe} would change nothing a player can see.",
+        "InvalidGrantedBy": "The grant source must be a text label, or omitted; it is never converted from another type.",
+        "GrantedByTooLong": "The grant source must be {max} characters or fewer; it is not truncated, because a shortened name is a different name.",
+        "Failed": "The recipe knowledge grant could not be completed."
+      },
       "Reset": {
         "Success": "Reset crafting knowledge for {actor} ({count} recipe(s)).",
         "GMOnly": "Only a GM can reset crafting knowledge.",
@@ -1345,6 +1358,20 @@
         "Erased": "Erased {count} learned recipe(s).",
         "EraseFailed": "Failed to erase the learned recipe.",
         "Failed": "The knowledge action could not be completed."
+      }
+    },
+    "Currency": {
+      "Affordability": {
+        "Affordable": "{actor} can afford {amount} {unit}.",
+        "NotAffordable": "{actor} cannot afford {amount} {unit}.",
+        "GMOnly": "Only a GM can check whether a character can afford a cost.",
+        "NoActor": "No such actor to check currency for.",
+        "NotReady": "Fabricate is still starting up, so currency cannot be checked yet.",
+        "UnitNotFound": "No currency unit named {unit} is configured for this world.",
+        "InvalidAmount": "The amount to check must be a number greater than zero.",
+        "LadderEmpty": "This world has no currency units configured, so no cost can be priced.",
+        "LadderInvalid": "This world's currency configuration is invalid, so no cost can be priced: {detail}",
+        "CheckUnavailable": "The affordability check could not be completed: {detail}"
       }
     },
     "Admin": {
@@ -5477,6 +5504,8 @@
           "ItemsEmptyTitle": "No owned copies",
           "LearnedBanner": "Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.",
           "LearnedByCrafting": "Learned by crafting",
+          "LearnedByGrant": "Learned by grant: {grantedBy}",
+          "LearnedByGrantUnlabelled": "Learned by grant",
           "LearnedEmptyHint": "This character has not learned any recipe in this crafting system.",
           "LearnedEmptyTitle": "Nothing learned yet",
           "LearnedFrom": "Learned from {source}",
