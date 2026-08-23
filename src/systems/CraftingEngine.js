@@ -19,6 +19,7 @@ import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollProm
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { planComplications } from '../utils/complicationPlan.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
@@ -42,6 +43,7 @@ import {
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { fireComplications } from './complicationRuntime.js';
 import {
   awardedQuantityOf,
   createOrStackComponentItem,
@@ -61,6 +63,7 @@ import {
   setStackQuantity,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
@@ -317,6 +320,30 @@ function stampCraftedComponentIdentity(itemData, systemId, componentId) {
 }
 
 /**
+ * Re-shape a progressive resolution's published `meta` into the award report
+ * {@link planComplications} classifies stages against (issue 1286).
+ *
+ * It is a RENAME and nothing more. `ResolutionModeService` publishes id lists because
+ * `meta` is a wire-ish record; the planner accepts either a result object or a bare id
+ * everywhere, so the ids travel through untouched. Nothing is re-derived here — the break
+ * index is not recoverable from `awarded` + `remaining` once a skipped stage sits between
+ * the last award and the halt, which is precisely why the award loop reports it.
+ *
+ * @param {?object} meta the five flat keys `_resolveProgressiveResultGroups` publishes
+ * @returns {{awarded: Array<string>, remaining: number, partialResult: string|null,
+ *   haltedResult: string|null, skippedResults: Array<string>}}
+ */
+function awardFromResolutionMeta(meta) {
+  return {
+    awarded: Array.isArray(meta?.awardedResultIds) ? meta.awardedResultIds : [],
+    remaining: Number(meta?.remaining ?? 0),
+    partialResult: meta?.partialResultId ?? null,
+    haltedResult: meta?.haltedResultId ?? null,
+    skippedResults: Array.isArray(meta?.skippedResultIds) ? meta.skippedResultIds : [],
+  };
+}
+
+/**
  * Handles the actual crafting process
  * Validates ingredients, consumes items, creates outputs
  */
@@ -362,6 +389,177 @@ export class CraftingEngine {
     this.getPlayerResultOrder = getPlayerResultOrder;
     this.getCraftingSystem = getCraftingSystem;
     this.resolveItemUuid = resolveItemUuid;
+    // Declared here, installed post-construction (issue 1286). See
+    // `installComplicationDelivery` for why it is not a ninth parameter, and
+    // `_complicationWriter` for the ambient fallback that makes an un-installed engine
+    // still deliver.
+    this.complicationDeliveryWriter = null;
+  }
+
+  /**
+   * Install the complication delivery writer (issue 1286).
+   *
+   * A POST-CONSTRUCTION seam on the `GatheringEngine#installBlindRunRelay` precedent,
+   * rather than a ninth constructor parameter: this constructor is already an
+   * eight-argument list with an options bag, and every existing `new CraftingEngine(...)`
+   * site — production and fixture alike — must keep working untouched.
+   *
+   * An engine that never calls this still fires complications: {@link _complicationWriter}
+   * falls back to `game.fabricate.complicationDeliveryWriter`, the same
+   * `this.x || game.fabricate?.getX?.()` idiom the resolution service, the run manager and
+   * the visibility service already use here. An engine with NEITHER fires the plan and
+   * rolls the visible effect rolls, then drops the GM requests — the award, the run record
+   * and the chat card are untouched, because a complication is strictly downstream of a
+   * committed award and must never be able to cost a craft its results.
+   *
+   * @param {object} deps
+   * @param {?{deliver: (args: object) => boolean}} [deps.writer] The delivery writer
+   *   composed in `main.js`. It owns the emit AND mints the resolution id; this engine
+   *   deliberately does neither, so a complication cannot reach a socket from here.
+   * @returns {CraftingEngine} this, for chaining at the bootstrap site.
+   */
+  installComplicationDelivery({ writer = null } = {}) {
+    this.complicationDeliveryWriter = writer;
+    return this;
+  }
+
+  /**
+   * The complication delivery writer, injected or ambient.
+   * @private
+   * @returns {?{deliver: (args: object) => boolean}}
+   */
+  _complicationWriter() {
+    return this.complicationDeliveryWriter || game.fabricate?.complicationDeliveryWriter || null;
+  }
+
+  /**
+   * FIRE the component complications a committed progressive award earned — the one
+   * guarded seam all three engine call sites route through (issue 1286).
+   *
+   * ## Where this is called from, and why never anywhere else
+   *
+   * Exactly three sites, each AFTER the award is committed and BEFORE the chat card is
+   * posted: the immediate craft path, the timed craft FINISH path, and salvage. Never
+   * from `ResolutionModeService`, which resolves up to three times per craft and resolves
+   * once BEFORE any consumption — see the do-not-fire-here note on
+   * `_resolveProgressiveResultGroups`.
+   *
+   * Once per STEP resolution, not once per `craft()` call: a collapsed chain recurses into
+   * `craft()` per step, so a three-step chain fires three times. That is correct — three
+   * steps are three progressive resolutions with three separate awards.
+   *
+   * ## The whole-call guard
+   *
+   * This is guard 3 of 3 (per-complication and per-effect guards live inside
+   * {@link fireComplications}, which resolves rather than rejects). It is kept here anyway
+   * because a complication is strictly downstream of a committed award: the ingredients
+   * are spent, the items exist, the run record is written. Nothing in this method may be
+   * able to turn that into a thrown craft, so everything from the plan to the delivery is
+   * inside the `try` — including the ordering read and the trigger evaluation.
+   *
+   * The delivery writer OWNS the emit and mints the resolution id. This engine never
+   * touches `game.socket` and never mints, so the plan carries a null `resolutionId` and
+   * the writer stamps the real one once per `deliver` call — which is once per resolution.
+   *
+   * @private
+   * @param {object} options
+   * @param {'crafting'|'salvage'} options.activity which activity resolved
+   * @param {?object} options.actor the acting actor, whose roll data resolves the
+   *   condition roll and its comparand
+   * @param {?string} options.craftingSystemId addressing for the GM-side re-read
+   * @param {Array<{resultId: ?string, componentId: ?string, component: ?object}>}
+   *   options.stages the ORDERED stage occurrences the award ran over, in fire order
+   * @param {object} options.award the award report, via {@link awardFromResolutionMeta} or
+   *   `resolveProgressiveAward` verbatim
+   * @param {?object} options.checkBreakage the ACTIVE check's breakage block, for the
+   *   `when.checkTrigger` clause
+   * @param {?object} options.checkResult the resolved check result
+   * @param {boolean} [options.deliver=true] Whether to hand the GM requests to the
+   *   delivery writer HERE. A batching caller passes `false` and emits the collected
+   *   requests itself — the one case is bulk salvage, whose rows are one resolution each
+   *   but must reach the GM as ONE socket message: the GM-side rate limiter is sized on
+   *   the stated assumption that "a bulk salvage of any size emits one"
+   *   (`complicationSocket.js`), so a per-row emit would silently drop the tail of a long
+   *   run. The firing itself still happens per row; only the emit is deferred.
+   * @returns {Promise<?object>} `fireComplications`'s return, or null when nothing ran.
+   */
+  async _fireComponentComplications({
+    activity,
+    actor,
+    craftingSystemId,
+    stages,
+    award,
+    checkBreakage,
+    checkResult,
+    deliver = true,
+  }) {
+    try {
+      if (!Array.isArray(stages) || stages.length === 0) return null;
+      const plan = planComplications({
+        activity,
+        stages,
+        award,
+        ...resolveCheckTriggerMatches(checkBreakage, checkResult),
+      });
+      const fired = await fireComplications({
+        plan,
+        actor,
+        context: {
+          craftingSystemId: craftingSystemId ?? null,
+          actorUuid: actor?.uuid ?? null,
+          speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+        },
+      });
+      if (deliver && fired.gmRequests.length > 0) {
+        this._complicationWriter()?.deliver({
+          craftingSystemId: craftingSystemId ?? null,
+          actorUuid: actor?.uuid ?? null,
+          complications: fired.gmRequests,
+        });
+      }
+      return fired;
+    } catch (error) {
+      // The award is already committed. A complication that cannot fire is a lost
+      // narrative beat; a thrown craft here would be lost items.
+      console.error('Fabricate | Component complications failed to fire', error);
+      return null;
+    }
+  }
+
+  /**
+   * The crafting call site's adapter: read the ordered stage list from the resolution
+   * service and the award from the resolution it just published (issue 1286).
+   *
+   * Both crafting paths (immediate and timed FINISH) call this with the `resolutionMeta`
+   * their own `_createResultItems` returned, so the classification is against the award
+   * that actually happened rather than a re-resolution.
+   *
+   * The `awardedResultIds` guard is what keeps a non-progressive resolution out: with no
+   * award report every stage would classify as `unreached` and a `stageMissed`
+   * complication would fire on a craft that awarded everything.
+   *
+   * There is deliberately NO site on the crafting failure-award path
+   * (`_awardFailureResults`): `_resolveProgressiveResultGroups` publishes no
+   * `disposition`, so `_isFailureAwardDisposition(undefined)` is false and progressive
+   * awards nothing there.
+   *
+   * @private
+   */
+  async _fireCraftComplications({ actor, recipe, step, checkResult, resolutionMeta }) {
+    const resolutionService =
+      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    if (resolutionService?.getMode?.(recipe) !== 'progressive') return null;
+    if (!Array.isArray(resolutionMeta?.awardedResultIds)) return null;
+    const system = this._getRecipeSystem(recipe);
+    return this._fireComponentComplications({
+      activity: 'crafting',
+      actor,
+      craftingSystemId: recipe?.craftingSystemId ?? null,
+      stages: resolutionService.progressiveStageOccurrences?.({ recipe, step }) ?? [],
+      award: awardFromResolutionMeta(resolutionMeta),
+      checkBreakage: this._resolveCraftingCheckBreakage(system, recipe),
+      checkResult,
+    });
   }
 
   /**
@@ -1160,7 +1358,7 @@ export class CraftingEngine {
       // validated by the pre-consumption misconfiguration gate above (a matched signature
       // that could not resolve to a valid result group aborted before any consumption),
       // so this deterministic re-resolution inside `_createResultItems` yields real groups.
-      const { items: resultItems } = await this._createResultItems(
+      const { items: resultItems, resolutionMeta } = await this._createResultItems(
         craftingActor,
         executionRecipe,
         step,
@@ -1203,6 +1401,18 @@ export class CraftingEngine {
           await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
         }
       }
+
+      // Component complications (issue 1286): AFTER the award is committed — the items
+      // exist and the run record is written — and BEFORE the card is posted, so the card
+      // can report what fired. Progressive resolutions only; every other mode returns
+      // without planning anything.
+      await this._fireCraftComplications({
+        actor: craftingActor,
+        recipe: executionRecipe,
+        step,
+        checkResult,
+        resolutionMeta,
+      });
 
       await this._postCraftChatMessage({
         success: true,
@@ -1811,6 +2021,17 @@ export class CraftingEngine {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
     }
+
+    // Component complications (issue 1286). The timed path reaches this point only
+    // after the matured FINISH created its results and `completeStepSuccess` archived
+    // the run, so the award is as committed here as it is on the immediate path.
+    await this._fireCraftComplications({
+      actor: craftingActor,
+      recipe: executionRecipe,
+      step,
+      checkResult,
+      resolutionMeta,
+    });
 
     await this._postCraftChatMessage({
       success: true,
@@ -5481,11 +5702,19 @@ export class CraftingEngine {
    *   without this an N-item run would post the aggregate plus N strays. It does NOT
    *   suppress the interactive roll's own `Roll#toMessage` post — that is the Dice So
    *   Nice trigger and every roll keeps animating. Defaults to false.
+   * @param {boolean} [options.deferComplicationDelivery] When true, this call still FIRES
+   *   its component complications but does not emit them, returning the GM requests on
+   *   `complicationRequests` for the caller to batch into ONE socket message (issue 1286).
+   *   The bulk-salvage sibling of `suppressChat`, and required for the same reason: the
+   *   GM-side rate limiter is sized on the stated assumption that a bulk salvage of any
+   *   size emits ONE message, so a per-row emit would silently drop a long run's tail.
+   *   Defaults to false, which delivers per resolution — correct for a single salvage.
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string,
    *   salvageRun: object|null, cancelled?: boolean, misconfigured?: boolean,
-   *   waiting?: boolean}>}
+   *   waiting?: boolean, complicationRequests?: object[]}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
+    const deferComplicationDelivery = options?.deferComplicationDelivery === true;
     const actor = await fromUuid(actorUuid);
     if (!actor) {
       return { success: false, results: null, message: 'Actor not found', salvageRun: null };
@@ -5842,6 +6071,15 @@ export class CraftingEngine {
       checkResult,
       salvageRun
     );
+    // Captured HERE, beside the resolution it must agree with, because `completeRun`
+    // below reassigns `salvageRun` and the ordered list is read off its captured
+    // `resultOrder` (issue 1286). Null for every non-progressive salvage.
+    const complicationInputs = this._progressiveSalvagePlanInputs(
+      component,
+      system,
+      checkResult,
+      salvageRun
+    );
     const consumedItems = await this._consumeComponentItems(
       actor,
       componentItems,
@@ -5885,6 +6123,25 @@ export class CraftingEngine {
       });
     }
 
+    // Component complications (issue 1286): after the items are on the actor and the
+    // run is completed, before the card is posted. The FAILURE branch above has no such
+    // site and needs none — progressive salvage returns `[]` for a failed check, so there
+    // are no stages, no award and no candidates.
+    let complicationRequests = null;
+    if (complicationInputs) {
+      const fired = await this._fireComponentComplications({
+        activity: 'salvage',
+        actor,
+        craftingSystemId,
+        stages: complicationInputs.stages,
+        award: complicationInputs.award,
+        checkBreakage: this._resolveSalvageCheckBreakage(system),
+        checkResult,
+        deliver: deferComplicationDelivery !== true,
+      });
+      if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
+    }
+
     // Salvage chat parity (issue 675): the same card crafting posts, reading as a
     // salvage analogue — the source broken down, the materials recovered, and any
     // tools that broke. Gated on the same `chatOutput` toggle inside the poster.
@@ -5910,6 +6167,10 @@ export class CraftingEngine {
       success: true,
       results: resultItems,
       message: `Successfully salvaged ${component.name || componentId}`,
+      // Present ONLY when the caller asked to batch (bulk salvage). Addressing only, by
+      // construction: a GM request carries no name, description, macro uuid or
+      // visibility, so there is nothing here for a player-facing surface to redact.
+      ...(complicationRequests === null ? undefined : { complicationRequests }),
       // The rolled total, threaded top-level so the player summary can read it even on
       // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
       // a no-check simple salvage (nothing was rolled); a finite number otherwise.
@@ -6171,43 +6432,15 @@ export class CraftingEngine {
     }
 
     if (mode === 'progressive') {
-      const group = allGroups[0];
-      if (!group) return [];
+      const resolved = this._resolveProgressiveSalvageAward(
+        component,
+        system,
+        checkResult,
+        salvageRun
+      );
+      if (!resolved) return [];
 
-      // Salvage normalizes the budget with `Number(value || 0)` (divergence 4) and
-      // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`). It does
-      // NOT zero the budget after a `partial` tail award (divergence 2:
-      // `zeroRemainingOnPartial: false`) — that divergence is latent because the
-      // salvage return shape never exposes `remaining`; see #431.
-      const authored = group.results || [];
-      // Read the order from the RUN RECORD, never from settings (issue 651 D2). The run
-      // carries the order it was started with, so the user executing a world-time resume
-      // is irrelevant — that is the whole point of capturing it at start.
-      //
-      // RUNLESS INVARIANT: no run manager → no run → no captured order → AUTHORED ORDER.
-      // There is deliberately NO settings fallback here. Adding one would look like a
-      // harmless gap-fill and would quietly reintroduce the defect the capture exists to
-      // close: the resume path would start reading the *executing* user's order again.
-      const results =
-        component.salvage?.allowPlayerResultReorder === false
-          ? authored
-          : applyPlayerResultOrder(authored, salvageRun?.resultOrder ?? null);
-
-      // Resolved ONCE for the whole award rather than per result: `costFor` is called for
-      // every result in the group, and every bulk row calls this method, so a scan here was
-      // a `rows x results x components` term.
-      const managedItemIndex = getDefinitionIndex(system?.components);
-      const { awarded } = resolveProgressiveAward({
-        results,
-        initialRemaining: Number(checkResult?.value || 0),
-        costFor: (result) =>
-          Number(findById(managedItemIndex, result.componentId || result.systemItemId)?.difficulty),
-        awardMode: system?.salvageCraftingCheck?.progressive?.awardMode || 'equal',
-        invalidCost: 'skip',
-        zeroRemainingOnPartial: false,
-      });
-
-      // Progressive results are a quantity-less ordered list: the loop above charges a
+      // Progressive results are a quantity-less ordered list: the loop charges a
       // result's difficulty ONCE and awards that entry ONCE, so the GM expresses "more of
       // X" by listing X again rather than via a count. Force `quantity: 1` so the grant
       // path (`_createResultItems` reads `result.quantity`) produces one item per awarded
@@ -6217,13 +6450,136 @@ export class CraftingEngine {
       // entry's difficulty (issue 676). `quantity` remains in the stored model and the
       // normalizer still clamps it; forcing it here leaves the stored value inert, so no
       // migration is required.
-      return [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }];
+      //
+      // THE FORCE STAYS HERE, on the award path, and not inside
+      // `_resolveProgressiveSalvageAward`: that helper reports what the loop DID, and a
+      // complication classifier reading a rewritten quantity off it would be reading this
+      // method's grant-path concern.
+      return [
+        {
+          ...resolved.group,
+          results: resolved.award.awarded.map((result) => ({ ...result, quantity: 1 })),
+        },
+      ];
     }
 
     // Unreachable: `mode` is one of `simple | routed | progressive` by construction and
     // every one of the three returns above. Kept as an explicit exhaustiveness fallback
     // that awards NOTHING, never `allGroups`.
     return [];
+  }
+
+  /**
+   * Resolve a progressive SALVAGE award, returning the plan inputs rather than the
+   * award-shaped result groups (issue 1286).
+   *
+   * Split out of {@link _resolveSalvageResultGroups} because two callers need two
+   * different halves of one computation: that method needs the awarded results to grant,
+   * and the complication classifier needs the WHOLE ordered list plus the award loop's own
+   * report of why it stopped. Re-deriving either from the other is what makes the salvage
+   * and crafting classifiers drift apart.
+   *
+   * The three things this must not disturb, all verified by the salvage suite: the
+   * `simple` branch's by-index success selection, the failure branch's by-ROLE lookup, and
+   * the `quantity: 1` force — which stays at the award site, not here.
+   *
+   * Salvage normalizes the budget with `Number(value || 0)` (divergence 4) and skips
+   * invalid-cost results (divergence 1: `invalidCost: 'skip'`). It does NOT zero the
+   * budget after a `partial` tail award (divergence 2: `zeroRemainingOnPartial: false`),
+   * which is why "was there a partial" is not inferable from `remaining` on this path and
+   * the loop has to report `partialResult` itself; see #431.
+   *
+   * @private
+   * @param {object} component the component being salvaged
+   * @param {object} system its owning crafting system
+   * @param {?object} checkResult the salvage check result, whose `value` is the budget
+   * @param {?object} [salvageRun] the active run, carrying the result order captured at
+   *   START. Read from HERE and never from settings (issue 651 D2): the run carries the
+   *   order it was started with, so whichever client wins the world-time resume race is
+   *   irrelevant. RUNLESS INVARIANT: no run manager -> no run -> no captured order ->
+   *   AUTHORED ORDER, with deliberately NO settings fallback, because a harmless-looking
+   *   gap-fill there would quietly restore the executing-user read the capture exists to
+   *   close.
+   * @returns {?{group: object, results: Array<object>, award: object}} `results` is the
+   *   ORDERED stage list, one entry per occurrence; `award` is `resolveProgressiveAward`'s
+   *   return VERBATIM. Null when the component authors no salvage result group.
+   */
+  _resolveProgressiveSalvageAward(component, system, checkResult, salvageRun = null) {
+    const allGroups = Array.isArray(component?.salvage?.resultGroups)
+      ? component.salvage.resultGroups
+      : [];
+    const group = allGroups[0];
+    if (!group) return null;
+
+    const authored = group.results || [];
+    const results =
+      component.salvage?.allowPlayerResultReorder === false
+        ? authored
+        : applyPlayerResultOrder(authored, salvageRun?.resultOrder ?? null);
+
+    // Resolved ONCE for the whole award rather than per result: `costFor` is called for
+    // every result in the group, and every bulk row calls this method, so a scan here was
+    // a `rows x results x components` term.
+    const managedItemIndex = getDefinitionIndex(system?.components);
+    const award = resolveProgressiveAward({
+      results,
+      initialRemaining: Number(checkResult?.value || 0),
+      costFor: (result) =>
+        Number(findById(managedItemIndex, result.componentId || result.systemItemId)?.difficulty),
+      awardMode: system?.salvageCraftingCheck?.progressive?.awardMode || 'equal',
+      invalidCost: 'skip',
+      zeroRemainingOnPartial: false,
+    });
+
+    return { group, results, award };
+  }
+
+  /**
+   * The salvage stage occurrences and award report a firing needs, or null when this
+   * salvage is not a progressive one (issue 1286).
+   *
+   * Called at the RESOLVE site rather than at the firing site, and held in a local until
+   * the award is committed. That is not a style choice: `completeRun` reassigns
+   * `salvageRun` to the completed record, and the ordered list is read off
+   * `salvageRun.resultOrder`. Re-resolving after the completion write would silently fall
+   * back to the AUTHORED order for any run whose completed record does not carry the
+   * captured order, and the complication card would then name a different stage from the
+   * one the award actually spent against.
+   *
+   * A component appearing several times in the ordered list contributes several stage
+   * occurrences, each with its own `resultId` — which is what lets a firing name the
+   * occurrence that produced it rather than marking every occurrence of that component.
+   *
+   * It runs the award loop a SECOND time, deliberately and cheaply: the loop is pure, the
+   * component index is memoized on the candidate array, and the alternative — returning
+   * both halves through `_resolveSalvageResultGroups` — would push a complication concern
+   * into a method three other call sites use for the award alone. The two evaluations sit
+   * on adjacent lines against identical inputs, which is what makes them agree, and it is
+   * the same purity argument `resolveResultGroups` relies on to be asked three times.
+   *
+   * @private
+   * @returns {?{stages: Array<object>, award: object}}
+   */
+  _progressiveSalvagePlanInputs(component, system, checkResult, salvageRun = null) {
+    const { mode, unsupportedMode } = resolveSalvageCheck(system);
+    if (unsupportedMode || mode !== 'progressive') return null;
+    const resolved = this._resolveProgressiveSalvageAward(
+      component,
+      system,
+      checkResult,
+      salvageRun
+    );
+    if (!resolved) return null;
+    const managedItemIndex = getDefinitionIndex(system?.components);
+    const stages = resolved.results.map((result) => {
+      const componentId = result?.componentId || result?.systemItemId || null;
+      return {
+        resultId: result?.id ?? null,
+        componentId,
+        component: componentId ? (findById(managedItemIndex, componentId) ?? null) : null,
+      };
+    });
+    return { stages, award: resolved.award };
   }
 
   /**

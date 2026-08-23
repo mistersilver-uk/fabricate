@@ -1352,3 +1352,202 @@ test('a tier whose group EXISTS but is empty still succeeds — deliberate no-aw
     delete globalThis.Roll;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Progressive component complications: the gathering call site (issue 1286)
+//
+// PROGRESSIVE GATHERING SHIPS DORMANT. `_libraryTaskToRuntimeTask` hardcodes
+// `resolutionMode: 'd100'` and `GatheringEconomyView` renders both formula-rolled modes
+// disabled, pending issue 683, so `_resolveProgressiveOutcome` is unreachable from any
+// GM-selectable configuration today. An end-to-end `startAttempt` test of this would
+// therefore pass VACUOUSLY — it would assert that a d100 attempt fires nothing, which is
+// true whether or not any of this works. These drive `_resolveProgressiveOutcome` and
+// `_commitTerminalSideEffects` DIRECTLY, exactly as the other dormant seams in this file
+// are exercised, so that issue 683 flips a switch onto tested behaviour.
+// ---------------------------------------------------------------------------
+
+/** An authored complication; `gmOnly`, so every firing produces a GM request. */
+function gatheringComplication({
+  id = 'cx',
+  when = { stageAwarded: true },
+  match = 'any',
+  activities = { gathering: true }
+} = {}) {
+  return {
+    id,
+    name: 'Cave-in',
+    description: 'Cave-in description',
+    severity: 'major',
+    visibility: 'gmOnly',
+    activities,
+    match,
+    when,
+    rollCondition: { enabled: false },
+    effectRoll: { enabled: false }
+  };
+}
+
+/**
+ * A progressive gathering system whose three ore components cost 3, 5 and 7, with the
+ * complications attached per component id.
+ */
+function progressiveGatheringSystem({ complications = {}, difficulties = {}, triggers = [] } = {}) {
+  // A component with no authored complications carries NO `complications` key at all,
+  // matching the absence-preserving normalizer: the plan must cope with the field being
+  // absent rather than an empty array.
+  const component = (id, difficulty) => {
+    const record = { id, name: id, difficulty: difficulties[id] ?? difficulty };
+    if (complications[id]) record.complications = complications[id];
+    return record;
+  };
+  return {
+    id: 'system-a',
+    enabled: true,
+    features: { gathering: true },
+    components: [component('comp-a', 3), component('comp-b', 5), component('comp-c', 7)],
+    gatheringCraftingCheck: {
+      progressive: { rollFormula: '1d20', awardMode: 'equal', checkBreakage: { triggers } }
+    }
+  };
+}
+
+/** Resolve a progressive gathering outcome and commit its terminal side effects. */
+async function driveProgressiveGathering({ engine, system, task, total = 8 }) {
+  stubRoll(total, [{ number: 1, faces: 20, total }]);
+  try {
+    const environment = targetedEnvironment({ tasks: [task] });
+    const outcome = await engine._resolveProgressiveOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task
+    });
+    if (outcome.status !== 'misconfigured') {
+      await engine._commitTerminalSideEffects({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult: outcome.checkResult
+      });
+    }
+    return outcome;
+  } finally {
+    delete globalThis.Roll;
+  }
+}
+
+test('progressive gathering (DORMANT): a committed award fires its awarded stages once', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    complications: {
+      'comp-a': [gatheringComplication({ id: 'ca' })],
+      'comp-c': [gatheringComplication({ id: 'cc', when: { stageMissed: true } })]
+    }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'succeeded');
+  // Budget 8: comp-a (3) and comp-b (5) are awarded, comp-c (7) halts the loop.
+  assert.deepEqual(outcome.checkResult.resolutionMeta, {
+    awardedResultIds: ['result-a', 'result-b'],
+    remaining: 0,
+    partialResultId: null,
+    haltedResultId: 'result-c',
+    skippedResultIds: []
+  });
+  assert.equal(writer.calls.length, 1, 'one delivery for one resolution');
+  assert.deepEqual(
+    writer.calls[0].complications.map(entry => [entry.componentId, entry.bucket, entry.activity]),
+    [
+      ['comp-a', 'full', 'gathering'],
+      ['comp-c', 'halted', 'gathering']
+    ]
+  );
+  assert.equal(writer.calls[0].actorUuid, actor.uuid);
+  assert.equal(writer.calls[0].craftingSystemId, 'system-a');
+});
+
+test('progressive gathering (DORMANT): NEGATIVE CONTROL — an invalid-cost abort fires nothing', async () => {
+  // `invalidCost: 'fail'` makes gathering raise INVALID_PROGRESSIVE_DIFFICULTY, and a GM
+  // misconfiguration is not a narrative outcome — matching the crafting misconfiguration
+  // gate. The abort returns before the award, so the commit is never reached at all.
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    complications: {
+      'comp-a': [gatheringComplication({ id: 'ca' })],
+      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })]
+    },
+    difficulties: { 'comp-b': 0 }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'misconfigured');
+  assert.equal(outcome.code, 'INVALID_PROGRESSIVE_DIFFICULTY');
+  assert.equal(writer.calls.length, 0, 'a misconfigured resolution fires nothing');
+});
+
+test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never reaches the site', async () => {
+  const calls = {};
+  const task = routedTask();
+  const engine = makeEngine({ task, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    // Deliberately a complication that would match on EVERY bucket. Without the mode
+    // guard a d100 stage would classify as `unreached` — never having been "awarded" by
+    // a loop that never ran — and this would fire. That is the failure mode the control
+    // exists to catch, so a `stageAwarded`-only complication would prove nothing.
+    complications: {
+      'comp-a': [gatheringComplication({ when: { stageAwarded: true, stageMissed: true } })]
+    }
+  });
+
+  // A d100 outcome carries no progressive resolution meta, and the guard reads the
+  // task's own mode before anything else.
+  await engine._commitTerminalSideEffects({
+    viewer,
+    actor,
+    system,
+    environment: targetedEnvironment({ tasks: [task] }),
+    task,
+    outcome: { status: 'succeeded', resultGroups: task.resultGroups, checkResult: { provider: 'd100' } },
+    checkResult: { provider: 'd100' }
+  });
+
+  assert.equal(writer.calls.length, 0, 'complications are a progressive-only consequence');
+});
+
+test('progressive gathering (DORMANT): a THROWING delivery writer never costs the attempt its award', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  engine.installComplicationDelivery({
+    writer: {
+      deliver() {
+        throw new Error('socket exploded');
+      }
+    }
+  });
+  const system = progressiveGatheringSystem({
+    complications: { 'comp-a': [gatheringComplication()] }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'succeeded');
+  assert.equal(calls.createResults.length, 1, 'the gathered results were still created');
+});
