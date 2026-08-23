@@ -4706,3 +4706,272 @@ test('LEARN.scope=total - a writable pool still reports a genuinely spent budget
   const refused = await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: copy, actor });
   assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent', 'spent is still spent');
 });
+
+// ---------------------------------------------------------------------------
+// 1289 — the observability predicate, the shared flag key, and the byte-identical
+// pin on the learn gate it is a SIBLING of.
+// ---------------------------------------------------------------------------
+
+const { readFileSync } = await import('node:fs');
+const { LEARNED_RECIPES_FLAG_KEY } = await import('../src/config/flags.js');
+
+const VISIBILITY_SERVICE_SOURCE = readFileSync('src/systems/RecipeVisibilityService.js', 'utf8');
+
+// The whole of `_isLearnModeEnabled` — its comment and its body — exactly as it stands.
+// Held as lines rather than one template literal because the comment is full of backticks.
+const LEARN_GATE_SOURCE = [
+  "  // Whether a system permits learning at all (spec §Learning Recipes → Preconditions).",
+  "  // The flat `visibilityMode` is canonical when authored, so learning requires the",
+  "  // resolved mode to be `'knowledge'` — a flat `item`/`global`/`restricted` system is",
+  "  // rejected even though it retains the normalizer's residual `knowledge.mode` default",
+  "  // of `itemOrLearned`. A legacy system with no authored flat mode still honours its",
+  "  // `learned`/`itemOrLearned` sub-mode. Shared by `learnRecipe`,",
+  "  // `learnRecipeFromOwnedBook`, and `_isRecipeEligibleForOwnedItemLearning` so the gate",
+  "  // cannot drift between the explicit-learn and drop/picker paths.",
+  "  _isLearnModeEnabled(system) {",
+  "    if (this._getVisibilityMode(system) !== 'knowledge') return false;",
+  "    const knowledge = this._getKnowledgeConfig(system);",
+  "    return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');",
+  "  }"
+].join('\n');
+
+test('1289 C8 `_isLearnModeEnabled` is BYTE-IDENTICAL, comment and body', () => {
+  // A source pin, not a behavioural one, and that is the whole point: issue 1289's D4
+  // WITHDREW a disjunct that an earlier revision would have added to this method, so the
+  // proof it shipped as designed is that the method is unchanged. A green diff cannot tell
+  // "correctly left alone" from "forgotten", and a behavioural test cannot either — the
+  // withdrawn `|| resolutionMode === 'alchemy'` widening would leave every existing learn
+  // case green while silently admitting alchemy systems to the learn path.
+  //
+  // If you are here because this failed: the observability question belongs to
+  // `isLearnedKnowledgeObservable`, which is a SIBLING derived from the reveal switch arm by
+  // arm. Do not fold it into this gate. Only a genuine change to what may be LEARNED — with
+  // its own spec change under §Learning Recipes → Preconditions — justifies editing the
+  // literal above.
+  assert.ok(
+    VISIBILITY_SERVICE_SOURCE.includes(LEARN_GATE_SOURCE),
+    'the learn gate must not drift while observability is added beside it'
+  );
+});
+
+test('1289 the two predicates are siblings: neither is expressed in terms of the other', () => {
+  // The capability control for the scan above: applied to the SIBLING it must find the
+  // method, so a scan that could never match anything fails here rather than passing
+  // silently over both.
+  const slice = VISIBILITY_SERVICE_SOURCE.slice(
+    VISIBILITY_SERVICE_SOURCE.indexOf('  isLearnedKnowledgeObservable(system) {'),
+    VISIBILITY_SERVICE_SOURCE.indexOf('  // Per-recipe-item use/learn caps (issue 511)')
+  );
+  assert.ok(slice.length > 0, 'the sibling predicate exists and sits beside the learn gate');
+  assert.ok(
+    !slice.includes('_isLearnModeEnabled'),
+    'observability must be derived from the reveal switch, never built on the learn gate'
+  );
+  assert.ok(
+    !LEARN_GATE_SOURCE.includes('isLearnedKnowledgeObservable'),
+    'and the learn gate must not be built on observability either'
+  );
+});
+
+test('1289 the observability predicate matches the reveal switch, arm by arm', () => {
+  const service = buildService();
+  const system = (overrides) => ({ resolutionMode: 'simple', ...overrides });
+  const cases = [
+    // [label, system, observable]
+    ['non-alchemy knowledge', system({ visibilityMode: 'knowledge' }), true],
+    ['non-alchemy item', system({ visibilityMode: 'item' }), false],
+    ['non-alchemy global', system({ visibilityMode: 'global' }), false],
+    ['non-alchemy restricted', system({ visibilityMode: 'restricted' }), false],
+    [
+      'non-alchemy teaser (reads discoveryProgress, never learnedRecipes)',
+      system({ visibilityMode: 'knowledge', recipeVisibility: { listMode: 'teaser' } }),
+      false
+    ],
+    [
+      'flat knowledge over a residual item sub-mode (a migrated world)',
+      system({ visibilityMode: 'knowledge', recipeVisibility: { knowledge: { mode: 'item' } } }),
+      true
+    ],
+    [
+      'legacy knowledge + learned sub-mode, no flat enum',
+      system({ recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned' } } }),
+      true
+    ],
+    [
+      'legacy knowledge + item sub-mode resolves to the item MODE',
+      system({ recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } } }),
+      false
+    ],
+    ['alchemy global', system({ resolutionMode: 'alchemy', visibilityMode: 'global' }), true],
+    ['alchemy knowledge', system({ resolutionMode: 'alchemy', visibilityMode: 'knowledge' }), true],
+    [
+      'alchemy teaser falls to the default arm, which DOES read the learned map',
+      system({
+        resolutionMode: 'alchemy',
+        visibilityMode: 'global',
+        recipeVisibility: { listMode: 'teaser' }
+      }),
+      true
+    ],
+    ['alchemy item, auto-learn off', system({ resolutionMode: 'alchemy', visibilityMode: 'item' }), false],
+    [
+      'alchemy restricted, auto-learn off',
+      system({ resolutionMode: 'alchemy', visibilityMode: 'restricted' }),
+      false
+    ],
+    [
+      'alchemy item, auto-learn ON — the brew-discovery union reveals under every mode',
+      system({ resolutionMode: 'alchemy', visibilityMode: 'item', alchemy: { learnOnCraft: true } }),
+      true
+    ],
+    [
+      'alchemy restricted, auto-learn ON',
+      system({
+        resolutionMode: 'alchemy',
+        visibilityMode: 'restricted',
+        alchemy: { learnOnCraft: true }
+      }),
+      true
+    ],
+    ['a missing system is not observable', null, false]
+  ];
+
+  for (const [label, candidate, expected] of cases) {
+    assert.equal(service.isLearnedKnowledgeObservable(candidate), expected, label);
+  }
+});
+
+test('1289 the two predicates DISAGREE in both directions, which is why they are two', () => {
+  const service = buildService();
+  const migrated = {
+    resolutionMode: 'simple',
+    visibilityMode: 'knowledge',
+    recipeVisibility: { knowledge: { mode: 'item' } }
+  };
+  const alchemyLearnMode = {
+    resolutionMode: 'alchemy',
+    visibilityMode: 'knowledge',
+    recipeVisibility: { knowledge: { mode: 'itemOrLearned' } }
+  };
+  const alchemyItem = { resolutionMode: 'alchemy', visibilityMode: 'item' };
+
+  assert.equal(service._isLearnModeEnabled(migrated), false, 'learn gate reads the residual raw');
+  assert.equal(service.isLearnedKnowledgeObservable(migrated), true, 'observability follows the force');
+
+  assert.equal(service._isLearnModeEnabled(alchemyLearnMode), true, 'the learn gate is mode-only');
+  assert.equal(service.isLearnedKnowledgeObservable(alchemyItem), false, 'and observability is not');
+  assert.equal(service._isLearnModeEnabled(alchemyItem), false);
+});
+
+test('1289 the learned-map accessors key on the SHARED constant, not a bare literal', async () => {
+  // Behavioural: the write lands where `getFabricateFlag` reads, at the constant's path.
+  const service = buildService();
+  const actor = new FakeActor({ id: 'a-key' });
+  await service._setLearnedMap(actor, { 'r-a': { learnedAt: 1, sourceItemUuid: null } });
+
+  assert.deepEqual(
+    actor.getFlag('fabricate', `fabricate.${LEARNED_RECIPES_FLAG_KEY}`),
+    { 'r-a': { learnedAt: 1, sourceItemUuid: null } },
+    'the persisted path is spelled by the shared constant'
+  );
+  assert.deepEqual(service._getLearnedMap(actor), { 'r-a': { learnedAt: 1, sourceItemUuid: null } });
+
+  // And a source pin, because the constant and the literal it replaced resolve to the SAME
+  // string: a regression to `'learnedRecipes'` would leave every behavioural test green
+  // while re-opening the two-spellings-of-one-persisted-key hazard the constant exists for.
+  assert.ok(
+    !/getFabricateFlag\(actor, 'learnedRecipes'/.test(VISIBILITY_SERVICE_SOURCE),
+    'no bare learned-recipes literal survives on the read side'
+  );
+  assert.ok(
+    !/setFabricateFlag\(actor, 'learnedRecipes'/.test(VISIBILITY_SERVICE_SOURCE),
+    'nor on the write side'
+  );
+});
+
+test('1289 C7 neither book learn path writes `granted` or `grantedBy`', async () => {
+  const system = buildUncappedLearnSystem({ consumeOnLearn: false });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const service = buildService({ system, recipes });
+
+  const bookA = new FakeItem({ uuid: 'Actor.a1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const ownedBookActor = new FakeActor({ id: 'a1', items: [bookA] });
+  assert.equal(
+    (await service.learnRecipeFromOwnedBook({ recipe: recipes[0], craftingActor: ownedBookActor })).success,
+    true
+  );
+
+  const bookB = new FakeItem({ uuid: 'Actor.a2.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const explicitLearnActor = new FakeActor({ id: 'a2', items: [bookB] });
+  assert.equal(
+    (await service.learnRecipe({
+      viewer: { isGM: false, id: 'user-1' },
+      recipe: recipes[1],
+      craftingActor: explicitLearnActor
+    })).success,
+    true
+  );
+
+  for (const [label, actor, id] of [
+    ['learnRecipeFromOwnedBook', ownedBookActor, 'r-a'],
+    ['learnRecipe', explicitLearnActor, 'r-b']
+  ]) {
+    const entry = actor.getFlag('fabricate', 'fabricate.learnedRecipes')[id];
+    assert.deepEqual(
+      Object.keys(entry).sort(),
+      ['learnedAt', 'sourceItemUuid'],
+      `${label} writes the two-field book entry and nothing else`
+    );
+    assert.equal(entry.granted, undefined, `${label} must not claim a grant`);
+    assert.equal(entry.grantedBy, undefined, `${label} must not claim a grant label`);
+  }
+});
+
+test('1289 C7 craft-time auto-learn writes a null uuid but never `granted`', async () => {
+  // The other null-uuid writer, and the reason the display ladder needs a discriminant
+  // beyond the absent uuid.
+  const system = buildMockSystem({
+    id: 'system-1',
+    resolutionMode: 'alchemy',
+    visibilityMode: 'global',
+    alchemy: { learnOnCraft: true }
+  });
+  const recipe = buildMockRecipe({ id: 'r-brew', linkedRecipeItemUuid: null });
+  const service = buildService({ system, recipes: [recipe] });
+  const actor = new FakeActor({ id: 'a-brew' });
+
+  await service.learnRecipeOnCraft(recipe, actor);
+
+  const entry = actor.getFlag('fabricate', 'fabricate.learnedRecipes')['r-brew'];
+  assert.deepEqual(Object.keys(entry).sort(), ['learnedAt', 'sourceItemUuid']);
+  assert.equal(entry.sourceItemUuid, null, 'a null uuid, exactly as a grant writes');
+  assert.equal(entry.granted, undefined, 'and no `granted`, which is what tells the two apart');
+});
+
+test('1289 C7 a node carrying only `granted` does not read as an ENTRY', async () => {
+  // `learnedAt`/`sourceItemUuid` stay the sole markers, so no migration touches the existing
+  // corpus and a stray `granted` cannot make a container read as a learned recipe.
+  const onlyGranted = readLearnedRecipeEntries({ 'r-x': { granted: true } });
+  assert.equal(onlyGranted.has('r-x'), false, '`granted` alone is not an entry marker');
+
+  const onlyLabel = readLearnedRecipeEntries({ 'r-x': { grantedBy: 'mod' } });
+  assert.equal(onlyLabel.has('r-x'), false, 'nor is `grantedBy` alone');
+
+  // What such a node DOES read as, pinned rather than left to be rediscovered: the walk
+  // treats a scalar under a container as the pre-object `{ id: true }` legacy entry shape,
+  // so the field name surfaces as the trailing segment of a bogus id. Harmless — nothing
+  // resolves it to a recipe — but it is not "no keys at all", and a reader diffing these
+  // against the live corpus will see it as an orphan.
+  assert.deepEqual([...onlyGranted.keys()], ['r-x.granted']);
+
+  // A full granted entry, by contrast, reads whole and keeps both new scalars.
+  const granted = readLearnedRecipeEntries({
+    'r-x': { learnedAt: 3, sourceItemUuid: null, granted: true, grantedBy: 'downtime' }
+  });
+  assert.deepEqual(granted.get('r-x'), {
+    learnedAt: 3,
+    sourceItemUuid: null,
+    granted: true,
+    grantedBy: 'downtime'
+  });
+});

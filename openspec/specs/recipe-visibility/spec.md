@@ -256,7 +256,9 @@ Alchemy visibility is **reveal-not-gate**: `visibilityMode` selects which source
    - `restricted`/Manual — the per-recipe `access` grant admits the viewer (`_isRecipeVisibleByAccessGrant`).
 2. Discovery-by-brew reveal is unioned across ALL modes and is on a MATCHED SIGNATURE, decoupled from check success (issue 554):
    - `alchemy.learnOnCraft` DEFAULTS ON (issue 966): `_normalizeAlchemyConfig` reads `!== false`, so only an explicitly stored `false` disables it.
-Under `global` the learned map is the ONLY reveal source, so an off default left the most permissive-sounding mode revealing nothing to any player; `systemValidation` raises the non-blocking `alchemyGlobalNoDiscovery` warning for a `global` alchemy system that turns it off.
+Under `global` the learned map is the ONLY reveal source, so an off default left the most permissive-sounding mode revealing nothing to any player **except a recipe a GM grants**; `systemValidation` raises the non-blocking `alchemyGlobalNoDiscovery` warning for a `global` alchemy system that turns it off.
+`learnedRecipes` has TWO writers under `global` alchemy — `alchemy.learnOnCraft` and the GM Knowledge Grant below — because the alchemy reveal switch's `default:` arm reads the learned map unconditionally and `learnOnCraft` gates only the brew-discovery union.
+The warning is retained, and its GM-facing message is scoped to match rather than left asserting that no player will ever see a recipe: that claim is false in the same release that adds the way they can.
    - if `alchemy.learnOnCraft === true`, a matched-signature attempt writes `learnedRecipes` REGARDLESS of the check outcome — a passed OR failed Simple brew (and any matched Tiered brew) learns it; the recipe is then revealed under any mode.
    - if `alchemy.learnOnCraft !== true`, a brew writes nothing to `learnedRecipes`; `learnOnCraft` governs ONLY the brew-discovery union, not whether anything is revealed (a book/grant/learn under item/knowledge/Manual still reveals independent of `learnOnCraft`).
    - The write happens wherever the brew RESOLVES, which for a time-gated brew is the matured FINISH, not the START that armed the gate.
@@ -516,6 +518,9 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 1. If the recipe item's `caps.learn.consumeOnLearn === true`, consume selected item.
 2. Return the updated access state.
 
+An entry MAY additionally carry the optional scalars `granted` and `grantedBy` (see GM-Only Knowledge Grant).
+Neither book learn path ever writes either: a book-learned entry names the copy it was learned from, so claiming a grant beside a real `sourceItemUuid` would be a second, contradictory provenance.
+
 ### Learned-Entry Durability
 
 A learned entry **survives deletion of the copy it was learned from**.
@@ -523,7 +528,15 @@ A learned entry **survives deletion of the copy it was learned from**.
 Learned entries are therefore INDEPENDENT of currently-owned copies, and a surface presenting both MUST NOT couple the two lists.
 
 A UI surfacing learned knowledge MUST resolve the source display name through the recipe's **member recipe-item definition** when the copy is gone.
-The full ladder is: a still-owned copy's name, else the member definition's name rendered as "no longer owned", else the trailing uuid segment, else a "learned by crafting" statement for the `null` `sourceItemUuid` every `learnRecipeOnCraft` entry carries.
+
+The ladder is specified **by discriminant**, not by position, because two writers now produce a `null` `sourceItemUuid`.
+The three uuid-bearing rungs are reached only when `sourceItemUuid` is present: a still-owned copy's name, else the member definition's name rendered as "no longer owned", else the trailing uuid segment.
+When `sourceItemUuid` is absent, `granted === true` reads as **granted** — naming its `grantedBy` label when that is a usable string, and label-less otherwise — and everything else reads as learned by crafting.
+The two granted rungs carry **distinct kind values**, because that value is the surface's test hook and collapsing them would leave the label-less case unaddressable by any selector.
+A `grantedBy` alongside a uuid is ignored for display: a uuid-bearing entry has real book provenance and that provenance wins.
+
+The discriminant is `granted`, **not** the presence of a label.
+A label-less grant is an ordinary call — a caller with nothing meaningful to say is not made to invent something — and rendering it as learned by crafting would be exactly the false provenance the grant exists to remove.
 
 ### Recipe And System Id Constraint
 
@@ -743,6 +756,9 @@ Two alternatives are specifically excluded.
 `foundry.utils.flattenObject` is not the inverse of the expansion: it recurses to non-object leaves, so it yields `plainid.learnedAt` rather than `plainid`, no key reads as a recipe id, and every actor's whole map is deleted on any recipe deletion.
 Longest-prefix matching against the known recipe ids cannot find an **orphan** entry, whose id is by definition absent from that set — and orphans are the cascade's only input.
 A learned entry is therefore **scalar-only** by contract: a plain-object-valued field added to one would be walked as a nested recipe id and dropped from the entry view.
+That contract binds Fabricate's own writers and is retained unchanged; the reader does **not enforce it**.
+The entry-boundary walk excludes arrays from its nested-record test by design — a discovery entry's `fragments` is an array and an entry FIELD — so an array-valued field written directly to the flag by a third party survives into the entry view rather than being dropped.
+The flag is public and other modules can write it, so every consumer of an entry field MUST re-test its type at the point of use rather than trusting the contract.
 
 Reader-side repair is explicitly **best-effort**, because the id → storage mapping is not injective and some inputs lose data before any reader runs:
 
@@ -758,6 +774,53 @@ The complete fix is at the write boundary (see Recipe And System Id Constraint),
 
 `game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget })` is the GM API the Knowledge surface's per-character reset routes through — both grains, with and without `systemId` — and it remains available to macros and the console.
 It is explicitly GM-gated (a non-GM returns the `FABRICATE.Knowledge.Reset.GMOnly` outcome and never mutates), takes an `actorId` (never an actor uuid, resolved via `game.actors.get`; a missing actor returns `FABRICATE.Knowledge.Reset.NoActor`), delegates the scoped id set to `forgetLearnedRecipes` with `clearDiscovery: true`, and returns `{ success, message, messageData }` without throwing.
+
+### GM-Only Knowledge Grant
+
+`game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy })` grants a recipe's knowledge to one character with **no owned book required**.
+It exists because a downtime activity's reward is "you learned this by doing the work": every other write path onto `learnedRecipes` is anchored on a real owned recipe item, and none of them can serve a reward.
+
+It is GM-gated, resolves `actorId` through the same ownership gate the reset API uses, and **never throws** — it refuses in the same result shape it succeeds in.
+The gates run in the order **GM -> actor -> readiness**, and that order is normative: the readiness check throws, so it MUST run after the never-throwing refusals rather than before them, or a pre-ready non-GM call would throw where it returns a GM-only outcome today.
+
+The mutation itself is **not** a member of `RecipeVisibilityService` and MUST NOT be added to it.
+That service is handed out live, through a published accessor, with no gate of any kind; every write path on it is bounded by an owned book, a matched copy, a learn budget or a prerequisite, and this one is unbounded by design.
+Placing it there would make an unbounded, self-benefiting write reachable by any player from the console.
+It is a free function over injected seams instead, and it reaches no private member of the service.
+
+It enforces exactly **eight** preconditions — the caller is a GM, the actor resolves and the caller may act as it, the module is ready, the recipe resolves, its crafting system resolves, learned knowledge is **observable** on that system, `grantedBy` normalizes, and the recipe is not already known.
+It enforces **neither** book membership, owned-copy possession, Required Knowledge, nor the per-book character gate.
+The latter two are inert for a recipe with no member book; where a recipe is book-backed, the skip is the intended GM override — those gates exist for a reader *earning* knowledge from a book, and a GM who wants them enforced can decline to grant.
+
+#### Learned-Knowledge Observability
+
+**Learned-knowledge observability** is a distinct predicate from learn-mode and is a **sibling** of it, never a superset: the two disagree in both directions and MUST NOT be expressed in terms of one another.
+It is derived from the reveal evaluator arm by arm, so the two must be changed together.
+
+- Under `resolutionMode === "alchemy"` a learned entry is observable when `alchemy.learnOnCraft === true` — the brew-discovery union reveals under every mode — and otherwise under every resolved mode except `restricted` and `item`, which are the two arms that never consult the learned map.
+- Otherwise it is observable only when the resolved mode is `knowledge`.
+
+Two consequences are named rather than left to be rediscovered.
+A system with flat `visibilityMode: "knowledge"` and a residual `knowledge.mode: "item"` **is** observable, because the flat enum forces the `itemOrLearned` sub-mode; the learn gate reads that residual raw and refuses, which is the disagreement in one direction.
+Alchemy with `item` or `restricted` and craft-time auto-learn off is **not** observable, so a predicate widened by a blanket "or alchemy" disjunct would report a successful grant onto an entry no player can ever see, which is the disagreement in the other.
+
+A grant on a system failing the predicate **refuses and writes nothing**.
+
+#### Idempotency and the written entry
+
+A grant for an already-known recipe performs **no write** and answers `success: true`.
+The caller is an automation tick that may legitimately re-run, so a refusal would make a correct re-run read as a failure; the caller distinguishes *granted now* from *already knew* by the outcome, never by the boolean.
+Idempotency is decided through the **entry-boundary reader**, never a bare index, so a dot-expanded legacy id is not re-granted every call.
+
+The written entry is `{ learnedAt, sourceItemUuid: null, granted: true, grantedBy }` — four scalars, spread over the raw persisted map exactly as craft-time auto-learn spreads it, so no second write shape is introduced.
+
+- `granted` is written `true` and **never** `false`; absence means not granted, so no migration touches the existing corpus.
+- `grantedBy` is a trimmed string of at most 64 characters, or `null`.
+A non-string, or a string longer than 64 characters after trimming, is **refused**, never coerced or truncated — a truncated module id names a *different* module, which is the same class of lie as silently coercing an object.
+- Neither field is added to the entry-field marker set: `learnedAt` remains the sole marker, so a node carrying only `granted` or only `grantedBy` does not read as an entry.
+
+The field is named `grantedBy` and not `source` because `source*` on a learned entry already means **the book**.
+A bare `source` beside `sourceItemUuid`, `sourceOwned`, `sourceItemName` and the rest would read as a sixth book-provenance field, which is the false provenance this capability exists to remove.
 
 ### Auto-Relearn Semantics
 
