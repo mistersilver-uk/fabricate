@@ -446,8 +446,15 @@ The payload names the crafting system, the component, the authored complication,
   **Any ownership predicate whose first disjunct reads `isOwner` is INERT on a GM-side apply path**, because `isOwner` resolves against the ambient user and is unconditionally true for a GM on every document in the world; such a predicate would pass for a sender who owns nothing and would never consult the sender at all.
 - The speaker and the acting actor are resolved GM-side from the addressing, never read from the payload.
 - Inbound deliveries are rate limited per sender, applied LAST so a malformed or unauthenticated message never consumes a sender's budget, and charged per MESSAGE rather than per complication.
-- One message carries a whole resolution's complications, and a bulk salvage of any size emits exactly ONE message.
-  Per-row emits would collide with that rate limit head-on and would silently refuse the tail of a long run on a path the player never sees.
+- **A message is addressed to ONE crafting system and ONE actor, so the unit of relay is the addressed `(craftingSystemId, actorUuid)` pair, not the run.**
+  Both are authorization inputs — the GM re-reads the authored complication from that system's record and re-authorizes that actor against the attested sender — so neither can be carried per entry without moving the authorization decision onto the wire.
+- ONE resolution is therefore always exactly ONE message, however many complications it carries.
+  A **bulk salvage** relays one message per distinct addressed pair, which is exactly one for the ordinary run and is bounded above by the **25-target selection cap** (`ui-integration/spec.md` § Bulk Salvage Execution) in the worst case, where every selected row names a different actor or system.
+  What is forbidden is the PER-ROW emit: a run of N rows against one pair must relay once, not N times, or a long run silently loses its tail on a path the player never sees.
+- **The per-sender bound is sized against that worst case, not against the ordinary one.**
+  The legitimate ceiling in one window is the selection cap times the number of fully fanned-out runs a window can hold, plus headroom for deliberate one-at-a-time resolutions and for a collapsed crafting chain, which relays once per step.
+  A bound sized on "a bulk salvage of any size is one message" reopens exactly the silent tail loss this requirement exists to close, because two selection-capped multi-actor runs inside one window legitimately spend fifty units.
+  The refusal is silent to the player by construction — it is a GM-side drop of a narrative beat — so the bound must not be reachable by ordinary play; making a scripted flood useless is the only thing it is for.
 
 The residual abuse surface is stated precisely: an authenticated player can ask the GM to fire complications their own actors are eligible for, at the limiter's bound.
 That is a self-inflicted nuisance rather than privilege escalation.

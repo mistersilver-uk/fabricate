@@ -2535,13 +2535,17 @@ The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage E
   A cap applied to the salvage service alone would let a 40-row selection salvage 25 and destroy all 40, which puts the unbounded behaviour on the destructive path.
   The service keeps its own `bulkLimit` refusal as a defensive backstop that the selection bound makes unreachable through the UI.
 - A run may push older entries out of the 50-entry salvage history; the history is a convenience log, not an audit record.
-- **Component complications are collected onto the aggregate card and delivered ONCE for the whole run.**
+- **Component complications are collected onto the aggregate card and relayed in BATCH, never per row.**
   Each row is its own resolution and fires its own complications, but the run posts one aggregate card and **zero** per-row complication messages, while still running every row's macro.
-  The GM-side rate limit is sized on the stated assumption that a bulk salvage of any size relays one message (`recipes-and-steps/spec.md` § Complication Macros), so a per-row relay would silently lose the tail of a long run on a path the player never sees.
-  Batching also fixes the relay ordering and reduces the de-duplication to one key rather than one per row.
+  The batch is keyed on the addressed `(craftingSystemId, actorUuid)` pair, which is the relay's unit because both are GM-side authorization inputs (`recipes-and-steps/spec.md` § Complication Macros).
+  An ordinary run addresses one pair and relays **one** message; a run that spans actors or systems relays one per distinct pair, bounded above by the 25-target selection cap stated above.
+  A per-row relay is what is forbidden: it would silently lose the tail of a long run to the GM-side rate limit, on a path the player never sees.
+  Batching also fixes the relay ordering and reduces the de-duplication to one key per pair rather than one per row.
   The collection rides the BULK CARD model rather than a run record, because a bulk salvage is not one run: each row has its own.
-- The aggregate card's player-facing complication block is a **forecast group card**, titled by a count of what could fire, drawn from the player forecast projection, and hidden after the run commits.
-  It is a group card rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
+- The aggregate card's complication block is a **flat fired-complications section on the posted chat card**, rendered by the one renderer all four card builders share and carrying every row's FIRED complications in run order, each attributed by component name because a bulk card lists many components.
+  It is **not** a forecast and has no hidden state: the card is written after the run has committed, from the already-redacted player-visible set (`publicComplications`), so a `gmOnly` complication cannot reach it even when a GM is the acting user.
+  The entries are deliberately **not** de-duplicated across rows: each row is its own resolution, and collapsing two rows that fired the same complication would under-report what happened.
+  The pre-run **forecast** group card is a different surface on a different screen — see § Player Salvage Surface, _Bulk complication forecast_ — and the two must not be conflated: a chat card posted after the commit cannot be "hidden after the run commits".
 - A bulk row acts on the **selected** participation when its card is the inspected one, and on the primary otherwise — the same acting-participation rule §Player Salvage Surface states for a single salvage.
 - The listing is **not** reloaded from document hooks while a run is in flight.
   Each item's own item CRUD would otherwise reload the listing under the open panel roughly once per item, since the change subscription's trailing debounce coalesces nothing across items that each take a roll, a message create and up to three flag writes.
@@ -3241,6 +3245,11 @@ The player's route to salvage.
   Certainty, not resolution mode: `simple` / `routed` / `progressive` is authoring vocabulary a player surface never uses, and the queue row already derives certainty from the row's own yield preview.
   The blocked-reason set and its first-match precedence are `essence`, `recipeItem`, `salvageDisabled`, the three `misconfiguredReason` values (`simpleMultiGroup` / `routedNoFormula` / `progressiveNoFormula`), `toolsUnavailable`, `depleted`.
   These are the already-normative ids rather than a second vocabulary, and a `toolsUnavailable` row names the missing tools.
+- **Bulk complication forecast.**
+  The bulk panel renders a pre-run **"What could go wrong"** block above the queue, titled by a count of what could fire and drawn from the player **forecast** projection, exactly as the prototype draws it.
+  It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
+  It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
+  The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.
 - **Bulk yield preview.**
   The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.
   A no-check `simple` row's results are **guaranteed**; a checked `simple` row's same results are **possible**.

@@ -1267,25 +1267,25 @@
     },
     "Chat": {
       "Complications": "Complications",
-    "GmComplication": {
-      "Title": "Complications (GM only)",
-      "Actor": "Actor",
-      "ReportedBy": "Reported by",
-      "Unverified": "Reported by the acting client",
-      "Stage": "Stage",
-      "EffectRoll": "Effect roll",
-      "EffectRollFailed": "Effect roll failed",
-      "PlayerVisible": "Shown to the player",
-      "MacroSkipped": "Macro skipped: it does not resolve to a script macro",
-      "MacroFailed": "Macro failed \u2014 see the console",
-      "Bucket": {
-        "full": "Awarded",
-        "partial": "Partly awarded",
-        "halted": "Stopped here",
-        "unreached": "Never reached",
-        "skipped": "Skipped"
-      }
-    },
+      "GmComplication": {
+        "Title": "Complications (GM only)",
+        "Actor": "Actor",
+        "ReportedBy": "Reported by",
+        "Unverified": "Reported by the acting client",
+        "Stage": "Stage",
+        "EffectRoll": "Effect roll",
+        "EffectRollFailed": "Effect roll failed",
+        "PlayerVisible": "Shown to the player",
+        "MacroSkipped": "Macro skipped: it does not resolve to a script macro",
+        "MacroFailed": "Macro failed \u2014 see the console",
+        "Bucket": {
+          "full": "Awarded",
+          "partial": "Partly awarded",
+          "halted": "Stopped here",
+          "unreached": "Never reached",
+          "skipped": "Skipped"
+        }
+      },
       "CraftSuccess": "Crafting Successful",
       "CraftFailure": "Crafting Failed",
       "Actor": "Crafter",

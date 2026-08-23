@@ -483,10 +483,15 @@ Each stage in the ordered list lands in EXACTLY ONE bucket, and the partition is
 | `partial` | `partialResult`, the `partial`-mode tail award, which is itself a member of `awarded` |
 | `halted` | `haltedResult`: the one stage that stopped the loop and was not awarded |
 | `unreached` | every stage after the stop point — the halt, or the partial tail the loop stops on — which the loop never evaluated |
-| `skipped` | an invalid cost, derived over the WHOLE ordered list rather than the visited prefix |
+| `skipped` | a stage this classifier must not read as an outcome: an invalid cost, derived over the WHOLE ordered list rather than the visited prefix, OR a stage with no resolvable result id |
 
-Classification order is load-bearing twice: `skipped` is tested FIRST so an invalid cost sitting after the stop point is never read as `unreached`, and `partial` is tested before `full` because the tail award is a member of `awarded`.
-A stage with no resolvable result id falls through to `unreached`, because the partition must be total and the loop demonstrably did not award something it could not name.
+Classification order is load-bearing three times: the id-less test runs FIRST OF ALL, because a stage with no resolvable result id is in none of the id sets the other four tests consult and would otherwise fall out of the bottom of the chain; `skipped` is tested next so an invalid cost sitting after the stop point is never read as `unreached`; and `partial` is tested before `full` because the tail award is a member of `awarded`.
+
+**A stage with no resolvable result id is `skipped`, and MUST NOT be `unreached`.**
+The partition must be total, so an id-less stage has to land somewhere, and `skipped` is the one bucket that contributes to nothing.
+`unreached` is the worst reading available: the award loop pushes a result into `awarded` whatever its id, and only the id set drops the id-less ones, so an id-less stage the loop DID award would classify as `unreached` and fire a `stageMissed` complication naming a component the player is holding.
+The loop can and does award a result it cannot name; it is this classifier that cannot recognise it afterwards, and a complication must fail toward silence rather than toward accusing the player of a miss.
+`_normalizeSalvageResult` mints an id for every salvage result, so no shipped path reaches this today — but this spec contemplates an id-less progressive result, so the branch is specified rather than left to fall through.
 
 `halted` and `unreached` stay DISTINCT even though the `stageMissed` clause below unions them, so a later change can offer "only the stage you nearly reached" without reopening this model, and so an output can say which of the two it was.
 
