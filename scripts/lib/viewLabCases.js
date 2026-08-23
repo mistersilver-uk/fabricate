@@ -5005,6 +5005,38 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
     ],
+    // THE PER-STAGE COMPLICATION BAND (issue 1286) IS ASSERTED HERE RATHER THAN GIVEN ITS OWN
+    // CASE, and the reason is mechanical: `SalvageProgressiveBody` passes `complications` on
+    // every render (`resolved ? 'resolved' : 'forecast'`) rather than behind an opt-in, so this
+    // frame ALREADY draws the band. A second case would have had to repeat this case's query and
+    // steps exactly, and identical inputs produce a byte-identical PNG — a duplicate frame
+    // published under a second name, which is what `no two cases claiming exact reach produce the
+    // same frame` exists to stop being done deliberately. What the band actually lacked was an
+    // ASSERTION: `expectSelector` is the only claim the capture driver checks before it
+    // photographs, and this case had none at all.
+    //
+    // Three claims, of which the second is the one that is easy to lose:
+    //
+    //   1. stage 2 (`hb-salv-alembic-r2`, Ground Reagent) carries the band in its FORECAST tense,
+    //      naming `hb-comp-dust-cloud` — the row's copy, not merely a container;
+    //   2. stage 1 (`hb-salv-alembic-r1`, Empty Vial) carries NO band. Its absence is invisible in
+    //      a screenshot review and is the whole rule: the row-structure flip is
+    //      gated on the band having CONTENT for that stage rather than on the extension being
+    //      passed, and a presence gate would re-skin every progressive stage row in every world —
+    //      including the overwhelming majority whose components author no complications;
+    //   3. `hb-comp-dust-spoiled` appears NOWHERE. It is `gmOnly`, it is enabled for salvage, and
+    //      it fires on this very component, so it is the disclosure guarantee in the one frame a
+    //      player reads.
+    //
+    // The reorderable stage list this case is named for is unaffected: the band is drawn INSIDE
+    // the stage row, so the counterpart's own condition still holds around it.
+    expectSelector:
+      '[data-inventory-salvage-panel="progressive"]' +
+      ':has([data-progressive-stage="hb-salv-alembic-r2"] ' +
+      '[data-progressive-stage-complications][data-progressive-stage-complication-tense="forecast"] ' +
+      '[data-progressive-stage-complication="hb-comp-dust-cloud"])' +
+      ':has([data-progressive-stage="hb-salv-alembic-r1"]:not(:has([data-progressive-stage-complications])))' +
+      ':not(:has([data-progressive-stage-complication="hb-comp-dust-spoiled"]))',
   }),
   playerCase({
     id: 'player-salvage-no-check',
@@ -5289,10 +5321,37 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     // Progressive is the one mode that honours a player's saved stage order, so this is also
     // the frame that carries the footer's reorder note.
+    //
+    // AND THE "WHAT COULD GO WRONG" BLOCK (issue 1286), asserted here rather than in a case of
+    // its own. The block renders whenever a queued entry publishes a forecast, and the Cracked
+    // Alembic's stages produce Ground Reagent and Frostcap Mushroom — the world's two
+    // complication-bearing components — so this frame already draws it. A separate case would
+    // have repeated these steps exactly and published the same PNG twice.
+    //
+    // THE POSITIONS ARE PINNED BY VALUE, and the gap between them is the claim. `position`
+    // counts EVERY stage in the player's order, not the complication-bearing ones: the alembic's
+    // authored stages are Empty Vial (1, authors none), Ground Reagent (2) and Frostcap Mushroom
+    // (3), so the rows are numbered 2 and 3 with 1 absent. A dense 1..N would name rows the
+    // single-item panel does not have, and only a value assertion can tell the two apart.
+    //
+    // NO ORDER NOTE, and its absence is asserted. Nothing has reordered this list, and a player
+    // who MAY arrange it and has not is reading the GM's order — `orderIsPlayers` is derived from
+    // the rendered order differing from the authored one and never from the reorder permission,
+    // which this very frame proves is granted (the footer's own reorder note is above). The
+    // presence half is `player-inventory-bulk-complications-reordered`.
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])' +
-      ':has([data-inventory-bulk-reorder-note])',
+      ':has([data-inventory-bulk-reorder-note])' +
+      ':has([data-inventory-bulk-complications] [data-inventory-bulk-complication-count])' +
+      ':has([data-inventory-bulk-complication-group="lab-herbalism:hb-cracked-alembic"] ' +
+      '[data-inventory-bulk-complication-position="2"] ' +
+      '[data-inventory-bulk-complication="hb-comp-dust-cloud"])' +
+      ':has([data-inventory-bulk-complication-position="3"] ' +
+      '[data-inventory-bulk-complication="hb-comp-frostcap-shatter"])' +
+      ':not(:has([data-inventory-bulk-complication-position="1"]))' +
+      ':not(:has([data-inventory-bulk-complication-order]))' +
+      ':not(:has([data-inventory-bulk-complication="hb-comp-dust-spoiled"]))',
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -5313,6 +5372,67 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-inventory-bulk-queue-row="lab-smithing:sm-longsword"])' +
       ':has([data-inventory-bulk-queue-row="lab-runework:rw-slag"])' +
       ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])',
+  }),
+  // THE ONE COMPLICATION STATE NO EXISTING FRAME REACHES (issue 1286).
+  //
+  // Every other player complication surface this feature ships is already photographed, because
+  // both progressive bodies pass the band on every render and the bulk block draws itself
+  // whenever a queued entry publishes a forecast — so `player-salvage`,
+  // `player-crafting-progressive*` and `player-inventory-bulk-mode-progressive` all show the new
+  // markup and now assert it. The forecast NUMBERED AGAINST THE PLAYER'S OWN ORDER is the
+  // exception: it needs a stage list the player has actually rearranged, and no case had ever
+  // moved a SALVAGE stage.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-complications-reordered',
+    label: 'Player app — Inventory bulk complications, reordered stage list',
+    // The order note and the renumbering are ONE fact and are photographed together, because
+    // neither means anything alone: the note is the sentence that makes the numbers readable
+    // ("the roll walks the list in this order"), and the numbers are what the sentence is about.
+    //
+    // The sequence: inspect the Cracked Alembic, open its salvage panel, move its FIRST stage
+    // down one, then shift-click a second card to enter a bulk selection — which promotes the
+    // inspected card into it, so the queue holds both.
+    //
+    // The move is what makes `orderIsPlayers` true. It is derived from the rendered order
+    // DIFFERING from the authored one, never from `allowPlayerResultReorder`: a player who may
+    // arrange the list and has not is reading the GM's, and `player-inventory-bulk-mode-progressive`
+    // is the frame that pins that permission alone leaves the note off.
+    //
+    // The renumbering is the assertion, and it is arithmetic rather than decoration. Authored,
+    // the alembic's stages are Empty Vial (1), Ground Reagent (2), Frostcap Mushroom (3) and the
+    // complication rows sit at 2 and 3. After the first stage moves down the order is Ground
+    // Reagent, Empty Vial, Frostcap Mushroom — so the SAME two rows are numbered 1 and 3, the gap
+    // has moved to 2, and a block that had re-derived its positions from its own row list rather
+    // than reading them off the entry would print 1 and 2 both before and after.
+    //
+    // The Air Shard is the second card for the reason `player-inventory-bulk-report` picks it: it
+    // is salvageable and page-one, and it salvages under SMITHING, which is `simple` and has no
+    // stages at all. So the queue is two rows and the block is exactly ONE group — which is also
+    // the strongest available claim that the block groups by queued ENTRY rather than by queue
+    // row. A two-group frame is unreachable and that is a fixture fact rather than an oversight:
+    // progressive is a per-SYSTEM mode, herbalism is the world's only progressive system, and it
+    // holds exactly two salvageable components — this one, and the Air Shard's herbalism half,
+    // which is never the acting participation of the collapsed multi-system card.
+    //
+    // NO PAGE-SIZE STEP, deliberately: both of these cards are page-one at the default 25, which
+    // `player-inventory-bulk-roll-prompt` and `-report` already rely on with the same pair.
+    steps: [
+      { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-progressive-stage-move-down]' },
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+    ],
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-complication-group="lab-herbalism:hb-cracked-alembic"] ' +
+      '[data-inventory-bulk-complication-order])' +
+      ':has([data-inventory-bulk-complication-position="1"] ' +
+      '[data-inventory-bulk-complication="hb-comp-dust-cloud"])' +
+      ':has([data-inventory-bulk-complication-position="3"] ' +
+      '[data-inventory-bulk-complication="hb-comp-frostcap-shatter"])' +
+      ':not(:has([data-inventory-bulk-complication-position="2"]))' +
+      ':not(:has([data-inventory-bulk-complication="hb-comp-dust-spoiled"]))',
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -6027,6 +6147,30 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
+    // The crafting half of the per-stage complication band (issue 1286), asserted on the frame
+    // that already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
+    // `complications="forecast"` unconditionally, so all four `player-crafting-progressive*`
+    // frames render the band, and a fifth case sharing this case's query and steps would publish
+    // a byte-identical PNG under a second name.
+    //
+    // CRAFTING IS FORECAST-ONLY, and the tense token here is the assertion of it. The fired
+    // record is defined on the salvage RUN record and the immediate crafting path writes no run,
+    // so `CraftingListingBuilder` marks nothing fired and no crafting stage can ever claim a
+    // complication happened. A `fired`/`resolved` tense appearing on this surface would be the
+    // panel inventing a resolution.
+    //
+    // Addressed by COMPLICATION id and never by stage id: `hb-r-stillroom`'s result entries
+    // author no explicit ids, so `_normalizeRecipeResult` mints a fresh one on every lab boot and
+    // a `[data-progressive-stage="…"]` selector could never be written for this recipe. (The
+    // salvage cases can use stage ids because `CRACKED_ALEMBIC_STAGE_IDS` authors them.) The
+    // `gmOnly` exclusion is pinned here too — the redaction is per-activity, and
+    // `hb-comp-dust-spoiled` is enabled for crafting as well as salvage.
+    expectSelector:
+      '[data-recipe-mode="progressive"]' +
+      ':has([data-recipe-section="progressive-stages"] ' +
+      '[data-progressive-stage-complications][data-progressive-stage-complication-tense="forecast"] ' +
+      '[data-progressive-stage-complication="hb-comp-dust-cloud"])' +
+      ':not(:has([data-progressive-stage-complication="hb-comp-dust-spoiled"]))',
   }),
   playerCase({
     id: 'player-crafting-progressive-reordered',
