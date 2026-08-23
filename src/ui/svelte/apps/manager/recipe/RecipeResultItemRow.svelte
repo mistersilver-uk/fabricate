@@ -318,6 +318,7 @@
       {#each stageComplications as complication (complication.id)}
         <ComplicationSummaryRow
           variant="readonly-gm"
+          nameEmphasis="inline"
           name={complication.name}
           severity={complication.severity}
           severityLabel={severityLabel(complication.severity)}

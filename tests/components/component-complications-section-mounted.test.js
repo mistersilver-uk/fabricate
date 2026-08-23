@@ -728,6 +728,45 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'and the fallback when the host passes no mint is Foundry’s own id generator'
     );
   });
+
+  it('renders the DISPLAY emphasis by default, which is the accordion’s', async () => {
+    const { target } = await mountSection({ complications: [complication()] });
+    const nameEl = target.querySelector('.fab-complication-row-name');
+    assert.ok(nameEl.classList.contains('is-display'), 'the accordion row keeps the serif name');
+    assert.equal(nameEl.classList.contains('is-inline'), false);
+  });
+
+  it('draws the effect roll’s LABEL in prose, not in the expression’s mono face', async () => {
+    // The label borrowed `.fab-complication-expression` for its flex sizing and inherited the
+    // mono face with it. A label is the sentence a GM writes for the chat card; only the dice
+    // expression beside it is an expression.
+    const { target } = await mountSection({
+      complications: [complication({ effectRoll: { enabled: true, expr: '1d6', label: '' } })],
+    });
+    await openFirstRow(target);
+    const label = target.querySelector('[data-complication-effect-roll-label]');
+    const expression = target.querySelector('[data-complication-effect-roll-expr]');
+    assert.equal(
+      label.classList.contains('fab-complication-expression'),
+      false,
+      'the label does not wear the expression class'
+    );
+    assert.ok(
+      expression.classList.contains('fab-complication-expression'),
+      'the expression beside it still does — which is what keeps this from being vacuous'
+    );
+
+    assert.doesNotMatch(
+      blockIn(sectionSource, '.fab-complication-effect-label'),
+      /font-family/,
+      'the label names no face and inherits the host sans'
+    );
+    assert.match(
+      blockIn(sectionSource, '.fab-complication-expression'),
+      /font-family:\s*var\(--fab-font-mono\)/,
+      'and the expression keeps mono'
+    );
+  });
 });
 
 /**
@@ -856,6 +895,81 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
       dirtyEvents.at(-1),
       false,
       'the baseline is the cloned persisted list, so add-then-remove re-equals it'
+    );
+  });
+});
+
+/*
+ * THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT, and the effect roll's LABEL is not
+ * an expression. Both are the same failure seen twice: a declaration that reads as belonging
+ * to the element it is on, while the element is shared with a context that wants the other
+ * value.
+ *
+ * `ComplicationSummaryRow` serves SIX call sites. The prototypes draw its name two ways —
+ * the Component Studio's accordion in the serif display face at 12.5px, and both GM
+ * read-only strips in the host sans, smaller — so the row carried one of the two and the
+ * other two screens drifted from a single root cause. The fix is a prop, not a call-site
+ * override: an override would put the treatment in the consumer's stylesheet, where the next
+ * consumer cannot find it and the primitive still claims to own it.
+ *
+ * The `fontFamily` axis is why these are pinned in SOURCE: the harness mounts markup, not a
+ * stylesheet, and a face is exactly what happy-dom cannot compute. The part a DOM CAN answer
+ * — which class each context renders, and which class the label does not wear — is asserted
+ * mounted, in the suite above that owns the harness.
+ */
+describe('1286 the complication row exposes its name treatment, and prose is not mono', () => {
+  const componentEditViewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    'utf8'
+  );
+  const recipeResultRowSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte'),
+    'utf8'
+  );
+
+  it('states no face and no size on the shared name, only on its two emphases', () => {
+    const base = blockIn(summaryRowSource, '.fab-complication-row-name');
+    assert.doesNotMatch(
+      base,
+      /font-family|font-size/,
+      'the base rule carries the ink, the weight and the leading — never one context’s face'
+    );
+
+    const display = blockIn(summaryRowSource, '.fab-complication-row-name.is-display');
+    assert.match(display, /font-family:\s*var\(--fab-font-serif\)/);
+    assert.match(display, /font-size:\s*12\.5px/);
+
+    const inline = blockIn(summaryRowSource, '.fab-complication-row-name.is-inline');
+    assert.match(inline, /font-size:\s*11\.5px/);
+    assert.doesNotMatch(
+      inline,
+      /font-family/,
+      'a strip name takes the HOST face, which is inherited rather than named: this ' +
+        'repository ships serif and mono tokens and no sans one'
+    );
+  });
+
+  it('has both GM read-only strips ASK for the inline treatment', () => {
+    // Read at the call sites, because "the prop exists" and "the drift is fixed" are two
+    // different claims and only the second one is the finding. A prop nothing passes leaves
+    // both strips exactly as they were.
+    for (const [name, source] of [
+      ['the Component Studio salvage strip', componentEditViewSource],
+      ['the Recipe Studio stage strip', recipeResultRowSource],
+    ]) {
+      assert.match(
+        source,
+        /<ComplicationSummaryRow\s+variant="readonly-gm"\s+nameEmphasis="inline"/,
+        `${name} passes the inline emphasis`
+      );
+    }
+
+    // Non-vacuity: the ACCORDION deliberately passes nothing and takes the default, so the
+    // scan above cannot be passing because every call site spells the prop.
+    assert.doesNotMatch(
+      sectionSource,
+      /nameEmphasis/,
+      'the authoring section relies on the default, which is the treatment it already had'
     );
   });
 });

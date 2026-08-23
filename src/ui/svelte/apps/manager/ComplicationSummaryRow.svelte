@@ -40,6 +40,21 @@
   Props:
    - variant: `authoring` (Component Studio), `readonly-gm` (both GM read-only strips) or
      `player`.
+   - nameEmphasis: `display` (default) or `inline`, the NAME's type treatment.
+     The prototypes draw the same row's name two ways and the difference is not derivable
+     from `variant`: an ACCORDION row's name is the heading of a thing you are about to
+     open, drawn in the serif display face at 12.5px, while a STRIP's name is one run of
+     metadata on a row about something else, drawn in the host sans at 11.5px. A shared
+     primitive that picked from `variant` would be hard-coding a treatment behind a
+     semantic flag — the next consumer wanting a strip-shaped row with a display name, or
+     an accordion with an inline one, would have no way to say so and would reach for a
+     call-site override, which is the drift this prop exists to prevent. `display` is the
+     default because it is what the one call site that existed first passes.
+     (The two GM strips' prototypes disagree by half a pixel — the Component Studio's
+     salvage strip draws 11px and the Recipe Studio's stage strip 11.5px. `inline` is one
+     treatment at 11.5px rather than two: a second emphasis for half a pixel between two
+     separately-drawn prototype documents would make this prop unusable for the reason it
+     was added.)
    - severity / severityLabel: the `minor | major | severe` token and its localized word.
    - visibility: `gmOnly | visible`. The Player pill renders on the GM variants only — a
      player being told "you can see this" is noise, and on a GM screen it is the fact that
@@ -57,6 +72,7 @@
 
   let {
     variant = 'authoring',
+    nameEmphasis = 'display',
     name = '',
     severity = 'minor',
     severityLabel = '',
@@ -109,7 +125,7 @@
     >
     <span class="fab-complication-row-copy">
       {#if eyebrow}<span class="fab-complication-row-eyebrow">{eyebrow}</span>{/if}
-      <span class="fab-complication-row-name">{name}</span>
+      <span class="fab-complication-row-name is-{nameEmphasis}">{name}</span>
       <!-- `title` carries the FULL string. The line ellipsises rather than wraps so the row
            height cannot move, which means a longer localized form is invisible past roughly
            sixty characters without it. -->
@@ -277,12 +293,26 @@
     text-transform: uppercase;
   }
 
+  /* Everything the two emphases SHARE. The axis they differ on is face and size; the ink,
+     the weight and the leading are the name's, not the treatment's. */
   .fab-complication-row-name {
     color: var(--fab-text);
-    font-family: var(--fab-font-serif);
-    font-size: 12.5px;
     font-weight: 600;
     line-height: 1.2;
+  }
+
+  /* The accordion's name: the heading of a row you are about to open. */
+  .fab-complication-row-name.is-display {
+    font-family: var(--fab-font-serif);
+    font-size: 12.5px;
+  }
+
+  /* A strip's name: one run of metadata on a row about something else, so it takes the
+     host sans — inherited rather than named, since this repository ships serif and mono
+     tokens and no sans token, and Foundry's own `--font-primary` is the face every other
+     unstyled run here already renders in. */
+  .fab-complication-row-name.is-inline {
+    font-size: 11.5px;
   }
 
   /* Clipped to one line so the row height cannot move under a long authored sentence. The

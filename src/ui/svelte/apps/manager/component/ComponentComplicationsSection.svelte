@@ -905,8 +905,13 @@
                     oninput={(event) =>
                       setNested(complication.id, 'effectRoll', 'expr', event.currentTarget.value)}
                   />
+                  <!-- NOT `.fab-complication-expression`: this field is the sentence the
+                       GM writes for the chat card ("Shrapnel damage"), and it borrowed the
+                       expression's class for its flex sizing and inherited the MONO face
+                       with it. A label is prose, so it takes the host sans; only the dice
+                       expression beside it is mono. -->
                   <input
-                    class="manager-input fab-complication-expression"
+                    class="manager-input fab-complication-effect-label"
                     type="text"
                     value={complication.effectRoll?.label || ''}
                     data-complication-effect-roll-label
@@ -1197,6 +1202,18 @@
 
   .fab-complication-expression.is-short {
     flex: 0 0 130px;
+  }
+
+  /* The effect roll's LABEL shares the expression's SIZING — it is the elastic field on the
+     same line — and not its face. Stated as its own rule rather than as an `is-*` modifier
+     on the expression, because "an expression that is not in the expression face" is a
+     contradiction a later reader would resolve the wrong way. The face is inherited rather
+     than named: this repository ships serif and mono tokens and no sans one, and the host
+     face is what every other unstyled run in this section already renders in. */
+  .fab-complication-effect-label {
+    flex: 1 1 180px;
+    min-width: 0;
+    font-size: 11.5px;
   }
 
   .fab-complication-comparator {
