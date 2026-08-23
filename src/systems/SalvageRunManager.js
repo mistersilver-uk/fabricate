@@ -113,6 +113,38 @@ export class SalvageRunManager extends RunContainerManagerBase {
     return this.updateRun(actor, run);
   }
 
+  /**
+   * Archive an active run to history with a terminal status and whatever the caller has
+   * to record about how it ended.
+   *
+   * ## The payload is NOT an allowlist, and one field now depends on that
+   *
+   * `...payload` is spread wholesale between the run and the authoritative status fields,
+   * so any key a caller passes lands on the persisted record and survives the
+   * flag round-trip — `_normalizeContainer` normalizes the CONTAINER, never the individual
+   * run records. That is a deliberate property of this class (the salvage `resultOrder`
+   * capture already relies on it) and it is what lets `salvage()` write
+   * `firedComplications` here rather than amending an archived entry afterwards, which
+   * this class offers no way to do (issue 1286).
+   *
+   * `firedComplications` is `[{resultId, componentId, complicationId, buckets}]` and is
+   * REDACTED BY THE CALLER, at the write, through `publicComplications`. That is not a
+   * caller courtesy this class could take over: the container is an actor flag replicated
+   * to every client with permission on the actor — for a player character, the owning
+   * player — so a `gmOnly` complication reaching this method has already leaked, whatever
+   * this method then does with it. Redacting on the way OUT would be too late and would
+   * also be the wrong shape, because history records are read straight off the flag by
+   * surfaces that never call back through here.
+   *
+   * A run that fired nothing player-visible carries no such key at all, matching the
+   * omitted-when-default doctrine the rest of the persisted shapes follow.
+   *
+   * @param {Actor} actor
+   * @param {object} run The active run being completed.
+   * @param {'succeeded'|'failed'|'cancelled'} [status]
+   * @param {object} [payload] Terminal evidence, spread verbatim onto the record.
+   * @returns {Promise<object>} the archived record.
+   */
   async completeRun(actor, run, status = 'succeeded', payload = {}) {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return run;

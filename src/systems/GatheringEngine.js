@@ -9,7 +9,7 @@ import {
   buildInteractiveRollOptions,
   promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
-import { planComplications } from '../utils/complicationPlan.js';
+import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -939,7 +939,7 @@ export class GatheringEngine {
           }
         : completedRun;
 
-    await this._commitTerminalSideEffects({
+    const { complications } = await this._commitTerminalSideEffects({
       viewer,
       actor,
       system,
@@ -963,6 +963,7 @@ export class GatheringEngine {
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications,
       initiatedBy: 'timed',
     });
   }
@@ -2822,7 +2823,7 @@ export class GatheringEngine {
       };
     }
 
-    await this._commitTerminalSideEffects({
+    const { complications } = await this._commitTerminalSideEffects({
       viewer,
       actor,
       system,
@@ -2844,6 +2845,7 @@ export class GatheringEngine {
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications,
     });
   }
 
@@ -3028,13 +3030,20 @@ export class GatheringEngine {
     // the run record, `response.createdResults` and the posted chat card. Gating only
     // this half would create items on the actor that all three report as zero — a state
     // an item-count-only assertion cannot detect — so the two read the SAME predicate.
+    //
+    // REDACTED AT THE SOURCE (issue 1286): the raw fired list never leaves this method.
+    // What comes back is `publicComplications`' output, so the caller — which threads it
+    // into the terminal response a player reads and into the chat card a player sees —
+    // has no unredacted list to thread by mistake, whatever the acting user's role is.
+    let complications = [];
     if (awardsResultsFor(outcome, system)) {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
       // Component complications (issue 1286), INSIDE the award gate and immediately after
       // the award: an outcome this predicate refuses awarded nothing, so its stages never
       // happened. Progressive attempts only — every d100 and routed outcome returns
       // without planning anything. The chat card is posted by the caller, after this.
-      await this._fireGatheringComplications({ actor, system, task, outcome });
+      const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+      complications = publicComplications(fired?.fired);
     }
     await this._applyTerminalTools({
       viewer,
@@ -3064,6 +3073,7 @@ export class GatheringEngine {
       environment,
       task,
     });
+    return { complications };
   }
 
   async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
@@ -3609,6 +3619,9 @@ export class GatheringEngine {
     createdResults,
     usedTools = [],
     checkResult,
+    // ALREADY REDACTED by `_commitTerminalSideEffects`, which applies `publicComplications`
+    // at the source (issue 1286). Nothing here re-filters, and nothing here may widen it.
+    complications = [],
     initiatedBy = 'immediate',
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
@@ -3639,6 +3652,10 @@ export class GatheringEngine {
       response.createdResults = createdResults;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
+      // Inside the opaque-blind guard with everything else a blind attempt withholds, and
+      // set only when something fired, so a transparent attempt with no complications
+      // returns exactly the response it did before this feature existed.
+      if (complications.length > 0) response.complications = complications;
 
       // Blind tasks are redacted; only post the rich summary for transparent runs.
       await this._postGatheringChatMessage({
@@ -3650,6 +3667,7 @@ export class GatheringEngine {
         usedTools,
         checkResult,
         run,
+        complications,
       });
     }
 
@@ -3705,6 +3723,10 @@ export class GatheringEngine {
    * @param {Array}   params.usedTools      - Tool breakage plan entries.
    * @param {object}  [params.checkResult]  - Outcome detail (events, items).
    * @param {object}  params.run            - Terminal run (carries economyEvidence).
+   * @param {Array}   [params.complications] - Fired component complications, ALREADY
+   *   redacted to the player-visible set by `_commitTerminalSideEffects` (issue 1286).
+   *   The component name each row shows is resolved here, against the same
+   *   `componentsById` index the awarded components use.
    * @private
    */
   async _postGatheringChatMessage({
@@ -3716,6 +3738,7 @@ export class GatheringEngine {
     usedTools,
     checkResult,
     run,
+    complications = [],
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -3774,6 +3797,13 @@ export class GatheringEngine {
           };
         });
 
+      const complicationRows = normalizeList(complications).map((entry) => ({
+        name: stringOrEmpty(entry?.name),
+        description: stringOrEmpty(entry?.description),
+        severity: stringOrEmpty(entry?.severity),
+        componentName: stringOrEmpty(componentsById.get(stringOrNull(entry?.componentId))?.name),
+      }));
+
       const content = buildGatheringChatContent(
         {
           status,
@@ -3782,6 +3812,7 @@ export class GatheringEngine {
           components,
           events,
           brokenTools,
+          complications: complicationRows,
           staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
           // A chat message is a permanent world document, so never state a node count
           // this client only guessed. When the depletion was relayed to the active GM

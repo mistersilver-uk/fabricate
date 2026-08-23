@@ -7,9 +7,18 @@
  * unit-testable without stubbing `game`/`ChatMessage`, mirroring the engine's
  * "resolve to plain models, then render" split. All image/name resolution
  * happens in the caller (GatheringEngine); this module only formats.
+ *
+ * The fired-complications block is the ONE thing this module takes from
+ * {@link module:src/systems/CraftingChatCard} (issue 1286). A complication row is the
+ * same row on all four cards, so a local copy here would be a fourth spelling of one
+ * `<li>` — the duplication the crafting card's exported atoms exist to prevent. The
+ * shared renderer is parameterised by BEM block, so it emits this card's own
+ * `fabricate-gather-chat` classes and needs no new CSS.
  */
 
 import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
+
+import { renderComplications } from './CraftingChatCard.js';
 
 const COMPONENT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 const EVENT_FALLBACK_IMG = DEFAULT_GATHERING_EVENT_IMG;
@@ -25,6 +34,9 @@ const CHAT_KEYS = Object.freeze({
   toolsBroken: 'FABRICATE.Chat.GatherToolsBroken',
   stamina: 'FABRICATE.Chat.GatherStamina',
   nodes: 'FABRICATE.Chat.GatherNodes',
+  // Deliberately NOT `Gather`-prefixed: a complication is the same object on every card
+  // and reads one shared heading key, on the `FABRICATE.Chat.Roll` precedent (issue 1286).
+  complications: 'FABRICATE.Chat.Complications',
 });
 
 // FontAwesome glyphs (Foundry bundles FA6) for the footer stat pills.
@@ -118,6 +130,9 @@ function renderStat(icon, label, value) {
  * @param {Array<{name:string,img:string}>}                 [model.brokenTools]
  * @param {number|null} [model.staminaSpent]
  * @param {number|null} [model.nodesRemaining]
+ * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
+ *   [model.complications] - Fired component complications, already redacted to the
+ *   player-visible set by the caller (issue 1286).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
  */
@@ -168,6 +183,14 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
       ? `<footer class="fabricate-gather-chat__footer">${stats.join('')}</footer>`
       : '';
 
+  // Above the stat footer and below the sections, matching the crafting and salvage
+  // cards' "what the award cost you, then what it did to you" order.
+  const complications = renderComplications({
+    entries: model.complications,
+    heading: loc(CHAT_KEYS.complications),
+    card: 'gather',
+  });
+
   return [
     `<div class="fabricate-gather-chat fabricate-gather-chat--${stateModifier}">`,
     '<header class="fabricate-gather-chat__header">',
@@ -175,6 +198,7 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
     `<div class="fabricate-gather-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     ...sections,
+    complications,
     footer,
     '</div>',
   ]

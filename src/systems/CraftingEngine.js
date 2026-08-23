@@ -19,7 +19,7 @@ import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollProm
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
-import { planComplications } from '../utils/complicationPlan.js';
+import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
@@ -232,6 +232,44 @@ function salvageCreatedResultRecord({ item, componentId }) {
     name: item.name ?? null,
     img: item.img ?? null,
   };
+}
+
+/**
+ * Narrow a resolution's fired complications to the four keys the SALVAGE RUN RECORD
+ * stores (issue 1286).
+ *
+ * ## Redaction happens HERE, at the write, and never at the read
+ *
+ * The container is `flags.fabricate.salvageRuns` on the ACTOR — a document replicated to
+ * every client with permission on it, which for a player character means the owning
+ * player. So the audience filter runs before the value is persisted, through
+ * `publicComplications`, and it is keyed on the AUDIENCE rather than on the acting user's
+ * role: a GM salvaging on a player's behalf must write exactly what a player salvaging
+ * for themselves would, or a `gmOnly` complication lands in a document that player can
+ * read and the whole GM-side socket path is defeated on the one path nobody tests.
+ *
+ * `publicComplications` returns three more keys than this (the authored strings the chat
+ * card renders); its contract permits a persisting caller to NARROW and forbids widening,
+ * and this narrows: the run record is a durable actor flag, and the player strip that
+ * reads it re-resolves the prose from the system record it already holds.
+ *
+ * `resultId` is required and is not redundant with `componentId`. The player's strip is
+ * per STAGE OCCURRENCE and a component may legitimately appear several times in one
+ * ordered list, so a `componentId`-only record would badge every occurrence of that
+ * component or none of them. `buckets` is a list rather than a scalar because `full`,
+ * `partial` and `stageMissed` can all be true at once for one component.
+ *
+ * @param {Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
+ * @returns {Array<{resultId: ?string, componentId: ?string, complicationId: ?string,
+ *   buckets: Array<string>}>}
+ */
+function salvageRunComplicationRecords(fired) {
+  return publicComplications(fired).map(({ resultId, componentId, complicationId, buckets }) => ({
+    resultId,
+    componentId,
+    complicationId,
+    buckets,
+  }));
 }
 
 /**
@@ -1406,7 +1444,7 @@ export class CraftingEngine {
       // exist and the run record is written — and BEFORE the card is posted, so the card
       // can report what fired. Progressive resolutions only; every other mode returns
       // without planning anything.
-      await this._fireCraftComplications({
+      const firedComplications = await this._fireCraftComplications({
         actor: craftingActor,
         recipe: executionRecipe,
         step,
@@ -1423,6 +1461,9 @@ export class CraftingEngine {
         createdResults: resultItems,
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
+        // Redacted inside the poster, which holds the system the component names resolve
+        // against. Null for every non-progressive craft (issue 1286).
+        firedComplications: firedComplications?.fired ?? null,
       });
 
       // Collapsed chain (issue 710): a non-final step just succeeded and the run is
@@ -2025,7 +2066,7 @@ export class CraftingEngine {
     // Component complications (issue 1286). The timed path reaches this point only
     // after the matured FINISH created its results and `completeStepSuccess` archived
     // the run, so the award is as committed here as it is on the immediate path.
-    await this._fireCraftComplications({
+    const firedComplications = await this._fireCraftComplications({
       actor: craftingActor,
       recipe: executionRecipe,
       step,
@@ -2042,6 +2083,7 @@ export class CraftingEngine {
       createdResults: resultItems,
       rollValue: rollTotalForCard(checkResult),
       tierStep: tierStepForCard(checkResult),
+      firedComplications: firedComplications?.fired ?? null,
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -5199,6 +5241,39 @@ export class CraftingEngine {
   }
 
   /**
+   * The PLAYER-SAFE chat rows for a resolution's fired complications (issue 1286).
+   *
+   * Two things happen here and both are the point of the method existing at all:
+   *
+   *  1. **Redaction.** `publicComplications` is the audience filter, and it is applied on
+   *     the way INTO the card rather than anywhere earlier, so the one place a fired list
+   *     becomes chat is the one place the filter has to be looked for. A `gmOnly`
+   *     complication has no row here on any client, INCLUDING a GM's: its card is created
+   *     by the elected GM over the socket, from that GM's own re-read of the authored
+   *     record, and never by the acting client's poster.
+   *  2. **Naming the occurrence.** `publicComplications` carries a `componentId`, not a
+   *     name — it is a projection of the complication, not of the system. The stage
+   *     occurrence's component name is resolved here, against the system the poster
+   *     already holds, because a player reading "you missed the iron ingot" on a card that
+   *     also granted an iron ingot cannot otherwise reconcile the two.
+   *
+   * @private
+   * @param {?Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
+   * @param {?object} system The owning crafting system, for the component-name lookup.
+   * @returns {Array<{name: string, description: string, severity: string,
+   *   componentName: string}>}
+   */
+  _complicationChatEntries(fired, system) {
+    const componentIndex = getDefinitionIndex(system?.components);
+    return publicComplications(fired).map((entry) => ({
+      name: entry.name,
+      description: entry.description,
+      severity: entry.severity,
+      componentName: findById(componentIndex, entry.componentId)?.name || '',
+    }));
+  }
+
+  /**
    * Post an automatic crafting summary chat message.
    *
    * Checks system.features.chatOutput; returns silently when the toggle is off or
@@ -5217,6 +5292,10 @@ export class CraftingEngine {
    *   or null when no check ran; the card renders it only when finite.
    * @param {object|null} [params.tierStep]        - Realized routed tier-step evidence
    *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
+   * @param {Array|null} [params.firedComplications] - The UNREDACTED fired list from this
+   *   resolution's `fireComplications` call, or null (issue 1286). Redacted here, at the
+   *   write, via {@link _complicationChatEntries}; an empty or absent list renders
+   *   nothing, so a system authoring no complications posts a byte-identical card.
    * @private
    */
   async _postCraftChatMessage({
@@ -5229,6 +5308,7 @@ export class CraftingEngine {
     failureReason,
     rollValue = null,
     tierStep = null,
+    firedComplications = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -5259,6 +5339,7 @@ export class CraftingEngine {
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
         tierStep,
         failureReason: failureReason || '',
+        complications: this._complicationChatEntries(firedComplications, system),
       },
       localize
     );
@@ -5385,6 +5466,12 @@ export class CraftingEngine {
    *   caller owns the chat output for this run — a bulk salvage posts ONE aggregated
    *   card and suppresses the per-item ones. Gated in the SAME place as
    *   `features.chatOutput` so there is one early return, not two.
+   * @param {Array|null} [params.firedComplications] - The UNREDACTED fired list from this
+   *   salvage's `fireComplications` call, or null (issue 1286). Redacted here via
+   *   {@link _complicationChatEntries}. Note the gate above covers it: `suppressed` and
+   *   `chatOutput` govern the whole card, and a suppressed bulk row's complications reach
+   *   the player on the AGGREGATE card instead. The MACRO is not gated by any of this —
+   *   it is not chat, and it runs GM-side over the socket regardless.
    * @private
    */
   async _postSalvageChatMessage({
@@ -5399,6 +5486,7 @@ export class CraftingEngine {
     rollValue = null,
     tierStep = null,
     suppressed = false,
+    firedComplications = null,
   }) {
     if (suppressed || !system || system.features?.chatOutput !== true) return;
 
@@ -5429,6 +5517,7 @@ export class CraftingEngine {
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
         tierStep,
         failureReason: failureReason || '',
+        complications: this._complicationChatEntries(firedComplications, system),
       },
       localize
     );
@@ -5711,7 +5800,10 @@ export class CraftingEngine {
    *   Defaults to false, which delivers per resolution — correct for a single salvage.
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string,
    *   salvageRun: object|null, cancelled?: boolean, misconfigured?: boolean,
-   *   waiting?: boolean, complicationRequests?: object[]}>}
+   *   waiting?: boolean, complicationRequests?: object[], complications?: object[]}>}
+   *   `complications` is the PLAYER-SAFE projection of what fired (issue 1286), present
+   *   only when something player-visible did. `complicationRequests` is its GM-side
+   *   counterpart and is addressing only; the two are never the same list.
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const deferComplicationDelivery = options?.deferComplicationDelivery === true;
@@ -6105,6 +6197,40 @@ export class CraftingEngine {
       checkResult,
     });
 
+    // Component complications (issue 1286): after the items are on the actor — the award
+    // is committed and a complication is strictly downstream of it — and before the card
+    // is posted. The FAILURE branch above has no such site and needs none: progressive
+    // salvage returns `[]` for a failed check, so there are no stages, no award and no
+    // candidates.
+    //
+    // It sits BEFORE the run completion rather than after it because `firedComplications`
+    // has to be written AT WRITE TIME, in the completion payload. `completeRun` moves the
+    // run out of `active` and into `history`, and there is no supported way to amend a
+    // history entry afterwards — so firing after it would force either a second, ad-hoc
+    // actor-flag write or a run record that never carries what fired. The award itself is
+    // untouched by the move: the items exist and the tools have broken by this line.
+    let complicationRequests = null;
+    let firedComplications = null;
+    if (complicationInputs) {
+      const fired = await this._fireComponentComplications({
+        activity: 'salvage',
+        actor,
+        craftingSystemId,
+        stages: complicationInputs.stages,
+        award: complicationInputs.award,
+        checkBreakage: this._resolveSalvageCheckBreakage(system),
+        checkResult,
+        deliver: deferComplicationDelivery !== true,
+      });
+      firedComplications = fired?.fired ?? null;
+      if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
+    }
+    // TWO redactions of one list, deliberately: the run record narrows to four durable
+    // keys, the return carries the seven a view-model renders. Both start from
+    // `publicComplications`, so neither can widen past the player audience.
+    const runComplications = salvageRunComplicationRecords(firedComplications);
+    const playerComplications = publicComplications(firedComplications);
+
     if (salvageRunManager && salvageRun) {
       salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
         consumedComponents: consumedItems.map(({ item, quantity }) => ({
@@ -6120,26 +6246,12 @@ export class CraftingEngine {
           data: checkResult.data || {},
         },
         failureReason: null,
+        // Spread conditionally so a salvage that fired nothing — which is every
+        // non-progressive salvage and most progressive ones — writes a record with no
+        // such key at all, exactly as it did before this feature existed. `completeRun`
+        // spreads its payload with NO allowlist, so the field persists once written.
+        ...(runComplications.length > 0 && { firedComplications: runComplications }),
       });
-    }
-
-    // Component complications (issue 1286): after the items are on the actor and the
-    // run is completed, before the card is posted. The FAILURE branch above has no such
-    // site and needs none — progressive salvage returns `[]` for a failed check, so there
-    // are no stages, no award and no candidates.
-    let complicationRequests = null;
-    if (complicationInputs) {
-      const fired = await this._fireComponentComplications({
-        activity: 'salvage',
-        actor,
-        craftingSystemId,
-        stages: complicationInputs.stages,
-        award: complicationInputs.award,
-        checkBreakage: this._resolveSalvageCheckBreakage(system),
-        checkResult,
-        deliver: deferComplicationDelivery !== true,
-      });
-      if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
     }
 
     // Salvage chat parity (issue 675): the same card crafting posts, reading as a
@@ -6161,6 +6273,7 @@ export class CraftingEngine {
       rollValue: rollTotalForCard(checkResult),
       tierStep: tierStepForCard(checkResult),
       suppressed: options?.suppressChat === true,
+      firedComplications,
     });
 
     return {
@@ -6171,6 +6284,11 @@ export class CraftingEngine {
       // construction: a GM request carries no name, description, macro uuid or
       // visibility, so there is nothing here for a player-facing surface to redact.
       ...(complicationRequests === null ? undefined : { complicationRequests }),
+      // The FIRED surface, and unlike the requests above it needs redacting — it is read
+      // by the player's own salvage view-model, so a `gmOnly` complication must not be
+      // here even when a GM is the acting user. Omitted entirely when nothing
+      // player-visible fired, so an unchanged caller sees an unchanged return.
+      ...(playerComplications.length > 0 && { complications: playerComplications }),
       // The rolled total, threaded top-level so the player summary can read it even on
       // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
       // a no-check simple salvage (nothing was rolled); a finite number otherwise.
