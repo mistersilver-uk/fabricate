@@ -11214,14 +11214,28 @@
   background: var(--fab-mv2-bg);
 }
 
-/* A recipe stage row that draws a complication strip becomes taller than its own line, and
-   `align-items: center` on the joined rule above would then centre the grip and the ordinal
-   against the WHOLE card rather than beside the line they label (issue 1286). This is
-   additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
+/* A recipe stage row that draws a complication strip hands its PADDING to the row's own
+   line (`.manager-recipe-stage-line`, in RecipeResultItemRow.svelte) and clips itself, so
+   the strip below can run edge to edge with its `border-top` acting as a card divider —
+   which is exactly how the prototype builds this card: `flex-direction: column;
+   overflow: hidden` with the padding on an inner top row and the band as its sibling.
+   Inset by the card's padding instead, the band's rule drew as a short line floating
+   inside the card rather than as a divider across it (issue 1286).
+
+   `overflow: hidden` is what keeps the band's warning fill inside the card's 8px radius.
+   It cannot clip the row's component picker: `SearchablePopover` portals its popover to
+   the manager host rather than rendering it in flow.
+
+   The grip and the ordinal moved INSIDE that line, so this no longer needs the
+   `align-items: flex-start` it once carried to stop them centring against the whole card —
+   they now centre against the line they label, which is what they always meant to do.
+
+   Additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
    and moves no existing stage row in either studio — the join above stays the one place
    the two surfaces share values. */
 .fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications) {
-  align-items: flex-start;
+  overflow: hidden;
+  padding: 0;
 }
 
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is

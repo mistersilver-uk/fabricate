@@ -98,7 +98,7 @@
 </script>
 
 <div
-  class="fab-complication-row is-{variant}"
+  class="fab-complication-row is-{variant} is-gravity-{gravity.tone}"
   class:is-expanded={expanded}
   data-complication-row={variant}
   {...hookAttributes}
@@ -177,15 +177,33 @@
     overflow: hidden;
   }
 
-  /* The OPEN border is the prototype's own: it takes the strong edge so an expanded row is
-     legible as the one being edited. Hover is the shipped manager's, not the prototype's —
-     the prototype declares no hover delta anywhere. */
-  .fab-complication-row.is-expanded {
+  /* The OPEN border is the row's own SEVERITY border, which is the prototype's rule:
+     `border: open ? sev.border : var(--border)`, with the three `sev.border` tokens the
+     severity tile below already carries. It is stated as three rules rather than one
+     `currentColor` trick because the tile's colour is the severity INK (`--fab-*`) and the
+     row's edge is the severity BORDER (`--fab-*-border`) — two different tokens per family.
+
+     It must not be `--fab-border-strong`: that is exactly what the hover below paints, so
+     an open row and a merely-hovered collapsed row would draw the identical edge and the
+     open one would be indistinguishable at rest.
+
+     Hover is the shipped manager's, not the prototype's — the prototype declares no hover
+     delta anywhere — and it is scoped to a COLLAPSED row for the same reason: an expanded
+     row keeps its gravity edge under the pointer instead of losing it. */
+  .fab-complication-row.is-authoring:not(.is-expanded):hover {
     border-color: var(--fab-border-strong);
   }
 
-  .fab-complication-row.is-authoring:hover {
-    border-color: var(--fab-border-strong);
+  .fab-complication-row.is-expanded.is-gravity-info {
+    border-color: var(--fab-info-border);
+  }
+
+  .fab-complication-row.is-expanded.is-gravity-warning {
+    border-color: var(--fab-warning-border);
+  }
+
+  .fab-complication-row.is-expanded.is-gravity-danger {
+    border-color: var(--fab-danger-border);
   }
 
   /* The two READ-ONLY strips are a tucked band rather than a card: no fill of their own, a

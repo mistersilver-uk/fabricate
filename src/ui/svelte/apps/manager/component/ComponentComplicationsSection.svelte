@@ -186,6 +186,32 @@
     return complications.filter((entry) => entry?.activities?.[activity] === true).length;
   }
 
+  /**
+   * A progressive activity pill's `title`, with the count the label suppresses.
+   *
+   * Three FULL key literals rather than one composed key with a `{count}` that also has to
+   * carry the plural: `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see
+   * written down, and the manager's own plural idiom is a sibling `…One` key chosen by
+   * `count === 1` (`ToolsBrowserView`, `ImportFolderMappingModal`).
+   */
+  function countTitle(label, count) {
+    if (count === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Component.Complications.ActivityProgressive',
+        '{activity} uses progressive resolution in this system.'
+      ).replace('{activity}', label);
+    }
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Manager.Component.Complications.ActivityProgressiveCountOne'
+        : 'FABRICATE.Admin.Manager.Component.Complications.ActivityProgressiveCount';
+    const fallback =
+      count === 1
+        ? '{activity} uses progressive resolution in this system — 1 complication.'
+        : '{activity} uses progressive resolution in this system — {count} complications.';
+    return text(key, fallback).replace('{activity}', label).replace('{count}', String(count));
+  }
+
   const headerPills = $derived(
     ACTIVITY_ORDER.map((activity) => {
       const progressive = isProgressive(activity);
@@ -198,22 +224,29 @@
         // the WARNING family, so "Salvage · n/a" would render amber and read as a hazard
         // the GM must act on rather than as a fact about the system.
         tone: progressive ? '' : 'muted',
+        // A ZERO is SUPPRESSED, on the prototype's own rule
+        // (`label + (on ? (n ? ' · ' + n : '') : ' · n/a')`): the pill's job on a
+        // progressive activity is to say the activity resolves progressively, and
+        // "Salvage · 0" spends a counter slot restating the empty state already drawn
+        // below it. The count earns the suffix only once there is one.
         label: progressive
-          ? text(
-              'FABRICATE.Admin.Manager.Component.Complications.ActivityCount',
-              '{activity} · {count}'
-            )
-              .replace('{activity}', label)
-              .replace('{count}', String(count))
+          ? count > 0
+            ? text(
+                'FABRICATE.Admin.Manager.Component.Complications.ActivityCount',
+                '{activity} · {count}'
+              )
+                .replace('{activity}', label)
+                .replace('{count}', String(count))
+            : label
           : text(
               'FABRICATE.Admin.Manager.Component.Complications.ActivityNone',
               '{activity} · n/a'
             ).replace('{activity}', label),
+        // The count the LABEL drops is not lost — the prototype's `title` keeps it
+        // ("… — 2 complications"), which is where a number belongs once the pill itself
+        // has stopped shouting it.
         title: progressive
-          ? text(
-              'FABRICATE.Admin.Manager.Component.Complications.ActivityProgressive',
-              '{activity} uses progressive resolution in this system.'
-            ).replace('{activity}', label)
+          ? countTitle(label, count)
           : text(
               'FABRICATE.Admin.Manager.Component.Complications.ActivityNotProgressive',
               '{activity} does not use progressive resolution in this system, so a complication enabled for it is stored but never fires.'
@@ -456,7 +489,7 @@
           <i class="fas fa-triangle-exclamation fab-complications-title-glyph" aria-hidden="true"
           ></i>{text('FABRICATE.Admin.Manager.Component.Complications.Title', 'Complications')}
         </h3>
-        <p class="manager-muted">
+        <p class="manager-muted fab-complications-hint">
           {text(
             'FABRICATE.Admin.Manager.Component.Complications.Hint',
             'What goes wrong when this component is produced as a stage of a progressive result — a progressive craft, salvage or gathering. A complication does not fire when this component is itself salvaged or spent.'
@@ -561,6 +594,7 @@
               <ComplicationEffectRow
                 control="switch"
                 on={complication.visibility === 'visible'}
+                onTone="accent"
                 icon="fas fa-eye"
                 tone={complication.visibility === 'visible' ? 'accent' : 'subtle'}
                 title={text(
@@ -606,10 +640,19 @@
                 {#each ACTIVITY_ORDER as activity (activity)}
                   {@const on = complication.activities?.[activity] === true}
                   {@const progressive = isProgressive(activity)}
+                  <!-- The CHOSEN state and the NOT-PROGRESSIVE state are two independent
+                       axes, exactly as the prototype composes them: its chip is
+                       `background: on ? accent-soft : surface-soft` with
+                       `opacity: prog ? 1 : .6` written OUTSIDE the `on` branch. Collapsing
+                       them into one ternary inverts the warning — the case worth flagging
+                       is an activity the GM HAS selected and the system will not resolve
+                       progressively, and a single ternary paints exactly that case at full
+                       accent strength while dimming the harmless unselected one. -->
                   <Chip
                     tag="button"
                     type="button"
-                    tone={on ? 'accent' : progressive ? '' : 'muted'}
+                    tone={on ? 'accent' : ''}
+                    class={progressive ? '' : 'is-not-progressive'}
                     icon={ACTIVITY_ICONS[activity]}
                     aria-pressed={on}
                     disabled={saving}
@@ -621,9 +664,13 @@
                         ).replace('{activity}', activityLabel(activity))}
                     data-complication-activity={activity}
                     onclick={() => toggleActivity(complication.id, activity)}
-                    >{activityLabel(activity)}{progressive
-                      ? ''
-                      : ` ${text('FABRICATE.Admin.Manager.Component.Complications.NotProgressive', '· not progressive')}`}</Chip
+                    >{activityLabel(activity)}{#if !progressive}<span
+                        class="fab-complication-activity-note"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Component.Complications.NotProgressive',
+                          '· not progressive'
+                        )}</span
+                      >{/if}</Chip
                   >
                 {/each}
               </div>
@@ -827,6 +874,7 @@
               <div class="fab-complication-rows">
                 <ComplicationEffectRow
                   control="switch"
+                  form="effect"
                   on={complication.effectRoll?.enabled === true}
                   icon="fas fa-dice-d6"
                   tone={complication.effectRoll?.enabled ? 'accent' : 'subtle'}
@@ -878,7 +926,7 @@
                 <div class="fab-complication-macro" data-complication-macro>
                   <ComplicationEffectRow
                     control="none"
-                    on
+                    form="effect"
                     icon="fas fa-code"
                     tone={complication.macroUuid ? 'accent' : 'subtle'}
                     title={text(
@@ -1002,11 +1050,26 @@
     justify-content: flex-end;
   }
 
+  /* The hint's MEASURE, from the prototype (`max-width: 460px`). Without it the sentence
+     runs the full width of the panel beside a right-aligned pill cluster, which at the
+     Studio's widths is a ~110-character line — roughly double a readable measure, and the
+     one thing a GM has to read before authoring anything here. */
+  .fab-complications-hint {
+    max-width: 460px;
+  }
+
+  /* NO vertical margin on either of these. The section root is `.manager-component-panel`,
+     which is `display: grid; gap: var(--fab-space-3)` — a grid gap and an item margin ADD,
+     so the 9px each of these used to carry rendered as 12 + 9 + 9 = 30px between the list
+     and the Add control while the EMPTY state measured 12 + 9 = 21px: one section
+     disagreeing with itself by 9px, and both two to three times the prototype's own 9px.
+     The panel's gap is the only rhythm here, and it is the same rhythm every sibling panel
+     in the Studio keeps. (The parity harness records no `margin` property, so nothing else
+     would ever have caught this.) */
   .fab-complications-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 9px;
   }
 
   .fab-complications-add {
@@ -1015,7 +1078,6 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-top: 9px;
     border-style: dashed;
   }
 
@@ -1041,6 +1103,32 @@
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
+  }
+
+  /* The NOT-PROGRESSIVE axis, applied on top of whichever tone the chip's chosen-ness gave
+     it. `opacity` is the prototype's own device and is the one property that composes with
+     a tone instead of replacing it — a second `is-*` tone could not, because a chip has
+     exactly one. `Chip.svelte` declares no `opacity`, so there is nothing here to lose a
+     cascade fight with, and the child combinator off this scoped container is what bounds
+     the `:global` to these three chips.
+
+     The selector deliberately does not spell the chip's own base class. The hand-rolled-
+     chip ratchet in `manager-layout.test.js` matches that class name ANYWHERE in a manager
+     component file — comments included — and it has reached empty; a styling hook that
+     wrote it would re-open a list whose whole value is that it can only shrink. */
+  .fab-complication-activity-chips > :global(.is-not-progressive) {
+    opacity: 0.6;
+  }
+
+  /* The annotation is its OWN run, not more of the chip's label: the prototype nests it as
+     `font: 400 9px; color: subtle` beside a 600-weight 11px chip. Concatenated into the
+     chip's text node it inherited the chip's weight and size, so "· not progressive" read
+     as part of the activity's NAME rather than as a note about it. */
+  .fab-complication-activity-note {
+    margin-left: 2px;
+    color: var(--fab-text-subtle);
+    font-size: 9px;
+    font-weight: 400;
   }
 
   /* The two grouped cards — When and Then — sit one step INSIDE the panel on the recessed

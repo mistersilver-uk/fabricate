@@ -564,12 +564,17 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  it('1286: the strip names its owning component, and is progressive-only', async () => {
+  it('1286: the strip COUNTS and names its owning component, and is progressive-only', async () => {
     const target = await harness.mount(complicatedProps());
+    // The COUNT leads, on the prototype's own rule
+    // (`list.length + ' complication' + s + ' on ' + component.name`). On a band the GM has
+    // not opened, the number is the half of that sentence worth reading — the component is
+    // already named by the row above and by this band's own Edit control — and a title that
+    // dropped it made every band look alike however much was hiding in it.
     assert.match(
       strips(target)[0].textContent,
-      /Complications on Scrap Metal/,
-      'the band states its subject rather than leaving it to adjacency'
+      /1 complication on Scrap Metal/,
+      'the band states how much it is hiding, and whose it is'
     );
     harness.remount();
 

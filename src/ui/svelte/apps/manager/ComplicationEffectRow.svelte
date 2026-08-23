@@ -35,12 +35,42 @@
      control, matching every other switch in the manager), or `none` (a row whose ON-ness is
      not a flag at all: the macro row is enabled by whether a macro is LINKED, and a switch
      beside a drop zone that already says so would be a second control for one fact).
+     `none` therefore has NO on-state: it never takes the enabled edge, and its `children`
+     are always revealed, because a row with no flag cannot be off.
    - on: whether the row is enabled. The revealed `children` strip renders ONLY when it is,
      which is the prototype's rule and is also what keeps a disabled effect's inputs out of
-     the tab order.
+     the tab order. Ignored when `control` is `none`, per above.
+   - form: the row's GEOMETRY — `condition` (the default) or `effect`. See the note below.
+   - onTone: what the ON state means — `neutral` (the default: chosen among peers) or
+     `accent` (a deliberate, singular choice). See the note below.
    - tone: the glyph's colour family — `danger`, `warning`, `success`, `accent`, `info` or
      `subtle` (the default). Colour only; it never changes the row.
    - label: the control's accessible name, falling back to `title`.
+
+  ## TWO GEOMETRIES, ONE PRIMITIVE (`form`)
+
+  The prototype draws its condition rows and its effect rows to two different specs: a
+  condition is `padding: 9px 11px`, radius 8, `align-items: flex-start`, and TRANSPARENT
+  until it is checked; an effect is `padding: 11px 12px`, radius 9, `align-items: center`,
+  and sits on `--bg1` whether it is on or not. They are not a rounding difference — an
+  effect row is a standing affordance inside the "Then" card, while a condition is one
+  item in a checklist, and the always-on fill is what says so. The right-hand switch also
+  centres against a two-line copy block rather than hanging at its top.
+
+  It is stated as a `form` PROP rather than derived from `control`, even though the two
+  correlate perfectly in this section today: "Tell the player" is a `switch` that is
+  neither of these shapes (the prototype makes it a 34px inline pill sharing a row with
+  Name and Severity), so deriving would have silently re-shaped it. Its pill geometry
+  remains a recorded deviation — this component draws it in the `condition` form.
+
+  ## `onTone` — WHAT AN ON STATE MEANS
+
+  `neutral` is "checked, like its peers": the strong edge and the raised fill, which is
+  what a list of conditions wants — five rows in the same treatment, and the chosen ones
+  legible as a set. `accent` is a SINGULAR choice the row exists to make, and the
+  prototype paints exactly one row that way: "Tell the player" is `accent-border` on
+  `accent-soft`. Under the neutral treatment it was indistinguishable from a ticked
+  condition, so "the player will be told" stopped reading as a decision the GM made.
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -48,6 +78,8 @@
   let {
     control = 'checkbox',
     on = false,
+    form = 'condition',
+    onTone = 'neutral',
     icon = '',
     tone = 'subtle',
     title = '',
@@ -65,6 +97,13 @@
   const toneClass = $derived(TONES.has(tone) ? `is-tone-${tone}` : 'is-tone-subtle');
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const accessibleName = $derived(label || title);
+  // A `none` row has no flag, so `on` is not its state — see the props note. Kept as two
+  // derivations rather than one because they answer different questions: whether the row
+  // is PAINTED as enabled, and whether its children are reachable.
+  const enabled = $derived(control !== 'none' && on === true);
+  const revealed = $derived(control === 'none' || on === true);
+  const formClass = $derived(form === 'effect' ? 'is-form-effect' : 'is-form-condition');
+  const onToneClass = $derived(onTone === 'accent' ? 'is-on-accent' : 'is-on-neutral');
 </script>
 
 <!-- The head's CONTENT is written once and rendered into whichever wrapper the control
@@ -109,8 +148,8 @@
 {/snippet}
 
 <div
-  class="fab-complication-effect"
-  class:is-on={on}
+  class="fab-complication-effect {formClass} {onToneClass}"
+  class:is-on={enabled}
   class:is-disabled={disabled}
   {...hookAttributes}
 >
@@ -119,7 +158,7 @@
   {:else}
     <div class="fab-complication-effect-head">{@render headContent()}</div>
   {/if}
-  {#if on && children}
+  {#if revealed && children}
     <div class="fab-complication-effect-reveal">{@render children()}</div>
   {/if}
 </div>
@@ -130,17 +169,41 @@
      `Chip.svelte` states the rule and the reason in full. */
   .fab-complication-effect {
     box-sizing: border-box;
-    padding: 9px 11px;
     border: 1px solid var(--fab-border);
+  }
+
+  /* A CONDITION: one item in a checklist. Transparent until it is checked, so the chosen
+     ones read as a set against the card behind them. */
+  .fab-complication-effect.is-form-condition {
+    padding: 9px 11px;
     border-radius: 8px;
     background: none;
   }
 
-  /* An enabled row lifts onto the raised surface and takes the stronger edge, so the set of
-     chosen conditions reads at a glance without reading each control. */
-  .fab-complication-effect.is-on {
-    border-color: var(--fab-border-strong);
+  /* An EFFECT: a standing affordance in the "Then" card, which is why it keeps its raised
+     fill whether it is on or off. Roomier and slightly rounder than a condition, and its
+     head centres — see the geometry note in the header. */
+  .fab-complication-effect.is-form-effect {
+    padding: 11px 12px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
+  }
+
+  /* An enabled row takes the stronger edge, so the set of chosen conditions reads at a
+     glance without reading each control; a condition also lifts onto the raised surface,
+     which an effect row is already sitting on. */
+  .fab-complication-effect.is-on.is-on-neutral {
+    border-color: var(--fab-border-strong);
+  }
+
+  .fab-complication-effect.is-form-condition.is-on {
+    background: var(--fab-bg-1);
+  }
+
+  /* The ACCENT on-state — see the `onTone` note in the header. */
+  .fab-complication-effect.is-on.is-on-accent {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
   }
 
   .fab-complication-effect-head {
@@ -148,6 +211,11 @@
     gap: 10px;
     align-items: flex-start;
     margin: 0;
+  }
+
+  .fab-complication-effect.is-form-effect .fab-complication-effect-head {
+    gap: 11px;
+    align-items: center;
   }
 
   /* Only the checkbox form makes the whole head a click target; the switch form's head is

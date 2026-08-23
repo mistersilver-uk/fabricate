@@ -823,6 +823,26 @@
       : null;
   }
 
+  /**
+   * The complication band's eyebrow: "2 complications on Coiled Mainspring".
+   *
+   * The COUNT is the half of that sentence worth reading on a collapsed band — the band
+   * already names the component in its Edit control, and the prototype leads with the
+   * number for exactly that reason. Two FULL key literals rather than one composed key,
+   * because `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written
+   * down, and the manager's plural idiom is a sibling `…One` key chosen by `count === 1`.
+   */
+  function stripTitle(count, componentId) {
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Manager.Component.Complications.StripTitleOne'
+        : 'FABRICATE.Admin.Manager.Component.Complications.StripTitle';
+    const fallback = count === 1 ? '1 complication on {name}' : '{count} complications on {name}';
+    return text(key, fallback)
+      .replace('{count}', String(count))
+      .replace('{name}', salvageComponentName(componentId));
+  }
+
   // ── The read-only complication strip under a progressive salvage row (issue 1286) ─────
   //
   // It draws the complications authored on the YIELD component the row REFERENCES, never
@@ -1564,10 +1584,7 @@
                       <div class="manager-salvage-stage-complications-head">
                         <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
                         <span class="manager-salvage-stage-complications-title"
-                          >{text(
-                            'FABRICATE.Admin.Manager.Component.Complications.StripTitle',
-                            'Complications on {name}'
-                          ).replace('{name}', salvageComponentName(result.componentId))}</span
+                          >{stripTitle(stageComplications.length, result.componentId)}</span
                         >
                         <!-- The ONLY route to changing any of this, exactly as the row's DC
                              badge above is: a complication belongs to the referenced

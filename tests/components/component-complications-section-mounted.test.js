@@ -37,6 +37,26 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sectionPath = 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte';
 const sectionSource = readFileSync(resolve(repoRoot, sectionPath), 'utf8');
+const summaryRowSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'),
+  'utf8'
+);
+
+/**
+ * The declaration body of one CSS rule in a component's scoped `<style>`.
+ *
+ * A component's own style block is the ONLY place some of these rulings are stated —
+ * spacing that no mounted assertion can read (the harness mounts markup, not a stylesheet)
+ * and that the visual-parity harness does not record either, because it measures no
+ * `margin` property. `manager-layout.test.js` reads `Chip.svelte`'s block the same way and
+ * for the same reason.
+ */
+function blockIn(source, selector) {
+  const start = source.indexOf(`${selector} {`);
+  assert.notEqual(start, -1, `expected a \`${selector}\` rule`);
+  const end = source.indexOf('}', start);
+  return source.slice(start, end);
+}
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -156,8 +176,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.doesNotMatch(
       hint,
       /world|setting|determined player|read/i,
-      'gmOnly is a DISCLOSURE guarantee; the confidentiality limit belongs in the spec, not '
-        + 'in a line of editor chrome that would read as a warning about this component'
+      'gmOnly is a DISCLOSURE guarantee; the confidentiality limit belongs in the spec, not ' +
+        'in a line of editor chrome that would read as a warning about this component'
     );
   });
 
@@ -188,6 +208,212 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       !pill('salvage').classList.contains('is-disabled'),
       'so the n/a pill must not carry that tone'
     );
+  });
+
+  // ── The header pills, the Applies-to chips, and the open row's edge ──────────────────
+  //
+  // Every one of these is a two-state signal whose WRONG state is the one that renders on
+  // the case the signal exists for, which is exactly the class of defect a screenshot of
+  // the happy path cannot show.
+
+  it('suppresses a ZERO on a progressive pill, and keeps the count in its title', async () => {
+    const { target } = await mountSection({
+      activityProgressive: { crafting: true, salvage: true, gathering: false },
+      // Enabled for crafting only, so salvage is progressive AND empty — the case the
+      // prototype writes as bare "Salvage", never "Salvage · 0".
+      complications: [complication()],
+    });
+    const pill = (activity) =>
+      target.querySelector(`[data-complications-activity-pill="${activity}"]`);
+    assert.match(pill('salvage').textContent, /Salvage/, 'the activity is still named');
+    assert.doesNotMatch(
+      pill('salvage').textContent,
+      /·/,
+      'a zero earns no counter — the empty state below already says there is nothing here'
+    );
+    assert.match(pill('crafting').textContent, /Crafting · 1/, 'a real count still shows');
+    // The count the label drops on the empty pill is not lost anywhere it matters: the
+    // title carries it, and agrees in number.
+    assert.match(pill('crafting').getAttribute('title'), /1 complication\b/);
+    assert.doesNotMatch(pill('crafting').getAttribute('title'), /1 complications/);
+    assert.doesNotMatch(
+      pill('salvage').getAttribute('title'),
+      /\d/,
+      'and an empty progressive activity states no number at all'
+    );
+  });
+
+  it('dims a NOT-PROGRESSIVE Applies-to chip whether or not the GM has chosen it', async () => {
+    // The prototype composes two INDEPENDENT axes on this chip: `background: on ?
+    // accent-soft : surface-soft`, and `opacity: prog ? 1 : .6` written OUTSIDE the `on`
+    // branch. Collapsed into one ternary the warning inverts — the case worth flagging is
+    // an activity the GM HAS selected and the system will not resolve progressively, and a
+    // single ternary paints exactly that one at full accent strength while receding the
+    // harmless unselected one.
+    const { target } = await mountSection({
+      activityProgressive: { crafting: true, salvage: false, gathering: false },
+      complications: [
+        complication({ activities: { crafting: true, salvage: true, gathering: false } }),
+      ],
+    });
+    await openFirstRow(target);
+    const chip = (activity) => target.querySelector(`[data-complication-activity="${activity}"]`);
+
+    // CHOSEN and not progressive — "stored, and it will not fire". Both signals, together.
+    assert.ok(chip('salvage').classList.contains('is-accent'), 'the GM chose it, so it is on');
+    assert.ok(
+      chip('salvage').classList.contains('is-not-progressive'),
+      'and the system will not resolve it, so it is dimmed — this is the case being warned about'
+    );
+
+    // NOT chosen and not progressive — dimmed, but never wearing the chosen tone.
+    assert.ok(chip('gathering').classList.contains('is-not-progressive'));
+    assert.equal(
+      chip('gathering').classList.contains('is-accent'),
+      false,
+      'an unchosen chip is not painted as a choice'
+    );
+
+    // Chosen and progressive — the ordinary on state, with nothing to warn about.
+    assert.ok(chip('crafting').classList.contains('is-accent'));
+    assert.equal(
+      chip('crafting').classList.contains('is-not-progressive'),
+      false,
+      'a progressive activity is never dimmed'
+    );
+  });
+
+  it('renders the "not progressive" note as its OWN run, not as more of the chip label', async () => {
+    const { target } = await mountSection({
+      activityProgressive: { crafting: true, salvage: false, gathering: false },
+      complications: [complication()],
+    });
+    await openFirstRow(target);
+    const chip = target.querySelector('[data-complication-activity="salvage"]');
+    const note = chip.querySelector('.fab-complication-activity-note');
+    assert.ok(Boolean(note), 'the annotation is an element the sheet can type separately');
+    assert.match(note.textContent, /not progressive/);
+    // Concatenated into the chip's own text node it inherited the chip's 600 weight and
+    // full size, so the note read as part of the activity's NAME rather than about it.
+    assert.doesNotMatch(
+      chip.firstChild?.textContent ?? '',
+      /not progressive/,
+      'the note is not spliced into the chip label'
+    );
+    assert.equal(
+      target.querySelector(
+        '[data-complication-activity="crafting"] .fab-complication-activity-note'
+      ),
+      null,
+      'and a progressive activity carries no note at all'
+    );
+  });
+
+  it('gives an OPEN row the SEVERITY border, which is not the hover edge', async () => {
+    const { target } = await mountSection({ complications: [complication()] });
+    const row = target.querySelector('[data-complication="cx-1"]');
+    assert.ok(
+      row.classList.contains('is-gravity-warning'),
+      'a MAJOR complication carries its gravity on the row, which is what the edge keys on'
+    );
+
+    // The prototype's rule is `border: open ? sev.border : var(--border)`. Painting the
+    // open row `--fab-border-strong` instead is what the hover state already draws, so an
+    // expanded row and a merely-hovered collapsed one became indistinguishable at rest.
+    for (const [tone, token] of [
+      ['info', '--fab-info-border'],
+      ['warning', '--fab-warning-border'],
+      ['danger', '--fab-danger-border'],
+    ]) {
+      assert.match(
+        blockIn(summaryRowSource, `.fab-complication-row.is-expanded.is-gravity-${tone}`),
+        new RegExp(String.raw`border-color:\s*var\(${token}\)`),
+        `an expanded ${tone} row takes its own gravity border`
+      );
+    }
+    assert.equal(
+      summaryRowSource.includes('.fab-complication-row.is-expanded {'),
+      false,
+      'and there is no tone-blind expanded rule left to reintroduce the strong edge'
+    );
+    assert.ok(
+      summaryRowSource.includes('.fab-complication-row.is-authoring:not(.is-expanded):hover'),
+      'hover is scoped to a COLLAPSED row, so an open one keeps its gravity edge under the pointer'
+    );
+  });
+
+  it('paints "Tell the player" as a CHOSEN state, not a checked one', async () => {
+    // The prototype's ON state here is `border: accent-border; background: accent-soft` —
+    // the only row in the section it paints that way. Under the neutral treatment (the
+    // strong edge and the raised fill) it was indistinguishable from a ticked condition
+    // three rows below, so "the player will be told" stopped reading as a decision the GM
+    // made and started reading as one more box in a list.
+    const { target } = await mountSection({
+      complications: [complication({ visibility: 'visible' })],
+    });
+    await openFirstRow(target);
+    const row = target.querySelector('[data-complication-visibility]');
+    assert.ok(row.classList.contains('is-on'), 'the complication is visible, so the row is on');
+    assert.ok(row.classList.contains('is-on-accent'), 'and its on state is the ACCENT one');
+    assert.equal(
+      row.classList.contains('is-on-neutral'),
+      false,
+      'never the neutral one a checked condition wears'
+    );
+
+    // A condition keeps the neutral treatment: five rows in one list want to read as a
+    // set, and an accent edge on each would make every one of them look singular.
+    const condition = target.querySelector('[data-complication-condition="stageMissed"]');
+    assert.ok(condition.classList.contains('is-on-neutral'));
+    assert.equal(condition.classList.contains('is-on-accent'), false);
+  });
+
+  it('draws an EFFECT row to the effect geometry and a CONDITION row to the condition one', async () => {
+    // Two shapes in the prototype, not a rounding difference: a condition is `9px 11px`,
+    // radius 8, `flex-start`, transparent until checked; an effect is `11px 12px`, radius
+    // 9, `center`, and sits on the raised fill whether it is on or off — because an effect
+    // is a standing affordance in the "Then" card while a condition is one item in a
+    // checklist. `form` is an explicit prop rather than derived from `control`, because
+    // "Tell the player" is a `switch` that is NEITHER shape.
+    const { target } = await mountSection({ complications: [complication()] });
+    await openFirstRow(target);
+    const form = (selector) => {
+      const node = target.querySelector(selector);
+      assert.ok(Boolean(node), `expected ${selector}`);
+      return node.classList.contains('is-form-effect') ? 'effect' : 'condition';
+    };
+    assert.equal(form('[data-complication-condition="stageMissed"]'), 'condition');
+    assert.equal(form('[data-complication-roll-condition]'), 'condition');
+    assert.equal(form('[data-complication-effect-roll]'), 'effect');
+    assert.equal(form('[data-complication-macro] .fab-complication-effect'), 'effect');
+
+    // The macro row has no on-FLAG at all — it is enabled by whether a macro is LINKED —
+    // so it must not wear the enabled edge while still revealing its drop zone.
+    const macro = target.querySelector('[data-complication-macro] .fab-complication-effect');
+    assert.equal(
+      macro.classList.contains('is-on'),
+      false,
+      'a row with no flag cannot be on, and the prototype gives it the plain border'
+    );
+    assert.ok(
+      macro.querySelector('.fab-complication-effect-reveal'),
+      'yet its controls are always reachable, which is what `control="none"` means'
+    );
+  });
+
+  it('lets the panel GRID own the spacing around the Add control', async () => {
+    // The section root is `.manager-component-panel`, which is `display: grid` with a 12px
+    // gap. A grid gap and an item margin ADD, so a 9px margin on each of these rendered as
+    // 12 + 9 + 9 = 30px when populated against 12 + 9 = 21px when empty: one section
+    // disagreeing with itself, and both far past the prototype's own 9px. Nothing else
+    // catches it — the visual-parity harness records no `margin` property.
+    for (const selector of ['.fab-complications-list', '.fab-complications-add']) {
+      assert.doesNotMatch(
+        blockIn(sectionSource, selector),
+        /margin/,
+        `${selector} must not add to the panel's grid gap`
+      );
+    }
   });
 
   it('renders the generated TRIGGER SENTENCE as the row body, with the full string as its title', async () => {
@@ -509,8 +735,8 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
     assert.ok(Array.isArray(updates.complications), 'top level');
     assert.ok(
       !Object.hasOwn(updates.salvage, 'complications'),
-      'a cross-activity concern inside the salvage sub-record would be spec-invalid the '
-        + 'moment the system turns salvage off'
+      'a cross-activity concern inside the salvage sub-record would be spec-invalid the ' +
+        'moment the system turns salvage off'
     );
   });
 
@@ -527,8 +753,8 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
     assert.deepEqual(
       drafts.at(-1).updates.complications,
       [],
-      'an authored [] normalizes to ABSENT, so omitting the field would make the deletion '
-        + 'unsaveable — the issue-651 shape of defect'
+      'an authored [] normalizes to ABSENT, so omitting the field would make the deletion ' +
+        'unsaveable — the issue-651 shape of defect'
     );
   });
 

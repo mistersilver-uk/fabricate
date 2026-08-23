@@ -1,5 +1,6 @@
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -2651,6 +2652,65 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('1286: the band is FULL-BLEED — the grip and the ordinal ride the stage line, not the card', async () => {
+    // The prototype's stage card is `flex-direction: column; overflow: hidden` with NO
+    // padding of its own: the padding is on an inner top ROW and the band is that row's
+    // sibling, so the band's `border-top` runs the full width and reads as a card DIVIDER.
+    // Left as the card's own leading flex items, the grip and the ordinal pushed the band
+    // ~58px in and its top rule drew as a short line floating inside the card.
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    const banded = target.querySelector(
+      '[data-recipe-result-row]:has([data-recipe-result-complications])'
+    );
+    assert.ok(Boolean(banded), 'the herb stage draws a band');
+
+    const line = banded.querySelector('.manager-recipe-stage-line');
+    assert.ok(Boolean(line), 'the row has a line of its own for the band to sit beneath');
+    assert.ok(line.querySelector('.manager-recipe-stage-grip'), 'the grip rides that line');
+    assert.ok(line.querySelector('.manager-recipe-stage-ordinal'), 'so does the ordinal');
+    // The band is the LINE's sibling, never its child: nested inside it the band would be
+    // inset by the line's padding and would still not reach the card's edges.
+    assert.equal(
+      line.querySelector('[data-recipe-result-complications]'),
+      null,
+      'the band is a sibling of the line, not part of it'
+    );
+    assert.equal(
+      banded.querySelector('[data-recipe-result-complications]').parentElement,
+      line.parentElement,
+      'both are children of the one wrapper, which is what makes the band full-width'
+    );
+
+    // A row with no band keeps the OLD anatomy exactly: both wrappers are `display:
+    // contents`, so grip, ordinal and option row are the card's own flex items.
+    const plain = [...target.querySelectorAll('[data-recipe-result-row]')].find(
+      (row) => !row.querySelector('[data-recipe-result-complications]')
+    );
+    assert.ok(plain.querySelector('.manager-recipe-stage-grip'), 'an unbanded row still grips');
+    editHarness.remount();
+  });
+
+  it('1286: a banded stage card sheds its own padding so the band can reach the edges', async () => {
+    // Stated in the sheet, not measurable from the mounted markup: the harness mounts
+    // markup without `styles/fabricate.css`, and the visual-parity harness measures the
+    // band's own box rather than the card's. `manager-layout.test.js` reads the sheet the
+    // same way for the same reason.
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const selector =
+      '.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications)';
+    const start = sheet.indexOf(`${selector} {`);
+    assert.notEqual(start, -1, 'the banded stage card is still scoped by `:has()`');
+    const block = sheet.slice(start, sheet.indexOf('}', start));
+    assert.match(block, /padding:\s*0/, 'the card hands its padding to the line inside it');
+    assert.match(block, /overflow:\s*hidden/, "so the band's fill stays inside the card radius");
+  });
+
   it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
     // The trap: feeding the strip `forecastComplications` — which filters to
     // `visibility: "visible"` — reads as a working surface right up until a GM authors a
@@ -2880,8 +2940,7 @@ describe('RecipeEditView (mounted)', () => {
       'the popover lists every unattached library tool'
     );
     for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
-      const expectedName =
-        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
+      const expectedName = testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
       const option = options.find((node) => node.textContent.includes(expectedName));
       assert.ok(option, `${testCase.id}: the picker option shows "${expectedName}"`);
       assert.equal(
@@ -4166,9 +4225,7 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-water', amount: 1 } }],
       { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger')
-      .click();
+    target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger').click();
     await flushRender();
 
     const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
