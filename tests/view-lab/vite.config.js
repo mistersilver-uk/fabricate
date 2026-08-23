@@ -118,6 +118,19 @@ export default defineConfig({
     strictPort: true,
     hmr: false,
     fs: { allow: [repoRoot, ...(chromeCache ? [chromeCache.dir] : []), ...(existsSync(dnd5eRoot) ? [dnd5eRoot] : [])] },
+    // The served asset trees are READ-ONLY and enormous — a harvest is ~7,100 files of Foundry
+    // core art alone, and the dnd5e tree is the same shape. Serving a directory puts it in the
+    // watch graph, and watching it costs one inotify handle PER FILE. On a stock Linux box
+    // `fs.inotify.max_user_watches` is 65,536 for the whole user session, so one harvest is
+    // enough to exhaust it — and the failure does not name the cause: the suite dies with
+    // `ENOSPC ... watch '<some>.webp'` from deep inside chokidar, on tests that have nothing to
+    // do with art. Nothing here is ever edited mid-run, so watching it buys nothing at any price.
+    watch: {
+      ignored: [
+        ...(chromeCache ? [join(chromeCache.dir, '**')] : []),
+        ...(existsSync(dnd5eRoot) ? [join(dnd5eRoot, '**')] : []),
+      ],
+    },
   },
   optimizeDeps: { entries: ['tests/view-lab/mount.js'] },
 });
