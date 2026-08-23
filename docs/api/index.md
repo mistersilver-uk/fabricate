@@ -599,6 +599,8 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 | `getActorInventoryCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorInventory` strategy, or `null` before readiness. |
 | `getCraftingEngine` | `handle` | `game.fabricate` | The live crafting engine, or `null` before readiness. |
 | `getCraftingEngine().findComponentItems` | `handle` | the crafting engine | `(actor, component, system)` finds an actor's existing stacks of a component, so an award can **stack** rather than duplicate. See its carve-outs below. |
+| `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded, and answers the total, the dice groups and the resolved formula. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
+| `resolveBulkCheckDecision` | `stable` | `game.fabricate` | `({ callSite, formulas })` settles **one** roll decision — situational bonus, roll mode, Advantage — for N rolls the caller will make. It rolls nothing, takes no `actorId`, and answers which of the caller's formulas the decision covers. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -617,9 +619,14 @@ It takes **documents, not ids**; its third argument is a crafting-system **objec
 
 ### Calling A `stable` Member
 
-Every `stable` behavioural member takes an **`actorId`**, never an actor uuid, and resolves it through Fabricate's own ownership gate.
-Both are **GM-gated**, and both refuse rather than throw before the module is ready.
+Every `stable` behavioural member **that reads or acts on a specific actor** takes an **`actorId`**, never an actor uuid, and resolves it through Fabricate's own ownership gate.
+`resolveBulkCheckDecision` is the one that does not: it reads no actor, rolls nothing and writes nothing, so it takes none — an ownership gate on an argument a member never reads would advertise a check that is not there.
+All four are **GM-gated**, and all four refuse rather than throw before the module is ready.
 The gate order is **GM → actor → readiness**, in that order, because the readiness check throws and must run after the refusals that may not.
+A member's own request validation — including the `callSite` and election gates the two check-roll members add — runs **after** the readiness refusal.
+Two consequences follow, and they are stated here rather than left to be discovered: a GM holding a **stale `actorId`** answers `noActor` before any call-site check, and a pre-`ready` call answers `notReady` before `invalidCallSite`.
+That ordering is deliberate: under it a stale id answers `noActor` on **every** client, where an election-first order would report the same defect two different ways depending on which screen the GM was looking at.
+Uniformity beats the marginal precision.
 
 ```javascript
 const result = await game.fabricate.grantRecipeKnowledge({
@@ -638,6 +645,76 @@ Branch on the **outcome** to tell *granted now* from *already knew*, never on th
 `success: false` means the question could not be **answered** — an unknown unit, a non-positive amount, an empty or invalid ladder, an unreachable spender — and `affordable` is then `null` rather than a confident `false`.
 A shortfall is `success: true` with `affordable: false`, which is what keeps *tell the player they are short* apart from *tell the GM their ladder is broken*.
 
+### Rolling A Standalone Check Roll
+
+`rollActorCheck` and `resolveBulkCheckDecision` publish Fabricate's check-roll **mechanics** to a companion that owns no crafting system.
+The concept has a name, and the name has two axes that must not be collapsed.
+
+**"Standalone" is a claim about the crafting-system axis**: the roll stands outside any `CraftingSystem`.
+**It is not a claim about the game-system axis**, where Fabricate is agnostic on every path including this one — a Standalone Check Roll is exactly as game-system agnostic as every other Fabricate check.
+
+So this is **not "a Fabricate check"**.
+A Fabricate check is taken on a subject inside a crafting system and carries that system's modifier catalogue, combination rule, tool bonuses, authored triggers, tier stepping and failure-result policy.
+A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its formula-validity net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no system and no subject to derive them from.
+If you want a system's modifiers applied, route a real craft or salvage instead.
+
+{: .warning }
+> **This does not give a manual-fulfilment GM their physical-dice prompt back.**
+> Fabricate's check path evaluates with `allowInteractive: false` **unconditionally**, and this member inherits that, so **Foundry's own `RollResolver` stays suppressed**.
+> What the member opens is a *different* dialog: Fabricate's own roll prompt, which confirms the roll, offers Advantage and a situational bonus, and — crucially — **reports its own dismissal**, so you can abort with zero mutation.
+> Foundry's dice resolver cannot do that: closing it fulfils the roll with a random face indistinguishable from a typed one.
+
+```javascript
+const result = await game.fabricate.rollActorCheck({
+  actorId: actor.id,
+  callSite: 'gmAction',        // or 'broadcast'; REQUIRED, and there is no default
+  formula: '1d20 + @prof',
+  dc: 15,                      // omit for an ungraded roll that just answers the total
+  compare: 'meet',             // 'meet' (default) or 'exceed'
+  label: 'Downtime: Research', // optional; defaults to a localized activity noun
+  interactive: true            // default false — no dialog, no chat post
+});
+if (result.outcome === 'cancelled') return;         // the GM dismissed the prompt: do nothing
+if (!result.success) return ui.notifications.warn(game.i18n.format(result.message, result.messageData ?? {}));
+if (result.passed) applyReward(result.total);
+```
+
+`total` is **always the raw roll total**, and it is `null` for every refusal — `engineUnavailable` and `noFormula` included.
+A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real zero from a refusal.
+`passed` is `true`, `false`, or `null` for an ungraded roll, which is not graded and therefore has no pass.
+`diceGroups` is a list, so its absence is `[]` rather than `null`.
+
+**`callSite` is required and has no default.**
+Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
+Declare `broadcast` from any handler that fires on every connected client, and Fabricate refuses `notElected` on every client but the elected GM's.
+Declaring `gmAction` from a synced hook **bypasses that gate entirely** and puts the single-executor obligation back on you.
+
+`resolveBulkCheckDecision` is for the case where you will roll for several characters at once and want to ask the GM **once**:
+
+```javascript
+const decision = await game.fabricate.resolveBulkCheckDecision({
+  callSite: 'gmAction',
+  formulas: characters.map((character) => character.downtimeFormula)
+});
+if (decision.outcome === 'cancelled') return;
+for (const index of decision.covered) {
+  await game.fabricate.rollActorCheck({
+    actorId: characters[index].id,
+    callSite: 'gmAction',
+    formula: characters[index].downtimeFormula,
+    dc: 15,
+    interactive: true,
+    rollDecision: decision.decision   // requires interactive: true, or it is REFUSED
+  });
+}
+```
+
+`covered` is the array of **indices into your own `formulas` array**, not the formulas themselves, because two characters may share a formula and you have to map the answer back onto your own subjects.
+A formula the retirement shim empties — `@craftingmod`, or anything built on it that cannot be rewritten — is **not usable**: it never appears in `covered`, it never denies Advantage to the rest of the batch, and `rollActorCheck` refuses it as `noFormula` rather than silently passing a graded check with the DC ignored.
+A batch in which nothing can roll answers `nothingToDecide` with `success: true` and opens no dialog.
+
+A `rollDecision` supplied with `interactive: false` is **refused** as `invalidRollDecision`, not silently discarded: the evaluator only consults one on its interactive path, so your bonus, Advantage and roll mode would otherwise all vanish with no error while the base formula rolled.
+
 ### The Outcome Vocabulary
 
 `COMPANION.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
@@ -655,6 +732,11 @@ Nothing outside the declared set is contract, however reachable it is.
 > **Elect a single executor before acting on an answer.**
 > A companion invoking any member from a handler that fires on **every connected client** — a synced hook such as `updateWorldTime`, or a socket broadcast — must check `game.users.activeGM?.id === game.user?.id` first.
 > Reading is harmless; acting on the read from N clients is not, and `grantRecipeKnowledge` under N clients is N writes.
+>
+> **For `rollActorCheck` and `resolveBulkCheckDecision`, Fabricate discharges this for you — but only if you tell it the truth.**
+> Declare `callSite: 'broadcast'` and Fabricate refuses `notElected` on every unelected client.
+> Declare `callSite: 'gmAction'` from a synced hook and the gate never runs, because the declaration is the only signal Fabricate has and nothing in the environment can check it.
+> The harm those two members guard against is sharper than a duplicated message: N clients roll N **different totals** and hand them to N copies of your module.
 
 ## Subscribing To Gathering Hooks
 
