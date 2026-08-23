@@ -126,7 +126,11 @@ function compileManagerRoot() {
   // evidence map globs the two separately. ComponentSourceInspector and
   // ComponentDifficultyInspector are gone: decision 4 removed the right rail, and both
   // rehomed into the single scrolling column.
-  for (const componentEditorPart of ['ComponentEditorHeader', 'ComponentIdentityStrip']) {
+  for (const componentEditorPart of [
+    'ComponentEditorHeader',
+    'ComponentIdentityStrip',
+    'ComponentComplicationsSection',
+  ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/component/${componentEditorPart}.svelte`);
   }
   // The library's row and its inspector, both extracted out of the browser / the root
@@ -318,6 +322,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComplicationEffectRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RosterRow.svelte');
   // Folder-aware import mapping modal + its inline vocabulary add-form (issue 771). Both
   // are always rendered in the root tree, so omitting either HANGS the mounted suite.
@@ -619,6 +625,8 @@ function compileManagerRoot() {
     // is in this mounted tree, so omitting this entry HANGS the WHOLE suite as
     // `# cancelled 225` — which is exactly what it did before this line existed.
     'src/utils/macroReference.js',
+    'src/utils/componentComplications.js',
+    'src/utils/complicationSummary.js',
     // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
     // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
     // Omitting it kills this suite in its `before` hook, which `node --test` reports as
