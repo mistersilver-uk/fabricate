@@ -42,7 +42,11 @@ import {
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
 
-import { assertContractResult, assertLocalizationKey } from './helpers/companionContractOutcomes.js';
+import {
+  assertContractResult,
+  assertLocalizationKey,
+  assertMessageDataCovers,
+} from './helpers/companionContractOutcomes.js';
 import {
   CurrencyCraftingActorFake,
   makeCurrencyConfigStoreStub,
@@ -193,6 +197,9 @@ function assertStableAnswerShape(member, result) {
     `${member.name}: ${result.outcome} is not in the declared vocabulary`
   );
   assertLocalizationKey(result.message, `${member.name}'s ${result.outcome}`);
+  // And the key's placeholders are all supplied. Every answer this suite produces comes from
+  // the real member, so this is where a member that forgot its interpolation bag is caught.
+  assertMessageDataCovers(result, `${member.name}'s ${result.outcome} answer`);
   if ('messageData' in result) {
     assert.equal(
       typeof result.messageData,
@@ -656,7 +663,15 @@ describe('the harness copies are faithful to src/main.js', () => {
     // self-benefiting write published beside the class constructors — or re-exported from
     // this module — would be reachable by any player from the console with no gate at all.
     // The gated facade method is the only authorised route, by design.
-    const exportBlocks = source.slice(source.indexOf('export const __test'));
+    const exportBlockStart = source.indexOf('export const __test');
+    // GUARDED, because both assertions below are ABSENCE assertions. `indexOf` answers `-1`
+    // for a marker that has been renamed, `slice(-1)` is the file's last character, and both
+    // would then pass over a one-character string, silently, forever.
+    assert.ok(
+      exportBlockStart >= 0,
+      'src/main.js still declares a test-only export block for this slice to start at'
+    );
+    const exportBlocks = source.slice(exportBlockStart);
     assert.equal(
       /grantRecipeKnowledge/.test(exportBlocks),
       false,

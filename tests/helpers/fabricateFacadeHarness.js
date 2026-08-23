@@ -44,6 +44,7 @@ import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/s
 import { checkWorldCurrencyAffordability } from '../../src/systems/currencyAffordance.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
+import { classMemberSource } from './boundedSource.js';
 
 /**
  * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above
@@ -74,15 +75,11 @@ export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
 /**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
  *
- * Bounding is the point. The alchemy suite's `MAIN_SOURCE.slice(indexOf(...))` runs to
- * the end of the file, which is harmless for a "must CONTAIN" assertion and permanently
- * red for a "must NOT contain" one — every helper the rest of the class legitimately
- * uses is inside an unbounded slice. Single-sourcing the strategy here is also what
- * stops the unbounded form being the pattern the next author copies.
- *
- * The bound is the first line that is exactly two-space-indented `}`, which is a class
- * member's closing brace in this file's formatting. Every deeper brace is indented
- * further, so a nested arrow, object literal or `try` block cannot end the slice early.
+ * A thin naming of {@link classMemberSource} for this file's default source, kept because
+ * `mainMethodSource(SIGNATURE)` is what the owner-gate suites already read as. The bounding
+ * strategy itself — and the reason an unbounded `indexOf`/`slice` pair is a hazard rather
+ * than a shortcut — lives in `boundedSource.js`, which is where any other suite reaches for
+ * it rather than re-deriving it here.
  *
  * @param {string} signature The method signature exactly as authored, INCLUDING its
  *   opening brace — e.g. `_gateBulkTargets(targets, actorId) {`. Passing a bare name
@@ -93,11 +90,7 @@ export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
  *   means the pin is now vacuous, which must fail loudly rather than assert on ''.
  */
 export function mainMethodSource(signature, source = MAIN_SOURCE) {
-  const start = source.indexOf(signature);
-  if (start < 0) throw new Error(`main.js declares no \`${signature}\``);
-  const end = source.indexOf('\n  }\n', start);
-  if (end < 0) throw new Error(`\`${signature}\` has no member-level closing brace`);
-  return source.slice(start, end + '\n  }'.length);
+  return classMemberSource(source, signature, 'main.js');
 }
 
 /** Minimal `foundry.utils` shim the builder's flag reads use at call time. */
