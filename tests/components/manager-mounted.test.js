@@ -14922,7 +14922,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       railChip().textContent.trim(),
       'PREMIUM',
-      'muted is not removed: the rail still names which route premium provides'
+      'muted is not removed WHILE NOTHING ELSE CLAIMS THE TRACK — which is this case, because ' +
+        'the shared factory declares no badge, so the rollup total is zero and suppressed. It ' +
+        'is not a universal rule: a nonzero rollup REPLACES the chip outright (issue 1302), ' +
+        'and AC-14 cell 1 pins that state'
     );
     assert.equal(
       downtimeTitle(),
@@ -15988,6 +15991,437 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(Boolean(unmountEvent), 'leaving the route publishes the unmount hook');
     assert.equal(unmountEvent[1].tabId, 'factions');
     assert.equal(unmountEvent[1].coreFallback, true);
+  });
+
+  // -- Downtime rail tab badges (issue 1302) --------------------------------------------
+  //
+  // A companion tab may carry `{ count, accessibleName }`, and `setWorldNavTabBadge` restates
+  // one at runtime with no mount and no remount. Every fixture here attaches badges through
+  // `downtimeProvider`'s `tab(id)` decorator or through a case-local provider, and NEVER by
+  // adding one to the factory's default tab literal: that literal is the fixture the shipped
+  // installed-chip case registers on the `systems` route with the group closed, which is
+  // precisely the state a nonzero rollup changes, and a default badge would suppress the very
+  // chip that case asserts.
+
+  const downtimeBadge = (tabId) => target.querySelector(`[data-world-downtime-badge="${tabId}"]`);
+  const downtimeRollup = () => target.querySelector('[data-world-downtime-badge-total]');
+  const downtimeParentAriaLabel = () => worldNavItem('downtime').getAttribute('aria-label');
+  const downtimePremiumState = () =>
+    target.querySelector('[data-world-nav-premium]')?.dataset.worldNavPremiumState;
+
+  // AC-14's fixture: three rendered tabs, registered badges of 3 on `ledger` and 2 on `crew`,
+  // and `writs` carrying none — so the total is 5 and an un-badged tab has to contribute 0.
+  function badgedDowntimeProvider(mounts = [], badges = { ledger: 3, crew: 2 }) {
+    return downtimeProvider({
+      prefix: 'Guild',
+      ids: ['ledger', 'crew', 'writs'],
+      tab: (id) =>
+        badges[id] === undefined
+          ? {}
+          : { badge: { count: badges[id], accessibleName: `${badges[id]} waiting on ${id}` } },
+      mount: ({ context }) => {
+        mounts.push(context);
+      },
+    });
+  }
+
+  // Registered BEFORE the mount, so the Manager opens in provider mode on its default route —
+  // which is the state the rollup exists for, and the one no navigation is needed to reach.
+  async function mountBadgedDowntimeManager({ badges, mounts = [] } = {}) {
+    const registry = createManagerExtensionsRegistry();
+    registry.publicApi.registerWorldNavProvider(badgedDowntimeProvider(mounts, badges));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    await settleDowntimeProvider();
+    return { registry, mounts };
+  }
+
+  it('AC-11 — the runtime channel reaches the rail with no mount, and never by remounting one', async () => {
+    const mounts = [];
+    const { registry } = await mountBadgedDowntimeManager({ mounts });
+
+    // (a) THE HALF THAT KILLS THE WRITE-ONLY SINK. The disclosure toggle opens the group
+    // without leaving the `systems` route, so nothing has mounted and the companion holds no
+    // context at all — the registry-level setter is the only channel there is. An
+    // implementation that renders `tab.badge` and never subscribes stops here.
+    target.querySelector('[data-world-downtime-toggle]').click();
+    await settleDowntimeProvider();
+    assert.equal(mounts.length, 0, 'opening a disclosure is not a navigation, and not a mount');
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '3',
+      'the tab’s REGISTERED badge is what the rail starts from'
+    );
+
+    assert.equal(
+      registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', {
+        count: 5,
+        accessibleName: '5 claims waiting',
+      }),
+      true
+    );
+    await settleDowntimeProvider();
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '5',
+      'the runtime badge reached the rail with no mount live anywhere'
+    );
+    assert.equal(mounts.length, 0, 'and stating one did not create one');
+
+    // (b) The same call against a LIVE mount. `mounts.length === 1` is the assertion doing
+    // the work: the host's mount effect keys on the context OBJECT and disposes the active
+    // mount when it changes, so a replaced context is a remount and would push a second
+    // entry. The identity clause below is entailed by the count, and kept as a cheap
+    // restatement of what the count means.
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1, 'navigating to the companion’s screen mounts it once');
+    const contextBefore = mounts[0];
+
+    assert.equal(
+      registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', {
+        count: 9,
+        accessibleName: '9 claims waiting',
+      }),
+      true
+    );
+    await settleDowntimeProvider();
+    assert.equal(downtimeBadge('ledger').textContent.trim(), '9');
+    assert.equal(
+      mounts.length,
+      1,
+      'THE WHOLE POINT: a new badge, same mount — the screen the GM is looking at survives it'
+    );
+    assert.equal(mounts[0], contextBefore, 'and the context the companion holds is the same one');
+
+    // SURVIVES A TAB CHANGE AND A ROUTE CHANGE. The requirement says so and nothing else here
+    // pins it: every other cell states a badge and reads it back where it stands.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '9',
+      'a tab change ends a mount, and a badge is not scoped to one'
+    );
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '9',
+      'leaving the route entirely does not clear it either — which is the whole reason the ' +
+        'channel hangs off the registration rather than off the frozen mount context'
+    );
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '9',
+      'and it is still there on return'
+    );
+  });
+
+  it('AC-12 — a badge is a DESCRIPTION with a verbatim name, never part of the sub-item’s name', async () => {
+    useShippedLocalization();
+    // The fixture's `accessibleName` is a LIVE lang key, and the rendered value must be that
+    // key. A fixture string that is not a real key passes against the mutation
+    // `aria-label={text(badge.accessibleName, badge.accessibleName)}`, because `text` returns
+    // its fallback for anything that does not resolve — so only a resolvable key discriminates.
+    const VERBATIM_KEY = 'FABRICATE.Admin.Manager.World.Downtime.Nav';
+    const registry = createManagerExtensionsRegistry();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        prefix: 'Guild',
+        ids: ['ledger', 'crew'],
+        tab: (id) => ({
+          badge:
+            id === 'ledger'
+              ? { count: 3, accessibleName: VERBATIM_KEY }
+              : { count: 2, accessibleName: '2 crew idle' },
+        }),
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const badge = downtimeBadge('ledger');
+    assert.equal(badge.getAttribute('role'), 'img', 'a bare numeral needs a name of its own');
+    assert.equal(
+      badge.getAttribute('aria-label'),
+      VERBATIM_KEY,
+      'a badge name is FINAL DISPLAY TEXT, rendered verbatim exactly as `label` is'
+    );
+    assert.notEqual(
+      shippedString(VERBATIM_KEY),
+      VERBATIM_KEY,
+      'and that key really does resolve in the shipped lang file, so the assertion above has teeth'
+    );
+
+    // A DESCRIPTION, not a name. The sub-item's own accessible name stays the companion's
+    // `accessibleName`; Core owns no word order in the companion's language, and
+    // `aria-labelledby` with two IDREFs would concatenate them in Core's listed order.
+    const railItem = target.querySelector('#manager-downtime-nav-ledger');
+    assert.equal(railItem.getAttribute('aria-label'), 'Open Guild ledger');
+    assert.equal(railItem.getAttribute('aria-describedby'), badge.id);
+    assert.equal(badge.id, 'manager-downtime-nav-badge-ledger');
+    assert.equal(
+      target.querySelector(`#${badge.id}`).getAttribute('aria-label'),
+      VERBATIM_KEY,
+      'the IDREF resolves to the badge, and the description a GM hears is that same string'
+    );
+    assert.notEqual(
+      downtimeBadge('crew').id,
+      badge.id,
+      'two badged tabs carry distinct ids, or one sub-item describes the other’s count'
+    );
+    assert.equal(downtimeBadge('crew').id, 'manager-downtime-nav-badge-crew');
+
+    // NEVER A DESCENDANT OF THE LABEL SPAN. That span names the whole companion panel region,
+    // so a badge nested inside it would silently rename the region to "Guild ledger 3".
+    const labelSpan = target.querySelector('#manager-downtime-nav-label-ledger');
+    assert.ok(!labelSpan.contains(badge), 'the badge is a SIBLING of the label, not a child of it');
+    assert.equal(badge.parentElement, railItem, 'it sits in the row’s own trailing track');
+    assert.equal(
+      labelSpan.textContent.trim(),
+      'Guild ledger',
+      'so the visible label is unchanged by the badge beside it'
+    );
+    const region = target.querySelector('#world-downtime-panel-ledger');
+    assert.equal(region.getAttribute('aria-labelledby'), labelSpan.id);
+    assert.equal(
+      target.querySelector(`#${region.getAttribute('aria-labelledby')}`).textContent.trim(),
+      'Guild ledger',
+      'and the panel region’s accessible name is unchanged by the badge’s presence'
+    );
+  });
+
+  it('AC-13 — a stated zero renders the numeral, and clearing leaves no dangling IDREF', async () => {
+    const registry = createManagerExtensionsRegistry();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    const railItem = () => target.querySelector('#manager-downtime-nav-ledger');
+
+    assert.ok(!downtimeBadge('ledger'), 'a tab stating no count renders no numeral');
+    assert.ok(
+      !railItem().hasAttribute('aria-describedby'),
+      'and points no description at an element that is not there'
+    );
+
+    registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', {
+      count: 3,
+      accessibleName: '3 claims waiting',
+    });
+    await settleDowntimeProvider();
+    assert.equal(downtimeBadge('ledger').textContent.trim(), '3');
+
+    registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', {
+      count: 0,
+      accessibleName: 'Nothing waiting',
+    });
+    await settleDowntimeProvider();
+    assert.equal(
+      downtimeBadge('ledger').textContent.trim(),
+      '0',
+      'a stated zero is a POSITIVE statement about the tab: "0" means no records, and an ' +
+        'absent numeral means no count was stated at all'
+    );
+    assert.equal(downtimeBadge('ledger').getAttribute('aria-label'), 'Nothing waiting');
+    assert.equal(railItem().getAttribute('aria-describedby'), 'manager-downtime-nav-badge-ledger');
+
+    registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', null);
+    await settleDowntimeProvider();
+    assert.ok(!downtimeBadge('ledger'), 'clearing a badge removes the element');
+    assert.ok(
+      !railItem().hasAttribute('aria-describedby'),
+      'and takes the IDREF with it — no description pointing at a node that no longer exists'
+    );
+  });
+
+  // AC-14 — the parent rollup, in six cells. Every one of them discriminates against an
+  // implementation the other five accept, which is why they are written out rather than
+  // folded into "the rollup shows when it should".
+  describe('AC-14 — the Downtime parent rollup summarises what a closed disclosure hides', () => {
+    it('cell 1 — renders the total on a fresh Manager, in place of the muted PREMIUM chip', async () => {
+      useShippedLocalization();
+      await mountBadgedDowntimeManager();
+
+      const parent = worldNavItem('downtime');
+      assert.equal(
+        parent.getAttribute('aria-expanded'),
+        'false',
+        'the Downtime disclosure is closed on EVERY fresh Manager open, which is the state ' +
+          'the rollup exists for'
+      );
+      const rollup = downtimeRollup();
+      assert.equal(rollup.textContent.trim(), '5', '3 on ledger plus 2 on crew; writs has none');
+      assert.equal(rollup.getAttribute('role'), 'img');
+      assert.equal(
+        rollup.getAttribute('aria-label'),
+        '5 updates',
+        'Core names the unit itself, generically: it cannot know whether a companion counts ' +
+          'records or demands, and the summed value is heterogeneous across tabs'
+      );
+      assert.ok(
+        rollup.classList.contains('manager-nav-issue-badge'),
+        'the rail’s summary vehicle, which is the mark that survives the collapsed-rail hide'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-nav-premium]'),
+        'the parent’s single trailing track carries EITHER the chip or the rollup, never both'
+      );
+
+      // The parent's `aria-label` replaces its subtree, so a `role="img"` rollup inside it
+      // would be silent — the same gap that already silences the PREMIUM chip.
+      const visibleLabel = parent.querySelector('.manager-nav-label').textContent.trim();
+      assert.equal(parent.getAttribute('aria-label'), 'Downtime, 5 updates');
+      assert.ok(
+        parent.getAttribute('aria-label').includes(visibleLabel),
+        'Label-in-Name: the composed name contains the text rendered inside the row’s label'
+      );
+    });
+
+    it('cell 2 — opening the group removes the rollup, restores the chip, and reverts the name', async () => {
+      useShippedLocalization();
+      await mountBadgedDowntimeManager();
+      target.querySelector('[data-world-downtime-toggle]').click();
+      await settleDowntimeProvider();
+
+      assert.ok(
+        !downtimeRollup(),
+        'the children are on screen carrying their own counts, so Core has nothing to summarise'
+      );
+      assert.equal(downtimePremiumState(), 'installed', 'and the muted chip has its track back');
+      assert.equal(
+        downtimeParentAriaLabel(),
+        'Downtime',
+        'EXACTLY the route name: an unconditional composition would make every GM on every ' +
+          'route hear "Downtime, 0 updates", and nothing else here catches that'
+      );
+    });
+
+    it('cell 3 — collapsing the rail brings the rollup back even with the group open', async () => {
+      await mountBadgedDowntimeManager();
+      target.querySelector('[data-world-downtime-toggle]').click();
+      await settleDowntimeProvider();
+      assert.ok(!downtimeRollup(), 'the starting state for this cell is the group OPEN');
+
+      // `railLockedOpen` is false off the Downtime route, so the control is enabled here.
+      railToggleControl().click();
+      await settleDowntimeProvider();
+
+      assert.ok(railBodyCollapsed(), 'the rail is genuinely collapsed');
+      assert.equal(
+        downtimeRollup().textContent.trim(),
+        '5',
+        'the SECOND disjunct, and the cell that kills an implementation carrying only ' +
+          '`!railGroupExpanded.worldDowntime`: on a collapsed rail the submenu is hidden and ' +
+          'the rollup is the group’s only surviving signal'
+      );
+      // Deliberately nothing about the sub-item badges: happy-dom applies no stylesheet, so
+      // `.manager-nav-submenu`'s `display: none` is invisible to it and those nodes are still
+      // in the DOM. That claim belongs in the real-browser layout suite, not here.
+    });
+
+    it('cell 4 — a provider with no badges renders no rollup and keeps its chip', async () => {
+      useShippedLocalization();
+      await mountBadgedDowntimeManager({ badges: {} });
+
+      assert.ok(
+        !downtimeRollup(),
+        'Core has nothing to summarise at zero, and a lone 0 pill in a 56px icon gutter is a ' +
+          'mark drawing attention to nothing'
+      );
+      assert.equal(downtimePremiumState(), 'installed');
+      assert.equal(
+        downtimeParentAriaLabel(),
+        'Downtime',
+        'and the row keeps the plain route name in every state but the one that earns more'
+      );
+    });
+
+    it('cell 5 — the runtime layer OVERRIDES the registered one: 5 → 7 → 5, and never 10', async () => {
+      useShippedLocalization();
+      const mounts = [];
+      const { registry } = await mountBadgedDowntimeManager({ mounts });
+      assert.equal(downtimeRollup().textContent.trim(), '5');
+
+      assert.equal(
+        registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', {
+          count: 5,
+          accessibleName: '5 claims waiting',
+        }),
+        true
+      );
+      await settleDowntimeProvider();
+      assert.equal(
+        downtimeRollup().textContent.trim(),
+        '7',
+        'ledger’s runtime 5 REPLACES its registered 3; `sum(registered) + sum(runtime)` would ' +
+          'render 10, and "changes the total" would accept it'
+      );
+      assert.equal(downtimeParentAriaLabel(), 'Downtime, 7 updates');
+      assert.equal(mounts.length, 0, 'with no mount live anywhere');
+
+      registry.publicApi.setWorldNavTabBadge('downtime', 'ledger', null);
+      await settleDowntimeProvider();
+      assert.equal(
+        downtimeRollup().textContent.trim(),
+        '5',
+        'and `null` clears the runtime layer, restoring the registered badge and the total'
+      );
+    });
+
+    it('cell 6 — core-fallback renders no rollup and keeps the gold preview chip', async () => {
+      // The CHEAP SECONDARY to AC-15, not the decisive form: Core's preview tabs are a frozen
+      // literal declaring no badge, so this state is unreachable by a registered badge and a
+      // client-mount assertion about it would pass against the guard deleted outright. The
+      // source contract in `manager-contract.test.js` is what actually pins the branch.
+      mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+      await settleDowntimeProvider();
+
+      assert.ok(!downtimeRollup(), 'Core does not summarise its own preview to itself');
+      assert.equal(downtimePremiumState(), 'preview', 'and the loud gold sell is untouched');
+    });
+  });
+
+  // AC-23 — the four keys tasks 4 and 5 read. `text(key, fallback)` returns the FALLBACK
+  // whenever `localize` hands the key back, so an implementation that renders every badge
+  // correctly and ships none of these keys keeps every other criterion green while leaving
+  // four strings untranslatable in every locale.
+  it('AC-23 — the four new Downtime badge keys are string leaves in the shipped lang file', () => {
+    const base = 'FABRICATE.Admin.Manager.World.Downtime';
+    for (const leaf of [
+      'BadgeTotalOne',
+      'BadgeTotalOther',
+      'NavWithBadgeOne',
+      'NavWithBadgeOther',
+    ]) {
+      const key = `${base}.${leaf}`;
+      assert.notEqual(
+        shippedString(key),
+        key,
+        `${key} must be a string leaf in lang/en.json, or its fallback is untranslatable`
+      );
+    }
+    for (const leaf of ['BadgeTotalOne', 'BadgeTotalOther']) {
+      assert.ok(
+        shippedString(`${base}.${leaf}`).includes('{count}'),
+        `${leaf} must substitute the total rather than stating a number`
+      );
+    }
+    // The teeth on Decision 5's SUBSTITUTED noun. Writing the literal word "Downtime" into
+    // these two keys would put the row's noun in three places, where a translator changing one
+    // and not the others silently breaks Label-in-Name with no test able to see it.
+    for (const leaf of ['NavWithBadgeOne', 'NavWithBadgeOther']) {
+      const value = shippedString(`${base}.${leaf}`);
+      assert.ok(value.includes('{label}'), `${leaf} must take the row’s label as a token`);
+      assert.ok(value.includes('{count}'), `${leaf} must take the total as a token`);
+    }
   });
 
   // -- The World > Downtime experimental gate (issue 1257) ------------------------------
