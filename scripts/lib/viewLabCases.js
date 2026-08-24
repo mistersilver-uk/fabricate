@@ -4052,8 +4052,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      // Issue 1302 — geometrically inside its OWN sub-item, keyed on the tab id on both sides:
+      // `expectContained` resolves each side with `document.querySelector` and is first-match,
+      // not strict, so an unkeyed pair would compare the first sub-item's box against the first
+      // badge's box, which need not be the same row.
+      {
+        container: '[data-world-downtime-item="ledger"]',
+        target: '[data-world-downtime-badge="ledger"]',
+      },
     ],
-    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.manager-rail',
+      '[data-world-downtime-submenu]',
+    ],
     // The companion owns the scrolling, which is only true if Core handed it the whole height.
     expectOverflowY: '[data-lab-companion-scroll]',
     expectScrollable: '[data-lab-companion-scroll]',
@@ -4063,6 +4077,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
