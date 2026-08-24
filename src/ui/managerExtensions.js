@@ -1,5 +1,6 @@
 import { MANAGER_HOOKS } from '../config/hooks.js';
 import { createExtensionRegistry, requireNonEmptyString } from './extensionRegistry.js';
+import { createNavTabBadgeStore } from './navTabBadgeStore.js';
 
 /**
  * The surface id Core's GM Manager looks a World navigation provider up under for its
@@ -627,16 +628,34 @@ function validateProvider(provider) {
  * Manager-specific: the provider shape, its route chrome and header actions, and the names
  * this registry's callers already depend on.
  *
+ * It also owns the page session's TAB BADGES (issue 1302). They hang here rather than on the
+ * frozen mount context because a badge's job is to be true while the companion is not mounted,
+ * and they are dropped when their surface leaves the registry — which the store learns through
+ * the shared factory's existing surface-id broadcast, so the factory itself learns nothing
+ * about badges and the player registry is untouched by the whole feature.
+ *
  * @param {object} [options] Injectable edges.
  * @param {(...args: unknown[]) => void} [options.reportError] Error sink for a throwing subscriber.
  * @param {(name: string, payload: object) => void} [options.emitHook] Hook edge.
- * @returns {Readonly<object>} Frozen registry.
+ * @returns {Readonly<object>} Frozen registry, adding `subscribeNavTabBadges(surfaceId, listener)`
+ *   to the shared surface, and `setWorldNavTabBadge(surfaceId, tabId, badge)` to `publicApi`.
  */
 export function createManagerExtensionsRegistry({
   reportError = console.error,
   emitHook = emitManagerHook,
 } = {}) {
-  return createExtensionRegistry({
+  // The two collaborators need each other by NATURE, not by accident: the store's liveness
+  // check asks which provider holds a surface, and the registry's public API carries the
+  // store's setter. The knot is untied with a deferred READ rather than a second import edge —
+  // `findProvider` runs at call time, long after both exist — so the module graph stays
+  // one-directional and the store imports nothing back from here.
+  let registry = null;
+  const badges = createNavTabBadgeStore({
+    normalizeBadge: normalizeNavTabBadge,
+    findProvider: (surfaceId) => registry?.getWorldNavProvider(surfaceId) ?? null,
+    reportError,
+  });
+  registry = createExtensionRegistry({
     validateProvider,
     registeredHook: MANAGER_HOOKS.NAV_PROVIDER_REGISTERED,
     unregisteredHook: MANAGER_HOOKS.NAV_PROVIDER_UNREGISTERED,
@@ -649,7 +668,13 @@ export function createManagerExtensionsRegistry({
     subscriberFailureMessage: 'Fabricate | Manager extension subscriber failed:',
     reportError,
     emitHook,
+    additionalPublicMethods: { setWorldNavTabBadge: badges.setBadge },
   });
+  // A runtime badge does not survive its provider. The unsubscribe is deliberately dropped:
+  // this pair lives for the page session, and holding a handle nobody can call would only
+  // suggest a teardown path that does not exist.
+  registry.subscribeSurfaceIds(badges.retainSurfaces);
+  return Object.freeze({ ...registry, subscribeNavTabBadges: badges.subscribe });
 }
 
 /**
