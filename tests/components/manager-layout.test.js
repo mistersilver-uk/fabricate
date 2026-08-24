@@ -172,7 +172,7 @@ async function readRenderedToolGeometry(width, view) {
     const editor =
       view === 'tool-edit'
         ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
-          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button">Back</button><button class="manager-button">Delete</button><button class="manager-button" data-tool-editor-save>Save Tool</button></div></div></header>
+          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button fab-manager-button is-ghost">Back</button><button class="manager-button fab-manager-button is-danger">Delete</button><button class="manager-button fab-manager-button is-primary" data-tool-editor-save>Save Tool</button></div></div></header>
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
@@ -5805,10 +5805,10 @@ async function readRenderedKnowledgeGeometry(width) {
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
-    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button fab-manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button fab-manager-button is-danger">Reset this system</button><button class="manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -8000,6 +8000,111 @@ test('a disabled manager button paints from the disabled rule in every one of th
       measured.off.dashed.height,
       measured.on.dashed.height,
       'and keeps the pinned 34px control height it had when enabled'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The `warning` role paints, and the spelling it replaces never did (issue 1118) ────────
+//
+// This is the defect that put a sixth role in the primitive's vocabulary, measured from both
+// sides. `environment/CompositionList.svelte` renders ONE verb — the same `onForceInclude`,
+// the same `data-action="force-include"`, the same localization key — from two places, and one
+// of them wrote `class="manager-button is-warning"`. The sheet declares
+// `.manager-button.is-warning-action` and declares `.manager-button.is-warning` NOWHERE, so
+// that Force add shipped with no warning treatment at all while the amber treatment shipped
+// with no call site: a defect and a dead rule, from one typo, on a pair of buttons that are the
+// same verb.
+//
+// The role is what makes the typo unrepeatable — `role="warning"` names a vocabulary entry and
+// the primitive owns which class it emits — so the assertion is on the emitted class rather
+// than on a class string anyone has to remember. The MISSPELT probe is kept beside it as the
+// negative control, and it is not decoration: it is the only thing that distinguishes "the
+// warning role paints" from "these two probes both landed on the base control and agree".
+test('the warning role paints amber, and the is-warning spelling it replaces paints nothing', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const neutral = managerButtonClassesFor('neutral');
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <section class="manager-edit-card">
+              <button type="button" class="${managerButtonClassesFor('warning')}" data-probe="warning"><span>Force add</span></button>
+              <button type="button" class="${neutral} is-warning" data-probe="misspelt"><span>Force add</span></button>
+              <button type="button" class="${neutral}" data-probe="neutral"><span>Force add</span></button>
+              <span class="manager-icon-button is-warning-action" data-probe="icon"></span>
+            </section>
+            <span data-token="border" style="color: var(--fab-warning-border)"></span>
+            <span data-token="ink" style="color: var(--fab-warning-text)"></span>
+            <span data-token="surface" style="color: var(--fab-warning-soft)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const paintOf = (probe) => {
+        const style = getComputedStyle(document.querySelector(`[data-probe="${probe}"]`));
+        return {
+          borderColor: style.borderTopColor,
+          color: style.color,
+          background: style.backgroundColor,
+        };
+      };
+      const token = (name) =>
+        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+      return {
+        warning: paintOf('warning'),
+        misspelt: paintOf('misspelt'),
+        neutral: paintOf('neutral'),
+        icon: paintOf('icon'),
+        tokens: { border: token('border'), ink: token('ink'), surface: token('surface') },
+      };
+    });
+
+    assert.deepEqual(
+      measured.warning,
+      {
+        borderColor: measured.tokens.border,
+        color: measured.tokens.ink,
+        background: measured.tokens.surface,
+      },
+      'a warning manager button computes the three amber tokens the sheet names for it'
+    );
+    // The defect itself, still measurable: `is-warning` selects nothing, so a button wearing
+    // it is indistinguishable from a bare neutral one.
+    assert.deepEqual(
+      measured.misspelt,
+      measured.neutral,
+      'the `is-warning` spelling this role replaces still matches NO rule, which is why the ' +
+        'site that used it shipped with no warning treatment at all'
+    );
+    assert.notDeepEqual(
+      measured.warning,
+      measured.neutral,
+      'and the role must differ from neutral, or the amber assertion above proves nothing'
+    );
+    // The pair this repair exists to reunite: the icon button beside it in the same list
+    // already spelt the class correctly, and the two must now agree on the paint.
+    assert.deepEqual(
+      { color: measured.icon.color, background: measured.icon.background },
+      { color: measured.warning.color, background: measured.warning.background },
+      'the icon Force add and the labelled Force add are one verb and paint alike'
     );
   } finally {
     await context.close();

@@ -1681,6 +1681,8 @@
                normalizer's clamp requires before `enabled` can ever be true. That is
                Ruling A's invariant in progressive mode, and it stays literally testable. -->
             <ManagerButton
+              role="dashed"
+              fullWidth
               data-add-salvage-result
               data-add-salvage-group={salvageStageGroup ? undefined : ''}
               onclick={() => addSalvageStage()}
@@ -1812,6 +1814,8 @@
                     {/if}
 
                     <ManagerButton
+                      role="dashed"
+                      fullWidth
                       data-add-salvage-result
                       onclick={() => addSalvageResult(group.id)}
                       disabled={saving}
@@ -1840,6 +1844,8 @@
                still shows it so the GM can author the one group. -->
             {#if !salvageHideAddGroup}
               <ManagerButton
+                role="dashed"
+                fullWidth
                 data-add-salvage-group
                 onclick={() => addSalvageGroup()}
                 disabled={saving}

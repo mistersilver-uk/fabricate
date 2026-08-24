@@ -9921,6 +9921,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
     assert.ok(saveButton, 'header save submit should target the edit form');
     assert.equal(saveButton.disabled, false, 'save should be enabled when the draft is dirty');
+
+    // `ComponentEditorHeader`'s conversion, asserted where it RENDERS (issue 1118). Nothing
+    // measured this pair before: the header's three `data-*` hooks are PROPS spread through a
+    // computed key (`dirtyAttr` / `backAttr` / `saveAttr`, so a second studio can wear its own),
+    // which means no literal `data-*` string sits on either tag and no source scan could ever
+    // have named one of them. Its own docblock is the AUTHORITY for the ghost-Back ruling the
+    // other five Backs in this sweep were repaired against, so the pair it describes should be
+    // the one pair a regression cannot reach — and it was the only one with no assertion at all.
+    //
+    // Both halves matter and each is the other's mutation proof: swapping the two roles reds
+    // this, and so does dropping either.
+    assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
+    assert.ok(
+      saveButton.classList.contains('fab-manager-button'),
+      `the header Save renders through the ManagerButton primitive, got ${saveButton.className}`
+    );
+    assert.ok(
+      saveButton.classList.contains('is-primary') && !saveButton.classList.contains('is-ghost'),
+      `and stays the primary beside a ghost Back, got ${saveButton.className}`
+    );
+    assert.equal(
+      saveButton.getAttribute('type'),
+      'submit',
+      'and keeps the submit type that pairs with `form="manager-component-edit-form"` — the ' +
+        'primitive emits `type` only on a <button>, and dropping it silently stops Save working'
+    );
     saveButton.click();
     flushSync();
     await tick();
@@ -19944,6 +19970,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     // bespoke `manager-environment-issue-action` class it used to be found by styled nothing
     // in any theme — it was a test selector wearing a style class's clothes — and matching on
     // `textContent` could not tell the two deep links apart except by the words on them.
+    //
+    // Audit row 44's forgotten role, asserted on BOTH deep links by name. Same reasoning as
+    // the system overview's: a "go and look at that" link repeated down an issue list, beside
+    // a severity chip that is meant to be the loud thing. Addressing each by its record kind
+    // is what makes the mutation proof real — moving `role="ghost"` onto a neighbouring
+    // control reds this, where "the validation tab contains a ghost" would not.
+    for (const kind of ['event', 'task']) {
+      const action = target.querySelector(`[data-environment-issue-action="${kind}"]`);
+      assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
+      assert.ok(
+        action.classList.contains('fab-manager-button'),
+        `the View ${kind} link renders through the ManagerButton primitive, got ${action.className}`
+      );
+      assert.ok(
+        action.classList.contains('is-ghost'),
+        `the View ${kind} link takes the ghost role, got ${action.className}`
+      );
+    }
+
     target.querySelector('[data-environment-issue-action="event"]').click();
     await tick();
     flushSync();
@@ -20814,6 +20859,33 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const blockerLink = target.querySelector('[data-system-edit-blocker-link]');
     assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
+    // Audit row 8's forgotten role (issue 1118). This is a "go and look at that" link inside a
+    // callout that already carries the alarm — the triangle, the title and the body copy — and
+    // at the base `.manager-button` weight it competed with the sentence explaining it. Ghost
+    // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
+    // secondary verb beside something that outranks it.
+    //
+    // Named by its own hook, and paired with the Save beside it in the same editor, which is
+    // the control a "the settings tab renders a ghost" assertion would have accepted.
+    assert.ok(
+      blockerLink.classList.contains('fab-manager-button'),
+      `the blocker link renders through the ManagerButton primitive, got ${blockerLink.className}`
+    );
+    assert.ok(
+      blockerLink.classList.contains('is-ghost'),
+      `the blocker link takes the ghost role, got ${blockerLink.className}`
+    );
+    const detailsSave = target.querySelector('[data-system-details-save]');
+    assert.ok(Boolean(detailsSave), 'the Identity card renders its Save details submit');
+    assert.ok(
+      detailsSave.classList.contains('is-primary') && !detailsSave.classList.contains('is-ghost'),
+      `and the Save beside it stays the primary, got ${detailsSave.className}`
+    );
+    assert.equal(
+      detailsSave.getAttribute('type'),
+      'submit',
+      'Save details submits its own form, so the conversion must keep it a submit'
+    );
     blockerLink.click();
     await tick();
     flushSync();

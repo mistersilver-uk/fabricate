@@ -634,7 +634,14 @@
                       )}</span
                     >
                   </div>
+                  <!-- Ghost (issue 1118, row 8). This is a "go and look at that" link
+                       sitting inside a blocker callout that already carries the alarm; at
+                       the base weight it competed with the copy explaining it. The
+                       authority is `component/ComponentEditorHeader.svelte`'s comment on
+                       its own Back: a secondary verb beside something that outranks it is
+                       ghost. -->
                   <ManagerButton
+                    role="ghost"
                     class="manager-system-edit-blocker-link"
                     data-system-edit-blocker-link
                     onclick={() => {

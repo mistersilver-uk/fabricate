@@ -118,6 +118,7 @@ async function mountEditor() {
     },
   });
   return {
+    root,
     updates,
     /**
      * Feed the recorded patches back in, the way the real host does.
@@ -208,6 +209,64 @@ const NEVER_RECEIVES_NULL = [
 ];
 
 describe('Gathering task editor steppers (issue 1050)', () => {
+  // ── Two adds on one screen, two roles, and both were wrong (issue 1118) ──────────────
+  //
+  // Audit rows 34 and 35. The gathering task editor renders two ADD verbs, and the sweep found
+  // them spelt as one bare `manager-button` each:
+  //
+  //  - Add modifier appends to the stamina modifier list directly above it, which is `dashed`:
+  //    a dashed outline reads as the empty slot the next row will fill. It takes NO `fullWidth`
+  //    — that is the delta's per-row ruling, and it is about the container: the list is a
+  //    column of grid rows, and a full-width dashed control under them reads as a fourth row
+  //    rather than as the thing that adds one. Its scoped `justify-self: start` went with the
+  //    conversion rather than being fought for; `justify-self` is a grid property and the
+  //    button's parent is a column flex container, so it had never done anything.
+  //  - Add drop rule is the drops section's CREATE action in toolbar chrome, which is
+  //    `primary`. The proof it was a mistake rather than a choice is on the SAME screen: the
+  //    identical verb in the drops empty state calls the same `onAddDrop` with the same label
+  //    and already shipped `is-primary`. Two spellings of one verb on one screen.
+  //
+  // Each is addressed by its own hook, and the two are asserted against EACH OTHER: moving
+  // either role onto the other control reds this, where "the editor contains a dashed button"
+  // and "the editor contains a primary button" would both still pass.
+  it('paints Add modifier as a dashed append and Add drop rule as the toolbar primary', async () => {
+    const { root } = await mountEditor();
+
+    const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
+    assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
+    assert.ok(
+      addModifier.classList.contains('fab-manager-button'),
+      `Add modifier renders through the ManagerButton primitive, got ${addModifier.className}`
+    );
+    assert.ok(
+      addModifier.classList.contains('is-dashed'),
+      `Add modifier takes the dashed append role, got ${addModifier.className}`
+    );
+    assert.ok(
+      !addModifier.classList.contains('is-full-width'),
+      `and is deliberately NOT full width, got ${addModifier.className}`
+    );
+
+    const addDrop = root.querySelector('[data-gathering-add-drop="toolbar"]');
+    assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
+    assert.ok(
+      addDrop.classList.contains('fab-manager-button'),
+      `Add drop rule renders through the ManagerButton primitive, got ${addDrop.className}`
+    );
+    assert.ok(
+      addDrop.classList.contains('is-primary'),
+      `Add drop rule takes the primary role, got ${addDrop.className}`
+    );
+    assert.ok(
+      !addDrop.classList.contains('is-dashed'),
+      `and not the append role that belongs to the control above, got ${addDrop.className}`
+    );
+    assert.ok(
+      !addModifier.classList.contains('is-primary'),
+      `nor Add modifier the toolbar create role, got ${addModifier.className}`
+    );
+  });
+
   it('renders every migrated field as a real number input inside a Stepper', async () => {
     // Fail closed: if a selector stopped resolving, every table-driven assertion below would
     // silently assert nothing, and `field()` throwing here says so in one place.

@@ -1174,7 +1174,14 @@
                   >
                 </div>
               {/each}
+              <!-- Dashed, and deliberately NOT `fullWidth` (issue 1118, row 34). It is the
+                   add-a-row verb at the foot of the modifier list, which is what `dashed`
+                   states; the list is a column of grid rows and a full-width dashed control
+                   under them would read as a fourth row rather than as the slot that adds
+                   one. Its scoped `justify-self: start` went with the conversion — it was a
+                   grid property on a flex item and had never done anything. -->
               <ManagerButton
+                role="dashed"
                 disabled={(characterModifierLibrary || []).length === 0}
                 onclick={addStaminaCostModifier}
                 data-gathering-add-stamina-modifier
@@ -1935,7 +1942,11 @@
               )}
             />
           </label>
-          <ManagerButton onclick={onAddDrop} data-gathering-add-drop="toolbar">
+          <!-- Primary (issue 1118, row 35): the section's CREATE action in toolbar chrome is
+               the loud one, and the identical verb in this screen's own empty state — same
+               `onAddDrop`, same label — was already `is-primary`. Two spellings of one verb
+               on one screen is exactly the drift the primitive exists to end. -->
+          <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
             >

@@ -918,8 +918,29 @@
                   </div>
                 {:else}
                   {#if mode === 'manual' && entry.compositionState === 'notMatching'}
+                    <!-- THE `warning` REPAIR (issue 1118). This spelt its modifier
+                         `is-warning`, and the sheet declares `.manager-button.is-warning-action`
+                         while declaring `.manager-button.is-warning` NOWHERE — so Force add
+                         shipped with no warning treatment at all, and the amber treatment
+                         shipped with no call site. One verb, two places: the icon button at
+                         the top of this file spells it correctly, and it is the same
+                         `onForceInclude`, the same `data-action` and the same localization
+                         key. `role="warning"` emits the class that exists, which is why the
+                         role-to-class relation in the primitive is a NAMED MAPPING rather
+                         than a template over the role name.
+
+                         NOTE FOR THE NEXT READER, and it is not a small one: this control
+                         cannot currently render. It sits in the standalone Non-matching
+                         section, which the markup gates on `mode !== 'manual'`, and its own
+                         guard demands `mode === 'manual'`. The two conditions are mutually
+                         exclusive. Manual mode grew its own Available-to-add section — with
+                         the icon Force add above, which DOES render — and this branch was
+                         left behind. Reported with the sweep rather than deleted or
+                         re-gated: which of those it wants is a product decision about where
+                         a manual force-add belongs, not a class repair. -->
                     <ManagerButton
-                      class="is-warning manager-environment-force-include"
+                      role="warning"
+                      class="manager-environment-force-include"
                       data-action="force-include"
                       onclick={() => onForceInclude(kind, entry.id)}
                     >

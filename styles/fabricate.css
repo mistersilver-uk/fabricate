@@ -13416,10 +13416,15 @@
   background: var(--fab-danger);
 }
 
-/* The `warning` role's treatment. It has no call site yet and is deliberately kept: the one
-   control that means to render it spells the class `is-warning`, which this sheet declares
-   nowhere, so the site ships with no warning treatment at all. Issue 1118 makes `warning` a
-   role of the primitive, which emits THIS class name. */
+/* The `warning` role's treatment, and it HAS a call site now (issue 1118, task 9).
+   `environment/CompositionList.svelte`'s labelled Force add spelt the class `is-warning`,
+   which this sheet declares nowhere, so it shipped with no warning treatment at all while
+   this rule sat here with nothing rendering it — a defect and a dead rule, from one typo.
+   `<ManagerButton role="warning">` emits THIS class name, which is why the primitive keeps a
+   named role-to-class mapping rather than a template over the role name.
+
+   The three declarations are paint only. That is what makes the role order-independent
+   against `.manager-button.fab-manager-button`, which states geometry and no colour. */
 .fabricate-manager .manager-button.is-warning-action:not(:disabled),
 .fabricate-manager .manager-icon-button.is-warning-action:not(:disabled) {
   border-color: var(--fab-warning-border);

@@ -157,7 +157,7 @@ function managerRows() {
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
         <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" class="manager-button" data-boundary>Open</button>
+      <button type="button" class="manager-button fab-manager-button" data-boundary>Open</button>
     </article>
   `).join('');
 }
@@ -238,7 +238,7 @@ function managerFixture(theme, width, height) {
           <p class="manager-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
         </div>
         <div class="manager-header-actions">
-          <button id="focus-target" type="button" class="manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
+          <button id="focus-target" type="button" class="manager-button fab-manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
         </div>
       </header>
       <div class="manager-body">
@@ -270,7 +270,7 @@ function managerFixture(theme, width, height) {
         <aside class="manager-inspector" data-region data-boundary>
           <h2 data-contrast-surface>Palette</h2>
           <p class="manager-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
-          <button type="button" class="manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
+          <button type="button" class="manager-button fab-manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
           <!-- The armed half of the inline two-step row confirmation (issue 785). It is
                the product's first SOLID fab-danger surface, so it carries its OWN
                contrast probe: contrastSample reads the FIRST node matching a
@@ -519,7 +519,7 @@ function liveUpdateFixture(origin) {
       </head>
       <body>
         <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
-          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="manager-button is-primary">Action</button></header>
+          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="manager-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
             <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
             <main class="manager-main"><div class="manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>

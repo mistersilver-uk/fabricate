@@ -674,6 +674,35 @@ const REVIEWED = [
   // are unconverted ones. Their reasoning is preserved at their new entries rather than
   // summarised here.
   {
+    id: globalRule('.fabricate-manager .manager-button.is-warning-action:not(:disabled)'),
+    disposition: 'NO_CONFLICT',
+    // WAS DEAD, and is the sweep's one entry to move in that direction. Its old `why` said the
+    // entry 'should go live rather than away', and this is that: the primitive's sixth role
+    // emits this class, and the control that always meant to render it now does. Named the same
+    // way the other converted-reach entries are, by the role prop rather than by a container,
+    // because the role IS the reach.
+    //
+    // ONE caveat, recorded because it is a second defect on the same control and the reason
+    // this entry cannot rest on a mounted assertion: that Force add does not currently render in
+    // any state. It sits in `CompositionList`'s standalone Non-matching section, which the
+    // markup gates on `mode !== 'manual'`, while its own guard demands `mode === 'manual'`.
+    // Reported with the sweep; repairing it is a product decision about where a manual
+    // force-add belongs.
+    convertedReach: [
+      {
+        file: 'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
+        role: 'warning',
+        buttons: 1,
+      },
+    ],
+    why:
+      'Paint only — `border-color`, `color` and `background` — against a primitive that states ' +
+      'geometry and no colour, so the two cannot collide whatever the source order. That is ' +
+      "the delta's stated reason for admitting `warning` as a role at all, now measured rather " +
+      'than argued. Its `.manager-icon-button` sibling in the same comma group is what the ' +
+      'quick-action Force add beside it renders, and the pair agree by construction.',
+  },
+  {
     id: globalRule('.fabricate-manager .manager-button.is-primary:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     // The primary paint reaches no LITERAL site at all now — no population-B trigger is a
@@ -751,16 +780,12 @@ const REVIEWED = [
   // last three families are orphaned too — no component carries the classes at all — but
   // they are outside a manager-button reconciliation and are named in the handoff as a
   // separate dead-CSS sweep rather than half-cleaned here.
-  {
-    id: globalRule('.fabricate-manager .manager-button.is-warning-action:not(:disabled)'),
-    disposition: 'DEAD',
-    why:
-      'DEAD and deliberately KEPT, which is why this list is not a retirement order. It ' +
-      "corroborates the delta's `warning` repair from the other side: the treatment exists and " +
-      'NOTHING renders it, because the one site that means to spells the class `is-warning`, ' +
-      'which the sheet declares nowhere. The primitive gains a `warning` role that emits THIS ' +
-      'class, so the entry should go live rather than away.',
-  },
+  // The list is EMPTY, and that is the change task 9 made to it.
+  // `.manager-button.is-warning-action:not(:disabled)` was the one entry: DEAD and deliberately
+  // kept, because it corroborated the `warning` repair from the other side — the amber treatment
+  // existed and nothing rendered it, since the one control that meant to render it spelt the
+  // class `is-warning`, which the sheet declares nowhere. It has a call site now and has moved
+  // to NO_CONFLICT above, which is the outcome its own `why` asked for.
 ];
 
 const idsWith = (...dispositions) =>

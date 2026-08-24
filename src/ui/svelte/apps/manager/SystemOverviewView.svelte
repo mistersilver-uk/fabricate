@@ -269,7 +269,11 @@
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}
+                <!-- Ghost (issue 1118, row 21). One deep link per issue row, in a list
+                     whose severity chip is the loud thing; a solid control on every row
+                     would out-shout the severities the list exists to rank. -->
                 <ManagerButton
+                  role="ghost"
                   class="manager-system-overview-link"
                   data-overview-link={issue.kind}
                   onclick={() => onSelectIssue(issue)}

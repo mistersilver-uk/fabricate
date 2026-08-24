@@ -288,6 +288,33 @@ describe('CompositionList mounted layout', () => {
     forceIncludeQuick.click();
     assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
 
+    // THE `warning` REPAIR's reachable half (issue 1118). Force add is ONE verb — one
+    // `onForceInclude`, one `data-action`, one localization key — rendered from two places in
+    // this component, and the two spelt their amber modifier differently: this icon control
+    // wrote `is-warning-action`, which the sheet declares, and the labelled control wrote
+    // `is-warning`, which it declares nowhere. That is the defect that put a sixth role in the
+    // primitive's vocabulary.
+    //
+    // Only this half can be asserted from a mount, and the reason is a SECOND defect on the
+    // same pair: the labelled control sits in the standalone Non-matching section, which the
+    // markup gates on `mode !== 'manual'`, while its own guard demands `mode === 'manual'`. It
+    // renders in no state at all, which is also why the misspelling survived — nobody ever saw
+    // it. Its role is pinned from source in `tests/manager-button-source-contract.test.js`,
+    // with the reachability defect reported rather than repaired here.
+    assert.ok(
+      forceIncludeQuick.classList.contains('is-warning-action'),
+      `the icon Force add carries the amber class the sheet declares, got ${forceIncludeQuick.className}`
+    );
+    assert.ok(
+      !forceIncludeQuick.classList.contains('is-warning'),
+      'and not the spelling that matches no rule at all'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-force-include'),
+      'and the labelled Force add is unreachable in every mode this component offers, which ' +
+        'is a defect in its own right — see the source contract for the role it carries'
+    );
+
     assert.equal(
       target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
       null,

@@ -146,6 +146,7 @@
                        wearing a style class's clothes, and it named neither the verb nor
                        the record it opens. -->
                   <ManagerButton
+                    role="ghost"
                     data-environment-issue-action={issue.recordKind}
                     onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}
                   >
