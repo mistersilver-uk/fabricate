@@ -142,6 +142,8 @@
   import TagsCategoriesView from './TagsCategoriesView.svelte';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
+  import WorldModifiersTab from './world/WorldModifiersTab.svelte';
+  import WorldPrerequisitesTab from './world/WorldPrerequisitesTab.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
   import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
   import {
@@ -149,6 +151,10 @@
     WORLD_DOWNTIME_SURFACE_ID,
   } from '../../../managerExtensions.js';
   import { resolveNavTabBadge, navTabBadgeTotal } from '../../../navTabBadgeStore.js';
+  import {
+    mapModifierToPrerequisite,
+    mapPrerequisiteToModifier,
+  } from '../../../../systems/characterModifierPrerequisiteCopy.js';
 
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
@@ -423,6 +429,7 @@
     'checks',
     'gathering',
     'worldTravel',
+    'worldRules',
     'worldDowntime',
   ]);
   let railGroupUserExpanded = $state({
@@ -430,6 +437,7 @@
     checks: false,
     gathering: false,
     worldTravel: false,
+    worldRules: false,
     worldDowntime: false,
   });
   // The selected Downtime preview is owned here rather than inside the extension host
@@ -2660,6 +2668,31 @@
   // a GM has to be able to configure the world's coins BEFORE any crafting system opts in, so
   // gating this on a system having currency enabled would be a chicken-and-egg lock-out.
   const isWorldCurrencyRoute = $derived(currentView === 'world-currency');
+  // World > Rules & Resources (issue 1311). THREE SIBLING ROUTES under one rail group, rather
+  // than one route with a sub-tab variable as Travel and Downtime use. The reason is concrete:
+  // Travel's model would force a rename of `world-currency`, churning three View Lab cases and
+  // their `expectView` assertions, the route-scoped CSS, the spec section and the docs page, for
+  // nothing a GM could see. The Checks group is the precedent for a group whose children are
+  // real routes.
+  const isWorldPrerequisitesRoute = $derived(currentView === 'world-prerequisites');
+  const isWorldModifiersRoute = $derived(currentView === 'world-modifiers');
+  const isWorldRulesRoute = $derived(
+    isWorldCurrencyRoute || isWorldPrerequisitesRoute || isWorldModifiersRoute
+  );
+  // Which sub-item the rail marks as current, and the `data-world-rules-tab` marker the CSS and
+  // the View Lab read.
+  const worldRulesTab = $derived(
+    isWorldPrerequisitesRoute ? 'prerequisites' : isWorldModifiersRoute ? 'modifiers' : 'currency'
+  );
+  // ONE derivation for the destination's name, read by the breadcrumb, the page title and the
+  // `<main>` aria-label. Three call-site literals would drift.
+  const worldRulesPageTitle = $derived(
+    isWorldPrerequisitesRoute
+      ? text('FABRICATE.Admin.Manager.CharacterPrerequisites.Title', 'Character prerequisites')
+      : isWorldModifiersRoute
+        ? text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')
+        : text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency')
+  );
   // World > Travel (issue 1282). UNGATED for the same reason World > Currency is: the realm
   // library is world geography, and a GM has to be able to author a valley before deciding
   // which crafting systems care about it. The per-system Travel & Realms toggle governs
@@ -3017,6 +3050,7 @@
     checks: isChecksRoute,
     gathering: isActiveGatheringChildRoute,
     worldTravel: isWorldTravelRoute,
+    worldRules: isWorldRulesRoute,
     worldDowntime: isWorldDowntimeRoute,
   });
   const railGroupExpanded = $derived({
@@ -3024,6 +3058,7 @@
     checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
     gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
     worldTravel: railGroupUserExpanded.worldTravel || railGroupLockedOpen.worldTravel,
+    worldRules: railGroupUserExpanded.worldRules || railGroupLockedOpen.worldRules,
     worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
   });
   // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
@@ -3852,6 +3887,8 @@
       view === 'world' ||
       view === 'world-downtime' ||
       view === 'world-currency' ||
+      view === 'world-prerequisites' ||
+      view === 'world-modifiers' ||
       view === 'world-travel'
     )
       return view;
@@ -3926,8 +3963,7 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    if (currentView === 'world-currency')
-      return text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency');
+    if (isWorldRulesRoute) return worldRulesPageTitle;
     if (currentView === 'world-travel') {
       if (worldTravelTab === 'map')
         return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
@@ -4085,6 +4121,44 @@
         .replace('{count}', String(selectedCurrencyUnits.length))
         .replace('{systems}', String(currencyEnabledSystemCount))
         .replace('{total}', String(allSystems.length));
+    }
+    if (currentView === 'world-prerequisites') {
+      const count = selectedCharacterPrerequisites.length;
+      const template =
+        count === 0
+          ? text(
+              'FABRICATE.Admin.Manager.World.Prerequisites.SubtitleEmpty',
+              'No prerequisites yet · shared by every crafting system'
+            )
+          : count === 1
+            ? text(
+                'FABRICATE.Admin.Manager.World.Prerequisites.SubtitleOne',
+                '1 prerequisite · shared by every crafting system'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.World.Prerequisites.Subtitle',
+                '{count} prerequisites · shared by every crafting system'
+              );
+      return template.replace('{count}', String(count));
+    }
+    if (currentView === 'world-modifiers') {
+      const count = selectedSystemModifiers.length;
+      const template =
+        count === 0
+          ? text(
+              'FABRICATE.Admin.Manager.World.Modifiers.SubtitleEmpty',
+              'No modifiers yet · shared by every crafting system'
+            )
+          : count === 1
+            ? text(
+                'FABRICATE.Admin.Manager.World.Modifiers.SubtitleOne',
+                '1 modifier · shared by every crafting system'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.World.Modifiers.Subtitle',
+                '{count} modifiers · shared by every crafting system'
+              );
+      return template.replace('{count}', String(count));
     }
     if (currentView === 'world-downtime')
       return downtimeChrome(
@@ -6942,13 +7016,76 @@
     });
   }
 
-  // World > Currency (issue 1278). No availability refusal, unlike `openWorldDowntime` below:
-  // the route is ungated because the world's coins have to be configurable before any crafting
-  // system can enable currency.
-  function openWorldCurrency() {
-    return afterTruthyResult(confirmRouteExit('world-currency'), () => {
-      activeView = 'world-currency';
+  // World > Rules & Resources (issue 1311). UNGATED, exactly like Currency was on its own and
+  // like Travel, and for the same reason: the libraries have to be authorable before any
+  // crafting system references them.
+  //
+  // The destination travels as the route-exit subject id, because a Rules & Resources page is
+  // the "same group, different subject" case that parameter exists for — without it a
+  // navigation guard could not tell a real move apart from re-entering the page the GM is
+  // already on.
+  const WORLD_RULES_ROUTES = Object.freeze({
+    currency: 'world-currency',
+    prerequisites: 'world-prerequisites',
+    modifiers: 'world-modifiers',
+  });
+  function openWorldRulesDestination(destination = 'currency') {
+    const view = WORLD_RULES_ROUTES[destination];
+    if (!view) return;
+    return afterTruthyResult(confirmRouteExit(view, destination), () => {
+      railGroupUserExpanded.worldRules = true;
+      activeView = view;
     });
+  }
+
+  function activateWorldRulesParent() {
+    railGroupUserExpanded.worldRules = true;
+    if (isWorldRulesRoute) return;
+    openWorldRulesDestination('currency');
+  }
+
+  // The cross-copy between the two libraries (issue 1308's `characterModifierPrerequisiteCopy`)
+  // used to be an in-page affair: both lists rendered on System Settings, so copying expanded
+  // the other section and scrolled to the new row. Across two sibling routes it is a
+  // NAVIGATION, which a page component cannot perform — so each page hands the source entry up
+  // and this pair owns the mapping, the write, the route change and the open request.
+  //
+  // The nonce is what makes the request re-assertable: copying the same entry twice must open it
+  // both times, and an id alone cannot say that it was asked for again.
+  let worldRulesRequestOpenId = $state('');
+  let worldRulesRequestOpenNonce = $state(0);
+
+  // The copy announcement moved up here with the handler. It used to live on the System Settings
+  // page beside both lists; once the copy became a NAVIGATION the source page unmounts, so an
+  // announcement rendered there would be torn down before a screen reader read it. The
+  // destination page scrolls to and focuses the new row, which is the sighted half of the same
+  // confirmation — this is the other half.
+  let worldRulesCopyAnnouncement = $state('');
+  function announceWorldRulesCopy(name) {
+    const label = String(name || '').trim();
+    const localized = text('FABRICATE.Admin.Manager.ListErgonomics.CopiedAnnouncement', '');
+    worldRulesCopyAnnouncement =
+      localized && localized.includes('{name}')
+        ? localized.replace('{name}', label)
+        : `Copied ${label} and icon — set the condition.`;
+  }
+
+  async function copyModifierToPrerequisite(entry) {
+    const created = await store.addCharacterPrerequisite(mapModifierToPrerequisite(entry));
+    if (!created?.id) return;
+    worldRulesRequestOpenId = created.id;
+    worldRulesRequestOpenNonce += 1;
+    announceWorldRulesCopy(entry?.label);
+    openWorldRulesDestination('prerequisites');
+  }
+
+  async function copyPrerequisiteToModifier(entry) {
+    const created = await store.addSystemModifier(mapPrerequisiteToModifier(entry));
+    if (!created?.id) return;
+    worldRulesRequestOpenId = created.id;
+    worldRulesRequestOpenNonce += 1;
+    announceWorldRulesCopy(entry?.name);
+    openWorldRulesDestination('modifiers');
   }
 
   function openWorldDowntime() {
@@ -7954,6 +8091,7 @@
   class="fabricate-manager"
   data-manager-view={currentView}
   data-world-travel-tab={worldTravelTabAttribute}
+  data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
@@ -8024,13 +8162,13 @@
           <button type="button" onclick={() => selectSystemAndShowBrowser()}
             >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
           >
-          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute && !isWorldTravelRoute}
+          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute && !isWorldRulesRoute && !isWorldTravelRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={() => editSystem(selectedSystem.id)}
               >{selectedSystem.name}</button
             >
           {/if}
-          {#if isWorldRoute || isWorldDowntimeRoute || isWorldCurrencyRoute || isWorldTravelRoute}
+          {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <!--
               `World.Heading` is the RAIL's micro-label and is authored in caps for the
@@ -8041,9 +8179,11 @@
             <span data-breadcrumb-world
               >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
             >
-            {#if isWorldCurrencyRoute}
+            {#if isWorldRulesRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}</span>
+              <span>{text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}</span>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span data-breadcrumb-world-rules-tab={worldRulesTab}>{worldRulesPageTitle}</span>
             {/if}
             {#if isWorldTravelRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -8350,7 +8490,7 @@
         system and "Export" would sit disabled against a selected-system id the route does not
         even have.
       -->
-      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldCurrencyRoute}
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
@@ -9428,21 +9568,119 @@
               </div>
             {/if}
           </div>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${isWorldCurrencyRoute ? 'is-active' : ''}`}
-            id="manager-world-nav-currency"
-            data-world-nav-item="currency"
-            aria-label={text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
-            aria-current={isWorldCurrencyRoute ? 'page' : undefined}
-            onclick={openWorldCurrency}
+          <!--
+            World > Rules & Resources (issue 1311). A GROUP, for the reason Travel and Downtime
+            are: the route has several destinations, and the rail is where this Manager has
+            always put a route's destinations. Currency was a leaf only because it was the first
+            of the three to move to world scope; the character prerequisite library and the
+            modifier library joined it in issue 1308 and the three are one kind of thing.
+
+            UNGATED, like Parties and Travel: every one of these libraries has to be authorable
+            before any crafting system references it.
+
+            The count is the total across all three, because the parent stands for the group
+            rather than for any one destination.
+          -->
+          <div
+            class={`manager-nav-group manager-world-rules-group ${railGroupExpanded.worldRules ? 'is-expanded' : ''}`}
+            data-world-rules-section
           >
-            <i class="fas fa-coins" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
-            </span>
-            <span class="manager-nav-count">{selectedCurrencyUnits.length}</span>
-          </button>
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldRulesRoute ? 'is-active' : ''}`}
+              id="manager-world-nav-rules"
+              data-world-nav-item="rules"
+              aria-label={text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
+              aria-current={isWorldRulesRoute ? 'page' : undefined}
+              aria-controls="manager-rules-submenu"
+              aria-expanded={railGroupExpanded.worldRules}
+              onclick={activateWorldRulesParent}
+            >
+              <i class="fas fa-scale-balanced" aria-hidden="true"></i>
+              <span class="manager-nav-label">
+                {text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
+              </span>
+              <span class="manager-nav-count">
+                {selectedCurrencyUnits.length +
+                  selectedCharacterPrerequisites.length +
+                  selectedSystemModifiers.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              id="manager-rules-toggle"
+              data-world-rules-toggle
+              aria-label={railGroupExpanded.worldRules
+                ? text('FABRICATE.Admin.Manager.World.CollapseRules', 'Collapse Rules & Resources')
+                : text('FABRICATE.Admin.Manager.World.ExpandRules', 'Expand Rules & Resources')}
+              aria-controls="manager-rules-submenu"
+              aria-expanded={railGroupExpanded.worldRules}
+              disabled={railGroupLockedOpen.worldRules}
+              aria-disabled={railGroupLockedOpen.worldRules}
+              title={railGroupLockedOpen.worldRules ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('worldRules', event)}
+            >
+              <i
+                class={railGroupExpanded.worldRules ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if railGroupExpanded.worldRules}
+              <div
+                class="manager-nav-submenu"
+                id="manager-rules-submenu"
+                data-world-rules-submenu
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.World.RulesDestinations',
+                  'Rules & Resources'
+                )}
+              >
+                <button
+                  type="button"
+                  class={`manager-nav-subitem ${isWorldCurrencyRoute ? 'is-active' : ''}`}
+                  id="manager-rules-nav-currency"
+                  data-world-rules-item="currency"
+                  aria-current={isWorldCurrencyRoute ? 'page' : undefined}
+                  onclick={() => openWorldRulesDestination('currency')}
+                >
+                  <i class="fas fa-coins" aria-hidden="true"></i>
+                  <span class="manager-nav-label">
+                    {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class={`manager-nav-subitem ${isWorldPrerequisitesRoute ? 'is-active' : ''}`}
+                  id="manager-rules-nav-prerequisites"
+                  data-world-rules-item="prerequisites"
+                  aria-current={isWorldPrerequisitesRoute ? 'page' : undefined}
+                  onclick={() => openWorldRulesDestination('prerequisites')}
+                >
+                  <i class="fas fa-user-shield" aria-hidden="true"></i>
+                  <span class="manager-nav-label">
+                    {text(
+                      'FABRICATE.Admin.Manager.CharacterPrerequisites.Title',
+                      'Character prerequisites'
+                    )}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class={`manager-nav-subitem ${isWorldModifiersRoute ? 'is-active' : ''}`}
+                  id="manager-rules-nav-modifiers"
+                  data-world-rules-item="modifiers"
+                  aria-current={isWorldModifiersRoute ? 'page' : undefined}
+                  onclick={() => openWorldRulesDestination('modifiers')}
+                >
+                  <i class="fas fa-user-gear" aria-hidden="true"></i>
+                  <span class="manager-nav-label">
+                    {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+                  </span>
+                </button>
+              </div>
+            {/if}
+          </div>
           <!--
             Downtime is a GROUP, not a leaf: the design nests the same four previews under it
             that Core's own tab strip offers, each carrying a premium padlock. The structure
@@ -9690,6 +9928,49 @@
           {onSetCurrencyProvider}
           {onSetCurrencyMacro}
           {onClearCurrencyMacro}
+        />
+      </main>
+    {:else if isWorldPrerequisitesRoute}
+      <!--
+        World > Character prerequisites (issue 1311), the second Rules & Resources destination.
+        Same shape as Currency above and for the same reasons: its own `manager-main` from the
+        root, no right-hand inspector, and the entry editors expand in place.
+      -->
+      <main class="manager-main" aria-label={worldRulesPageTitle}>
+        <p class="visually-hidden" aria-live="polite" data-list-copy-announcement>
+          {worldRulesCopyAnnouncement}
+        </p>
+        <WorldPrerequisitesTab
+          library={selectedCharacterPrerequisites}
+          presetsSupported={characterPrerequisitePresetsSupported}
+          onAdd={onAddCharacterPrerequisite}
+          onUpdate={onUpdateCharacterPrerequisite}
+          onDelete={onDeleteCharacterPrerequisite}
+          onReorder={onReorderCharacterPrerequisite}
+          onSeedPresets={onSeedCharacterPrerequisitePresets}
+          onCopyToModifier={copyPrerequisiteToModifier}
+          requestOpenId={worldRulesRequestOpenId}
+          requestOpenNonce={worldRulesRequestOpenNonce}
+        />
+      </main>
+    {:else if isWorldModifiersRoute}
+      <!-- World > Modifiers (issue 1311), the third Rules & Resources destination. -->
+      <main class="manager-main" aria-label={worldRulesPageTitle}>
+        <p class="visually-hidden" aria-live="polite" data-list-copy-announcement>
+          {worldRulesCopyAnnouncement}
+        </p>
+        <WorldModifiersTab
+          library={selectedSystemModifiers}
+          presetsSupported={characterModifierPresetsSupported}
+          {foundrySystemId}
+          onAdd={onAddCharacterModifier}
+          onUpdate={onUpdateCharacterModifier}
+          onDelete={onDeleteCharacterModifier}
+          onReorder={onReorderCharacterModifier}
+          onSeedPresets={onSeedCharacterModifierPresets}
+          onCopyToPrerequisite={copyModifierToPrerequisite}
+          requestOpenId={worldRulesRequestOpenId}
+          requestOpenNonce={worldRulesRequestOpenNonce}
         />
       </main>
     {:else if isWorldTravelRoute}
@@ -10350,7 +10631,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute && !isWorldCurrencyRoute}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute && !isWorldRulesRoute}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">

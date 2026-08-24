@@ -20,6 +20,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-report-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
   ],

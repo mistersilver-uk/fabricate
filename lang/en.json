@@ -4209,8 +4209,7 @@
           "TaskDcOverridePlaceholder": "System default"
         },
         "ListErgonomics": {
-          "ToggleSection": "Collapse or expand this section",
-          "CopyToPrerequisites": "Copy to prerequisites",
+            "CopyToPrerequisites": "Copy to prerequisites",
           "CopyToModifiers": "Copy to modifiers",
           "CopiedAnnouncement": "Copied {name} and icon — set the condition.",
           "MoveUp": "Move up",
@@ -4221,7 +4220,7 @@
           "DeleteTitle": "Delete {name}?",
           "DeleteContent": "Delete modifier <strong>{name}</strong>? It is removed across every crafting system, and any check that selected it drops it on that system's next save.",
           "Title": "Modifiers",
-          "Hint": "Reusable actor-driven modifiers, shared by every crafting system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.",
+          "Hint": "Reusable actor-driven modifiers. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.",
           "Empty": "No modifiers yet.",
           "Add": "Add modifier",
           "Delete": "Delete modifier",
@@ -4455,6 +4454,20 @@
           "PartiesHint": "Create and manage parties shared across every crafting system.",
           "PartiesActions": "World party actions",
           "PartiesInspector": "Selected world party",
+          "RulesNav": "Rules & Resources",
+          "CollapseRules": "Collapse Rules & Resources",
+          "ExpandRules": "Expand Rules & Resources",
+          "RulesDestinations": "Rules & Resources",
+          "Prerequisites": {
+            "Subtitle": "{count} prerequisites · shared by every crafting system",
+            "SubtitleOne": "1 prerequisite · shared by every crafting system",
+            "SubtitleEmpty": "No prerequisites yet · shared by every crafting system"
+          },
+          "Modifiers": {
+            "Subtitle": "{count} modifiers · shared by every crafting system",
+            "SubtitleOne": "1 modifier · shared by every crafting system",
+            "SubtitleEmpty": "No modifiers yet · shared by every crafting system"
+          },
           "CurrencyNav": "Currency",
           "CurrencyTitle": "World Currency",
           "TravelNav": "Travel",

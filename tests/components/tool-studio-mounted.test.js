@@ -31,6 +31,7 @@ const harness = createMountedComponentHarness({
     // now uses to widen its guard onto the legacy compendium `{ pack, id }` shape.
     'src/utils/essenceValidation.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/chanceColorScale.js',
     'src/ui/svelte/util/dropRateTier.js',

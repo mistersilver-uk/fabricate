@@ -11,6 +11,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-item-limits-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The Limits tab's "Character prerequisites to learn" picker imports the pure
     // prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',

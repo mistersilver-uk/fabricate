@@ -23,6 +23,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 const RECIPE_RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
   'src/utils/recipeBrowserModel.js',

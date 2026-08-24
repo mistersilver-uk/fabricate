@@ -11,6 +11,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-item-contents-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The recipe thumbnails resolve through the shared pure image helper (issue 544).
     'src/ui/svelte/util/craftingImageDefaults.js',
   ],

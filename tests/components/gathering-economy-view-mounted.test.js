@@ -103,6 +103,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // (issue 1050); omitting it leaves the compiled component with an unresolvable import.
     for (const modulePath of [
       'src/ui/svelte/util/foundryBridge.js',
+      'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
     ]) {
       writeRawModule(modulePath);

@@ -8650,7 +8650,7 @@ test('the modifier row gives every field room for its longest content at every m
 
   try {
     const stepper = (bound) =>
-      `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-system-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
+      `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
       `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
     const editor = `
@@ -8658,7 +8658,7 @@ test('the modifier row gives every field room for its longest content at every m
         <div class="manager-modifier-name-row">
           <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
           <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
-          <div class="manager-modifier-bounds-row" data-system-modifier-bounds="mod-probe">
+          <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
           </div>
         </div>
@@ -8714,7 +8714,7 @@ test('the modifier row gives every field room for its longest content at every m
               needed: Math.round(measureText(label, 'Herbalism Training')),
             },
             bounds: ['min', 'max'].map((bound) => {
-              const input = document.querySelector(`[data-system-modifier-field="${bound}"]`);
+              const input = document.querySelector(`[data-world-modifier-field="${bound}"]`);
               const style = getComputedStyle(input);
               const content =
                 input.getBoundingClientRect().width -

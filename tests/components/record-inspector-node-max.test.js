@@ -10,6 +10,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-record-inspector-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/gatheringImageDefaults.js',
   ],
   compiledModules: [

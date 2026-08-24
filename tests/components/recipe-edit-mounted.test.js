@@ -18,6 +18,7 @@ const repoRoot = resolve(__dirname, '../..');
 
 const RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   // The add-new essence offer projection (issue 1036). The three ingredient components
   // below import it to withhold a DISABLED essence from their add controls.
   'src/utils/essenceValidation.js',

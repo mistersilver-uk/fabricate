@@ -25,6 +25,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-editor-root-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/componentEditor.js',
     'src/utils/essenceValidation.js',
   ],

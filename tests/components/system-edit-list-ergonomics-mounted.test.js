@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-list-ergonomics-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -117,7 +118,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       modifierLibrary: MODIFIERS
     });
 
-    const row = root.querySelector('[data-system-modifier="mod-herbalism"]');
+    const row = root.querySelector('[data-world-modifier="mod-herbalism"]');
     assert.ok(row, 'modifier row exists');
 
     // Collapsed by default: a summary toggle, no editor body.
@@ -145,7 +146,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       modifierLibrary: MODIFIERS
     });
 
-    const row = root.querySelector('[data-system-modifier="mod-herbalism"]');
+    const row = root.querySelector('[data-world-modifier="mod-herbalism"]');
     const summary = row.querySelector('[data-toggle-modifier]');
     summary.dispatchEvent(clickEvent());
     await flushRender();
@@ -161,7 +162,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     // shipped restructures the field as the GM types. Both halves are asserted, because
     // "shows the value" and "draws no cap" are different claims and dropping either would
     // leave half the ruling unguarded.
-    const expressionInput = row.querySelector('[data-system-modifier-field="expression"]');
+    const expressionInput = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(expressionInput, 'the editor exposes the expression field');
     assert.equal(
       expressionInput.value,
@@ -217,7 +218,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.equal(calls[0].path, 'skills.nature.value', 'expression @-stripped to path');
     assert.ok(!('id' in calls[0]), 'no id copied');
 
-    const target = root.querySelector('[data-system-character-prerequisite="pre-open"]');
+    const target = root.querySelector('[data-world-character-prerequisite="pre-open"]');
     assert.ok(target, 'the target prerequisite row exists');
     assert.ok(
       target.querySelector('.manager-prerequisite-body'),
@@ -258,7 +259,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.equal(calls[0].expression, '@skills.cra.rank', 'path @-prefixed to expression');
     assert.ok(!('op' in calls[0]), 'op dropped');
 
-    const target = root.querySelector('[data-system-modifier="mod-lore"]');
+    const target = root.querySelector('[data-world-modifier="mod-lore"]');
     assert.ok(
       target.querySelector('.manager-character-modifier-editor'),
       'the newly-copied modifier is opened in edit mode'
@@ -333,15 +334,15 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     });
 
     assert.ok(
-      Boolean(root.querySelector('[data-system-modifiers]')),
+      Boolean(root.querySelector('[data-world-modifiers]')),
       'the Modifiers section is not gathering-scoped: checks use the same library'
     );
     assert.ok(
-      Boolean(root.querySelector('[data-system-modifier="mod-herbalism"]')),
+      Boolean(root.querySelector('[data-world-modifier="mod-herbalism"]')),
       'and its rows render'
     );
     assert.ok(
-      Boolean(root.querySelector('[data-system-character-prerequisites]')),
+      Boolean(root.querySelector('[data-world-character-prerequisites]')),
       'the Character Prerequisites card still renders'
     );
     assert.ok(
@@ -364,24 +365,24 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
     });
 
-    const flat = root.querySelector('[data-system-modifier="mod-flat"]');
+    const flat = root.querySelector('[data-world-modifier="mod-flat"]');
     flat.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
     await flushRender();
-    const min = flat.querySelector('[data-system-modifier-field="min"]');
-    const max = flat.querySelector('[data-system-modifier-field="max"]');
+    const min = flat.querySelector('[data-world-modifier-field="min"]');
+    const max = flat.querySelector('[data-world-modifier-field="max"]');
     assert.ok(min && max, 'both bounds are authorable');
     assert.equal(min.value, '-1', 'a stored bound renders as its value, not as a blank');
     assert.equal(max.value, '5');
     assert.ok(
-      !flat.querySelector('[data-system-modifier-roll-note="mod-flat"]'),
+      !flat.querySelector('[data-world-modifier-roll-note="mod-flat"]'),
       'a flat expression raises no roll warning'
     );
 
-    const rolled = root.querySelector('[data-system-modifier="mod-roll"]');
+    const rolled = root.querySelector('[data-world-modifier="mod-roll"]');
     rolled.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
     await flushRender();
     assert.ok(
-      Boolean(rolled.querySelector('[data-system-modifier-roll-note="mod-roll"]')),
+      Boolean(rolled.querySelector('[data-world-modifier-roll-note="mod-roll"]')),
       'a roll-shaped expression says so where it is authored, not only in Validation'
     );
   });
@@ -399,12 +400,12 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       ]
     });
 
-    const inverted = root.querySelector('[data-system-modifier-bounds-invalid="mod-inv"]');
+    const inverted = root.querySelector('[data-world-modifier-bounds-invalid="mod-inv"]');
     assert.ok(inverted, 'an inverted pair is called out where the GM authored it');
     assert.equal(inverted.dataset.systemModifierBoundsCause, 'inverted');
     assert.match(inverted.textContent.trim(), /minimum is above its maximum/i);
 
-    const huge = root.querySelector('[data-system-modifier-bounds-invalid="mod-huge"]');
+    const huge = root.querySelector('[data-world-modifier-bounds-invalid="mod-huge"]');
     assert.ok(huge, 'so is a bound the dice grammar cannot express');
     assert.equal(
       huge.dataset.systemModifierBoundsCause,
@@ -412,7 +413,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       'a DIFFERENT cause: "too large to appear in a roll" is not "min above max"'
     );
     assert.ok(
-      !root.querySelector('[data-system-modifier-bounds-invalid="mod-ok"]'),
+      !root.querySelector('[data-world-modifier-bounds-invalid="mod-ok"]'),
       'a well-formed entry gets no note'
     );
   });
@@ -431,7 +432,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       modifierLibrary: BOUNDED,
       ...props
     });
-    const row = root.querySelector('[data-system-modifier="mod-flat"]');
+    const row = root.querySelector('[data-world-modifier="mod-flat"]');
     row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
     await flushRender();
     return { root, row };
@@ -444,8 +445,8 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
   it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
     const { row } = await openEditor();
 
-    const del = row.querySelector('[data-system-modifier-delete="mod-flat"]');
-    const done = row.querySelector('[data-system-modifier-done="mod-flat"]');
+    const del = row.querySelector('[data-world-modifier-delete="mod-flat"]');
+    const done = row.querySelector('[data-world-modifier-done="mod-flat"]');
     assert.ok(del && done, 'the open editor renders both verbs');
 
     assert.ok(del.classList.contains('is-danger'), 'deleting a modifier is a DESTRUCTIVE action');
@@ -470,7 +471,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     // header-actions class, and this change converts only this one.
     const actions = [
       ...root.querySelectorAll(
-        '[data-system-modifiers] .manager-character-modifier-card-header-actions .manager-button'
+        '[data-world-modifiers] .manager-character-modifier-card-header-actions .manager-button'
       )
     ];
 
@@ -499,19 +500,19 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'the icon is on that row'
     );
     assert.ok(
-      Boolean(nameRow.querySelector('[data-system-modifier-field="label"]')),
+      Boolean(nameRow.querySelector('[data-world-modifier-field="label"]')),
       'so is the label'
     );
-    const bounds = nameRow.querySelector('[data-system-modifier-bounds="mod-flat"]');
+    const bounds = nameRow.querySelector('[data-world-modifier-bounds="mod-flat"]');
     assert.ok(bounds, 'and so is the bounds pair, which used to sit on its own row below');
     assert.ok(
-      Boolean(bounds.querySelector('[data-system-modifier-field="min"]')) &&
-        Boolean(bounds.querySelector('[data-system-modifier-field="max"]')),
+      Boolean(bounds.querySelector('[data-world-modifier-field="min"]')) &&
+        Boolean(bounds.querySelector('[data-world-modifier-field="max"]')),
       'both bounds ride that one wrapper, so they wrap together'
     );
 
     // The expression comes AFTER the row, in document order.
-    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(expression, 'the expression field is still rendered');
     assert.ok(
       Boolean(
@@ -546,11 +547,11 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       modifierLibrary: [{ id: 'mod-open', label: 'Open', icon: 'fa-solid fa-a', expression: '@a' }],
       onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
     });
-    const row = root.querySelector('[data-system-modifier="mod-open"]');
+    const row = root.querySelector('[data-world-modifier="mod-open"]');
     row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
     await flushRender();
 
-    const min = row.querySelector('[data-system-modifier-field="min"]');
+    const min = row.querySelector('[data-world-modifier-field="min"]');
     assert.equal(min.value, '', 'an unbounded bound stays EMPTY — empty is not zero');
     assert.equal(min.getAttribute('placeholder'), 'Unbounded', 'the placeholder survives the move');
 
@@ -565,7 +566,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       selectedSystem: makeSystem(),
       modifierLibrary: [{ id: 'mod-inv', label: 'Inverted', icon: 'fa-solid fa-a', expression: '@a', min: 5, max: -1 }]
     });
-    const note = root.querySelector('.manager-modifier-bounds-error[data-system-modifier-bounds-invalid="mod-inv"]');
+    const note = root.querySelector('.manager-modifier-bounds-error[data-world-modifier-bounds-invalid="mod-inv"]');
     assert.ok(note, 'the error surface is not a casualty of the relayout');
   });
 
@@ -573,14 +574,14 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
   it('offers roll-data suggestion chips under the expression, derived from the active world', async () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
 
-    const chips = [...row.querySelectorAll('[data-system-modifier-suggestion]')];
+    const chips = [...row.querySelectorAll('[data-world-modifier-suggestion]')];
     assert.ok(chips.length > 0, 'the expression carries a suggestion row');
     const terms = chips.map((chip) => chip.textContent.trim());
     assert.ok(terms.includes('@abilities.wis.mod'), 'a dnd5e world is offered dnd5e roll data');
     assert.ok(terms.includes('1d4'), 'and the system-agnostic terms beside it');
 
-    const suggestions = row.querySelector('[data-system-modifier-suggestions="mod-flat"]');
-    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    const suggestions = row.querySelector('[data-world-modifier-suggestions="mod-flat"]');
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(
       Boolean(
         expression.compareDocumentPosition(suggestions) &
@@ -592,7 +593,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
 
   it('offers the pf2e paths in a pf2e world, so the row is not one hard-coded list', async () => {
     const { row } = await openEditor({ foundrySystemId: 'pf2e' });
-    const terms = [...row.querySelectorAll('[data-system-modifier-suggestion]')].map((chip) =>
+    const terms = [...row.querySelectorAll('[data-world-modifier-suggestion]')].map((chip) =>
       chip.textContent.trim()
     );
     assert.ok(
@@ -609,7 +610,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
     });
 
-    const die = [...row.querySelectorAll('[data-system-modifier-suggestion]')].find(
+    const die = [...row.querySelectorAll('[data-world-modifier-suggestion]')].find(
       (chip) => chip.textContent.trim() === '1d4'
     );
     assert.ok(die, 'the 1d4 chip is present');
@@ -638,7 +639,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       },
     });
 
-    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
     expression.value = 'abilities.str.mod';
     expression.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await flushRender();
@@ -653,16 +654,16 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       '@abilities.med.mod',
       'and the placeholder models an expression that would actually resolve'
     );
-    const hint = row.querySelector('[data-system-modifier-expression-hint]');
+    const hint = row.querySelector('[data-world-modifier-expression-hint]');
     assert.ok(Boolean(hint), 'the field states the requirement it no longer meets for the GM');
     assert.match(hint.textContent, /leading @/, 'and says which character that is');
   });
 
   it('leaves focus and the caret at the end of the expression field after a chip', async () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
-    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
 
-    const chip = row.querySelector('[data-system-modifier-suggestion]');
+    const chip = row.querySelector('[data-world-modifier-suggestion]');
     chip.dispatchEvent(clickEvent());
     await flushRender();
 

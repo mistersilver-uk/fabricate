@@ -64,6 +64,7 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringConditionIcons.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',

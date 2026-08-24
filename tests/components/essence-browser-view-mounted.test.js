@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-browser-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/utils/essenceBrowserModel.js',
     'src/utils/essenceBulkEditModel.js',

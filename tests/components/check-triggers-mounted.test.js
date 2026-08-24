@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-triggers-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',

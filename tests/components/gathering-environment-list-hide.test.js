@@ -16,6 +16,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-env-hide-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/gatheringImageDefaults.js'

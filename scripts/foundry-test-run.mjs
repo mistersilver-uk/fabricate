@@ -8803,9 +8803,9 @@ async function main() {
         // Currency Units card, and (c) the row-level copy buttons on the summary
         // rows. Reset afterwards so the Currency captures below start expanded.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
-        const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
+        const modifierCard = page.locator('.fabricate-manager [data-world-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-        const modifierRows = modifierCard.locator('[data-system-modifier]');
+        const modifierRows = modifierCard.locator('[data-world-modifier]');
         await modifierRows.nth(1).waitFor({ state: 'visible', timeout: 5_000 });
         const modifierRowCount = await modifierRows.count();
         if (modifierRowCount !== 2) {

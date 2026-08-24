@@ -257,6 +257,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/world/WorldPrerequisitesTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
@@ -513,6 +515,9 @@ function compileManagerRoot() {
 
   for (const utilPath of [
     'foundryBridge.js',
+    // Shared by both World library pages (issue 1311): one aria-live reorder announcement
+    // composed in one place rather than copied into each page.
+    'listReorderAnnouncement.js',
     'recipeItemAccessBadge.js',
     'essenceIcons.js',
     'foundryIconVocabulary.js',
@@ -3092,13 +3097,25 @@ async function mountSystemSettings(storeOptions) {
   );
 }
 
-// Open WORLD > CURRENCY, which is where the currency ladder is authored since issue 1278. It
-// used to be a card on System Settings; the route needs no selected crafting system, because
-// the config it edits is world scope.
+// Open WORLD > RULES & RESOURCES > CURRENCY, which is where the currency ladder is authored
+// since issue 1278 and where it was grouped with the two character libraries in issue 1311. It
+// used to be a card on System Settings; the route needs no selected crafting system, because the
+// config it edits is world scope. Activating the group parent lands on Currency, so one click
+// still suffices — which is itself worth pinning, since the parent must not open a blank group.
 async function mountCurrencyEditor(storeOptions) {
   return mountManagerRoute(storeOptions, (root) =>
-    root.querySelector('[data-world-nav-item="currency"]').click()
+    root.querySelector('[data-world-nav-item="rules"]').click()
   );
+}
+
+// Open one of the other two Rules & Resources destinations. Two clicks: the parent opens the
+// group and lands on Currency, then the sub-item moves to the requested page.
+async function mountWorldRulesDestination(storeOptions, destination) {
+  return mountManagerRoute(storeOptions, (root) => {
+    root.querySelector('[data-world-nav-item="rules"]').click();
+    flushSync();
+    root.querySelector(`[data-world-rules-item="${destination}"]`).click();
+  });
 }
 
 // Mount the manager and open the tabbed System Overview page for Alchemy with an
@@ -3309,7 +3326,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
         // are UNGATED, unlike Downtime.
         'Travel',
-        'Currency',
+        'Rules & Resources',
       ]
     );
     assert.equal(
@@ -6487,21 +6504,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('SystemEditView character-prerequisites accordion renders an icon picker left of the name input (issue 544)', () => {
-    mountSystemEditView({
-      selectedSystem: { id: 'sys1', name: 'System One', resolutionMode: 'simple', features: {} },
-      characterPrerequisiteLibrary: [
-        {
-          id: 'p1',
-          name: 'Proficient in Arcana',
-          icon: 'fa-solid fa-hat-wizard',
-          path: 'skills.arc.prof.multiplier',
-          op: 'gte',
-          value: 1,
-        },
-      ],
-    });
-    const card = target.querySelector('[data-system-character-prerequisites]');
+  // The card moved to World > Rules & Resources > Character prerequisites in issue 1311; the
+  // contract it carries is unchanged, so the assertions are the same and only the route differs.
+  it('World prerequisites page renders an icon picker left of the name input (issue 544)', async () => {
+    await mountWorldRulesDestination(
+      {
+        characterPrerequisites: [
+          {
+            id: 'p1',
+            name: 'Proficient in Arcana',
+            icon: 'fa-solid fa-hat-wizard',
+            path: 'skills.arc.prof.multiplier',
+            op: 'gte',
+            value: 1,
+          },
+        ],
+      },
+      'prerequisites'
+    );
+    const card = target.querySelector('[data-world-character-prerequisites]');
     assert.ok(card, 'the prerequisites card renders');
     // Expand the item, then the name row exposes the icon field (with the searchable
     // IconPicker trigger) before the name input.
@@ -6798,11 +6819,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    // 'Parties', 'Travel' and 'Currency': all three World entries are ungated — Travel because
+    // 'Parties', 'Travel' and 'Rules & Resources': all three World entries are ungated — Travel because
     // realms are world geography and have to be authorable before any system opts in (issue
     // 1282). The Downtime group is experimental-gated (issue 1257) and this fixture leaves
     // `fabricate.experimentalFeatures` at its default off.
-    assert.deepEqual(navLabels, ['Parties', 'Travel', 'Currency']);
+    assert.deepEqual(navLabels, ['Parties', 'Travel', 'Rules & Resources']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6910,7 +6931,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         // World > Travel (issue 1282) and World > Currency (issue 1278) sit under Parties and
         // are UNGATED, unlike Downtime.
         'Travel',
-        'Currency',
+        'Rules & Resources',
       ]
     );
 
@@ -7041,7 +7062,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Graph',
         'Parties',
         'Travel',
-        'Currency',
+        'Rules & Resources',
         'Downtime',
       ]
     );
@@ -14310,12 +14331,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
-      // Parties, Travel and Currency are all permanent World entries (issues 1182, 1278, 1282);
-      // Downtime is the experimental-gated one.
+      // Parties, Travel and Rules & Resources are all permanent World entries (issues 1182, 1278,
+      // 1282, 1311); Downtime is the experimental-gated one. Currency is no longer a top-level
+      // entry — it is the first destination inside the Rules & Resources group, beside the two
+      // character libraries.
       [
         'manager-world-nav-parties',
         'manager-world-nav-travel',
-        'manager-world-nav-currency',
+        'manager-world-nav-rules',
         'manager-world-nav-downtime',
       ]
     );
