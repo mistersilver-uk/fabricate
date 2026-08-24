@@ -358,6 +358,20 @@ describe('the player complication seam', () => {
       ]);
     });
 
+    it('marks BOTH occurrences when the resolution fired on both', async () => {
+      const { store, services } = await loadedSalvageStore();
+
+      // Shard is staged twice (r1 and r3) and a complication fires per RESULT ENTRY, so a
+      // resolution in which both entries went wrong writes two records and badges two strips.
+      await salvageWith(store, services, [firedRecord('r1', 'x1'), firedRecord('r3', 'x1')]);
+
+      assert.deepEqual(firedFlags(store), [
+        ['r1', 'x1', true],
+        ['r3', 'x1', true],
+        ['r4', 'x2', false],
+      ]);
+    });
+
     it('publishes the run record verbatim on the salvage result', async () => {
       const { store, services } = await loadedSalvageStore();
       const record = [firedRecord('r3', 'x1')];

@@ -101,8 +101,8 @@ export function checkTriggerIdsOf(checkBreakage) {
  * different record from the one that will fire.
  *
  * A component listed several times gains the forecast on EVERY occurrence, because a
- * complication is evaluated per result entry. Firing is a different question and is deduped
- * per `(componentId, complicationId)`; see {@link markFiredStageComplications}.
+ * complication is evaluated per result entry — and fires per result entry too, so every one of
+ * those occurrences can end up marked; see {@link markFiredStageComplications}.
  *
  * @param {Array<{id: string|null, componentId: string|null}>} stages the built stage rows, in
  *   the order this view-model publishes them.
@@ -143,16 +143,26 @@ function holdsComplication(stage, componentId, complicationId) {
 }
 
 /**
- * The ONE occurrence a fired record marks: the stage it names, else the component's first
- * occurrence carrying that complication.
+ * The occurrence ONE fired record marks: the stage it names, else the first occurrence
+ * carrying that complication which no earlier record has already claimed.
  *
- * The fallback is not a guess — it is the reader's half of `namedOccurrence`, which already
- * names a component's first non-skipped occurrence for a firing decided only by a trigger or
- * a condition roll, and can report a null `resultId` for a stage the award loop could not
- * name. Dropping such a record instead would render a complication the player was told about
- * in chat as un-fired on the panel beside it.
+ * The named path is the normal one and is exact — a firing is produced per result entry and
+ * carries that entry's own id, so N firings for one component name N distinct stages.
+ *
+ * The fallback exists for a record the planner did not mint that way: a run record persisted
+ * before the per-entry rule, or one whose `resultId` no longer resolves against a reordered
+ * list. It consumes an UNCLAIMED occurrence rather than always the first, so two such records
+ * mark two rows instead of fighting over one. Dropping them instead would render a
+ * complication the player was told about in chat as un-fired on the panel beside it.
+ *
+ * @param {Array<object>} rows
+ * @param {object} record
+ * @param {string} componentId
+ * @param {string} complicationId
+ * @param {Set<string>} claimed `${index}\n${complicationId}` for every mark already placed
+ * @returns {number} the row index, or -1
  */
-function occurrenceIndex(rows, record, componentId, complicationId) {
+function occurrenceIndex(rows, record, componentId, complicationId, claimed) {
   const resultId = typeof record?.resultId === 'string' && record.resultId ? record.resultId : null;
   const named =
     resultId === null
@@ -161,10 +171,23 @@ function occurrenceIndex(rows, record, componentId, complicationId) {
           (stage) => stage?.id === resultId && holdsComplication(stage, componentId, complicationId)
         );
   if (named !== -1) return named;
-  return rows.findIndex((stage) => holdsComplication(stage, componentId, complicationId));
+  return rows.findIndex(
+    (stage, index) =>
+      !claimed.has(`${index}\n${complicationId}`) &&
+      holdsComplication(stage, componentId, complicationId)
+  );
 }
 
-/** `Map<stageIndex, Set<complicationId>>` — at most one occurrence per fired pair. */
+/**
+ * `Map<stageIndex, Set<complicationId>>` — one mark per FIRED RECORD, so a complication that
+ * fired on three occurrences marks three rows.
+ *
+ * `claimed` is keyed on `(stage index, complicationId)` and no longer on
+ * `(componentId, complicationId)`: the old pair key was the reader's half of a firing rule
+ * that fired once per component, and under the per-entry rule it would silently discard every
+ * firing after the first. It survives only to stop two unnamed records from claiming the same
+ * row; a repeated record naming the SAME stage re-marks it, which is idempotent.
+ */
 function resolveMarks(rows, records) {
   const marks = new Map();
   const claimed = new Set();
@@ -172,11 +195,9 @@ function resolveMarks(rows, records) {
     const componentId = record?.componentId ?? null;
     const complicationId = record?.complicationId ?? null;
     if (!componentId || !complicationId) continue;
-    const pair = `${componentId}\n${complicationId}`;
-    if (claimed.has(pair)) continue;
-    const index = occurrenceIndex(rows, record, componentId, complicationId);
+    const index = occurrenceIndex(rows, record, componentId, complicationId, claimed);
     if (index === -1) continue;
-    claimed.add(pair);
+    claimed.add(`${index}\n${complicationId}`);
     if (!marks.has(index)) marks.set(index, new Set());
     marks.get(index).add(complicationId);
   }
@@ -196,13 +217,18 @@ function resolveMarks(rows, records) {
  * (It cannot simply re-apply `publicComplications` either: that filter reads a `visibility`
  * its own output does not carry, so re-applying it to its own output returns nothing.)
  *
- * ## Per result entry, but once per resolution
+ * ## Per result entry, in both tenses
  *
  * A complication is EVALUATED per result entry, so a component listed five times carries the
- * forecast five times. It FIRES at most once per `(componentId, complicationId)` — the
- * planner's own dedupe key, applied inside its per-component group — so the mark lands on
- * exactly ONE of those five rows and the other four keep reading un-fired. Two records for
- * one pair (a caller concatenating bulk rows, say) still mark once.
+ * forecast five times — and it FIRES per result entry too, so between one and five of those
+ * rows end up marked, exactly the ones the resolution's records name. A component selected
+ * twice asked for two awards and gets two independent verdicts, so a rule that marked only one
+ * row would tell a player one `1d6` was rolled when two were.
+ *
+ * The marks therefore follow the records one for one. There is no `(componentId,
+ * complicationId)` collapse here and there must not be one: it was the reader's half of a
+ * firing rule that no longer exists, and reinstating it would drop every firing after the
+ * first.
  *
  * A resolution that fired nothing leaves every row un-fired, which is also the pre-roll and
  * the runless state: no strip claims fired without a record saying so, and none of the three

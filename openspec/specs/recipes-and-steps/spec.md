@@ -498,7 +498,7 @@ Only the EMISSION is ordered — after the award commits, before the chat card i
 A GM-side macro executes asynchronously and may complete after the card; complication macros are not ordered relative to each other or to the card, and a macro must not assume it can mutate the card it was fired alongside.
 
 **A complication macro must tolerate running more than once.**
-Deliveries are de-duplicated per executing context on `(resolutionId, resultId, complicationId)` in a bounded, non-persistent set, and a resolution id is on the payload for exactly this, because `(componentId, complicationId)` is not unique across two legitimate resolutions.
+Deliveries are de-duplicated per executing context on `(resolutionId, resultId, complicationId)` in a bounded, non-persistent set, and every one of the three parts is load-bearing: `complicationId` alone repeats across components, `resultId` is what keeps two legitimate firings of one complication on two occurrences of one component apart (`resolution-modes/spec.md` § Once per result entry, never once per component), and `resolutionId` is what keeps two legitimate resolutions apart.
 Foundry elects a USER rather than a client, and a user may hold several sockets, so an elected GM with the world open in two tabs is two contexts with two empty sets: the duplicate that case produces is a STATED, ACCEPTED residual rather than a defect.
 The addressing-only contract bounds it — a duplicate can only re-run the macro the GM themselves authored.
 
@@ -624,10 +624,12 @@ A progressive salvage fires the component complications of its YIELD components 
 3. **The FAILURE branch fires nothing, and needs no site.**
    Progressive salvage returns no result group on a failed check, so a failed progressive salvage has no stages, no award and no candidates.
    This is a stated requirement rather than an implementation consequence, so that adding a failure-award path to progressive salvage later cannot silently acquire complication firing.
-4. A component appearing several times in the ordered list contributes several stage occurrences, each with its own result id, which is what lets a firing name the occurrence that produced it rather than marking every occurrence of that component.
+4. A component appearing several times in the ordered list contributes several stage occurrences, each with its own result id and each its own award, so each fires its complications independently and every firing names the occurrence that produced it.
+   Neither the engine nor any surface may collapse those firings onto one occurrence, and none may mark every occurrence of a component from a single firing.
 5. **`firedComplications` is written onto the salvage run record**, as `[{ resultId, componentId, complicationId, buckets }]`.
-   `resultId` is REQUIRED and is the same id class the awarded-result ids use, because the player's per-stage surface is per stage OCCURRENCE: keying on `componentId` alone would mark every occurrence of a component fired, or none.
-   `buckets` is a LIST rather than a scalar because `full`, `partial` and `stageMissed` can all be true at once for one component.
+   `resultId` is REQUIRED and is the same id class the awarded-result ids use, because firing is per stage OCCURRENCE and so is the player's per-stage surface: keying on `componentId` alone would mark every occurrence of a component fired, or none, and would make several genuine firings indistinguishable from one another.
+   The list MAY therefore hold several records differing only in `resultId`, and a writer MUST NOT de-duplicate them.
+   `buckets` is a LIST for the persisted shape's sake; a firing belongs to one entry, so it carries that entry's one bucket, and a record written before the per-entry firing rule may still hold several.
 6. **The run record is REDACTED at write time.**
    It is written through the player-safe projection, never through a role-aware filter: the salvage run record is an actor flag replicated to every client with permission on that actor, so a projection parameterised on the acting user's role would write `gmOnly` complications into a player-readable document every time a GM was the acting user.
    No `gmOnly` complication, and no `when`, `rollCondition`, `effectRoll` or `macroUuid`, may reach that record.

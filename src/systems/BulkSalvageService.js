@@ -338,28 +338,44 @@ export class BulkSalvageService {
    * ## What "per component" means, and what the count counts
    *
    * One group per queued `(systemId, componentId)`, in queue order: two selected rows of
-   * the same component on two actors are one warning, not two. Inside a group, entries are
-   * deduped on `(result componentId, complicationId)` — which is precisely the runtime's
-   * own firing dedupe key, so a component staged five times contributes one entry rather
-   * than five. `count` is the total of those entries and is therefore a count of DISTINCT
-   * warnings, not of predicted firings: each queued row is its own resolution, so the same
-   * complication could genuinely fire once per row, and a preview headline that said so
-   * would be arithmetic rather than a warning.
+   * the same component on two actors are one warning, not two. Inside a group there is one
+   * entry per STAGE OCCURRENCE that carries the complication, and NO dedupe across
+   * occurrences: the runtime fires per result entry, so a component staged five times is
+   * five separate awards that can go wrong five separate ways, and an entry list that
+   * collapsed them would under-report what the run can do.
+   *
+   * `count` is the total of those entries, which is therefore a count of the firings this
+   * row could produce. It is still not a prediction across the whole run — each queued row
+   * is its own resolution, so the same complication can fire again on the next row, and the
+   * headline stays a warning rather than arithmetic.
+   *
+   * This is the same rule and the same shape the in-panel bulk block draws from the store's
+   * `attachStageComplications` output (`ui-integration/spec.md` § Bulk complication
+   * forecast). The two projections read different sources for different callers; they must
+   * not read different rules.
    *
    * Nothing here is an audience decision of this service's own: the entries come from the
    * player forecast projection, which is where the `gmOnly` filter lives, and this service
    * must not grow a second copy of that rule.
    *
-   * THE SURFACE IS NOT SHIPPED. `ui-integration/spec.md` marks the bulk "What could go
-   * wrong" block PLANNED; this is the projection it will read.
+   * ## It has no caller in this repository, and that is stated rather than implied
+   *
+   * The shipped bulk "What could go wrong" block reads the queued entry the inventory store
+   * publishes, NOT this method — `ui-integration/spec.md` says so explicitly. This is the
+   * service-side projection published for a caller holding no store, and no such caller
+   * exists here yet; it is covered by tests and by that spec sentence alone. An earlier
+   * revision of this docblock claimed the surface was unshipped and that this was what it
+   * would read, and both halves were false.
    *
    * @param {Array<{actorId: string, actorName: string, systemId: string,
    *   componentId: string}>} targets the selection, in the order the player sees it.
    * @returns {{count: number, components: Array<{systemId: string|null,
    *   componentId: string|null, name: string, img: string,
    *   complications: Array<{id: string|null, name: string, description: string,
-   *     severity: string, visibility: string, componentId: string,
-   *     componentName: string}>}>}}
+   *     severity: string, visibility: string, resultId: string|null, componentId: string,
+   *     componentName: string}>}>}} `resultId` names the stage occurrence an entry hangs
+   *   off, so two entries for a component staged twice are distinguishable rather than
+   *   indistinguishable repeats.
    */
   forecast(targets = []) {
     const groups = new Map();
@@ -410,8 +426,13 @@ export class BulkSalvageService {
   }
 
   /**
-   * The player-visible complications one runnable row could fire, in stage order, deduped
-   * on the runtime's own `(componentId, complicationId)` firing key.
+   * The player-visible complications one runnable row could fire, in stage order, ONE ENTRY
+   * PER STAGE OCCURRENCE.
+   *
+   * There is deliberately no dedupe. The runtime fires per result entry, so a component
+   * staged five times is five awards that can each go wrong on their own, and folding them
+   * to one entry would promise fewer consequences than the run can deliver. The pair key
+   * this method used to hold mirrored a firing rule that no longer exists.
    *
    * The component a stage names is the one it PRODUCES, never the component being
    * salvaged — a complication is authored on the yield.
@@ -425,17 +446,18 @@ export class BulkSalvageService {
     if (results.length === 0) return [];
     const componentIndex = getDefinitionIndex(entry.system?.components);
     const checkTriggerIds = checkTriggerIdsOf(config?.checkBreakage);
-    const seen = new Set();
     const forecast = [];
     for (const result of results) {
       const componentId = result?.componentId || result?.systemItemId || null;
       const component = componentId ? findById(componentIndex, componentId) : null;
       const entries = forecastComplications(component, { activity: 'salvage', checkTriggerIds });
       for (const complication of entries) {
-        const pair = `${componentId}\n${complication.id}`;
-        if (seen.has(pair)) continue;
-        seen.add(pair);
-        forecast.push({ ...complication, componentId, componentName: component?.name || '' });
+        forecast.push({
+          ...complication,
+          resultId: result?.id ?? null,
+          componentId,
+          componentName: component?.name || '',
+        });
       }
     }
     return forecast;

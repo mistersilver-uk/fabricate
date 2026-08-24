@@ -162,7 +162,7 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
     });
   }
 
-  it('forecasts per RESULT ENTRY but fires ONCE, on the occurrence the record names', () => {
+  it('forecasts per RESULT ENTRY and marks only the occurrences that fired', () => {
     const stages = twice();
     assert.deepEqual(
       stages.map((row) => row.complications.map((entry) => entry.name)),
@@ -176,7 +176,7 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
     assert.deepEqual(
       marked.map((row) => row.complications.map((entry) => entry.fired)),
       [[false], [true]],
-      'the second occurrence fired; the first did not'
+      'one record, one mark: the second occurrence fired and the first did not'
     );
   });
 
@@ -194,7 +194,7 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
     assert.equal(marked[1].complications[0].fired, false);
   });
 
-  it('falls back to the first occurrence when the record names no stage', () => {
+  it('falls back to the first UNCLAIMED occurrence when the record names no stage', () => {
     const marked = markFiredStageComplications(twice(), [
       { resultId: null, componentId: 'iron', complicationId: 'x1' },
     ]);
@@ -204,15 +204,40 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
     );
   });
 
-  it('marks once for two records naming the same (componentId, complicationId)', () => {
+  it('marks BOTH occurrences when the complication fired on both', () => {
     const marked = markFiredStageComplications(twice(), [
       { resultId: 'r1', componentId: 'iron', complicationId: 'x1' },
       { resultId: 'r2', componentId: 'iron', complicationId: 'x1' },
     ]);
     assert.deepEqual(
       marked.map((row) => row.complications[0].fired),
-      [true, false],
-      'the dedupe key is the runtime firing key, not the stage'
+      [true, true],
+      'two entries were two awards and fired twice, so a mark on one of them would under-report'
+    );
+  });
+
+  it('spreads two UNNAMED records across two occurrences rather than fighting over one', () => {
+    // A record whose `resultId` no longer resolves (a legacy run record, a reordered list).
+    // Two of them are two firings, so they consume two rows.
+    const marked = markFiredStageComplications(twice(), [
+      { resultId: null, componentId: 'iron', complicationId: 'x1' },
+      { resultId: null, componentId: 'iron', complicationId: 'x1' },
+    ]);
+    assert.deepEqual(
+      marked.map((row) => row.complications[0].fired),
+      [true, true]
+    );
+  });
+
+  it('re-marking the SAME named stage is idempotent rather than spilling onto the next', () => {
+    const marked = markFiredStageComplications(twice(), [
+      { resultId: 'r2', componentId: 'iron', complicationId: 'x1' },
+      { resultId: 'r2', componentId: 'iron', complicationId: 'x1' },
+    ]);
+    assert.deepEqual(
+      marked.map((row) => row.complications[0].fired),
+      [false, true],
+      'a duplicated record names one entry, so it marks that one entry twice over'
     );
   });
 
@@ -419,25 +444,36 @@ describe('1286: BulkSalvageService.forecast — the pre-run projection', () => {
   const shrapnel = complication({ id: 'x1', name: 'Shrapnel' });
   const curse = complication({ id: 'x2', name: 'Curse', visibility: 'gmOnly' });
 
-  it('groups per component and counts each warning once, however often it is staged', () => {
+  it('groups per component and draws one row per STAGE OCCURRENCE, undeduped', () => {
     const system = salvageSystemWith({ complications: [shrapnel, curse] });
     const forecast = bulkService(system).forecast([target('a1')]);
 
     assert.equal(forecast.components.length, 1, 'one group per queued component');
     assert.deepEqual(
-      forecast.components[0].complications.map((entry) => [entry.componentName, entry.name]),
-      [['Iron', 'Shrapnel']],
-      'Iron is staged twice, so the warning is deduped on the runtime firing key'
+      forecast.components[0].complications.map((entry) => [
+        entry.resultId,
+        entry.componentName,
+        entry.name,
+      ]),
+      [
+        ['r1', 'Iron', 'Shrapnel'],
+        ['r2', 'Iron', 'Shrapnel'],
+      ],
+      'Iron is staged twice, and each entry can fire on its own, so both are drawn'
     );
-    assert.equal(forecast.count, 1);
+    assert.equal(forecast.count, 2, 'the count is the firings this row could produce');
     assert.equal(forecast.components[0].name, 'Anvil');
+    assert.ok(
+      !forecast.components[0].complications.some((entry) => entry.name === 'Curse'),
+      'and the gmOnly one is absent from both'
+    );
   });
 
   it('collapses two rows of one component, and a duplicate row, into one group', () => {
     const system = salvageSystemWith({ complications: [shrapnel] });
     const forecast = bulkService(system).forecast([target('a1'), target('a2'), target('a1')]);
     assert.equal(forecast.components.length, 1, 'two actors and a duplicate are one warning');
-    assert.equal(forecast.count, 1);
+    assert.equal(forecast.count, 2, 'the surviving group still draws both of its Iron stages');
   });
 
   it('respects the selection cap, refusing by POSITION exactly as the run does', () => {

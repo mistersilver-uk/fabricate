@@ -389,8 +389,9 @@ function needsGmClient(firing) {
  *   the addressing the GM side resolves the speaker and acting actor from. Explicit
  *   collaborators, not a grab bag: nothing else is read from it.
  * @returns {Promise<{activity: string|null, resolutionId: string|null, fired: Array<object>,
- *   gmRequests: Array<object>}>} `fired` is in fire order, at most one entry per
- *   `(componentId, complicationId)`.
+ *   gmRequests: Array<object>}>} `fired` is in fire order, which is RESULT-ENTRY order: one
+ *   entry per (result entry, complication) that fired, so a component staged twice can appear
+ *   twice with two independently settled condition rolls and two effect rolls.
  */
 export async function fireComplications({ plan, actor = null, context = {} } = {}) {
   const result = {

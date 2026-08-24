@@ -253,11 +253,12 @@ function salvageCreatedResultRecord({ item, componentId }) {
  * and this narrows: the run record is a durable actor flag, and the player strip that
  * reads it re-resolves the prose from the system record it already holds.
  *
- * `resultId` is required and is not redundant with `componentId`. The player's strip is
- * per STAGE OCCURRENCE and a component may legitimately appear several times in one
- * ordered list, so a `componentId`-only record would badge every occurrence of that
- * component or none of them. `buckets` is a list rather than a scalar because `full`,
- * `partial` and `stageMissed` can all be true at once for one component.
+ * `resultId` is required and is not redundant with `componentId`. A complication fires per
+ * RESULT ENTRY, so a component staged five times can contribute five records that differ in
+ * nothing but `resultId`; a `componentId`-only record would collapse them into one and badge
+ * every occurrence of that component or none of them. `buckets` is a list for the persisted
+ * shape's sake only — a firing belongs to ONE entry, so it now always holds that entry's one
+ * bucket, and a record written before the per-entry rule may still hold several.
  *
  * @param {Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
  * @returns {Array<{resultId: ?string, componentId: ?string, complicationId: ?string,
@@ -5257,6 +5258,15 @@ export class CraftingEngine {
    *     occurrence's component name is resolved here, against the system the poster
    *     already holds, because a player reading "you missed the iron ingot" on a card that
    *     also granted an iron ingot cannot otherwise reconcile the two.
+   *
+   * ## One row per FIRING, and repeats are NOT collapsed
+   *
+   * A complication fires per result entry, so a component staged twice that went wrong
+   * twice produces two rows carrying the same three strings. That repetition is the
+   * report, not a rendering fault: collapsing it would tell a player one `1d6` was rolled
+   * when two were, and neither this card nor the aggregate bulk card has ever deduped its
+   * rows. The rows carry no per-entry disambiguator, which is a recorded presentation gap
+   * (`openspec/specs/resolution-modes/spec.md`) and not a licence to merge them.
    *
    * @private
    * @param {?Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.

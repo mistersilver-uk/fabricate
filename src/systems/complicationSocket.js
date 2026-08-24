@@ -107,10 +107,18 @@ export const COMPLICATION_RATE_LIMIT = 100;
 export const COMPLICATION_RATE_WINDOW_MS = 60_000;
 
 /**
- * Entries one message may address. Bounds a hostile payload while sitting far above the
- * legitimate worst case (a bulk salvage of an entire inventory, several complications a
- * row). Excess entries are dropped rather than refusing the whole message, so a forged
- * tail cannot suppress the legitimate head.
+ * Entries one message may address. Bounds a hostile payload. Excess entries are dropped
+ * rather than refusing the whole message, so a forged tail cannot suppress the legitimate
+ * head.
+ *
+ * The legitimate worst case is a bulk salvage of an entire inventory, and it carries THREE
+ * terms rather than two: rows (capped at 25), the complications a row's yields author, and
+ * the STAGE OCCURRENCES those yields take — a complication fires per result entry
+ * (`openspec/specs/resolution-modes/spec.md`), so a component staged five times contributes
+ * five entries. A deliberately extreme system can therefore reach this bound, and the tail
+ * beyond it is dropped: a lost GM card and a lost macro, never a lost award, because
+ * complications are strictly downstream of a committed award. Raising the number raises the
+ * abuse product above in the same proportion, which is why it is not raised reflexively.
  */
 export const COMPLICATION_DELIVERY_MAX_ENTRIES = 250;
 

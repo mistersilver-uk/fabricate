@@ -3296,6 +3296,7 @@ The player's route to salvage.
   The audience rules in the rest of this bullet are normative for every projection a player surface may read and for the strip that renders it.
   A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
   A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
+  Each occurrence is marked on its own: a component staged twice whose complication fired on both entries renders BOTH strips fired, and one that fired on neither renders neither, because the resolution produces one fired record per firing and the marks follow the records one for one.
   A component whose only complication is `gmOnly` therefore renders in both GM read-only strips and in neither player surface.
 - **Bulk selection unit.**
   The bulk gesture's unit is the **acting participation**, one unit per row, with no per-row quantity control; a run may span crafting systems and source actors (see §Bulk Salvage Execution).
@@ -3310,10 +3311,13 @@ The player's route to salvage.
   The block reads that projection **off the queued entry the inventory store publishes** — the same `attachStageComplications` output the single-item panel's stage rows carry, flattened per entry into ordered rows — and re-derives no part of it.
   The rule that decides what a player may be shown has one owner, and a panel computing any of it a second time is how a `gmOnly` consequence eventually reaches a player; reading the same projection as the stage bands is also what keeps the two screens from disagreeing.
   `BulkSalvageService.forecast(targets)` is a second, service-side projection of the same rule, published for a caller with no store to read; it is **not** what this block reads.
+  Being a second projection of the SAME rule is binding: it is one entry per stage occurrence too, with no dedupe of its own, and its `count` counts the same things this block's count counts.
   Only RUNNABLE rows carry a forecast — a blocked row never enters the run, so it can promise neither a yield nor a complication — which is what makes the block inherit the selection cap and every blocked reason by construction rather than through a second filter.
   A stage no budget can reach contributes nothing, on the yield preview's own rule: a null threshold marks a stage the award loop skips at every budget, and a forecast that listed it would promise a consequence the run cannot deliver.
-  Within a group there is one row per STAGE OCCURRENCE that carries the complication, not one per distinct complication: a component staged twice is two rows at two positions, because a complication is evaluated per result entry.
-  The headline count is a count of the rows the block actually DRAWS, deliberately rather than a de-duplicated tally — a number in a section eyebrow that disagrees with the rows beneath it is worse than no number at all.
+  Within a group there is one row per STAGE OCCURRENCE that carries the complication, not one per distinct complication: a component staged twice is two rows at two positions, because a complication is both evaluated AND fired per result entry.
+  Each of those two rows is a consequence the run can actually deliver, independently of the other, so the rows are the forecast's real unit rather than a repetition of one warning.
+  The headline count is a count of the rows the block actually DRAWS, deliberately rather than a de-duplicated tally.
+  That count therefore equals the number of firings this queued entry could produce — it is the same unit the firing rule uses (`resolution-modes/spec.md` § Once per result entry, never once per component), not an approximation of it — and a number in a section eyebrow that disagreed with the rows beneath it would be worse than no number at all.
   It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
   It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
   The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.

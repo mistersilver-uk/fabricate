@@ -147,7 +147,7 @@ A `recipeIds[]` entry is protected from the component-id remap but IS rewritten 
 A membership entry naming a recipe id absent from the payload MUST be preserved verbatim and reported as a broken internal reference.
 After the transform, no within-payload reference may point at a pre-regeneration or absent component id, and no `recipeIds[]` membership entry may point at a pre-regeneration recipe id.
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.
-Component **complication** identifiers join that preserve list: nothing outside the owning component references one, and the runtime de-duplication key is `(componentId, complicationId)`, which the component-id remap already rebinds on its own half.
+Component **complication** identifiers join that preserve list: nothing outside the owning component references one, and every runtime key that names a complication pairs its id with a component id or a result id the component-id remap already rebinds on its own half.
 Keep-mode import MUST NOT regenerate component identifiers or any reference.
 
 ### Environment persistence
