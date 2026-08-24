@@ -241,6 +241,7 @@
         </ManagerButton>
       {/if}
       <ManagerButton
+        role="danger"
         class="manager-component-browser-inspector-delete"
         data-component-action="delete"
         onclick={() => onDelete(selectedComponent.id)}

@@ -8726,6 +8726,47 @@ describe('CraftingSystemManager mounted behavior', () => {
   // impact reaches the panel, that the two clicks reach the store, and above all that the
   // armed token does not survive a change to the set it was armed for.
 
+  // ── Row 68: the component inspector's Delete, the same repair one column over ──────
+  //
+  // Same shape as the recipe inspector's, and deliberately asserted the same way: this
+  // column has FOUR controls, and Unlink is the one that makes the sibling check worth
+  // running. Unlink breaks the item linkage and keeps the component — it destroys nothing —
+  // so it is precisely the neighbour a `danger` role picked by feel would land on.
+  it('paints the component inspector Delete as danger, and not Unlink beside it', async () => {
+    await openComponentsBrowser();
+
+    const inspector = target.querySelector('[data-component-inspector]');
+    assert.ok(Boolean(inspector), 'the components route opens on the single-component inspector');
+
+    const remove = inspector.querySelector('[data-component-action="delete"]');
+    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    assert.ok(
+      remove.classList.contains('fab-manager-button'),
+      'Delete renders through the ManagerButton primitive, not a hand-written class'
+    );
+    assert.ok(
+      remove.classList.contains('is-danger'),
+      'Delete carries the danger role — the verb removes the component from the system'
+    );
+    assert.ok(
+      remove.classList.contains('manager-component-browser-inspector-delete'),
+      'and keeps the bespoke class the panel geometry is keyed on'
+    );
+
+    for (const action of ['edit', 'copy-source', 'unlink']) {
+      const sibling = inspector.querySelector(`[data-component-action="${action}"]`);
+      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+      assert.ok(
+        sibling.classList.contains('fab-manager-button'),
+        `${action} renders through the primitive too`
+      );
+      assert.ok(
+        !sibling.classList.contains('is-danger'),
+        `${action} destroys no record, so the danger role must not have landed on it`
+      );
+    }
+  });
+
   function componentDeleteButton() {
     return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
   }
@@ -9210,6 +9251,55 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector(`[data-recipe-select="${id}"]`).click();
     flushSync();
   }
+
+  // ── Row 29: the recipe inspector's Delete is the DESTRUCTIVE verb (issue 1118) ─────
+  //
+  // It shipped role-less and got its danger-red ink and border from a BESPOKE rule that
+  // restated `.manager-button.is-danger`'s two tokens by hand. Two copies of one decision is
+  // the failure this conversion exists to end, so the copy went and the role arrived; the
+  // rule keeps only the panel SURFACE, which `is-danger` does not declare.
+  //
+  // Asserted on the RENDERED node, addressed by the hook the control already carried, and
+  // asserted against its two SIBLINGS in the same stacked column rather than on its own. A
+  // check that only reads Delete cannot tell "Delete is danger" from "this whole column is
+  // danger", and the column is exactly where a misplaced role would land: Duplicate and Edit
+  // are neighbours in the same `<div>`, one tag apart in the source.
+  it('paints the recipe inspector Delete as danger, and only Delete', async () => {
+    await openRecipesBrowser();
+
+    const inspector = target.querySelector('.manager-recipe-browser-inspector');
+    assert.ok(Boolean(inspector), 'the recipes route opens on the single-recipe inspector');
+
+    const remove = inspector.querySelector('[data-recipe-action="delete"]');
+    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    assert.ok(
+      remove.classList.contains('fab-manager-button'),
+      'Delete renders through the ManagerButton primitive, not a hand-written class'
+    );
+    assert.ok(
+      remove.classList.contains('is-danger'),
+      'Delete carries the danger role — the verb removes a record'
+    );
+    // The pass-through class survives the conversion, because the sheet keys the panel's own
+    // surface and full-width geometry on it and `manager-contract.test.js` names it too.
+    assert.ok(
+      remove.classList.contains('manager-recipe-browser-inspector-delete'),
+      'and keeps the bespoke class the panel geometry is keyed on'
+    );
+
+    for (const action of ['duplicate', 'edit']) {
+      const sibling = inspector.querySelector(`[data-recipe-action="${action}"]`);
+      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+      assert.ok(
+        sibling.classList.contains('fab-manager-button'),
+        `${action} renders through the primitive too`
+      );
+      assert.ok(
+        !sibling.classList.contains('is-danger'),
+        `${action} destroys nothing, so the danger role must not have landed on it`
+      );
+    }
+  });
 
   function recipeDeleteButton() {
     return target.querySelector('[data-recipe-bulk-delete-card] .manager-button.is-danger');

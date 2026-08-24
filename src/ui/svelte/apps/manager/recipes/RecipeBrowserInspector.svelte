@@ -730,6 +730,7 @@
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
       </ManagerButton>
       <ManagerButton
+        role="danger"
         class="manager-recipe-browser-inspector-delete"
         data-recipe-action="delete"
         onclick={() => onDelete()}
