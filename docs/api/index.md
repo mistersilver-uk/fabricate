@@ -594,7 +594,7 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 |:-------|:--------|:----------|:----------------|
 | `schemaVersion` | `stable` | the `COMPANION` descriptor | The contract version, as a number. Readable before any service exists. |
 | `grantRecipeKnowledge` | `stable` | `game.fabricate` | `({ actorId, recipeId, grantedBy })` teaches one actor one recipe with no owned book required. GM-gated, idempotent, and it refuses where a learned entry would be invisible to the player. |
-| `checkAffordability` | `stable` | `game.fabricate` | `({ actorId, unitId, amount })` answers whether an actor can afford a cost against the **world** coin ladder. GM-gated, ladder-aware, single-unit, and it writes nothing. |
+| `checkAffordability` | `stable` | `game.fabricate` | `({ actorId, unitId, amount })` answers whether an actor can afford a cost against the **world** coin ladder. GM-gated, ladder-aware, single-unit, and **this member** writes nothing — `creditCurrency` below is the one that does. |
 | `getCurrencyConfigStore` | `handle` | `game.fabricate` | The world currency configuration store Fabricate itself uses, or `null` before readiness. Read it as `getCurrencyConfigStore()?.get?.() ?? null`, because `.get()` on the `null` throws. |
 | `getActorPropertyCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorProperty` strategy, or `null` before readiness. |
 | `getActorInventoryCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorInventory` strategy, or `null` before readiness. |
@@ -602,6 +602,8 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 | `getCraftingEngine().findComponentItems` | `handle` | the crafting engine | `(actor, component, system)` finds an actor's existing stacks of a component, so an award can **stack** rather than duplicate. See its carve-outs below. |
 | `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded, and answers the total, the dice groups and the resolved formula. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
 | `resolveBulkCheckDecision` | `stable` | `game.fabricate` | `({ callSite, formulas })` settles **one** roll decision — situational bonus, roll mode, Advantage — for N rolls the caller will make. It rolls nothing, takes no `actorId`, and answers which of the caller's formulas the decision covers. |
+| `awardComponents` | `stable` | `game.fabricate` | `({ actorId, callSite, systemId, awards })` places components on an actor's sheet, stacking onto what they already hold rather than duplicating it. GM-gated, call-site-gated, **not idempotent**, and it answers one `placements` entry per requested award so partial success is legible. |
+| `creditCurrency` | `stable` | `game.fabricate` | `({ actorId, callSite, unitId, amount })` credits one denomination of the **world** coin ladder to an actor. GM-gated, call-site-gated, **not idempotent**, whole amounts only, and `credited` is `null` wherever Fabricate cannot prove what landed. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -622,7 +624,7 @@ It takes **documents, not ids**; its third argument is a crafting-system **objec
 
 Every `stable` behavioural member **that reads or acts on a specific actor** takes an **`actorId`**, never an actor uuid, and resolves it through Fabricate's own ownership gate.
 `resolveBulkCheckDecision` is the one that does not: it reads no actor, rolls nothing and writes nothing, so it takes none — an ownership gate on an argument a member never reads would advertise a check that is not there.
-All four are **GM-gated**, and all four refuse rather than throw before the module is ready.
+Every `stable` behavioural member is **GM-gated**, and every one refuses rather than throws before the module is ready.
 The gate order is **GM → actor → readiness**, in that order, because the readiness check throws and must run after the refusals that may not.
 A member's own request validation — including the `callSite` and election gates the two check-roll members add — runs **after** the readiness refusal.
 Two consequences follow, and they are stated here rather than left to be discovered: a GM holding a **stale `actorId`** answers `noActor` before any call-site check, and a pre-`ready` call answers `notReady` before `invalidCallSite`.
@@ -724,6 +726,80 @@ A `rollDecision` supplied with `interactive: false` is **refused** as `invalidRo
 There is no separate `rollMode` argument to `rollActorCheck`: the roll uses the client's own default unless the `rollDecision` you forward carries one, and `decision.decision.rollMode` (when present) overrides that default the same way `bonus` and `advantage` do.
 Its accepted values are `publicroll`, `gmroll`, `blindroll`, and `selfroll`, and `resolveBulkCheckDecision`'s own picker never hands you anything outside that list, so forwarding its answer unmodified cannot produce an invalid one.
 
+### Placing A Reward
+
+`awardComponents` and `creditCurrency` are the two members that **write value** onto a character.
+Everything in this section follows from that, and none of it applies to the members above.
+
+```javascript
+const { callSites, outcomes } = game.fabricate.api.COMPANION;
+
+const award = await game.fabricate.awardComponents({
+  actorId: actor.id,
+  callSite: callSites.gmAction,             // REQUIRED, exactly as on the check-roll members
+  systemId,                                 // one crafting system per call, never per entry
+  awards: [{ componentId, quantity: 3 }]    // at most 64 entries; the keys are exactly these two
+});
+for (const placement of award.placements) { // one entry per requested award, in YOUR order
+  if (placement.outcome !== outcomes.awarded) log(placement.componentId, placement.message);
+}
+
+const credit = await game.fabricate.creditCurrency({
+  actorId: actor.id,
+  callSite: callSites.gmAction,
+  unitId: 'gp',
+  amount: 50                                // a positive whole number, or a string naming one
+});
+```
+
+**Neither member is idempotent, and you own not double-awarding.**
+Awarding 3 hides twice is legitimately 6 hides, and crediting 50 gp twice is legitimately 100 gp, so there is no state Fabricate can read that tells a duplicate award from a second intended one.
+`grantRecipeKnowledge` is idempotent only because the learned map is its own key, and nothing equivalent exists here.
+Fabricate will not add an award id it dedupes on: a per-actor ledger of caller-supplied ids is a persisted shape with unbounded growth and no restore semantics, and a partial guarantee is more dangerous than a published non-guarantee.
+**Record your claim in front of the irreversible act rather than guarding inside it** — write "this activity has been settled" first, then award.
+
+**Retry only the outcomes Fabricate declares to have mutated nothing.**
+`success` is not the axis, and neither is a zero amount.
+
+| Member | Safe to retry |
+|:-------|:--------------|
+| `awardComponents` | `gmOnly`, `noActor`, `notReady`, `invalidCallSite`, `notElected`, `invalidAwards`, `systemNotFound`, `awardFailed` |
+| `creditCurrency` | `gmOnly`, `noActor`, `notReady`, `invalidCallSite`, `notElected`, `invalidAmount`, `ladderEmpty`, `ladderInvalid`, `unitNotFound`, `creditNotConfigured` |
+
+Anything else may have moved value, and retrying it double-awards.
+That includes `partiallyAwarded`, and it includes **`creditFailed`** — which is the trap, because the obvious "retry on `success: false`" policy then double-credits exactly when a GM's currency macro is broken and the GM cannot see it happening.
+`awardFailed` is inside its set because that member runs no code Fabricate does not own, so every one of its failures is an observed non-write; `creditFailed` is outside it because under two of the three currency spend strategies the mechanism is a GM's macro or a game system's own adapter.
+
+**Both members address WORLD actors, so an unlinked token cannot be awarded.**
+An unlinked token's synthetic actor carries its **base actor's id**, so passing that id addresses the world prototype: you get `success: true`, and the items or coin land on a sheet the player never opens.
+This is not a lookup Fabricate declines to make — every unlinked token created from one base actor shares that id, so an `actorId` could not tell two of them apart even in principle.
+The remedies are: **link the token, or do not use these members for it.**
+Foundry's own handle for a synthetic actor is `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")`; Fabricate's actor-targeted members take an `actorId` by convention, and that convention is what this limit is.
+
+**`awardComponents` answers per entry, and `awarded` is a total it computed itself.**
+`placements` holds one `{ index, componentId, requested, placed, stacked, outcome, message }` per requested award, in your order and with `placements[i].index === i`, so you can map the answer back onto your own array without having kept it.
+It is `[]` for a refusal taken before anything was attempted, and **fully populated** when everything was attempted and nothing landed — that pair is how you tell those two apart.
+`awarded` is the sum of `placements[].placed`, it is `null` for a pre-attempt refusal, and it is `0` for `awardFailed`.
+`stacked` tells "added 3 to an existing stack" from "created a new item", which is the fact `findComponentItems` was published to let you record.
+A failing entry does not stop the entries after it: an award is a give, so the loop accumulates rather than aborting.
+
+**A `multiUnitUnsupported` entry has two possible causes, and only one of them is a limit.**
+Fabricate writes your quantity into the item payload and then reads back what it wrote, and when the stored value is not the requested one it refuses a multi-unit request rather than creating a single item and reporting N.
+If the game system's item schema genuinely carries no quantity field, that is a real capability limit and single-unit awards are the honest workaround.
+If instead the GM's configured stack-quantity path is **wrong**, **do not loop single awards**: that leaves N loose documents that will never stack, which is the duplicate-versus-stack failure these members exist to prevent.
+Point the GM at Fabricate's own stack-quantity path advisory, which diagnoses exactly that misconfiguration.
+
+**`credited` is three-valued, and `0` never means "the credit failed".**
+It is the amount for `credited`; `0` for `creditNotConfigured` and for every refusal taken before any mechanism ran; and `null` for both `creditFailed` and `creditUnavailable`.
+So `0` means *Fabricate can prove nothing moved* and `null` means *Fabricate cannot say*, exactly as `affordable: null` already works on `checkAffordability`, with `outcome` carrying the rest.
+`awardComponents`' `awarded` is `null` rather than `0` for that same refusal class, and the two are consistent rather than in disagreement: `awarded` is a sum over `placements[]`, so an empty attempt record makes the sum vacuous rather than zero, while `credited` has no companion structure to be vacuous over.
+
+{: .warning }
+> **In a `macro` currency world, a credit runs the GM's `increment` macro.**
+> That macro has until now run only on a player-cancelled craft, so a credit hands it `recipe: null` and `craftingSystem: null`, and an `increment` macro that reads `context.recipe.name` without checking throws on every credit.
+> Tell the GM to branch on `context.caller`: the **pair** `(macro key, caller)` separates all four occasions — `canAfford` with `"craft"` is the craft-time gate, `canAfford` with `"award"` is `checkAffordability`, `increment` with `"craft"` is the cancel refund, and `increment` with `"award"` is `creditCurrency`.
+> A world with no `increment` macro configured is a normal state rather than a broken one, and answers `creditNotConfigured` — the GM's to fix, and never reported as the spender declining.
+
 ### The Outcome Vocabulary
 
 `COMPANION.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
@@ -742,10 +818,11 @@ Nothing outside the declared set is contract, however reachable it is.
 > A companion invoking any member from a handler that fires on **every connected client** — a synced hook such as `updateWorldTime`, or a socket broadcast — must check `game.users.activeGM?.id === game.user?.id` first.
 > Reading is harmless; acting on the read from N clients is not, and `grantRecipeKnowledge` under N clients is N writes.
 >
-> **For `rollActorCheck` and `resolveBulkCheckDecision`, Fabricate discharges this for you — but only if you tell it the truth.**
+> **For the four members that take a `callSite` — `rollActorCheck`, `resolveBulkCheckDecision`, `awardComponents` and `creditCurrency` — Fabricate discharges this for you, but only if you tell it the truth.**
 > Declare `callSite: 'broadcast'` and Fabricate refuses `notElected` on every unelected client.
 > Declare `callSite: 'gmAction'` from a synced hook and the gate never runs, because the declaration is the only signal Fabricate has and nothing in the environment can check it.
-> The harm those two members guard against is sharper than a duplicated message: N clients roll N **different totals** and hand them to N copies of your module.
+> The harm the two check-roll members guard against is sharper than a duplicated message: N clients roll N **different totals** and hand them to N copies of your module.
+> For the two award members the harm inverts and gets worse: N clients place N copies of the **same** value onto a player's sheet, with no `alreadyKnown` no-op to absorb the repeat and nothing for a GM to do but find and reverse it by hand.
 
 ## Subscribing To Gathering Hooks
 
