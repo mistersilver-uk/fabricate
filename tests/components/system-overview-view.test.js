@@ -15,6 +15,12 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // THE manager's labelled push-button (issue 1118). Named AHEAD of the conversion that
+    // puts it in this tree: `SystemOverviewView`'s deep-link control is one of the sweep's
+    // forgotten-role repairs, and the moment it becomes a `<ManagerButton>` an omission here
+    // costs a HUNG suite reported as `# cancelled`, not a failing one. Compiling a module the
+    // tree does not yet render is free; discovering the omission from a cancelled count is not.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte'

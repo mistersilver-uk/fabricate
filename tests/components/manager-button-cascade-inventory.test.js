@@ -54,10 +54,40 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { managerButtonCascade } from '../helpers/manager-button-cascade.js';
 
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
 const cascade = managerButtonCascade();
+
+/**
+ * The conversion LEDGER: the batches whose sites no longer appear in the derived corpus.
+ *
+ * A converted site stops being a call site in this instrument's terms — it no longer writes
+ * `class="manager-button…"`, so nothing keys on it — while remaining one of the 129 the sweep
+ * is accountable for. Recording each landed batch here is what lets the non-vacuity floor keep
+ * asserting the WHOLE population instead of shrinking with it.
+ *
+ * It is not merely bookkeeping: the floor verifies every entry against the tree, so a batch
+ * cannot book sites it did not convert, and cannot book a file it emptied by deleting controls.
+ */
+const CONVERTED_BATCHES = Object.freeze([
+  Object.freeze({
+    task: 5,
+    files: Object.freeze([
+      // 39 sites — 30 `<button>` and 9 `<a href>` — including the five `.manager-header-actions`
+      // Backs whose forgotten `ghost` role this batch repairs.
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+        sites: 39,
+      }),
+    ]),
+  }),
+]);
 
 // Code point, not `localeCompare`, for the same reason `sourceScan.js` gives: locale-dependent
 // ordering would make one corpus compare in two orders on two machines.
@@ -527,12 +557,49 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // while this instrument was being built: a `<style>` named inside a docblock swallowed one
   // component\'s whole markup, and Svelte's scoping hash made every scoped rule match nothing.
   assert.ok(cascade.rules.length > 4000, `parsed ${cascade.rules.length} rules`);
-  assert.equal(cascade.convertingSites.length, 129, 'the conversion is 129 sites');
+
+  // The sweep's total is a CONSERVED quantity, not a countdown, and this floor has to say so
+  // or it decays into one. The instrument finds a site by its literal `class="manager-button…"`,
+  // which is exactly the thing a conversion removes: after task 5 the derived population is 90
+  // across 41 components, after task 9 it is 0 across 0, and a floor pinned to whatever the
+  // last batch left would ratchet down to nothing while reporting itself satisfied.
+  //
+  // So the floor is stated over BOTH halves — the sites still awaiting conversion plus the
+  // sites already converted — and it stays 129 across 42 for the whole sweep. Each batch adds
+  // its own line to the ledger and touches neither total, and a batch that DELETED a control
+  // instead of converting it fails here rather than looking like progress.
+  const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
-    new Set(cascade.convertingSites.map((site) => site.file)).size,
+    cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
+    129,
+    'the conversion is 129 sites, whether or not a given one has been converted yet'
+  );
+  assert.equal(
+    new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
     42,
     'across 42 components'
   );
+
+  // …and the ledger is not allowed to be fiction. A converted file must actually render the
+  // primitive at least as many times as it claims, and must carry none of the literal the
+  // instrument keys on — otherwise a wrong number here would silently buy back the total the
+  // two assertions above are defending.
+  for (const { file, sites } of converted) {
+    const source = readFileSync(resolve(repoRoot, file), 'utf8');
+    const rendered = source.match(/<ManagerButton[\s/>]/g)?.length ?? 0;
+    assert.ok(
+      rendered >= sites,
+      `${file} is booked as ${sites} converted sites but renders ManagerButton ${rendered} times`
+    );
+    assert.ok(
+      !source.includes('class="manager-button'),
+      `${file} is booked as converted but still writes a literal class="manager-button"`
+    );
+    assert.ok(
+      !cascade.convertingSites.some((site) => site.file === file),
+      `${file} is booked as converted but the instrument still derives call sites in it`
+    );
+  }
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
     16,

@@ -68,6 +68,7 @@
   } from '../../../../utils/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -8362,8 +8363,9 @@
                 It stays Core's own markup rather than a public action descriptor: its premium
                 treatment is Core copy about Core's product, not a shape to ask a companion for.
               -->
-              <a
-                class="manager-button manager-downtime-unlock"
+              <ManagerButton
+                tag="a"
+                class="manager-downtime-unlock"
                 data-downtime-unlock
                 href={PATREON_URL}
                 target="_blank"
@@ -8376,7 +8378,7 @@
                     'Unlock with Premium'
                   )}</span
                 >
-              </a>
+              </ManagerButton>
             {:else}
               <!--
                 The status chip leads the group, exactly where every Core editor puts its own
@@ -8423,15 +8425,10 @@
               {/each}
             {/if}
           {:else if currentView === 'recipes'}
-            <button
-              type="button"
-              class="manager-button is-primary"
-              onclick={createRecipe}
-              disabled={!selectedSystemId}
-            >
+            <ManagerButton role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
-            </button>
+            </ManagerButton>
           {:else if currentView === 'recipe-edit'}
             {#if recipeEditDirty}
               <Chip
@@ -8441,37 +8438,26 @@
                 >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <button
-              type="button"
-              class="manager-button is-ghost"
-              onclick={backToRecipesBrowse}
-              disabled={recipeEditSaving}
-            >
+            <ManagerButton role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-button is-danger"
+            </ManagerButton>
+            <ManagerButton
+              role="danger"
               onclick={deleteRecipeFromEdit}
               disabled={!selectedRecipeId || recipeEditSaving}
               title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-button is-primary"
-              onclick={saveRecipeDraft}
-              disabled={!canSaveRecipeEdit}
-            >
+            </ManagerButton>
+            <ManagerButton role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
               <i
                 class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
                 aria-hidden="true"
               ></i>
               <span>{recipeEditSaveLabel()}</span>
-            </button>
+            </ManagerButton>
           {:else if currentView === 'recipe-item-edit'}
             {#if recipeItemEditDirty}
               <Chip
@@ -8482,9 +8468,7 @@
                 >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <button
-              type="button"
-              class="manager-button"
+            <ManagerButton
               data-recipe-item-back
               onclick={backToBooksScrolls}
               disabled={recipeItemEditSaving}
@@ -8496,10 +8480,9 @@
                   'Back to Books & Scrolls'
                 )}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-danger"
+            </ManagerButton>
+            <ManagerButton
+              role="danger"
               data-recipe-item-delete
               onclick={deleteRecipeItemFromEdit}
               disabled={!recipeItemDraft?.id || recipeItemEditSaving}
@@ -8507,10 +8490,9 @@
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-button is-primary"
+            </ManagerButton>
+            <ManagerButton
+              role="primary"
               data-recipe-item-save
               onclick={saveRecipeItemDraft}
               disabled={!canSaveRecipeItemEdit}
@@ -8520,7 +8502,7 @@
                 aria-hidden="true"
               ></i>
               <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
-            </button>
+            </ManagerButton>
             <!--
           An attempted-and-failed save is announced beside the control the GM just clicked
           (issue 919). It trails the Save button so the wrapping toolbar drops it onto its
@@ -8553,9 +8535,8 @@
             {#if checksDirty}
               <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
             {/if}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               data-checks-save
               onclick={saveChecks}
               disabled={!checksDirty || checksSaving}
@@ -8563,12 +8544,12 @@
               <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
               ></i>
               <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
-            </button>
+            </ManagerButton>
           {:else if currentView === 'essences'}
-            <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
+            <ManagerButton role="primary" onclick={createEssenceDraft}>
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')}</span>
-            </button>
+            </ManagerButton>
           {:else if currentView === 'essence-edit'}
             <!-- The SHARED editor header (issue 1036), wearing this studio's own three data
                  hooks. Its own note said "extract when a second studio wants it"; this is
@@ -8590,9 +8571,8 @@
               onBack={cancelEssenceEdit}
             />
           {:else if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               onclick={() => createGatheringTask(selectedSystemId)}
               disabled={!canShowEnvironments}
             >
@@ -8603,11 +8583,10 @@
                   'Create gathering task'
                 )}</span
               >
-            </button>
+            </ManagerButton>
           {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               onclick={() => createGatheringEvent(selectedSystemId)}
               disabled={!canShowEnvironments}
             >
@@ -8618,21 +8597,19 @@
                   'Create gathering event'
                 )}</span
               >
-            </button>
+            </ManagerButton>
           {:else if currentView === 'world'}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               onclick={() => store.createParty?.()}
               disabled={$viewState.travelSaving}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
-            </button>
+            </ManagerButton>
           {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               onclick={async () => {
                 const created = await store.createRealmQuick?.(
                   text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
@@ -8643,29 +8620,26 @@
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-            </button>
+            </ManagerButton>
           {:else if isWorldTravelRoute}
             <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
           {:else if currentView === 'environments'}
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               onclick={createEnvironment}
               disabled={!canShowEnvironments}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
               >
-            </button>
+            </ManagerButton>
           {:else if currentView === 'environment-edit'}
             {#if $viewState.environmentDraftDirty}
               <Chip tone="warning"
                 >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <button
-              type="button"
-              class="manager-button"
+            <ManagerButton
               onclick={backToEnvironmentsBrowse}
               disabled={$viewState.environmentSaving}
             >
@@ -8676,10 +8650,9 @@
                   'Back to environments'
                 )}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-danger"
+            </ManagerButton>
+            <ManagerButton
+              role="danger"
               data-action="delete-environment"
               onclick={() => store.deleteEnvironmentDraft?.()}
               disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}
@@ -8687,10 +8660,9 @@
               <i class="fas fa-trash" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-primary"
+            </ManagerButton>
+            <ManagerButton
+              role="primary"
               onclick={saveEnvironmentEdit}
               disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}
             >
@@ -8699,14 +8671,14 @@
                 aria-hidden="true"
               ></i>
               <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-            </button>
+            </ManagerButton>
           {:else if currentView === 'gathering-task-edit'}
             {#if gatheringTaskDraftDirty}
               <Chip tone="warning"
                 >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
+            <ManagerButton onclick={backToGatheringTaskLibrary}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text(
@@ -8714,10 +8686,10 @@
                   'Back to task library'
                 )}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-danger"
+            </ManagerButton>
+            <ManagerButton
+              role="danger"
+              data-gathering-task-delete
               onclick={deleteGatheringTaskDraft}
               disabled={!selectedGatheringTaskId || gatheringTaskSaving}
               title={text(
@@ -8732,10 +8704,9 @@
                   'Delete gathering task'
                 )}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-primary"
+            </ManagerButton>
+            <ManagerButton
+              role="primary"
               onclick={saveGatheringTaskDraft}
               disabled={!gatheringTaskDraftDirty ||
                 !gatheringTaskValidation.valid ||
@@ -8747,7 +8718,7 @@
                 aria-hidden="true"
               ></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-            </button>
+            </ManagerButton>
             <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
             {#if gatheringTaskSaveError}
               <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
@@ -8760,7 +8731,7 @@
                 >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
+            <ManagerButton onclick={backToGatheringEventLibrary}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text(
@@ -8768,10 +8739,9 @@
                   'Back to event library'
                 )}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-danger"
+            </ManagerButton>
+            <ManagerButton
+              role="danger"
               onclick={deleteGatheringEventDraft}
               disabled={!selectedGatheringEventId || gatheringEventSaving}
               title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
@@ -8780,10 +8750,9 @@
               <span
                 >{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span
               >
-            </button>
-            <button
-              type="button"
-              class="manager-button is-primary"
+            </ManagerButton>
+            <ManagerButton
+              role="primary"
               onclick={saveGatheringEventDraft}
               disabled={!gatheringEventDraftDirty ||
                 !gatheringEventValidation.valid ||
@@ -8797,7 +8766,7 @@
                 aria-hidden="true"
               ></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-            </button>
+            </ManagerButton>
             <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
             {#if gatheringEventSaveError}
               <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>
@@ -8805,38 +8774,28 @@
               </p>
             {/if}
           {:else if currentView === 'system-edit'}
-            <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
+            <ManagerButton onclick={backToSystemsBrowser}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span
               >
-            </button>
+            </ManagerButton>
           {:else}
             <!-- data-manager-import-system: a zero-behaviour hook. The only other handle on
                  this button is `manager-button`, which a dozen header controls share, so a
                  screenshot case could not name it without matching whichever came first. -->
-            <button
-              type="button"
-              class="manager-button"
-              data-manager-import-system
-              onclick={importSystem}
-            >
+            <ManagerButton data-manager-import-system onclick={importSystem}>
               <i class="fas fa-file-import" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-button"
-              onclick={() => exportSystem()}
-              disabled={!selectedSystemId}
-            >
+            </ManagerButton>
+            <ManagerButton onclick={() => exportSystem()} disabled={!selectedSystemId}>
               <i class="fas fa-file-export" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-            </button>
-            <button type="button" class="manager-button is-primary" onclick={createSystem}>
+            </ManagerButton>
+            <ManagerButton role="primary" onclick={createSystem}>
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-            </button>
+            </ManagerButton>
           {/if}
         </div>
       {/if}
@@ -10652,9 +10611,7 @@
                         </div>
                       </div>
                       <div class="manager-drop-editor-actions">
-                        <button
-                          type="button"
-                          class="manager-button"
+                        <ManagerButton
                           aria-label={text(
                             'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
                             'Duplicate'
@@ -10668,10 +10625,9 @@
                               'Duplicate'
                             )}</span
                           >
-                        </button>
-                        <button
-                          type="button"
-                          class="manager-button is-danger"
+                        </ManagerButton>
+                        <ManagerButton
+                          role="danger"
                           aria-label={text(
                             'FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop',
                             'Delete'
@@ -10685,7 +10641,7 @@
                               'Delete'
                             )}</span
                           >
-                        </button>
+                        </ManagerButton>
                       </div>
                     </section>
 
@@ -12228,9 +12184,8 @@
                   </div>
 
                   <div class="manager-travel-inspector-actions">
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
+                    <ManagerButton
+                      role="danger"
                       disabled={$viewState.travelSaving === true}
                       onclick={() => store.deleteRealm?.(selectedTravelRealm.id)}
                     >
@@ -12241,7 +12196,7 @@
                           'Delete realm'
                         )}</span
                       >
-                    </button>
+                    </ManagerButton>
                   </div>
 
                   <section class="manager-inspector-card">
@@ -12649,8 +12604,8 @@
                   'Environment resources'
                 )}
               >
-                <a
-                  class="manager-button"
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/gathering-environments"
                   target="_blank"
                   rel="noreferrer"
@@ -12662,9 +12617,9 @@
                       'Gathering docs'
                     )}</span
                   >
-                </a>
-                <a
-                  class="manager-button"
+                </ManagerButton>
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/quickstart"
                   target="_blank"
                   rel="noreferrer"
@@ -12676,7 +12631,7 @@
                       'Quickstart'
                     )}</span
                   >
-                </a>
+                </ManagerButton>
               </div>
             </section>
           {:else}
@@ -12799,8 +12754,8 @@
                   'Essence resources'
                 )}
               >
-                <a
-                  class="manager-button"
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/essences"
                   target="_blank"
                   rel="noreferrer"
@@ -12812,9 +12767,9 @@
                       'Essence docs'
                     )}</span
                   >
-                </a>
-                <a
-                  class="manager-button"
+                </ManagerButton>
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/effect-transfer"
                   target="_blank"
                   rel="noreferrer"
@@ -12826,7 +12781,7 @@
                       'Effect transfer'
                     )}</span
                   >
-                </a>
+                </ManagerButton>
               </div>
             </section>
           {:else}
@@ -12946,8 +12901,8 @@
                   'Component resources'
                 )}
               >
-                <a
-                  class="manager-button"
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/crafting-systems#components"
                   target="_blank"
                   rel="noreferrer"
@@ -12959,9 +12914,9 @@
                       'Component docs'
                     )}</span
                   >
-                </a>
-                <a
-                  class="manager-button"
+                </ManagerButton>
+                <ManagerButton
+                  tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/quickstart"
                   target="_blank"
                   rel="noreferrer"
@@ -12973,7 +12928,7 @@
                       'Quickstart'
                     )}</span
                   >
-                </a>
+                </ManagerButton>
               </div>
             </section>
           {:else}
@@ -13260,24 +13215,24 @@
               class="manager-setup-links"
               aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
             >
-              <a
-                class="manager-button"
+              <ManagerButton
+                tag="a"
                 href="https://mistersilver-uk.github.io/fabricate/quickstart"
                 target="_blank"
                 rel="noreferrer"
               >
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
-              </a>
-              <a
-                class="manager-button"
+              </ManagerButton>
+              <ManagerButton
+                tag="a"
                 href="https://mistersilver-uk.github.io/fabricate"
                 target="_blank"
                 rel="noreferrer"
               >
                 <i class="fas fa-circle-question" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
-              </a>
+              </ManagerButton>
             </div>
           </section>
         {:else}
