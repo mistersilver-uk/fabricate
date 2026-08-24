@@ -27,6 +27,7 @@ import {
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { normalizeModifierLibrary } from '../src/systems/modifierLibrary.js';
 
 const CHECK_LIBRARY = [
   { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
@@ -355,23 +356,33 @@ test('the export upcast composes with 1.22.0: a PRE-1.22.0 bundle keeps its cata
   );
 });
 
-// The whole point of the move: ONE library, read by the normalizer that owns it.
-test('the merged library normalizes as the system library, bounds and all', () => {
+// The whole point of the 1.23.0 move: ONE library, read by the normalizer that owns it.
+//
+// Since issue 1308 that normalizer is `normalizeModifierLibrary`, not `_normalizeSystem` — the
+// library became a WORLD setting and the crafting system stopped carrying a copy. What this still
+// pins is that 1.23.0's OUTPUT is well-formed for whoever owns it next, which for an upgrade path
+// running both migrations in one pass is the 1.28.0 lift.
+test('the merged library normalizes as the modifier library, bounds and all', () => {
   const merged = systemOf(migrateUnifyModifierLibraries(world()));
-  const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  const normalized = manager._normalizeSystem(merged);
+  const normalized = normalizeModifierLibrary(merged.modifiers);
   assert.deepEqual(
-    normalized.modifiers.map((entry) => entry.id),
+    normalized.map((entry) => entry.id),
     ['med', 'nature', 'nature-gathering', 'survival']
   );
-  assert.equal(normalized.modifiers[0].min, -1);
-  assert.equal(normalized.modifiers[0].max, 5);
-  assert.equal(normalized.modifiers[0].isRollExpression, false);
-  assert.deepEqual(
-    normalized.craftingCheck.defaultModifierIds,
-    ['med', 'nature'],
-    'and the crafting selection still resolves against it'
-  );
+  assert.equal(normalized[0].min, -1);
+  assert.equal(normalized[0].max, 5);
+  assert.equal(normalized[0].isRollExpression, false);
+  // And the crafting selection still resolves against it, once the world library carries it.
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager._characterLibrariesStore = {
+    isSeeded: () => true,
+    listCharacterPrerequisites: () => [],
+    listModifiers: () => normalized,
+  };
+  assert.deepEqual(manager._normalizeSystem(merged).craftingCheck.defaultModifierIds, [
+    'med',
+    'nature',
+  ]);
 });
 
 // The shared per-system transform is what lets the world migration and the export upcast

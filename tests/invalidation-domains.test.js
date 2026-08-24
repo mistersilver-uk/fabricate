@@ -134,7 +134,6 @@ const APPROVED_SYSTEM_FIELD_DOMAINS = {
   essenceDefinitions: ['labelling', 'materials-and-yield', 'component-definitions'],
   recipeItemDefinitions: ['labelling', 'narrative', 'access-and-knowledge'],
   membershipResolvesByRecipeIds: ['access-and-knowledge'],
-  modifiers: ['resolution-config'],
   craftingCheck: ['resolution-config'],
   salvageCraftingCheck: ['resolution-config'],
   gatheringCraftingCheck: ['resolution-config'],
@@ -144,7 +143,6 @@ const APPROVED_SYSTEM_FIELD_DOMAINS = {
   teaserConfig: ['access-and-knowledge'],
   components: ['labelling', 'narrative', 'component-definitions'],
   tools: ['labelling', 'narrative', 'component-definitions', 'resolution-config'],
-  characterPrerequisites: ['labelling', 'access-and-knowledge'],
   gatheringRealmSettings: ['labelling', 'component-definitions', 'access-and-knowledge'],
 };
 const APPROVED_RECIPE_FIELD_DOMAINS = {
