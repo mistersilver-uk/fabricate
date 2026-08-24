@@ -34,6 +34,21 @@ export const SETTING_KEYS = Object.freeze({
   // cannot meaningfully disagree about where a party is standing. Each crafting system keeps
   // only `gatheringRealmSettings.enabled`, which decides whether it PARTICIPATES.
   TRAVEL_CONFIG: 'travelConfig',
+  // Issue 1308: the world-scoped character libraries — the character-prerequisite library and
+  // the modifier library, as `{ characterPrerequisites: [], modifiers: [] }`. They are world
+  // scope because both resolve against the acting CHARACTER rather than against any one
+  // crafting system, so three crafting systems used to mean three copies of the same
+  // "Medicine proficiency at least 1" and three copies of the same `@abilities.med.mod`.
+  // Unlike currency and travel, NO per-system participation flag remains: an unreferenced
+  // entry already costs nothing, so there is no meaningful "off" state to model.
+  //
+  // ONE key for TWO independent libraries, and that is a persistence decision rather than a
+  // modelling one. They share no key, no reference, no invariant and no reader; the key is
+  // shared only so a fourth near-identical persistence shell is not written beside
+  // `CurrencyConfigStore` and `GatheringRealmStore`. Splitting it later would be a pure
+  // persistence change. The cost, accepted knowingly: a write to either library rewrites both,
+  // so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
+  CHARACTER_LIBRARIES: 'characterLibraries',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -135,6 +150,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.TRAVEL_CONFIG]: {
     name: 'Travel Configuration',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.CHARACTER_LIBRARIES]: {
+    name: 'Character Libraries',
     scope: 'world',
     config: false,
     type: Object,

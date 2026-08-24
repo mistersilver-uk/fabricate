@@ -65,11 +65,9 @@ import {
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
-  isRollExpression,
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
-  resolveModifierBounds,
 } from './checkModifierResolver.js';
 import {
   craftingDataChange,
@@ -80,6 +78,7 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -743,82 +742,17 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the SYSTEM-LEVEL modifier library (issue 1117): the ONE named library of
-   * `{id, label, icon?, expression, isRollExpression, min?, max?}` entries that every
-   * activity's check selects over AND that every gathering drop row, event and stamina
-   * cost references. Malformed entries are dropped, ids are trimmed and de-duplicated,
-   * and a bad expression coerces to an empty string.
+   * Normalize the modifier library. Delegates to the shared `normalizeModifierLibrary`, which
+   * moved out of this class in issue 1308 when the library moved to WORLD scope and gained two
+   * more callers that must agree with it byte for byte — the world store and the startup
+   * migration. See `src/systems/modifierLibrary.js` for the rules and their reasoning.
    *
-   * IT IS ONE LIBRARY, not two. Until issue 1117 a system authored modifiers twice, in
-   * two near-identical shapes: the check-modifier catalogue at `system.checkModifiers`
-   * and the gathering character-modifier library at
-   * `gatheringConfig.systems[systemId].characterModifiers`. The `1.23.0` migration merges
-   * them here, and the `checkModifiers`/`characterModifiers` keys are both retired — this
-   * normalizer is an ALLOWLIST REBUILD, so an unemitted key is dropped on the next save,
-   * which is exactly why the migration must run first (`_runMigrations` in `src/main.js`
-   * precedes every manager load).
-   *
-   * THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-   * `min`/`max` clamp the resolved value of a CHECK modifier, and gathering's own
-   * per-reference `min`/`max` clamp a drop contribution independently of them.
-   *
-   * `icon`, `min` and `max` are all ABSENCE-PRESERVING: each is attached only when
-   * authored, so `null`, `undefined`, `''` and junk all normalize to the same shape (key
-   * absent) and absence means unbounded. `0` is a real bound and survives, which is why
-   * the guard is `Number.isFinite` and not truthiness. An inverted pair (`min > max`) is
-   * PRESERVED VERBATIM rather than repaired: it is a blocking readiness issue
-   * (`modifierBoundsInverted`) that the GM must fix, and silently swapping the pair would
-   * roll a number nobody authored. `clampModifierValue` makes such an entry contribute 0
-   * meanwhile — the refuse posture gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS`
-   * already takes.
-   *
-   * `isRollExpression` is DERIVED here and never read off the input, so a persisted or
-   * imported flag can never contradict the expression beside it. It is emitted rather
-   * than left to each reader because the two readers that need it — the authoring
-   * surface's Roll chip and the check-readiness rule that BLOCKS on a roll-shaped
-   * expression reaching a check — must classify one entry identically.
-   *
-   * AN ENTRY WITH NO EXPRESSION IS KEPT, which is a deliberate change from the gathering
-   * normalizer this replaces (it dropped one). The library now has an "Add modifier"
-   * button, and an entry that vanished on save the moment it was created would make that
-   * button appear broken. An unresolvable expression is still a runtime misconfiguration
-   * — gathering reports `CHARACTER_MODIFIER_NON_FINITE` for it instead of
-   * `MISSING_CHARACTER_MODIFIER` — so nothing silently succeeds.
-   *
-   * @param {unknown} library Raw `system.modifiers`.
-   * @returns {Array<{id: string, label: string, expression: string, isRollExpression: boolean,
-   *   icon?: string, min?: number, max?: number}>}
+   * @param {unknown} library
+   * @returns {Array<object>}
    * @private
    */
   _normalizeModifierLibrary(library) {
-    const raw = Array.isArray(library) ? library : [];
-    const seenIds = new Set();
-    const modifiers = [];
-    for (const entry of raw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      const expression = typeof entry.expression === 'string' ? entry.expression.trim() : '';
-      const normalized = {
-        id,
-        label: typeof entry.label === 'string' ? entry.label : '',
-        expression,
-        isRollExpression: isRollExpression(expression),
-      };
-      if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
-      // Asked of the RESOLVER rather than re-derived here, so the persisted shape and the
-      // clamp the engine applies cannot disagree about what an unbounded form is. That
-      // matters more than it looks: `Number(null)`, `Number('')` and `Number([])` are all
-      // `0`, and `0` is a REAL bound on this field — so a hand-written `Number.isFinite`
-      // guard here would MINT a bound of 0 every time the editor cleared one (it patches
-      // `null`), exactly the trap `_normalizeSalvage`'s `dcOverride` guard calls out.
-      const { min, max } = resolveModifierBounds(entry);
-      if (min !== null) normalized.min = min;
-      if (max !== null) normalized.max = max;
-      modifiers.push(normalized);
-    }
-    return modifiers;
+    return normalizeModifierLibrary(library);
   }
 
   /**
