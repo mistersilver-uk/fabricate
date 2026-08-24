@@ -589,6 +589,84 @@ describe('the player complication seam', () => {
     });
   });
 
+  describe('orderProvenance', () => {
+    // The THIRD state the boolean above cannot hold. The bulk forecast card names whose
+    // order its positions are numbered against on EVERY card, and "may arrange it and has
+    // not" is neither of `orderIsPlayers`' two answers: it is the GM's order, but not a
+    // fixed one. Derived in the store so the panel renders it rather than re-deriving it
+    // from `allowsReorder` and `orderIsPlayers` together.
+
+    it("is 'arrangeable' when reorder is permitted and the player has not used it", async () => {
+      const { store } = await loadedSalvageStore();
+      const entry = store.bulkSalvageable[0];
+
+      assert.equal(entry.orderIsPlayers, false, 'the boolean says only that it is not theirs');
+      assert.equal(
+        entry.orderProvenance,
+        'arrangeable',
+        'while the provenance says whose it IS, and that they may replace it'
+      );
+    });
+
+    it("is 'players' once the stored order actually differs from the authored one", async () => {
+      const { store } = await loadedSalvageStore({ orders: { [ORDER_KEY]: ['r2', 'r1'] } });
+
+      assert.equal(store.bulkSalvageable[0].orderProvenance, 'players');
+    });
+
+    it("is 'arrangeable' for a stored order that reproduces the authored sequence", async () => {
+      const { store } = await loadedSalvageStore({
+        orders: { [ORDER_KEY]: ['r1', 'r2', 'r3', 'r4'] },
+      });
+
+      // Presence of a stored order is not difference from the authored one, so this player
+      // is still reading the GM's list — and may still replace it.
+      assert.equal(store.bulkSalvageable[0].orderProvenance, 'arrangeable');
+    });
+
+    it("is 'gm' when the GM pinned the order, whatever is stored", async () => {
+      const system = salvageSystem();
+      system.components[0].salvage.allowPlayerResultReorder = false;
+      const { store } = await loadedSalvageStore({
+        system,
+        orders: { [ORDER_KEY]: ['r3', 'r2', 'r1'] },
+      });
+
+      assert.equal(store.bulkSalvageable[0].orderProvenance, 'gm');
+    });
+
+    it('is NULL for a row with no ordered stage list at all', async () => {
+      // A `simple` row has no order for anyone to own, so naming the GM as its author
+      // would invent a fact. It publishes no forecast either, which is what keeps the
+      // card's "always state provenance" rule and this null from ever meeting.
+      const system = salvageSystem();
+      system.salvageResolutionMode = 'simple';
+      const { store } = await loadedSalvageStore({ system });
+      const entry = store.bulkSalvageable[0];
+
+      assert.equal(entry.mode, 'simple');
+      assert.equal(entry.orderProvenance, null);
+      assert.deepEqual(entry.complications, [], 'and no card exists to render the null');
+    });
+
+    it('tracks the inspected panel across a reorder and back', async () => {
+      const { store } = await loadedSalvageStore();
+      assert.equal(store.bulkSalvageable[0].orderProvenance, 'arrangeable');
+
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      assert.equal(store.bulkSalvageable[0].orderProvenance, 'players');
+
+      store.reorderSalvageStage(1, 0, '');
+      flushSync();
+      assert.equal(
+        store.bulkSalvageable[0].orderProvenance,
+        'arrangeable',
+        'dragging back is not the same as never having dragged, but it IS the same order'
+      );
+    });
+  });
+
   describe('a component authoring no complications', () => {
     const bare = () => salvageSystem({ shardComplications: [], dustComplications: [] });
 

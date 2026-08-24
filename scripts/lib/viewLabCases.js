@@ -5341,11 +5341,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // (3), so the rows are numbered 2 and 3 with 1 absent. A dense 1..N would name rows the
     // single-item panel does not have, and only a value assertion can tell the two apart.
     //
-    // NO ORDER NOTE, and its absence is asserted. Nothing has reordered this list, and a player
-    // who MAY arrange it and has not is reading the GM's order — `orderIsPlayers` is derived from
-    // the rendered order differing from the authored one and never from the reorder permission,
-    // which this very frame proves is granted (the footer's own reorder note is above). The
-    // presence half is `player-inventory-bulk-complications-reordered`.
+    // THE ORDER NOTE IN ITS MIDDLE STATE, and the value is asserted rather than the presence.
+    // Nothing has reordered this list, so a player who MAY arrange it and has not is reading the
+    // GM's order — but not a pinned one, which this very frame proves is granted (the footer's
+    // own reorder note is above). `arrangeable` is that third state: the card names the GM as the
+    // order's author AND the affordance that replaces it, because `orderIsPlayers` alone is FALSE
+    // here and a card saying nothing would leave the numbers below counting against an order it
+    // never named. The `players` half is `player-inventory-bulk-complications-reordered`.
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])' +
@@ -5357,7 +5359,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-inventory-bulk-complication-position="3"] ' +
       '[data-inventory-bulk-complication="hb-comp-frostcap-shatter"])' +
       ':not(:has([data-inventory-bulk-complication-position="1"]))' +
-      ':not(:has([data-inventory-bulk-complication-order]))' +
+      ':has([data-inventory-bulk-complication-order="arrangeable"])' +
+      ':not(:has([data-inventory-bulk-complication-order="players"]))' +
       ':not(:has([data-inventory-bulk-complication="hb-comp-dust-spoiled"]))',
   }),
   playerCase({
@@ -5401,10 +5404,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // down one, then shift-click a second card to enter a bulk selection — which promotes the
     // inspected card into it, so the queue holds both.
     //
-    // The move is what makes `orderIsPlayers` true. It is derived from the rendered order
+    // The move is what makes the provenance `players`. It is derived from the rendered order
     // DIFFERING from the authored one, never from `allowPlayerResultReorder`: a player who may
     // arrange the list and has not is reading the GM's, and `player-inventory-bulk-mode-progressive`
-    // is the frame that pins that permission alone leaves the note off.
+    // is the frame that pins that permission alone leaves the card in its `arrangeable` state.
+    //
+    // ONE GROUP, so this frame shows the `players` state alone rather than beside a GM-ordered
+    // one. The second queued card is the Air Shard, which salvages under SMITHING — `simple`, no
+    // stages, and therefore no forecast and no card. A frame holding both provenances at once is
+    // unreachable in this world for the fixture reason spelled out below, so the per-card claim
+    // is carried by the mounted suite instead.
     //
     // The renumbering is the assertion, and it is arithmetic rather than decoration. Authored,
     // the alembic's stages are Empty Vial (1), Ground Reagent (2), Frostcap Mushroom (3) and the
@@ -5433,7 +5442,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-complication-group="lab-herbalism:hb-cracked-alembic"] ' +
-      '[data-inventory-bulk-complication-order])' +
+      '[data-inventory-bulk-complication-order="players"])' +
       ':has([data-inventory-bulk-complication-position="1"] ' +
       '[data-inventory-bulk-complication="hb-comp-dust-cloud"])' +
       ':has([data-inventory-bulk-complication-position="3"] ' +

@@ -379,6 +379,40 @@ function playerStageOrder(salvage, storedOrder) {
 }
 
 /**
+ * WHOSE order a bulk entry's stage list is, as one of three named states (issue 1286).
+ *
+ * `orderIsPlayers` is a BOOLEAN over one question — did the rendered order come from the
+ * player's stored preference and actually differ from the authored one — and the panel
+ * needs a third answer it cannot express. A player who MAY arrange the list and has not
+ * is looking at the GM's order, which is neither "the GM fixed it" nor "the player chose
+ * this": calling it the GM's full stop would imply a fixity they do not have, and calling
+ * it theirs would be a false claim about their own arrangement. So it is its own state.
+ *
+ * - `'players'`   — the rendered order IS the player's stored one, and differs from the
+ *                   authored list. It persists and is re-read on every salvage of this
+ *                   component, which is the fact that makes arranging it worth doing.
+ * - `'arrangeable'` — the GM's authored order, which this player may replace.
+ * - `'gm'`        — the GM's authored order, pinned by `allowPlayerResultReorder: false`.
+ *
+ * NULL when the row has no ordered stage list at all — a `simple` or `routed` row has no
+ * order for anyone to own, and naming the GM as its author would invent a fact. Such a row
+ * publishes no complication forecast either, so no card ever has to render the null.
+ *
+ * It is derived HERE and not in the panel, on the block's standing rule: the bulk card
+ * renders what it is given and re-derives no part of the projection.
+ *
+ * @param {?object} salvage the row's own salvage projection.
+ * @param {boolean} orderIsPlayers whether the rendered order differs from the authored one.
+ * @returns {?('players'|'arrangeable'|'gm')}
+ */
+function bulkOrderProvenance(salvage, orderIsPlayers) {
+  const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
+  if (salvage?.mode !== 'progressive' || stages.length === 0) return null;
+  if (orderIsPlayers) return 'players';
+  return salvage?.allowPlayerResultReorder === false ? 'gm' : 'arrangeable';
+}
+
+/**
  * One bulk entry's player-visible complication FORECAST (issue 1286), flattened from the
  * stage rows the builder already attached it to.
  *
@@ -473,6 +507,12 @@ function bulkRunProjection(salvage, storedOrder, queued) {
     // saying otherwise is a false claim about their own arrangement. Same derivation as
     // the inspected panel's `salvageOrderIsCustom` — see `orderDiffersFromAuthored`.
     orderIsPlayers,
+    // The same question as a THIRD state the boolean above cannot hold: the bulk
+    // forecast card names whose order it is numbered against on every card, and "may
+    // arrange it and has not" is neither of the boolean's two answers. Derived here
+    // because a panel deriving it from `allowsReorder` and `orderIsPlayers` together
+    // would be the block re-deriving the projection it exists to merely render.
+    orderProvenance: bulkOrderProvenance(salvage, orderIsPlayers),
     // The pre-run complication forecast for this entry, in that order and numbered
     // against ALL of its stages.
     complications: queued ? bulkStageComplications(stages) : [],

@@ -83,6 +83,7 @@ const entry = (overrides = {}) => ({
   mode: 'progressive',
   allowsReorder: true,
   orderIsPlayers: false,
+  orderProvenance: 'arrangeable',
   complications: [complication()],
   yieldRows: [],
   ...overrides,
@@ -281,24 +282,84 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
 
   // ── Whose order it is ────────────────────────────────────────────────────────────
 
-  it('names the order as the player’s ONLY when the projection says so', async () => {
-    const mine = await mount({ salvageable: [entry({ orderIsPlayers: true })] });
-    assert.equal(
-      groupsIn(mine)[0]
-        .querySelector('[data-inventory-bulk-complication-order]')
-        .textContent.trim(),
-      'FABRICATE.App.Complications.OrderNote',
+  // Three states, one per card. A boolean cannot hold them: a player who MAY arrange the
+  // list and has not is `orderIsPlayers: false` while plainly not looking at an order the
+  // GM fixed, so the middle state is asserted against BOTH of its neighbours rather than
+  // merely against the presence of a note.
+  const orderNoteIn = (group) => group.querySelector('[data-inventory-bulk-complication-order]');
+
+  it('names the order as the player’s OWN, and says it is remembered', async () => {
+    const mine = await mount({ salvageable: [entry({ orderProvenance: 'players' })] });
+    const note = orderNoteIn(groupsIn(mine)[0]);
+
+    assert.equal(note.getAttribute('data-inventory-bulk-complication-order'), 'players');
+    assert.equal(note.textContent.trim(), 'FABRICATE.App.Complications.OrderPlayers');
+    assert.ok(
+      note.classList.contains('is-players'),
+      'the one state the player caused reads a step brighter than the GM\u2019s two',
     );
   });
 
-  it('says nothing about the order to a player who MAY reorder and has not', async () => {
-    // `orderIsPlayers` is not `allowsReorder`. The permission says a player MAY arrange
-    // the list; one who may and has not is reading the GM's order, and a note claiming
-    // otherwise is a false statement about their own arrangement.
+  it('names the GM as the author to a player who MAY reorder and has not', async () => {
+    // The state the old boolean note could not say anything about. `orderIsPlayers` is not
+    // `allowsReorder`: one who may arrange and has not is reading the GM's order, so the
+    // card may not call it theirs — but calling it the GM's full stop would assert a
+    // fixity they do not have, so the copy names the affordance too.
     const root = await mount({
-      salvageable: [entry({ allowsReorder: true, orderIsPlayers: false })],
+      salvageable: [entry({ allowsReorder: true, orderProvenance: 'arrangeable' })],
     });
-    assert.ok(!root.querySelector('[data-inventory-bulk-complication-order]'));
+    const note = orderNoteIn(groupsIn(root)[0]);
+
+    assert.equal(note.getAttribute('data-inventory-bulk-complication-order'), 'arrangeable');
+    assert.equal(note.textContent.trim(), 'FABRICATE.App.Complications.OrderArrangeable');
+    assert.ok(
+      !note.classList.contains('is-players'),
+      'it is the GM\u2019s order, however changeable',
+    );
+  });
+
+  it('names the GM’s pinned order as the GM’s', async () => {
+    const root = await mount({
+      salvageable: [entry({ allowsReorder: false, orderProvenance: 'gm' })],
+    });
+    const note = orderNoteIn(groupsIn(root)[0]);
+
+    assert.equal(note.getAttribute('data-inventory-bulk-complication-order'), 'gm');
+    assert.equal(note.textContent.trim(), 'FABRICATE.App.Complications.OrderGm');
+  });
+
+  it('states provenance PER CARD, so a mixed selection is not one heading', async () => {
+    // The prototype's standing "GM order" badge above the block is the failure this
+    // asserts against: a bulk selection can mix a pinned row with a rearranged one, and no
+    // single heading is true for both.
+    const root = await mount({
+      counts: { selected: 2, salvageable: 2, blocked: 0, atMax: false },
+      salvageable: [
+        entry({ key: 'sys:alembic', orderProvenance: 'players' }),
+        entry({ key: 'sys:retort', name: 'Chipped Retort', orderProvenance: 'gm' }),
+      ],
+    });
+    const groups = groupsIn(root);
+
+    assert.equal(groups.length, 2);
+    assert.deepEqual(
+      groups.map((group) => orderNoteIn(group).getAttribute('data-inventory-bulk-complication-order')),
+      ['players', 'gm'],
+    );
+    const allNotes = [...blockIn(root).querySelectorAll('[data-inventory-bulk-complication-order]')];
+    assert.equal(allNotes.length, 2, 'two cards, two statements');
+    assert.ok(
+      allNotes.every((note) => note.closest('[data-inventory-bulk-complication-group]')),
+      'and every one of them sits INSIDE a card rather than above the block',
+    );
+  });
+
+  it('draws no order note at all for a provenance it does not know', async () => {
+    // Null is unreachable from the store for a card that exists — a row with no ordered
+    // stage list publishes no forecast — so the fallback exists to degrade to silence
+    // rather than to print a raw state name at a player.
+    const root = await mount({ salvageable: [entry({ orderProvenance: null })] });
+    assert.ok(!orderNoteIn(groupsIn(root)[0]));
   });
 
   // ── The shared row, in the shared player variant ─────────────────────────────────

@@ -391,7 +391,7 @@
               <InventoryBulkComplicationGroup
                 img={group.entry.img}
                 name={group.entry.name}
-                orderIsPlayers={group.entry.orderIsPlayers === true}
+                orderProvenance={group.entry.orderProvenance ?? null}
                 complications={group.complications}
                 attrs={{ 'data-inventory-bulk-complication-group': group.entry.key }}
               />

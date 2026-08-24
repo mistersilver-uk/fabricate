@@ -28,10 +28,26 @@
   `{#each}` index here would silently produce that dense sequence and nothing on screen
   would say it was wrong.
 
-  `orderIsPlayers` decides the order note, and it is NOT the reorder permission. A
-  player who MAY reorder and has not is looking at the GM's authored order, so a note
-  claiming the order is theirs would be a false statement about their own arrangement.
-  The store derives it by comparing the rendered order against the authored one.
+  ## THE ORDER'S PROVENANCE IS STATED ON EVERY CARD, and per card
+
+  `orderProvenance` is `'players'` / `'arrangeable'` / `'gm'`, and every card states its
+  own. It is never a heading over the block: a bulk selection can hold one row the GM
+  pinned beside another the player has rearranged, and one heading cannot be true for
+  both. The design prototype's standing "GM order" badge above the block is exactly that
+  mistake, and a card that stated nothing in the default case is the other half of it —
+  the numbers below are positions in SOME order, and a card that never says whose leaves
+  the player to guess.
+
+  THE THIRD STATE IS THE POINT. `orderIsPlayers` is a boolean over one question — did the
+  rendered order come from the player's stored preference AND differ from the authored one
+  — so a player who MAY arrange the list and has not is FALSE under it while plainly not
+  looking at an order the GM fixed. `'arrangeable'` is that state: it names the GM as the
+  author (which is true) and the affordance that replaces it (which is what "GM order"
+  alone would wrongly deny them). `'players'` says the order is REMEMBERED, because
+  persistence across every future salvage is what makes arranging it worth the gesture.
+  `'gm'` states authorship and nothing else — it is not an error and not a refusal.
+
+  The store derives all three (`bulkOrderProvenance`); this card selects a key.
 
   ## The metadata is an EYEBROW, not a second tile
 
@@ -50,8 +66,8 @@
 
   Props:
    - img / name: the queued entry's artwork and authored name.
-   - orderIsPlayers: whether the order these positions are numbered against is the
-     player's own. From the projection only — see above.
+   - orderProvenance: whose order these positions are numbered against, as one of
+     `'players'` / `'arrangeable'` / `'gm'`. From the projection only — see above.
    - complications: that entry's published forecast rows, in the player's order.
    - attrs: extra attributes for the `<li>` (the card's `data-` hook).
 -->
@@ -64,7 +80,7 @@
   // component (SonarCloud's copy-paste detector reads `.svelte`).
   import ComplicationSummaryRow from '../../manager/ComplicationSummaryRow.svelte';
 
-  let { img = '', name = '', orderIsPlayers = false, complications = [], attrs = {} } = $props();
+  let { img = '', name = '', orderProvenance = null, complications = [], attrs = {} } = $props();
 
   // FULL key literals per severity rather than a composed `${BASE}.${severity}`:
   // `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written down,
@@ -80,6 +96,18 @@
     const key = SEVERITY_LABEL_KEYS[severity];
     return key ? localize(key) : String(severity ?? '');
   }
+
+  // FULL key literals per state, on the same rule as the severity map above.
+  const ORDER_NOTE_KEYS = Object.freeze({
+    players: 'FABRICATE.App.Complications.OrderPlayers',
+    arrangeable: 'FABRICATE.App.Complications.OrderArrangeable',
+    gm: 'FABRICATE.App.Complications.OrderGm',
+  });
+
+  // Null only for a row with no ordered stage list at all, which by construction publishes
+  // no forecast and so never reaches this card — the fallback is there so an unexpected
+  // provenance degrades to a silent head rather than to a raw state name on screen.
+  const orderNoteKey = $derived(ORDER_NOTE_KEYS[orderProvenance] ?? null);
 
   /**
    * One row's metadata line: where in the player's order the result sits, which result
@@ -118,13 +146,20 @@
     <CraftingThumb src={img} alt="" size={24} />
     <span class="bulk-complication-head-text">
       <span class="inventory-detail-row-name">{name}</span>
-      {#if orderIsPlayers}
-        <!-- Only when the projection says the rendered order IS the player's. It is the
-             one sentence that makes the position numbers mean anything: the roll walks
+      {#if orderNoteKey}
+        <!-- ALWAYS, and naming which of the three states THIS entry is in. It is the
+             sentence that makes the position numbers below mean anything: the roll walks
              the list in this order, so where a result sits decides whether the roll ever
-             reaches it. -->
-        <span class="bulk-complication-order-note" data-inventory-bulk-complication-order>
-          {localize('FABRICATE.App.Complications.OrderNote')}
+             reaches it — and a position is only readable once the player knows whose
+             arrangement it counts against. The state is on the attribute's VALUE rather
+             than on its presence so a frame or a test can assert which one was drawn,
+             which presence alone could not. -->
+        <span
+          class="bulk-complication-order-note"
+          class:is-players={orderProvenance === 'players'}
+          data-inventory-bulk-complication-order={orderProvenance}
+        >
+          {localize(orderNoteKey)}
         </span>
       {/if}
     </span>
@@ -200,6 +235,16 @@
     font-weight: 400;
     line-height: 1.35;
     color: var(--fab-text-muted);
+  }
+
+  /* The player's OWN order reads a step brighter than the GM's two states, and that is
+     the only visual difference between them. It is the one state the player caused, so
+     it is the one worth catching an eye scanning a mixed selection — but it is still a
+     provenance line rather than a status, so it stays a colour step and never becomes a
+     badge. A badge here would re-introduce, per card, the standing heading this block
+     deliberately does not draw. */
+  .bulk-complication-order-note.is-players {
+    color: var(--fab-text-secondary);
   }
 
   .bulk-complication-rows {
