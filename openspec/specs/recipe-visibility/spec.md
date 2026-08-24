@@ -812,6 +812,9 @@ A grant on a system failing the predicate **refuses and writes nothing**.
 A grant for an already-known recipe performs **no write** and answers `success: true`.
 The caller is an automation tick that may legitimately re-run, so a refusal would make a correct re-run read as a failure; the caller distinguishes *granted now* from *already knew* by the outcome, never by the boolean.
 Idempotency is decided through the **entry-boundary reader**, never a bare index, so a dot-expanded legacy id is not re-granted every call.
+That idempotency is a property of the learned map being the grant's own natural key, and it does NOT generalise to the sibling published write members.
+`awardComponents` and `creditCurrency` have no such key — awarding 3 hides twice is legitimately 6, and crediting 50 gp twice is legitimately 100 gp — so both are explicitly **not** idempotent and the caller owns not double-awarding; see `companion-api/spec.md`.
+The reciprocal statement is written here rather than only there, because a reader arriving from the knowledge side otherwise learns that a grant is idempotent and nothing tells them the write members beside it are not.
 
 The written entry is `{ learnedAt, sourceItemUuid: null, granted: true, grantedBy }` — four scalars, spread over the raw persisted map exactly as craft-time auto-learn spreads it, so no second write shape is introduced.
 
