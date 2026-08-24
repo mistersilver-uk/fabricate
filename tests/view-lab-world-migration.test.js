@@ -114,7 +114,7 @@ test('the startup migration pass does not rewrite any lab system’s crafting ch
 // `characterModifiers` library into `system.modifiers`. `labContent.js` deliberately goes
 // on authoring BOTH at their pre-migration locations, so a lab build runs the whole ladder
 // and the frames render the state a GM upgrading will actually see.
-test('the startup migration pass MERGES both lab libraries into system.modifiers', async () => {
+test('the startup migration pass MERGES both lab libraries into the world library', async () => {
   const { before, after } = await migrateLabWorld();
   const seeded = labSystem(before.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
   const migrated = labSystem(after.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
@@ -141,10 +141,21 @@ test('the startup migration pass MERGES both lab libraries into system.modifiers
     [],
     'the lab fixtures must author DISTINCT ids across the two libraries'
   );
+  // The destination moved again in issue 1308: `1.23.0` still merges the two into ONE library,
+  // but `1.28.0` then lifts that library off the crafting system into the `characterLibraries`
+  // world setting, so the lab build now exercises THREE hops and the merged order is asserted
+  // where it finally lands. The system's own copy is shed, and that is asserted too — an
+  // emitted-but-empty key would mean the allowlist rebuild had stopped shedding it.
+  assert.equal(migrated?.modifiers, undefined, 'the per-system copy is shed by 1.28.0');
+  // Scoped to THIS system's ids, because the world library is a union across every lab system —
+  // which is the whole point of the 1.28.0 move. What is asserted is unchanged in substance: both
+  // of Herbalism's libraries arrive, check entries first, entry for entry, in that relative order.
+  const expected = [...seeded.craftingCheck.checkModifiers, ...seededGathering];
+  const expectedIds = new Set(expected.map((entry) => entry.id));
   assert.deepEqual(
-    migrated?.modifiers,
-    [...seeded.craftingCheck.checkModifiers, ...seededGathering],
-    'both libraries arrive in ONE system-level library, check entries first, entry for entry'
+    (after.characterLibraries?.modifiers ?? []).filter((entry) => expectedIds.has(entry.id)),
+    expected,
+    'both libraries arrive in ONE world library, check entries first, entry for entry'
   );
 
   // The reference REWRITE that accompanies a re-key is proven in

@@ -251,10 +251,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   // FIVE, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
   // the routed DC-source downgrade boundary, issue 1098's 1.25.0 seeds the failure-result
-  // policy, issue 1278's 1.26.0 lifts currency to world scope, and issue 1282's 1.27.0 lifts
-  // travel; the runner counts every entry it applies.
-  assert.equal(summary.ran, 5);
-  assert.equal(store.get('migrationVersion'), '1.27.0');
+  // policy, issue 1278's 1.26.0 lifts currency to world scope, issue 1282's 1.27.0 lifts travel,
+  // and issue 1308's 1.28.0 lifts both character libraries; the runner counts every entry it
+  // applies.
+  assert.equal(summary.ran, 6);
+  assert.equal(store.get('migrationVersion'), '1.28.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(
@@ -262,8 +263,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
       `the transient report is never persisted into ${key}`
     );
   }
+  // The re-keyed entry is asserted where it now LIVES: 1.28.0 runs in the same pass and lifts the
+  // unified library into the `characterLibraries` world setting, shedding the per-system copy.
+  assert.equal(store.get('craftingSystems')[0].modifiers, undefined);
   assert.ok(
-    store.get('craftingSystems')[0].modifiers.some((entry) => entry.id === 'nature-gathering')
+    store.get('characterLibraries').modifiers.some((entry) => entry.id === 'nature-gathering')
   );
 });
 
