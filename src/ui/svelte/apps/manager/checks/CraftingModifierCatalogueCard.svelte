@@ -563,7 +563,7 @@
       <p class="manager-muted" data-crafting-modifier-empty="linked">
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
-          'This system has no modifiers yet. They are defined once, in System settings › Modifiers.'
+          'This world has no modifiers yet. They are defined once, in System settings › Modifiers.'
         )}
       </p>
     {/if}
@@ -654,7 +654,7 @@
       <span>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierLibraryNote',
-          'These are defined once for the whole crafting system, in system settings — this check only decides which of them apply and how.'
+          'These are defined once for the whole world, in system settings — this check only decides which of them apply and how.'
         )}
       </span>
     </p>

@@ -11,6 +11,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Chip from '../Chip.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
@@ -104,11 +105,15 @@
       <h3 class="manager-card-title">
         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Title', 'Character prerequisites')}
+        <!-- The scope chip (issue 1308) — see the twin on the Modifiers card. -->
+        <Chip tone="neutral" class="manager-library-scope-chip"
+          >{text('FABRICATE.Admin.Manager.World.Scope', 'every system')}</Chip
+        >
       </h3>
       <p class="manager-muted">
         {text(
           'FABRICATE.Admin.Manager.CharacterPrerequisites.Hint',
-          'Pass/fail conditions — a property path, comparison and value — that gate learning, crafting and tool usage.'
+          'Pass/fail conditions — a property path, comparison and value — that gate learning, crafting and tool usage. Shared by every crafting system.'
         )}
       </p>
     </div>

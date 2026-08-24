@@ -3296,6 +3296,42 @@ export function createAdminStore(services) {
     return services.getCharacterLibrariesStore?.() ?? null;
   }
 
+  /**
+   * Confirm the removal of one world character-library entry (issue 1308).
+   *
+   * These two lists are the only DESTRUCTIVE edits on a page framed as "settings for the selected
+   * crafting system" whose reach is actually the whole world, and until this they were a single
+   * unconfirmed click on a bare icon button. Removing a modifier does not merely delete the
+   * entry: every check that named it loses it from `defaultModifierIds` on that system's next
+   * save, in every system, and a prerequisite removal ungates every book that cited it. The copy
+   * names that reach outright, on the pattern the party-delete confirmation already sets.
+   *
+   * The two key literals are passed in WHOLE rather than composed from a scope token. A
+   * template-literal key would read to the lang-key scanner as the bare Manager namespace base,
+   * which would then count every key beneath it as referenced and silently disarm the
+   * orphaned-key gate for the whole namespace.
+   *
+   * @param {Array<object>} library The list the entry is being removed from.
+   * @param {string} entryId
+   * @param {string} titleKey Full lang key for the dialog title.
+   * @param {string} contentKey Full lang key for the dialog body.
+   * @returns {Promise<boolean>}
+   */
+  async function _confirmLibraryEntryDelete(library, entryId, titleKey, contentKey) {
+    const entry = (Array.isArray(library) ? library : []).find((item) => item?.id === entryId);
+    const name = String(entry?.name || entry?.label || entryId);
+    const escapedName = _escapeHtml(name);
+    const confirmed = await services.confirmDialog?.({
+      title: services.localize?.(titleKey, { name }) || `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.(contentKey, { name: escapedName }) ||
+        `Delete <strong>${escapedName}</strong> from every crafting system?`
+      }</p>`,
+      ..._deleteConfirmButtons(),
+    });
+    return confirmed === true;
+  }
+
   function _systemCharacterPrerequisites() {
     const store = _characterLibrariesStore();
     return normalizeCharacterPrerequisiteList(store?.listCharacterPrerequisites?.(), _randomID);
@@ -3341,6 +3377,13 @@ export function createAdminStore(services) {
     const current = _systemCharacterPrerequisites();
     const next = current.filter((entry) => entry.id !== prerequisiteId);
     if (next.length === current.length) return false; // unknown id — nothing removed
+    const confirmedPrerequisite = await _confirmLibraryEntryDelete(
+      current,
+      prerequisiteId,
+      'FABRICATE.Admin.Manager.CharacterPrerequisites.DeleteTitle',
+      'FABRICATE.Admin.Manager.CharacterPrerequisites.DeleteContent'
+    );
+    if (!confirmedPrerequisite) return false;
     const persisted = await _persistSystemCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
@@ -7437,6 +7480,13 @@ export function createAdminStore(services) {
     if (!context || !modifierId) return false;
     const next = context.library.filter((entry) => entry.id !== modifierId);
     if (next.length === context.library.length) return false;
+    const confirmedModifier = await _confirmLibraryEntryDelete(
+      context.library,
+      modifierId,
+      'FABRICATE.Admin.Manager.Modifiers.DeleteTitle',
+      'FABRICATE.Admin.Manager.Modifiers.DeleteContent'
+    );
+    if (!confirmedModifier) return false;
     await _saveSystemModifierLibrary(context.store, next);
     return true;
   }
