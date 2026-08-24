@@ -190,7 +190,12 @@
     TAGS.has(tag) && !(tag === 'a' && !String(href ?? '').trim()) ? tag : 'button'
   );
 
-  const roleClass = $derived(ROLE_CLASSES[role] ?? '');
+  // `Object.hasOwn`, not `ROLE_CLASSES[role] ?? ''`. The role set is closed and a caller
+  // passing `toString` is not reachable from data today, but a plain index reads INHERITED
+  // members too, so the unrecognised-value contract this component states — an unknown role
+  // renders neutral, never an unstyled `is-*` — held only for values that are not names on
+  // `Object.prototype`. An own-property check is what the contract actually says.
+  const roleClass = $derived(Object.hasOwn(ROLE_CLASSES, role) ? ROLE_CLASSES[role] : '');
   const classes = $derived(
     [
       'manager-button',

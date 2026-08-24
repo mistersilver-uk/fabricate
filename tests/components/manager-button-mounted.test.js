@@ -111,6 +111,19 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     assert.equal(button().className, 'manager-button fab-manager-button');
   });
 
+  it('renders neutral for a role that names an inherited member of the mapping', async () => {
+    // `ROLE_CLASSES[role]` reads Object.prototype too, so a plain index made the
+    // unrecognised-role contract above hold for every string EXCEPT the handful that are
+    // names on that prototype — and those emit a function's source text as a class list.
+    // Not reachable from product data; it is pinned because the guard that closes it
+    // (`Object.hasOwn`) is a line a future tidy-up would read as redundant (issue 1118).
+    for (const role of ['toString', 'constructor', 'hasOwnProperty']) {
+      await harness.mount({ role });
+      assert.equal(button().className, 'manager-button fab-manager-button', `role="${role}"`);
+      harness.remount();
+    }
+  });
+
   it('emits is-full-width only when fullWidth is set, and never as a role', async () => {
     await harness.mount({ role: 'dashed', fullWidth: true });
     assert.equal(button().className, 'manager-button fab-manager-button is-dashed is-full-width');
