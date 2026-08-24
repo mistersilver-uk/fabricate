@@ -154,7 +154,13 @@ const REVIEWED = [
       '`is-full-width` — so the four `SearchablePopover` dashed triggers that never gain ' +
       '`fab-manager-button` render the same control as the converted buttons beside them. It ' +
       "still loses to the primitive's own `is-dashed` at (0,4,0), and now loses to it with " +
-      'identical values, which is the point of the reconciliation.',
+      'identical values, which is the point of the reconciliation.\n' +
+      'The report prints one divergent TIE for it — 11px against the base primitive rule`s ' +
+      '0.72rem — and that one is inert in both directions, which is why it carries no ' +
+      '`tieDivergence` claim. A CONVERTED dashed button also matches the (0,4,0) companion, ' +
+      'which states 11px and wins outright; an unconverted one matches no primitive rule at ' +
+      'all. There is no arrangement of this sheet in which the 0.72rem reaches a dashed ' +
+      'control, so the tie cannot be made visible by reordering.',
   },
   {
     id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled)'),
@@ -180,6 +186,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-header-actions .manager-button'),
     disposition: 'INTENDED',
+    tieDivergence: [],
     why:
       'The 38px control this rule declared is RETIRED (task 4): the maintainer ruled 34px, ' +
       'which is what the Tool Studio renders and what the primitive re-declares. What is left ' +
@@ -191,6 +198,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-primary'),
     disposition: 'INTENDED',
+    tieDivergence: [],
     why:
       "The same container statement for the header's loudest action: `0 var(--fab-space-4)` " +
       'and weight 700, which are exactly what `.manager-button.fab-manager-button.is-primary` ' +
@@ -201,6 +209,8 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
     disposition: 'INTENDED',
+    tieDivergence: [],
+    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:147'],
     why:
       'Deliberately NOT re-chained, and the one place where this instrument is wrong about ' +
       'its own corpus. `collectSites` gives every non-population-B site the primitive class, ' +
@@ -215,6 +225,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-reset-actions .manager-button'),
     disposition: 'INTENDED',
+    tieDivergence: [],
     why:
       'The sibling selector in the same comma group, which also heads `.manager-tool-edit-' +
       'actions .manager-button` — the Tool Studio cluster that IS the authority the primitive ' +
@@ -226,6 +237,7 @@ const REVIEWED = [
       '.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button'
     ),
     disposition: 'INTENDED',
+    tieDivergence: ['font-size'],
     why:
       'NEWLY at risk, and it is task 4 that put it there: at (0,4,0) it used to beat the ' +
       "primitive's (0,3,0) control outright, and the re-chained bespoke rules are (0,4,0) too, " +
@@ -429,6 +441,83 @@ test('every reviewed DEAD rule is a real rule in the sheet with no call site at 
     assert.ok(
       !cascade.candidateFor(id),
       `${id} now reaches a call site and is no longer dead; give it a live disposition`
+    );
+  }
+});
+
+test('a site the sweep does not convert is never modelled as carrying the primitive class', () => {
+  // The instrument used to hand `fab-manager-button` to everything outside population B, which
+  // included `ArmedDangerButton` — a component held out of the conversion on purpose, which
+  // writes `class="manager-button is-danger"` in its own markup and will never gain the
+  // primitive class. The error was invisible in the report: it changed no derived set and no
+  // printed line, because losses are only counted on CONVERTING sites. What it changed was the
+  // advice. `.manager-knowledge-row-actions .manager-button` derived as a plain RECHAIN, and
+  // re-chaining it would have left that row's Delete button at the ambient ~1rem beside the
+  // 0.72rem Expend button next to it — the exact regression the rule exists to prevent.
+  //
+  // So the model is pinned here rather than trusted, because nothing downstream would notice.
+  const unconverted = cascade.sites.filter((site) => !site.converting);
+  const wrong = unconverted.filter((site) => site.classes.has('fab-manager-button'));
+  assert.deepEqual(
+    wrong.map((site) => site.id),
+    [],
+    'a site the sweep does not convert must be scored on its literal classes alone'
+  );
+  // Non-vacuity in the direction that actually rotted: population B is excluded by an obvious
+  // branch, and a held-back FILE is not. If this floor ever reads zero, the corpus has stopped
+  // containing the case this assertion was written for.
+  const heldBack = unconverted.filter((site) => site.population !== 'B');
+  assert.ok(
+    heldBack.length > 0,
+    'at least one non-population-B site is held back from the conversion, or this proves nothing'
+  );
+  assert.ok(
+    cascade.convertingSites.every((site) => site.classes.has('fab-manager-button')),
+    'and every converting site IS scored with it, or the model has drifted the other way'
+  );
+});
+
+test('every reviewed entry that claims a control would be stranded still reaches it', () => {
+  // `stranding` is the machine-checkable half of an INTENDED filing that rests on "chaining
+  // this would strand a control the sweep cannot convert". Prose cannot notice the day that
+  // control moves out of the container; this can.
+  for (const entry of REVIEWED) {
+    if (!entry.stranding) continue;
+    const candidate = cascade.candidateFor(entry.id);
+    assert.ok(candidate, `${entry.id} should still be a rule that matches a call site`);
+    const reached = candidate.matches
+      .filter((match) => !match.site.converting)
+      .map((match) => match.site.id);
+    for (const site of entry.stranding) {
+      assert.ok(
+        reached.includes(site),
+        `${entry.id} no longer reaches ${site}, so the reason it was not re-chained has expired`
+      );
+    }
+  }
+});
+
+test('every reviewed zero-pixel tie really does declare the same value on both sides', () => {
+  // The load-bearing claim behind the container-rule INTENDED filings is not "the primitive
+  // wins" — it is "which of the two wins cannot be seen". A TIE is what makes that claim
+  // necessary, because a tie is settled by source order and this sweep reorders the sheet; an
+  // outright loss is settled by specificity and needs no such defence. So the assertion is
+  // scoped to ties, and it names the divergences it tolerates rather than tolerating any.
+  for (const entry of REVIEWED) {
+    if (!Array.isArray(entry.tieDivergence)) continue;
+    const candidate = cascade.candidateFor(entry.id);
+    assert.ok(candidate, `${entry.id} should still be a rule that matches a call site`);
+    const ties = candidate.losses.filter((loss) => loss.verdict.startsWith('ties'));
+    assert.ok(
+      ties.length > 0,
+      `${entry.id} no longer ties anything, so its zero-pixel claim is stale rather than proven`
+    );
+    assert.deepEqual(
+      [...new Set(ties.flatMap((loss) => loss.divergent))].sort(byCodePoint),
+      [...entry.tieDivergence].sort(byCodePoint),
+      `${entry.id} ties the primitive on a property whose VALUE differs, so source order is ` +
+        'visible after all — either the values were changed apart, or this entry needs a ' +
+        'disposition that does something about it rather than recording that it is harmless'
     );
   }
 });

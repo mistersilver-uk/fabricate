@@ -46,6 +46,12 @@ const CONTRACT_CLASS = 'manager-button';
 const APP_ROOT_CLASS = 'fabricate-manager';
 // `ArmedDangerButton` renders the same CSS contract but is a primitive in its own right and is
 // explicitly out of the conversion's scope, so its site is enumerated and then held back.
+//
+// Held back means held back COMPLETELY: it is a consumer of the `manager-button` contract that
+// never receives `fab-manager-button`, exactly like a population-B trigger, and `collectSites`
+// models it that way. A rule chained above the primitive does not reach it, which is what makes
+// its two knowledge-row usages a real constraint on what may be re-chained rather than a
+// bookkeeping detail.
 const NON_CONVERTING_FILES = new Set(['src/ui/svelte/apps/manager/ArmedDangerButton.svelte']);
 // `SearchablePopover` takes a class STRING and renders the button itself, so these sites never
 // gain `fab-manager-button`. They are population B: enumerated, never converted.
@@ -951,17 +957,27 @@ function collectSites(trees) {
       const tokens = ownsContract ? element.tokens : triggerTokens.tokens;
       const population = decidePopulation({ triggersContract, element });
       const line = tree.lineOf(element.start + attribute.nameOffset);
+      // Whether the sweep converts this site is the SAME question as whether it ends up
+      // carrying `fab-manager-button`, and the two must be answered once. They were not:
+      // `classes` used to add the primitive class to everything outside population B, which
+      // handed it to `ArmedDangerButton` as well — a component that renders
+      // `class="manager-button is-danger"` from its own markup, is held out of the conversion
+      // on purpose, and will never gain it. The consequence was not academic. A chained
+      // selector still appeared to reach it, so `.manager-knowledge-row-actions
+      // .manager-button` derived as safe to re-chain when chaining it would have left that
+      // row's Delete button at the ambient ~1rem beside the 0.72rem Expend button next to it.
+      const converting = population !== 'B' && !NON_CONVERTING_FILES.has(file);
       sites.push({
         id: `${file}:${line}`,
         file,
         line,
         tag: ownsContract ? element.tag : 'button',
         tokens,
-        classes: new Set([...tokens, ...(population === 'B' ? [] : [PRIMITIVE_CLASS])]),
+        classes: new Set([...tokens, ...(converting ? [PRIMITIVE_CLASS] : [])]),
         dynamic: ownsContract ? element.dynamic : triggerTokens.dynamic,
         directives: element.directives.map(({ name }) => name),
         population,
-        converting: population !== 'B' && !NON_CONVERTING_FILES.has(file),
+        converting,
         // A population-B trigger is rendered by `SearchablePopover`, not written here, so it
         // has no element of its own. Standing it as a synthetic child of the `<SearchablePopover>`
         // tag gives it the caller's real ancestry, which is what every container rule asks
@@ -1171,6 +1187,31 @@ function verdictFor(order, primitive, candidate) {
   return 'ties and wins on source order only';
 }
 
+/**
+ * The overlapping facets whose DECLARED VALUE actually differs between the two rules.
+ *
+ * An overlap is what puts a rule at risk; a divergence is what makes losing the overlap
+ * visible. Most of the at-risk set is the first without the second — a container rule
+ * restating the geometry the primitive copied from it in the first place — and "which of these
+ * two wins is a zero-pixel question" is the load-bearing claim behind several dispositions in
+ * `manager-button-cascade-inventory.test.js`. Deriving it here lets that file ASSERT the claim
+ * instead of asserting a person's reading of it, so a later edit to the primitive's values
+ * cannot quietly turn a documented tie into a real repaint.
+ *
+ * Textual, exactly like the winner-change comparison in `repaintsAt`: two spellings of one
+ * computed value (`--fab-mv2-border` for `var(--fab-border)`) count as divergent here, which is
+ * blind spot 6 and is why the real-browser gate stays the arbiter of pixels.
+ */
+function divergentFacets(candidate, primitive, overlap) {
+  return overlap.filter((facet) => {
+    const mine = declarationFor(candidate, facet);
+    const theirs = declarationFor(primitive, facet);
+    return (
+      !mine || !theirs || mine.property !== theirs.property || mine.value !== theirs.value
+    );
+  });
+}
+
 function arbitrate(candidate, primitive) {
   const order = compareSpecificity(primitive.analysis.specificity, candidate.analysis.specificity);
   if (order < 0) return null;
@@ -1178,9 +1219,11 @@ function arbitrate(candidate, primitive) {
     reportedFacets(primitive.declarations).has(facet)
   );
   if (overlap.length === 0) return null;
+  const sorted = overlap.sort(byCodePoint);
   return {
     primitive,
-    overlap: overlap.sort(byCodePoint),
+    overlap: sorted,
+    divergent: divergentFacets(candidate, primitive, sorted),
     verdict: verdictFor(order, primitive, candidate),
   };
 }
@@ -1378,10 +1421,11 @@ function describeBlindSpots({ sites, unbalanced, atRisk }) {
       .map((match) => `${rule.id} @ ${match.site.id} (needs ${match.missing.compound.text})`)
   );
   return [
-    'Role classes the conversion ADDS are not modelled. Each site is scored on the classes it ' +
-      'carries today plus `fab-manager-button`, because the role a role-less site receives is a ' +
-      'per-site design decision, not a fact in the tree. A site given `is-primary` or `is-ghost` ' +
-      'gains the primitive companion at (0,4,0) and may pull in further rules.',
+    'Role classes the conversion ADDS are not modelled. Each CONVERTING site is scored on the ' +
+      'classes it carries today plus `fab-manager-button`, because the role a role-less site ' +
+      'receives is a per-site design decision, not a fact in the tree. A site given `is-primary` ' +
+      'or `is-ghost` gains the primitive companion at (0,4,0) and may pull in further rules. A ' +
+      'site the sweep does NOT convert is scored on its literal classes alone.',
     'An ancestor supplied by a CALLER component cannot be resolved statically. Those sites are ' +
       `reported as \`unresolved\` with the candidate providers named; there are ${unresolved.length} ` +
       'such pairings in the at-risk set.',
@@ -1437,7 +1481,10 @@ function renderAtRiskEntry({ rule, losses }, disposition) {
     const unresolved = matched.filter((match) => match.state === 'unresolved');
     lines.push(
       `    vs ${loss.primitive.origin}:${loss.primitive.line} ${stripScopeHash(loss.primitive.selector)} ` +
-        `${formatSpecificity(loss.primitive.analysis.specificity)} — ${loss.verdict}; overlaps ${loss.overlap.join(', ')}`,
+        `${formatSpecificity(loss.primitive.analysis.specificity)} — ${loss.verdict}; overlaps ${loss.overlap.join(', ')}` +
+        (loss.divergent.length === 0
+          ? ' — SAME VALUE throughout, so which wins is a zero-pixel question'
+          : `; DIFFERENT VALUE for ${loss.divergent.join(', ')}`),
       `      confirmed sites (${confirmed.length}): ${confirmed.map(siteLabel).join(', ') || 'none'}`
     );
     if (unresolved.length > 0) {
