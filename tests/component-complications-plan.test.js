@@ -575,7 +575,7 @@ test('1286: forecastComplications projects only VISIBLE complications for the ac
     }),
   ]);
 
-  const forecast = forecastComplications(authored, { activity: 'salvage' });
+  const forecast = forecastComplications(authored, { activity: 'salvage', checkTriggerIds: [] });
 
   assert.deepEqual(
     forecast.map((entry) => entry.name),
@@ -620,7 +620,7 @@ test('1286: neither player projection ever emits when, rollCondition, effectRoll
   });
   const leaked = ['when', 'rollCondition', 'effectRoll', 'macroUuid', 'activities', 'match'];
 
-  const [forecast] = forecastComplications(component('iron', [secretive]), { activity: 'salvage' });
+  const [forecast] = forecastComplications(component('iron', [secretive]), { activity: 'salvage', checkTriggerIds: [] });
   for (const key of leaked) assert.ok(!(key in forecast), `forecast leaked ${key}`);
   assert.equal(forecast.name, 'Shrapnel');
   assert.equal(forecast.severity, 'major');

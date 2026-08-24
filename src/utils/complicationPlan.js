@@ -254,6 +254,15 @@ function stageFacts(bucket) {
  * @returns {boolean} `false` leaves the clause INERT (fail-open), never a validation error:
  *   an id that no longer resolves, or that belongs to another activity's id space, contributes
  *   nothing to `match` rather than blocking it.
+ *
+ * `null` is a fail-OPEN sentinel meaning "the caller cannot say which triggers this block owns",
+ * and it is LIVE on the runtime path: neither `CraftingEngine` nor `GatheringEngine` passes ids
+ * to `planComplications`, so a clause naming an unknown trigger stays evaluable rather than
+ * being made inert. It is NOT live on the forecast path — every `forecastComplications` caller
+ * routes through `checkTriggerIdsOf`, which returns `[]` and never `null` — so that function
+ * requires the ids rather than defaulting them. Defaulting them there would have meant omitting
+ * them silently EXCLUDED a trigger-only complication from a player's forecast, which is a
+ * disclosure decision no call site should be able to take by accident.
  */
 function isOwnedTrigger(triggerId, ownedTriggerIds) {
   return ownedTriggerIds === null || ownedTriggerIds.has(triggerId);
@@ -560,8 +569,8 @@ function canEverFire(complication, ownedTriggerIds) {
  * @returns {Array<{id: string|null, name: string, description: string, severity: string,
  *   visibility: string}>}
  */
-export function forecastComplications(component, { activity, checkTriggerIds = null } = {}) {
-  const ownedTriggerIds = checkTriggerIds === null ? null : idSet(checkTriggerIds);
+export function forecastComplications(component, { activity, checkTriggerIds }) {
+  const ownedTriggerIds = idSet(checkTriggerIds);
   return list(component?.complications)
     .filter((complication) => complication?.visibility === 'visible')
     .filter((complication) => appliesToActivity(complication, activity))
