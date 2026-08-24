@@ -1161,7 +1161,10 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     ['manager-world-downtime-narrow'],
     'the narrow frame is the one whose window really overflows, and it proves the pane scrolls'
   );
-  assert.equal(getCaseById('manager-world-downtime-narrow').expectScrollable, '.downtime-preview-scroll');
+  assert.equal(
+    getCaseById('manager-world-downtime-narrow').expectScrollable,
+    '.downtime-preview-scroll'
+  );
   const normal = cases.slice(0, 4);
   for (const viewCase of normal) {
     assert.ok(
@@ -1319,7 +1322,11 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   // seeds `false` and nothing locks the group open off the Downtime route, so no GM ever sees the
   // rollup's counterpart today without navigating away from the one place the badge would matter.
   assert.equal(rollup.expectView, 'systems', 'reached with no interaction, on the systems browser');
-  assert.equal(rollup.query?.downtimeProvider, '1', 'a provider is registered so the rollup can render');
+  assert.equal(
+    rollup.query?.downtimeProvider,
+    '1',
+    'a provider is registered so the rollup can render'
+  );
   assert.deepEqual(rollup.steps, [], 'the default state, not a state reached by clicking anything');
   assert.match(
     rollup.expectSelector,
@@ -1351,6 +1358,23 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     rollup.expectContained,
     [{ container: '#manager-world-nav-downtime', target: '[data-world-downtime-badge-total]' }],
     'the rollup sits inside the parent row it replaces the chip in'
+  );
+  // Issue 1302 — the sub-item badge is keyed on the tab id on BOTH sides, matching the
+  // rollup's own pair above: `expectContained` resolves each side with `document.querySelector`
+  // and is first-match, not strict, so an unkeyed pair (e.g. `.manager-nav-subitem`) would
+  // silently compare the first sub-item's box against the first badge's box instead of the
+  // ledger row's own pair, and ship green while mis-targeting the capture.
+  assert.deepEqual(
+    premium.expectContained,
+    [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      {
+        container: '[data-world-downtime-item="ledger"]',
+        target: '[data-world-downtime-badge="ledger"]',
+      },
+    ],
+    'the premium-installed frame pins its own tab-id-keyed badge containment, not just the rollup'
   );
 });
 
@@ -3883,7 +3907,7 @@ test('the player companion cases photograph the seam through the production regi
   assert.match(
     mountSource,
     /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions, \{\s*experimentalFeaturesEnabled: params\.experimental,/,
-    'and states the experimental gate from the param that seeds the lab world\'s own setting'
+    "and states the experimental gate from the param that seeds the lab world's own setting"
   );
 });
 
