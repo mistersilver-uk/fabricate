@@ -383,8 +383,12 @@ function labDowntimeProvider() {
     tabs: [
       {
         id: 'ledger',
-        label: 'Ledger',
+        label: 'Ledger Administration',
         accessibleName: 'Open the downtime ledger',
+        // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
+        // a long multi-word label, on the same tab, or the widest case is one the layout
+        // assertions do not look at.
+        badge: { count: 1284, accessibleName: '1,284 downtime claims waiting for review' },
         tooltip: 'Every character’s downtime, in one ledger',
         icon: 'fas fa-scroll',
         title: 'Downtime ledger',

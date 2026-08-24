@@ -1,5 +1,6 @@
 import { MANAGER_HOOKS } from '../config/hooks.js';
 import { createExtensionRegistry, requireNonEmptyString } from './extensionRegistry.js';
+import { createNavTabBadgeStore } from './navTabBadgeStore.js';
 
 /**
  * The surface id Core's GM Manager looks a World navigation provider up under for its
@@ -12,6 +13,24 @@ export const WORLD_DOWNTIME_SURFACE_ID = 'downtime';
 const REQUIRED_TAB_FIELDS = Object.freeze(['label', 'accessibleName', 'tooltip', 'icon']);
 // Route chrome. Every one is optional; Core keeps its own string when a tab omits it.
 const OPTIONAL_TAB_FIELDS = Object.freeze(['title', 'subtitle', 'breadcrumb', 'actionsLabel']);
+// The two fields of a tab badge. Both required when a badge is present; nothing else is
+// accepted, so a `tone` or a `label` fails at the call site rather than rendering nothing.
+const TAB_BADGE_FIELDS = Object.freeze(['count', 'accessibleName']);
+/**
+ * Every key a provider tab may carry (issue 1302).
+ *
+ * DERIVED from the field lists above rather than restated, because a restatement is a
+ * hand-maintained mirror across twenty lines of the same file: it would agree today and
+ * refuse the next optional field somebody adds to `OPTIONAL_TAB_FIELDS` and forgets to add
+ * here — a failure whose message would blame the companion for Core's omission.
+ */
+const TAB_FIELDS = Object.freeze([
+  'id',
+  ...REQUIRED_TAB_FIELDS,
+  ...OPTIONAL_TAB_FIELDS,
+  'actions',
+  'badge',
+]);
 const OPTIONAL_ACTION_FIELDS = Object.freeze(['icon', 'tooltip']);
 // Boolean-only action fields. They were the two provider fields nothing validated: a
 // `primary: 'yes'` reached the renderer and quietly painted an ordinary button, which is the
@@ -52,6 +71,7 @@ const ACTION_TONE_CLASSES = Object.freeze({
 const EXTERNAL_ACTION_HREF = /^https?:\/\//i;
 const PROVIDER = 'Fabricate World navigation provider';
 const ROUTE_CHROME = 'Fabricate World navigation route chrome';
+const NAV_TAB_BADGE = 'Fabricate World navigation tab badge';
 
 /**
  * The string-valued fields of a runtime chrome update.
@@ -174,6 +194,11 @@ const DEFAULT_STATUS_TONE = 'warning';
  * required: Core's preview strip consumes them too, as an accessible name and a
  * keyboard-visible `role="tooltip"`.
  *
+ * A CLOSED KEY SET (issue 1302). A key Core does not name is refused with a deterministic
+ * message rather than accepted and dropped, so a companion reaching for a field this seam
+ * does not have learns it at the line that reached for it. `apiVersion` is the field that
+ * exists to negotiate a wider contract; silence is not.
+ *
  * @typedef {object} WorldNavProviderTab
  * @property {string} id Non-empty tab id, unique within the provider's tab set.
  * @property {string} label Localized visible tab label; also the panel region's name.
@@ -188,6 +213,33 @@ const DEFAULT_STATUS_TONE = 'warning';
  * @property {string} [actionsLabel] Localized accessible name of the header action group.
  * @property {WorldNavProviderAction[]} [actions] Header actions for this tab; falls back
  *   to the provider's own `actions` when omitted.
+ * @property {WorldNavProviderTabBadge} [badge] Count Core renders on this tab's rail
+ *   sub-item. A runtime badge set through `setWorldNavTabBadge` overrides it; `null` there
+ *   restores this one.
+ */
+
+/**
+ * A count a tab carries on the Manager rail.
+ *
+ * A COUNT, not arbitrary text. The rail's trailing track shrinks the label track without
+ * bound, and the label is the companion's own and is not Core's to shorten — so the seam
+ * carries the one shape whose width Core can predict.
+ *
+ * `count: 0` is a POSITIVE ZERO and renders the numeral `0`: the rail's record counts
+ * already render zero, so "0" means *no records* and an absent numeral means *no count was
+ * stated*. It is the direct analogue of an empty `actions` array, which likewise states
+ * emptiness rather than falling back.
+ *
+ * `accessibleName` is final display text, rendered verbatim exactly as `label` is, and is
+ * never treated as a lang key. It names the badge alone; Core announces it as a DESCRIPTION
+ * of the sub-item rather than as part of the sub-item's name, because Core owns no word
+ * order in the companion's language.
+ *
+ * @typedef {object} WorldNavProviderTabBadge
+ * @property {number} count Non-negative safe integer. Core imposes no upper bound; the
+ *   supported width is four digits, beyond which the LABEL yields and the numeral does not.
+ * @property {string} accessibleName Localized accessible name of the badge itself, rendered
+ *   verbatim.
  */
 
 /**
@@ -389,13 +441,21 @@ export function managerHeaderActionClass(action) {
 }
 
 /**
- * Refuse any key the chrome contract does not name.
+ * Refuse any key a contract does not name.
  *
- * DELIBERATELY STRICTER than the tab contract, which ignores what it does not read. A tab is
- * validated once, at registration, where a companion is watching; a chrome update happens on
- * a drill-down click, where a mistyped `subtile` would simply leave the previous subtitle on
- * screen with nothing anywhere to say why. This is a new surface with no shipped caller, so
- * strictness costs no compatibility and buys the failure being visible at the call site.
+ * APPLIED TO BOTH SIDES OF THIS SEAM since issue 1302: a provider tab, its badge and every
+ * runtime chrome update alike. It used to be the chrome channel's alone, and this docstring
+ * used to record the tab contract's leniency as the deliberate contrast; that reading was a
+ * compatibility concession rather than a design preference, and it is now withdrawn. A key
+ * Core does not name is refused with a deterministic message wherever it arrives, because a
+ * mistyped `subtile` — or a `badge` written against a Core too old to render one — is a
+ * companion defect that produces no error, no warning and no visible effect, which is the
+ * hardest failure there is to find.
+ *
+ * WHAT SURVIVES OF THE DISTINCTION is WHEN each is validated, not whether. A tab is checked
+ * once, at registration, where a companion author is watching the line that registered it. A
+ * chrome update is checked on a drill-down click, arbitrarily far from that author's
+ * attention, which is why its refusal has to travel back up their own call stack.
  *
  * @param {object} value Candidate object.
  * @param {readonly string[]} allowed Accepted keys.
@@ -473,6 +533,39 @@ export function normalizeRouteChrome(chrome) {
   return Object.keys(normalized).length === 0 ? null : Object.freeze(normalized);
 }
 
+/**
+ * Validate one tab badge and return the frozen value Core renders.
+ *
+ * Exported beside `normalizeRouteChrome`, and for the same reason it is: the runtime channel
+ * that carries a badge owns no contract of its own, so the shape a companion may state stays
+ * this module's business and `tests/manager-extensions.test.js` pins both in one place.
+ *
+ * Validation happens BEFORE anything is stored, so a refused badge leaves the rail showing
+ * whatever it showed already rather than a half-applied one.
+ *
+ * @param {WorldNavProviderTabBadge|null|undefined} badge Candidate badge.
+ * @param {string} [label] Error-message prefix naming the owner of the badge.
+ * @returns {Readonly<WorldNavProviderTabBadge>|null} Frozen badge, or `null` for "no badge".
+ * @throws {TypeError} When the badge is malformed.
+ */
+export function normalizeNavTabBadge(badge, label = NAV_TAB_BADGE) {
+  // `null` and `undefined` mean the same thing — there is no badge to state — exactly as
+  // they do for a chrome update. On the runtime channel that is how a companion CLEARS one.
+  if (badge === null || badge === undefined) return null;
+  if (typeof badge !== 'object' || Array.isArray(badge)) {
+    throw new TypeError(`${label} must be an object, or null to clear it`);
+  }
+  refuseUnknownKeys(badge, TAB_BADGE_FIELDS, label);
+  // One guard for every wrong count there is: absent, negative, fractional, a string, `NaN`,
+  // `Infinity` and beyond `Number.MAX_SAFE_INTEGER`, where a numeral stops being the number
+  // it was written as. The message names the field, because that is what the author must fix.
+  if (!Number.isSafeInteger(badge.count) || badge.count < 0) {
+    throw new TypeError(`${label} requires a non-negative integer count`);
+  }
+  requireNonEmptyString(badge.accessibleName, `${label} requires a non-empty accessibleName`);
+  return Object.freeze({ count: badge.count, accessibleName: badge.accessibleName });
+}
+
 function validateTab(tab, index, seenIds) {
   if (!tab || typeof tab !== 'object') {
     throw new TypeError(`${PROVIDER} tab ${index} must be an object`);
@@ -482,6 +575,7 @@ function validateTab(tab, index, seenIds) {
     throw new TypeError(`${PROVIDER} declares a duplicate tab id: "${tab.id}"`);
   }
   seenIds.add(tab.id);
+  refuseUnknownKeys(tab, TAB_FIELDS, `${PROVIDER} tab "${tab.id}"`);
   for (const field of REQUIRED_TAB_FIELDS) {
     requireNonEmptyString(tab[field], `${PROVIDER} tab "${tab.id}" requires a non-empty ${field}`);
   }
@@ -490,6 +584,14 @@ function validateTab(tab, index, seenIds) {
     requireNonEmptyString(tab[field], `${PROVIDER} tab "${tab.id}" requires a non-empty ${field}`);
   }
   validateActions(tab.actions, `${PROVIDER} tab "${tab.id}"`);
+  if (tab.badge !== undefined) {
+    normalizeNavTabBadge(tab.badge, `${PROVIDER} tab "${tab.id}" badge`);
+    // Frozen IN PLACE rather than replaced by the normalized copy above, because the registry
+    // stores the companion's own provider object by reference and Core renders straight from
+    // it. An unfrozen badge could be rewritten after registration, and the rail would then
+    // show a value nothing validated, changing at a moment nothing published.
+    Object.freeze(tab.badge);
+  }
 }
 
 function validateProvider(provider) {
@@ -526,16 +628,34 @@ function validateProvider(provider) {
  * Manager-specific: the provider shape, its route chrome and header actions, and the names
  * this registry's callers already depend on.
  *
+ * It also owns the page session's TAB BADGES (issue 1302). They hang here rather than on the
+ * frozen mount context because a badge's job is to be true while the companion is not mounted,
+ * and they are dropped when their surface leaves the registry — which the store learns through
+ * the shared factory's existing surface-id broadcast, so the factory itself learns nothing
+ * about badges and the player registry is untouched by the whole feature.
+ *
  * @param {object} [options] Injectable edges.
  * @param {(...args: unknown[]) => void} [options.reportError] Error sink for a throwing subscriber.
  * @param {(name: string, payload: object) => void} [options.emitHook] Hook edge.
- * @returns {Readonly<object>} Frozen registry.
+ * @returns {Readonly<object>} Frozen registry, adding `subscribeNavTabBadges(surfaceId, listener)`
+ *   to the shared surface, and `setWorldNavTabBadge(surfaceId, tabId, badge)` to `publicApi`.
  */
 export function createManagerExtensionsRegistry({
   reportError = console.error,
   emitHook = emitManagerHook,
 } = {}) {
-  return createExtensionRegistry({
+  // The two collaborators need each other by NATURE, not by accident: the store's liveness
+  // check asks which provider holds a surface, and the registry's public API carries the
+  // store's setter. The knot is untied with a deferred READ rather than a second import edge —
+  // `findProvider` runs at call time, long after both exist — so the module graph stays
+  // one-directional and the store imports nothing back from here.
+  let registry = null;
+  const badges = createNavTabBadgeStore({
+    normalizeBadge: normalizeNavTabBadge,
+    findProvider: (surfaceId) => registry?.getWorldNavProvider(surfaceId) ?? null,
+    reportError,
+  });
+  registry = createExtensionRegistry({
     validateProvider,
     registeredHook: MANAGER_HOOKS.NAV_PROVIDER_REGISTERED,
     unregisteredHook: MANAGER_HOOKS.NAV_PROVIDER_UNREGISTERED,
@@ -548,7 +668,13 @@ export function createManagerExtensionsRegistry({
     subscriberFailureMessage: 'Fabricate | Manager extension subscriber failed:',
     reportError,
     emitHook,
+    additionalPublicMethods: { setWorldNavTabBadge: badges.setBadge },
   });
+  // A runtime badge does not survive its provider. The unsubscribe is deliberately dropped:
+  // this pair lives for the page session, and holding a handle nobody can call would only
+  // suggest a teardown path that does not exist.
+  registry.subscribeSurfaceIds(badges.retainSurfaces);
+  return Object.freeze({ ...registry, subscribeNavTabBadges: badges.subscribe });
 }
 
 /**

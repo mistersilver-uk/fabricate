@@ -4052,8 +4052,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      // Issue 1302 — geometrically inside its OWN sub-item, keyed on the tab id on both sides:
+      // `expectContained` resolves each side with `document.querySelector` and is first-match,
+      // not strict, so an unkeyed pair would compare the first sub-item's box against the first
+      // badge's box, which need not be the same row.
+      {
+        container: '[data-world-downtime-item="ledger"]',
+        target: '[data-world-downtime-badge="ledger"]',
+      },
     ],
-    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.manager-rail',
+      '[data-world-downtime-submenu]',
+    ],
     // The companion owns the scrolling, which is only true if Core handed it the whole height.
     expectOverflowY: '[data-lab-companion-scroll]',
     expectScrollable: '[data-lab-companion-scroll]',
@@ -4063,6 +4077,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -4133,6 +4148,58 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$/,
       /^src\/ui\/svelte\/components\/Medallion\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  // Issue 1302 — the Downtime parent rollup, the state Core reaches on a fresh Manager open:
+  // the disclosure closed and never yet visited (`railGroupUserExpanded.worldDowntime` seeds
+  // `false`, and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it
+  // open). No other frame reaches this with zero interaction, and it is the only frame that
+  // can photograph the chip/rollup swap without also proving the rail-collapse or group-toggle
+  // path — see the `manager-world-downtime-premium-installed` and `-collapsed` frames for those.
+  managerCase({
+    id: 'manager-world-downtime-rollup',
+    label: 'Manager — World Downtime rollup on a closed disclosure',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [],
+    expectView: 'systems',
+    // One selector proves both halves of the swap: the rollup is present inside the parent
+    // button, and — because `:not(:has(...))` is scoped to that same button — the muted
+    // `PREMIUM` chip is NOT a descendant of it. The two are mutually exclusive by contract
+    // (`{#if !downtimeNavRollupVisible}` wraps the chip), so proving one absent while the
+    // other is present is a DOM-removal claim, not a restyling one.
+    expectSelector:
+      '#manager-world-nav-downtime:not(:has([data-world-nav-premium])) [data-world-downtime-badge-total]',
+    expectAttributes: [
+      {
+        selector: '[data-world-downtime-badge-total]',
+        name: 'aria-label',
+        // The lab provider's only badge is the four-digit one on `ledger` (1284), so the
+        // rollup total is that same value — Core sums the RESOLVED badge once per tab it
+        // renders, never registered-plus-runtime. `{count} update`/`updates` is rendered
+        // unformatted (issue 1302 accepted limitation 5), so no thousands separator here.
+        value: '1284 updates',
+      },
+    ],
+    expectContained: [
+      {
+        container: '#manager-world-nav-downtime',
+        target: '[data-world-downtime-badge-total]',
+      },
+    ],
+    // The Downtime parent row is the LAST rail entry, below Parties, Travel and Currency, and
+    // nothing scrolls it into view without a step this state deliberately takes none of. Every
+    // assertion above still passes against the un-scrolled DOM regardless of window height, but
+    // 1000px — the tallest the capture viewport's `.application` max-height clamp allows — is
+    // what actually keeps the row in the published frame, so a human can judge it too.
+    position: { width: 1330, height: 1000 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),

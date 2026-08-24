@@ -1011,8 +1011,13 @@ Each entry in `tabs`:
 | `breadcrumb` | no | Localized leaf breadcrumb crumb while this tab is active. |
 | `actionsLabel` | no | Localized accessible name of the header-action group. |
 | `actions` | no | Header actions for this tab, replacing the provider-level list. |
+| `badge` | no | `{ count, accessibleName }` rendered on the tab's rail sub-item. See [Tab Badges](#tab-badges). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**A tab's key set is closed.**
+Fabricate refuses a key it does not name above, with a deterministic message, exactly as [Runtime Route Chrome](#runtime-route-chrome) refuses an unknown key.
+This is stricter than earlier releases, which silently ignored an unrecognized tab field.
 
 Each action is `{ id, label, icon?, tooltip?, primary?, tone?, disabled? }` plus **exactly one** of:
 
@@ -1029,6 +1034,58 @@ Fabricate localizes only its own fallback copy.
 `tone` selects the action's button treatment: `primary`, `ghost`, `danger`, or `neutral`, the default, which is the plain Manager button with no added styling.
 `primary: true` is the older, still-supported spelling of `tone: 'primary'`.
 An action that declares both `primary` and `tone` is refused at registration.
+
+### Tab Badges
+
+A tab may declare a `badge` — a small mark on its rail sub-item saying something is waiting there, e.g. "3 claims to review":
+
+```javascript
+tabs: TABS.map(({ id, icon, key }) => ({
+  id,
+  icon,
+  label: game.i18n.localize(`MY_MODULE.Downtime.${key}.Label`),
+  accessibleName: game.i18n.localize(`MY_MODULE.Downtime.${key}.Accessible`),
+  tooltip: game.i18n.localize(`MY_MODULE.Downtime.${key}.Tooltip`),
+  badge: pendingCountFor(id) > 0
+    ? { count: pendingCountFor(id), accessibleName: `${pendingCountFor(id)} pending` }
+    : undefined,
+})),
+```
+
+`badge` is `{ count, accessibleName }`.
+Both fields are required whenever `badge` is present, and no other key is accepted.
+`count` is a non-negative integer; `count: 0` renders the numeral `0` rather than nothing, so a companion that wants to state "nothing pending" explicitly can.
+`accessibleName` is **final display text, rendered verbatim**, exactly as a tab's own `label` is: localize it yourself, and never pass a lang key expecting Fabricate to resolve it.
+
+**Change a badge at runtime, with no mount and no remount, through the registry itself:**
+
+```javascript
+game.fabricate.api.managerExtensions.setWorldNavTabBadge('downtime', 'board', {
+  count: 3,
+  accessibleName: '3 claims to review',
+});
+
+// Clear the runtime layer and fall back to the tab's own registered badge (or none).
+game.fabricate.api.managerExtensions.setWorldNavTabBadge('downtime', 'board', null);
+```
+
+`setWorldNavTabBadge(surfaceId, tabId, badge)` returns `true` when a provider currently holds `surfaceId` and declares `tabId`, and `false` otherwise, storing nothing.
+A malformed `badge` throws a `TypeError` and changes nothing — validation runs first, before Fabricate checks whether anything is listening, so a companion feature-detecting the seam gets the same answer regardless of install order.
+
+**Resolution is three layers deep, in one fixed order:** the runtime badge set through `setWorldNavTabBadge`, then the tab's own registered `badge`, then no badge at all.
+`null` clears the runtime layer and falls back to the registered badge.
+An explicit `{ count: 0, accessibleName }` is a stated zero and does **not** fall back, the same rule an empty `actions` array follows for [Runtime Route Chrome](#runtime-route-chrome).
+
+**A badge is scoped to the registration, not to a mount — this is the opposite lifetime from runtime route chrome.**
+Route chrome is cleared the moment a mount ends; a badge's whole job is to be true while your companion is **not** mounted, so it survives mount, unmount, tab change, route change and window state.
+It is dropped only when your provider itself leaves the registry, so unregistering and re-registering starts a tab back at its own registered `badge`, with no stale runtime value left over.
+
+**The badge is announced as a description, never as a name.**
+Fabricate renders it with `role="img"` and your `accessibleName`, points the rail sub-item's `aria-describedby` at it, and leaves the sub-item's own accessible name as the tab's `accessibleName`.
+When no badge is set — including right after a runtime badge is cleared with `null` — the sub-item carries no `aria-describedby` at all, so nothing is left pointing at a description that is not there.
+
+Core also **sums** the resolved badge counts of every tab the rail renders onto the Downtime parent row, as a single summary mark, while that group is collapsed or the rail is collapsed.
+That rollup is Core's arithmetic over your numbers, it replaces the rail's muted `PREMIUM` chip for as long as it shows, and for most GMs — whose Downtime disclosure is closed on every fresh Manager open — it is the only place your count is ever seen.
 
 ### The Mount Context
 

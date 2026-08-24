@@ -12,6 +12,8 @@ import {
   managerHeaderActionClass,
   normalizeRouteChrome,
 } from '../src/ui/managerExtensions.js';
+import { navTabBadgeTotal, resolveNavTabBadge } from '../src/ui/navTabBadgeStore.js';
+import { createPlayerExtensionsRegistry } from '../src/ui/playerExtensions.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 
@@ -317,9 +319,7 @@ test('a header action treatment is validated like every other provider field', (
   ];
   for (const [overrides, expected] of cases) {
     const candidate = provider({ ids: ['board'] });
-    candidate.tabs[0].actions = [
-      { id: 'save', label: 'Save', onSelect: () => {}, ...overrides },
-    ];
+    candidate.tabs[0].actions = [{ id: 'save', label: 'Save', onSelect: () => {}, ...overrides }];
     assert.throws(
       () =>
         createManagerExtensionsRegistry({ emitHook: () => {} }).publicApi.registerWorldNavProvider(
@@ -377,7 +377,10 @@ test('a runtime chrome update normalizes to exactly what a companion stated', ()
   );
   assert.ok(Object.isFrozen(chrome.status));
   assert.equal(chrome.actions[0].onSelect, onSelect, 'the descriptor stays the companion’s');
-  assert.ok(Object.isFrozen(chrome.actions), 'the list Core renders is not one a companion may splice');
+  assert.ok(
+    Object.isFrozen(chrome.actions),
+    'the list Core renders is not one a companion may splice'
+  );
 
   const empty = normalizeRouteChrome({ actions: [] });
   assert.deepEqual(empty.actions, [], 'an EMPTY action list is a statement, not an omission');
@@ -490,4 +493,428 @@ test('the registry publishes its hooks through the injected edge and defaults to
   } finally {
     globalThis.Hooks = originalHooks;
   }
+});
+
+// ---------------------------------------------------------------------------------------
+// Issue 1302 — a tab may carry a BADGE, the tab contract becomes a closed key set, and the
+// runtime channel that restates a badge is scoped to the REGISTRATION rather than to a mount.
+// ---------------------------------------------------------------------------------------
+
+// Badges are attached to the shared `provider()` fixture here rather than inside it, so every
+// test above keeps registering the same badge-free tabs it always did.
+function badgedProvider({ badges = {}, ...options } = {}) {
+  const extension = provider(options);
+  for (const tab of extension.tabs) {
+    if (badges[tab.id] !== undefined) tab.badge = badges[tab.id];
+  }
+  return extension;
+}
+
+// ONE table, TWO callers. The same function validates a badge at registration and on the
+// runtime channel, so a refusal that differed between them would be a defect a companion
+// could only find by trying both — and each fragment names the field the author must fix.
+const REFUSED_BADGES = Object.freeze([
+  [{ count: 3, accessibleName: 'three', tone: 'warning' }, 'does not accept "tone"'],
+  [{ count: 3, accessibleName: 'three', label: 'Claims' }, 'does not accept "label"'],
+  [{ count: 3 }, 'requires a non-empty accessibleName'],
+  [{ count: 3, accessibleName: '' }, 'requires a non-empty accessibleName'],
+  [{ count: 3, accessibleName: '   ' }, 'requires a non-empty accessibleName'],
+  [{ count: 3, accessibleName: 7 }, 'requires a non-empty accessibleName'],
+  [{ accessibleName: 'three' }, 'requires a non-negative integer count'],
+  [{ count: -1, accessibleName: 'three' }, 'requires a non-negative integer count'],
+  [{ count: 1.5, accessibleName: 'three' }, 'requires a non-negative integer count'],
+  [{ count: '3', accessibleName: 'three' }, 'requires a non-negative integer count'],
+  [{ count: Number.NaN, accessibleName: 'three' }, 'requires a non-negative integer count'],
+  [
+    { count: Number.POSITIVE_INFINITY, accessibleName: 'three' },
+    'requires a non-negative integer count',
+  ],
+  [
+    { count: Number.MAX_SAFE_INTEGER + 1, accessibleName: 'three' },
+    'requires a non-negative integer count',
+  ],
+  [7, 'must be an object, or null to clear it'],
+  [[{ count: 3, accessibleName: 'three' }], 'must be an object, or null to clear it'],
+]);
+
+const ACCEPTED_BADGES = Object.freeze([
+  { count: 0, accessibleName: 'Nothing waiting' },
+  { count: 1200, accessibleName: '1200 claims waiting' },
+]);
+
+function refusal(fragment) {
+  return (error) =>
+    error instanceof TypeError &&
+    error.message.includes(fragment) &&
+    error.message.startsWith('Fabricate World navigation');
+}
+
+// A registry read the way CORE reads it: `subscribeNavTabBadges` replays immediately and
+// republishes on every change, so `snapshot()` is always the record the rail would render
+// from at that instant. Reading through the subscription rather than through the store's own
+// accessor also means a channel that stored correctly and published nothing fails here.
+function badgeHarness() {
+  const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+  let latest = null;
+  registry.subscribeNavTabBadges(WORLD_DOWNTIME_SURFACE_ID, (badges) => {
+    latest = badges;
+  });
+  return {
+    registry,
+    register: (extension) => registry.publicApi.registerWorldNavProvider(extension),
+    setBadge: (...args) => registry.publicApi.setWorldNavTabBadge(...args),
+    tab: (tabId) =>
+      registry
+        .getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID)
+        .tabs.find((candidate) => candidate.id === tabId),
+    snapshot: () => latest,
+  };
+}
+
+test('AC-1 — a tab may declare a badge, and Core renders it back frozen and unchanged', () => {
+  const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+  const extension = badgedProvider({
+    ids: ['ledger'],
+    badges: { ledger: { count: 3, accessibleName: '3 claims waiting' } },
+  });
+
+  registry.publicApi.registerWorldNavProvider(extension);
+  const [tab] = registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID).tabs;
+  assert.deepEqual(tab.badge, { count: 3, accessibleName: '3 claims waiting' });
+
+  // Frozen IN PLACE, not replaced by a normalized copy: the registry stores the companion's
+  // own object by reference and Core renders straight from it, so an unfrozen badge could be
+  // rewritten after registration and the rail would show a value nothing validated.
+  assert.ok(Object.isFrozen(tab.badge), 'the badge Core renders is frozen');
+  assert.throws(() => {
+    tab.badge.count = 9;
+  }, TypeError);
+  assert.equal(tab.badge.count, 3, 'the count survives an attempt to rewrite it');
+});
+
+test('AC-2 — a malformed badge is refused at registration and the registry is unchanged', () => {
+  for (const [badge, fragment] of REFUSED_BADGES) {
+    const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+    assert.throws(
+      () =>
+        registry.publicApi.registerWorldNavProvider(
+          badgedProvider({ ids: ['ledger'], badges: { ledger: badge } })
+        ),
+      refusal(fragment),
+      `expected ${fragment} for ${JSON.stringify(badge)}`
+    );
+    assert.ok(
+      !registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID),
+      'a refused registration leaves the registry holding nothing'
+    );
+    // The message has to name the TAB as well as the field, because a provider may declare
+    // seven tabs and "requires a non-negative integer count" alone names none of them.
+    assert.throws(
+      () =>
+        registry.publicApi.registerWorldNavProvider(
+          badgedProvider({ ids: ['ledger'], badges: { ledger: badge } })
+        ),
+      /tab "ledger" badge /,
+      'the refusal names the offending tab'
+    );
+  }
+
+  for (const badge of ACCEPTED_BADGES) {
+    const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+    registry.publicApi.registerWorldNavProvider(
+      badgedProvider({ ids: ['ledger'], badges: { ledger: { ...badge } } })
+    );
+    assert.deepEqual(
+      registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID).tabs[0].badge,
+      badge,
+      `${badge.count} is a count a companion may state`
+    );
+  }
+});
+
+test('AC-3 — the tab key set is closed, and every key it names still registers', () => {
+  const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+  const mistyped = provider({ ids: ['ledger'] });
+  mistyped.tabs[0].badgeCount = 3;
+  assert.throws(
+    () => registry.publicApi.registerWorldNavProvider(mistyped),
+    (error) =>
+      error instanceof TypeError &&
+      error.message ===
+        'Fabricate World navigation provider tab "ledger" does not accept "badgeCount"',
+    'a key Core does not name is refused deterministically, not accepted and dropped'
+  );
+  assert.ok(
+    !registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID),
+    'a refused registration leaves the registry holding nothing'
+  );
+
+  // The other half, and the one that would catch a key set that closed too far: the five
+  // required fields alone still register, the shipped optional-field case above still
+  // registers, and a tab stating EVERY named key at once registers.
+  assert.doesNotThrow(() => badgeHarness().register(provider({ ids: ['ledger'] })));
+
+  const everyKey = provider({ ids: ['ledger'] });
+  Object.assign(everyKey.tabs[0], {
+    title: 'Company Ledger',
+    subtitle: 'Six crew · two projects',
+    breadcrumb: 'Ledger',
+    actionsLabel: 'Ledger actions',
+    actions: [{ id: 'save', label: 'Save', onSelect: () => {} }],
+    badge: { count: 3, accessibleName: '3 claims waiting' },
+  });
+  const full = badgeHarness();
+  assert.doesNotThrow(() => full.register(everyKey));
+  assert.equal(full.tab('ledger').badge.count, 3);
+});
+
+test('AC-4 — setWorldNavTabBadge states a badge at runtime on a surface a provider holds', () => {
+  const harness = badgeHarness();
+  harness.register(badgedProvider({ ids: ['ledger'] }));
+
+  const badge = { count: 1200, accessibleName: '1200 claims waiting' };
+  assert.equal(harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', badge), true);
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    badge,
+    'the rail resolves the runtime value, with no mount and no remount'
+  );
+});
+
+test('AC-5 — an unheld surface and an undeclared tab are refused, and store nothing', () => {
+  const harness = badgeHarness();
+  const otherSurface = [];
+  harness.registry.subscribeNavTabBadges('crew-quarters', (badges) => otherSurface.push(badges));
+  harness.register(badgedProvider({ ids: ['ledger'] }));
+  const badge = { count: 3, accessibleName: '3 claims waiting' };
+
+  assert.equal(
+    harness.setBadge('crew-quarters', 'roster', badge),
+    false,
+    'a surface no provider holds is refused'
+  );
+  assert.equal(
+    otherSurface.length,
+    1,
+    'only the subscription replay published: nothing was stored for that surface'
+  );
+  assert.deepEqual(Object.keys(otherSurface[0]), []);
+
+  assert.equal(
+    harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'crew', badge),
+    false,
+    'a tab the holding provider does not declare is refused'
+  );
+  assert.deepEqual(
+    Object.keys(harness.snapshot()),
+    [],
+    'a badge for a tab that may never exist is refused rather than parked'
+  );
+});
+
+test('AC-6 — validation precedes the liveness check, and a refused call changes nothing', () => {
+  const harness = badgeHarness();
+
+  // The refusal is IDENTICAL whoever sent it. A companion feature-detecting this seam must
+  // not get `false` from one Core and a `TypeError` from another because a second module
+  // happened to register first.
+  for (const [badge, fragment] of REFUSED_BADGES) {
+    assert.throws(
+      () => harness.setBadge('nobody-holds-this', 'ledger', badge),
+      refusal(fragment),
+      `an unheld surface still throws for ${JSON.stringify(badge)}`
+    );
+  }
+
+  harness.register(badgedProvider({ ids: ['ledger'] }));
+  const stated = { count: 3, accessibleName: '3 claims waiting' };
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', stated);
+  for (const [badge, fragment] of REFUSED_BADGES) {
+    assert.throws(
+      () => harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', badge),
+      refusal(fragment),
+      `a held surface refuses ${JSON.stringify(badge)} the same way`
+    );
+  }
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    stated,
+    'a refused call leaves the rail showing what it showed already'
+  );
+});
+
+test('AC-7 — a badge resolves through three layers, in one order', () => {
+  const harness = badgeHarness();
+  const registered = { count: 3, accessibleName: '3 claims waiting' };
+  harness.register(
+    badgedProvider({ ids: ['ledger', 'writs'], badges: { ledger: { ...registered } } })
+  );
+
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    registered,
+    'layer two: the tab renders its registered badge with nothing on the runtime channel'
+  );
+
+  const runtime = { count: 9, accessibleName: '9 claims waiting' };
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', runtime);
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    runtime,
+    'layer one: the runtime badge overrides the registered one'
+  );
+
+  assert.equal(harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', null), true);
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    registered,
+    'null CLEARS the runtime layer rather than storing an empty one'
+  );
+
+  assert.ok(
+    !resolveNavTabBadge(harness.tab('writs'), harness.snapshot()),
+    'layer three: a tab with no registered badge and no runtime one has no badge'
+  );
+  assert.equal(harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'writs', null), true);
+  assert.ok(
+    !resolveNavTabBadge(harness.tab('writs'), harness.snapshot()),
+    'clearing a layer that was never set leaves the tab with no badge, not an empty one'
+  );
+
+  // A POSITIVE ZERO. `{ count: 0 }` is the companion stating that the tab holds nothing,
+  // which is a different claim from stating no count at all — the direct analogue of an
+  // empty `actions` array, and it must not fall back to the registered 3.
+  const zero = { count: 0, accessibleName: 'Nothing waiting' };
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', zero);
+  assert.deepEqual(resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()), zero);
+});
+
+test('AC-8 — runtime badges are keyed per tab, and clearing one leaves the other', () => {
+  const harness = badgeHarness();
+  harness.register(badgedProvider({ ids: ['ledger', 'crew'] }));
+  const ledger = { count: 3, accessibleName: '3 claims waiting' };
+  const crew = { count: 2, accessibleName: '2 crew idle' };
+
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', ledger);
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'crew', crew);
+  assert.deepEqual(resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()), ledger);
+  assert.deepEqual(resolveNavTabBadge(harness.tab('crew'), harness.snapshot()), crew);
+
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', null);
+  assert.ok(!resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()));
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('crew'), harness.snapshot()),
+    crew,
+    'clearing one tab is not clearing the surface'
+  );
+});
+
+test('AC-9 — a runtime badge is scoped to the registration and dropped with it', () => {
+  const harness = badgeHarness();
+  const registered = { count: 3, accessibleName: '3 claims waiting' };
+  const unregister = harness.register(
+    badgedProvider({ ids: ['ledger'], badges: { ledger: { ...registered } } })
+  );
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', {
+    count: 9,
+    accessibleName: '9 claims waiting',
+  });
+
+  unregister();
+  assert.deepEqual(
+    Object.keys(harness.snapshot()),
+    [],
+    'a surface leaving the registry takes its runtime badges with it'
+  );
+
+  harness.register(badgedProvider({ ids: ['ledger'], badges: { ledger: { ...registered } } }));
+  assert.deepEqual(
+    resolveNavTabBadge(harness.tab('ledger'), harness.snapshot()),
+    registered,
+    'a re-registered provider starts from its OWN registered badge, not the last one set'
+  );
+});
+
+test('AC-10 — the two registries publish exactly the methods each of them owns', () => {
+  assert.deepEqual(
+    Object.keys(createManagerExtensionsRegistry({ emitHook: () => {} }).publicApi),
+    ['registerWorldNavProvider', 'setWorldNavTabBadge'],
+    'the Manager seam gains the badge setter, and gains nothing else'
+  );
+  // The negative alone never proved the option works, and the positive alone never proved it
+  // stayed on one side of the seam. Both, or neither is evidence.
+  assert.deepEqual(
+    Object.keys(createPlayerExtensionsRegistry({ emitHook: () => {} }).publicApi),
+    ['registerPlayerNavProvider'],
+    'the player seam is untouched by a Manager-only feature'
+  );
+});
+
+test('AC-22 — navTabBadgeTotal sums the RESOLVED badge once per tab, never registered plus runtime', () => {
+  const tabs = [
+    { id: 'ledger', badge: { count: 3, accessibleName: '3 claims waiting' } },
+    { id: 'crew', badge: { count: 2, accessibleName: '2 crew idle' } },
+    { id: 'writs' },
+  ];
+
+  assert.equal(navTabBadgeTotal(tabs, null), 5, 'the registered layer alone totals 5');
+  assert.equal(
+    navTabBadgeTotal(tabs, { ledger: { count: 5, accessibleName: '5 claims waiting' } }),
+    7,
+    'the runtime layer OVERRIDES the registered one: 7, and never the additive 10'
+  );
+  // Clearing a runtime badge is an ABSENT key, not a key holding `null`: the store deletes
+  // the entry rather than storing an empty one, which is what makes "never set" and "set then
+  // cleared" indistinguishable to every reader. The real clear is driven below.
+  assert.equal(
+    navTabBadgeTotal(tabs, {}),
+    5,
+    'clearing the runtime layer returns the total to the registered sum'
+  );
+  assert.equal(
+    navTabBadgeTotal([{ id: 'ledger' }, { id: 'crew' }], null),
+    0,
+    'an un-badged tab contributes 0 rather than throwing'
+  );
+  assert.equal(navTabBadgeTotal([], null), 0);
+  assert.equal(navTabBadgeTotal(null, null), 0);
+
+  // The same arithmetic over the record the STORE actually publishes, which is a frozen
+  // null-prototype object rather than a literal — so a total that reached for an inherited
+  // member, or that could not read that shape at all, fails here too. `toString` is deliberately
+  // among the tab ids: it is an inherited member of an ordinary object literal, so a plain
+  // `{}` snapshot plus a bare (non-`Object.hasOwn`) lookup would resolve it to a function
+  // rather than to "no badge" — the other three ids never collide with anything
+  // `Object.prototype` carries. The TOTAL alone cannot witness that on its own: `?.count ?? 0`
+  // reduces a wrongly-resolved function to 0 exactly as it reduces a correctly-resolved
+  // `null`, since neither carries a `count`. So this block also reads `resolveNavTabBadge`
+  // directly for the colliding tab, which is the one call that actually sees the function.
+  const harness = badgeHarness();
+  harness.register(
+    badgedProvider({
+      ids: ['ledger', 'crew', 'writs', 'toString'],
+      // Null-prototype, deliberately: `badgedProvider` itself reads this table with a bare
+      // `badges[tab.id]`, and a plain `{}` here would resolve `badges['toString']` to
+      // `Object.prototype.toString` and badge the fixture's own tab by accident — the very
+      // hazard this addition exists to exercise, just one call frame too early.
+      badges: Object.assign(Object.create(null), {
+        ledger: { count: 3, accessibleName: '3 claims waiting' },
+        crew: { count: 2, accessibleName: '2 crew idle' },
+      }),
+    })
+  );
+  const registeredTabs = harness.registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID).tabs;
+  assert.equal(navTabBadgeTotal(registeredTabs, harness.snapshot()), 5);
+  assert.equal(
+    resolveNavTabBadge(harness.tab('toString'), harness.snapshot()),
+    null,
+    'an un-badged tab whose id collides with an inherited member still resolves to no badge'
+  );
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', {
+    count: 5,
+    accessibleName: '5 claims waiting',
+  });
+  assert.equal(navTabBadgeTotal(registeredTabs, harness.snapshot()), 7);
+  harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', null);
+  assert.equal(navTabBadgeTotal(registeredTabs, harness.snapshot()), 5);
 });
