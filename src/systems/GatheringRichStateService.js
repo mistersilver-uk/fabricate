@@ -1255,7 +1255,7 @@ export class GatheringRichStateService {
     if (!reveals || typeof reveals !== 'object') return [];
     // Build the scope-specific prefix once via revealKey (with a sentinel task
     // id) so the matching format always mirrors the writer's key format.
-    const sentinel = ' ';
+    const sentinel = '\0';
     const sampleKey = revealKey({
       environmentId: envId,
       taskId: sentinel,

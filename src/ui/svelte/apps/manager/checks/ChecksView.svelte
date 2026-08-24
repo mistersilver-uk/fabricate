@@ -1327,7 +1327,7 @@
       previewActorId,
       previewRecord?.id ?? '',
       previewPlan.dc,
-    ].join(' ')
+    ].join('\0')
   );
   let adoptedPreviewSignature = $state('');
   $effect(() => {
