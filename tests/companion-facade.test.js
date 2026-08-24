@@ -31,8 +31,11 @@ import { describe, it } from 'node:test';
 import { ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
+import { runFormulaPassFail, runFormulaProgressive } from '../src/systems/checkRoll.js';
 import {
   AFFORDABILITY_MESSAGE_KEYS,
+  BULK_CHECK_DECISION_MESSAGE_KEYS,
+  CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_CONTRACT,
   COMPANION_MEMBERS,
   COMPANION_MEMBER_HOSTS,
@@ -41,6 +44,7 @@ import {
   COMPANION_PROMISES,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
+import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 import {
   assertContractResult,
@@ -55,6 +59,7 @@ import {
 import {
   FabricateFacadeUnderTest,
   HARNESS_SOURCE,
+  MAIN_SOURCE,
   installFacadeGame,
   mainMethodSource,
 } from './helpers/fabricateFacadeHarness.js';
@@ -114,6 +119,77 @@ function makeGrantTargetActor(id, { ownerUserIds = [] } = {}) {
 }
 
 /**
+ * A `globalThis.Roll` the check-roll members can actually roll with.
+ *
+ * The two Standalone Check Roll members reach the REAL runners through their seam bag, so the
+ * facade half of their gate table is only assertable with a dice engine present — and the
+ * prompt-spy count that distinguishes "refused" from "rolled and then refused" is only
+ * meaningful when the runner really would have opened the dialog.
+ */
+function installDice() {
+  class FakeRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 18;
+      this.dice = [{ number: 1, faces: 20, total: 18, results: [{ result: 18 }] }];
+    }
+    async evaluate() {
+      return this;
+    }
+    async toMessage() {
+      return { id: 'msg' };
+    }
+    static validate() {
+      return true;
+    }
+  }
+  FakeRoll.replaceFormulaData = (formula) => String(formula);
+  globalThis.Roll = FakeRoll;
+  globalThis.ChatMessage = { getSpeaker: ({ actor } = {}) => ({ alias: actor?.name ?? '' }) };
+}
+
+/**
+ * The Standalone Check Roll seam bag the harness facade injects, with its call records.
+ *
+ * `isElectedExecutor` and `hasDiceEngine` are what the eight-cell gate table turns on, and the
+ * two prompt seams are what make "this client did not open a dialog" assertable at all: both
+ * production prompts AUTO-CONFIRM where there is no `DialogV2`, so a headless run cannot tell
+ * a refusal from a confirmation without them.
+ */
+function makeCheckSeams({ elected = true, diceEngine = true } = {}) {
+  const calls = { prompt: 0, promptBulk: 0, bags: [] };
+  return {
+    calls,
+    seams: {
+      isElectedExecutor: () => elected,
+      hasDiceEngine: () => diceEngine,
+      localize: (_key, fallback) => fallback,
+      prompt: async () => {
+        calls.prompt += 1;
+        return { confirmed: true };
+      },
+      promptBulk: async () => {
+        calls.promptBulk += 1;
+        return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+      },
+      // The bag is RECORDED, because the delegator's own key discipline is only assertable
+      // downstream of it: the leaf reads named keys and ignores the rest, so a delegator that
+      // forwarded the whole request would be invisible to every module-level assertion — and
+      // a forwarded `actor` overwrites the RESOLVED one and walks straight past the gate.
+      runPassFail: async (bag) => {
+        calls.bags.push(bag);
+        return await runFormulaPassFail(bag);
+      },
+      runProgressive: async (bag) => {
+        calls.bags.push(bag);
+        return await runFormulaProgressive(bag);
+      },
+      buildRollOptions: buildInteractiveRollOptions,
+    },
+  };
+}
+
+/**
  * Stand the companion half of the facade up for ONE question, with the fixture named only
  * where it differs from the default. Everything else is real code.
  */
@@ -124,8 +200,12 @@ function standUpFacade({
   recipes = [RECIPE],
   systems = [OBSERVABLE_SYSTEM],
   currencyUnits = undefined,
+  elected = true,
+  diceEngine = true,
 } = {}) {
   installFacadeGame({ user, actors });
+  installDice();
+  const checkSeams = makeCheckSeams({ elected, diceEngine });
   const resolveRecipeCalls = [];
   const facade = new FabricateFacadeUnderTest({
     ready,
@@ -143,8 +223,9 @@ function standUpFacade({
       makeWorldCurrencyConfig(currencyUnits ? { units: currencyUnits } : {})
     ),
     actorPropertyCoinSpender: new ActorPropertyCoinSpender(),
+    companionCheckSeams: checkSeams.seams,
   });
-  return { facade, resolveRecipeCalls };
+  return { facade, resolveRecipeCalls, checkCalls: checkSeams.calls, checkSeams: checkSeams.seams };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +251,16 @@ const STABLE_MEMBERS = [
     keys: AFFORDABILITY_MESSAGE_KEYS,
     call: (facade, actorId) => facade.checkAffordability({ actorId, unitId: 'gp', amount: 1 }),
     extraKeys: ['affordable'],
+  },
+  {
+    // The third ACTOR-TARGETED member. `resolveBulkCheckDecision` is deliberately absent: it
+    // takes no `actorId`, is GM-gated inline, and can never answer `noActor` — its own gate
+    // outcomes are asserted separately below.
+    name: 'rollActorCheck',
+    keys: CHECK_ROLL_MESSAGE_KEYS,
+    call: (facade, actorId) =>
+      facade.rollActorCheck({ actorId, callSite: 'gmAction', formula: '1d20', dc: 15 }),
+    extraKeys: ['passed', 'total', 'diceGroups', 'resolvedFormula'],
   },
 ];
 
@@ -307,6 +398,214 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
       false,
       'and never reads the actor collection directly, which would drop that predicate'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-4 / AC-13 — the gate table over (isGM, callSite, isElectedExecutor)
+// ---------------------------------------------------------------------------
+
+/** A GM-owned actor the check members can roll for. */
+function rollableActor() {
+  return makeGrantTargetActor('actor-1');
+}
+
+describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its prompt count', () => {
+  for (const [isGM, callSite, elected, outcome, prompts] of [
+    [true, 'gmAction', true, COMPANION_OUTCOMES.checkPassed, 1],
+    // A single-client GM action does not consult the election at all, so an unelected GM
+    // still rolls. Without this cell an implementation that elected EVERY call would pass.
+    [true, 'gmAction', false, COMPANION_OUTCOMES.checkPassed, 1],
+    // The cell the first draft of this criterion omitted. Without it, an implementation that
+    // answered `notElected` for EVERY broadcast call satisfies the table in full.
+    [true, 'broadcast', true, COMPANION_OUTCOMES.checkPassed, 1],
+    [true, 'broadcast', false, COMPANION_OUTCOMES.notElected, 0],
+    [false, 'gmAction', true, COMPANION_OUTCOMES.gmOnly, 0],
+    [false, 'gmAction', false, COMPANION_OUTCOMES.gmOnly, 0],
+    [false, 'broadcast', true, COMPANION_OUTCOMES.gmOnly, 0],
+    [false, 'broadcast', false, COMPANION_OUTCOMES.gmOnly, 0],
+  ]) {
+    it(`isGM ${isGM} + ${callSite} + elected ${elected} -> ${outcome}, prompt x${prompts}`, async () => {
+      const actor = rollableActor();
+      const { facade, checkCalls } = standUpFacade({
+        user: isGM ? GM : PLAYER,
+        actors: [actor],
+        elected,
+      });
+
+      const result = await facade.rollActorCheck({
+        actorId: 'actor-1',
+        callSite,
+        formula: '1d20',
+        dc: 15,
+        interactive: true,
+      });
+
+      assert.equal(result.outcome, outcome);
+      assert.equal(checkCalls.prompt, prompts, 'the dialog count separates refusal from roll');
+      assert.equal(result.message, CHECK_ROLL_MESSAGE_KEYS[outcome]);
+    });
+  }
+
+  it('is ORDERED: three cells that only the specified gate order can all produce', async () => {
+    // A NON-GM with a missing call site and an unresolvable actor answers `gmOnly`.
+    const noGm = standUpFacade({ user: PLAYER, actors: [] });
+    assert.equal(
+      (await noGm.facade.rollActorCheck({ actorId: 'ghost', formula: '1d20', dc: 15 })).outcome,
+      COMPANION_OUTCOMES.gmOnly
+    );
+
+    // A GM with a VALID call site and an unresolvable actor answers `noActor`.
+    const stale = standUpFacade({ actors: [] });
+    assert.equal(
+      (
+        await stale.facade.rollActorCheck({
+          actorId: 'ghost',
+          callSite: 'gmAction',
+          formula: '1d20',
+          dc: 15,
+        })
+      ).outcome,
+      COMPANION_OUTCOMES.noActor
+    );
+
+    // A GM with an unresolvable actor AND an invalid call site answers `noActor`. This is the
+    // cell that pins the recorded ordering cost: a stale `actorId` is reported before any
+    // call-site check, on every client, rather than two different ways depending on which
+    // screen the GM is looking at. Combining only ONE failure at a time leaves it unasserted.
+    const both = standUpFacade({ actors: [] });
+    assert.equal(
+      (
+        await both.facade.rollActorCheck({
+          actorId: 'ghost',
+          callSite: 'nonsense',
+          formula: '1d20',
+          dc: 15,
+        })
+      ).outcome,
+      COMPANION_OUTCOMES.noActor
+    );
+  });
+});
+
+describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the request', () => {
+  it('cannot be handed an actor that overrides the one the ownership gate resolved', async () => {
+    // The mutation this exists for is `{ actor: gate.actor, …, ...request }`. It passes every
+    // MODULE-level criterion, because the leaf reads named keys and ignores the rest — but a
+    // caller-supplied `actor` wins the spread, and the roll is then taken for an actor the
+    // gate never resolved and the caller may not own. The gate would have passed on a
+    // DIFFERENT actor entirely.
+    const owned = makeGrantTargetActor('actor-1');
+    const impostor = { id: 'actor-99', name: 'Impostor', getRollData: () => ({}) };
+    const hostilePrompt = { calls: 0 };
+    const { facade, checkCalls, checkSeams } = standUpFacade({ actors: [owned] });
+
+    const result = await facade.rollActorCheck({
+      actorId: 'actor-1',
+      callSite: 'gmAction',
+      formula: '1d20',
+      dc: 15,
+      // `interactive: true` is what makes the prompt count below an assertion rather than a
+      // decoration. Defaulted false, the dialog is off the path entirely and the caller's own
+      // prompt could not have been called whatever the delegator did.
+      interactive: true,
+      actor: impostor,
+      prompt: () => {
+        hostilePrompt.calls += 1;
+        return { confirmed: true };
+      },
+      speaker: { alias: 'Impostor' },
+      craftingModifier: { catalogue: [{ id: 'x', value: 999 }] },
+      triggers: [{ outcome: 'success' }],
+    });
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
+    const [bag] = checkCalls.bags;
+    assert.equal(bag.actor, owned, 'the RESOLVED actor, never one the caller attached');
+    assert.notEqual(bag.actor, impostor);
+    assert.deepEqual(
+      Object.keys(bag),
+      [
+        'formula',
+        'dc',
+        'thresholdMode',
+        'triggers',
+        'actor',
+        'label',
+        'rollOptions',
+        'craftingModifier',
+      ],
+      'the runner call carries exactly the eight keys the delegator names'
+    );
+    assert.equal(bag.craftingModifier, null, 'no smuggled modifier catalogue');
+    assert.deepEqual(bag.triggers, [], 'no smuggled forced-outcome trigger');
+    // `prompt` is a LEGITIMATE key of the composed bag, so a key-set assertion alone cannot
+    // see a caller's function installed under it. Identity can.
+    assert.equal(bag.rollOptions.prompt, checkSeams.prompt, 'the SEAM prompt, by identity');
+    assert.equal(checkCalls.prompt, 1, 'reachability: the seam prompt IS opened on this path');
+    assert.equal(hostilePrompt.calls, 0, "and the caller's own prompt was never called");
+  });
+});
+
+describe('AC-13 — resolveBulkCheckDecision refuses gmOnly and notReady, but NEVER noActor', () => {
+  it('answers gmOnly for a non-GM, pre-ready, and opens no dialog', async () => {
+    const { facade, checkCalls } = standUpFacade({ user: PLAYER, ready: false });
+
+    const result = await facade.resolveBulkCheckDecision({
+      callSite: 'gmAction',
+      formulas: ['1d20'],
+    });
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.gmOnly);
+    assert.equal(result.message, BULK_CHECK_DECISION_MESSAGE_KEYS.gmOnly);
+    assert.equal(checkCalls.promptBulk, 0);
+  });
+
+  it('answers notReady once the GM gate has passed, as a refusal and never a throw', async () => {
+    const { facade } = standUpFacade({ ready: false });
+
+    const result = await facade.resolveBulkCheckDecision({
+      callSite: 'gmAction',
+      formulas: ['1d20'],
+    });
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.notReady);
+    assert.equal(result.message, BULK_CHECK_DECISION_MESSAGE_KEYS.notReady);
+  });
+
+  it('never answers noActor, whatever it is handed, because it reads no actor', async () => {
+    const { facade } = standUpFacade({ actors: [] });
+
+    for (const request of [
+      { callSite: 'gmAction', formulas: ['1d20'] },
+      { callSite: 'gmAction', formulas: [] },
+      { callSite: 'nonsense', formulas: ['1d20'] },
+      // Even handed an actorId it does not declare, it must not grow an actor gate.
+      { callSite: 'gmAction', formulas: ['1d20'], actorId: 'ghost' },
+    ]) {
+      const result = await facade.resolveBulkCheckDecision(request);
+      assert.notEqual(result.outcome, COMPANION_OUTCOMES.noActor, JSON.stringify(request));
+      assert.equal(
+        BULK_CHECK_DECISION_MESSAGE_KEYS.noActor,
+        undefined,
+        'and the member declares no key for an outcome it can never answer'
+      );
+    }
+  });
+
+  it('settles a decision, and rolls nothing at all doing it', async () => {
+    const { facade, checkCalls } = standUpFacade();
+
+    const result = await facade.resolveBulkCheckDecision({
+      callSite: 'gmAction',
+      formulas: ['1d20', '', '2d10'],
+    });
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.decided);
+    assert.equal(result.success, true);
+    assert.deepEqual(result.covered, [0, 2]);
+    assert.equal(checkCalls.promptBulk, 1);
+    assert.equal(checkCalls.prompt, 0, 'the single-item prompt is not this member’s dialog');
   });
 });
 
@@ -481,7 +780,7 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 
   it('resolves every member through its OWN declared host and path', () => {
     const facade = makeInitializedFacade();
-    assert.equal(COMPANION_MEMBERS.length, 8, 'the declared set is eight members');
+    assert.equal(COMPANION_MEMBERS.length, 10, 'the declared set is ten members');
     for (const member of COMPANION_MEMBERS) {
       const host = resolveHost(member, facade);
       assert.ok(host, `${member.name}: its declared host resolved to nothing`);
@@ -564,6 +863,8 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
 const GRANT = 'async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {';
 const AFFORD = 'async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {';
+const ROLL = 'async rollActorCheck({';
+const BULK = 'async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {';
 
 /**
  * Every claim below is asserted over BOTH texts.
@@ -614,10 +915,19 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('reproduces one guard per member, ordered preamble-then-readiness', () => {
-    for (const signature of [GRANT, AFFORD]) {
+    // `rollActorCheck` joins this loop and `resolveBulkCheckDecision` does NOT: the two gate
+    // DIFFERENTLY, deliberately, and a uniform shape asserted over both is unsatisfiable
+    // together with the criterion that pins the bulk member's missing actor gate.
+    for (const signature of [GRANT, AFFORD, ROLL]) {
       for (const [label, body] of bothTexts(signature)) {
+        // The trailing `{` the first two members carry is deliberately NOT pinned here.
+        // `rollActorCheck` passes a module-level frozen key pair instead of an inline object
+        // literal, because that literal IS the duplicated run between `src/main.js` and this
+        // harness — the one measured at 139 tokens for the grant, over SonarJS's minimum. The
+        // claim this assertion makes is delegation to the shared preamble with the caller's
+        // own `actorId`; each member's own refusal STRINGS are pinned per member below.
         assert.ok(
-          body.includes('const gate = this._requireGmActor(actorId, {'),
+          body.includes('const gate = this._requireGmActor(actorId,'),
           `${label} ${signature} no longer delegates its gate to the shared preamble`
         );
         assert.ok(
@@ -645,6 +955,200 @@ describe('the harness copies are faithful to src/main.js', () => {
         body.includes('gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly]'),
         `${label}: the currency check answers in the currency vocabulary`
       );
+    }
+    // `rollActorCheck`'s pair is HOISTED to module scope on both sides, so the claim is
+    // pinned where it is stated rather than inside the delegator body.
+    for (const [label, source] of [
+      ['production', MAIN_SOURCE],
+      ['the harness mirror', HARNESS_SOURCE],
+    ]) {
+      assert.ok(
+        source.includes('gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly]') &&
+          source.includes('noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]'),
+        `${label}: a refused check roll must not report itself in the grant's words`
+      );
+    }
+  });
+
+  it('AC-5 — rollActorCheck reuses the preamble and passes the RESOLVED actor through', () => {
+    for (const [label, body] of bothTexts(ROLL)) {
+      assert.ok(body.length > 150, `non-vacuity: ${label} sliced to ${body.length} characters`);
+      assert.ok(
+        body.includes('this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS)'),
+        `${label} stopped delegating its gate to the shared preamble, with its OWN hoisted keys`
+      );
+      assert.ok(
+        body.includes('actor: gate.actor'),
+        `${label} must pass the RESOLVED actor into the leaf: a second resolver would be the ` +
+          'THIRD copy the preamble’s own comment warns the author of'
+      );
+      assert.ok(
+        body.includes('this._companionCheckSeams()'),
+        `${label} obtains its seams from the one hoisted bag, never a restated literal`
+      );
+      // The refusal is built by THIS member's own builder, and the gate outcome wins over
+      // readiness. Both halves are one substitution away from a cross-member vocabulary leak
+      // — `bulkCheckDecisionResult(...)` here answers a non-GM in the BULK member's words and
+      // in its answer SHAPE — and the behavioural cases that would catch it all run against
+      // the mirror, so production's copy is pinned where it is written.
+      assert.ok(
+        body.includes('return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);'),
+        `${label} must answer its OWN refusal shape, with the gate outcome ahead of readiness`
+      );
+    }
+  });
+
+  it('AC-5 — resolveBulkCheckDecision gates GM INLINE, with no actor gate at all', () => {
+    for (const [label, body] of bothTexts(BULK)) {
+      assert.ok(body.length > 100, `non-vacuity: ${label} sliced to ${body.length} characters`);
+      assert.ok(
+        body.includes("user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null"),
+        `${label} lost the inline GM gate`
+      );
+      assert.ok(
+        body.includes('if (gmOnly || this.ready !== true) {'),
+        `${label} lost the readiness half, which keeps the GM refusal ahead of readiness`
+      );
+      // `_requireGmActor(undefined, …)` ALWAYS answers `noActor`, because
+      // `_resolveCraftingActor(null)` returns null — so reusing the preamble here would make
+      // a member that reads no actor answer an actor refusal on every single call.
+      assert.equal(
+        codeOnly(body).includes('_requireGmActor'),
+        false,
+        `${label} must not reach the actor-targeted preamble`
+      );
+      assert.equal(
+        codeOnly(body).includes('actorId'),
+        false,
+        `${label} must not read an actorId it does not declare`
+      );
+      assert.ok(body.includes('this._companionCheckSeams()'), `${label} lost the hoisted seams`);
+      assert.ok(
+        body.includes('return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);'),
+        `${label} must answer its OWN refusal shape, with the GM refusal ahead of readiness`
+      );
+    }
+  });
+
+  /**
+   * The eight seams the ONE bag binds, each to the collaborator production actually ships.
+   *
+   * `[key, the exact binding, what the wrong binding does in production]`.
+   */
+  const SEAM_BINDINGS = [
+    [
+      'isElectedExecutor',
+      'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
+      'every connected GM client executes a broadcast call, rolling N different totals into ' +
+        'N companion instances — the exact harm the single-executor rule exists to prevent',
+    ],
+    [
+      'hasDiceEngine',
+      "hasDiceEngine: () => typeof globalThis.Roll === 'function'",
+      'engineUnavailable becomes unreachable, and a client with no dice engine dispatches ' +
+        'to a runner that cannot roll',
+    ],
+    [
+      'localize',
+      "resolved !== '' && resolved !== key ? resolved : fallback",
+      'a chat flavour reading `FABRICATE.Check.Roll.DefaultLabel check (DC 15)`, because ' +
+        'the bridge answers the KEY for a missing string exactly as Foundry does',
+    ],
+    ['prompt', 'prompt: promptCheckRoll', 'the BULK dialog opens for a single roll'],
+    ['promptBulk', 'promptBulk: promptBulkCheckRoll', 'the single-roll dialog opens for a batch'],
+    [
+      'runPassFail',
+      'runPassFail: runFormulaPassFail',
+      'a graded check dispatches the PROGRESSIVE runner: the dc is ignored and the member ' +
+        'answers `rolled` rather than checkPassed/checkFailed, at every DC, forever',
+    ],
+    [
+      'runProgressive',
+      'runProgressive: runFormulaProgressive',
+      'an ungraded roll is graded against an undefined dc',
+    ],
+    [
+      'buildRollOptions',
+      'buildRollOptions: buildInteractiveRollOptions',
+      'the roll options are composed by something other than the one builder that derives ' +
+        'the speaker from the resolved actor',
+    ],
+  ];
+
+  it('AC-5 — the ONE seam bag binds every seam to the collaborator production ships', () => {
+    // PRODUCTION ONLY, and that asymmetry is the whole reason this assertion exists rather
+    // than an oversight. `bothTexts` has nothing to compare here: the harness mirror
+    // SUBSTITUTES the bag for an injected one, by design, because every seam in it is a
+    // Foundry collaborator the harness has none of. `src/main.js` is never imported by any
+    // unit test either — this suite reads it as TEXT — so with the bag substituted in the
+    // mirror and unread in production, all eight bindings were held correct by nothing.
+    //
+    // What the existing pins prove is that a bag is CALLED (`this._companionCheckSeams()`
+    // appears in both delegator bodies). They say nothing about what is IN it, and ESLint
+    // catches a misspelled identifier but never a swap between two real ones. Each row below
+    // is a single substitution that otherwise survives the entire suite.
+    //
+    // D12 hoisted the bag to one private to keep the mirror's duplicated run down, and that
+    // removed even the second copy a reviewer could have diffed it against — which is why
+    // the two new members needed this pin where the shipped two did not.
+    const bag = mainMethodSource('_companionCheckSeams() {');
+    const keys = [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key);
+    assert.deepEqual(
+      keys,
+      SEAM_BINDINGS.map(([key]) => key),
+      'the bag binds exactly these eight seams — a dropped one leaves the leaf reading undefined'
+    );
+    // Non-vacuity, in the shape ROLL_ACTOR_CHECK_GATE_KEYS' own pins already use: a slice that
+    // silently shrank to nothing would satisfy `deepEqual([], [])` above only if the expected
+    // list were empty too, but the substring checks below would pass over a short string.
+    assert.ok(bag.length > 400, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
+    // Whitespace-normalized, and each binding matched with its TRAILING SEPARATOR left off,
+    // so the claims survive a reformat of `src/main.js`. That is a live possibility rather
+    // than a hypothetical: the file is currently OUTSIDE the `format:check` globs, and
+    // Prettier's `trailingComma: 'es5'` would add a comma to the last property here and wrap
+    // the ~165-character `rollActorCheck` signature the moment it is brought inside them.
+    // The lookahead is what keeps the match a whole binding — `runFormulaPassFailToo` is a
+    // different function, and a bare `includes` could not tell them apart.
+    const squashed = bag.replaceAll(/\s+/g, ' ');
+    for (const [key, binding, harm] of SEAM_BINDINGS) {
+      const whole = new RegExp(`${binding.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`);
+      assert.match(
+        squashed,
+        whole,
+        `${key} is no longer bound as \`${binding}\`, so in production ${harm}`
+      );
+    }
+  });
+
+  it('AC-5 — neither new delegator throws readiness, spreads a request, or reads game.actors', () => {
+    for (const signature of [ROLL, BULK]) {
+      for (const [label, body] of bothTexts(signature)) {
+        const code = codeOnly(body);
+        assert.equal(
+          code.includes('_requireReady()'),
+          false,
+          `${label} ${signature} must REFUSE notReady, never throw it`
+        );
+        // The structurally identical hole the shipped contract already had to close: a
+        // `{ ...request, actor }` forward passes every MODULE-level criterion while letting a
+        // companion inject an `actor` that overrides the resolved one, a `prompt` that bypasses
+        // the dialog, or a `speaker` impersonating another actor in chat.
+        //
+        // ANY spread, not a named one. `...request` is a SPELLING — `...arguments[0]`,
+        // `...options` and `...{ ...request }` all reopen the same hole — and a spelling is
+        // what a mutation walks straight past. The delegators need no spread at all, so their
+        // ABSENCE is a property.
+        assert.equal(
+          code.includes('...'),
+          false,
+          `${label} ${signature} spreads something into the leaf; it must name every key`
+        );
+        assert.equal(
+          code.includes('game.actors'),
+          false,
+          `${label} ${signature} reads the actor collection directly, dropping the ownership predicate`
+        );
+      }
     }
   });
 

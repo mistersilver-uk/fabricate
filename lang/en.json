@@ -1310,6 +1310,34 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier"
     },
+    "Check": {
+      "Roll": {
+        "Passed": "{label} check passed with {total} against DC {dc}.",
+        "Failed": "{label} check failed with {total} against DC {dc}.",
+        "Rolled": "{label} check rolled {total}.",
+        "RollFailed": "{label} check could not be rolled: {detail}",
+        "Cancelled": "The {label} check prompt was dismissed, so nothing was rolled.",
+        "EngineUnavailable": "This client has no dice engine, so the {label} check could not be rolled.",
+        "NoFormula": "The {label} check has no usable roll formula, so there is nothing to roll.",
+        "InvalidRollDecision": "A roll decision was supplied for a non-interactive {label} check, where it would have been silently discarded and the base formula rolled.",
+        "InvalidCallSite": "A check roll must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not roll.",
+        "GMOnly": "Only a GM can roll a check for an actor.",
+        "NoActor": "No such actor to roll a check for.",
+        "NotReady": "Fabricate is still starting up, so no check can be rolled yet.",
+        "DefaultLabel": "Fabricate"
+      },
+      "BulkDecision": {
+        "Decided": "One roll decision was settled, covering {count} of {total} checks.",
+        "NothingToDecide": "None of the supplied formulas can roll a check, so there was nothing to decide.",
+        "Cancelled": "The bulk roll prompt was dismissed, so no decision was settled.",
+        "InvalidCallSite": "A bulk check decision must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not prompt.",
+        "GMOnly": "Only a GM can settle a bulk check decision.",
+        "NotReady": "Fabricate is still starting up, so no bulk check decision can be settled yet.",
+        "Failed": "The bulk check decision could not be settled."
+      }
+    },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
       "LearningDisabled": "Learning is not enabled for this crafting system",

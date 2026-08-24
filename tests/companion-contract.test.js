@@ -19,6 +19,10 @@ import test from 'node:test';
 import { LEARNED_RECIPES_FLAG_KEY } from '../src/config/flags.js';
 import {
   AFFORDABILITY_MESSAGE_KEYS,
+  BULK_CHECK_DECISION_MESSAGE_KEYS,
+  CHECK_ROLL_DEFAULT_LABEL,
+  CHECK_ROLL_MESSAGE_KEYS,
+  COMPANION_CALL_SITES,
   COMPANION_CONTRACT,
   COMPANION_CONTRACT_SCHEMA_VERSION,
   COMPANION_MEMBERS,
@@ -30,12 +34,15 @@ import {
   GRANTED_SOURCE_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
   affordabilityResult,
+  bulkCheckDecisionResult,
+  checkRollResult,
   knowledgeGrantResult,
   normalizeGrantedBy,
 } from '../src/systems/companionContract.js';
 import {
   assertContractResult,
   assertLocalizationKey,
+  assertMessageIsFromTable,
   localizedString,
 } from './helpers/companionContractOutcomes.js';
 
@@ -56,6 +63,11 @@ const EXPECTED_MEMBERS = Object.freeze([
   ['getActorInventoryCoinSpender', 'facade', 'handle', 'accessor'],
   ['getCraftingEngine', 'facade', 'handle', 'accessor'],
   ['getCraftingEngine().findComponentItems', 'craftingEngine', 'handle', 'method'],
+  // APPENDED, never interleaved: two comments in `tests/companion-facade.test.js` name
+  // `getCraftingEngine().findComponentItems` as "the eighth member", and a row inserted above
+  // it would falsify both with nothing failing.
+  ['rollActorCheck', 'facade', 'stable', 'method'],
+  ['resolveBulkCheckDecision', 'facade', 'stable', 'method'],
 ]);
 
 /** Every outcome token declared for this `schemaVersion`, closed by enumeration. */
@@ -78,6 +90,49 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'ladderEmpty',
   'ladderInvalid',
   'checkUnavailable',
+  'checkPassed',
+  'checkFailed',
+  'rolled',
+  'rollFailed',
+  'engineUnavailable',
+  'noFormula',
+  'invalidRollDecision',
+  'cancelled',
+  'invalidCallSite',
+  'notElected',
+  'decided',
+  'nothingToDecide',
+]);
+
+/**
+ * Every `stable` member's own key table, with the SHARED gate outcomes that member can answer.
+ *
+ * `shared` differs per member and that is the point: `resolveBulkCheckDecision` takes no
+ * `actorId`, reads no actor and is GM-gated inline, so `noActor` is not merely unused there —
+ * it is unanswerable, and declaring a key for it would be dead vocabulary a caller would
+ * nonetheless write a branch for.
+ */
+const MEMBER_KEY_TABLES = Object.freeze([
+  Object.freeze({
+    name: 'grantRecipeKnowledge',
+    keys: KNOWLEDGE_GRANT_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'checkAffordability',
+    keys: AFFORDABILITY_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'rollActorCheck',
+    keys: CHECK_ROLL_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'resolveBulkCheckDecision',
+    keys: BULK_CHECK_DECISION_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'notReady']),
+  }),
 ]);
 
 /** The two grant outcomes that answer `success: true`. */
@@ -200,16 +255,27 @@ function affordabilityAnswer(outcome, affordable, messageData = null) {
   return expected;
 }
 
-test('the descriptor publishes exactly the three contract fields, frozen', () => {
+test('the descriptor publishes exactly the four contract fields, frozen', () => {
   assert.ok(Object.isFrozen(COMPANION_CONTRACT), 'the descriptor is frozen');
-  assert.deepEqual(Object.keys(COMPANION_CONTRACT), ['schemaVersion', 'members', 'outcomes']);
+  assert.deepEqual(Object.keys(COMPANION_CONTRACT), [
+    'schemaVersion',
+    'members',
+    'outcomes',
+    'callSites',
+  ]);
   assert.equal(COMPANION_CONTRACT.schemaVersion, COMPANION_CONTRACT_SCHEMA_VERSION);
   assert.equal(Number.isInteger(COMPANION_CONTRACT_SCHEMA_VERSION), true);
   assert.ok(COMPANION_CONTRACT_SCHEMA_VERSION >= 1, 'a published version starts at 1');
   assert.equal(COMPANION_CONTRACT.members, COMPANION_MEMBERS);
   assert.equal(COMPANION_CONTRACT.outcomes, COMPANION_OUTCOMES);
+  // `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has,
+  // and the docs' worked examples are what an author copies. Publishing the pair is what lets
+  // them read `COMPANION.callSites.broadcast` instead of retyping a literal whose only
+  // punishment for a typo is `invalidCallSite`.
+  assert.equal(COMPANION_CONTRACT.callSites, COMPANION_CALL_SITES);
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.members), 'the member table is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.outcomes), 'the outcome vocabulary is frozen');
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.callSites), 'the call-site pair is frozen');
 });
 
 test('the member table is exactly the declared set at its declared promise tiers', () => {
@@ -262,10 +328,7 @@ test('the outcome vocabulary is complete for this schema version and maps token 
 
 test('every declared outcome is emittable by a member, and every member outcome is declared', () => {
   const declared = new Set(Object.values(COMPANION_OUTCOMES));
-  const emittable = new Set([
-    ...Object.keys(KNOWLEDGE_GRANT_MESSAGE_KEYS),
-    ...Object.keys(AFFORDABILITY_MESSAGE_KEYS),
-  ]);
+  const emittable = new Set(MEMBER_KEY_TABLES.flatMap(({ keys }) => Object.keys(keys)));
   assert.deepEqual(
     [...declared].filter((outcome) => !emittable.has(outcome)),
     [],
@@ -278,29 +341,41 @@ test('every declared outcome is emittable by a member, and every member outcome 
   );
 });
 
-test('each member answers the shared gate outcomes in its OWN words', () => {
-  for (const shared of ['gmOnly', 'noActor', 'notReady']) {
-    const grantKey = KNOWLEDGE_GRANT_MESSAGE_KEYS[shared];
-    const affordabilityKey = AFFORDABILITY_MESSAGE_KEYS[shared];
-    assert.ok(grantKey && affordabilityKey, `${shared} is answered by both stable members`);
-    assert.notEqual(
-      grantKey,
-      affordabilityKey,
-      `a refused ${shared} grant must not report itself in the currency check's words`
-    );
+test('each member answers its OWN shared gate outcomes, in its OWN words', () => {
+  // PER MEMBER, not a four-way product. `resolveBulkCheckDecision` takes no `actorId`, reads
+  // no actor and is GM-gated inline, so it can never answer `noActor` — a fixed
+  // `['gmOnly','noActor','notReady']` loop asserted over every table would demand a key it
+  // must not have, and would contradict the criterion that pins its absence.
+  for (const { name, keys, shared } of MEMBER_KEY_TABLES) {
+    for (const outcome of shared) {
+      assertLocalizationKey(keys[outcome], `${name}'s ${outcome}`);
+    }
+    for (const outcome of ['gmOnly', 'noActor', 'notReady']) {
+      assert.equal(
+        keys[outcome] !== undefined,
+        shared.includes(outcome),
+        `${name} declares exactly the shared gate outcomes it can actually answer`
+      );
+    }
   }
-  const overlap = Object.values(KNOWLEDGE_GRANT_MESSAGE_KEYS).filter((key) =>
-    Object.values(AFFORDABILITY_MESSAGE_KEYS).includes(key)
-  );
-  assert.deepEqual(overlap, [], 'the two members share no message string');
+  // Pairwise distinctness across ALL FOUR members: a failed grant must not report itself in
+  // the currency check's words, and a refused check roll must not report itself in either's.
+  for (const left of MEMBER_KEY_TABLES) {
+    for (const right of MEMBER_KEY_TABLES) {
+      if (left.name === right.name) continue;
+      const overlap = Object.values(left.keys).filter((key) =>
+        Object.values(right.keys).includes(key)
+      );
+      assert.deepEqual(overlap, [], `${left.name} and ${right.name} share a message string`);
+    }
+  }
 });
 
 test('every outcome message key resolves to a string leaf in lang/en.json', () => {
-  for (const [outcome, key] of Object.entries(KNOWLEDGE_GRANT_MESSAGE_KEYS)) {
-    assertLocalizationKey(key, `the grant's ${outcome}`);
-  }
-  for (const [outcome, key] of Object.entries(AFFORDABILITY_MESSAGE_KEYS)) {
-    assertLocalizationKey(key, `the affordability check's ${outcome}`);
+  for (const { name, keys } of MEMBER_KEY_TABLES) {
+    for (const [outcome, key] of Object.entries(keys)) {
+      assertLocalizationKey(key, `${name}'s ${outcome}`);
+    }
   }
   assert.match(
     localizedString(KNOWLEDGE_GRANT_MESSAGE_KEYS.knowledgeNotObservable),
@@ -314,6 +389,85 @@ test('every outcome message key resolves to a string leaf in lang/en.json', () =
       `${outcome} carries the currency layer's free text as messageData.detail`
     );
   }
+  // The literal `{detail}` is what makes `assertMessageDataCovers` derive the requirement
+  // automatically, so a `rollFailed` answer that forgot its bag fails at the member rather
+  // than showing a GM the braces.
+  assert.match(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.rollFailed),
+    /\{detail\}/,
+    "a failed roll carries the runner's free text as messageData.detail"
+  );
+  // `assertMessageDataCovers` derives its requirement FROM the string, which makes it a
+  // one-way guard: it catches a string that GAINS a placeholder and is blind to one that
+  // LOSES it. These are the other direction. Dropping `{count}` from `Decided` would leave
+  // every answer's bag over-supplied and silently correct, while a GM reads a sentence that
+  // no longer says how much of their batch was covered.
+  assert.match(
+    localizedString(BULK_CHECK_DECISION_MESSAGE_KEYS.decided),
+    /\{count\}[\s\S]*\{total\}/,
+    'a settled decision names how many of how many checks it covers, count first'
+  );
+  for (const outcome of ['checkPassed', 'checkFailed']) {
+    assert.match(
+      localizedString(CHECK_ROLL_MESSAGE_KEYS[outcome]),
+      /\{label\}[\s\S]*\{total\}[\s\S]*\{dc\}/,
+      `the graded ${outcome} names the DC it was measured against`
+    );
+  }
+  assert.match(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.rolled),
+    /\{label\}[\s\S]*\{total\}/,
+    'the ungraded answer names no DC, because it was measured against none'
+  );
+  assert.doesNotMatch(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.rolled),
+    /\{dc\}/,
+    'and must not, because the ungraded arm supplies no dc to interpolate'
+  );
+  // The two graded strings are otherwise IDENTICAL but for one word, so nothing above can see
+  // them swapped in `lang/en.json` — and swapped, every passing check reports itself as a
+  // failure to the GM's chat log. The word is the only thing that distinguishes them.
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /passed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /failed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /failed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /passed/);
+  // The three refusals the FACADE DELEGATOR answers with are emitted before any label has
+  // been resolved, so a placeholder in one of them would put literal braces in front of a GM
+  // with nothing able to supply them. Same for the two the call-site gate answers with.
+  for (const outcome of ['gmOnly', 'noActor', 'notReady', 'invalidCallSite', 'notElected']) {
+    assert.doesNotMatch(
+      localizedString(CHECK_ROLL_MESSAGE_KEYS[outcome]),
+      /\{/,
+      `the check roll's ${outcome} is answered before a label exists, so it interpolates nothing`
+    );
+  }
+  for (const outcome of ['gmOnly', 'notReady', 'invalidCallSite', 'notElected']) {
+    assert.doesNotMatch(
+      localizedString(BULK_CHECK_DECISION_MESSAGE_KEYS[outcome]),
+      /\{/,
+      `the bulk decision's ${outcome} is answered before anything is computed`
+    );
+  }
+});
+
+test('the default check label is an activity noun that composes with the template', () => {
+  assertLocalizationKey(CHECK_ROLL_DEFAULT_LABEL.key, 'the default check label');
+  assert.equal(localizedString(CHECK_ROLL_DEFAULT_LABEL.key), CHECK_ROLL_DEFAULT_LABEL.fallback);
+  assert.equal(CHECK_ROLL_DEFAULT_LABEL.fallback, 'Fabricate');
+  // NORMATIVE, and asserted so a later translator cannot reintroduce the defect: the flavor
+  // template appends the literal word ` check`, so a default that itself ends in "check"
+  // renders "Check check (DC 15)".
+  assert.doesNotMatch(
+    localizedString(CHECK_ROLL_DEFAULT_LABEL.key),
+    /check$/i,
+    'the default label must be an activity NOUN that does not itself end in the word "check"'
+  );
+});
+
+test('the call sites are a closed pair mapping token to token', () => {
+  assert.ok(Object.isFrozen(COMPANION_CALL_SITES));
+  assert.deepEqual(Object.keys(COMPANION_CALL_SITES), ['gmAction', 'broadcast']);
+  for (const [name, token] of Object.entries(COMPANION_CALL_SITES)) assert.equal(token, name);
 });
 
 test('the two granted display rungs hold the shipped source ladder parallel', () => {
@@ -461,6 +615,135 @@ test('an outcome a member does not declare degrades to that member’s own gener
     message: AFFORDABILITY_MESSAGE_KEYS.checkUnavailable,
     messageData: detail,
   });
+});
+
+/** A complete expected `rollActorCheck` refusal: every derived field at its refusal value. */
+function checkRollRefusal(outcome, messageData = null) {
+  const expected = {
+    success: false,
+    passed: null,
+    total: null,
+    diceGroups: [],
+    resolvedFormula: null,
+    outcome,
+    message: CHECK_ROLL_MESSAGE_KEYS[outcome],
+  };
+  if (messageData) expected.messageData = messageData;
+  return expected;
+}
+
+test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
+  // Complete expected records, so the field SET is asserted by equality rather than by
+  // spot-check. `assertContractResult` reads `node:assert/strict`, under which `deepEqual` IS
+  // `deepStrictEqual`: `{ total: undefined }` does not satisfy `total: null`.
+  const refusals = ['gmOnly', 'noActor', 'notReady', 'invalidCallSite', 'notElected'];
+  for (const outcome of refusals) {
+    const result = checkRollResult(outcome);
+    assertContractResult(result, checkRollRefusal(outcome));
+    assertMessageIsFromTable(result, CHECK_ROLL_MESSAGE_KEYS, `the ${outcome} answer`);
+    // A LIST's absence is empty; a scalar's absence is meaningful. `0` or `false` here would
+    // be a confident wrong answer, and a `null` list would force every caller to guard a
+    // `.length` read.
+    assert.deepEqual(result.diceGroups, []);
+    assert.equal(result.total, null);
+  }
+  for (const outcome of ['noFormula', 'engineUnavailable', 'cancelled']) {
+    assertContractResult(
+      checkRollResult(outcome, { label: 'Fabricate' }),
+      checkRollRefusal(outcome, { label: 'Fabricate' })
+    );
+  }
+});
+
+test('derived fields are computed from the outcome and cannot be overridden by a bag', () => {
+  // The sharpest cell is `success`, not `passed` or `total`: `buildResult` WRITES `success`
+  // and only then spreads its extra fields, so a caller-supplied bag reaching that spread
+  // could override the computed boolean and not merely a derived scalar.
+  const label = { label: 'Fabricate' };
+  const hostile = checkRollResult('cancelled', label, { success: true, passed: true, total: 99 });
+  assert.equal(hostile.success, false, 'a refusal is a refusal whatever the record claims');
+  assert.equal(hostile.passed, null);
+  assert.equal(hostile.total, null);
+  assertContractResult(hostile, checkRollRefusal('cancelled', label));
+
+  const bulkHostile = bulkCheckDecisionResult('cancelled', null, {
+    success: true,
+    choice: { bonus: '+9' },
+    allowAdvantage: true,
+    covered: [0, 1, 2],
+  });
+  assert.equal(bulkHostile.success, false);
+  assert.equal(bulkHostile.decision, null);
+  assert.equal(bulkHostile.allowAdvantage, null);
+  assert.deepEqual(bulkHostile.covered, []);
+});
+
+test('a legitimate rolled zero answers 0, and never the null a refusal answers', () => {
+  const zero = checkRollResult('checkFailed', { label: 'Fabricate', total: 0, dc: 15 }, {
+    total: 0,
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }],
+    resolvedFormula: '1d20 - 5',
+  });
+  assert.ok(Object.is(zero.total, 0), 'a real zero is 0; null is reserved for "no answer"');
+  assert.equal(zero.passed, false);
+  assert.equal(zero.success, true, 'the check WAS rolled; it simply did not pass');
+  assert.equal(zero.diceGroups.length, 1);
+
+  const refusal = checkRollResult('engineUnavailable', { label: 'Fabricate' });
+  assert.equal(refusal.total, null, 'and the two are distinguishable, which is the whole point');
+});
+
+test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {
+  const ungraded = checkRollResult('rolled', { label: 'Fabricate', total: 7 }, {
+    total: 7,
+    diceGroups: [],
+    resolvedFormula: '1d20 + 2',
+  });
+  assert.equal(ungraded.passed, null, 'an ungraded roll is not graded, so it has no pass');
+  assert.equal(ungraded.success, true);
+
+  const decided = bulkCheckDecisionResult('decided', { count: 2, total: 4 }, {
+    choice: { bonus: '+2', rollMode: 'gmroll', advantage: 'advantage' },
+    allowAdvantage: true,
+    covered: [0, 2],
+  });
+  assertContractResult(decided, {
+    success: true,
+    decision: { bonus: '+2', rollMode: 'gmroll', advantage: 'advantage' },
+    allowAdvantage: true,
+    covered: [0, 2],
+    outcome: 'decided',
+    message: BULK_CHECK_DECISION_MESSAGE_KEYS.decided,
+    messageData: { count: 2, total: 4 },
+  });
+  assert.equal('confirmed' in decided.decision, false, 'the decision is the prompt shape MINUS it');
+});
+
+test('an undeclared outcome degrades to each new member own generic refusal', () => {
+  const roll = checkRollResult('someOutcomeFromALaterVersion', { label: 'x', detail: 'why' });
+  assert.equal(roll.success, false);
+  assert.equal(roll.message, CHECK_ROLL_MESSAGE_KEYS.rollFailed);
+  // The bulk member's generic refusal is spelled OUTSIDE its table on purpose: none of its
+  // seven outcomes means "the decision could not be obtained", `rollFailed` would be a lie
+  // about a member that never rolls, and `cancelled` would report a malfunction as "the GM
+  // declined" — the exact collapse the discriminator ladder exists to prevent.
+  const bulk = bulkCheckDecisionResult('someOutcomeFromALaterVersion');
+  assert.equal(bulk.success, false);
+  assertLocalizationKey(bulk.message, "the bulk decision's generic refusal");
+  assert.equal(
+    Object.values(BULK_CHECK_DECISION_MESSAGE_KEYS).includes(bulk.message),
+    false,
+    'and it is not one of the seven, so no outcome is minted for a path no member can reach'
+  );
+  // "Not one of the seven" and "resolves to a string" are both satisfied by ANY other
+  // member's key — `FABRICATE.Check.Roll.RollFailed` passes both — and that would be a
+  // cross-member vocabulary leak on exactly the path this deviation exists to reason about:
+  // the bulk member telling a GM its decision "could not be rolled". The namespace is the
+  // claim, so the namespace is what is pinned.
+  assert.ok(
+    bulk.message.startsWith('FABRICATE.Check.BulkDecision.'),
+    `the bulk member's generic refusal must speak in its OWN namespace, got ${bulk.message}`
+  );
 });
 
 test('the learned-recipes flag key names the shape already persisted in every world', () => {

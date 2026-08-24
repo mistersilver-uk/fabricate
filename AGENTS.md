@@ -737,6 +737,12 @@ A companion MUST read anything Fabricate publishes in `setup` or `ready`, not at
 Verified at all four sites individually rather than assumed to generalise from one (issue 1289): none of the four getters — `getCraftingEngine`, `getActorPropertyCoinSpender`, `getActorInventoryCoinSpender`, `getCurrencyConfigStore` — is `_requireReady()`-gated, so a pre-readiness call never throws and always answers `null`, never an unrelated live object and never an exception.
 Do not add a readiness guard to one of these accessors on the assumption the others already have one, and do not remove the guardless pattern from a new sibling accessor expecting one to already exist elsewhere: none does, by design.
 The throw belongs to a caller that needs a value NOW (`_requireReady()`); a `null`-before-readiness accessor exists precisely so a companion can read it defensively without wrapping every read in a `whenReady()` gate.
+- **V14 retired the `rollMode` chat vocabulary in favour of `messageMode`.**
+On 14.365 `core.rollMode` survives only as a deprecated shim setting, registered in `client/game.mjs`, that maps `core.messageMode` back to a legacy string, so any read of it returns a truthy value and trips `Roll#toMessage`'s own deprecation warning in `client/dice/roll.mjs` — which carries **no `once`**, so it fires once per roll rather than once per session, unlike the setting-read warning itself, which **is** `{once: true}`.
+Do not conflate the two: reading the setting warns once per session; the truthy value it hands to `Roll#toMessage` then warns again on every single roll, which is the one that matters for a bulk resolve.
+An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on `CONFIG.ChatMessage.modes[mode]` being undefined.
+Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
+This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

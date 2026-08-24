@@ -63,6 +63,11 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 
 - Every mode's check has a single supported source: a GM-authored roll formula (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively.
 This built-in dice-expression check is the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration — no macro and no game-system adapter is required or supported.
+- A **Standalone Check Roll** published to a companion (`companion-api/spec.md`) consults **none** of this section: no modifier catalogue, no `defaultModifierPolicy`, no `bySubject` pick, no `maxModifierPicks`, no tool bonus, no authored trigger, no tier stepping and no `failureResultPolicy`.
+It has no subject and no crafting system to draw them from, so it is the check-roll mechanics **without** the system-derived terms.
+A companion that wants a system's modifiers applied routes a real craft or salvage instead.
+- The published member applies the **post-shim** usability test below **before** dispatching to a runner, so a formula the retirement shim empties is refused as `noFormula` rather than reaching `runFormulaPassFail`'s non-blocking `engine: false` branch and passing with the DC ignored.
+The same branch remains reachable from a **direct** runner caller and is tracked as `fabricate#1296`; the published member refuses in front of it rather than repairing it.
 - A check is **usable** IFF its mode's `rollFormula` is authored.
 The historical macro-as-check-source and the `checkSource: "builtIn"` game-system adapter (`builtIn: { ability, skill, dc, advantage }`) were removed in 1.8.0 and are not part of the model; see `data-models` requirement 30 and its *Crafting Check Macro Contract* section.
 - Each of the three activity checks carries a **failure-result policy**, `failureResultPolicy` (`'never' | 'perRecord' | 'always'`), answering whether a FAILED check may produce a result at all.

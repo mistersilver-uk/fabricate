@@ -34,10 +34,17 @@ import { getFabricateFlag, setFabricateFlag } from '../../src/config/flags.js';
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
 import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
 import {
+  resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
+  rollActorCheck as rollStandaloneActorCheck,
+} from '../../src/systems/companionCheckRoll.js';
+import {
   AFFORDABILITY_MESSAGE_KEYS,
+  CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_OUTCOMES,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
   affordabilityResult,
+  bulkCheckDecisionResult,
+  checkRollResult,
   knowledgeGrantResult,
 } from '../../src/systems/companionContract.js';
 import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/systems/companionKnowledgeGrant.js';
@@ -71,6 +78,17 @@ export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/
  * @type {string}
  */
 export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
+
+/**
+ * Faithful copy of `src/main.js`'s hoisted `ROLL_ACTOR_CHECK_GATE_KEYS`.
+ *
+ * Hoisted on both sides so each delegator reads `this._requireGmActor(actorId, KEYS)` on one
+ * line rather than restating a four-line object literal in two files.
+ */
+const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+});
 
 /**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
@@ -260,6 +278,12 @@ export class FabricateFacadeUnderTest {
     currencyConfigStore = undefined,
     actorPropertyCoinSpender = null,
     actorInventoryCoinSpender = null,
+    // The Standalone Check Roll seam bag (issue 1293), INJECTED rather than reproduced. Every
+    // seam in production's own `_companionCheckSeams()` is a Foundry collaborator this harness
+    // has none of, and the two members' criteria turn on counting prompt and runner calls, so
+    // the bag is what a test substitutes. The two DELEGATORS below are faithful copies and are
+    // pinned against the production text; the bag they read is not part of that claim.
+    companionCheckSeams = null,
   } = {}) {
     this._alchemyListingBuilder = alchemyListingBuilder;
     this.craftingEngine = craftingEngine;
@@ -276,6 +300,7 @@ export class FabricateFacadeUnderTest {
     // faithfully below.
     this._bulkSalvageService = bulkSalvageService;
     this._bulkDestroyService = bulkDestroyService;
+    this._companionCheckSeamBag = companionCheckSeams;
   }
 
   get _game() {
@@ -393,6 +418,85 @@ export class FabricateFacadeUnderTest {
         actorPropertyCoinSpender: this.actorPropertyCoinSpender,
         actorInventoryCoinSpender: this.actorInventoryCoinSpender,
       }
+    );
+  }
+
+  // --- The Standalone Check Roll seam bag (INJECTED, see the constructor) -----
+  _companionCheckSeams() {
+    return this._companionCheckSeamBag;
+  }
+
+  // --- Faithful copy of Fabricate#rollActorCheck (issue 1293) ----------------
+  //
+  // The delegator only: the roll itself is the REAL free function. It reuses the shared
+  // preamble VERBATIM and passes `gate.actor` straight into the leaf, so no second actor
+  // resolver exists to disagree with the first.
+  //
+  // DO NOT "TIDY" THIS COPY TOWARDS `src/main.js`'s FORMATTING, and read the numbers before
+  // deciding otherwise (issue 1293, D12).
+  //
+  // The duplicated run against `src/main.js` measures 98 tokens as shipped — under SonarJS's
+  // 100-token minimum, and under the SonarCloud new-code duplication gate that follows from
+  // it. That margin is NOMINAL, not comfortable. It is held by two INDEPENDENT incidental
+  // asymmetries between this copy and production, and removing EITHER one alone crosses the
+  // threshold:
+  //
+  //   as shipped                                                            98
+  //   the trailing comma on `rollDecision = null,` below, normalised       133
+  //   `this._game.user` in `resolveBulkCheckDecision` written `game.user`  152
+  //   both                                                                 187
+  //
+  // (133 is the NORMALISED adjacency figure: 98 plus the 35-token destructuring head that
+  // joins the two runs once the comma stops separating them.)
+  //
+  // The live risk is therefore not someone rewriting this file. It is a Prettier SCOPE
+  // change. `.prettierrc.json` is `printWidth: 100` with `trailingComma: 'es5'`, and
+  // `src/main.js` is currently OUTSIDE the `format`/`format:check` globs in `package.json`.
+  // Bringing it inside them wraps production's ~165-character `rollActorCheck` signature into
+  // the same multi-line destructuring head this copy uses AND adds the trailing comma —
+  // mechanically producing a run of at least 134 tokens. `AGENTS.md` already contemplates
+  // widening those globs and warns that reformatting counts as NEW code, so that PR would
+  // inherit a >100-token duplicated block it did not write. Whoever widens the globs owns
+  // splitting this run, and the cheapest split is the one already used for the gate keys:
+  // hoist the shared shape out of both files rather than paraphrasing either.
+  //
+  // For scale, a whole-repo CPD sweep at a 100-token floor finds exactly one >=100 run
+  // anywhere in the tree: a pre-existing 173-token block across `_mergeBulkRows` and
+  // `_buildNotPermittedRow`, which measures 173 at `fdc27c21` too. Issue 1293 introduces no
+  // new duplicated block.
+  async rollActorCheck({
+    actorId = null,
+    callSite = null,
+    formula = null,
+    dc = null,
+    compare = null,
+    label = null,
+    interactive = false,
+    rollDecision = null,
+  } = {}) {
+    const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await rollStandaloneActorCheck(
+      { actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision },
+      this._companionCheckSeams()
+    );
+  }
+
+  // --- Faithful copy of Fabricate#resolveBulkCheckDecision (issue 1293) ------
+  //
+  // GM-gated INLINE rather than through `_requireGmActor`, because this member takes no
+  // `actorId`: `_resolveCraftingActor(null)` returns `null`, so the shared preamble would
+  // always answer `noActor` for a member that reads no actor and can never emit one.
+  async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
+    const gmOnly = this._game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
+    if (gmOnly || this.ready !== true) {
+      return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await resolveStandaloneBulkCheckDecision(
+      { callSite, formulas },
+      this._companionCheckSeams()
     );
   }
 
