@@ -188,10 +188,12 @@ function discriminateCheckOutcome(result, graded) {
  * a spread would let a companion inject its own `prompt` and bypass the dialog entirely, or a
  * `speaker` impersonating another actor in chat, while passing every behavioural assertion.
  *
- * Four keys are deliberately absent from v1 — `img` (dialog header art), `subjects` (the bulk
- * thumbnail strip), `rollMode` (inherited from the client default) and `speaker` (never
- * caller-supplied; derived from the resolved actor). The compatibility promise is asymmetric:
- * a member MAY gain an optional argument without a version bump but may not lose one, so this
+ * Three keys are deliberately absent from v1 as bare top-level fields — `img` (dialog header
+ * art), `subjects` (the bulk thumbnail strip) and `speaker` (never caller-supplied; derived
+ * from the resolved actor). `rollMode` is not a fourth: the roll uses the client's own default
+ * unless a supplied `rollDecision.rollMode` overrides it, exactly as `bonus` and `advantage`
+ * do (see `@param request.rollDecision` below). The compatibility promise is asymmetric: a
+ * member MAY gain an optional argument without a version bump but may not lose one, so this
  * starts narrow.
  *
  * @param {object} request

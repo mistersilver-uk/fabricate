@@ -105,7 +105,9 @@ Two members publish it.
 `rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`.
 Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision }`, and nothing else is read.
 No caller-supplied bag is spread into the options builder, the runner, or the nested roll options: a spread would let a companion inject its own prompt and bypass the dialog, or a speaker impersonating another actor in chat, while satisfying every behavioural assertion.
-`img`, `subjects`, `rollMode` and `speaker` are deliberately absent from the first version — `rollMode` is inherited from the client default and `speaker` is derived from the resolved actor and is never caller-supplied — because a member MAY gain an optional argument without a version bump but may not lose one.
+`img`, `subjects` and `speaker` are deliberately absent from the first version — `speaker` is derived from the resolved actor and is never caller-supplied — because a member MAY gain an optional argument without a version bump but may not lose one.
+There is no bare top-level `rollMode` key: the roll uses the client's own default unless the caller supplies a `rollDecision`, in which case `rollDecision.rollMode` overrides the default exactly as `rollDecision.bonus` and `rollDecision.advantage` do.
+The accepted values are Foundry's legacy roll-mode vocabulary, `publicroll | gmroll | blindroll | selfroll`, and `resolveBulkCheckDecision`'s own picker never produces anything outside that list, so a caller that only ever forwards a decision it received from that member cannot construct an invalid one; a caller that builds a `rollDecision` by hand can, and an unrecognised value there fails safe on every supported Foundry release rather than aborting the roll.
 
 `resolveBulkCheckDecision` answers **one** roll decision — situational bonus, roll mode, Advantage disposition — for N rolls the caller will make, and **rolls nothing**.
 Its request key set is exactly `{ callSite, formulas }`.

@@ -721,6 +721,9 @@ A batch in which nothing can roll answers `nothingToDecide` with `success: true`
 
 A `rollDecision` supplied with `interactive: false` is **refused** as `invalidRollDecision`, not silently discarded: the evaluator only consults one on its interactive path, so your bonus, Advantage and roll mode would otherwise all vanish with no error while the base formula rolled.
 
+There is no separate `rollMode` argument to `rollActorCheck`: the roll uses the client's own default unless the `rollDecision` you forward carries one, and `decision.decision.rollMode` (when present) overrides that default the same way `bonus` and `advantage` do.
+Its accepted values are `publicroll`, `gmroll`, `blindroll`, and `selfroll`, and `resolveBulkCheckDecision`'s own picker never hands you anything outside that list, so forwarding its answer unmodified cannot produce an invalid one.
+
 ### The Outcome Vocabulary
 
 `COMPANION.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
