@@ -55,6 +55,25 @@
  * block, so `:global()` nesting, selector rewriting, pruning and the hash's exact placement
  * are the compiler's answers and not this file's guesses.
  *
+ * ── AND THE CASE WITH NO BESPOKE CLASS AT ALL (issue 1118, task 9) ──────────────────────
+ * The scan above keys on the tokens a component HANDS to its `<ManagerButton>`, which is where
+ * the first three instances of this defect lived. It is blind to the shape that has no such
+ * token: a rule that reaches the button through the CONTRACT class itself —
+ * `.some-row .manager-button` — which is the ordinary way a container styles the controls
+ * inside it and was, before the sweep, always correct. Every one of those buttons is a child
+ * component now, so every such rule is subject to exactly the same failure, and the one in
+ * `ImportFolderMappingModal` was found by MUTATING its repair and watching this guard stay
+ * green rather than by the guard itself.
+ *
+ * That half is checked per COMPOUND rather than per selector, because the two spellings differ
+ * only in where the hash lands. `.row.svelte-h :global(.manager-button.fab-manager-button)`
+ * emits the hash on the ROW's compound and reaches the child correctly;
+ * `.row .manager-button.fab-manager-button` scoped emits
+ * `.row.svelte-h .manager-button.fab-manager-button:where(.svelte-h)` — the same selector plus
+ * a hash on the compound that has to match an element this component does not write. A
+ * whole-selector test cannot tell those apart and would fail the repair as loudly as the
+ * defect.
+ *
  * It deliberately says nothing about SPECIFICITY — `manager-button-cascade-inventory.test.js`
  * owns that question, and a `:global()` rule that reaches the button but loses to the
  * primitive is a cascade problem rather than a reach problem.
@@ -88,6 +107,25 @@ function svelteFiles(directory = 'src') {
  * @param {string} source component source text
  * @returns {Set<string>} every literal class token passed through the `class` prop
  */
+/**
+ * The compounds of a compiled selector: its parts between combinators.
+ *
+ * Deliberately crude — descendant, `>`, `+` and `~` are all treated as separators and nothing
+ * parses inside `:not(...)` or `:where(...)`, because the only question asked of the result is
+ * "does the piece that has to match a CHILD COMPONENT's element carry this component's scoping
+ * class". Svelte writes that class as a bare `.svelte-<hash>` or inside `:where(.svelte-<hash>)`
+ * and both stay attached to their own compound, which is all the precision this needs.
+ *
+ * @param {string} selector one compiled selector
+ * @returns {Array<string>} its compounds, in source order
+ */
+function compoundsOf(selector) {
+  return selector
+    .split(/\s*[\s>+~]\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function managerButtonClassTokens(source) {
   const tokens = new Set();
   for (const opening of source.matchAll(/<ManagerButton\b/g)) {
@@ -131,15 +169,22 @@ function compiledCss(file, source) {
   };
 }
 
+// The two classes the primitive emits unconditionally. A rule keyed on either of them reaches
+// a `<ManagerButton>` without the component having handed it any class at all, which is why
+// they are checked separately from the tokens a call site passes.
+const CONTRACT_CLASSES = ['manager-button', 'fab-manager-button'];
+
 test('no component scopes a rule onto a class it hands to a ManagerButton', () => {
   const violations = [];
   let sitesScanned = 0;
   let componentsWithScopedCss = 0;
+  let contractRulesScanned = 0;
 
   for (const file of svelteFiles()) {
     const source = readFileSync(join(repoRoot, file), 'utf8');
     const tokens = managerButtonClassTokens(source);
-    if (tokens.size === 0) continue;
+    const rendersPrimitive = /<ManagerButton[\s/>]/.test(source);
+    if (tokens.size === 0 && !rendersPrimitive) continue;
     sitesScanned += tokens.size;
 
     const { css, pruned } = compiledCss(file, source);
@@ -163,6 +208,19 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
         if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
         violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
       }
+      // The no-bespoke-class half. Per compound, and only for a component that actually
+      // renders the primitive: `.some-row .manager-button` in a component whose buttons are
+      // still hand-written is correct and must not be flagged.
+      if (!rendersPrimitive) continue;
+      for (const compound of compoundsOf(selector)) {
+        const noContractClass = CONTRACT_CLASSES.every(
+          (token) => !new RegExp(String.raw`\.${token}\b`).test(compound)
+        );
+        if (noContractClass) continue;
+        contractRulesScanned += 1;
+        if (!compound.includes(hash)) continue;
+        violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
+      }
     }
   }
 
@@ -174,6 +232,16 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
     componentsWithScopedCss > 0,
     'no component both renders a classed ManagerButton and owns a scoped <style>, so this ' +
       'guard walked over nothing'
+  );
+  // The floor for the half added at task 9. It has to be stated, because that half is the one
+  // with no bespoke token to key on: if no component in the corpus both renders the primitive
+  // and states a rule against the contract class, the compound walk above is unreachable and
+  // its silence means nothing. Three such rules exist as this lands, all in
+  // `ImportFolderMappingModal`.
+  assert.ok(
+    contractRulesScanned > 0,
+    'no component that renders a ManagerButton states a scoped rule against `.manager-button` ' +
+      'or `.fab-manager-button`, so the compound check walked over nothing'
   );
 
   // Code point, not `localeCompare`, for the reason `sourceScan.js` gives: locale-dependent
