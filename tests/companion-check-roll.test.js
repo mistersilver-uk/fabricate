@@ -23,10 +23,7 @@ import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { runFormulaPassFail, runFormulaProgressive } from '../src/systems/checkRoll.js';
-import {
-  resolveBulkCheckDecision,
-  rollActorCheck,
-} from '../src/systems/companionCheckRoll.js';
+import { resolveBulkCheckDecision, rollActorCheck } from '../src/systems/companionCheckRoll.js';
 import {
   BULK_CHECK_DECISION_MESSAGE_KEYS,
   CHECK_ROLL_MESSAGE_KEYS,
@@ -143,7 +140,14 @@ function makeSeams({ real = false, ...overrides } = {}) {
     success: true,
     outcome: 'pass',
     value: 20,
-    data: { dc: 15, formula: '1d20', resolvedFormula: '1d20', total: 20, comparison: 'meet', diceGroups: [] },
+    data: {
+      dc: 15,
+      formula: '1d20',
+      resolvedFormula: '1d20',
+      total: 20,
+      comparison: 'meet',
+      diceGroups: [],
+    },
     message: null,
   };
   const cannedProgressive = {
@@ -399,7 +403,12 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
       request({
         dc: 15,
         interactive: true,
-        rollDecision: { bonus: '+3', rollMode: 'blindroll', advantage: 'advantage', confirmed: true },
+        rollDecision: {
+          bonus: '+3',
+          rollMode: 'blindroll',
+          advantage: 'advantage',
+          confirmed: true,
+        },
       }),
       seams
     );
@@ -487,7 +496,10 @@ describe('AC-17 — covered names the caller OWN indices, and an empty batch dec
     installRoll();
     const { seams, calls } = makeSeams();
 
-    const result = await resolveBulkCheckDecision({ callSite: 'gmAction', formulas: ['', ''] }, seams);
+    const result = await resolveBulkCheckDecision(
+      { callSite: 'gmAction', formulas: ['', ''] },
+      seams
+    );
 
     assertBulkAnswerShape(result);
     assert.equal(result.outcome, COMPANION_OUTCOMES.nothingToDecide);
@@ -646,6 +658,29 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
     );
   });
 
+  it('takes the CALL-SITE rule from the contract, and defines no second copy', () => {
+    // The rule "exists once" is canonical, and four members now gate on it (issue 1301, D13).
+    // This module used to own the only copy; lifting it into the Foundry-free leaf that
+    // already owns `COMPANION_CALL_SITES` is what keeps the count at one. A local re-derivation
+    // here would be invisible to every behavioural case in this file — both copies would agree
+    // on the fixtures at hand, and drift only later.
+    assert.match(
+      MODULE_SOURCE,
+      /import \{[\s\S]*?gateCompanionCallSite[\s\S]*?\} from '\.\/companionContract\.js';/,
+      'the gate arrives from the contract module'
+    );
+    assert.equal(
+      /function\s+gateCompanion\w*CallSite/.test(MODULE_CODE),
+      false,
+      'and this module declares no call-site gate of its own'
+    );
+    assert.equal(
+      MODULE_CODE.includes('COMPANION_CALL_SITES'),
+      false,
+      'nor re-derives the rule from the call-site vocabulary directly'
+    );
+  });
+
   it('contains no globalThis.Roll reference at all, in code', () => {
     // No `typeof` carve-out: with `hasDiceEngine` as a seam there is no longer a legitimate
     // site for one.
@@ -690,9 +725,7 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
         makeSeams({ isElectedExecutor: () => false }).seams
       )
     );
-    record(
-      await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams)
-    );
+    record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
     record(await rollActorCheck(request({ formula: '@craftingmod' }), makeSeams().seams));
     record(
       await rollActorCheck(request({ dc: 15 }), makeSeams({ hasDiceEngine: () => false }).seams)
@@ -754,7 +787,10 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
       )
     );
     record(
-      await resolveBulkCheckDecision({ callSite: 'gmAction', formulas: ['1d20'] }, makeSeams().seams)
+      await resolveBulkCheckDecision(
+        { callSite: 'gmAction', formulas: ['1d20'] },
+        makeSeams().seams
+      )
     );
 
     assert.deepEqual(
@@ -938,7 +974,11 @@ describe('AC-15 — invalidRollDecision', () => {
     const { seams, calls } = makeSeams();
 
     const result = await rollActorCheck(
-      request({ dc: 15, interactive: false, rollDecision: { bonus: '+3', advantage: 'advantage' } }),
+      request({
+        dc: 15,
+        interactive: false,
+        rollDecision: { bonus: '+3', advantage: 'advantage' },
+      }),
       seams
     );
 
@@ -964,7 +1004,14 @@ describe('AC-15 — invalidRollDecision', () => {
  * @param {object} cell
  * @returns {Promise<object>}
  */
-async function driveCell({ graded, total = 18, formula = '1d20+@prof', throwOnConstruct, engine = true, dismissed }) {
+async function driveCell({
+  graded,
+  total = 18,
+  formula = '1d20+@prof',
+  throwOnConstruct,
+  engine = true,
+  dismissed,
+}) {
   installChat();
   installRoll({ total, throwOnConstruct });
   const { seams } = makeSeams({
@@ -973,7 +1020,11 @@ async function driveCell({ graded, total = 18, formula = '1d20+@prof', throwOnCo
     ...(dismissed ? { prompt: async () => ({ confirmed: false }) } : {}),
   });
   return await rollActorCheck(
-    request({ formula, ...(graded ? { dc: 15 } : {}), ...(dismissed ? { interactive: true } : {}) }),
+    request({
+      formula,
+      ...(graded ? { dc: 15 } : {}),
+      ...(dismissed ? { interactive: true } : {}),
+    }),
     seams
   );
 }
@@ -981,7 +1032,11 @@ async function driveCell({ graded, total = 18, formula = '1d20+@prof', throwOnCo
 describe('AC-16 — six cells per arm, each pinning outcome AND total AND diceGroups', () => {
   it('graded arm', async () => {
     const lowRoll = await driveCell({ graded: true, total: 3 });
-    assert.equal(lowRoll.outcome, COMPANION_OUTCOMES.checkFailed, 'a rolled failure is NOT a throw');
+    assert.equal(
+      lowRoll.outcome,
+      COMPANION_OUTCOMES.checkFailed,
+      'a rolled failure is NOT a throw'
+    );
     assert.equal(lowRoll.total, 3);
     assert.ok(lowRoll.diceGroups.length > 0);
     assert.equal(lowRoll.passed, false);
@@ -1018,7 +1073,10 @@ describe('AC-16 — six cells per arm, each pinning outcome AND total AND diceGr
 
     const zero = await driveCell({ graded: true, total: 0 });
     assert.equal(zero.outcome, COMPANION_OUTCOMES.checkFailed, 'a legitimate 0 is not rollFailed');
-    assert.ok(Object.is(zero.total, 0), 'a real zero is 0, never null — a caller must tell them apart');
+    assert.ok(
+      Object.is(zero.total, 0),
+      'a real zero is 0, never null — a caller must tell them apart'
+    );
     assert.ok(zero.diceGroups.length > 0);
   });
 

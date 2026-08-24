@@ -30,12 +30,18 @@ import {
   COMPANION_MEMBER_KINDS,
   COMPANION_OUTCOMES,
   COMPANION_PROMISES,
+  COMPONENT_AWARD_ENTRY_OUTCOMES,
+  COMPONENT_AWARD_MESSAGE_KEYS,
+  CURRENCY_CREDIT_MESSAGE_KEYS,
+  AWARD_ENTRIES_MAX,
   GRANTED_BY_MAX_LENGTH,
   GRANTED_SOURCE_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
+  componentAwardResult,
+  currencyCreditResult,
   knowledgeGrantResult,
   normalizeGrantedBy,
 } from '../src/systems/companionContract.js';
@@ -63,11 +69,14 @@ const EXPECTED_MEMBERS = Object.freeze([
   ['getActorInventoryCoinSpender', 'facade', 'handle', 'accessor'],
   ['getCraftingEngine', 'facade', 'handle', 'accessor'],
   ['getCraftingEngine().findComponentItems', 'craftingEngine', 'handle', 'method'],
-  // APPENDED, never interleaved: two comments in `tests/companion-facade.test.js` name
-  // `getCraftingEngine().findComponentItems` as "the eighth member", and a row inserted above
-  // it would falsify both with nothing failing.
+  // APPENDED, never interleaved: `getCraftingEngine().findComponentItems` is named as "the
+  // eighth member" at four sites — twice in `tests/companion-facade.test.js`, once below, and
+  // once in `companionContract.js` itself — and a row inserted above it would falsify all four
+  // with nothing failing.
   ['rollActorCheck', 'facade', 'stable', 'method'],
   ['resolveBulkCheckDecision', 'facade', 'stable', 'method'],
+  ['awardComponents', 'facade', 'stable', 'method'],
+  ['creditCurrency', 'facade', 'stable', 'method'],
 ]);
 
 /** Every outcome token declared for this `schemaVersion`, closed by enumeration. */
@@ -102,6 +111,20 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'notElected',
   'decided',
   'nothingToDecide',
+  // awardComponents (issue 1301). `awarded` and `awardFailed` are answered at BOTH levels; the
+  // three after them are ENTRY-level only and can never be a call-level `outcome`.
+  'awarded',
+  'partiallyAwarded',
+  'awardFailed',
+  'componentNotFound',
+  'invalidQuantity',
+  'multiUnitUnsupported',
+  'invalidAwards',
+  // creditCurrency (issue 1301): four outcomes carrying three values of `credited`.
+  'credited',
+  'creditFailed',
+  'creditUnavailable',
+  'creditNotConfigured',
 ]);
 
 /**
@@ -132,6 +155,16 @@ const MEMBER_KEY_TABLES = Object.freeze([
     name: 'resolveBulkCheckDecision',
     keys: BULK_CHECK_DECISION_MESSAGE_KEYS,
     shared: Object.freeze(['gmOnly', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'awardComponents',
+    keys: COMPONENT_AWARD_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'creditCurrency',
+    keys: CURRENCY_CREDIT_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
   }),
 ]);
 
@@ -286,6 +319,63 @@ test('the member table is exactly the declared set at its declared promise tiers
   );
   const names = COMPANION_MEMBERS.map((member) => member.name);
   assert.equal(new Set(names).size, names.length, 'member names are unique');
+});
+
+test('AC-1 — the member table grew by APPENDING, and the eighth member did not move', () => {
+  assert.equal(COMPANION_MEMBERS.length, 12, 'ten members plus the award and the credit');
+  assert.deepEqual(
+    [COMPANION_MEMBERS[10].name, COMPANION_MEMBERS[11].name],
+    ['awardComponents', 'creditCurrency'],
+    'the two new rows are at indices 10 and 11'
+  );
+  // The index assertion is the point: four sites name this row "the eighth member", and an
+  // interleaved row falsifies all of them with no assertion noticing.
+  assert.equal(COMPANION_MEMBERS[7].name, 'getCraftingEngine().findComponentItems');
+});
+
+test('AC-2 — success is DERIVED, and every new token is declared in all three places', () => {
+  // `buildResult` computes `success` as membership of `SUCCESSFUL_OUTCOMES` AND the presence
+  // of the outcome in the member's OWN key table, so an omission from EITHER place flips a
+  // published boolean with nothing else failing. That trap already nearly fired once: omitting
+  // the two bulk outcomes would have made both of `resolveBulkCheckDecision`'s answers report
+  // `success: false`.
+  const SUCCEEDS = [
+    ['awarded', () => componentAwardResult('awarded', null, { placements: [] })],
+    ['partiallyAwarded', () => componentAwardResult('partiallyAwarded', null, { placements: [] })],
+    ['credited', () => currencyCreditResult('credited', null, { amount: 1 })],
+  ];
+  for (const [outcome, build] of SUCCEEDS) {
+    assert.equal(build().success, true, `${outcome} is an act that HAPPENED`);
+  }
+
+  const FAILS = [
+    ['awardFailed', () => componentAwardResult('awardFailed', null, { placements: [] })],
+    ['creditFailed', () => currencyCreditResult('creditFailed', { detail: '' })],
+    ['creditUnavailable', () => currencyCreditResult('creditUnavailable', { detail: '' })],
+    ['creditNotConfigured', () => currencyCreditResult('creditNotConfigured', { detail: '' })],
+  ];
+  for (const [outcome, build] of FAILS) {
+    assert.equal(build().success, false, `${outcome} is an act that did NOT happen`);
+  }
+
+  // All three places, named: the vocabulary, the member's key table, and the success list —
+  // the last asserted THROUGH the boolean above rather than by reaching into a private const.
+  for (const outcome of ['awarded', 'partiallyAwarded', 'awardFailed', 'invalidAwards']) {
+    assert.ok(COMPANION_OUTCOMES[outcome], `${outcome} is declared`);
+    assert.ok(COMPONENT_AWARD_MESSAGE_KEYS[outcome], `${outcome} has a key`);
+  }
+  for (const outcome of ['credited', 'creditFailed', 'creditUnavailable', 'creditNotConfigured']) {
+    assert.ok(COMPANION_OUTCOMES[outcome], `${outcome} is declared`);
+    assert.ok(CURRENCY_CREDIT_MESSAGE_KEYS[outcome], `${outcome} has a key`);
+  }
+  // And the entry-only three are keys WITHOUT being call-level answers, which is what the
+  // dead-vocabulary sweep forces and what makes the call-level set computable by subtraction.
+  for (const outcome of COMPONENT_AWARD_ENTRY_OUTCOMES) {
+    assert.ok(COMPONENT_AWARD_MESSAGE_KEYS[outcome], `${outcome} is a table key`);
+  }
+  assert.equal(COMPONENT_AWARD_ENTRY_OUTCOMES.length, 3);
+  assert.ok(Object.isFrozen(COMPONENT_AWARD_ENTRY_OUTCOMES));
+  assert.equal(AWARD_ENTRIES_MAX, 64, 'the published bound is a value a caller can read');
 });
 
 test('every member row carries a resolvable host and path shape', () => {
@@ -679,11 +769,15 @@ test('derived fields are computed from the outcome and cannot be overridden by a
 });
 
 test('a legitimate rolled zero answers 0, and never the null a refusal answers', () => {
-  const zero = checkRollResult('checkFailed', { label: 'Fabricate', total: 0, dc: 15 }, {
-    total: 0,
-    diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }],
-    resolvedFormula: '1d20 - 5',
-  });
+  const zero = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 0, dc: 15 },
+    {
+      total: 0,
+      diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }],
+      resolvedFormula: '1d20 - 5',
+    }
+  );
   assert.ok(Object.is(zero.total, 0), 'a real zero is 0; null is reserved for "no answer"');
   assert.equal(zero.passed, false);
   assert.equal(zero.success, true, 'the check WAS rolled; it simply did not pass');
@@ -694,19 +788,27 @@ test('a legitimate rolled zero answers 0, and never the null a refusal answers',
 });
 
 test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {
-  const ungraded = checkRollResult('rolled', { label: 'Fabricate', total: 7 }, {
-    total: 7,
-    diceGroups: [],
-    resolvedFormula: '1d20 + 2',
-  });
+  const ungraded = checkRollResult(
+    'rolled',
+    { label: 'Fabricate', total: 7 },
+    {
+      total: 7,
+      diceGroups: [],
+      resolvedFormula: '1d20 + 2',
+    }
+  );
   assert.equal(ungraded.passed, null, 'an ungraded roll is not graded, so it has no pass');
   assert.equal(ungraded.success, true);
 
-  const decided = bulkCheckDecisionResult('decided', { count: 2, total: 4 }, {
-    choice: { bonus: '+2', rollMode: 'gmroll', advantage: 'advantage' },
-    allowAdvantage: true,
-    covered: [0, 2],
-  });
+  const decided = bulkCheckDecisionResult(
+    'decided',
+    { count: 2, total: 4 },
+    {
+      choice: { bonus: '+2', rollMode: 'gmroll', advantage: 'advantage' },
+      allowAdvantage: true,
+      covered: [0, 2],
+    }
+  );
   assertContractResult(decided, {
     success: true,
     decision: { bonus: '+2', rollMode: 'gmroll', advantage: 'advantage' },

@@ -42,6 +42,8 @@ import {
   COMPANION_MEMBER_KINDS,
   COMPANION_OUTCOMES,
   COMPANION_PROMISES,
+  COMPONENT_AWARD_MESSAGE_KEYS,
+  CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
@@ -371,7 +373,8 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
         // Each stand-up REPLACES `globalThis.game`, and the facade reads it live, so the two
         // halves of a differential are run one after another rather than built up front.
         const ask = async (options) =>
-          (await member.call(standUpFacade({ ready: false, ...options }).facade, 'actor-1')).outcome;
+          (await member.call(standUpFacade({ ready: false, ...options }).facade, 'actor-1'))
+            .outcome;
 
         assert.equal(await ask({ user: PLAYER, actors: [actor] }), 'gmOnly');
         assert.equal(await ask({ user: GM, actors: [actor] }), 'notReady');
@@ -780,7 +783,7 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 
   it('resolves every member through its OWN declared host and path', () => {
     const facade = makeInitializedFacade();
-    assert.equal(COMPANION_MEMBERS.length, 10, 'the declared set is ten members');
+    assert.equal(COMPANION_MEMBERS.length, 12, 'the declared set is twelve members');
     for (const member of COMPANION_MEMBERS) {
       const host = resolveHost(member, facade);
       assert.ok(host, `${member.name}: its declared host resolved to nothing`);
@@ -861,10 +864,15 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 // ---------------------------------------------------------------------------
 
 const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
-const GRANT = 'async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {';
+const GRANT =
+  'async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {';
 const AFFORD = 'async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {';
 const ROLL = 'async rollActorCheck({';
 const BULK = 'async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {';
+const AWARD =
+  'async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {';
+const CREDIT =
+  'async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {';
 
 /**
  * Every claim below is asserted over BOTH texts.
@@ -918,7 +926,7 @@ describe('the harness copies are faithful to src/main.js', () => {
     // `rollActorCheck` joins this loop and `resolveBulkCheckDecision` does NOT: the two gate
     // DIFFERENTLY, deliberately, and a uniform shape asserted over both is unsatisfiable
     // together with the criterion that pins the bulk member's missing actor gate.
-    for (const signature of [GRANT, AFFORD, ROLL]) {
+    for (const signature of [GRANT, AFFORD, ROLL, AWARD, CREDIT]) {
       for (const [label, body] of bothTexts(signature)) {
         // The trailing `{` the first two members carry is deliberately NOT pinned here.
         // `rollActorCheck` passes a module-level frozen key pair instead of an inline object
@@ -1002,7 +1010,7 @@ describe('the harness copies are faithful to src/main.js', () => {
     for (const [label, body] of bothTexts(BULK)) {
       assert.ok(body.length > 100, `non-vacuity: ${label} sliced to ${body.length} characters`);
       assert.ok(
-        body.includes("user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null"),
+        body.includes('user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null'),
         `${label} lost the inline GM gate`
       );
       assert.ok(
@@ -1120,6 +1128,75 @@ describe('the harness copies are faithful to src/main.js', () => {
     }
   });
 
+  it('AC-29 — each new delegator keeps its OWN refusal strings, where hoisting put them', () => {
+    // `bothTexts` returns a METHOD-BODY slice, and D12 hoisted these pairs out of that slice —
+    // so the body-level assertion above proves delegation to the shared preamble and can say
+    // nothing about WHICH strings each member delegates with. The mutation this closes is
+    // giving the harness's hoisted constant the grant's message keys: every body-level name
+    // assertion still passes, and a refused award reports itself in the grant's words in the
+    // MIRROR ONLY — where every facade-level case for these two members runs, because there is
+    // no Foundry smoke by design.
+    const PAIRS = [
+      ['awardComponents', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
+      ['creditCurrency', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
+    ];
+    for (const [label, source] of [
+      ['production', MAIN_SOURCE],
+      ['the harness mirror', HARNESS_SOURCE],
+    ]) {
+      for (const [member, table, keys] of PAIRS) {
+        assert.ok(
+          source.includes(`gmOnlyKey: ${table}[COMPANION_OUTCOMES.gmOnly]`) &&
+            source.includes(`noActorKey: ${table}[COMPANION_OUTCOMES.noActor]`),
+          `${label}: ${member}'s hoisted pair must read ${table}, never another member's`
+        );
+        // And the table it names really is that member's own, so the pin cannot be satisfied
+        // by a constant that merely SPELLS the right name.
+        assert.ok(
+          keys[COMPANION_OUTCOMES.gmOnly].startsWith('FABRICATE.'),
+          `${member}'s table resolves a real key`
+        );
+      }
+    }
+  });
+
+  it('AC-29 — `_worldCurrencySeams()` binds the same seams in both texts', () => {
+    // The bag D12 mitigation 1 hoisted, and the one `checkAffordability` was RETARGETED onto,
+    // so a mirror that omits a binding takes the whole currency surface with it. The mutation
+    // this closes is dropping `actorInventoryCoinSpender` here: every facade-level currency
+    // case that does not use that strategy stays green, and the hoist introduced to shorten
+    // the mirror has silently broken it.
+    const BINDINGS = [
+      ['getCurrencyConfig', 'getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null'],
+      ['actorPropertyCoinSpender', 'actorPropertyCoinSpender: this.actorPropertyCoinSpender'],
+      ['actorInventoryCoinSpender', 'actorInventoryCoinSpender: this.actorInventoryCoinSpender'],
+    ];
+    for (const [label, source] of [
+      ['production', MAIN_SOURCE],
+      ['the harness mirror', HARNESS_SOURCE],
+    ]) {
+      const bag = mainMethodSource('_worldCurrencySeams() {', source);
+      assert.ok(bag.length > 150, `non-vacuity: ${label} sliced to ${bag.length} characters`);
+      assert.deepEqual(
+        [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
+        BINDINGS.map(([key]) => key),
+        `${label} binds exactly these three seams`
+      );
+      const squashed = bag.replaceAll(/\s+/g, ' ');
+      for (const [key, binding] of BINDINGS) {
+        assert.ok(squashed.includes(binding), `${label}: ${key} is no longer bound as authored`);
+      }
+      // `isElectedExecutor` is absent on BOTH sides by design: the check gates on no call site,
+      // and a seam present in the bag but read by only one of its two consumers is how a gate
+      // ends up assumed rather than declared. `creditCurrency` adds its own.
+      assert.equal(
+        squashed.includes('isElectedExecutor'),
+        false,
+        `${label}: the shared bag carries no election`
+      );
+    }
+  });
+
   it('AC-5 — neither new delegator throws readiness, spreads a request, or reads game.actors', () => {
     for (const signature of [ROLL, BULK]) {
       for (const [label, body] of bothTexts(signature)) {
@@ -1155,7 +1232,8 @@ describe('the harness copies are faithful to src/main.js', () => {
   it('publishes COMPANION beside HOOKS, and publishes no grant symbol anywhere else', () => {
     const source = readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8');
     assert.ok(
-      source.includes('HOOKS: FABRICATE_HOOKS,') && source.includes('COMPANION: COMPANION_CONTRACT'),
+      source.includes('HOOKS: FABRICATE_HOOKS,') &&
+        source.includes('COMPANION: COMPANION_CONTRACT'),
       'the descriptor is assigned onto game.fabricate.api beside the hook aggregate'
     );
     assert.equal(
