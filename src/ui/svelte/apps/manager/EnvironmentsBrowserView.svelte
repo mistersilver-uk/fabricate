@@ -1250,11 +1250,14 @@
               />
             </label>
             <ManagerButton
+              role="primary"
               type="submit"
               class="manager-add-button"
+              data-gathering-condition-add={condition.kind}
               aria-label={conditionAddLabel(condition.kind)}
               title={conditionAddLabel(condition.kind)}
             >
+              <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
             </ManagerButton>
           </form>
@@ -1386,11 +1389,14 @@
               />
             </label>
             <ManagerButton
+              role="primary"
               type="submit"
               class="manager-add-button"
+              data-gathering-vocabulary-add={vocabulary.kind}
               aria-label={vocabularyAddLabel()}
               title={vocabularyAddLabel()}
             >
+              <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
             </ManagerButton>
           </form>

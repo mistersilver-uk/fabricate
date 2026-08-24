@@ -138,7 +138,12 @@
       )}
       aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.CreateLabel', 'New realm name')}
     />
-    <ManagerButton type="submit" disabled={saving || !createInput.trim()}>
+    <ManagerButton
+      role="primary"
+      type="submit"
+      data-realm-create
+      disabled={saving || !createInput.trim()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Travel.Realms.Create', 'Add realm')}</span>
     </ManagerButton>
