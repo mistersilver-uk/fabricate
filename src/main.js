@@ -2559,6 +2559,47 @@ class Fabricate {
   }
 
   /**
+   * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
+   * ladder (issue 1301).
+   *
+   * Sited beside {@link Fabricate#checkAffordability} and the bag they share, rather than after
+   * `awardComponents`, so the two WORLD-CURRENCY members read together — and so the two new
+   * delegators are not adjacent in either this file or its harness mirror. That second effect
+   * is measured rather than incidental: adjacent, near-identical delegators concatenate into
+   * ONE duplicated run across the two files, and the pair measured over the bar while each
+   * member alone measures under it.
+   *
+   * World scope, never a crafting system, exactly as {@link Fabricate#checkAffordability} is —
+   * the two share their request resolution through {@link Fabricate#_worldCurrencySeams} and
+   * the leaf's own shared resolver, so they can never disagree about what `50 gp` means.
+   *
+   * It routes through the resolved spender's `refund`, which under `spendStrategy: 'macro'`
+   * runs the GM's `increment` macro — a macro that until now ran only on the player-cancel
+   * refund. The `caller: 'award'` token the leaf passes is what lets that macro tell a
+   * companion credit from a cancelled craft.
+   *
+   * NOT IDEMPOTENT, for the same reason the award is not: crediting 50 gp twice is legitimately
+   * 100 gp, and nothing Fabricate can read tells a duplicate from a second, intended credit.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The actor to credit (never an actor uuid).
+   * @param {string|null} [options.unitId] The coin unit the credit is denominated in.
+   * @param {number|string|null} [options.amount] A whole positive number of that unit.
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await creditWorldCurrency(gate.actor, { unitId, amount, callSite }, {
+      ...this._worldCurrencySeams(),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
+    });
+  }
+
+  /**
    * The ONE seam bag both Standalone Check Roll members inject.
    *
    * Hoisted to a single private so neither delegator restates it, and so the harness mirror
@@ -2708,39 +2749,6 @@ class Fabricate {
     return await awardComponentsToActor(gate.actor, { systemId, awards, callSite }, this._componentAwardSeams());
   }
 
-  /**
-   * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
-   * ladder (issue 1301).
-   *
-   * World scope, never a crafting system, exactly as {@link Fabricate#checkAffordability} is —
-   * the two share their request resolution through {@link Fabricate#_worldCurrencySeams} and
-   * the leaf's own shared resolver, so they can never disagree about what `50 gp` means.
-   *
-   * It routes through the resolved spender's `refund`, which under `spendStrategy: 'macro'`
-   * runs the GM's `increment` macro — a macro that until now ran only on the player-cancel
-   * refund. The `caller: 'award'` token the leaf passes is what lets that macro tell a
-   * companion credit from a cancelled craft.
-   *
-   * NOT IDEMPOTENT, for the same reason the award is not: crediting 50 gp twice is legitimately
-   * 100 gp, and nothing Fabricate can read tells a duplicate from a second, intended credit.
-   *
-   * @param {object} options the CLOSED request key set; nothing else is read
-   * @param {string|null} [options.actorId] The actor to credit (never an actor uuid).
-   * @param {string|null} [options.unitId] The coin unit the credit is denominated in.
-   * @param {number|string|null} [options.amount] A whole positive number of that unit.
-   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
-   * @returns {Promise<Readonly<object>>}
-   */
-  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
-    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
-    if (gate.outcome || this.ready !== true) {
-      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await creditWorldCurrency(gate.actor, { unitId, amount, callSite }, {
-      ...this._worldCurrencySeams(),
-      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
-    });
-  }
 
   /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.

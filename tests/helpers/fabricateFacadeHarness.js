@@ -469,6 +469,32 @@ export class FabricateFacadeUnderTest {
     };
   }
 
+  // --- Faithful copy of Fabricate#creditCurrency (issue 1301) ----------------
+  //
+  // Sited HERE, beside `checkAffordability` and the bag they share, because production sites it
+  // here — the mirror follows production's member order as well as its text, and that order is
+  // what keeps the two new delegators from concatenating into one over-the-bar duplicated run
+  // across the two files.
+  //
+  // One incidental asymmetry, of the class this file already carries: production reads the
+  // election off the bare `game` global and this copy reads it off `this._game`, exactly as
+  // `resolveBulkCheckDecision` above does. The EXPRESSION is otherwise identical, and the
+  // election is added by this member rather than by `_worldCurrencySeams()` on both sides.
+  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await creditWorldCurrency(
+      gate.actor,
+      { unitId, amount, callSite },
+      {
+        ...this._worldCurrencySeams(),
+        isElectedExecutor: () => this._game.users?.activeGM?.id === this._game.user?.id,
+      }
+    );
+  }
+
   // --- The Standalone Check Roll seam bag (INJECTED, see the constructor) -----
   _companionCheckSeams() {
     return this._companionCheckSeamBag;
@@ -583,27 +609,6 @@ export class FabricateFacadeUnderTest {
       gate.actor,
       { systemId, awards, callSite },
       this._componentAwardSeams()
-    );
-  }
-
-  // --- Faithful copy of Fabricate#creditCurrency (issue 1301) ----------------
-  //
-  // One incidental asymmetry, of the class this file already carries: production reads the
-  // election off the bare `game` global and this copy reads it off `this._game`, exactly as
-  // `resolveBulkCheckDecision` above does. The EXPRESSION is otherwise identical, and the
-  // election is added by this member rather than by `_worldCurrencySeams()` on both sides.
-  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
-    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
-    if (gate.outcome || this.ready !== true) {
-      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await creditWorldCurrency(
-      gate.actor,
-      { unitId, amount, callSite },
-      {
-        ...this._worldCurrencySeams(),
-        isElectedExecutor: () => this._game.users?.activeGM?.id === this._game.user?.id,
-      }
     );
   }
 
