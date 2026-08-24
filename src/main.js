@@ -20,6 +20,7 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
+import { CharacterLibrariesStore } from './systems/CharacterLibrariesStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
@@ -1045,6 +1046,20 @@ class Fabricate {
       randomID: () => foundry.utils.randomID()
     });
     this.currencyConfigStore.load();
+    // Issue 1308: the world character libraries — the character-prerequisite library and the
+    // modifier library. Constructed and loaded HERE, before both managers, because
+    // `CraftingSystemManager` derives its Valid Id Basis from this store on every normalize; a
+    // manager built ahead of it would prune every reference against an empty basis.
+    //
+    // Note this is NOT where the travel store sits (it is constructed well after the manager).
+    // Copying that placement would be wrong: realms are read on demand, whereas these libraries
+    // are read during normalization itself.
+    this.characterLibrariesStore = new CharacterLibrariesStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.characterLibrariesStore.load();
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
@@ -1711,6 +1726,25 @@ class Fabricate {
    */
   getCurrencyConfigStore() {
     return this.currencyConfigStore ?? null;
+  }
+
+  /**
+   * Get the world character libraries store (issue 1308): the character-prerequisite library and
+   * the modifier library.
+   *
+   * World scope, not per crafting system, because both resolve against the acting CHARACTER.
+   * Nothing stays per system — there is no participation flag to consult.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, for the reason `getCurrencyConfigStore` above is
+   * not: these libraries gate craftability, learning and tool usability, and every call site
+   * guards with optional chaining, which catches an absent accessor but NOT a throw. A readiness
+   * throw here would surface as a crash on the craftability path rather than the unknown basis
+   * those callers are written to tolerate.
+   *
+   * @returns {CharacterLibrariesStore|null}
+   */
+  getCharacterLibrariesStore() {
+    return this.characterLibrariesStore ?? null;
   }
 
   /**
@@ -4625,6 +4659,7 @@ Hooks.once('ready', async () => {
     gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
     currencyConfigStore: fabricate.currencyConfigStore,
     travelStore: fabricate.gatheringRealmStore,
+    characterLibrariesStore: fabricate.characterLibrariesStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {

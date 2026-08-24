@@ -9,6 +9,7 @@ const GATHERING_ENVIRONMENTS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KE
 const PLAYER_CHARACTER_TYPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`;
 const CURRENCY_CONFIG_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CURRENCY_CONFIG}`;
 const TRAVEL_CONFIG_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TRAVEL_CONFIG}`;
+const CHARACTER_LIBRARIES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CHARACTER_LIBRARIES}`;
 
 /**
  * The invalidation scopes a world currency edit produces (issue 1278).
@@ -50,6 +51,41 @@ function travelParticipantScopes(craftingSystemManager) {
     .map((system) => ({
       systemId: system.id,
       domains: [INVALIDATION_DOMAINS.RESOLUTION_CONFIG],
+    }));
+}
+
+/**
+ * The scopes a character-libraries change announces (issue 1308): EVERY crafting system, each
+ * carrying the UNION of the three invalidation domains the two libraries used to carry between
+ * them.
+ *
+ * NO PARTICIPATION FILTER, unlike currency and travel above, because there is no participation
+ * flag to filter on — any system may reference any entry by id, so any system may be affected.
+ *
+ * THE DOMAINS ARE A UNION, and narrowing them would silently under-invalidate. Before this move
+ * the two libraries lived on the crafting system and were classified separately —
+ * `modifiers: [RESOLUTION_CONFIG]` and `characterPrerequisites: [LABELLING,
+ * ACCESS_AND_KNOWLEDGE]` — so an edit to either announced its own domains through the
+ * `craftingSystems` write. One setting cannot say WHICH library moved, so it must announce all
+ * three; copying the currency leg's `RESOLUTION_CONFIG`-only scope would silently stop
+ * announcing `labelling` and `access-and-knowledge` altogether. This is the same
+ * cannot-attribute-so-carry-all reasoning `invalidationDomains.js` applies to a component
+ * rewrite.
+ *
+ * @param {{ getSystems: () => any[] }|null|undefined} craftingSystemManager
+ * @returns {Array<{systemId: string, domains: readonly string[]}>}
+ */
+function characterLibraryScopes(craftingSystemManager) {
+  const systems = craftingSystemManager?.getSystems?.() ?? [];
+  return (Array.isArray(systems) ? systems : [])
+    .filter((system) => system?.id)
+    .map((system) => ({
+      systemId: system.id,
+      domains: [
+        INVALIDATION_DOMAINS.LABELLING,
+        INVALIDATION_DOMAINS.RESOLUTION_CONFIG,
+        INVALIDATION_DOMAINS.ACCESS_AND_KNOWLEDGE,
+      ],
     }));
 }
 
@@ -135,6 +171,7 @@ export function handleFabricateSettingChange(
     gatheringEnvironmentStore,
     currencyConfigStore,
     travelStore,
+    characterLibrariesStore,
     callAll,
   } = {}
 ) {
@@ -194,6 +231,23 @@ export function handleFabricateSettingChange(
     travelStore?.load?.();
     callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
     const scopes = travelParticipantScopes(craftingSystemManager);
+    if (scopes.length > 0) {
+      emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
+    }
+    return true;
+  }
+  if (settingKey === CHARACTER_LIBRARIES_KEY) {
+    // Issue 1308. Re-read the replicated libraries into the store's cache, then tell the shells.
+    // `load()` only reads, so there is no write -> `updateSetting` -> write loop.
+    //
+    // The reload MUST precede the announcements: every consumer that reacts to them reads the
+    // libraries back through this store, so announcing first would hand them the pre-edit
+    // libraries and cache that as the new truth.
+    characterLibrariesStore?.load?.();
+    // Unconditional manager republish, for the currency branch's reason: a second GM's authoring
+    // surface is stale whether or not any crafting system currently references the library.
+    callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
+    const scopes = characterLibraryScopes(craftingSystemManager);
     if (scopes.length > 0) {
       emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
     }
