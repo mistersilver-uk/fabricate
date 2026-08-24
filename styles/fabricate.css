@@ -2002,11 +2002,23 @@
    button in its switched-on colours, which is what `ToolEditView`'s Back button did for
    the whole of a tool save (issue 1118).
 
-   The header's own `.manager-header-actions .manager-button.is-ghost` pair is retired with
-   this edit. It stated the same three values through `--fab-border` and `--fab-text-muted`,
-   which are what `--fab-mv2-border` and `--fab-mv2-text-muted` alias, so which of the two
-   (0,4,0) rules won was a zero-pixel question decided by source order. A role's paint
-   belongs to the role; the container keeps only its own scale. */
+   TWO container rules stated this role's paint and both are retired, on one principle: a
+   role's paint belongs to the role, and the container keeps only its own scale.
+
+   `.manager-header-actions .manager-button.is-ghost` stated the same three values through
+   `--fab-border` and `--fab-text-muted`, which are what `--fab-mv2-border` and
+   `--fab-mv2-text-muted` alias, so which of the two (0,4,0) rules won was a zero-pixel
+   question decided by source order.
+
+   `.manager-tool-edit-actions .manager-button.is-ghost` was the SAME rule one container
+   over, and retiring it is not cosmetic: at (0,4,0) and unqualified it beat
+   `.manager-button:disabled` (0,3,0) outright, so it was the live half of the defect this
+   role's `:not(:disabled)` exists to end — in the one container `ToolEditView`'s
+   `disabled={saving}` Back button actually sits in, which is to say on the exemplar. Its
+   three declarations were byte-identical to this rule's, and every child of that container
+   is a `<ManagerButton>`, so nothing unconverted lost paint with it. `manager-layout.test.js`
+   now probes this invariant in every container the sheet styles, not just one, because a
+   probe scoped to one container is what let this survive a whole review round. */
 .fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled) {
   border-color: var(--fab-mv2-border);
   color: var(--fab-mv2-text-muted);
@@ -3062,6 +3074,20 @@
   min-height: 0;
   padding: 0 12px;
   border-radius: 8px;
+}
+
+/* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). The
+   geometry above must survive being switched off — a disabled preset that snapped back to
+   34px would move the row — while the fill must not: at (0,5,0) and unqualified this
+   declaration beat `.manager-button:disabled` (0,3,0), so a switched-off preset kept its lit
+   `--fab-bg-0` surface. That is the same defect as the Tool Studio's ghost Back, one
+   container further on, and no preset renders `disabled` today, which is exactly why nothing
+   caught it: it was latent, not shipping. It is repaired rather than filed because the
+   invariant the sheet states is that the disabled paint is role- AND container-independent,
+   and an invariant with a documented exception is a convention. */
+.fabricate-manager
+  .manager-checks-trigger-presets
+  .manager-button.fab-manager-button.is-dashed:not(:disabled) {
   background: var(--fab-bg-0);
 }
 
@@ -17229,12 +17255,6 @@
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tool-edit-actions .manager-button.is-ghost {
-  border-color: var(--fab-mv2-border);
-  background: transparent;
-  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-tool-edit-status {

@@ -383,7 +383,9 @@ test('Fabricate app shell suppresses the host outline on the selected-tab state 
   // Core's `button.active` carries the same orange outline + glow as `button:focus`,
   // so the selected nav-rail button keeps a Foundry ring once focus leaves it. The
   // :focus reset above only masks it while the button is focused.
-  const shellActiveBlock = blockFor('.fabricate-app button.active,\n.fabricate-app a.button.active');
+  const shellActiveBlock = blockFor(
+    '.fabricate-app button.active,\n.fabricate-app a.button.active'
+  );
 
   assert.ok(
     shellActiveBlock.includes('outline: none;') && shellActiveBlock.includes('box-shadow: none;'),
@@ -6873,7 +6875,10 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       };
     });
 
-    assert.ok(report.scrollRange > 100, `cards must overflow the pane (got ${report.scrollRange}px)`);
+    assert.ok(
+      report.scrollRange > 100,
+      `cards must overflow the pane (got ${report.scrollRange}px)`
+    );
     assert.equal(report.scrollerOverflowY, 'auto', 'the card content remains the scroll node');
     assert.ok(report.scrolledBy > 0, 'the card scroller accepts an independent scroll');
     assert.equal(report.footerIsSibling, true, 'the pager is a sibling outside the scroll node');
@@ -7857,7 +7862,7 @@ test('a Modifiers card button renders exactly like the tool studio button of the
   }
 });
 
-// ── A SWITCHED-OFF manager button looks switched off, in every role (issue 1118) ──────────
+// ── A SWITCHED-OFF manager button looks switched off, in every role AND every container ───
 //
 // The reported state of the sheet was that it did not. `.manager-button:disabled` is (0,3,0);
 // `.manager-button.is-primary`, `.is-danger` and `.is-warning-action` are (0,3,0) too and
@@ -7876,9 +7881,176 @@ test('a Modifiers card button renders exactly like the tool studio button of the
 // disabled paint from exactly the controls with no other. So this measures the INVARIANT the
 // repair states — the disabled paint is role-independent — rather than re-deriving the
 // arithmetic that made it false.
+//
+// ── WHY IT PROBES EVERY CONTAINER, AND WHY THE CONTAINER LIST IS DERIVED ─────────────────
+// The first version of this gate mounted its six probes inside `.manager-edit-card` and
+// nothing else, so it measured the invariant against the ROLE rules alone. It was green while
+// `.fabricate-manager .manager-tool-edit-actions .manager-button.is-ghost` — (0,4,0),
+// unqualified, three colour declarations — still beat the disabled rule outright in the one
+// container the Tool Studio's Back button actually sits in. The defect this whole section is
+// named for was live, in the exact control the issue cites, underneath a passing test.
+//
+// A hand-written container list would have repeated that failure one container later, so the
+// list is DERIVED from the sheet: every rule whose key compound is a `.manager-button` and
+// which names an ancestor between `.fabricate-manager` and that compound contributes its
+// ancestor chain, materialized as real elements. Add an ancestor-context rule to the sheet
+// and the probe follows it there on the next run, with no edit here. `ANCESTOR_CONTEXT_FLOOR`
+// and the named-context assertion below are what stop a parse break from emptying the list
+// and reporting green over nothing.
+//
+// Ancestors are materialized as nested elements, so a `>` combinator is honoured and a `+`
+// or `~` one is not: a sibling context is collected as UNMATERIALIZABLE and reds the gate
+// rather than being silently dropped. The sheet has none today.
 const DISABLED_ROLE_PROBES = ['neutral', 'primary', 'ghost', 'danger', 'dashed', 'warning'];
 
-test('a disabled manager button paints from the disabled rule in every one of the six roles', async () => {
+/**
+ * Every rule prelude in a stylesheet, with comments blanked and at-rule preludes dropped.
+ *
+ * Rules nested inside an `@media`/`@container` block are included: a container is a container
+ * whatever guards it, and a probe that skipped them would be blind to exactly the responsive
+ * overrides this sheet uses to re-type a header cluster at narrow widths.
+ *
+ * @param {string} sheet stylesheet text
+ * @returns {Array<string>} one prelude per rule
+ */
+function rulePreludes(sheet) {
+  const text = sheet.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+  const preludes = [];
+  let depth = 0;
+  let start = 0;
+  for (let cursor = 0; cursor < text.length; cursor += 1) {
+    const char = text[cursor];
+    if (char !== '{' && char !== '}' && !(char === ';' && depth <= 1)) continue;
+    if (char === '{' && depth <= 1) preludes.push(text.slice(start, cursor).trim());
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+    start = cursor + 1;
+  }
+  return preludes.filter((prelude) => prelude !== '' && !prelude.startsWith('@'));
+}
+
+const CLASS_TOKEN = /\.([\w-]+)/g;
+const ATTRIBUTE_TOKEN = /\[([\w-]+)="([^"]*)"]/g;
+
+/**
+ * A compound selector as a renderable element, or `null` when it cannot be one.
+ *
+ * Classes and quoted attribute selectors are materialized; anything else left in the compound
+ * — a pseudo-class, a type selector, a universal — means the caller must not pretend it can
+ * render this context, so it says so instead of rendering an approximation.
+ *
+ * @param {string} compound one compound selector, e.g. `.fabricate-manager[data-x="y"]`
+ * @returns {{classes: Array<string>, attributes: string}|null} the element, or null
+ */
+function elementForCompound(compound) {
+  const classes = [...compound.matchAll(CLASS_TOKEN)].map(([, name]) => name);
+  const attributes = [...compound.matchAll(ATTRIBUTE_TOKEN)]
+    .map(([, name, value]) => ` ${name}="${value}"`)
+    .join('');
+  const residue = compound.replaceAll(CLASS_TOKEN, '').replaceAll(ATTRIBUTE_TOKEN, '');
+  if (residue !== '' || classes.length === 0) return null;
+  return { classes, attributes };
+}
+
+/**
+ * The ancestor chain a manager-button selector names, or `null` when it names none.
+ *
+ * @param {string} selector one selector from a rule's prelude
+ * @returns {{id: string, root: object, chain: Array<object>}|null|'unmaterializable'}
+ */
+function ancestorContextIn(selector) {
+  const one = selector.trim().replaceAll(/\s+/g, ' ');
+  if (!one.includes('.manager-button')) return null;
+  // A comma inside `:is(…)`/`:not(…)` would have been split by the caller, leaving a fragment
+  // with unbalanced parentheses. Such a fragment is not a selector and is not reasoned about.
+  if ((one.match(/\(/g) || []).length !== (one.match(/\)/g) || []).length) return null;
+  const compounds = one.split(/\s*>\s*|\s+/).filter(Boolean);
+  if (!compounds.at(-1).includes('.manager-button')) return null;
+  const ancestors = compounds.slice(1, -1);
+  if (ancestors.length === 0) return null;
+  if (/[+~]/.test(one)) return 'unmaterializable';
+  const root = elementForCompound(compounds[0]);
+  const chain = ancestors.map((compound) => elementForCompound(compound));
+  if (!root || !root.classes.includes('fabricate-manager') || chain.includes(null)) {
+    return 'unmaterializable';
+  }
+  return { id: [compounds[0], ...ancestors].join(' '), root, chain };
+}
+
+// The Modifiers card, kept as the first context because it is the one the reported defect was
+// first measured in and the only one that is NOT an ancestor-context rule of its own — a
+// manager button with no container opinion at all is the base case the roles are ruled for.
+const BASE_DISABLED_CONTEXT = {
+  id: '.fabricate-manager .manager-edit-card',
+  root: { classes: ['fabricate-manager'], attributes: '' },
+  chain: [{ classes: ['manager-edit-card'], attributes: '' }],
+};
+
+// A floor, not a count: the exact number moves whenever the sheet gains or retires a container
+// rule, and pinning it would turn every such edit into a failure here. What must never happen
+// is the list going empty or near-empty through a parse break, which is the failure mode that
+// would make this whole gate vacuous while reporting green.
+const ANCESTOR_CONTEXT_FLOOR = 10;
+
+// Named because each is a container the issue's own findings turn on: the Tool Studio's Back
+// button cluster, the 27-site editor header, the knowledge rows, the drop inspector's stack
+// and the Checks Studio preset row, whose `background` was the SECOND rule found beating the
+// disabled invariant from a container.
+const REQUIRED_DISABLED_CONTEXTS = [
+  '.manager-tool-edit-actions',
+  '.manager-header-actions',
+  '.manager-knowledge-row-actions',
+  '.manager-drop-inspector-stack',
+  '.manager-checks-trigger-presets',
+];
+
+const { contexts: DISABLED_CONTEXTS, unmaterializable: UNMATERIALIZABLE_CONTEXTS } = (() => {
+  const found = new Map([[BASE_DISABLED_CONTEXT.id, BASE_DISABLED_CONTEXT]]);
+  const rejected = new Set();
+  for (const prelude of rulePreludes(css)) {
+    for (const selector of prelude.split(',')) {
+      const context = ancestorContextIn(selector);
+      if (context === null) continue;
+      if (context === 'unmaterializable') rejected.add(selector.trim());
+      else if (!found.has(context.id)) found.set(context.id, context);
+    }
+  }
+  return { contexts: [...found.values()], unmaterializable: [...rejected] };
+})();
+
+function disabledProbeMarkup(context, index) {
+  const probes = DISABLED_ROLE_PROBES.map(
+    (role) =>
+      `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="on-${index}-${role}"><span>Save</span></button>` +
+      `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="off-${index}-${role}" disabled><span>Save</span></button>`
+  ).join('');
+  const open = context.chain
+    .map((element) => `<div class="${element.classes.join(' ')}"${element.attributes}>`)
+    .join('');
+  const close = context.chain.map(() => '</div>').join('');
+  return `<main class="${context.root.classes.join(' ')}"${context.root.attributes}>${open}${probes}${close}</main>`;
+}
+
+test('a disabled manager button paints from the disabled rule in every role and container', async () => {
+  assert.deepEqual(
+    UNMATERIALIZABLE_CONTEXTS,
+    [],
+    'every ancestor-context rule for a manager button must be renderable by this probe — ' +
+      'teach `elementForCompound` the new shape rather than letting a container go unprobed'
+  );
+  assert.ok(
+    DISABLED_CONTEXTS.length >= ANCESTOR_CONTEXT_FLOOR,
+    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} manager-button containers, got ` +
+      `${DISABLED_CONTEXTS.length} — a shorter list means the prelude scan broke, not that the ` +
+      'sheet stopped styling containers'
+  );
+  for (const required of REQUIRED_DISABLED_CONTEXTS) {
+    assert.ok(
+      DISABLED_CONTEXTS.some((context) => context.id.includes(required)),
+      `${required} must be among the derived containers, got ${DISABLED_CONTEXTS.map((context) => context.id).join(' | ')}`
+    );
+  }
+
   const context = await sharedBrowser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
@@ -7886,11 +8058,9 @@ test('a disabled manager button paints from the disabled rule in every one of th
   const page = await context.newPage();
 
   try {
-    const probes = DISABLED_ROLE_PROBES.map(
-      (role) =>
-        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="on-${role}"><span>Save</span></button>` +
-        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="off-${role}" disabled><span>Save</span></button>`
-    ).join('');
+    const roots = DISABLED_CONTEXTS.map((entry, index) => disabledProbeMarkup(entry, index)).join(
+      ''
+    );
 
     await page.setContent(`
       <!doctype html>
@@ -7903,8 +8073,8 @@ test('a disabled manager button paints from the disabled rule in every one of th
           </style>
         </head>
         <body>
+          ${roots}
           <main class="fabricate-manager">
-            <section class="manager-edit-card">${probes}</section>
             <!-- The tokens the disabled rule NAMES, resolved by the browser in this theme, so
                  the assertions below pin the paint to that rule rather than to whatever the
                  six probes happen to agree on. -->
@@ -7917,89 +8087,118 @@ test('a disabled manager button paints from the disabled rule in every one of th
       </html>
     `);
 
-    const measured = await page.evaluate((roles) => {
-      const paintOf = (element) => {
-        const style = getComputedStyle(element);
-        return {
-          borderColor: style.borderTopColor,
-          color: style.color,
-          background: style.backgroundColor,
-          opacity: style.opacity,
-          borderStyle: style.borderTopStyle,
-          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+    const measured = await page.evaluate(
+      ({ roles, count }) => {
+        const paintOf = (element) => {
+          const style = getComputedStyle(element);
+          return {
+            borderColor: style.borderTopColor,
+            color: style.color,
+            background: style.backgroundColor,
+            opacity: style.opacity,
+            borderStyle: style.borderTopStyle,
+            height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          };
         };
-      };
-      const read = (probe) => {
-        const element = document.querySelector(`[data-probe="${probe}"]`);
-        return element ? paintOf(element) : null;
-      };
-      const token = (name) =>
-        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
-      return {
-        on: Object.fromEntries(roles.map((role) => [role, read(`on-${role}`)])),
-        off: Object.fromEntries(roles.map((role) => [role, read(`off-${role}`)])),
-        tokens: {
-          border: token('border'),
-          ink: token('ink'),
-          surface: token('surface'),
-          ghostBorder: token('ghost-border'),
-        },
-      };
-    }, DISABLED_ROLE_PROBES);
-
-    for (const role of DISABLED_ROLE_PROBES) {
-      assert.ok(measured.on[role], `the enabled ${role} probe rendered`);
-      assert.ok(measured.off[role], `the disabled ${role} probe rendered`);
-    }
-
-    // NON-VACUITY, and the one that would have caught the defect on its own: the sheet must
-    // actually reach these probes. If it did not, every role would report the UA default and
-    // the equality below would hold over nothing.
-    assert.equal(
-      measured.on.ghost.borderColor,
-      measured.tokens.ghostBorder,
-      "the enabled ghost takes the primitive's resting border, or this fixture is unstyled"
+        const read = (probe) => {
+          const element = document.querySelector(`[data-probe="${probe}"]`);
+          return element ? paintOf(element) : null;
+        };
+        const perContext = (state) =>
+          Array.from({ length: count }, (unused, index) =>
+            Object.fromEntries(roles.map((role) => [role, read(`${state}-${index}-${role}`)]))
+          );
+        const token = (name) =>
+          getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+        return {
+          on: perContext('on'),
+          off: perContext('off'),
+          tokens: {
+            border: token('border'),
+            ink: token('ink'),
+            surface: token('surface'),
+            ghostBorder: token('ghost-border'),
+          },
+        };
+      },
+      { roles: DISABLED_ROLE_PROBES, count: DISABLED_CONTEXTS.length }
     );
 
-    for (const role of DISABLED_ROLE_PROBES) {
-      const off = measured.off[role];
-      assert.deepEqual(
-        { borderColor: off.borderColor, color: off.color, background: off.background },
-        {
-          borderColor: measured.tokens.border,
-          color: measured.tokens.ink,
-          background: measured.tokens.surface,
-        },
-        `a disabled ${role} button paints from .manager-button:disabled, not from its role`
+    // Collected rather than thrown one at a time. `assert` stops at the first failure, and
+    // the first container in sheet order is not the interesting one — the run that proved
+    // this widening reds before the repair reported only `.manager-checks-trigger-presets`
+    // and said nothing at all about `.manager-tool-edit-actions`, which is the container the
+    // issue names. A gate over a matrix has to report the matrix.
+    const violations = [];
+    const record = (condition, message) => {
+      if (!condition) violations.push(message);
+    };
+    const samePaint = (left, right) =>
+      left.borderColor === right.borderColor &&
+      left.color === right.color &&
+      left.background === right.background;
+
+    for (const [index, entry] of DISABLED_CONTEXTS.entries()) {
+      const on = measured.on[index];
+      const off = measured.off[index];
+
+      for (const role of DISABLED_ROLE_PROBES) {
+        record(on[role], `${entry.id}: the enabled ${role} probe did not render`);
+        record(off[role], `${entry.id}: the disabled ${role} probe did not render`);
+      }
+      if (DISABLED_ROLE_PROBES.some((role) => !on[role] || !off[role])) continue;
+
+      // NON-VACUITY, and the one that would have caught the defect on its own: the sheet must
+      // actually reach these probes. If it did not, every role would report the UA default and
+      // the equality below would hold over nothing.
+      record(
+        on.ghost.borderColor === measured.tokens.ghostBorder,
+        `${entry.id}: the enabled ghost must take the primitive's resting border ` +
+          `${measured.tokens.ghostBorder}, got ${on.ghost.borderColor} — this fixture is unstyled`
       );
-      assert.equal(off.opacity, '0.62', `and keeps the disabled rule's opacity in ${role}`);
-      assert.notDeepEqual(
-        {
-          borderColor: off.borderColor,
-          color: off.color,
-          background: off.background,
-        },
-        {
-          borderColor: measured.on[role].borderColor,
-          color: measured.on[role].color,
-          background: measured.on[role].background,
-        },
-        `the ${role} role must PAINT differently when enabled, or its probe proves nothing`
+
+      const disabledPaint = {
+        borderColor: measured.tokens.border,
+        color: measured.tokens.ink,
+        background: measured.tokens.surface,
+      };
+
+      for (const role of DISABLED_ROLE_PROBES) {
+        record(
+          samePaint(off[role], disabledPaint),
+          `${entry.id}: a disabled ${role} button must paint from .manager-button:disabled, ` +
+            `not from its role or its container — got border ${off[role].borderColor}, ink ` +
+            `${off[role].color}, fill ${off[role].background}; expected border ` +
+            `${disabledPaint.borderColor}, ink ${disabledPaint.color}, fill ${disabledPaint.background}`
+        );
+        record(
+          off[role].opacity === '0.62',
+          `${entry.id}: a disabled ${role} button must keep the disabled rule's opacity, got ${off[role].opacity}`
+        );
+        record(
+          !samePaint(off[role], on[role]),
+          `${entry.id}: the ${role} role must PAINT differently when enabled, or its probe proves nothing`
+        );
+      }
+
+      // The dashed role is why the reconciliation splits paint from geometry rather than
+      // qualifying one rule: switching a control off must take its colours, never its shape.
+      // A `border` shorthand under `:not(:disabled)` would have taken the dashed edge with it.
+      record(
+        off.dashed.borderStyle === 'dashed',
+        `${entry.id}: a disabled dashed button must keep its dashed edge, got ${off.dashed.borderStyle}`
+      );
+      record(
+        off.dashed.height === on.dashed.height,
+        `${entry.id}: a disabled dashed button must keep the control height it had when ` +
+          `enabled, got ${off.dashed.height} against ${on.dashed.height}`
       );
     }
 
-    // The dashed role is why the reconciliation splits paint from geometry rather than
-    // qualifying one rule: switching a control off must take its colours, never its shape.
-    // A `border` shorthand under `:not(:disabled)` would have taken the dashed edge with it.
-    assert.equal(
-      measured.off.dashed.borderStyle,
-      'dashed',
-      'a disabled dashed button keeps its dashed edge'
-    );
-    assert.equal(
-      measured.off.dashed.height,
-      measured.on.dashed.height,
-      'and keeps the pinned 34px control height it had when enabled'
+    assert.deepEqual(
+      violations,
+      [],
+      `the disabled paint must be role-independent AND container-independent:\n- ${violations.join('\n- ')}`
     );
   } finally {
     await context.close();
@@ -8945,11 +9144,10 @@ test('the Downtime rail children sit on the same indent and gap as every other r
         return {
           // The visible indent is what a GM compares, so measure where the GLYPH lands
           // relative to the group that holds it, not the declared padding.
-          glyphOffset:
-            +(
-              button.querySelector('i').getBoundingClientRect().left -
-              document.getElementById(submenuId).getBoundingClientRect().left
-            ).toFixed(2),
+          glyphOffset: +(
+            button.querySelector('i').getBoundingClientRect().left -
+            document.getElementById(submenuId).getBoundingClientRect().left
+          ).toFixed(2),
           gap: computed.columnGap,
           paddingLeft: computed.paddingLeft,
           minHeight: computed.minHeight,
@@ -9629,7 +9827,10 @@ test('Core keeps the Downtime panel scroller for a visibly overflowing companion
   // and the only variable is how the root treats its own content. That is the whole point:
   // "a full-height companion kills Core's scroller" and "a definite height kills Core's
   // scroller" are both false, and each was believed once.
-  const visible = await readCompanionPanelChain(1400, companionRoot('display:block', companionRows));
+  const visible = await readCompanionPanelChain(
+    1400,
+    companionRoot('display:block', companionRows)
+  );
   assert.equal(
     visible.panelsOverflowY,
     'auto',
