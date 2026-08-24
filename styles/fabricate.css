@@ -2627,7 +2627,6 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: var(--fab-accent);
   background: none;
   box-shadow: none;
   font-family: inherit;
@@ -2640,6 +2639,25 @@
      control an eighth of a pixel proud, which is what the parity run reported. */
   line-height: normal;
   white-space: nowrap;
+}
+
+/* The INK is split out and qualified, and the split states which of the declarations above
+   are a RESET and which is paint (issue 1118). At (0,4,0) and unqualified, `color` beat
+   `.manager-button:disabled` (0,3,0), so a switched-off link-styled action would have stayed
+   accent-blue — the same shape of defect as the Tool Studio's ghost Back, on a control that
+   happens to have no `disabled` call site yet. Qualified, it takes the disabled rule's muted
+   ink like every other role.
+
+   `border: 0` and `background: none` deliberately do NOT move with it. They are the LINK
+   RESET, in the same class as `appearance: none` and `box-shadow: none`: what makes this a
+   link rather than a button, in both states. A disabled link snapping back to a bordered
+   34px box would be a worse answer than a muted one. The disabled rule's own `border-color`
+   and `background` are therefore not overridden here so much as invisible by construction —
+   there is no border to colour and no box to fill — which is why this control is not a second
+   exception beside `.manager-button.is-danger.is-armed`. */
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link > i {
@@ -23684,25 +23702,25 @@
   line-height: 1.25;
 }
 
-.fabricate-manager .manager-tools-create-actions,
+/* `.manager-tools-create-actions` IS GONE FROM THIS SHEET (issue 1118). No element in any
+   component carries the class — the row it was written for is not rendered any more — so its
+   three rules were dead: this group's flex context, a `select` sizing rule, and its own
+   `flex-wrap`. The cascade reconciliation retired its fourth,
+   `.manager-tools-create-actions .manager-button`, and MERGED that rule's declarations into
+   the `select` one on the way past, which left the retirement half done and the dead rule
+   looking freshly maintained. Retiring the class outright is what the first edit meant.
+
+   `.manager-tools-create-prompt`, `.manager-tools-item-shortcuts` and
+   `.manager-tools-library-toolbar` are dead by the same grep and are NOT retired here: they
+   are a separate container family and belong to a dead-CSS sweep of their own, not to a
+   button conversion. `.manager-tools-library-actions` is live — `ToolsBrowserView` renders
+   it — which is why this group survives at all. */
 .fabricate-manager .manager-tools-item-shortcuts,
 .fabricate-manager .manager-tools-library-toolbar,
 .fabricate-manager .manager-tools-library-actions {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tools-create-actions select {
-  min-width: 0;
-  min-height: 34px;
-  height: 34px;
-  flex: 1 1 180px;
-  font-size: 0.7rem;
-}
-
-.fabricate-manager .manager-tools-create-actions {
-  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-tools-item-shortcuts {
@@ -24084,18 +24102,13 @@
 @container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-tools-authority-card,
   .fabricate-manager .manager-tools-create-card,
-  .fabricate-manager .manager-tools-create-actions,
   .fabricate-manager .manager-tools-library-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-tools-authority-segments,
-  .fabricate-manager .manager-tools-create-actions > * {
-    width: 100%;
-  }
-
   .fabricate-manager .manager-tools-authority-segments {
+    width: 100%;
     flex-direction: column;
     max-width: none;
   }
