@@ -881,19 +881,35 @@ test('AC-22 — navTabBadgeTotal sums the RESOLVED badge once per tab, never reg
 
   // The same arithmetic over the record the STORE actually publishes, which is a frozen
   // null-prototype object rather than a literal — so a total that reached for an inherited
-  // member, or that could not read that shape at all, fails here too.
+  // member, or that could not read that shape at all, fails here too. `toString` is deliberately
+  // among the tab ids: it is an inherited member of an ordinary object literal, so a plain
+  // `{}` snapshot plus a bare (non-`Object.hasOwn`) lookup would resolve it to a function
+  // rather than to "no badge" — the other three ids never collide with anything
+  // `Object.prototype` carries. The TOTAL alone cannot witness that on its own: `?.count ?? 0`
+  // reduces a wrongly-resolved function to 0 exactly as it reduces a correctly-resolved
+  // `null`, since neither carries a `count`. So this block also reads `resolveNavTabBadge`
+  // directly for the colliding tab, which is the one call that actually sees the function.
   const harness = badgeHarness();
   harness.register(
     badgedProvider({
-      ids: ['ledger', 'crew', 'writs'],
-      badges: {
+      ids: ['ledger', 'crew', 'writs', 'toString'],
+      // Null-prototype, deliberately: `badgedProvider` itself reads this table with a bare
+      // `badges[tab.id]`, and a plain `{}` here would resolve `badges['toString']` to
+      // `Object.prototype.toString` and badge the fixture's own tab by accident — the very
+      // hazard this addition exists to exercise, just one call frame too early.
+      badges: Object.assign(Object.create(null), {
         ledger: { count: 3, accessibleName: '3 claims waiting' },
         crew: { count: 2, accessibleName: '2 crew idle' },
-      },
+      }),
     })
   );
   const registeredTabs = harness.registry.getWorldNavProvider(WORLD_DOWNTIME_SURFACE_ID).tabs;
   assert.equal(navTabBadgeTotal(registeredTabs, harness.snapshot()), 5);
+  assert.equal(
+    resolveNavTabBadge(harness.tab('toString'), harness.snapshot()),
+    null,
+    'an un-badged tab whose id collides with an inherited member still resolves to no badge'
+  );
   harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', {
     count: 5,
     accessibleName: '5 claims waiting',
