@@ -280,6 +280,17 @@ function managerFixture(theme, width, height) {
                foundry-native and is marginal in ironblood-forge, which is why
                fab-on-danger exists at all. -->
           <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          <!-- The two QUIET roles (issue 1118). Both paint muted ink on no fill at all -
+               is-ghost takes fab-mv2-text-muted, is-dashed takes fab-text-muted at 11px -
+               and between them they are now the treatment for every navigational verb and
+               every content-authoring append verb in the manager, across every theme.
+               Nothing measured either: the three probes above sample surface text, a chip
+               and a SOLID action, and a muted-on-transparent label is none of those. A role
+               whose whole design is to recede is exactly the one a theme's contrast can fail
+               quietly, so each carries its own probe. They sit here rather than in the header
+               because contrastSample reads the FIRST node matching a selector. -->
+          <button type="button" class="manager-button fab-manager-button is-ghost" data-contrast-quiet-ghost data-boundary>Back to systems</button>
+          <button type="button" class="manager-button fab-manager-button is-dashed" data-contrast-quiet-dashed data-boundary>Add outcome tier</button>
           ${bulkEditSubhint()}
           ${bulkBookPickCard()}
         </aside>
@@ -336,6 +347,19 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
+  // The two quiet roles, muted ink on no fill (issue 1118). Non-vacuity FIRST, for the same
+  // reason the scoped samples check it: these two are the only probes here whose rule paints
+  // a MUTED scale over the panel's inherited primary ink, so a role rule that stopped
+  // applying computes the inherited colour and passes on a ratio that measures nothing. The
+  // ratio is in the message because a failure is a THEME TOKEN decision and the number is
+  // what decides it.
+  for (const [hook, role] of [['[data-contrast-quiet-ghost]', 'ghost'], ['[data-contrast-quiet-dashed]', 'dashed']]) {
+    const sample = result.contrastSamples.find(entry => entry.selector === hook);
+    assert.ok(sample, `expected a contrast sample for the ${role} role at ${hook}`);
+    assert.notEqual(sample.color, sample.inheritedColor, `${theme}/${surfaceId}/${width} the ${role} role computed the inherited ink (${sample.color}) — its rule did not apply, so the ratio would prove nothing`);
+    const ratio = contrastSample(result, hook);
+    assert.ok(ratio >= 4.5, `${theme}/${surfaceId}/${width} the ${role} role's label should pass WCAG AA against the surface it recedes into, got ${ratio.toFixed(2)}:1`);
+  }
   // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
@@ -416,7 +440,7 @@ async function inspectRenderedSurface(page) {
       }
       return layers;
     };
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
