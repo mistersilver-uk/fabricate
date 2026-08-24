@@ -122,7 +122,6 @@ function _normalizeRetiredCraftingModEntry(entry) {
 }
 
 /**
-/**
  * Normalize one entry of the transient `_characterLibraryCollisions` report (1.28.0) into a fixed
  * `{ library, entryId, keptFrom, discardedFrom }` shape, so the GM notice can format it without
  * re-guarding each field and a hand-written entry cannot put an object into a notification string.

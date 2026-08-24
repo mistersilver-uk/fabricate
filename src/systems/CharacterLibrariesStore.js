@@ -44,7 +44,7 @@ export class CharacterLibrariesStore {
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.libraries = null;
     this.loaded = false;
-    this.seeded = false;
+    this.seeded = { characterPrerequisites: false, modifiers: false };
   }
 
   /**
@@ -80,7 +80,7 @@ export class CharacterLibrariesStore {
     } catch {
       raw = null;
     }
-    this.seeded = _carriesLibraryKey(raw);
+    this.seeded = _carriedLibraryKeys(raw);
     this.libraries = this._normalize(raw);
     this.loaded = true;
     return cloneJson(this.libraries);
@@ -111,11 +111,19 @@ export class CharacterLibrariesStore {
    * Whether the setting has ever actually been written, as against reading back the registered
    * default. This is the predicate that makes a destructive prune decidable — see `load()`.
    *
+   * PER LIBRARY when given a key, because the two are independent: a payload carrying only
+   * `modifiers` says nothing about whether the GM has ever authored a prerequisite, and treating
+   * one aggregate flag as the answer for both would hand a caller a real, empty, PRUNABLE basis
+   * derived from a key that is simply absent. With no key it answers the aggregate question,
+   * which is the right one for "has this world migrated at all".
+   *
+   * @param {'characterPrerequisites'|'modifiers'|null} [key]
    * @returns {boolean}
    */
-  isSeeded() {
+  isSeeded(key = null) {
     this._ensureLoaded();
-    return this.seeded === true;
+    if (!key) return this.seeded.characterPrerequisites || this.seeded.modifiers;
+    return this.seeded[key] === true;
   }
 
   /** The world's character-prerequisite library. */
@@ -153,7 +161,7 @@ export class CharacterLibrariesStore {
     // A write is by definition a real payload, so the setting is seeded from here on. Without
     // this the store would keep reporting UNKNOWN until the next reload and go on refusing to
     // prune ids the GM has just deliberately removed.
-    this.seeded = true;
+    this.seeded = { characterPrerequisites: true, modifiers: true };
     await this.setSetting(SETTING_KEYS.CHARACTER_LIBRARIES, cloneJson(next));
     return cloneJson(next);
   }
@@ -184,19 +192,19 @@ export class CharacterLibrariesStore {
 }
 
 /**
- * True when the raw payload actually carries one of the two library keys — i.e. the setting has
- * been written, as against synthesised from the registered default. An array or a scalar is not a
- * payload this store ever wrote, so it reads as unseeded.
+ * Which of the two library keys the raw payload actually carries — i.e. which halves have been
+ * WRITTEN, as against synthesised from the registered default. An array or a scalar is not a
+ * payload this store ever wrote, so both read as unseeded.
  *
  * @param {unknown} raw
- * @returns {boolean}
+ * @returns {{ characterPrerequisites: boolean, modifiers: boolean }}
  */
-function _carriesLibraryKey(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  return (
-    Object.prototype.hasOwnProperty.call(raw, 'characterPrerequisites') ||
-    Object.prototype.hasOwnProperty.call(raw, 'modifiers')
-  );
+function _carriedLibraryKeys(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    characterPrerequisites: Object.prototype.hasOwnProperty.call(source, 'characterPrerequisites'),
+    modifiers: Object.prototype.hasOwnProperty.call(source, 'modifiers'),
+  };
 }
 
 function cloneJson(value) {

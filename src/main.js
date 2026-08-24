@@ -1593,6 +1593,23 @@ class Fabricate {
       }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
       ui.notifications?.warn?.(message, { permanent: true });
     }
+
+    // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about
+    // what an id MEANS. Identical copies are filtered out upstream, so everything here changed a
+    // real rule — and the change is INVISIBLE without this notice, because the reference still
+    // resolves. It resolves to the other system's definition, so a book that gated learning at
+    // rank 2 now gates at rank 1 with nothing on screen to say so. The migration's own label
+    // promises the GM this report by name; permanent, for the reason the sibling above is.
+    const characterLibraryCollisions = Array.isArray(summary?.characterLibraryCollisions)
+      ? summary.characterLibraryCollisions : [];
+    if (characterLibraryCollisions.length > 0 && game.user?.isGM) {
+      const names = [...new Set(characterLibraryCollisions.map((entry) => entry.entryId))].join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.CharacterLibraries.CollisionNotice', {
+        count: characterLibraryCollisions.length,
+        entries: names,
+      }) || `Fabricate merged every crafting system's character prerequisites and modifiers into one world library. ${characterLibraryCollisions.length} entr(ies) shared an id across systems but were defined differently, so only one definition survived: ${names}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources.`;
+      ui.notifications?.warn?.(message, { permanent: true });
+    }
   }
 
   /**

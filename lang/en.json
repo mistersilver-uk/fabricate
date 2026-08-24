@@ -48,6 +48,9 @@
         "UnknownError": "unknown error",
         "NoFix": "no fix action provided"
       },
+      "CharacterLibraries": {
+        "CollisionNotice": "Fabricate merged every crafting system's character prerequisites and modifiers into one world library. {count} entr(ies) shared an id across systems but were defined differently, so only one definition survived: {entries}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources."
+      },
       "UnifyModifiers": {
         "CollisionNotice": "Fabricate merged each system’s check modifiers and gathering character modifiers into one Modifiers library. {count} gathering modifier(s) in {systems} shared an id with a check modifier and were renamed with a \"-gathering\" suffix; every reference to them was updated. Review them under System settings › Modifiers."
       }

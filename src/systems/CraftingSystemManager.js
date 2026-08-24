@@ -63,6 +63,7 @@ import {
   matchRecipeItemDefinition,
 } from '../utils/sourceUuid.js';
 
+import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
@@ -77,6 +78,7 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -117,6 +119,32 @@ const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
  * @param {...Array<{id?: unknown}>} lists
  * @returns {Set<string>}
  */
+/**
+ * The Valid Id Basis for ONE library: the union of the world list and the system's surviving
+ * legacy copy, or `null` when neither can vouch for an id.
+ *
+ * PER LIBRARY, because the two are independent. A setting payload carrying only `modifiers` says
+ * nothing about whether a prerequisite has ever been authored, so an aggregate seeded flag would
+ * hand this a real, empty, PRUNABLE basis derived from a key that is simply absent.
+ *
+ * A legacy copy counts only when it is NON-EMPTY. An empty array is a legacy key, not a legacy
+ * library: it vouches for nothing while licensing a full prune, and every pre-1308 save emitted
+ * one, so treating its presence as a basis would arm the exact failure this whole mechanism
+ * exists to prevent.
+ *
+ * @param {object|null} store
+ * @param {'characterPrerequisites'|'modifiers'} key
+ * @param {() => Array<object>} readWorld
+ * @param {unknown} legacy
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
+function _libraryBasis(store, key, readWorld, legacy) {
+  const seeded = store?.isSeeded?.(key) === true;
+  const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
+  if (!seeded && !legacyList) return null;
+  return _idSet(seeded ? readWorld() : [], legacyList ?? []);
+}
+
 function _idSet(...lists) {
   const ids = new Set();
   for (const list of lists) {
@@ -239,28 +267,20 @@ export class CraftingSystemManager {
    */
   _characterLibraryBasis(system) {
     const store = this._resolveCharacterLibrariesStore();
-    const seeded = store?.isSeeded?.() === true;
-
-    const legacyPrerequisites = Array.isArray(system?.characterPrerequisites)
-      ? system.characterPrerequisites
-      : null;
-    const legacyModifiers = Array.isArray(system?.modifiers) ? system.modifiers : null;
-
-    // Neither a written world library nor a legacy copy: nothing can vouch for these ids, so
-    // the basis is unknown and every reference passes through untouched.
-    if (!seeded && !legacyPrerequisites && !legacyModifiers) {
-      return { prerequisiteIds: null, modifierIds: null };
-    }
-
-    const prerequisiteIds =
-      seeded || legacyPrerequisites
-        ? _idSet(seeded ? store.listCharacterPrerequisites() : [], legacyPrerequisites ?? [])
-        : null;
-    const modifierIds =
-      seeded || legacyModifiers
-        ? _idSet(seeded ? store.listModifiers() : [], legacyModifiers ?? [])
-        : null;
-    return { prerequisiteIds, modifierIds };
+    return {
+      prerequisiteIds: _libraryBasis(
+        store,
+        'characterPrerequisites',
+        () => store.listCharacterPrerequisites(),
+        system?.characterPrerequisites
+      ),
+      modifierIds: _libraryBasis(
+        store,
+        'modifiers',
+        () => store.listModifiers(),
+        system?.modifiers
+      ),
+    };
   }
 
   /**
@@ -372,6 +392,11 @@ export class CraftingSystemManager {
     // move, would silently strip every tool prerequisite in any world that has not migrated.
     const { prerequisiteIds: validToolPrerequisiteIds, modifierIds: validCatalogueIds } =
       this._characterLibraryBasis(system);
+    const _legacyModifiers = normalizeModifierLibrary(system.modifiers);
+    const _legacyCharacterPrerequisites = normalizeCharacterPrerequisiteList(
+      system.characterPrerequisites,
+      () => foundry.utils.randomID()
+    );
     const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
     // Salvage-normalization context (issue 764), HOISTED above the component map so the
     // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
@@ -494,11 +519,24 @@ export class CraftingSystemManager {
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      // PER-SYSTEM COPY REMOVED (issue 1308). The modifier library is WORLD scope: it is
-      // authored once and every crafting system's check triple selects over the same list, so
-      // there is nothing left to emit here. Not emitting it is what SHEDS the stale copy — this
-      // normalizer is an allowlist rebuild, so an unemitted key is dropped on the next save, and
-      // the 1.28.0 migration lifts the entries into the world setting before any save runs.
+      // A SURVIVING LEGACY COPY IS CARRIED THROUGH; THE MIGRATION IS THE ONLY THING THAT REMOVES
+      // IT (issue 1308).
+      //
+      // The library is WORLD scope — authored once, with every crafting system's check triple
+      // selecting over the same list — so on a migrated world there is nothing here to carry and
+      // this emits nothing.
+      //
+      // The tempting alternative was to let the allowlist rebuild shed the key, which is how the
+      // 1.22.0 and 1.23.0 relocations retired theirs. It is wrong here, twice over. Migrations run
+      // on the ACTIVE GM alone, so every player and every assistant GM hydrates through this
+      // normalizer while the world setting is still unwritten; `hydrate` runs it on load, and the
+      // legacy copy is the only place those entries exist on that client, so any later save makes
+      // the loss durable. And `upsertTool` derives its own Valid Id Basis from the NORMALIZED
+      // record, so a shed here silently narrows a basis that pass depends on.
+      //
+      // Carrying it forward is not a read-alias keeping a retired location alive. The 1.28.0
+      // migration strips it exactly once, from the one client entitled to, and it is gone.
+      ...(_legacyModifiers.length > 0 && { modifiers: _legacyModifiers }),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
@@ -564,10 +602,11 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: normalizedTools,
-      // PER-SYSTEM COPY REMOVED (issue 1308), for the same reason as the modifier library above:
-      // a character prerequisite is evaluated against the acting character, not against the
-      // crafting system, so the library is world scope and this record carries only references
-      // to it.
+      // Carried through on the same rule as the modifier library above, and removed by the same
+      // migration.
+      ...(_legacyCharacterPrerequisites.length > 0 && {
+        characterPrerequisites: _legacyCharacterPrerequisites,
+      }),
       // PARTICIPATION ONLY (issue 1282). The realm library itself is world scope — realms are
       // geography, and the same valley is the same valley whichever crafting system a
       // character is there to serve — so it lives in the `travelConfig` world setting and

@@ -152,24 +152,32 @@ export function buildWorldCharacterLibraries(systems) {
 }
 
 /**
- * Drop both library keys from every system.
+ * Drop the named library keys from every system.
+ *
+ * STRIPS ONLY WHAT THE WORLD NOW HOLDS, and that pairing is load-bearing rather than tidy. The
+ * lift is decided PER LIBRARY — a world that already carries modifiers is not re-merged, while
+ * its prerequisites may still be waiting to be lifted — so a strip that removed both keys
+ * unconditionally would delete the un-lifted library outright, with no error and no copy
+ * anywhere. That state is easy to reach: any GM edit seeds the setting, and only the ACTIVE GM
+ * ever runs migrations, so an assistant GM adding one modifier is enough to arm it.
  *
  * @param {Array<object>} systems
+ * @param {Array<string>} keys The library keys the world now owns.
  * @returns {Array<object>} a new array; unchanged systems are returned BY REFERENCE
  */
-export function stripSystemCharacterLibraries(systems) {
+export function stripSystemCharacterLibraries(systems, keys = LIBRARIES.map((l) => l.key)) {
   const list = Array.isArray(systems) ? systems : [];
+  const strip = Array.isArray(keys) ? keys : [];
+  if (strip.length === 0) return list;
   return list.map((system) => {
     if (!isPlainObject(system)) return system;
-    const carries = LIBRARIES.some((library) =>
-      Object.prototype.hasOwnProperty.call(system, library.key)
-    );
+    const carries = strip.some((key) => Object.prototype.hasOwnProperty.call(system, key));
     // Returning the ORIGINAL reference matters: the runner detects change by JSON comparison over
     // the whole corpus, so rebuilding every system unconditionally would report the crafting
     // systems as changed in every upgraded world and rewrite the entire corpus for nothing.
     if (!carries) return system;
     const next = { ...system };
-    for (const library of LIBRARIES) delete next[library.key];
+    for (const key of strip) delete next[key];
     return next;
   });
 }
@@ -182,29 +190,46 @@ export function migrateCharacterLibrariesToWorldScope(data = {}) {
   const systems = Array.isArray(data.systems) ? data.systems : [];
   const existing = isPlainObject(data.characterLibraries) ? data.characterLibraries : {};
 
-  // The idempotence guard, as a DISJUNCTION: either populated library proves the lift already
-  // ran, so a world whose GM authored only modifiers is not re-merged on every boot.
-  const alreadyMigrated = LIBRARIES.some(
-    (library) => Array.isArray(existing[library.key]) && existing[library.key].length > 0
-  );
+  // THE IDEMPOTENCE GUARD IS PER LIBRARY, not a disjunction across the two.
+  //
+  // A disjunction reads "either populated library proves the lift already ran", which is true of
+  // a world the ACTIVE GM migrated and false of every other way the setting can come to hold
+  // entries. Any GM edit writes it, and migrations run on the active GM alone, so an assistant
+  // GM adding a single modifier makes `alreadyMigrated` true while every crafting system still
+  // carries both libraries — and the pass would then strip them without ever lifting them.
+  //
+  // Deciding each library on its own removes that entirely: the modifiers half is left alone
+  // because the world already owns it, and the prerequisites half is lifted because it does not.
+  const built = buildWorldCharacterLibraries(systems);
+  const collisions = Array.isArray(built._collisions) ? built._collisions : [];
+  delete built._collisions;
 
-  let characterLibraries = existing;
-  let collisions = [];
-  if (!alreadyMigrated) {
-    const built = buildWorldCharacterLibraries(systems);
-    collisions = Array.isArray(built._collisions) ? built._collisions : [];
-    delete built._collisions;
-    // Return the ORIGINAL object when there was nothing to lift. The runner detects change by
-    // JSON comparison, so emitting a freshly-built pair of empty arrays over a stored `{}` would
-    // register as a change and write the setting in every world that has never authored either
-    // library — churn that shows up as an unexplained write in an otherwise no-op upgrade.
-    const liftedAnything = LIBRARIES.some((library) => built[library.key].length > 0);
-    characterLibraries = liftedAnything ? built : existing;
+  const characterLibraries = { ...existing };
+  const lifted = [];
+  for (const library of LIBRARIES) {
+    const stored = existing[library.key];
+    const alreadyMigrated = Array.isArray(stored) && stored.length > 0;
+    if (alreadyMigrated) {
+      // The world owns this library; the systems' copies are stale duplicates and may go.
+      lifted.push(library.key);
+      continue;
+    }
+    if (built[library.key].length === 0) continue;
+    characterLibraries[library.key] = built[library.key];
+    lifted.push(library.key);
   }
 
   const result = {
-    systems: stripSystemCharacterLibraries(systems),
-    characterLibraries,
+    // ONLY the libraries the world now holds are stripped — see `stripSystemCharacterLibraries`.
+    systems: stripSystemCharacterLibraries(systems, lifted),
+    // Return the ORIGINAL object when nothing was lifted. The runner detects change by JSON
+    // comparison, so emitting a freshly-built pair of empty arrays over a stored `{}` would
+    // register as a change and write the setting in every world that has never authored either
+    // library — churn that shows up as an unexplained write in an otherwise no-op upgrade.
+    characterLibraries:
+      JSON.stringify(characterLibraries) === JSON.stringify(existing)
+        ? existing
+        : characterLibraries,
   };
   if (collisions.length > 0) result._characterLibraryCollisions = collisions;
   return result;

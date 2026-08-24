@@ -25,11 +25,13 @@ From `data-models/spec.md`:
 - `CraftingSystem` and its `recipeItemDefinitions` and `tools`.
 - The `gatheringEnvironments` world setting (per-system environment records).
 - The `gatheringConfig` world setting (per-system `rules`, `conditions`, `vocabularies`, `economy`, reusable `tasks`, reusable `events`).
-  The modifier library moved onto the crafting system in issue 1117 and is exported with it.
+  The modifier library moved onto the crafting system in issue 1117 and off it again, to world scope, in issue 1308; it now travels in the `characterLibraries` slice.
 - The `currencyConfig` world setting (the world coin ladder, spend strategy, provider, and macro set; see `data-models/spec.md` -> CurrencyConfig).
   Currency moved to world scope in issue 1278; each crafting system carries only `requirements.currency.enabled`.
 - The `travelConfig` world setting (the world realm library, its reveal mode and its modifier visibility, including each realm's Foundry Scene Region `sceneMappings`; see `data-models/spec.md` -> TravelConfig).
   Travel moved to world scope in issue 1282; each crafting system carries only `gatheringRealmSettings.enabled`.
+- The `characterLibraries` world setting (the world character-prerequisite library and the world modifier library; see `data-models/spec.md` -> CharacterLibraries).
+  Both libraries moved to world scope in issue 1308; a crafting system carries neither key and no participation flag over them.
 - The excluded `gatheringParties` world setting.
 
 ## Requirements
@@ -37,13 +39,17 @@ From `data-models/spec.md`:
 ### Export completeness
 
 A system export MUST include every supported GM-authored record type for that system.
-This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, `gatheringConfig`, `currencyConfig`, and `travelConfig` settings.
+This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, `gatheringConfig`, `currencyConfig`, `travelConfig`, and `characterLibraries` settings.
 The per-system `economy` slice (stamina defaults and resource-node/limitation flags) MUST ride along.
 The world currency configuration MUST ride along as its own envelope slice even though it is not part of the `CraftingSystem` record, because an exported recipe's currency option and an exported component's salvage currency requirement both name a unit by `id` and are unusable in the destination world unless that unit arrives with them.
 Unlike the gathering slices there is no per-system filtering to do: the world has exactly one currency configuration, so the whole of it travels.
 
 The world travel configuration MUST ride along as its own envelope slice for the same reason and on the same terms: an exported environment's `includedRealmIds` / `excludedRealmIds` name realms by `id` and are unusable in the destination world unless those realms arrive with them.
 The whole library travels rather than the subset one system's environments happen to cite, because a realm is geography rather than a per-system record and there is no owning system to filter by.
+
+The world character libraries MUST ride along as their own envelope slice, on the same terms and for the same reason: an exported book's `caps.learn.characterPrerequisiteIds`, an exported tool's `prerequisites.ids` and an exported check's `defaultModifierIds` all name entries by `id` and are unusable in the destination world unless those entries arrive with them.
+The slice carries BOTH libraries under one key, `characterLibraries`, mirroring the setting — but each is assembled by its own normalizer, and every rule below treats the two independently.
+The whole of each library travels, because since issue 1308 there is no owning system to filter by.
 
 Completeness is a property of the authoring DATA, not of the key set: an exported recipe carries whatever `Recipe.toJSON()` emits, which since issue 1087 omits the flat top-level `results` alias and every field whose absence the constructor rebuilds to the identical value (see `data-models/spec.md` requirement 18).
 An export produced after that change is therefore smaller and key-sparser than one produced before it while describing the same system, and MUST NOT be treated as incomplete for the keys it leaves out.
@@ -52,8 +58,8 @@ Import MUST keep ACCEPTING both, permanently: the read fallbacks are what let an
 ### Explicit schema markers
 
 The export envelope MUST carry an integer `schemaVersion` that is distinct from `fabricateVersion`.
-The current schema version is `4`.
-Schema `4` added the envelope-level `travelConfig` slice; schema `3` added the envelope-level `currencyConfig` slice; schema `2` added the explicit version marker and the runtime-state boundary flag.
+The current schema version is `5`.
+Schema `5` added the envelope-level `characterLibraries` slice; schema `4` added the envelope-level `travelConfig` slice; schema `3` added the envelope-level `currencyConfig` slice; schema `2` added the explicit version marker and the runtime-state boundary flag.
 The envelope MUST carry a `runtimeStateIncluded` boolean marker, which is `false` for authoring-only exports.
 
 ### Authoring-versus-runtime boundary
@@ -81,6 +87,13 @@ This hoist MUST also run **branch-independently**, for the reason every other fi
 A pre-`4` payload carries its realm library on the system at `gatheringRealms` (or, pre-`1.1.0`, at `gatheringRegions`), and `migrateExportPayload` MUST hoist it to the envelope-level `travelConfig` and reduce the system's own block to `{ enabled }`, using the SAME transforms the world-side `1.27.0` migration applies (`buildWorldTravelConfig` / `stripSystemTravelConfig`), not a second implementation of them.
 This hoist MUST also run branch-independently, and MUST be idempotent: once the envelope carries a library the lift is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
 It is idempotent: once the envelope carries units the hoist is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
+
+A pre-`5` payload carries both character libraries on the system at `characterPrerequisites` and `modifiers`, and `migrateExportPayload` MUST hoist them to the envelope-level `characterLibraries` and DELETE the system's own keys, using the SAME transforms the world-side `1.28.0` migration applies (`buildWorldCharacterLibraries` / `stripSystemCharacterLibraries`), not a second implementation of them.
+Nothing is left behind on the system: unlike currency and travel there is no participation flag, so the strip is a deletion rather than a reduction.
+This hoist MUST also run branch-independently, for the reason every other field-level upcast does, and MUST be idempotent.
+**Its already-lifted guard MUST key on the LISTS being non-empty, not on the slice being present**, because `buildExportPayload` always emits the slice with both keys: a presence check would read every current-schema export as already lifted and then strip the system's copy, losing both libraries outright for any payload whose system still carries them.
+Keying on the lists is safe here precisely because this slice has NO scalars — unlike currency and travel, there is no configured-but-empty state an emptiness check could mistake for absence.
+The guard MUST be a TWO-LIST DISJUNCTION for the reason the world migration's is: either populated library proves the lift already ran, so an export from a world that authored only modifiers does not get its prerequisite half rebuilt from a system block already stripped.
 
 ### Currency configuration merge on import
 
@@ -111,6 +124,28 @@ A world that already has realms has already answered how it reveals its places, 
 An incoming configuration carrying no realms MUST write nothing, and a merge that adds no realm to an already-configured world MUST write nothing, so an import that changes no travel data issues no setting write.
 Copy-mode import MUST NOT regenerate realm ids: they are cross-referenced by environment location availability, party overrides and the actor discovery flag, and regenerating them would orphan every one of those references (see `data-models/spec.md` -> TravelConfig requirement 4).
 Realms are therefore no longer part of what a copy-mode import rebinds at all: a copy that duplicated the world's realms would give the destination two records for one valley.
+
+### Character libraries merge on import
+
+Import MUST merge the payload's `characterLibraries` into the destination world's own NON-DESTRUCTIVELY, on exactly the terms the currency and travel merges use and for the same reason: both libraries are world scope, so there is no key under which an import may simply replace what is there, and overwriting would destroy libraries the destination GM authored for systems that have nothing to do with this import.
+
+**The merge MUST be TWO independent id-keyed merges, one per library, and MUST NEVER be a single object-level merge.**
+The two lists share one setting key for persistence economy only and share no invariant (`data-models/spec.md` -> CharacterLibraries requirements 1 and 2).
+A single object-level destination-wins merge would let a destination world that has prerequisites but no modifiers win the whole slice and silently discard every incoming modifier — the concrete harm the per-library rule exists to prevent, and one that leaves every imported check, drop row and event citing modifier ids that name nothing.
+
+Entries MUST merge by `id` with the DESTINATION winning a collision: an id already present in the destination keeps its own definition, and only genuinely new entries are appended.
+That is what makes an import safe to run twice, and it is what keeps the destination's existing books, tools and checks resolving to the rules their author meant.
+The merge MUST NOT reorder or remove a destination entry.
+There are no scalars in this slice, so there is nothing to seed and no unconfigured-world special case.
+
+An incoming slice adding no entry to either library MUST write nothing, so an import that changes no character-library data issues no setting write.
+Copy-mode import MUST NOT regenerate character-prerequisite or modifier ids: they are cross-referenced by book learning gates, tool requirement gates, all three activity checks' default sets, every subject pick, and every gathering drop row, event and stamina cost, and regenerating them would orphan every one of those references (see `data-models/spec.md` -> CharacterLibraries requirement 7).
+They are world scope and already merge destination-wins, so rebinding them would fork the world's own rules once per copy.
+
+**The character-libraries merge MUST run BEFORE the crafting system is created or updated, and MUST reach the destination through the store rather than behind its cache.**
+This is the ONE ordering difference between this slice and the currency and travel slices, which are persisted LAST because nothing reads them during normalization.
+Both of these libraries ARE read during normalization: `CraftingSystemManager` derives its Valid Id Basis from them on every system normalize, so a system created while the incoming entries are still only in the payload has every tool prerequisite reference and every default modifier id pruned against a basis that cannot yet see them.
+Writing the setting earlier is necessary but not sufficient — a direct setting write leaves the store's cache holding the pre-import libraries, and the manager reads the cache — so the merge MUST refresh the store as part of the write.
 
 ### GM gating
 
@@ -147,6 +182,7 @@ A `recipeIds[]` entry is protected from the component-id remap but IS rewritten 
 A membership entry naming a recipe id absent from the payload MUST be preserved verbatim and reported as a broken internal reference.
 After the transform, no within-payload reference may point at a pre-regeneration or absent component id, and no `recipeIds[]` membership entry may point at a pre-regeneration recipe id.
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.
+Character-prerequisite and modifier-library entry identifiers are preserved for a stronger reason since issue 1308: they are world scope, so a copy that minted fresh ones would fork the world's own rules rather than duplicate a per-system record.
 Component **complication** identifiers join that preserve list: nothing outside the owning component references one, and every runtime key that names a complication pairs its id with a component id or a result id the component-id remap already rebinds on its own half.
 Keep-mode import MUST NOT regenerate component identifiers or any reference.
 
@@ -195,8 +231,9 @@ For supported authoring data, a single-store keep-mode `export → import → ex
 Equivalence is over the RECONSTRUCTED authoring data, not the literal key set: a bundle carrying the flat top-level `results` alias, or carrying a field at the value its constructor rebuilds from absence, MUST come back describing the same recipes even though the re-export omits those keys (`data-models/spec.md` requirement 18 and § Write-Retired Aliases).
 Losing a result that reached the payload only through the flat alias would be a round-trip failure, which is why the read fallback is permanent rather than a migration window.
 `craftingCheck.maxModifierPicks` MUST round-trip through `export → import → export` under keep mode, and an ABSENT cap MUST stay absent for every rule the derivation above does not stamp — absence is the "unlimited" value, so writing a bound where the source had none would truncate recipe picks the bundle carries.
-`CraftingSystem.modifiers` — the ONE system-level modifier library (issues 1095, 1117), with each entry's absence-preserving `min` / `max` — MUST round-trip under keep mode, as MUST each of the three activity checks' `defaultModifierPolicy` / `defaultModifierIds` / `maxModifierPicks` selection triple.
-`buildExportPayload` deep-clones the system, so the top-level catalogue round-trips for free once `_normalizeSystem` emits it there; an entry that authored NEITHER bound MUST come back with neither key, because a `min: 0` acquired in transit is a legal-looking catalogue that silently zeroes the modifier.
+The world modifier library (issues 1095, 1117, 1308), with each entry's absence-preserving `min` / `max`, MUST round-trip under keep mode, as MUST each of the three activity checks' `defaultModifierPolicy` / `defaultModifierIds` / `maxModifierPicks` selection triple.
+An entry that authored NEITHER bound MUST come back with neither key, because a `min: 0` acquired in transit is a legal-looking library entry that silently zeroes the modifier.
+Since issue 1308 the library round-trips through the `characterLibraries` envelope slice rather than through the system object, and a full export's system object MUST carry NEITHER `modifiers` NOR `characterPrerequisites`.
 Every SUBJECT pick MUST round-trip, including an AUTHORED EMPTY array, which is distinct from an absent one: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`.
 A bundle carrying the pre-1095 `craftingCheck.checkModifiers`, the pre-1117 `CraftingSystem.checkModifiers`, a gathering-slice `characterModifiers` library, or the legacy `byRecipe` token is upcast by the export-payload transforms (`applySystemCheckModifierCatalogue`, then `applyUnifiedModifierLibrary`) and is NOT required to round-trip in its legacy form.
 The two run in that order because it is observable: the merge reads only the system-level key, so running it first would merge an empty catalogue out of a pre-1095 bundle and then retire it.
@@ -208,6 +245,9 @@ A bundle carrying the pre-`3` per-system currency block is upcast by the hoist a
 The world `travelConfig` slice MUST round-trip under keep mode into an UNCONFIGURED destination world — every realm, its `sceneMappings`, its biomes and modifiers, the reveal mode and the modifier visibility.
 Into an ALREADY-CONFIGURED destination the round trip is deliberately NOT identity, on the same terms as currency: a destination realm id wins over the incoming definition and the destination's scalars are left alone.
 A bundle carrying the pre-`4` per-system realm library is upcast by the hoist above and is NOT required to round-trip in its legacy form.
+The world `characterLibraries` slice MUST round-trip under keep mode into an UNCONFIGURED destination world, and MUST do so PER LIBRARY: a destination configured with one library and not the other MUST receive the whole of the library it lacks, which is the assertion a single object-level merge would fail.
+Into an ALREADY-CONFIGURED destination the round trip is deliberately NOT identity, on the same terms as currency and travel: a destination entry id wins over the incoming definition, per library and independently.
+A bundle carrying the pre-`5` per-system libraries is upcast by the hoist above and is NOT required to round-trip in its legacy form.
 `Component.complications` MUST round-trip under keep mode in full, macro uuids included, and an ABSENT `complications` MUST stay absent — absence and an empty list are the same state by `data-models/spec.md` § Component requirement 20, so a round trip that materialized an empty array would be inventing a key the normalizer refuses to write.
 
 ## Out of Scope

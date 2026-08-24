@@ -148,15 +148,51 @@ test('lifts, strips and reports in one pass', () => {
   );
 });
 
-// The idempotence guard, as a DISJUNCTION. A world whose GM authored only modifiers must not have
-// the prerequisite half re-merged from stale system blocks on every boot.
-test('a populated world library is NEVER re-merged, even when the other library is empty', () => {
+// THE IDEMPOTENCE GUARD IS PER LIBRARY, and this is the case that proves why it has to be.
+//
+// A disjunction across the two lists reads "either populated library proves the lift already
+// ran". That is true of a world the ACTIVE GM migrated and false of every other way the setting
+// comes to hold entries — any GM edit writes it, and migrations run on the active GM alone. So an
+// assistant GM adding one modifier used to make the whole pass think it had already run, and the
+// strip then deleted every crafting system's prerequisites without ever lifting them: gone from
+// the systems, never in the world, recoverable from nowhere.
+test('a library the world already owns is not re-merged, while the other half is still lifted', () => {
   const stored = { characterPrerequisites: [], modifiers: [MED] };
   const result = migrateCharacterLibrariesToWorldScope({
-    systems: [system('a', { characterPrerequisites: [SMITH] })],
+    systems: [system('a', { characterPrerequisites: [SMITH], modifiers: [{ id: 'other' }] })],
     characterLibraries: stored,
   });
-  assert.equal(result.characterLibraries, stored, 'the GM-owned library is authoritative');
+  assert.deepEqual(
+    result.characterLibraries.modifiers.map((entry) => entry.id),
+    ['med'],
+    'the GM-owned library is authoritative and is not re-merged from the systems'
+  );
+  assert.deepEqual(
+    result.characterLibraries.characterPrerequisites.map((entry) => entry.id),
+    ['smithsTools'],
+    'and the half the world did NOT own is lifted rather than lost'
+  );
+});
+
+// The same hazard from the other end: a library that is NOT lifted must NOT be stripped. Without
+// the pairing the entries exist nowhere afterwards, which is the single most destructive outcome
+// this migration can produce.
+test('a library that was not lifted is left ON the systems rather than deleted', () => {
+  // `modifiers` is world-owned so it may be stripped; `characterPrerequisites` is only lifted
+  // because the world lacks it. Both end up somewhere — that is the whole assertion.
+  const result = migrateCharacterLibrariesToWorldScope({
+    systems: [system('a', { characterPrerequisites: [SMITH], modifiers: [MED] })],
+    characterLibraries: { modifiers: [MED] },
+  });
+  const world = result.characterLibraries;
+  const survivors = new Set([
+    ...world.characterPrerequisites.map((entry) => entry.id),
+    ...world.modifiers.map((entry) => entry.id),
+    ...(result.systems[0].characterPrerequisites ?? []).map((entry) => entry.id),
+    ...(result.systems[0].modifiers ?? []).map((entry) => entry.id),
+  ]);
+  assert.ok(survivors.has('smithsTools'), 'the prerequisite exists somewhere after the pass');
+  assert.ok(survivors.has('med'), 'and so does the modifier');
 });
 
 test('re-running over already-stripped systems changes nothing', () => {

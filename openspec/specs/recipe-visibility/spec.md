@@ -24,7 +24,7 @@ From `data-models/spec.md`:
 - `CraftingSystem.recipeItemDefinitions`
 - `RecipeItemDefinition.recipeIds` (canonical recipe↔book membership, many-to-many)
 - `RecipeItemDefinition.caps` (per-recipe-item use/learn caps, including `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds`)
-- `CraftingSystem.characterPrerequisites` (system-owned character-prerequisite library referenced by `caps.learn.characterPrerequisiteIds`)
+- The `characterLibraries` world setting's `characterPrerequisites` (the WORLD character-prerequisite library referenced by `caps.learn.characterPrerequisiteIds`; moved off the crafting system by issue 1308, so a book learns the same rule whichever system owns it)
 - `Recipe.access` (canonical restricted-mode grants: `characterIds`, `playerIds`)
 - `Recipe.visibility` (legacy restricted-mode player list; `access` read-forward source)
 - `Recipe.recipeItemId` (legacy; removed by the 1.13.0 migration, read as an un-migrated fallback)
@@ -562,13 +562,15 @@ Every learn path enforces this gate on the same entry points as the character ga
 
 ### Character Prerequisite Learning Gate
 
-A book/scroll may carry a **character-prerequisite learning gate** (issue 544): the recipe item definition's `caps.learn.characterPrerequisiteIds`, a list of ids into the system's `characterPrerequisites` library.
+A book/scroll may carry a **character-prerequisite learning gate** (issue 544): the recipe item definition's `caps.learn.characterPrerequisiteIds`, a list of ids into the WORLD character-prerequisite library (issue 1308; resolved through `resolveCharacterPrerequisiteLibrary`, which unions the world library with any surviving legacy in-system copy so an unmigrated client still resolves every id).
 This is **distinct** from Required Knowledge above: `prerequisiteIds` gates on **prior recipe knowledge** (has the reader already learned recipe X), while the character-prerequisite gate gates on the acting **actor's roll data** (a stat, level, proficiency, or flag comparison).
 The gate is **per-book**: every recipe a book teaches shares that book's `characterPrerequisiteIds`, so the gate is evaluated once per definition, not per recipe.
 Like Required Knowledge, it is only enforced when `caps.learn.limitLearning` is `true` (`_meetsCharacterPrerequisites` returns `{ met: true }` immediately when Limited learning is off).
 
 When enforced, a reader may learn the book's recipes only when the acting actor passes **ALL** of the referenced prerequisites (**AND** semantics), evaluated against `actor.getRollData()` by the pure `evaluatePrerequisites` resolver (`RecipeVisibilityService._meetsCharacterPrerequisites` → `{ met, reason }`).
-A `characterPrerequisiteIds` entry that no longer resolves to a system definition is **skipped (fail-open)**: a deleted prerequisite removes its gate rather than bricking the book.
+A `characterPrerequisiteIds` entry that no longer resolves to a library definition is **skipped (fail-open)**: a deleted prerequisite removes its gate rather than bricking the book.
+**This is the OPPOSITE polarity to the tool gate over the same library**, which fails CLOSED and makes the tool unusable on a single unresolvable id (`data-models` -> CharacterPrerequisite requirement 5).
+The two are deliberate in each direction — knowledge that cannot be checked is granted, a tool whose gate cannot be checked is withheld — and stating the pairing here is what stops a reader generalizing this line to the whole concept.
 An unknown or missing roll-data `path` degrades to `0`/`false` (never throws) and fails its condition.
 
 The gate is enforced at **every learn entry point**, beside the Required Knowledge check:
@@ -585,7 +587,7 @@ Test requirements:
 
 - `evaluatePrerequisites` passes only when every referenced prerequisite passes (AND), and returns each failure with a `prerequisitePreview` string for messaging.
 - An unknown/missing roll-data `path` fails its condition without throwing and warns exactly once; the valueless operators (`isTrue`/`isFalse`/`exists`) evaluate with no comparand.
-- A dangling `characterPrerequisiteIds` id (no matching system definition) is skipped so the gate stays satisfiable (fail-open).
+- A dangling `characterPrerequisiteIds` id (no matching library definition) is skipped so the gate stays satisfiable (fail-open).
 - Each learn entry point refuses an unmet gate with `FABRICATE.Knowledge.CharacterPrerequisiteNotMet` and writes no `learnedRecipes` entry, while the preview/picker/craft-learn paths omit the blocked recipe silently.
 - The inventory row projects `learnBlocked === true` with a non-empty `learnBlockedReason` for a failed gate and `false` for a satisfied or absent gate.
 

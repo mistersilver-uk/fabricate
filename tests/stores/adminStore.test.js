@@ -831,8 +831,11 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.equal(await store.addSystemModifier({ id: 'med' }), null);
-      assert.equal(await store.deleteSystemModifier('sys1', 'ghost'), false);
-      assert.equal(await store.updateSystemModifier('sys1', 'ghost', { label: 'X' }), false);
+      // The id goes in the FIRST argument since issue 1308 dropped the system id. Passing the old
+      // two-argument shape made this assert that `'sys1'` is not a modifier id, which is true and
+      // proves nothing — `'ghost'` was never tested at all.
+      assert.equal(await store.deleteSystemModifier('ghost'), false);
+      assert.equal(await store.updateSystemModifier('ghost', { label: 'X' }), false);
       assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 
