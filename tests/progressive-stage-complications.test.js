@@ -13,7 +13,7 @@ import {
   markFiredStageComplications,
 } from '../src/utils/progressiveStageComplications.js';
 
-import { authoredComplication } from './helpers/complicationFixtures.js';
+import { authoredComplication, visibleComplicationPair } from './helpers/complicationFixtures.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -63,6 +63,24 @@ describe('1286: attachStageComplications — the player forecast', () => {
     assert.deepEqual(
       gmView.map((entry) => entry.name),
       ['Curse']
+    );
+  });
+
+  it('carries EVERY visible complication a stage authors, and not just the first', () => {
+    // The plural case, which no other fixture in this feature produces: two complications
+    // that BOTH survive redaction, on one stage. A projection that kept only the first would
+    // be invisible against a `visible` + `gmOnly` pair, and would silently under-warn a
+    // player about a consequence the runtime will still fire at them.
+    const [row] = attachStageComplications([stage('r1', 'iron')], {
+      componentById: componentIndex([
+        { id: 'iron', name: 'Iron', complications: [...visibleComplicationPair(), curse] },
+      ]),
+      activity: 'salvage',
+    });
+    assert.deepEqual(
+      row.complications.map((entry) => entry.name),
+      ['Shrapnel', 'Scalding'],
+      'both visible complications reach the row, in authored order, and the gmOnly one does not'
     );
   });
 
@@ -241,6 +259,40 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
     );
   });
 
+  it('marks the complication the record NAMES, not every complication on that stage', () => {
+    // Two complications a player can see on one stage — the case the shared `visible` +
+    // `gmOnly` fixture cannot produce. One of them fired. A mark keyed on the stage alone
+    // would tell the player that BOTH happened, which is the exact false claim this
+    // function's "it marks; it never adds" contract exists to prevent, and the one a
+    // one-entry row can never expose.
+    const pairById = componentIndex([
+      { id: 'iron', name: 'Iron', complications: visibleComplicationPair() },
+    ]);
+    const stages = attachStageComplications([stage('r1', 'iron'), stage('r2', 'iron')], {
+      componentById: pairById,
+      activity: 'salvage',
+    });
+
+    const marked = markFiredStageComplications(stages, [
+      { resultId: 'r2', componentId: 'iron', complicationId: 'p1' },
+    ]);
+
+    assert.deepEqual(
+      marked.map((row) => row.complications.map((entry) => [entry.name, entry.fired])),
+      [
+        [
+          ['Shrapnel', false],
+          ['Scalding', false],
+        ],
+        [
+          ['Shrapnel', true],
+          ['Scalding', false],
+        ],
+      ],
+      'one record marks exactly one entry on exactly one occurrence'
+    );
+  });
+
   it('MARKS but never ADDS: an unredacted gmOnly record surfaces nothing', () => {
     const stages = twice();
     const marked = markFiredStageComplications(stages, [
@@ -351,6 +403,32 @@ describe('1286: InventoryListingBuilder publishes the player complication foreca
     );
     assert.ok(!('complications' in salvage.stages[2]));
     assert.equal(salvage.stages[0].complications[0].fired, false, 'pre-roll, nothing has fired');
+  });
+
+  it('forecasts against the SALVAGE activity, which the panel it feeds is', () => {
+    // `appliesToActivity` is an equality test on one flag, so the activity token this
+    // builder passes is load-bearing in both directions at once: pass the wrong one and a
+    // salvage-only complication vanishes from the salvage panel while a crafting-only one
+    // is advertised on it. Neither is visible against a complication enabled for all three
+    // activities, which is every other fixture in this suite.
+    const salvage = salvageViewModel(
+      salvageSystemWith({
+        complications: [
+          complication({ id: 'x1', name: 'Slip', activity: 'salvage' }),
+          complication({ id: 'x2', name: 'Quench', activity: 'crafting' }),
+        ],
+      })
+    );
+
+    assert.deepEqual(
+      salvage.stages.map((row) => [row.id, (row.complications ?? []).map((entry) => entry.name)]),
+      [
+        ['r1', ['Slip']],
+        ['r2', ['Slip']],
+        ['r3', []],
+      ],
+      'the salvage-only complication is forecast and the crafting-only one is withheld'
+    );
   });
 
   it('filters the forecast with SALVAGE own trigger ids, not the recipe block', () => {

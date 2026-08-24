@@ -24,7 +24,10 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
-import { authoredComplication } from '../helpers/complicationFixtures.js';
+import {
+  authoredComplication,
+  visibleComplicationPair,
+} from '../helpers/complicationFixtures.js';
 import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
 import { CraftingListingBuilder } from '../../src/systems/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
@@ -372,6 +375,38 @@ describe('the player complication seam', () => {
       ]);
     });
 
+    it('marks ONE of two visible complications on the occurrence that fired', async () => {
+      // Shard authors TWO complications a player can see, plus the gmOnly one. Every other
+      // fixture in this feature pairs one visible with one gmOnly, so after redaction each
+      // row holds a single entry and a mark that flooded its whole row is indistinguishable
+      // from a correct one. Here it is not: a GM authored two, one fired, and the panel must
+      // not tell the player that both happened.
+      const { store, services } = await loadedSalvageStore({
+        system: salvageSystem({ shardComplications: [...visibleComplicationPair(), CURSE] }),
+      });
+
+      assert.deepEqual(
+        stageComplicationNames(store),
+        [
+          ['Shrapnel', 'Scalding'],
+          [],
+          ['Shrapnel', 'Scalding'],
+          ['Cave-in'],
+        ],
+        'both visible complications survive the forecast on both Shard occurrences'
+      );
+
+      await salvageWith(store, services, [firedRecord('r3', 'p1')]);
+
+      assert.deepEqual(firedFlags(store), [
+        ['r1', 'p1', false],
+        ['r1', 'p2', false],
+        ['r3', 'p1', true],
+        ['r3', 'p2', false],
+        ['r4', 'x2', false],
+      ]);
+    });
+
     it('publishes the run record verbatim on the salvage result', async () => {
       const { store, services } = await loadedSalvageStore();
       const record = [firedRecord('r3', 'x1')];
@@ -494,6 +529,23 @@ describe('the player complication seam', () => {
         description: 'Splinters fly.',
         severity: 'major',
       });
+    });
+
+    it("states each stage's OWN DC and never the cumulative threshold it sits at", async () => {
+      const { store } = await loadedSalvageStore();
+
+      // Shard(5), Filings(3), Shard(5) spread to cumulative thresholds 5, 8, 13, so the two
+      // numbers coincide on the FIRST row and nowhere else. The second forecast row is the
+      // second Shard occurrence: its own DC is still 5, and it is the row that can tell a
+      // player which number the eyebrow beside it is quoting.
+      const [, second] = store.bulkSalvageable[0].complications;
+
+      assert.equal(store.orderedSalvageStages[2].threshold, 13, 'that stage sits at 13');
+      assert.deepEqual(
+        [second.resultId, second.position, second.resultName, second.resultDifficulty],
+        ['r3', 3, 'Shard', 5],
+        "the row quotes the stage's authored difficulty, not the budget it is reached at"
+      );
     });
 
     it("excludes a stage unreachable at any budget, on the yield preview's own rule", async () => {

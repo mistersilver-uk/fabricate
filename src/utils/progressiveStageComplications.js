@@ -70,8 +70,15 @@ function list(value) {
  *
  * Supplying them is what lets {@link forecastComplications} exclude a complication whose only
  * enabled clause names a trigger that block does NOT own — a clause the planner already makes
- * inert — so "N complications could fire" is not a lie. Omitting them is the fail-open
- * `null` case, which forecasts such a complication and overcounts.
+ * inert — so "N complications could fire" is not a lie.
+ *
+ * It fails CLOSED, which is why the caller's source for `checkBreakage` matters. This
+ * function never returns `null` — `forecastComplications`' fail-open case is reachable only
+ * by passing it `checkTriggerIds: null` directly, and {@link attachStageComplications} always
+ * passes this array instead. So a caller that omits the block, or reads it off the wrong
+ * activity, yields ids the complication does not name, and a complication whose ONLY enabled
+ * clause is that trigger drops out of the forecast while the runtime still fires it. That is
+ * under-disclosure with no symptom on screen, so each builder's source is pinned by a test.
  *
  * It reads the ids only, never a trigger's condition: matching a condition needs a resolved
  * roll and is `ResolutionModeService.resolveCheckTriggerMatches`'s job. That module is not
