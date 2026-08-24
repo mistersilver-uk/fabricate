@@ -6,8 +6,9 @@
  * and performs no I/O. It declares WHAT the contract is — its version, its member table,
  * its outcome tokens, the localization key each outcome answers with, and the two value
  * normalizers a member needs before it writes anything. The members themselves live where
- * their behaviour lives (`companionKnowledgeGrant.js`, `currencyAffordance.js`) and the
- * descriptor is assigned onto the facade in `src/main.js`.
+ * their behaviour lives (`companionKnowledgeGrant.js`, `companionCheckRoll.js`,
+ * `companionComponentAward.js`, `currencyAffordance.js`) and the descriptor is assigned onto
+ * the facade in `src/main.js`.
  *
  * It sits under `src/systems/` rather than beside `src/ui/managerExtensions.js` because the
  * navigation seam is UI — route chrome pinned against a Svelte component — while this one is

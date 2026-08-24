@@ -421,6 +421,54 @@ const SITE_MAPPING = [
     accessor: 'setStackQuantity',
     sites: 1,
   },
+  {
+    site: 'companionComponentAward payload stackability probe',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+    anchors: [/if \(hasStackQuantity\(itemData, quantityPath\) \|\| !sourceItem\)/],
+  },
+  {
+    site: 'companionComponentAward payload quantity write',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'setStackQuantity',
+    sites: 1,
+    anchors: [/setStackQuantity\(itemData, quantity, quantityPath\)/],
+  },
+  {
+    site: 'companionComponentAward WRITTEN-VALUE test on the payload',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 1,
+    absentDefault: 1,
+    // The award refuses `multiUnitUnsupported` when this read does not answer the quantity
+    // just written, which is what a presence test cannot see: a GM who configures the PARENT
+    // of the count leaves `hasStackQuantity` answering true while the write no-ops.
+    anchors: [
+      /readStoredStackQuantity\(itemData, \{ absentDefault: 1, path: quantityPath \}\) !== quantity/,
+    ],
+  },
+  {
+    site: 'companionComponentAward stack-target base read',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 1,
+    // The ONLY `absentDefault: null` site in `src/**`, and it is the whole of the award's
+    // "nothing is invented" rule: a target carrying no readable count is not stacked onto at
+    // all, so the award creates a second document instead of authoring a count field on an
+    // item type that has none.
+    absentDefault: null,
+    anchors: [
+      /readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/,
+    ],
+  },
+  {
+    site: 'companionComponentAward stack write',
+    file: 'src/systems/companionComponentAward.js',
+    accessor: 'updateStackQuantity',
+    sites: 1,
+    anchors: [/updateStackQuantity\(target, before \+ quantity, quantityPath\)/],
+  },
 ];
 
 /** The accessor module itself, which DEFINES these names and must not be counted. */
@@ -547,11 +595,15 @@ describe('the per-site accessor mapping', () => {
     }
   });
 
-  it('uses only 1 and 0 as absent defaults, and only on the stored reader', () => {
+  it('uses only 1, 0 and null as absent defaults, and only on the stored reader', () => {
+    // `null` is the third value, and it is a DIFFERENT KIND of answer from the other two:
+    // 1 and 0 supply a base, while `null` says the item carries no readable count at all and
+    // hands the decision back to the caller. Exactly one site uses it (issue 1301).
+    const ABSENT_DEFAULTS = [0, 1, null];
     for (const entry of SITE_MAPPING) {
       if (entry.accessor === 'readStoredStackQuantity') {
         assert.ok(
-          entry.absentDefault === 0 || entry.absentDefault === 1,
+          ABSENT_DEFAULTS.includes(entry.absentDefault),
           `${entry.site} must declare an absent default`
         );
       } else {
@@ -575,6 +627,22 @@ describe('the per-site accessor mapping', () => {
       [...countAbsentDefaults(0).entries()],
       [['src/gatheringResultCreation.js', 1]],
       'exactly one `absentDefault: 0` in src/**, and only in gatheringResultCreation.js'
+    );
+  });
+
+  it('records exactly one absent-default-null site, and live source agrees', () => {
+    // Pinned in both directions for the same reason the `0` site is: `null` is the value that
+    // makes the component award REFUSE to stack rather than inventing a base, so a second site
+    // adopting it — or this one losing it — is a behavioural change that must be deliberate.
+    const nullDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === null);
+    assert.deepEqual(
+      nullDefault.map((entry) => entry.site),
+      ['companionComponentAward stack-target base read']
+    );
+    assert.deepEqual(
+      [...countAbsentDefaults('null').entries()],
+      [['src/systems/companionComponentAward.js', 1]],
+      'exactly one `absentDefault: null` in src/**, and only in the component award'
     );
   });
 
