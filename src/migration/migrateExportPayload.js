@@ -21,6 +21,10 @@
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
 import {
+  buildWorldCharacterLibraries,
+  stripSystemCharacterLibraries,
+} from './migrateCharacterLibrariesToWorldScope.js';
+import {
   buildWorldCurrencyConfig,
   stripSystemCurrencyConfig,
 } from './migrateCurrencyToWorldScope.js';
@@ -258,6 +262,52 @@ function liftTravelToWorldScope(migrated) {
   migrated.system = stripSystemTravelConfig([system])[0];
 }
 
+/**
+ * Lift a pre-1308 export's per-system character libraries up to the envelope-level
+ * `characterLibraries` (issue 1308), and drop the system's own copies.
+ *
+ * BRANCH-INDEPENDENT ON PURPOSE, exactly like the two lifts above and every sibling before them.
+ * `migrateExportPayload` returns early once `schemaVersion` is already current, so a derivation
+ * reachable only from the schema-bump path would silently skip every payload authored at the
+ * current schema — including a hand-edited one that still carries either library on the system.
+ *
+ * Idempotent, and the guard is a TWO-LIST DISJUNCTION for the reason the world migration's is:
+ * either populated library proves the lift already ran, so an export from a world that authored
+ * only modifiers does not get its prerequisite half rebuilt from a system block already stripped.
+ * Unlike currency and travel there are no scalars, so the guard can key on the lists themselves.
+ *
+ * An export carries one system, so the "union across systems" the world migration performs
+ * degenerates here to that system's own libraries — but it is the SAME function, so the export
+ * path and the world path cannot drift on how an entry is carried across.
+ */
+function liftCharacterLibrariesToWorldScope(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+
+  const existing = migrated.characterLibraries;
+  // NON-EMPTY, not merely present. `buildExportPayload` always emits the slice with both keys, so
+  // a presence check would read every export as already lifted and then strip the system's own
+  // copy — losing the libraries entirely for any payload whose system still carries them. Keying
+  // on the lists is safe here precisely because this slice has NO scalars: unlike currency and
+  // travel, there is no configured-but-empty state for an emptiness check to mistake for absence.
+  const alreadyLifted =
+    existing &&
+    typeof existing === 'object' &&
+    !Array.isArray(existing) &&
+    ((Array.isArray(existing.characterPrerequisites) &&
+      existing.characterPrerequisites.length > 0) ||
+      (Array.isArray(existing.modifiers) && existing.modifiers.length > 0));
+
+  if (!alreadyLifted) {
+    // `_collisions` is diagnostic output for the WORLD migration's GM notice, which unions many
+    // systems. One system cannot collide with itself, so it is dropped rather than persisted into
+    // an envelope no reader of it would ever consult.
+    const { _collisions: _diagnostics, ...built } = buildWorldCharacterLibraries([system]);
+    migrated.characterLibraries = built;
+  }
+  migrated.system = stripSystemCharacterLibraries([system])[0];
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -275,8 +325,8 @@ export function migrateExportPayload(payload) {
 
   // Already current — no-op for the schema envelope, but still run every field-level
   // upcast, because an export stamped at the current schema can predate #561's first-class tool
-  // fields, #1055's modifier pick cap, #1278's world currency slice, or #1282's world travel
-  // slice. Clone so callers never alias the input.
+  // fields, #1055's modifier pick cap, #1278's world currency slice, #1282's world travel slice,
+  // or #1308's world character libraries. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
@@ -287,6 +337,7 @@ export function migrateExportPayload(payload) {
     seedFailureResultPolicy(current);
     liftCurrencyToWorldScope(current);
     liftTravelToWorldScope(current);
+    liftCharacterLibrariesToWorldScope(current);
     return current;
   }
 
@@ -324,6 +375,7 @@ export function migrateExportPayload(payload) {
   seedFailureResultPolicy(migrated);
   liftCurrencyToWorldScope(migrated);
   liftTravelToWorldScope(migrated);
+  liftCharacterLibrariesToWorldScope(migrated);
 
   return migrated;
 }

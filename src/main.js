@@ -4339,6 +4339,10 @@ function bindFabricateGlobal() {
     // every realm-gated environment in the payload lands in the destination world citing realm
     // ids that name nothing.
     const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
+    // And the world character libraries (issue 1308), for the same reason and with the same
+    // consequence: omit them and the export carries empty libraries, so every learning gate,
+    // tool requirement and check modifier in the payload lands unresolvable.
+    const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
@@ -4346,7 +4350,8 @@ function bindFabricateGlobal() {
       gatheringEnvironments,
       gatheringConfig,
       currencyConfig,
-      travelConfig
+      travelConfig,
+      characterLibraries
     );
   };
 

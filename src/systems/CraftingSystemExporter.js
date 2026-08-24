@@ -7,6 +7,7 @@ import { migrateExportPayload } from '../migration/migrateExportPayload.js';
 
 import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
+  assembleCharacterLibrariesAuthoringBundle,
   assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
   assembleTravelAuthoringBundle,
@@ -35,6 +36,7 @@ const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
  * @param {object} [gatheringConfig={}] - FULL `gatheringConfig` setting object
  * @param {object} [currencyConfig={}] - FULL `currencyConfig` world setting
  * @param {object} [travelConfig={}] - FULL `travelConfig` world setting
+ * @param {object} [characterLibraries={}] - FULL `characterLibraries` world setting
  * @returns {object} Export envelope ready for JSON.stringify
  */
 export function buildExportPayload(
@@ -49,7 +51,12 @@ export function buildExportPayload(
   // The world travel configuration (issue 1282): the realm library plus its two scalars.
   // Defaulted for the same reason, with the same consequence — an export produced without it
   // carries an empty library, and every realm-gated environment in it lands unresolvable.
-  travelConfig = {}
+  travelConfig = {},
+  // The world character libraries (issue 1308): the character-prerequisite library and the
+  // modifier library. Defaulted for the same reason as the two above, with the same consequence —
+  // an export produced without it carries empty libraries, so every learning gate, tool
+  // requirement and check modifier in the bundle lands unresolvable.
+  characterLibraries = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -85,6 +92,7 @@ export function buildExportPayload(
     gatheringConfig: bundle.gatheringConfig,
     currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
     travelConfig: assembleTravelAuthoringBundle(travelConfig),
+    characterLibraries: assembleCharacterLibrariesAuthoringBundle(characterLibraries),
   };
 }
 
@@ -227,6 +235,19 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.travelConfig)
       : {};
 
+  // The WORLD character libraries (issue 1308), carried for exactly the reason the two slices
+  // above are: they ride the envelope rather than the system, so there is nothing on `system` to
+  // fall back on. Drop them here and `CompendiumImporter._persistCharacterLibraries` receives
+  // `undefined` and returns immediately, landing every learning gate, tool requirement and check
+  // modifier in the destination world citing entry ids that name nothing. Deliberately NOT
+  // rebound under `copy` mode, for the reason realm and unit ids are not: these ids are world
+  // scope, shared by every crafting system, and the merge already lets the destination win a
+  // collision — rebinding would fork the world's own rules per copy.
+  const characterLibraries =
+    data.characterLibraries && typeof data.characterLibraries === 'object'
+      ? structuredClone(data.characterLibraries)
+      : {};
+
   const prepared = {
     system,
     recipes,
@@ -234,6 +255,7 @@ export function prepareForImport(rawData, mode = 'keep') {
     gatheringConfig,
     currencyConfig,
     travelConfig,
+    characterLibraries,
   };
 
   if (mode === 'copy') {

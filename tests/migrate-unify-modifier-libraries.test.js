@@ -325,10 +325,13 @@ test('the export upcast merges an imported bundle’s two libraries', () => {
   };
   const migrated = migrateExportPayload(bundle);
 
+  // The merged library lands in the envelope's world slice, because 1.28.0's lift runs at the end
+  // of the same chain and takes it off the system.
   assert.deepEqual(
-    migrated.system.modifiers.map((modifier) => modifier.id),
+    migrated.characterLibraries.modifiers.map((modifier) => modifier.id),
     ['med', 'nature', 'nature-gathering', 'survival']
   );
+  assert.equal(migrated.system.modifiers, undefined);
   assert.equal(Object.hasOwn(migrated.system, 'checkModifiers'), false);
   assert.equal(Object.hasOwn(migrated.gatheringConfig.system, 'characterModifiers'), false);
   assert.deepEqual(
@@ -354,9 +357,10 @@ test('the export upcast composes with 1.22.0: a PRE-1.22.0 bundle keeps its cata
     },
   });
   assert.deepEqual(
-    migrated.system.modifiers.map((entry) => entry.id),
+    migrated.characterLibraries.modifiers.map((entry) => entry.id),
     ['med', 'nature'],
-    'the 1.22.0 lift runs first, so the merge finds the catalogue where it now lives'
+    'the 1.22.0 lift runs first so the merge finds the catalogue, and 1.28.0 then lifts the ' +
+      'merged library off the system into the envelope slice'
   );
 });
 

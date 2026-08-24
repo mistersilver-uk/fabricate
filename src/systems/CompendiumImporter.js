@@ -15,6 +15,7 @@ const CURRENCY_CONFIG_KEY = 'currencyConfig';
 
 /** World-setting key for the travel config (mirrors SETTING_KEYS.TRAVEL_CONFIG). */
 const TRAVEL_CONFIG_KEY = 'travelConfig';
+const CHARACTER_LIBRARIES_KEY = 'characterLibraries';
 
 /** How often (in recipes processed) Phase 4 emits an interim progress tick. */
 const RECIPE_PROGRESS_INTERVAL = 10;
@@ -330,6 +331,17 @@ export class CompendiumImporter {
       this._emitProgress({ pct: 0.2, phase: 'system', message: `Saving ${systemLabel}…` });
       const systemInput = { ...systemData, components: remappedComponents };
       await this._validateGatheringConfig(systemInput);
+
+      // ORDER IS LOAD-BEARING (issue 1308): the world character libraries are merged BEFORE the
+      // system is created or updated, unlike the currency and travel slices, which are persisted
+      // last because nothing reads them during normalization.
+      //
+      // These two ARE read during normalization. `_normalizeSystem` derives its Valid Id Basis
+      // from the world libraries, so a system created while the incoming entries are still only
+      // in the payload would have every tool prerequisite reference and every default modifier id
+      // pruned against a basis that cannot yet see them. Merging first is what makes a copy-mode
+      // import of a bundle authored in another world land with its references intact.
+      await this._persistCharacterLibraries(packData.characterLibraries);
 
       let system;
       if (existingSystem && overwriteExisting) {
@@ -691,6 +703,58 @@ export class CompendiumImporter {
     // and a scene mapping that arrived without an id would be minted a FRESH id on every
     // `load()`, changing its identity from one reload to the next.
     await this._setSetting(TRAVEL_CONFIG_KEY, normalizeTravelConfig(next));
+  }
+
+  /**
+   * Merge the imported world character libraries into this world's own (issue 1308).
+   *
+   * NON-DESTRUCTIVE, and PER LIBRARY. The two lists share one setting key for persistence
+   * economy only — they share no invariant — so they are merged independently. A single
+   * object-level merge would let a destination holding prerequisites but no modifiers win the
+   * whole slice and silently discard every incoming modifier.
+   *
+   * Entries merge by `id` with the DESTINATION winning a collision, exactly as currency units and
+   * realms do: an id already in this world keeps its own definition and only genuinely new
+   * entries are appended. That is what makes an import safe to run twice, and it is what keeps
+   * every book, tool, check and drop row that references an id resolving to the rule its author
+   * meant. Ids are never regenerated.
+   * @private
+   */
+  async _persistCharacterLibraries(incoming) {
+    if (!this._getSetting || !this._setSetting) return;
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return;
+
+    const current = this._getSetting(CHARACTER_LIBRARIES_KEY) || {};
+    const next = { ...current };
+    let changed = false;
+
+    for (const key of ['characterPrerequisites', 'modifiers']) {
+      const currentList = Array.isArray(current[key]) ? current[key] : [];
+      const incomingList = Array.isArray(incoming[key]) ? incoming[key] : [];
+      if (incomingList.length === 0) {
+        next[key] = currentList;
+        continue;
+      }
+      const seen = new Set(
+        currentList.map((entry) => String(entry?.id || '').trim()).filter(Boolean)
+      );
+      const added = [];
+      for (const entry of incomingList) {
+        const id = String(entry?.id || '').trim();
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        added.push(structuredClone(entry));
+      }
+      next[key] = added.length > 0 ? [...currentList, ...added] : currentList;
+      if (added.length > 0) changed = true;
+    }
+
+    if (!changed) return;
+    await this._setSetting(CHARACTER_LIBRARIES_KEY, next);
+    // Republish through the store so its cache is not left holding the pre-import libraries.
+    // `_setSetting` writes the setting directly, so nothing else would refresh it, and the
+    // crafting system normalizer reads this library on every save.
+    globalThis.game?.fabricate?.getCharacterLibrariesStore?.()?.load?.();
   }
 
   /**

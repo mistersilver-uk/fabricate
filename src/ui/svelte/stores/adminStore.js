@@ -9116,6 +9116,9 @@ export function createAdminStore(services) {
     // came to disagree with the API's (issue 642). `tests/export-system-gathering-bundle.test.js`
     // pins both call sites against the exporter's own signature so they cannot drift again.
     const travelConfig = services.getGatheringRealmStore?.()?.get?.() || {};
+    // And the world character libraries (issue 1308), for the same reason and with the same
+    // consequence.
+    const characterLibraries = services.getCharacterLibrariesStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
@@ -9123,7 +9126,8 @@ export function createAdminStore(services) {
       gatheringEnvironments,
       gatheringConfig,
       currencyConfig,
-      travelConfig
+      travelConfig,
+      characterLibraries
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);
