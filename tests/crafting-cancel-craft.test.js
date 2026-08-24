@@ -61,7 +61,10 @@ class FakeItem {
 }
 
 class FakeActor {
-  constructor(name, { isOwner = true, gp = 0, failCreate = false, failUpdate = false } = {}) {
+  constructor(
+    name,
+    { isOwner = true, gp = 0, failCreate = false, failUpdate = false, schemaPaths = null } = {}
+  ) {
     this.id = `actor-${name}`;
     this.uuid = `Actor.${name}`;
     this.name = name;
@@ -73,6 +76,11 @@ class FakeActor {
     this._updates = [];
     this._failCreate = failCreate;
     this._failUpdate = failUpdate;
+    // When set, the actor has a SCHEMA: a payload naming a path outside it is pruned by
+    // `SchemaField`, the diff is empty, and `Document#update` resolves `undefined` having
+    // written nothing. That is the shape a mis-typed GM currency path produces, and it is the
+    // only way to drive it — a fake that applies every key it is handed cannot model it.
+    this._schemaPaths = schemaPaths ? new Set(schemaPaths) : null;
   }
   getFlag(ns, key) {
     return this._flags?.[ns]?.[key];
@@ -85,7 +93,15 @@ class FakeActor {
   async update(payload) {
     if (this._failUpdate) throw new Error('update refused');
     this._updates.push(payload);
+    if (this._schemaPaths && !Object.keys(payload).every((path) => this._schemaPaths.has(path))) {
+      return undefined;
+    }
     for (const [path, value] of Object.entries(payload)) setProperty(this, path, value);
+    // Resolves THE DOCUMENT, as a real `Document#update` does when it applied a change.
+    // `ActorPropertyCoinSpender.refund` judges its write by this return (issue 1301), so a
+    // stub resolving `undefined` asserts the empty-diff case that means nothing was written —
+    // which would make every currency refund on this fixture report a failure.
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (this._failCreate) throw new Error('createEmbeddedDocuments refused');
@@ -126,7 +142,7 @@ function makeSystem() {
   };
 }
 
-function setupGame(system, { sourceActor } = {}) {
+function setupGame(system, { sourceActor, currencyUnits = CURRENCY_UNITS } = {}) {
   const woodSource = new FakeItem('wood-src', 'Wood', 1);
   globalThis.fromUuid = async (uuid) => (uuid === 'Item.wood-src' ? woodSource : null);
   globalThis.fromUuidSync = (uuid) =>
@@ -139,7 +155,7 @@ function setupGame(system, { sourceActor } = {}) {
           spendStrategy: 'actorProperty',
           providerId: '',
           macros: {},
-          units: CURRENCY_UNITS,
+          units: currencyUnits,
         }),
       }),
     },
@@ -380,7 +396,11 @@ test('a mid-reversal RESTORE failure cannot double-restore: run is archived, not
   assert.equal(craftingActor.system.currency.gp, 5, 'currency was still refunded');
 
   // Crucially, the run is archived, so a re-cancel is a no-op — no double-restore path.
-  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'the run is archived, not left active');
+  assert.equal(
+    runManager.getActiveRuns(craftingActor).length,
+    0,
+    'the run is archived, not left active'
+  );
   const second = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
   assert.equal(second.success, false, 'the archived run cannot be re-cancelled');
 });
@@ -502,4 +522,80 @@ test('multi-step cancel reverses ONLY the consumed-but-unresolved step, never a 
     step0ResultsBefore,
     'the succeeded step 0 output is left intact'
   );
+});
+
+// ---------------------------------------------------------------------------
+// AC-33 (issue 1301) — a DISCARDED currency write is reported to the craft path
+//
+// This is the declared behaviour change `ActorPropertyCoinSpender.refund` makes, asserted at
+// the level a player actually experiences it. `Document#update` resolves `undefined` when the
+// whole diff is empty, which is exactly what a GM-authored `actorPath` that is not in the
+// actor's data model produces: `SchemaField` prunes the unknown key, with no error, no hook
+// and no notification. The spender answered `{ valid: true }` regardless, so a refund that
+// wrote nothing reported success — and nothing in the tree pinned that answer.
+//
+// The fixture restores a consumed INPUT as well as failing the currency refund, because
+// `partialRefund` is `!reversal.ok && (reversal.restored.length > 0 || currencyRecovered)`:
+// a mis-typed path makes `refundedGroups` zero, so a currency-only fixture would answer
+// `partialRefund: false` and the interesting half of the criterion would be untestable.
+// ---------------------------------------------------------------------------
+
+/** The world ladder with `gp` pointing at a path no actor carries. */
+const MISTYPED_CURRENCY_UNITS = [
+  { ...CURRENCY_UNITS[0], actorPath: 'system.currency.gold' },
+  CURRENCY_UNITS[1],
+];
+
+/** Run one player cancel with a refund, recording what `console.error` was told. */
+async function cancelWithRefund({ currencyUnits, schemaPaths }) {
+  const system = makeSystem();
+  const craftingActor = new FakeActor('Crafter', { gp: 0, schemaPaths });
+  const sourceActor = new FakeActor('Source', { gp: 0 });
+  setupGame(system, { sourceActor, currencyUnits });
+
+  const runManager = new CraftingRunManager();
+  const engine = makeEngine(runManager);
+  const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
+
+  const errors = [];
+  const realError = console.error;
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, {
+      refund: true,
+    });
+    return { result, errors, craftingActor, sourceActor };
+  } finally {
+    console.error = realError;
+  }
+}
+
+test('AC-33 — a cancel whose currency write Foundry DISCARDED answers partialRefund', async () => {
+  const { result, errors, craftingActor, sourceActor } = await cancelWithRefund({
+    currencyUnits: MISTYPED_CURRENCY_UNITS,
+    schemaPaths: ['system.currency.gp', 'system.currency.sp'],
+  });
+
+  assert.equal(result.success, true, 'the cancel itself still completes');
+  assert.equal(result.refunded, false, 'a discarded write is NOT a refund');
+  assert.equal(result.partialRefund, true, 'the inputs came back and the coin did not');
+  assert.equal(result.restoredCount, 1, 'which is what makes the partial half assertable');
+  assert.equal(sourceActor.created.length, 1, 'the consumed ingredient IS restored');
+  assert.equal(craftingActor.system.currency.gold, undefined, 'and nothing was written');
+  assert.ok(
+    errors.some((line) => line.includes('Currency refund reported failure')),
+    'the shipped console.error fires, on the one client that can fix the configuration'
+  );
+});
+
+test('AC-33 — the positive control: a correct actorPath still refunds in full', async () => {
+  const { result, errors, craftingActor } = await cancelWithRefund({
+    currencyUnits: CURRENCY_UNITS,
+    schemaPaths: ['system.currency.gp', 'system.currency.sp'],
+  });
+
+  assert.equal(result.refunded, true);
+  assert.equal(result.partialRefund, false);
+  assert.equal(craftingActor.system.currency.gp, 5, '5 gp is refunded');
+  assert.deepEqual(errors, [], 'and nothing is reported');
 });

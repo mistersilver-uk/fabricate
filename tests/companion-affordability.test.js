@@ -274,11 +274,22 @@ describe('the unit and the amount are resolved before any spender runs', () => {
 describe('the macro arm', () => {
   const MACROS = { canAfford: 'Macro.afford', decrement: 'Macro.dec', increment: '' };
 
+  /**
+   * A resolver answering a runnable SCRIPT macro for every uuid.
+   *
+   * `MacroCoinSpender` now RESOLVES the configured uuid and gates on the document before it
+   * delegates (issue 1301), and this suite defines no `globalThis.fromUuid` — so without an
+   * injected resolver every case here would refuse at the gate and never reach its own
+   * `runMacro`, and the two cells that COUNT macro invocations would pass vacuously.
+   */
+  const resolveRunnableMacro = async () => ({ type: 'script', command: 'return true;' });
+
   function macroSeams(runMacro) {
     const received = [];
     const { seams } = seamsFor({
       spendStrategy: 'macro',
       macros: MACROS,
+      resolveMacro: resolveRunnableMacro,
       runMacro: async (uuid, context) => {
         received.push({ uuid, context });
         return runMacro(context);
@@ -344,6 +355,7 @@ describe('the macro arm', () => {
       getCraftingSystemManager: () => ({ getSystem: () => system }),
       getCurrencyConfig: () =>
         makeWorldCurrencyConfig({ spendStrategy: 'macro', macros: MACROS }),
+      resolveMacro: resolveRunnableMacro,
       runMacro: async (uuid, context) => {
         received.push(context);
         return true;

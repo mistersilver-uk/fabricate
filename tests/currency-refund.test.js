@@ -55,6 +55,11 @@ function makeActor(gp = 0, sp = 0) {
     async update(payload) {
       this._updates.push(payload);
       for (const [path, value] of Object.entries(payload)) setProperty(this, path, value);
+      // A real `Document#update` RESOLVES THE DOCUMENT when it applied a change, and resolves
+      // `undefined` when the diff was empty — which is what an off-schema path produces. The
+      // spender now judges the write by that return (issue 1301), so a stub that resolved
+      // nothing was asserting the very behaviour that means NOTHING WAS WRITTEN.
+      return this;
     },
   };
 }
@@ -131,6 +136,11 @@ test('MacroCoinSpender.refund runs the increment macro (the reserved refund flow
   const runs = [];
   const spender = new MacroCoinSpender({
     macros: { canAfford: 'M.afford', decrement: 'M.dec', increment: 'M.inc' },
+    // The RESOLVER is injected because the spender now gates on the macro document before it
+    // delegates (issue 1301), and this suite defines no `fromUuid`: without it every uuid here
+    // resolves nothing and refuses before reaching the injected runner, which would make this
+    // case pass for the wrong reason if it asserted only `valid: false`.
+    resolveMacro: async () => ({ type: 'script', command: 'return true;' }),
     runMacro: async (uuid, ctx) => {
       runs.push({ uuid, ctx });
       return true;

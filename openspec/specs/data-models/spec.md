@@ -521,14 +521,29 @@ CraftingSystem = {
     Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
     When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding. - `"macro"` drives currency through GM-supplied macros.
     Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem, caller }`.
-    `caller` is `"craft"` or `"award"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund, and `"award"` on the world-scoped affordability check (see the _CurrencyConfig_ section), on which `recipe` and `craftingSystem` are both `null`.
+    `caller` is `"craft"` or `"award"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund, and `"award"` on the world-scoped affordability check AND on the world-scoped currency credit (see the _CurrencyConfig_ section), on both of which `recipe` and `craftingSystem` are `null`.
     The token is positive on BOTH arms rather than inferred from those nulls, because a macro can test a token, while a null recipe is indistinguishable from an occasion the macro has never heard of.
+    The discriminator is therefore the PAIR `(macro key, caller)` rather than either half alone, and that pair separates FOUR occasions with no cell shared: `canAfford` with `"craft"` is the craft-time affordability gate, `canAfford` with `"award"` is the published affordability check, `increment` with `"craft"` is the player-cancel refund, and `increment` with `"award"` is the published currency credit.
+    `decrement` is deliberately absent from that set because it is craft-only and unambiguous, so a GM reading "the four occasions" does not wonder where their spend macro went.
+    Because `recipe` and `craftingSystem` are `null` on BOTH `"award"` occasions, a macro that dereferences `context.recipe` without first testing `caller` throws on every one of them.
     A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player.
     Under `caller: "craft"` a failure aborts the craft before ingredient consumption.
     Under `caller: "award"` a macro that THREW answers a refusal DISTINGUISHABLE from a genuine shortfall: `MacroCoinSpender` marks its catch branch `thrown: true`, and the affordability check reports that the question could not be answered rather than that the actor cannot pay.
-    That marker is additive, and the craft paths — which read only `valid` and `message` — are unaffected by it.
-    The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+    A spender carries TWO markers rather than one, and `caller: "award"` now covers two occasions rather than one, so the write-truth rule below is about both: `thrown: true` says the mechanism delivered no answer, and `wroteNothing: true` says Fabricate can PROVE nothing was written.
+    Both markers are additive, and the craft paths — which read only `valid` and `message` — are unaffected by either.
+    A spender's `refund` reports what it OBSERVED.
+    An `actor.update` that Foundry DISCARDED — because the configured `actorPath` is not in the actor's data model — is reported as _nothing was written_, never as success; an `actorPath` holding a value that is not a number is reported the same way, and is detected before any write is attempted; an inventory adapter that threw part-way is reported as _unknown_, not as a decline; and a macro that could not be found or run is reported as _nothing was written_, distinctly from a macro that ran and threw.
+    The `wroteNothing` marker is what carries that last distinction, and a reader of both members tests it FIRST.
+    Three of the four unrunnable spellings additionally carry `thrown: true` — the two that throw today, plus a non-`script` macro, whose command is chat text compiled as JavaScript and so throws for any body that is not also valid JS — solely so that the shipped affordability answer for each of them does not move; the blank-command spelling carries `wroteNothing` alone, for the same reason in the other direction.
+    **This MOVES a shipped answer, and that is declared rather than discovered:** a player cancelling a craft in an `actorProperty` world whose `actorPath` is mis-typed now receives a PARTIAL refund rather than a reported full one, with a console error, because a discarded write was never a refund.
+    The `increment` macro performs TWO occasions, not one.
+    The first is the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+    The second is the world-scoped currency credit published to a companion module, which reaches this same macro with `caller: "award"`.
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
+    The published credit answers such a world with _the world cannot express this credit_, never with _the spender declined_, because `increment` is the ONE macro key of the three that is optional and a missing one is therefore a documented-normal world state rather than a broken one.
+    That argument is `increment`'s alone: profile validation REQUIRES `canAfford` and `decrement`, so a `macro` world missing either fails validation and answers `ladderInvalid` before a spender exists at all.
+    Under the credit a THROWN `increment` macro answers that whether anything was credited is UNKNOWN, never a decline; an `increment` uuid that names nothing RUNNABLE answers _the world cannot credit_, exactly as a missing one does.
+    "Nothing runnable" is defined POSITIVELY and gated before anything is run, rather than discovered from a syntax error, because `Macro#command` is a string field on EVERY macro type: a uuid that resolves to nothing, a document with no string command, a macro whose type is not `script`, and a blank command are all the same fact.
     The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
     Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
@@ -745,19 +760,25 @@ type CurrencyConfig = {
 8. Exactly one runtime chokepoint composes the two scopes.
    `getCurrencyRequirementConfig` takes `enabled` from the crafting system and `units` / `spendStrategy` / `providerId` / `macros` from this config, reaching each through a seam (`getCraftingSystemManager`, `getCurrencyConfig`) with a `game.fabricate` global fallback.
    No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
-   The one reader that is not recipe-keyed is the published affordability check of requirement 10, which reads the world half alone through the same `getCurrencyConfig` seam and composes nothing.
+   The paths that are not recipe-keyed are the two published world-scoped members of requirements 10 to 14, the affordability check and the currency credit — and one of those two WRITES.
+   Both read the world half alone through the same `getCurrencyConfig` seam and compose nothing.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
-10. The published affordability check (`game.fabricate.checkAffordability`, a member of the companion contract — see `companion-api`) answers against the WORLD configuration ALONE and consults no crafting system's `requirements.currency.enabled` toggle.
-    It is structurally unable to: it resolves no crafting system and holds no system-manager seam.
-    That is the correct scope because the question it answers has no recipe — a downtime activity settled by a companion belongs to no crafting system, so there is no toggle whose answer could apply to it.
-11. It is LADDER-AWARE, so a caller supplies one `{ unitId, amount }` and performs no aggregation of its own.
-    The reader compares the actor's total base value across the whole connected branch, so 10 sp affords a 1 gp cost on a ten-silver-per-gold ladder.
-12. It resolves the unit and validates the amount BEFORE invoking any spender.
+10. The published affordability check (`game.fabricate.checkAffordability`) and the published currency credit (`game.fabricate.creditCurrency`), both members of the companion contract — see `companion-api` — answer against the WORLD configuration ALONE and consult no crafting system's `requirements.currency.enabled` toggle.
+    They are structurally unable to: neither resolves a crafting system and neither holds a system-manager seam.
+    That is the correct scope because the questions they answer have no recipe — a downtime activity settled by a companion belongs to no crafting system, so there is no toggle whose answer could apply to it.
+11. A caller supplies one `{ unitId, amount }` to either member and performs no aggregation of its own.
+    The CHECK is LADDER-AWARE in a sense the credit is not: it compares the actor's total base value across the whole connected branch, so 10 sp affords a 1 gp cost on a ten-silver-per-gold ladder.
+    The CREDIT writes ONE denomination — the requested unit's own `actorPath`, set to its current value plus the amount — and makes no change across the branch, so the branch-summing rule above is the check's alone.
+12. Both resolve the unit and validate the amount BEFORE invoking any spender, and through ONE shared resolution, so the check and the credit cannot disagree about what a unit is.
     An unresolvable `unitId`, a non-positive or non-finite `amount`, an empty ladder and an invalid profile each answer `success: false` with a distinct outcome, and NEVER `affordable: true`.
     The ordering is load-bearing rather than defensive: the only unknown-unit guard on the craft path lives inside the aggregation step a single-unit question skips, and skipping it prices the cost at a base value of zero, which every purse satisfies — so an unknown unit id, and an amount of zero, would each read as AFFORDABLE.
     A refusal answers `affordable: null` rather than `false`, so "this actor is short" and "this question could not be answered" cannot collapse into the same confident no.
-13. It performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
+    The credit additionally requires a positive SAFE-INTEGER amount, refusing anything else rather than truncating it, because a truncated amount is a different amount and because `current + amount` stops being exact beyond that range; the check is deliberately NOT narrowed to match, since narrowing what a published member accepts is a `schemaVersion` bump.
+13. The CHECK performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
+    That first conjunct is what licensed a world-scoped surface reaching GM-authored macro code with caller-chosen arguments at all, and it is NOT true of the credit.
+14. The CREDIT performs exactly one write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
+    Its safety therefore rests on TWO gates rather than one: the GM gate at the facade, and the call-site and election gate that requires a caller declaring a `broadcast` call site to be this client's elected executor.
 
 ## TravelConfig
 

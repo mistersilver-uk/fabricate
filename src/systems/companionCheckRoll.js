@@ -55,10 +55,10 @@ import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingC
 
 import {
   CHECK_ROLL_DEFAULT_LABEL,
-  COMPANION_CALL_SITES,
   COMPANION_OUTCOMES,
   bulkCheckDecisionResult,
   checkRollResult,
+  gateCompanionCallSite,
 } from './companionContract.js';
 
 /**
@@ -95,36 +95,6 @@ function resolveUsableCheckFormula(formula) {
  * @returns {boolean}
  */
 const isUsableCheckFormula = (formula) => resolveUsableCheckFormula(formula) !== '';
-
-/**
- * The CALL-SITE rule, shared by both members and existing exactly once.
- *
- * A second shared rule beside the authorization preamble, deliberately separate because it
- * answers a different question: the preamble asks WHO is calling, this asks WHERE FROM. It
- * runs AFTER the readiness refusal, because it is request validation and that is where every
- * other member's request validation sits (`invalidGrantedBy`, `invalidAmount`).
- *
- * `invalidCallSite` covers BOTH a missing and an unrecognised declaration: "not declared" is
- * wrong for the second, and a caller cannot fix what it is not told.
- *
- * @param {object|null} request the member's own request
- * @param {{isElectedExecutor: () => boolean}} seams
- * @returns {string|null} the refusal outcome, or `null` when the call site is admitted
- */
-function gateCompanionCheckCallSite(request, seams) {
-  const callSite = request?.callSite;
-  if (callSite !== COMPANION_CALL_SITES.gmAction && callSite !== COMPANION_CALL_SITES.broadcast) {
-    return COMPANION_OUTCOMES.invalidCallSite;
-  }
-  // A broadcast handler fires on EVERY connected client. Without this, N clients each roll N
-  // DIFFERENT totals and return them to N companion instances, which then apply N sets of
-  // consequences Fabricate can neither see nor reconcile. The election admits assistant GMs
-  // and prefers a full GM only when one is connected, so a sole connected assistant IS elected.
-  if (callSite === COMPANION_CALL_SITES.broadcast && seams.isElectedExecutor() !== true) {
-    return COMPANION_OUTCOMES.notElected;
-  }
-  return null;
-}
 
 /**
  * The display label the roll goes to chat and to the dialog under.
@@ -210,7 +180,7 @@ function discriminateCheckOutcome(result, graded) {
  * @returns {Promise<Readonly<object>>} a companion-contract answer; NEVER throws
  */
 export async function rollActorCheck(request, seams) {
-  const refusal = gateCompanionCheckCallSite(request, seams);
+  const refusal = gateCompanionCallSite(request, seams);
   if (refusal) return checkRollResult(refusal);
 
   const label = resolveCheckLabel(request?.label, seams);
@@ -340,7 +310,7 @@ export async function rollActorCheck(request, seams) {
  * @returns {Promise<Readonly<object>>} a companion-contract answer; NEVER throws
  */
 export async function resolveBulkCheckDecision(request, seams) {
-  const refusal = gateCompanionCheckCallSite(request, seams);
+  const refusal = gateCompanionCallSite(request, seams);
   if (refusal) return bulkCheckDecisionResult(refusal);
 
   const formulas = Array.isArray(request?.formulas) ? request.formulas : [];

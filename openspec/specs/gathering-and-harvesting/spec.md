@@ -1828,6 +1828,9 @@ There is no multi-step gathering state in this phase.
 
 ### Award Item Stacking
 
+These rules govern the **gathering** award, and only it.
+The companion-facing `awardComponents` member stacks by rules of its own, stated in `companion-api/spec.md`; two capabilities one word apart must cross-reference each other, or the wrong rule gets applied to one of them.
+
 A fresh award may stack onto an existing owned item carrying a value at the configured stack-quantity path, only through the list-aware Component Item Matching resolver named in the data-models spec, supplied the awarding system's resolved component set and system id.
 The stack-quantity path is tested for presence, not numericality: a stored non-numeric value still counts as stackable, so a system that stores the count as a string does not silently stop stacking.
 An award must never be folded into an owned item that resolves to a different component than the award source.

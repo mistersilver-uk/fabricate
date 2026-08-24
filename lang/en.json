@@ -1440,6 +1440,38 @@
         "LadderEmpty": "This world has no currency units configured, so no cost can be priced.",
         "LadderInvalid": "This world's currency configuration is invalid, so no cost can be priced: {detail}",
         "CheckUnavailable": "The affordability check could not be completed: {detail}"
+      },
+      "Credit": {
+        "Credited": "{actor} was credited {amount} {unit}.",
+        "CreditFailed": "The currency credit was not applied: {detail}",
+        "CreditUnavailable": "The currency credit could not be confirmed, so no amount is reported: {detail}",
+        "CreditNotConfigured": "This world's currency configuration cannot apply this credit, so nothing was written: {detail}",
+        "UnitNotFound": "No currency unit named {unit} is configured for this world.",
+        "InvalidAmount": "The amount to credit must be a whole number of coins greater than zero; it is never rounded, because a rounded amount is a different amount.",
+        "LadderEmpty": "This world has no currency units configured, so no credit can be applied.",
+        "LadderInvalid": "This world's currency configuration is invalid, so no credit can be applied: {detail}",
+        "InvalidCallSite": "A currency credit must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client credited nothing.",
+        "GMOnly": "Only a GM can credit currency to a character.",
+        "NoActor": "No such actor to credit currency to.",
+        "NotReady": "Fabricate is still starting up, so currency cannot be credited yet."
+      }
+    },
+    "Component": {
+      "Award": {
+        "Awarded": "Placed on the character sheet.",
+        "PartiallyAwarded": "Some of the components asked for were placed on the character sheet, and the rest were not; each entry reports its own result.",
+        "Failed": "The component award could not be completed.",
+        "ComponentNotFound": "No such component to award in this crafting system.",
+        "InvalidQuantity": "The quantity to award must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "MultiUnitUnsupported": "This item cannot carry a stack quantity, so more than one unit of it cannot be awarded. Either this game system has no quantity field on its items, or this world's configured item stack-quantity path does not name the count — check Fabricate's stack-quantity path advisory before awarding single units one at a time, because on a misconfigured path that leaves loose items that will never stack.",
+        "InvalidAwards": "The components to award must be a list of between one and {max} entries, each naming exactly a component and a quantity.",
+        "SystemNotFound": "No crafting system named {system} to award components from.",
+        "InvalidCallSite": "A component award must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client awarded nothing.",
+        "GMOnly": "Only a GM can award components to a character.",
+        "NoActor": "No such actor to award components to.",
+        "NotReady": "Fabricate is still starting up, so components cannot be awarded yet."
       }
     },
     "Admin": {

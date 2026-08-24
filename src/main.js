@@ -120,16 +120,22 @@ import {
   CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_CONTRACT,
   COMPANION_OUTCOMES,
+  COMPONENT_AWARD_MESSAGE_KEYS,
+  CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
+  componentAwardResult,
+  currencyCreditResult,
   knowledgeGrantResult
 } from './systems/companionContract.js';
 // Aliased on import because the facade delegator below carries the SAME name. A class
 // method is not a bare identifier in its own body, so the unaliased import would resolve
 // correctly and read as a recursive call to every human who met it.
 import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from './systems/companionKnowledgeGrant.js';
+// Aliased for the same reason as the grant above.
+import { awardComponents as awardComponentsToActor } from './systems/companionComponentAward.js';
 // Aliased for the same reason as the grant above: both facade delegators carry the SAME
 // names as the free functions they delegate to.
 import {
@@ -152,7 +158,25 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
   noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
 });
-import { checkWorldCurrencyAffordability } from './systems/currencyAffordance.js';
+
+/**
+ * `awardComponents`' and `creditCurrency`'s OWN refusal strings, hoisted for the same reason
+ * (issue 1301).
+ *
+ * Two pairs and not one: the whole point of parameterising the preamble is that a refused
+ * award reports itself in the award's words and a refused credit in the credit's, and a shared
+ * pair would be the cross-member vocabulary leak the parameter exists to prevent.
+ */
+const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+
+const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+import { checkWorldCurrencyAffordability, creditWorldCurrency } from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -2507,10 +2531,71 @@ class Fabricate {
     if (gate.outcome || this.ready !== true) {
       return affordabilityResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
-    return await checkWorldCurrencyAffordability(gate.actor, { unitId, amount }, {
+    return await checkWorldCurrencyAffordability(gate.actor, { unitId, amount }, this._worldCurrencySeams());
+  }
+
+  /**
+   * The ONE seam bag both WORLD-scoped currency members inject (issue 1301).
+   *
+   * Hoisted for the reason {@link Fabricate#_companionCheckSeams} is: neither delegator
+   * restates it, and the harness mirror has one thing to keep faithful rather than two. It
+   * removes an existing duplicated run as well as shortening both bodies — this literal was
+   * already spelled twice, here and in the mirror.
+   *
+   * `isElectedExecutor` is deliberately NOT here. The check does not gate on a call site — it
+   * writes nothing, so N clients answering the same question is harmless — and a seam present
+   * in the bag but read by only one of its two consumers is how a gate ends up being assumed
+   * rather than declared. `creditCurrency` spreads this bag and adds it.
+   *
+   * @returns {object}
+   * @private
+   */
+  _worldCurrencySeams() {
+    return {
       getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
       actorPropertyCoinSpender: this.actorPropertyCoinSpender,
       actorInventoryCoinSpender: this.actorInventoryCoinSpender
+    };
+  }
+
+  /**
+   * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
+   * ladder (issue 1301).
+   *
+   * Sited beside {@link Fabricate#checkAffordability} and the bag they share, rather than after
+   * `awardComponents`, so the two WORLD-CURRENCY members read together — and so the two new
+   * delegators are not adjacent in either this file or its harness mirror. That second effect
+   * is measured rather than incidental: adjacent, near-identical delegators concatenate into
+   * ONE duplicated run across the two files, and the pair measured over the bar while each
+   * member alone measures under it.
+   *
+   * World scope, never a crafting system, exactly as {@link Fabricate#checkAffordability} is —
+   * the two share their request resolution through {@link Fabricate#_worldCurrencySeams} and
+   * the leaf's own shared resolver, so they can never disagree about what `50 gp` means.
+   *
+   * It routes through the resolved spender's `refund`, which under `spendStrategy: 'macro'`
+   * runs the GM's `increment` macro — a macro that until now ran only on the player-cancel
+   * refund. The `caller: 'award'` token the leaf passes is what lets that macro tell a
+   * companion credit from a cancelled craft.
+   *
+   * NOT IDEMPOTENT, for the same reason the award is not: crediting 50 gp twice is legitimately
+   * 100 gp, and nothing Fabricate can read tells a duplicate from a second, intended credit.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The actor to credit (never an actor uuid).
+   * @param {string|null} [options.unitId] The coin unit the credit is denominated in.
+   * @param {number|string|null} [options.amount] A whole positive number of that unit.
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await creditWorldCurrency(gate.actor, { unitId, amount, callSite }, {
+      ...this._worldCurrencySeams(),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
     });
   }
 
@@ -2604,6 +2689,66 @@ class Fabricate {
     }
     return await resolveStandaloneBulkCheckDecision({ callSite, formulas }, this._companionCheckSeams());
   }
+
+  /**
+   * The seam bag {@link Fabricate#awardComponents} injects (issue 1301).
+   *
+   * FIVE seams, and the sixth the leaf declares — `createOrStack` — is deliberately absent:
+   * the leaf defaults it to the shared `createOrStackComponentItem` import, so passing it here
+   * would give the create primitive two spellings and let a facade change silently route the
+   * award past the seam whose `[created] ?? null` normalisation the answer's truthfulness rests
+   * on. It stays injectable for tests and defaulted in production.
+   *
+   * `findComponentItems` is the PUBLISHED resolver a companion can already reach for itself,
+   * which is what keeps what an award stacks onto and what salvage consumes from disagreeing.
+   * It is guarded with `?? []` because the engine is `null` before readiness — the member's own
+   * readiness refusal runs first, so this is a floor rather than a path.
+   *
+   * @returns {object}
+   * @private
+   */
+  _componentAwardSeams() {
+    return {
+      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? [],
+      resolveSourceItem: (uuid) => fromUuid(uuid),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
+    };
+  }
+
+  /**
+   * `COMPANION.awardComponents` — place one or more of a crafting system's components onto an
+   * actor's sheet (issue 1301).
+   *
+   * The write half of a pair the contract has published half of since issue 1289:
+   * `getCraftingEngine().findComponentItems` resolves an actor's existing stacks "so an award
+   * can stack rather than duplicate", and until now nothing published could perform that award.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order, reusing the
+   * shared preamble VERBATIM — and hands the resolved actor plus the seam bag to the leaf,
+   * which owns the call-site gate, the election, the `awards` validation and the per-entry
+   * quantity domain, because those are request validation and sit where every other member's
+   * request validation sits.
+   *
+   * NOT IDEMPOTENT, and deliberately: an award has no natural key, so awarding three hides
+   * twice is legitimately six hides. The caller owns not double-awarding.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The actor to award to (never an actor uuid).
+   * @param {string|null} [options.systemId] The crafting system every entry resolves within.
+   * @param {Array<object>|null} [options.awards] `{ componentId, quantity }` entries, in order.
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return componentAwardResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await awardComponentsToActor(gate.actor, { systemId, awards, callSite }, this._componentAwardSeams());
+  }
+
 
   /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
@@ -4114,9 +4259,10 @@ function bindFabricateGlobal() {
     // any collaborator exists — that is the whole affordance, and it is what lets a
     // companion version-check before it calls.
     //
-    // The four `stable` behavioural members it declares — `grantRecipeKnowledge` and
+    // The six `stable` behavioural members it declares — `grantRecipeKnowledge` and
     // `checkAffordability` from issue 1289, `rollActorCheck` and `resolveBulkCheckDecision`
-    // from issue 1293 — are METHODS ON THE FACADE, not entries in this class bag, and
+    // from issue 1293, `awardComponents` and `creditCurrency` from issue 1301 — are METHODS ON
+    // THE FACADE, not entries in this class bag, and
     // deliberately so: everything above is a constructor a caller instantiates, while
     // `grantRecipeKnowledge` is an unbounded, GM-gated write whose only authorised route is
     // the gated facade method. Publishing a grant symbol beside these classes would hand out
