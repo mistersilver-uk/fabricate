@@ -1730,7 +1730,7 @@
   // gathering d100 drop rows, events and stamina costs reference it. Every surface that
   // reads a modifier reads this one derivation.
   const selectedSystemModifiers = $derived(
-    Array.isArray(selectedSystem?.modifiers) ? selectedSystem.modifiers : []
+    Array.isArray($viewState.worldModifiers) ? $viewState.worldModifiers : []
   );
   // The currency ladder is WORLD scope (issue 1278) — one config for the whole world, because a
   // world runs exactly one ruleset and so has exactly one way actors store coins.
@@ -1786,55 +1786,54 @@
       label: provider.label,
     }))
   );
+  // WORLD scope since issue 1308: none of these takes a system id, and none of them requires a
+  // crafting system to be SELECTED. That second half is the part that is easy to get wrong — the
+  // old `if (!selectedSystemId) return;` guards were correct while the library belonged to a
+  // system and become a silent no-op once it does not, so a GM editing the library with no system
+  // selected would click Add and watch nothing happen. Currency's handlers below dropped the same
+  // guard for the same reason.
   async function onAddCharacterModifier(partial) {
-    if (!selectedSystemId) return null;
-    return await store.addSystemModifier(selectedSystemId, partial);
+    return await store.addSystemModifier(partial);
   }
   async function onSeedCharacterModifierPresets() {
-    if (!selectedSystemId || !characterModifierPresetsSupported) return;
-    await store.seedSystemModifierPresets(selectedSystemId);
+    if (!characterModifierPresetsSupported) return;
+    await store.seedSystemModifierPresets();
   }
   async function onUpdateCharacterModifier(modifierId, patch) {
-    if (!selectedSystemId) return;
-    await store.updateSystemModifier(selectedSystemId, modifierId, patch);
+    await store.updateSystemModifier(modifierId, patch);
   }
   async function onDeleteCharacterModifier(modifierId) {
-    if (!selectedSystemId) return;
-    await store.deleteSystemModifier(selectedSystemId, modifierId);
+    await store.deleteSystemModifier(modifierId);
   }
   async function onReorderCharacterModifier(fromIndex, toIndex) {
-    if (!selectedSystemId) return;
-    await store.reorderSystemModifier(fromIndex, toIndex, selectedSystemId);
+    await store.reorderSystemModifier(fromIndex, toIndex);
   }
 
-  // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
+  // Character prerequisites (issue 544) — pass/fail learning gates, WORLD scope since issue
+  // 1308, so these handlers take no system id and need no selection either.
   const selectedCharacterPrerequisites = $derived(
-    Array.isArray(selectedSystem?.characterPrerequisites)
-      ? selectedSystem.characterPrerequisites
+    Array.isArray($viewState.worldCharacterPrerequisites)
+      ? $viewState.worldCharacterPrerequisites
       : []
   );
   const characterPrerequisitePresetsSupported = $derived(
     ['dnd5e', 'pf2e'].includes(foundrySystemId)
   );
   async function onAddCharacterPrerequisite(partial) {
-    if (!selectedSystemId) return null;
-    return await store.addCharacterPrerequisite(selectedSystemId, partial);
+    return await store.addCharacterPrerequisite(partial);
   }
   async function onUpdateCharacterPrerequisite(prerequisiteId, patch) {
-    if (!selectedSystemId) return;
-    await store.updateCharacterPrerequisite(selectedSystemId, prerequisiteId, patch);
+    await store.updateCharacterPrerequisite(prerequisiteId, patch);
   }
   async function onDeleteCharacterPrerequisite(prerequisiteId) {
-    if (!selectedSystemId) return;
-    await store.deleteCharacterPrerequisite(selectedSystemId, prerequisiteId);
+    await store.deleteCharacterPrerequisite(prerequisiteId);
   }
   async function onReorderCharacterPrerequisite(fromIndex, toIndex) {
-    if (!selectedSystemId) return;
-    await store.reorderCharacterPrerequisite(fromIndex, toIndex, selectedSystemId);
+    await store.reorderCharacterPrerequisite(fromIndex, toIndex);
   }
   async function onSeedCharacterPrerequisitePresets() {
-    if (!selectedSystemId || !characterPrerequisitePresetsSupported) return;
-    await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
+    if (!characterPrerequisitePresetsSupported) return;
+    await store.seedCharacterPrerequisitePresetsForSystem();
   }
 
   // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them
@@ -2892,7 +2891,7 @@
   // see the Validation hero, which says so rather than claiming "Ready to enable" for
   // unsaved work.
   const checksDraftSystem = $derived({
-    modifiers: selectedSystem?.modifiers || [],
+    modifiers: selectedSystemModifiers,
     craftingCheck: selectedSystem?.craftingCheck || {},
     salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
     gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
@@ -9863,7 +9862,7 @@
               'perRecord'}
             gatheringFailureResultPolicy={selectedSystem?.gatheringCraftingCheck
               ?.failureResultPolicy || 'perRecord'}
-            modifiers={selectedSystem?.modifiers || []}
+            modifiers={selectedSystemModifiers}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
@@ -9945,7 +9944,7 @@
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedSystemModifiers}
-        checkModifierOptions={selectedSystem?.modifiers || []}
+        checkModifierOptions={selectedSystemModifiers}
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
           'addAll'}
         gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
@@ -10009,7 +10008,7 @@
           : []}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
-        prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
+        prerequisiteOptions={selectedCharacterPrerequisites}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onOpenSystems={selectSystemAndShowBrowser}
         onOpenSystem={() => editSystem(selectedSystem.id)}
@@ -10086,7 +10085,7 @@
           {salvageOutcomeNames}
           {salvageCheckEnabled}
           {salvageCheckTiers}
-          checkModifierOptions={selectedSystem?.modifiers || []}
+          checkModifierOptions={selectedSystemModifiers}
           salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
@@ -10168,7 +10167,7 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
-        craftingModifierOptions={selectedSystem?.modifiers || []}
+        craftingModifierOptions={selectedSystemModifiers}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
         craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
@@ -13018,7 +13017,7 @@
           <ToolBrowserInspector
             tool={selectedLibraryTool}
             managedItems={selectedSystem?.managedItemOptions || []}
-            prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
+            prerequisiteOptions={selectedCharacterPrerequisites}
             authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             onEdit={openToolEditor}
           />

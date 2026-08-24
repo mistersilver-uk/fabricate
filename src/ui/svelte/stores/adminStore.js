@@ -1191,6 +1191,16 @@ function _emptyWorldCurrencyState() {
   };
 }
 
+// The WORLD character libraries projection (issue 1308), a top-level sibling for the reason the
+// currency projection is one: hanging a world library off `selectedSystem` would make the same
+// library appear to change when the GM merely clicks a different crafting system.
+function _emptyCharacterLibrariesState() {
+  return {
+    worldCharacterPrerequisites: [],
+    worldModifiers: [],
+  };
+}
+
 function _emptyTravelState() {
   return {
     travelParties: [],
@@ -1872,6 +1882,7 @@ export function createAdminStore(services) {
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
     ..._emptyWorldCurrencyState(),
+    ..._emptyCharacterLibrariesState(),
   });
 
   function _setEnvironmentDraftState(
@@ -3274,32 +3285,35 @@ export function createAdminStore(services) {
 
   // --- Character prerequisites (issue 544) — system-owned pass/fail gates ------
 
-  function _systemCharacterPrerequisites(systemId) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return [];
-    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
-    return normalizeCharacterPrerequisiteList(system?.characterPrerequisites, _randomID);
+  /**
+   * The world character-libraries store (issue 1308). Both libraries are world scope now, so
+   * none of the list actions below takes a crafting system id and none of them requires a system
+   * to be selected — a GM authors these from a world surface, exactly as they do the coin ladder.
+   *
+   * @returns {object|null}
+   */
+  function _characterLibrariesStore() {
+    return services.getCharacterLibrariesStore?.() ?? null;
   }
 
-  async function _persistSystemCharacterPrerequisites(systemId, prerequisites) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return null;
-    const systemManager = services.getCraftingSystemManager?.();
-    if (!systemManager?.updateSystem) return null;
+  function _systemCharacterPrerequisites() {
+    const store = _characterLibrariesStore();
+    return normalizeCharacterPrerequisiteList(store?.listCharacterPrerequisites?.(), _randomID);
+  }
+
+  async function _persistSystemCharacterPrerequisites(prerequisites) {
+    const store = _characterLibrariesStore();
+    if (!store?.saveCharacterPrerequisites) return null;
     const normalized = normalizeCharacterPrerequisiteList(prerequisites, _randomID);
-    const updated = await systemManager.updateSystem(id, { characterPrerequisites: normalized });
-    return Array.isArray(updated?.characterPrerequisites)
-      ? updated.characterPrerequisites
-      : normalized;
+    const saved = await store.saveCharacterPrerequisites(normalized);
+    return Array.isArray(saved?.characterPrerequisites) ? saved.characterPrerequisites : normalized;
   }
 
-  async function addCharacterPrerequisite(systemId = get(selectedSystemId), partial = {}) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return null;
+  async function addCharacterPrerequisite(partial = {}) {
     const entry = normalizeCharacterPrerequisite({ id: _randomID(), ...partial }, _randomID);
     if (!entry) return null;
-    const persisted = await _persistSystemCharacterPrerequisites(id, [
-      ..._systemCharacterPrerequisites(id),
+    const persisted = await _persistSystemCharacterPrerequisites([
+      ..._systemCharacterPrerequisites(),
       entry,
     ]);
     if (persisted === null) return null;
@@ -3307,33 +3321,27 @@ export function createAdminStore(services) {
     return entry;
   }
 
-  async function updateCharacterPrerequisite(
-    systemId = get(selectedSystemId),
-    prerequisiteId,
-    updates = {}
-  ) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id || !prerequisiteId) return false;
+  async function updateCharacterPrerequisite(prerequisiteId, updates = {}) {
+    if (!prerequisiteId) return false;
     let changed = false;
-    const next = _systemCharacterPrerequisites(id).map((entry) => {
+    const next = _systemCharacterPrerequisites().map((entry) => {
       if (entry.id !== prerequisiteId) return entry;
       changed = true;
       return normalizeCharacterPrerequisite({ ...entry, ...updates, id: entry.id }, _randomID);
     });
     if (!changed) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const persisted = await _persistSystemCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
   }
 
-  async function deleteCharacterPrerequisite(systemId = get(selectedSystemId), prerequisiteId) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id || !prerequisiteId) return false;
-    const current = _systemCharacterPrerequisites(id);
+  async function deleteCharacterPrerequisite(prerequisiteId) {
+    if (!prerequisiteId) return false;
+    const current = _systemCharacterPrerequisites();
     const next = current.filter((entry) => entry.id !== prerequisiteId);
     if (next.length === current.length) return false; // unknown id — nothing removed
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const persisted = await _persistSystemCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
@@ -3347,27 +3355,18 @@ export function createAdminStore(services) {
    *
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<boolean>}
    */
-  async function reorderCharacterPrerequisite(
-    fromIndex,
-    toIndex,
-    systemId = get(selectedSystemId)
-  ) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return false;
-    const next = _reorderListByIndex(_systemCharacterPrerequisites(id), fromIndex, toIndex);
+  async function reorderCharacterPrerequisite(fromIndex, toIndex) {
+    const next = _reorderListByIndex(_systemCharacterPrerequisites(), fromIndex, toIndex);
     if (!next) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const persisted = await _persistSystemCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
   }
 
-  async function seedCharacterPrerequisitePresetsForSystem(systemId = get(selectedSystemId)) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return { added: 0, skipped: 0, unsupported: true, foundrySystemId: '' };
+  async function seedCharacterPrerequisitePresetsForSystem() {
     const foundrySystemId = String(services.getFoundrySystemId?.() || '');
     const presets = getCharacterPrerequisitePresetsForFoundrySystem(foundrySystemId);
     if (presets.length === 0) {
@@ -3375,10 +3374,10 @@ export function createAdminStore(services) {
     }
     const { added, skipped, next } = seedCharacterPrerequisitePresets({
       presets,
-      currentLibrary: _systemCharacterPrerequisites(id),
+      currentLibrary: _systemCharacterPrerequisites(),
     });
     if (added.length > 0) {
-      const persisted = await _persistSystemCharacterPrerequisites(id, next);
+      const persisted = await _persistSystemCharacterPrerequisites(next);
       if (persisted === null) {
         return { added: 0, skipped: skipped.length, unsupported: false, foundrySystemId };
       }
@@ -4711,6 +4710,7 @@ export function createAdminStore(services) {
       ...environmentState,
       ...travel.buildState(),
       ...buildWorldCurrencyState(),
+      ...buildCharacterLibrariesState(),
     }));
   }
 
@@ -4722,6 +4722,18 @@ export function createAdminStore(services) {
     const store = services.getCurrencyConfigStore?.();
     if (!store) return _emptyWorldCurrencyState();
     return { worldCurrency: normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID }) };
+  }
+
+  // Read the world character libraries straight from their store on every publish, for the same
+  // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
+  // invalidate because there is no per-system copy any more.
+  function buildCharacterLibrariesState() {
+    const store = _characterLibrariesStore();
+    if (!store) return _emptyCharacterLibrariesState();
+    return {
+      worldCharacterPrerequisites: store.listCharacterPrerequisites?.() ?? [],
+      worldModifiers: store.listModifiers?.() ?? [],
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -7339,27 +7351,27 @@ export function createAdminStore(services) {
    * @param {string} systemId Target crafting system id.
    * @returns {{ manager: object, system: object, library: Array<object> }|null}
    */
-  function _systemModifierContext(systemId) {
-    const systemManager = services.getCraftingSystemManager();
-    const system = systemId ? systemManager?.getSystem?.(systemId) : null;
-    if (!system) return null;
-    return {
-      manager: systemManager,
-      system,
-      library: Array.isArray(system.modifiers) ? system.modifiers : [],
-    };
+  /**
+   * The world modifier library and the store that owns it (issue 1308). No crafting system is
+   * consulted and none needs to be selected: the library is authored once for the world.
+   *
+   * @returns {{ store: object, library: Array<object> }|null}
+   */
+  function _systemModifierContext() {
+    const store = _characterLibrariesStore();
+    if (!store) return null;
+    return { store, library: store.listModifiers?.() ?? [] };
   }
 
   /**
-   * Persist a whole replacement modifier library for one system and re-project.
+   * Persist a whole replacement world modifier library and re-project.
    *
-   * @param {string} systemId Target crafting system id.
-   * @param {object} manager The crafting system manager.
+   * @param {object} store The world character-libraries store.
    * @param {Array<object>} next The replacement library.
    * @returns {Promise<void>}
    */
-  async function _saveSystemModifierLibrary(systemId, manager, next) {
-    await manager.updateSystem(systemId, { modifiers: next });
+  async function _saveSystemModifierLibrary(store, next) {
+    await store.saveModifiers(next);
     await refresh();
   }
 
@@ -7372,8 +7384,8 @@ export function createAdminStore(services) {
    * @param {object} [partial] Partial entry (id, label, icon, expression, min, max).
    * @returns {Promise<object|null>}
    */
-  async function addSystemModifier(systemId = get(selectedSystemId), partial = {}) {
-    const context = _systemModifierContext(systemId);
+  async function addSystemModifier(partial = {}) {
+    const context = _systemModifierContext();
     if (!context) return null;
     const id = String(partial?.id || _randomID());
     if (context.library.some((entry) => entry.id === id)) return null;
@@ -7388,7 +7400,7 @@ export function createAdminStore(services) {
       expression: partial?.expression || '',
     });
     if (!entry) return null;
-    await _saveSystemModifierLibrary(systemId, context.manager, [...context.library, entry]);
+    await _saveSystemModifierLibrary(context.store, [...context.library, entry]);
     return entry;
   }
 
@@ -7396,19 +7408,18 @@ export function createAdminStore(services) {
    * Update one modifier entry by id. Updates that fail normalization (e.g. no id)
    * preserve the prior entry. Returns true when the library changed.
    *
-   * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id.
    * @param {object} [updates] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateSystemModifier(systemId = get(selectedSystemId), modifierId, updates = {}) {
-    const context = _systemModifierContext(systemId);
+  async function updateSystemModifier(modifierId, updates = {}) {
+    const context = _systemModifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.map((entry) =>
       entry.id === modifierId ? _normalizeSystemModifier({ ...entry, ...updates }) || entry : entry
     );
     if (next.every((entry, index) => entry === context.library[index])) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    await _saveSystemModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7418,16 +7429,15 @@ export function createAdminStore(services) {
    * treats an unresolved reference as misconfiguration, and the check normalizer drops a
    * dangling `defaultModifierIds` entry on the next save).
    *
-   * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteSystemModifier(systemId = get(selectedSystemId), modifierId) {
-    const context = _systemModifierContext(systemId);
+  async function deleteSystemModifier(modifierId) {
+    const context = _systemModifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.filter((entry) => entry.id !== modifierId);
     if (next.length === context.library.length) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    await _saveSystemModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7437,29 +7447,26 @@ export function createAdminStore(services) {
    *
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<boolean>}
    */
-  async function reorderSystemModifier(fromIndex, toIndex, systemId = get(selectedSystemId)) {
-    const context = _systemModifierContext(systemId);
+  async function reorderSystemModifier(fromIndex, toIndex) {
+    const context = _systemModifierContext();
     if (!context) return false;
     const next = _reorderListByIndex(context.library, fromIndex, toIndex);
     if (!next) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    await _saveSystemModifierLibrary(context.store, next);
     return true;
   }
 
   /**
-   * Idempotently seed the active Foundry game system's preset bundle into the
-   * selected crafting system's modifier library. Existing ids are preserved; the
-   * return value identifies added vs. skipped presets and flags unsupported
-   * Foundry systems for the caller to surface to the GM.
+   * Idempotently seed the active Foundry game system's preset bundle into the WORLD modifier
+   * library. Existing ids are preserved; the return value identifies added vs. skipped presets
+   * and flags unsupported Foundry systems for the caller to surface to the GM.
    *
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<{added: Array, skipped: Array, unsupported: boolean, foundrySystemId?: string}>}
    */
-  async function seedSystemModifierPresets(systemId = get(selectedSystemId)) {
-    const context = _systemModifierContext(systemId);
+  async function seedSystemModifierPresets() {
+    const context = _systemModifierContext();
     if (!context) return { added: [], skipped: [], unsupported: true };
     const foundrySystemId =
       typeof services.getFoundrySystemId === 'function'
@@ -7474,18 +7481,17 @@ export function createAdminStore(services) {
       currentLibrary: context.library,
     });
     await _saveSystemModifierLibrary(
-      systemId,
-      context.manager,
+      context.store,
       result.next.map((entry) => _normalizeSystemModifier(entry)).filter(Boolean)
     );
     return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
   }
 
-  // The default a freshly added reference points at. It reads the SYSTEM library (issue
-  // 1117), not the gathering config, which is why it takes a system id rather than the
-  // gathering `systemConfig` block its callers already hold.
-  function _firstCharacterModifierId(systemId) {
-    return _systemModifierContext(systemId)?.library?.[0]?.id || '';
+  // The default a freshly added reference points at. It reads the ONE library (issue 1117),
+  // which since issue 1308 is world scope, so it consults neither the gathering config nor a
+  // crafting system.
+  function _firstCharacterModifierId() {
+    return _systemModifierContext()?.library?.[0]?.id || '';
   }
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
@@ -7530,7 +7536,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
+      partial?.modifierId || _firstCharacterModifierId() || ''
     ).trim();
     if (!modifierId) return null;
     let created = null;
@@ -7648,7 +7654,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
+      partial?.modifierId || _firstCharacterModifierId() || ''
     ).trim();
     if (!modifierId) return null;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);

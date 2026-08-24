@@ -25,7 +25,6 @@
  */
 import { activityFailureResultPolicy } from '../../../utils/failureResultPolicy.js';
 import { buildLearnedRecipeActorIndex } from '../../../utils/recipeDeleteImpact.js';
-import { normalizeCharacterPrerequisiteList } from '../../../systems/characterPrerequisites.js';
 import {
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
@@ -418,12 +417,10 @@ export function buildSelectedSystemViewData(
       ? selectedSystem.tools.map((tool) => _normalizeGatheringLibraryTool(tool))
       : [],
 
-    // System-owned character prerequisite library (issue 544). Surfaced through
-    // the allowlist projection (like `tools`) so the System Settings accordion
-    // and the recipe-item learning-gate picker read them.
-    characterPrerequisites: normalizeCharacterPrerequisiteList(
-      selectedSystem.characterPrerequisites
-    ),
+    // The character prerequisite library is NOT projected here any more (issue 1308). It is a
+    // WORLD library now, so projecting it off the selected system would be a second, always-empty
+    // source of truth — the same trap the currency `units` note below describes. Its readers take
+    // it from the view state's own world slice instead.
 
     // The currency fallback carries participation ONLY: the ladder is world scope since issue
     // 1278, so a `units` array here would be a second, always-empty source of truth for a
@@ -489,16 +486,17 @@ export function buildSelectedSystemViewData(
       // longer here: it moved to the system level and is projected below.
       ..._buildCheckModifierSelectionView(selectedSystem.craftingCheck, selectedSystem, 'crafting'),
     },
-    // The ONE system-level modifier library (issue 1117). This hand-built projection is an
-    // ALLOWLIST: a field omitted here is INVISIBLE to the UI, however correctly the
-    // normalizer and the write path behave — so without this line the library editor, all
-    // three eligibility pickers, the recipe override control AND every gathering drop-row,
-    // event and stamina-cost modifier picker all read empty. It absorbed both the
-    // check-modifier catalogue (`system.checkModifiers`) and the gathering character-
-    // modifier library (`gatheringConfig.systems[id].characterModifiers`).
-    modifiers: Array.isArray(selectedSystem.modifiers)
-      ? selectedSystem.modifiers.map((modifier) => _clonePlain(modifier))
-      : [],
+    // The modifier library is NOT projected here any more (issue 1308), for the same reason as
+    // the prerequisite library above: it moved to WORLD scope, so a per-system projection could
+    // only ever be empty.
+    //
+    // The warning this line used to carry still applies to everything AROUND it, and is worth
+    // keeping stated: this hand-built projection is an ALLOWLIST, so a field omitted here is
+    // INVISIBLE to the UI however correctly the normalizer and the write path behave. When this
+    // library was system-scoped, dropping its line left the library editor, all three eligibility
+    // pickers, the recipe override control and every gathering drop-row, event and stamina-cost
+    // modifier picker reading empty. Those consumers now read the world slice, and the same rule
+    // governs it there.
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
     // The engine normalizer defaults unknown/missing to "toolSpecific".

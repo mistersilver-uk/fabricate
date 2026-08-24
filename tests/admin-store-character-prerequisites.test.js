@@ -1,10 +1,11 @@
 /**
- * Coverage for the system-owned character prerequisite library CRUD in
- * adminStore (issue 544). Prerequisites live on the crafting system document
- * (`system.characterPrerequisites`, persisted through the crafting system
- * manager's `craftingSystems` setting), so the mock `updateSystem` round-trips
- * them through the real `normalizeCharacterPrerequisiteList` — the same shape the
- * production manager produces.
+ * Coverage for the character prerequisite library CRUD in adminStore (issue 544).
+ *
+ * The library moved to WORLD scope in issue 1308, so it is persisted through the
+ * `CharacterLibrariesStore` rather than through the crafting system, none of the actions takes a
+ * crafting system id, and — the part worth pinning — none of them requires a system to be
+ * SELECTED. The fake store below is the real class over an in-memory setting, so the round trip
+ * goes through the real `normalizeCharacterPrerequisiteList`.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +13,7 @@ import { get } from 'svelte/store';
 
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../src/systems/characterPrerequisites.js';
+import { CharacterLibrariesStore } from '../src/systems/CharacterLibrariesStore.js';
 
 function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) {
   const store = {};
@@ -24,8 +26,21 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
     recipeVisibility: { listMode: 'global' },
     requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
     tools: [],
-    characterPrerequisites: normalizeCharacterPrerequisiteList(prerequisites, () => `seed-${++idSeq}`),
   };
+  const worldSetting = {
+    characterPrerequisites: normalizeCharacterPrerequisiteList(
+      prerequisites,
+      () => `seed-${++idSeq}`
+    ),
+    modifiers: [],
+  };
+  const characterLibrariesStore = new CharacterLibrariesStore({
+    getSetting: () => worldSetting,
+    setSetting: async (_key, value) => {
+      Object.assign(worldSetting, value);
+    },
+    randomID: () => `mgr-${++idSeq}`,
+  });
   const systemManager = {
     getSystems: () => [system],
     getSystem: (id) => (id === system.id ? system : null),
@@ -35,13 +50,7 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
     deleteItem: async () => {},
     updateSystem: async (id, updates = {}) => {
       if (id !== system.id) return null;
-      if (Object.prototype.hasOwnProperty.call(updates, 'characterPrerequisites')) {
-        system.characterPrerequisites = normalizeCharacterPrerequisiteList(
-          updates.characterPrerequisites,
-          () => `mgr-${++idSeq}`
-        );
-      }
-      Object.assign(system, { ...updates, characterPrerequisites: system.characterPrerequisites });
+      Object.assign(system, updates);
       return system;
     },
   };
@@ -51,6 +60,7 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
       store[key] = value;
     },
     getCraftingSystemManager: () => systemManager,
+    getCharacterLibrariesStore: () => characterLibrariesStore,
     getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => foundrySystemId,
@@ -60,6 +70,7 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
     confirmDialog: async () => true,
     localize: (key) => key,
     _system: system,
+    _worldSetting: worldSetting,
   };
 }
 
@@ -71,11 +82,18 @@ async function storeFor(overrides) {
 }
 
 describe('adminStore character prerequisites (system-owned)', () => {
-  it('surfaces the prerequisite library on the selectedSystem projection', async () => {
+  it('surfaces the prerequisite library on the WORLD projection, not on selectedSystem', async () => {
     const { store } = await storeFor({
       prerequisites: [{ id: 'p1', name: 'Expert', path: '@skills.cra.rank', op: 'gte', value: 2 }],
     });
-    const projected = get(store.viewState).selectedSystem.characterPrerequisites;
+    const state = get(store.viewState);
+    assert.equal(
+      state.selectedSystem.characterPrerequisites,
+      undefined,
+      'a world library must not be hung off the selection, or it would appear to change when the ' +
+        'GM merely clicks a different crafting system'
+    );
+    const projected = state.worldCharacterPrerequisites;
     assert.equal(projected.length, 1);
     assert.deepEqual(projected[0], {
       id: 'p1',
@@ -89,29 +107,29 @@ describe('adminStore character prerequisites (system-owned)', () => {
 
   it('addCharacterPrerequisite appends a normalized entry with a generated id', async () => {
     const { store, services } = await storeFor();
-    const added = await store.addCharacterPrerequisite('sys1');
+    const added = await store.addCharacterPrerequisite();
     assert.ok(added?.id, 'returns the created entry');
-    assert.equal(services._system.characterPrerequisites.length, 1);
-    assert.equal(services._system.characterPrerequisites[0].op, 'gte');
+    assert.equal(services._worldSetting.characterPrerequisites.length, 1);
+    assert.equal(services._worldSetting.characterPrerequisites[0].op, 'gte');
   });
 
   it('updateCharacterPrerequisite merges a patch, cannot change the id, and rejects unknown ids', async () => {
     const { store, services } = await storeFor({
       prerequisites: [{ id: 'p1', name: 'Old', path: 'a', op: 'gte', value: 1 }],
     });
-    const ok = await store.updateCharacterPrerequisite('sys1', 'p1', {
+    const ok = await store.updateCharacterPrerequisite('p1', {
       name: 'New',
       op: 'isTrue',
       id: 'hacked',
     });
     assert.equal(ok, true);
-    const entry = services._system.characterPrerequisites[0];
+    const entry = services._worldSetting.characterPrerequisites[0];
     assert.equal(entry.id, 'p1', 'id cannot be mutated');
     assert.equal(entry.name, 'New');
     assert.equal(entry.op, 'isTrue');
     assert.equal(entry.value, null, 'switching to a valueless op nulls the value');
 
-    const missing = await store.updateCharacterPrerequisite('sys1', 'nope', { name: 'X' });
+    const missing = await store.updateCharacterPrerequisite('nope', { name: 'X' });
     assert.equal(missing, false);
   });
 
@@ -122,33 +140,33 @@ describe('adminStore character prerequisites (system-owned)', () => {
         { id: 'p2', name: 'B', path: 'b', op: 'gte', value: 1 },
       ],
     });
-    const ok = await store.deleteCharacterPrerequisite('sys1', 'p1');
+    const ok = await store.deleteCharacterPrerequisite('p1');
     assert.equal(ok, true);
     assert.deepEqual(
-      services._system.characterPrerequisites.map((e) => e.id),
+      services._worldSetting.characterPrerequisites.map((e) => e.id),
       ['p2'],
       'the removed prerequisite does not resurrect'
     );
-    assert.equal(await store.deleteCharacterPrerequisite('sys1', 'ghost'), false);
+    assert.equal(await store.deleteCharacterPrerequisite('ghost'), false);
   });
 
   it('seedCharacterPrerequisitePresetsForSystem seeds on dnd5e and is idempotent', async () => {
     const { store, services } = await storeFor({ foundrySystemId: 'dnd5e' });
-    const first = await store.seedCharacterPrerequisitePresetsForSystem('sys1');
+    const first = await store.seedCharacterPrerequisitePresetsForSystem();
     assert.equal(first.unsupported, false);
     assert.ok(first.added > 0);
-    const seededCount = services._system.characterPrerequisites.length;
+    const seededCount = services._worldSetting.characterPrerequisites.length;
 
-    const second = await store.seedCharacterPrerequisitePresetsForSystem('sys1');
+    const second = await store.seedCharacterPrerequisitePresetsForSystem();
     assert.equal(second.added, 0);
-    assert.equal(services._system.characterPrerequisites.length, seededCount);
+    assert.equal(services._worldSetting.characterPrerequisites.length, seededCount);
   });
 
   it('seedCharacterPrerequisitePresetsForSystem reports unsupported for a non-5e/pf2e world', async () => {
     const { store, services } = await storeFor({ foundrySystemId: 'cyberpunk' });
-    const result = await store.seedCharacterPrerequisitePresetsForSystem('sys1');
+    const result = await store.seedCharacterPrerequisitePresetsForSystem();
     assert.equal(result.unsupported, true);
     assert.equal(result.added, 0);
-    assert.equal(services._system.characterPrerequisites.length, 0);
+    assert.equal(services._worldSetting.characterPrerequisites.length, 0);
   });
 });

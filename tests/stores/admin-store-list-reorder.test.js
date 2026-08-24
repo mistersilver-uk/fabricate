@@ -7,10 +7,10 @@
  * the reordered order survives re-projection and persistence, and that
  * invalid/no-op moves are rejected.
  *
- * Modifiers and prerequisites are crafting-system state and persist through `updateSystem`.
- * Currency units are WORLD state since issue 1278 and persist through the world currency
- * setting instead, which is why the currency case below drives a real `CurrencyConfigStore`
- * and reads its order back off `viewState.worldCurrency` rather than off the selected system.
+ * ALL THREE are WORLD state now, and each drives its real store: currency units since issue 1278,
+ * modifiers and character prerequisites since issue 1308. So every case here reads its order back
+ * off a top-level `viewState` slice rather than off the selected system, and none of the reorder
+ * actions takes a crafting system id.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,7 @@ import { get } from 'svelte/store';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../../src/systems/characterPrerequisites.js';
 import { CurrencyConfigStore } from '../../src/systems/CurrencyConfigStore.js';
+import { CharacterLibrariesStore } from '../../src/systems/CharacterLibrariesStore.js';
 
 function createServices({ modifiers = [], prerequisites = [], currencyUnits = [] } = {}) {
   let idSeq = 0;
@@ -28,10 +29,6 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
   const system = {
     id: 'sys1',
     name: 'System One',
-    // The ONE modifier library, SYSTEM-owned since issue 1117 — it used to live in the
-    // gathering world config, which is why this suite's header called it "gathering world
-    // config" and why the reorder used to persist through `_saveGatheringConfig`.
-    modifiers,
     resolutionMode: 'simple',
     features: {},
     recipeVisibility: { listMode: 'global' },
@@ -41,7 +38,6 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
       currency: { enabled: true },
     },
     tools: [],
-    characterPrerequisites: normalizeCharacterPrerequisiteList(prerequisites, () => `seed-${++idSeq}`),
   };
   const systemManager = {
     getSystems: () => [system],
@@ -51,13 +47,7 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     deleteSystem: async () => {},
     updateSystem: async (id, updates = {}) => {
       if (id !== system.id) return null;
-      if (Object.prototype.hasOwnProperty.call(updates, 'characterPrerequisites')) {
-        system.characterPrerequisites = normalizeCharacterPrerequisiteList(
-          updates.characterPrerequisites,
-          () => `mgr-${++idSeq}`
-        );
-        Object.assign(system, { ...updates, characterPrerequisites: system.characterPrerequisites });
-      } else if (Object.prototype.hasOwnProperty.call(updates, 'requirements')) {
+      if (Object.prototype.hasOwnProperty.call(updates, 'requirements')) {
         system.requirements = JSON.parse(JSON.stringify(updates.requirements));
         Object.assign(system, { ...updates, requirements: system.requirements });
       } else {
@@ -71,6 +61,18 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     settingStore[key] = value;
   };
   settingStore.currencyConfig = { units: currencyUnits };
+  settingStore.characterLibraries = {
+    characterPrerequisites: normalizeCharacterPrerequisiteList(
+      prerequisites,
+      () => `seed-${++idSeq}`
+    ),
+    modifiers,
+  };
+  const characterLibrariesStore = new CharacterLibrariesStore({
+    getSetting,
+    setSetting,
+    randomID: () => `lib-seed-${++idSeq}`,
+  });
   const currencyStore = new CurrencyConfigStore({
     getSetting,
     setSetting,
@@ -80,6 +82,7 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     getSetting,
     setSetting,
     getCurrencyConfigStore: () => currencyStore,
+    getCharacterLibrariesStore: () => characterLibrariesStore,
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], listBySystem: async () => [] }),
@@ -102,10 +105,10 @@ async function storeFor(overrides) {
 }
 
 function modifierIds(store) {
-  return (get(store.viewState).selectedSystem.modifiers || []).map((entry) => entry.id);
+  return (get(store.viewState).worldModifiers || []).map((entry) => entry.id);
 }
 function prerequisiteIds(store) {
-  return (get(store.viewState).selectedSystem.characterPrerequisites || []).map((entry) => entry.id);
+  return (get(store.viewState).worldCharacterPrerequisites || []).map((entry) => entry.id);
 }
 function currencyUnitIds(store) {
   return (get(store.viewState).worldCurrency?.units || []).map((unit) => unit.id);
@@ -132,27 +135,27 @@ describe('adminStore settings-list reorder (issue 768)', () => {
     const { store, services } = await storeFor({ modifiers: MODIFIERS });
     assert.deepEqual(modifierIds(store), ['mod-a', 'mod-b', 'mod-c']);
 
-    const ok = await store.reorderSystemModifier(0, 2, 'sys1');
+    const ok = await store.reorderSystemModifier(0, 2);
     assert.equal(ok, true);
     assert.deepEqual(modifierIds(store), ['mod-b', 'mod-c', 'mod-a'], 're-projected order');
     assert.deepEqual(
-      services._system.modifiers.map((e) => e.id),
+      services._settingStore.characterLibraries.modifiers.map((e) => e.id),
       ['mod-b', 'mod-c', 'mod-a'],
-      'persisted on the crafting system document, through updateSystem'
+      'persisted through the world character-libraries setting'
     );
   });
 
-  it('reorderCharacterPrerequisite moves an entry and persists through updateSystem', async () => {
+  it('reorderCharacterPrerequisite moves an entry and persists to the world setting', async () => {
     const { store, services } = await storeFor({ prerequisites: PREREQUISITES });
     assert.deepEqual(prerequisiteIds(store), ['pre-a', 'pre-b', 'pre-c']);
 
-    const ok = await store.reorderCharacterPrerequisite(2, 0, 'sys1');
+    const ok = await store.reorderCharacterPrerequisite(2, 0);
     assert.equal(ok, true);
     assert.deepEqual(prerequisiteIds(store), ['pre-c', 'pre-a', 'pre-b']);
     assert.deepEqual(
-      services._system.characterPrerequisites.map((e) => e.id),
+      services._settingStore.characterLibraries.characterPrerequisites.map((e) => e.id),
       ['pre-c', 'pre-a', 'pre-b'],
-      'persisted on the crafting system document'
+      'persisted through the world character-libraries setting'
     );
   });
 
@@ -177,8 +180,8 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    await store.reorderSystemModifier(0, 2, 'sys1');
-    await store.reorderCharacterPrerequisite(0, 2, 'sys1');
+    await store.reorderSystemModifier(0, 2);
+    await store.reorderCharacterPrerequisite(0, 2);
     await store.reorderCurrencyUnit(0, 2);
 
     // Re-select from scratch to force a fresh projection off the persisted state.
@@ -197,11 +200,11 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    assert.equal(await store.reorderSystemModifier(0, 0, 'sys1'), false, 'no-op');
-    assert.equal(await store.reorderSystemModifier(1, 9, 'sys1'), false, 'to out of range');
-    assert.equal(await store.reorderSystemModifier(-1, 1, 'sys1'), false, 'from out of range');
-    assert.equal(await store.reorderCharacterPrerequisite(2, 2, 'sys1'), false, 'no-op');
-    assert.equal(await store.reorderCharacterPrerequisite(0, 5, 'sys1'), false, 'out of range');
+    assert.equal(await store.reorderSystemModifier(0, 0), false, 'no-op');
+    assert.equal(await store.reorderSystemModifier(1, 9), false, 'to out of range');
+    assert.equal(await store.reorderSystemModifier(-1, 1), false, 'from out of range');
+    assert.equal(await store.reorderCharacterPrerequisite(2, 2), false, 'no-op');
+    assert.equal(await store.reorderCharacterPrerequisite(0, 5), false, 'out of range');
     assert.equal(await store.reorderCurrencyUnit(1, 1), false, 'no-op');
     assert.equal(await store.reorderCurrencyUnit(0, -3), false, 'out of range');
 
