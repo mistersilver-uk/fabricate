@@ -1489,7 +1489,23 @@
   grid-template-rows: auto auto 1fr;
   height: 100%;
   min-width: 0;
-  overflow: hidden;
+
+  /* CLIP, NOT HIDDEN (issue 1286).
+
+     `overflow: hidden` still creates a SCROLL CONTAINER: the user gets no scrollbar, but the
+     box remains scrollable PROGRAMMATICALLY — and focus does exactly that. This root is a grid
+     whose `1fr` body row can be shorter than its own content, so a tall panel leaves the root
+     with real scrollable overflow. The first click on a control low in such a panel then makes
+     the browser scroll that control into view, taking the whole app with it: rail and body
+     slide up out of the frame and the lower third of the window becomes an UNRECOVERABLE void,
+     because with no scrollbar there is no way back.
+
+     The complications editor is what first made this reachable — tall enough to give the root
+     ~738px of scrollable overflow — but the trap belongs to the root, not to that panel, and
+     any future panel of the same height would spring it again. `clip` creates no scroll
+     container at all, so there is nothing for focus to scroll. Nothing scrolls this root
+     programmatically; the real scrollers are further in and are untouched. */
+  overflow: clip;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
 

@@ -305,7 +305,10 @@ test('manager root defines a scoped responsive app container', () => {
   );
   assert.ok(block.includes('isolation: isolate;'), 'manager should isolate its shell');
   assert.ok(block.includes('height: 100%;'), 'manager should fill the ApplicationV2 body');
-  assert.ok(block.includes('overflow: hidden;'), 'manager shell should own overflow');
+  // `clip`, deliberately, and NOT `hidden` — see the dedicated issue-1286 test below. Both
+  // hide the overflow; only `clip` refuses to be a scroll container, and `hidden` left focus
+  // able to scroll the entire app out of its own frame.
+  assert.ok(block.includes('overflow: clip;'), 'manager shell should own overflow');
 });
 
 test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
@@ -8977,4 +8980,31 @@ test("Core's preview keeps its own two-track host, with the tab strip on the bot
     `the preview scroller takes the rest (${read.scroll} of ${read.host} beside a ${read.strip} strip)`
   );
   assert.ok(read.scrollScrolls, 'and it still scrolls its own overflowing preview content');
+});
+
+test('the manager root clips rather than hides, so focus cannot scroll the app away (issue 1286)', () => {
+  // `.fabricate-manager {` opens more than one block in this sheet, so the LAYOUT one is found
+  // by the declaration only it carries rather than by taking the first match.
+  const blocks = css
+    .split('\n.fabricate-manager {')
+    .slice(1)
+    .map((chunk) => chunk.slice(0, chunk.indexOf('\n}')));
+  const body = blocks.find((chunk) => chunk.includes('grid-template-rows'));
+  assert.ok(body, 'the manager root layout block must still be findable by its grid rows');
+  assert.match(
+    body,
+    /overflow:\s*clip;/,
+    'the manager root must use `overflow: clip`, which creates NO scroll container'
+  );
+  assert.doesNotMatch(
+    body,
+    /overflow:\s*hidden;/,
+    // `hidden` looks equivalent — no scrollbar either way — and is not. It leaves the box
+    // scrollable PROGRAMMATICALLY, and focus scrolls it: clicking a control low in a tall panel
+    // scrolled this root by ~738px, carrying the rail and body up out of the frame and leaving
+    // the bottom third of the window an unrecoverable void, because with no scrollbar there was
+    // no way back. The complications editor merely made the root tall enough to reach it.
+    'the manager root must not use `overflow: hidden`: it still creates a scroll container that ' +
+      'focus can drive, which is the issue-1286 blank-window defect'
+  );
 });
