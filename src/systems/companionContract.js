@@ -852,7 +852,12 @@ function componentAwardPlacement(entry, index) {
  */
 export function componentAwardResult(outcome, messageData = null, record = null) {
   const placements = Object.freeze(
-    (Array.isArray(record?.placements) ? record.placements : []).map(componentAwardPlacement)
+    (Array.isArray(record?.placements) ? record.placements : []).map((entry, index) =>
+      // Called through an explicit arrow rather than passed by reference: `.map` supplies a
+      // THIRD argument, so a bare reference aligns this signature with `.map`'s only by
+      // accident, and a later parameter here would silently receive the whole array.
+      componentAwardPlacement(entry, index)
+    )
   );
   return buildResult(
     outcome,
