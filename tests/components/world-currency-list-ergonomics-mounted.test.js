@@ -6,7 +6,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 // The Move up/down chevrons on a Currency Unit's summary row (issue 768). This guard used to
-// live beside the modifier and prerequisite lists in `system-edit-list-ergonomics-mounted`,
+// live beside the modifier and prerequisite lists in `world-modifiers-list-ergonomics-mounted` and `world-prerequisites-list-ergonomics-mounted`,
 // because all three lists were rendered by SystemEditView. Issue 1278 moved the currency ladder
 // to world scope and out into WorldCurrencyTab, so its half of that shared contract moved here
 // rather than mounting a second component from the same file.

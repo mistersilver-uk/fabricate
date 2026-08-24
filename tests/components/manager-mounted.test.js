@@ -2355,6 +2355,18 @@ function createStore(calls = [], options = {}) {
     toggleRequirement: (requirement, enabled) => {
       calls.push(['toggleRequirement', requirement, enabled]);
     },
+    // Nor on these: both character libraries are world scope since issue 1308. The two `add`
+    // stubs RETURN a created entry, because the root's cross-copy reads its id to open the new
+    // row on the destination page — a stub answering `undefined` would make the copy look like a
+    // no-op and hide the very composition these are here to exercise.
+    addCharacterPrerequisite: async (partial) => {
+      calls.push(['addCharacterPrerequisite', partial]);
+      return { id: 'created-prereq', ...partial };
+    },
+    addSystemModifier: async (partial) => {
+      calls.push(['addSystemModifier', partial]);
+      return { id: 'created-modifier', ...partial };
+    },
     // No system id on any of these: currency is world scope since issue 1278, so the store's
     // currency actions address the ONE world config rather than a crafting system.
     setCurrencySpendStrategy: async (strategy) => {
@@ -7714,6 +7726,65 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.remove();
       target = null;
     }
+  });
+
+  // THE CROSS-COPY, END TO END (issues 1308, 1311).
+  //
+  // Copying between the two libraries used to be an in-page affair, and its only coverage lived
+  // in the System Settings ergonomics suite. Once the two lists became sibling ROUTES the copy
+  // became a navigation, which a page component cannot perform, so the page hands the entry up
+  // and the root owns the mapping, the write, the route change, the open request and the
+  // announcement. The page-level suites prove the page hands it up and honours a nonce; only this
+  // proves the root does the other five things — without it, deleting any one of them ships green.
+  it('root: copying a modifier lands on Character prerequisites with the new entry open', async () => {
+    const { calls } = await mountWorldRulesDestination(
+      {
+        modifiers: [
+          {
+            id: 'mod-herbalism',
+            label: 'Herbalism',
+            icon: 'fa-solid fa-leaf',
+            expression: '@skills.nature.value',
+          },
+        ],
+      },
+      'modifiers'
+    );
+
+    target.querySelector('[data-copy-to-prerequisite="mod-herbalism"]').click();
+    // The copy is a write THEN a navigation, so the microtask queue has to drain past the
+    // store call before the route change is observable.
+    for (let i = 0; i < 4; i += 1) {
+      await Promise.resolve();
+      await tick();
+      flushSync();
+    }
+
+    const write = calls.find((call) => call[0] === 'addCharacterPrerequisite');
+    assert.ok(write, 'the root writes the mapped entry to the destination library');
+    assert.equal(write[1].name, 'Herbalism', 'the modifier label becomes the prerequisite name');
+    assert.equal(
+      write[1].path,
+      'skills.nature.value',
+      'and the expression becomes a roll-data path, with its leading sigil stripped'
+    );
+    assert.equal('id' in write[1], false, 'the destination mints the id, not the mapper');
+
+    assert.ok(
+      target.querySelector('[data-world-prerequisites-page]'),
+      'the copy NAVIGATES to the destination page'
+    );
+    assert.equal(
+      target.querySelector('[data-world-modifiers-page]'),
+      null,
+      'and leaves the source page behind'
+    );
+    assert.match(
+      target.querySelector('[data-list-copy-announcement]')?.textContent ?? '',
+      /Herbalism/,
+      'the announcement is rendered by the DESTINATION — on the source page the navigation would ' +
+        'tear it down before an assistive technology reached it'
+    );
   });
 
   it('root: only a bySubject system’s recipe editor offers the modifier picker (issue 1055)', async () => {
