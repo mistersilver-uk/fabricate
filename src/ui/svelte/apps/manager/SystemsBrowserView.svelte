@@ -4,6 +4,7 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
 
   let {
@@ -157,15 +158,14 @@
         .replace('{total}', systems.length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="systems"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </section>
 
@@ -192,10 +192,10 @@
           'Create a system to start organizing components and recipes.'
         )}
       >
-        <button type="button" class="manager-button is-primary" onclick={onCreateSystem}>
+        <ManagerButton role="primary" onclick={onCreateSystem}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
-        </button>
+        </ManagerButton>
       </EmptyState>
     {:else if filteredSystems.length === 0}
       <EmptyState
@@ -206,8 +206,8 @@
           'Clear the search to show all configured systems.'
         )}
       >
-        <button type="button" class="manager-button" onclick={() => (searchTerm = '')}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        <ManagerButton onclick={() => (searchTerm = '')}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
         >
       </EmptyState>
     {:else}

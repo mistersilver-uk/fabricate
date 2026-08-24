@@ -45,6 +45,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
     'src/ui/svelte/apps/manager/library/LibraryShelf.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceRow.svelte',
+    // The manager's ONE labelled push-button (issue 1118): the sort-direction toggle and the
+    // filtered empty state's Clear filters both render it. Omitting it HANGS this suite.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',

@@ -21,6 +21,7 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
@@ -559,9 +560,8 @@
             <option value={key}>{sortLabel(key)}</option>
           {/each}
         </select>
-        <button
-          type="button"
-          class="manager-button manager-recipe-sort-direction"
+        <ManagerButton
+          class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Recipe.ToggleSortDirection',
@@ -580,7 +580,7 @@
               ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
           >
-        </button>
+        </ManagerButton>
       </div>
     </div>
 
@@ -693,12 +693,8 @@
           'No recipes match your filters.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button"
-          data-clear-filters="recipes"
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton data-clear-filters="recipes" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

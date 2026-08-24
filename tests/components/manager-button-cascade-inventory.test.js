@@ -87,6 +87,31 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
     ]),
   }),
+  Object.freeze({
+    task: 6,
+    files: Object.freeze([
+      // 24 sites across the nine browser views. Three carried a forgotten `primary`: the two
+      // inline `Add` submits in the environment Settings tab and the realm quick list's own.
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+        sites: 7,
+      }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte', sites: 3 }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
+        sites: 3,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
+        sites: 3,
+      }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte', sites: 2 }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte', sites: 2 }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte', sites: 2 }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte', sites: 1 }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte', sites: 1 }),
+    ]),
+  }),
 ]);
 
 // Code point, not `localeCompare`, for the same reason `sourceScan.js` gives: locale-dependent
@@ -123,14 +148,12 @@ const REVIEWED = [
       'against a source comment forbidding exactly that because the control swaps slots with ' +
       'the inspector primary. Scoped to `BulkEditPanelShell.svelte`; converts with it.',
   },
-  {
-    id: scopedRule('GatheringEconomyView.svelte', '.manager-economy-bulk-save'),
-    disposition: 'RECHAIN',
-    why:
-      'A second scoped (0,2,0) bespoke rule in the same band as `.fab-bulk-edit-apply`: ' +
-      '`padding: 3px 10px` and `font-size: 0.82rem` both lose outright. Scoped to ' +
-      '`GatheringEconomyView.svelte`; converts with it.',
-  },
+  // `GatheringEconomyView.svelte`'s `.manager-economy-bulk-save` was the third of these and is
+  // DISCHARGED (issue 1118, task 6). It converted with its component and its scoped selector was
+  // re-chained onto `.manager-button.fab-manager-button.is-primary`, which compiles to (0,5,0)
+  // and so beats both the primitive control and its `is-primary` companion on specificity
+  // instead of on injection order. Its key compound now demands `fab-manager-button`, so it is
+  // a PRIMITIVE rule here rather than a candidate, and leaves the derived set entirely.
   {
     id: scopedRule(
       'ImportFolderMappingModal.svelte',
@@ -367,17 +390,15 @@ const REVIEWED = [
       "The delta's worked example for a pass-through class. Two converting sites; it declares " +
       'one property the primitive never touches.',
   },
-  {
-    id: globalRule('.fabricate-manager .manager-add-button'),
-    disposition: 'NO_CONFLICT',
-    why:
-      'Was RECHAIN. Rows 16/17: at (0,2,0) it lost its width, padding and font-size to the ' +
-      'primitive and the `is-primary` companion, inside a 48px grid track that clipped the ' +
-      'label. Task 4 retired all three — the pinned 48px box went with them, and the trailing ' +
-      'grid track is `max-content` now — leaving the one declaration that is neither restated ' +
-      'nor overturned: the 36px height it shares with the sibling input. Nothing overlaps any ' +
-      'more, which is why it derives safe rather than needing a chain.',
-  },
+  // `.fabricate-manager .manager-add-button` was NO_CONFLICT here and is DISCHARGED (issue 1118,
+  // task 6). It was RECHAIN at r3: at (0,2,0) it lost its width, padding and font-size to the
+  // primitive and the `is-primary` companion, inside a 48px grid track that clipped the label.
+  // Task 4 retired all three — the pinned 48px box went with them, and the trailing grid track
+  // is `max-content` now — leaving the one declaration that is neither restated nor overturned:
+  // the 36px height it shares with the sibling input. Task 6 then converted its only two call
+  // sites (rows 16 and 17, `EnvironmentsBrowserView.svelte`), which carry the class through the
+  // primitive's appending `class` prop, so the rule still styles exactly what it always did
+  // while no longer being derivable from a literal `class="manager-button"` anywhere.
   {
     id: globalRule('.fabricate-manager .manager-setup-links .manager-button'),
     disposition: 'NO_CONFLICT',

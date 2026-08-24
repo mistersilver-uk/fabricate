@@ -6,6 +6,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
@@ -829,15 +830,14 @@
             .replace('{total}', environmentList.length)}</Chip
         >
         {#if filtersActive}
-          <button
-            type="button"
-            class="manager-button manager-clear-filters"
+          <ManagerButton
+            class="manager-clear-filters"
             data-clear-filters="environments"
             onclick={clearFilters}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-          </button>
+          </ManagerButton>
         {/if}
       </section>
 
@@ -869,17 +869,13 @@
             )}
           >
             <div class="manager-action-group">
-              <button type="button" class="manager-button is-primary" onclick={onCreateEnvironment}>
+              <ManagerButton role="primary" onclick={onCreateEnvironment}>
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span
                   >{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
                 >
-              </button>
-              <button
-                type="button"
-                class="manager-button"
-                onclick={() => selectGatheringTab('tasks')}
-              >
+              </ManagerButton>
+              <ManagerButton onclick={() => selectGatheringTab('tasks')}>
                 <i class="fas fa-list-check" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -887,12 +883,8 @@
                     'Review tasks'
                   )}</span
                 >
-              </button>
-              <button
-                type="button"
-                class="manager-button"
-                onclick={() => selectGatheringTab('encounters')}
-              >
+              </ManagerButton>
+              <ManagerButton onclick={() => selectGatheringTab('encounters')}>
                 <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -900,7 +892,7 @@
                     'Review events'
                   )}</span
                 >
-              </button>
+              </ManagerButton>
             </div>
           </EmptyState>
         {:else if filteredEnvironments.length === 0}
@@ -915,8 +907,8 @@
               'Clear search and filters to show all environments in this system.'
             )}
           >
-            <button type="button" class="manager-button" onclick={clearFilters}
-              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+            <ManagerButton onclick={clearFilters}
+              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
             >
           </EmptyState>
         {:else}
@@ -1257,14 +1249,14 @@
                 oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
               />
             </label>
-            <button
+            <ManagerButton
               type="submit"
-              class="manager-button manager-add-button"
+              class="manager-add-button"
               aria-label={conditionAddLabel(condition.kind)}
               title={conditionAddLabel(condition.kind)}
             >
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </button>
+            </ManagerButton>
           </form>
 
           <div
@@ -1393,14 +1385,14 @@
                 oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
             </label>
-            <button
+            <ManagerButton
               type="submit"
-              class="manager-button manager-add-button"
+              class="manager-add-button"
               aria-label={vocabularyAddLabel()}
               title={vocabularyAddLabel()}
             >
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </button>
+            </ManagerButton>
           </form>
 
           <div

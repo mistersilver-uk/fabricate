@@ -12,6 +12,7 @@
 <script>
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
 
@@ -137,10 +138,10 @@
       )}
       aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.CreateLabel', 'New realm name')}
     />
-    <button type="submit" class="manager-button" disabled={saving || !createInput.trim()}>
+    <ManagerButton type="submit" disabled={saving || !createInput.trim()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Travel.Realms.Create', 'Add realm')}</span>
-    </button>
+    </ManagerButton>
   </form>
 
   {#if realmList.length === 0}

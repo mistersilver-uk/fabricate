@@ -20,6 +20,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import ResolutionModeCard from './ResolutionModeCard.svelte';
@@ -467,12 +468,12 @@
               <span class="manager-economy-actor-col-label"
                 >{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span
               >
-              <button
-                type="button"
-                class="manager-button is-primary manager-economy-bulk-save"
+              <ManagerButton
+                role="primary"
+                class="manager-economy-bulk-save"
                 onclick={saveAll}
                 data-economy-bulk-save
-                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button
+                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</ManagerButton
               >
             </li>
             {#each pagedActors as actor (actor.actorId)}
@@ -813,8 +814,18 @@
      from the primitive's own `.fab-stepper` / `.fab-stepper.is-disabled` rules. */
 
   /* The trailing action column (bulk Save in the header, roll/reset per row).
-     Slightly more compact than a default button, with slightly larger label. */
-  .manager-economy-bulk-save {
+     Slightly more compact than a default button, with slightly larger label.
+
+     CHAINED onto the primitive's own classes (issue 1118), and the chain is the whole point.
+     A scoped rule compiles to `.manager-economy-bulk-save.svelte-<hash>` — TWO classes — and
+     Svelte injects it into `document.head` after Foundry's `<link>` for the global sheet, so
+     at (0,2,0) it did not beat `.fabricate-manager .manager-button.fab-manager-button` (0,3,0)
+     at all: it lost `padding` and `font-size` outright, and `is-primary`'s own padding at
+     (0,4,0) too. Naming `.manager-button.fab-manager-button.is-primary` here takes the compiled
+     selector to (0,5,0), which wins on specificity rather than on where the sheet happens to be
+     injected — see the header of `tests/helpers/scoped-component-css.js` for why injection order
+     is not a thing a rule may depend on. */
+  .manager-button.fab-manager-button.is-primary.manager-economy-bulk-save {
     width: auto;
     justify-self: center;
     padding: 3px 10px;
