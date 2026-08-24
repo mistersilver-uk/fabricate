@@ -108,9 +108,16 @@
      on `class`, never a seventh role — see `ui-integration/spec.md`.
    - tag: `'button'` (default) or `'a'`. Named `tag` because `Chip.svelte`, the same
      manager primitive family, already spells this capability that way; one meaning,
-     one name. An unrecognised value renders a `<button>`.
+     one name. An unrecognised value renders a `<button>`. `tag="a"` with an empty
+     `href` also renders a `<button>`: an anchor with no `href` is not focusable, has
+     no implicit link role and does not activate on Enter, and several anchor call
+     sites take their `href` from caller data, so the empty case is reachable in the
+     product and not merely a typo.
    - href / target / rel: the anchor's own attributes, emitted only when an anchor is
-     actually rendered.
+     actually rendered. An explicit `rel` always wins; left unset with
+     `target="_blank"`, `rel` defaults to `noreferrer` — a primitive that owns the
+     anchor shape owns that default, or the conversion preserves the per-site
+     inconsistency it exists to end.
    - type: the native button type, defaulting to `'button'` — a manager button inside
      a `<form>`-adjacent card must never submit by accident. Emitted only on a
      `<button>`; `type` on an anchor is invalid markup.
@@ -119,12 +126,38 @@
      about the verb, and it stacked a four-up wrapping row into four rows.
    - disabled / onclick: forwarded. `disabled` is not a valid attribute on an anchor,
      so it is ignored (and warned about) when an anchor is rendered.
+   - class: an EXTRA class, appended to the primitive's own — never a replacement. It
+     has to be a named prop rather than a rest key, because the rest spread lands
+     after `class={classes}` in the markup, so a `class` passed through it would
+     REPLACE `manager-button fab-manager-button is-<role>` outright rather than add
+     to it.
+
+     Worth knowing before writing a rule against it (issue 1118): a scoped `<style>`
+     block in the CALLING component that targets this class stops reaching the
+     rendered element the moment that site converts. Svelte scopes a rule by stamping
+     its `svelte-<hash>` class onto the elements the component ITSELF writes, not onto
+     a child component's internals, and a `class` prop handed to a child is forwarded
+     verbatim — so a scoped `.my-site-class { … }` rule in the caller matches nothing
+     the instant `my-site-class` moves from a bare `<button>` onto this component with
+     `class="my-site-class"`, and it fails two ways, neither of which names the cause:
+     EMITTED with the hash appended and silently matching nothing when the class (or
+     another class in the same compound selector) also appears somewhere the caller
+     still writes directly, or PRUNED to an `(unused)` comment behind a bare
+     `css_unused_selector` warning when it does not. `BulkEditPanelShell.svelte` and
+     `GatheringEconomyView.svelte` shipped exactly this and carry the fix —
+     `:global(...)`, re-chained with the ancestor and both primitive classes so it
+     still wins the cascade rather than losing to `fab-manager-button`, or hoisted
+     into `styles/fabricate.css` when more than one component needs the same rule.
+     `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical
+     guard that now catches it; it shipped once before that guard existed.
    - children: the label snippet. Content is a snippet rather than a `label` string
      because the shipped call sites interleave an `<i>` glyph with localized text and
      some wrap the text in its own `<span>`.
 
   Every other attribute — `data-*` hooks, `aria-*`, `title`, `data-tooltip` — is
-  forwarded through the rest spread, so a call site keeps its own selectors.
+  forwarded through the rest spread, so a call site keeps its own selectors. `class`
+  is the one exception, above: it is destructured and merged by hand rather than left
+  in `...rest`.
 -->
 <script>
   let {
