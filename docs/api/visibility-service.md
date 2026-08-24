@@ -58,7 +58,9 @@ For a system whose `resolutionMode` is `"alchemy"`, `visible` reflects only whet
 Brewing is gated solely by a matched ingredient signature, never by visibility.
 The system's `visibilityMode` selects the reveal source: `global` reveals brew-discovered recipes, `item` reveals a linked book or scroll held on the crafting actor or a component source, `knowledge` reveals a learned recipe, and `restricted` (surfaced as "Manual" in the alchemy manager) reveals a recipe granted on the Access tab.
 Brew-discovery (`alchemy.learnOnCraft`, on by default) reveal is unioned across every mode, and `learnOnCraft` governs only whether a matched brew records that discovery, never whether a recipe is craftable.
-Because `global` reveals from brew-discovery alone, turning `learnOnCraft` off under that mode reveals nothing to any player; the system-validation report flags the pairing as an `alchemyGlobalNoDiscovery` warning.
+Because `global` reveals from brew-discovery alone, turning `learnOnCraft` off under that mode reveals nothing to any player except a recipe a GM grants directly through `game.fabricate.grantRecipeKnowledge`.
+The grant writes to the same `learnedRecipes` flag `learnOnCraft` does, making it a second writer under this mode.
+The system-validation report flags the pairing as an `alchemyGlobalNoDiscovery` warning.
 A time-gated brew records its discovery when the gate matures and the run is finished, not when it is started.
 For non-alchemy modes `craftable` still follows the mode's gating rules, and `guardCraftStart` re-runs the same evaluation before a run starts.
 
@@ -67,6 +69,16 @@ For non-alchemy modes `craftable` still follows the mode's gating rules, and `gu
 Checks whether a user has knowledge of a recipe.
 
 **Returns:** `{ granted: boolean, reason: string, hasLearned: boolean, hasMatchedItem: boolean, matchedItems: Item[] }`
+
+### isLearnedKnowledgeObservable(system)
+
+Whether any reveal path on the given crafting system reads `learnedRecipes`, so that a learned entry written for a character can ever become visible to them.
+This is a sibling of the internal learn-mode gate, not a superset of it, and the two can disagree in both directions.
+A system with a flat `knowledge` visibility mode and a leftover legacy `item` sub-mode is observable, because the flat mode wins.
+An alchemy system set to `item` or `restricted` with brew-time auto-learn off is not observable, even though nothing stops a GM from writing a learned entry there.
+`game.fabricate.grantRecipeKnowledge` refuses to write onto a system this method reports as not observable, so a granted entry is never invisible by construction.
+
+**Returns:** `boolean`
 
 ### guardCraftStart(params)
 
@@ -185,3 +197,10 @@ It returns `{ success, message, messageData }` so a macro can branch on the outc
 The Knowledge surface's per-character reset control, in the Crafting Admin panel, routes through this same facade for both of its reset grains.
 It remains available to macros and the console for the same reset outside that UI.
 See [Visibility & Knowledge]({% link visibility.md %}#resetting-a-characters-knowledge) for the GM-facing surface.
+
+### GM knowledge grant facade
+
+`game.fabricate.grantRecipeKnowledge` writes one learned recipe entry to one actor without requiring an owned book.
+It is part of the companion contract, `game.fabricate.api.COMPANION`, documented in full on the [API Reference index]({% link api/index.md %}#companion-contract).
+Like the reset facade, it is GM-only, takes an actor id rather than an actor uuid, and never throws.
+It refuses to write when `isLearnedKnowledgeObservable` (above) reports the target system as not observable, so a grant never lands an entry no player can ever see.

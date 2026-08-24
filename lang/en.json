@@ -1330,6 +1330,34 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier"
     },
+    "Check": {
+      "Roll": {
+        "Passed": "{label} check passed with {total} against DC {dc}.",
+        "Failed": "{label} check failed with {total} against DC {dc}.",
+        "Rolled": "{label} check rolled {total}.",
+        "RollFailed": "{label} check could not be rolled: {detail}",
+        "Cancelled": "The {label} check prompt was dismissed, so nothing was rolled.",
+        "EngineUnavailable": "This client has no dice engine, so the {label} check could not be rolled.",
+        "NoFormula": "The {label} check has no usable roll formula, so there is nothing to roll.",
+        "InvalidRollDecision": "A roll decision was supplied for a non-interactive {label} check, where it would have been silently discarded and the base formula rolled.",
+        "InvalidCallSite": "A check roll must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not roll.",
+        "GMOnly": "Only a GM can roll a check for an actor.",
+        "NoActor": "No such actor to roll a check for.",
+        "NotReady": "Fabricate is still starting up, so no check can be rolled yet.",
+        "DefaultLabel": "Fabricate"
+      },
+      "BulkDecision": {
+        "Decided": "One roll decision was settled, covering {count} of {total} checks.",
+        "NothingToDecide": "None of the supplied formulas can roll a check, so there was nothing to decide.",
+        "Cancelled": "The bulk roll prompt was dismissed, so no decision was settled.",
+        "InvalidCallSite": "A bulk check decision must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not prompt.",
+        "GMOnly": "Only a GM can settle a bulk check decision.",
+        "NotReady": "Fabricate is still starting up, so no bulk check decision can be settled yet.",
+        "Failed": "The bulk check decision could not be settled."
+      }
+    },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
       "LearningDisabled": "Learning is not enabled for this crafting system",
@@ -1345,6 +1373,19 @@
       "CouldNotLearnRecipe": "Could not learn recipe",
       "PrerequisiteNotMet": "You must learn the required recipes first.",
       "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}.",
+      "Grant": {
+        "Success": "Granted {recipe} to {actor}.",
+        "AlreadyKnown": "{actor} already knows {recipe}, so nothing was written.",
+        "GMOnly": "Only a GM can grant recipe knowledge.",
+        "NoActor": "No such actor to grant recipe knowledge to.",
+        "NotReady": "Fabricate is still starting up, so recipe knowledge cannot be granted yet.",
+        "RecipeNotFound": "No such recipe to grant.",
+        "SystemNotFound": "No crafting system found for {recipe}.",
+        "KnowledgeNotObservable": "This crafting system never reveals learned recipes ({visibilityMode} visibility, {resolutionMode} resolution), so granting {recipe} would change nothing a player can see.",
+        "InvalidGrantedBy": "The grant source must be a text label, or omitted; it is never converted from another type.",
+        "GrantedByTooLong": "The grant source must be {max} characters or fewer; it is not truncated, because a shortened name is a different name.",
+        "Failed": "The recipe knowledge grant could not be completed."
+      },
       "Reset": {
         "Success": "Reset crafting knowledge for {actor} ({count} recipe(s)).",
         "GMOnly": "Only a GM can reset crafting knowledge.",
@@ -1365,6 +1406,20 @@
         "Erased": "Erased {count} learned recipe(s).",
         "EraseFailed": "Failed to erase the learned recipe.",
         "Failed": "The knowledge action could not be completed."
+      }
+    },
+    "Currency": {
+      "Affordability": {
+        "Affordable": "{actor} can afford {amount} {unit}.",
+        "NotAffordable": "{actor} cannot afford {amount} {unit}.",
+        "GMOnly": "Only a GM can check whether a character can afford a cost.",
+        "NoActor": "No such actor to check currency for.",
+        "NotReady": "Fabricate is still starting up, so currency cannot be checked yet.",
+        "UnitNotFound": "No currency unit named {unit} is configured for this world.",
+        "InvalidAmount": "The amount to check must be a number greater than zero.",
+        "LadderEmpty": "This world has no currency units configured, so no cost can be priced.",
+        "LadderInvalid": "This world's currency configuration is invalid, so no cost can be priced: {detail}",
+        "CheckUnavailable": "The affordability check could not be completed: {detail}"
       }
     },
     "Admin": {
@@ -5608,6 +5663,8 @@
           "ItemsEmptyTitle": "No owned copies",
           "LearnedBanner": "Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.",
           "LearnedByCrafting": "Learned by crafting",
+          "LearnedByGrant": "Learned by grant: {grantedBy}",
+          "LearnedByGrantUnlabelled": "Learned by grant",
           "LearnedEmptyHint": "This character has not learned any recipe in this crafting system.",
           "LearnedEmptyTitle": "Nothing learned yet",
           "LearnedFrom": "Learned from {source}",
@@ -5889,7 +5946,7 @@
           "BehaviourHeading": "Alchemy behaviour",
           "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply whatever alchemy check mode is set on The roll section.",
           "LearnOnCraft": "Learn a recipe when its ingredients are matched",
-          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and the only source of discovery under Global visibility.",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and under Global visibility the only source of discovery a player can reach for themselves; a GM can still grant a recipe directly.",
           "ConsumeOnFail": "Consume ingredients on a failed brew",
           "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
           "ShowAttemptHistory": "Show attempt history to players",

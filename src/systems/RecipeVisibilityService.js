@@ -1,4 +1,9 @@
-import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  LEARNED_RECIPES_FLAG_KEY,
+  getFabricateFlag,
+  setFabricateFlag,
+} from '../config/flags.js';
 import { indexedMembershipLookups, readDefinitionRevision } from '../utils/definitionIndex.js';
 import { recipeItemDefinitionsContaining } from '../utils/recipeItemMembership.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
@@ -416,13 +421,17 @@ export class RecipeVisibilityService {
     );
   }
 
+  // Both accessors key on the SHARED constant rather than a bare literal, because the
+  // learned map now has a writer outside this class: the companion contract's GM knowledge
+  // grant reaches the same flag through injected seams (issue 1289, D3). Two spellings of
+  // one persisted key is a typo away from a second flag that reads back empty forever.
   _getLearnedMap(actor) {
-    const learned = getFabricateFlag(actor, 'learnedRecipes', {});
+    const learned = getFabricateFlag(actor, LEARNED_RECIPES_FLAG_KEY, {});
     return learned && typeof learned === 'object' ? learned : {};
   }
 
   async _setLearnedMap(actor, learned) {
-    return await setFabricateFlag(actor, 'learnedRecipes', learned);
+    return await setFabricateFlag(actor, LEARNED_RECIPES_FLAG_KEY, learned);
   }
 
   _getDiscoveryProgressMap(actor) {
@@ -606,6 +615,55 @@ export class RecipeVisibilityService {
     if (this._getVisibilityMode(system) !== 'knowledge') return false;
     const knowledge = this._getKnowledgeConfig(system);
     return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');
+  }
+
+  /**
+   * Whether ANY reveal path on this system reads `learnedRecipes` — i.e. whether a learned
+   * entry written for a character can become visible to them (issue 1289, D4).
+   *
+   * A SIBLING of {@link _isLearnModeEnabled}, never a superset and never built on it. That
+   * method gates the LEARN path — "may a reader learn this from a book here" — while this one
+   * gates OBSERVABILITY — "can an entry someone wrote ever be seen". They are not one function
+   * because they disagree in BOTH directions:
+   *
+   * - A system carrying flat `visibilityMode: 'knowledge'` with a residual
+   *   `recipeVisibility.knowledge.mode: 'item'` IS observable — `evaluateRecipeAccess`'s
+   *   non-alchemy `item`/`knowledge` arm forces the `itemOrLearned` sub-mode when a flat enum
+   *   is authored, so `hasLearned` grants — while `_isLearnModeEnabled` reads that residual
+   *   `'item'` raw and returns `false`. This is not a hand-edited world: `migrateVisibilityModeEnum`
+   *   deliberately leaves the legacy block in place, and `setVisibilityMode` writes only
+   *   `{ visibilityMode }`, so clicking "Knowledge" on the radio lands exactly there.
+   * - Alchemy with `item` or `restricted` and `learnOnCraft` off is NOT observable, yet a
+   *   blanket "learn mode OR alchemy" widening would have reported a SUCCESSFUL grant onto an
+   *   entry no player can ever see — the exact defect this predicate exists to prevent.
+   *
+   * Derived from `evaluateRecipeAccess`'s reveal switch ARM BY ARM, so the two must be changed
+   * together. `_isLearnModeEnabled` is deliberately untouched by this addition: its comment
+   * enumerates the three learn paths whose gate must not drift, and observability is not one
+   * of them.
+   *
+   * @param {object|null|undefined} system the recipe's crafting system
+   * @returns {boolean}
+   */
+  isLearnedKnowledgeObservable(system) {
+    if (system?.resolutionMode === 'alchemy') {
+      // The brew-discovery union reveals a learned entry under EVERY mode.
+      if (system?.alchemy?.learnOnCraft === true) return true;
+      // Otherwise only the switch's `default:` arm reads the learned map; the
+      // `restricted` and `item` arms never do. Legacy `teaser` falls to `default:` too,
+      // and the agreement is structural rather than lucky: both this test and that arm
+      // are "everything that is not `restricted` or `item`".
+      const mode = this._getVisibilityMode(system);
+      return mode !== 'restricted' && mode !== 'item';
+    }
+    // Non-alchemy: the `item` arm forces `knowledgeMode: 'item'`, and the `restricted`,
+    // `global` and `teaser` arms never reach `evaluateKnowledgeAccess` at all, so
+    // `knowledge` is the only resolved mode under which `hasLearned` can grant. That is
+    // exact for legacy systems too, with no `_usesFlatVisibilityMode` branch: a legacy
+    // `listMode: 'knowledge'` resolves to `'knowledge'` only for the `learned` /
+    // `itemOrLearned` sub-modes, both of which honour `hasLearned`, while a legacy `item`
+    // sub-mode resolves to the `'item'` mode instead.
+    return this._getVisibilityMode(system) === 'knowledge';
   }
 
   // Per-recipe-item use/learn caps (issue 511). Caps live on the recipe's linked

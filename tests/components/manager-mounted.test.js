@@ -692,6 +692,10 @@ function compileManagerRoot() {
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    // The companion contract (issue 1289). `knowledgeStudio` reads its `grantedBy`
+    // length bound and `KnowledgeLearnedRow` its two granted message keys; it is
+    // import-free, so this single entry covers both edges.
+    'src/systems/companionContract.js',
     'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
     // The runtime route-chrome channel the Manager root owns for its Downtime surface. It is
     // a plain leaf, but the root imports it statically, so omitting it reports every mounted

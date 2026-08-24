@@ -578,10 +578,12 @@ function collectSystemBlockers(system, recipes, components) {
       });
     }
 
-    // Global alchemy visibility reveals a recipe ONLY from `learnedRecipes`, which
-    // only `alchemy.learnOnCraft` ever writes. Turning that flag off under Global
-    // therefore leaves every player's Known list permanently empty — brewing still
-    // works, so this is a WARNING with no `blocks`, not a system blocker (issue 966).
+    // Global alchemy visibility reveals a recipe ONLY from `learnedRecipes`, which has
+    // TWO writers: `alchemy.learnOnCraft`, and the companion contract's GM knowledge
+    // grant (issue 1289). Turning that flag off under Global therefore leaves every
+    // player's Known list empty of anything they can reach for themselves, while a GM
+    // can still grant into it — brewing still works either way, so this is a WARNING
+    // with no `blocks`, not a system blocker (issue 966).
     const alchemyVisibilityMode = system?.visibilityMode || null;
     if (alchemyVisibilityMode === 'global' && system?.alchemy?.learnOnCraft === false) {
       blockers.push({
@@ -591,7 +593,7 @@ function collectSystemBlockers(system, recipes, components) {
         severity: 'warning',
         code: 'alchemyGlobalNoDiscovery',
         message:
-          'Global visibility reveals alchemy recipes only through discovery by brewing, but "Learn a recipe when its ingredients are matched" is off; no player will ever see a recipe in their Known list.',
+          'Global visibility reveals alchemy recipes only through discovery by brewing or a GM grant, but "Learn a recipe when its ingredients are matched" is off; no player will see a recipe in their Known list unless a GM grants it.',
         nav: { view: 'system-overview' },
       });
     }

@@ -40,7 +40,7 @@ import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGath
 import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
 import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
-import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
+import { buildInteractiveRollOptions, promptBulkCheckRoll, promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
@@ -52,7 +52,7 @@ import { BulkSalvageService } from './systems/BulkSalvageService.js';
 import { BulkDestroyService } from './systems/BulkDestroyService.js';
 import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
-import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
+import { resolveCheckFormulaDisplay, runFormulaPassFail, runFormulaProgressive } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -99,7 +99,7 @@ import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
-import { setFabricateFlag } from './config/flags.js';
+import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
@@ -115,6 +115,44 @@ import {
   ActorPropertyCoinSpender,
 } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
+import {
+  AFFORDABILITY_MESSAGE_KEYS,
+  CHECK_ROLL_MESSAGE_KEYS,
+  COMPANION_CONTRACT,
+  COMPANION_OUTCOMES,
+  KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  affordabilityResult,
+  bulkCheckDecisionResult,
+  checkRollResult,
+  knowledgeGrantResult
+} from './systems/companionContract.js';
+// Aliased on import because the facade delegator below carries the SAME name. A class
+// method is not a bare identifier in its own body, so the unaliased import would resolve
+// correctly and read as a recursive call to every human who met it.
+import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from './systems/companionKnowledgeGrant.js';
+// Aliased for the same reason as the grant above: both facade delegators carry the SAME
+// names as the free functions they delegate to.
+import {
+  resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
+  rollActorCheck as rollStandaloneActorCheck
+} from './systems/companionCheckRoll.js';
+
+/**
+ * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble.
+ *
+ * Hoisted to module scope so the delegator reads `this._requireGmActor(actorId, KEYS)` on one
+ * line rather than restating a four-line object literal — the same duplicated run between
+ * `src/main.js` and its harness mirror that the shipped two members already carry.
+ *
+ * There is deliberately NO second pair for `resolveBulkCheckDecision`: that member takes no
+ * `actorId`, never reaches the preamble, and derives its own `gmOnly` string from its message
+ * table, so a pair for it would be dead.
+ */
+const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+import { checkWorldCurrencyAffordability } from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -1574,7 +1612,18 @@ class Fabricate {
   }
 
   /**
-   * Get the crafting engine instance
+   * Get the crafting engine instance.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before {@link Fabricate#initialize}
+   * has run, not a promise about `CraftingEngine`'s method surface. The one carved-out
+   * exception is `findComponentItems`, declared at the same tier with its own deviations —
+   * it takes documents, not ids, and throws on a null actor or a null component.
+   *
+   * `craftingEngine` is `null` from the constructor and reassigned in `initialize()`, so this
+   * answers `null` before readiness because it is never ready-gated, not because it checks.
+   *
+   * @returns {CraftingEngine|null}
    */
   getCraftingEngine() {
     return this.craftingEngine;
@@ -1845,10 +1894,36 @@ class Fabricate {
     return this.itemPilesIntegration;
   }
 
+  /**
+   * Get the `actorInventory` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorInventoryCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorInventoryCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorInventoryCoinSpender|null}
+   */
   getActorInventoryCoinSpender() {
     return this.actorInventoryCoinSpender;
   }
 
+  /**
+   * Get the `actorProperty` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorPropertyCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorPropertyCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorPropertyCoinSpender|null}
+   */
   getActorPropertyCoinSpender() {
     return this.actorPropertyCoinSpender;
   }
@@ -2274,6 +2349,51 @@ class Fabricate {
   }
 
   /**
+   * The ONE authorization rule every GM-gated, actor-targeted facade member applies:
+   * the caller is a GM, and the `actorId` resolves to an actor the caller may act as
+   * (issue 1289, D9).
+   *
+   * The order is normative and it is **GM -> actor -> readiness**, with readiness tested by
+   * each member AFTER this preamble rather than inside it. `_requireReady()` THROWS, and
+   * `recipe-visibility/spec.md` states that `resetActorKnowledge` returns its outcome without
+   * throwing, so a readiness-first preamble would make a pre-`ready` non-GM call throw where it
+   * returns `gmOnly` today. Neither gate here needs readiness: `game.user` and `game.actors`
+   * are both live from `init`.
+   *
+   * The message keys are PARAMETERS rather than constants, because a failed grant must not
+   * report itself in the words of a failed reset. Two representations of the one refusal come
+   * back, because this facade answers in two conventions: the legacy `{ success, message }`
+   * shape reads `message`, and the companion contract's `{ success, outcome, message }` builders
+   * read `outcome` and re-derive the identical key from their own table.
+   *
+   * Resolution goes through {@link Fabricate#_resolveCraftingActor}, whose predicate is a generic
+   * may-this-user-act-as-this-actor test with a GM bypass. Because the GM gate above has already
+   * passed, that bypass makes it exactly `game.actors.get` for every reachable caller — so
+   * adopting it here is a behavioural no-op that stops the resolver disagreeing with itself
+   * between members.
+   *
+   * A SECOND copy of this rule lives on the GM Knowledge surface's shell
+   * (`SvelteCraftingSystemManagerApp.svelte.js`'s `_knowledgeActor`). Unifying the two crosses
+   * the facade/UI-shell boundary and is a follow-up; this comment names it so the author of a
+   * THIRD copy meets it at the site.
+   *
+   * @param {string|null} actorId The target actor id (never an actor uuid).
+   * @param {{gmOnlyKey: string, noActorKey: string}} keys This member's own refusal strings.
+   * @returns {{actor: Actor|null, outcome: string|null, message: string|null}}
+   * @private
+   */
+  _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
+    if (game.user?.isGM !== true) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey };
+    }
+    const actor = this._resolveCraftingActor(actorId);
+    if (!actor) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.noActor, message: noActorKey };
+    }
+    return { actor, outcome: null, message: null };
+  }
+
+  /**
    * GM-only crafting-knowledge reset (issue 773). This is the GM API that the
    * Knowledge surface's per-character reset control routes through (issue 785, both
    * the "This system" and "All systems" grains), and it remains available to macros
@@ -2284,8 +2404,11 @@ class Fabricate {
    *
    * Explicitly GM-gated even though it is GM-only: it mutates player-owned actor
    * state and, for `total`-scope books, a world setting. Takes an `actorId` (never an
-   * actor uuid), resolves it via `game.actors.get`, and never throws — it returns the
-   * `{ success, message }` facade convention so a macro can branch on the outcome.
+   * actor uuid), resolves it through the shared {@link Fabricate#_requireGmActor} preamble,
+   * and never throws — it returns the `{ success, message }` facade convention so a macro can
+   * branch on the outcome. That preamble is a behavioural no-op here: this member's own gate
+   * was the first of the two copies the preamble unified, and its resolver's ownership
+   * predicate is bypassed for the GM this method already requires.
    *
    * @param {object} options
    * @param {string} options.actorId The actor whose knowledge is reset.
@@ -2295,13 +2418,12 @@ class Fabricate {
    * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
    */
   async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
-    if (game.user?.isGM !== true) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };
-    }
-    const actor = game.actors?.get?.(actorId);
-    if (!actor) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };
-    }
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly',
+      noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'
+    });
+    if (gate.outcome) return { success: false, message: gate.message };
+    const actor = gate.actor;
     const service = this.recipeVisibilityService;
     const result = systemId
       ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
@@ -2311,6 +2433,174 @@ class Fabricate {
       message: 'FABRICATE.Knowledge.Reset.Success',
       messageData: { actor: actor.name, count: result.count || 0, systemId },
     };
+  }
+
+  /**
+   * `COMPANION.grantRecipeKnowledge` — teach one actor one recipe with NO owned book
+   * required (issue 1289).
+   *
+   * A downtime activity's reward is "you learned this by doing the work", and every write path
+   * Fabricate already had onto `learnedRecipes` is anchored on a real owned recipe item. This
+   * one is unbounded by design, which is why the behaviour lives in a free function
+   * ({@link grantRecipeKnowledgeToActor}) rather than on `RecipeVisibilityService`: that service
+   * is handed out LIVE and UNGATED by `getRecipeVisibilityService()`, so an unbounded
+   * self-benefiting write placed there would be reachable by any player from the console.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order — and injects
+   * the four seams the grant needs. `notReady` is a refusal rather than a throw because a
+   * `stable` contract member is called inside a GM's automation tick, where a throw aborts work
+   * mid-flight; callers steer through `whenReady()`.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The actor to teach (never an actor uuid).
+   * @param {string|null} [options.recipeId] The recipe to grant, by id.
+   * @param {*} [options.grantedBy] Optional provenance label; refused, never coerced.
+   * @returns {Promise<Readonly<{success: boolean, outcome: string, message: string,
+   *   messageData?: object}>>}
+   */
+  async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+    });
+    // ONE guard, holding D5's normative order: the preamble's refusal decides first and
+    // readiness only where it passed, because `_requireReady()` throws and this member may not.
+    if (gate.outcome || this.ready !== true) {
+      return knowledgeGrantResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await grantRecipeKnowledgeToActor({ actor: gate.actor, recipeId, grantedBy }, {
+      resolveRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
+      resolveSystem: (recipe) => this.craftingSystemManager?.getSystem?.(recipe?.craftingSystemId) ?? null,
+      isObservable: (system) => this.recipeVisibilityService?.isLearnedKnowledgeObservable?.(system) === true,
+      readFlag: (actor, key, fallback) => getFabricateFlag(actor, key, fallback),
+      writeFlag: (actor, key, value) => setFabricateFlag(actor, key, value)
+    });
+  }
+
+  /**
+   * `COMPANION.checkAffordability` — can this actor afford `amount` of `unitId` against the
+   * WORLD coin ladder (issue 1289)?
+   *
+   * World scope, never a crafting system: a downtime activity is not a recipe and belongs to no
+   * system, so the answer consults no `requirements.currency` toggle and reaches no system
+   * manager. Ladder-aware, so one `{ unitId, amount }` is compared against the actor's total
+   * base value and the caller aggregates nothing. Performs no write.
+   *
+   * GM-gated for the same one reason the grant is, plus one of its own: on a `macro`-strategy
+   * world the check triggers GM-authored macro code with caller-chosen arguments, and a
+   * player-reachable trigger for that is a new hazard rather than a new convenience.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The actor whose purse is read (never an actor uuid).
+   * @param {string|null} [options.unitId] The coin unit the cost is denominated in.
+   * @param {number|null} [options.amount] How many of that unit, positive and finite.
+   * @returns {Promise<Readonly<{success: boolean, affordable: boolean|null, outcome: string,
+   *   message: string, messageData?: object}>>}
+   */
+  async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+    });
+    if (gate.outcome || this.ready !== true) {
+      return affordabilityResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await checkWorldCurrencyAffordability(gate.actor, { unitId, amount }, {
+      getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
+      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+      actorInventoryCoinSpender: this.actorInventoryCoinSpender
+    });
+  }
+
+  /**
+   * The ONE seam bag both Standalone Check Roll members inject.
+   *
+   * Hoisted to a single private so neither delegator restates it, and so the harness mirror
+   * has one thing to substitute rather than two. Seven seams, and `resolveActor` and `isGm`
+   * are deliberately ABSENT from it: both gates live in the facade, so the leaf resolves
+   * nothing and reads no collection — there is no second resolver to disagree with the first.
+   *
+   * `prompt` and `promptBulk` exist because both prompt functions AUTO-CONFIRM where there is
+   * no `DialogV2`. Without the seams, the dismissal case — the one property this capability
+   * exists to preserve — would be unreachable under test.
+   *
+   * `localize` is here because the leaf may not touch `game.i18n`: it needs the default label
+   * localized, and `foundryBridge.localize` answers the KEY when there is no `game.i18n` (as
+   * Foundry's own `localize` does for a missing string), so the fallback is applied at the one
+   * seam that needs it.
+   *
+   * @returns {object}
+   * @private
+   */
+  _companionCheckSeams() {
+    return {
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
+      hasDiceEngine: () => typeof globalThis.Roll === 'function',
+      localize: (key, fallback) => {
+        const resolved = bridgeLocalize(key);
+        return typeof resolved === 'string' && resolved !== '' && resolved !== key ? resolved : fallback;
+      },
+      prompt: promptCheckRoll,
+      promptBulk: promptBulkCheckRoll,
+      runPassFail: runFormulaPassFail,
+      runProgressive: runFormulaProgressive,
+      buildRollOptions: buildInteractiveRollOptions
+    };
+  }
+
+  /**
+   * `COMPANION.rollActorCheck` — roll ONE formula for ONE actor, graded against a `dc` or
+   * ungraded, and answer what was rolled (issue 1293).
+   *
+   * A **Standalone Check Roll**: the check-roll mechanics without a crafting system's derived
+   * terms. See {@link rollStandaloneActorCheck} for what that does and does not include.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order, reusing the
+   * shared preamble VERBATIM — and hands the resolved actor plus the seam bag to the leaf,
+   * which owns the call-site and election gates because they are request validation and sit
+   * where every other member's request validation sits.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The rolling actor (never an actor uuid).
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {string|null} [options.formula] The authored roll formula.
+   * @param {number|null} [options.dc] A finite DC selects the graded arm.
+   * @param {string|null} [options.compare] `'meet'` (default) or `'exceed'`.
+   * @param {string|null} [options.label] Display label; defaults to a localized activity noun.
+   * @param {boolean} [options.interactive] Open the roll prompt; defaults to false.
+   * @param {object|null} [options.rollDecision] A pre-resolved decision; refused unless interactive.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async rollActorCheck({ actorId = null, callSite = null, formula = null, dc = null, compare = null, label = null, interactive = false, rollDecision = null } = {}) {
+    const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await rollStandaloneActorCheck({ actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision }, this._companionCheckSeams());
+  }
+
+  /**
+   * `COMPANION.resolveBulkCheckDecision` — answer ONE roll decision to be applied to N rolls
+   * the caller will make (issue 1293). It rolls nothing.
+   *
+   * GM-gated INLINE rather than through {@link Fabricate#_requireGmActor}, and that is not a
+   * second copy of the rule: the shared preamble is scoped by its own comment to every
+   * GM-gated, ACTOR-TARGETED facade member, and this member targets no actor. It cannot use
+   * the preamble in any case — `_resolveCraftingActor(null)` returns `null`, so
+   * `_requireGmActor(undefined, …)` would always answer `noActor` for a member that reads no
+   * actor and can never legitimately emit one.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {Array<string>|null} [options.formulas] The batch's authored formulas, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
+    const gmOnly = game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
+    if (gmOnly || this.ready !== true) {
+      return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await resolveStandaloneBulkCheckDecision({ callSite, formulas }, this._companionCheckSeams());
   }
 
   /**
@@ -3803,7 +4093,24 @@ function bindFabricateGlobal() {
     CraftingSystemExporter,
     // Public hook names module authors can subscribe to, e.g.
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
-    HOOKS: FABRICATE_HOOKS
+    HOOKS: FABRICATE_HOOKS,
+    // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289):
+    // `{ schemaVersion, members, outcomes, callSites }`, frozen at module load. `callSites`
+    // was added by issue 1293 with no `schemaVersion` bump — the compatibility promise
+    // permits GAINING a field, never losing one. Assigned here and
+    // NOWHERE else, so its version is readable from Fabricate's own `init` onward, before
+    // any collaborator exists — that is the whole affordance, and it is what lets a
+    // companion version-check before it calls.
+    //
+    // The four `stable` behavioural members it declares — `grantRecipeKnowledge` and
+    // `checkAffordability` from issue 1289, `rollActorCheck` and `resolveBulkCheckDecision`
+    // from issue 1293 — are METHODS ON THE FACADE, not entries in this class bag, and
+    // deliberately so: everything above is a constructor a caller instantiates, while
+    // `grantRecipeKnowledge` is an unbounded, GM-gated write whose only authorised route is
+    // the gated facade method. Publishing a grant symbol beside these classes would hand out
+    // the same capability without the gate — the exact defect that keeps it off
+    // `RecipeVisibilityService` in the first place.
+    COMPANION: COMPANION_CONTRACT
   };
   managerExtensions.bindPublicApi(game.fabricate.api);
   // Both registries are page-session singletons imported at module scope, so the init and

@@ -30,10 +30,28 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { getFabricateFlag, setFabricateFlag } from '../../src/config/flags.js';
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
 import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
+import {
+  resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
+  rollActorCheck as rollStandaloneActorCheck,
+} from '../../src/systems/companionCheckRoll.js';
+import {
+  AFFORDABILITY_MESSAGE_KEYS,
+  CHECK_ROLL_MESSAGE_KEYS,
+  COMPANION_OUTCOMES,
+  KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  affordabilityResult,
+  bulkCheckDecisionResult,
+  checkRollResult,
+  knowledgeGrantResult,
+} from '../../src/systems/companionContract.js';
+import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/systems/companionKnowledgeGrant.js';
+import { checkWorldCurrencyAffordability } from '../../src/systems/currencyAffordance.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
+import { classMemberSource } from './boundedSource.js';
 
 /**
  * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above
@@ -62,17 +80,24 @@ export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/
 export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
 
 /**
+ * Faithful copy of `src/main.js`'s hoisted `ROLL_ACTOR_CHECK_GATE_KEYS`.
+ *
+ * Hoisted on both sides so each delegator reads `this._requireGmActor(actorId, KEYS)` on one
+ * line rather than restating a four-line object literal in two files.
+ */
+const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+});
+
+/**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
  *
- * Bounding is the point. The alchemy suite's `MAIN_SOURCE.slice(indexOf(...))` runs to
- * the end of the file, which is harmless for a "must CONTAIN" assertion and permanently
- * red for a "must NOT contain" one — every helper the rest of the class legitimately
- * uses is inside an unbounded slice. Single-sourcing the strategy here is also what
- * stops the unbounded form being the pattern the next author copies.
- *
- * The bound is the first line that is exactly two-space-indented `}`, which is a class
- * member's closing brace in this file's formatting. Every deeper brace is indented
- * further, so a nested arrow, object literal or `try` block cannot end the slice early.
+ * A thin naming of {@link classMemberSource} for this file's default source, kept because
+ * `mainMethodSource(SIGNATURE)` is what the owner-gate suites already read as. The bounding
+ * strategy itself — and the reason an unbounded `indexOf`/`slice` pair is a hazard rather
+ * than a shortcut — lives in `boundedSource.js`, which is where any other suite reaches for
+ * it rather than re-deriving it here.
  *
  * @param {string} signature The method signature exactly as authored, INCLUDING its
  *   opening brace — e.g. `_gateBulkTargets(targets, actorId) {`. Passing a bare name
@@ -83,11 +108,7 @@ export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
  *   means the pin is now vacuous, which must fail loudly rather than assert on ''.
  */
 export function mainMethodSource(signature, source = MAIN_SOURCE) {
-  const start = source.indexOf(signature);
-  if (start < 0) throw new Error(`main.js declares no \`${signature}\``);
-  const end = source.indexOf('\n  }\n', start);
-  if (end < 0) throw new Error(`\`${signature}\` has no member-level closing brace`);
-  return source.slice(start, end + '\n  }'.length);
+  return classMemberSource(source, signature, 'main.js');
 }
 
 /** Minimal `foundry.utils` shim the builder's flag reads use at call time. */
@@ -238,25 +259,48 @@ export function installFacadeGame({
  * ownership predicate, `AlchemyListingBuilder`, and `resolveAlchemySubmissions`.
  * Reads `globalThis.game` live so a mid-test user swap takes effect.
  */
-class FabricateFacadeUnderTest {
+export class FabricateFacadeUnderTest {
   constructor({
     alchemyListingBuilder,
-    craftingEngine,
-    craftingSystemManager,
-    ready,
+    craftingEngine = null,
+    craftingSystemManager = null,
+    ready = false,
     bulkSalvageService = null,
     bulkDestroyService = null,
-  }) {
+    // The collaborators the companion-contract members reach. Every default here mirrors
+    // what `Fabricate`'s CONSTRUCTOR leaves them as before `initialize()` runs, which is the
+    // state the `handle` tier's "answers `null` before readiness" promise is made about —
+    // `null` for the three assigned in the constructor, and deliberately UNSET for
+    // `currencyConfigStore`, which production never initialises and normalizes with `?? null`
+    // at its accessor instead.
+    recipeManager = null,
+    recipeVisibilityService = null,
+    currencyConfigStore = undefined,
+    actorPropertyCoinSpender = null,
+    actorInventoryCoinSpender = null,
+    // The Standalone Check Roll seam bag (issue 1293), INJECTED rather than reproduced. Every
+    // seam in production's own `_companionCheckSeams()` is a Foundry collaborator this harness
+    // has none of, and the two members' criteria turn on counting prompt and runner calls, so
+    // the bag is what a test substitutes. The two DELEGATORS below are faithful copies and are
+    // pinned against the production text; the bag they read is not part of that claim.
+    companionCheckSeams = null,
+  } = {}) {
     this._alchemyListingBuilder = alchemyListingBuilder;
     this.craftingEngine = craftingEngine;
     this.craftingSystemManager = craftingSystemManager;
     this.ready = ready;
+    this.recipeManager = recipeManager;
+    this.recipeVisibilityService = recipeVisibilityService;
+    this.currencyConfigStore = currencyConfigStore;
+    this.actorPropertyCoinSpender = actorPropertyCoinSpender;
+    this.actorInventoryCoinSpender = actorInventoryCoinSpender;
     // Injected rather than lazily built: `_getBulkSalvageService` / `_getBulkDestroyService`
     // exist only to wire Foundry collaborators, which this harness has none of. The gate,
     // the merge and the refusal row — the parts with behaviour worth pinning — are copied
     // faithfully below.
     this._bulkSalvageService = bulkSalvageService;
     this._bulkDestroyService = bulkDestroyService;
+    this._companionCheckSeamBag = companionCheckSeams;
   }
 
   get _game() {
@@ -283,6 +327,177 @@ class FabricateFacadeUnderTest {
     if (!actor) return null;
     if (game.user?.isGM === true) return actor;
     return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;
+  }
+
+  // --- Faithful copy of Fabricate#_requireGmActor (issue 1289) ---------------
+  //
+  // The one authorization rule three facade members share, in D9's normative order:
+  // GM -> actor -> (readiness, tested by each MEMBER afterwards, because `_requireReady()`
+  // throws and a `stable` contract member may not). The message keys are parameters so a
+  // failed grant is never reported in the words of a failed reset.
+  //
+  // `tests/companion-facade.test.js` pins this copy against the production text in BOTH
+  // directions, so neither side can lose a gate without the suite going red.
+  _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
+    const game = this._game;
+    if (game.user?.isGM !== true) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey };
+    }
+    const actor = this._resolveCraftingActor(actorId);
+    if (!actor) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.noActor, message: noActorKey };
+    }
+    return { actor, outcome: null, message: null };
+  }
+
+  // --- Faithful copies of the four `handle` accessors (issue 1289) -----------
+  //
+  // One line each in production too. They are reproduced rather than stubbed because the
+  // contract's member-resolution assertion reads every member THROUGH its declared host and
+  // path, and because the `null`-before-readiness half of the `handle` promise is a claim
+  // about exactly these four bodies. Note `getCurrencyConfigStore` normalizes with `?? null`
+  // where the other three return a constructor-assigned `null` directly — production differs
+  // the same way, and the promise is true of all four for that reason rather than by luck.
+  getCraftingEngine() {
+    return this.craftingEngine;
+  }
+
+  getCurrencyConfigStore() {
+    return this.currencyConfigStore ?? null;
+  }
+
+  getActorInventoryCoinSpender() {
+    return this.actorInventoryCoinSpender;
+  }
+
+  getActorPropertyCoinSpender() {
+    return this.actorPropertyCoinSpender;
+  }
+
+  // --- Faithful copy of Fabricate#grantRecipeKnowledge (issue 1289) ----------
+  //
+  // The delegator only: the grant itself is the REAL free function, wired to the REAL flag
+  // seams, so what this copy reproduces is exactly the part that lives in `src/main.js` —
+  // the shared preamble, the single readiness guard, and the four injected seams.
+  async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+    });
+    if (gate.outcome || this.ready !== true) {
+      return knowledgeGrantResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await grantRecipeKnowledgeToActor(
+      { actor: gate.actor, recipeId, grantedBy },
+      {
+        resolveRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
+        resolveSystem: (recipe) =>
+          this.craftingSystemManager?.getSystem?.(recipe?.craftingSystemId) ?? null,
+        isObservable: (system) =>
+          this.recipeVisibilityService?.isLearnedKnowledgeObservable?.(system) === true,
+        readFlag: (actor, key, fallback) => getFabricateFlag(actor, key, fallback),
+        writeFlag: (actor, key, value) => setFabricateFlag(actor, key, value),
+      }
+    );
+  }
+
+  // --- Faithful copy of Fabricate#checkAffordability (issue 1289) ------------
+  async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+    });
+    if (gate.outcome || this.ready !== true) {
+      return affordabilityResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await checkWorldCurrencyAffordability(
+      gate.actor,
+      { unitId, amount },
+      {
+        getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
+        actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+        actorInventoryCoinSpender: this.actorInventoryCoinSpender,
+      }
+    );
+  }
+
+  // --- The Standalone Check Roll seam bag (INJECTED, see the constructor) -----
+  _companionCheckSeams() {
+    return this._companionCheckSeamBag;
+  }
+
+  // --- Faithful copy of Fabricate#rollActorCheck (issue 1293) ----------------
+  //
+  // The delegator only: the roll itself is the REAL free function. It reuses the shared
+  // preamble VERBATIM and passes `gate.actor` straight into the leaf, so no second actor
+  // resolver exists to disagree with the first.
+  //
+  // DO NOT "TIDY" THIS COPY TOWARDS `src/main.js`'s FORMATTING, and read the numbers before
+  // deciding otherwise (issue 1293, D12).
+  //
+  // The duplicated run against `src/main.js` measures 98 tokens as shipped — under SonarJS's
+  // 100-token minimum, and under the SonarCloud new-code duplication gate that follows from
+  // it. That margin is NOMINAL, not comfortable. It is held by two INDEPENDENT incidental
+  // asymmetries between this copy and production, and removing EITHER one alone crosses the
+  // threshold:
+  //
+  //   as shipped                                                            98
+  //   the trailing comma on `rollDecision = null,` below, normalised       133
+  //   `this._game.user` in `resolveBulkCheckDecision` written `game.user`  152
+  //   both                                                                 187
+  //
+  // (133 is the NORMALISED adjacency figure: 98 plus the 35-token destructuring head that
+  // joins the two runs once the comma stops separating them.)
+  //
+  // The live risk is therefore not someone rewriting this file. It is a Prettier SCOPE
+  // change. `.prettierrc.json` is `printWidth: 100` with `trailingComma: 'es5'`, and
+  // `src/main.js` is currently OUTSIDE the `format`/`format:check` globs in `package.json`.
+  // Bringing it inside them wraps production's ~165-character `rollActorCheck` signature into
+  // the same multi-line destructuring head this copy uses AND adds the trailing comma —
+  // mechanically producing a run of at least 134 tokens. `AGENTS.md` already contemplates
+  // widening those globs and warns that reformatting counts as NEW code, so that PR would
+  // inherit a >100-token duplicated block it did not write. Whoever widens the globs owns
+  // splitting this run, and the cheapest split is the one already used for the gate keys:
+  // hoist the shared shape out of both files rather than paraphrasing either.
+  //
+  // For scale, a whole-repo CPD sweep at a 100-token floor finds exactly one >=100 run
+  // anywhere in the tree: a pre-existing 173-token block across `_mergeBulkRows` and
+  // `_buildNotPermittedRow`, which measures 173 at `fdc27c21` too. Issue 1293 introduces no
+  // new duplicated block.
+  async rollActorCheck({
+    actorId = null,
+    callSite = null,
+    formula = null,
+    dc = null,
+    compare = null,
+    label = null,
+    interactive = false,
+    rollDecision = null,
+  } = {}) {
+    const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await rollStandaloneActorCheck(
+      { actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision },
+      this._companionCheckSeams()
+    );
+  }
+
+  // --- Faithful copy of Fabricate#resolveBulkCheckDecision (issue 1293) ------
+  //
+  // GM-gated INLINE rather than through `_requireGmActor`, because this member takes no
+  // `actorId`: `_resolveCraftingActor(null)` returns `null`, so the shared preamble would
+  // always answer `noActor` for a member that reads no actor and can never emit one.
+  async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
+    const gmOnly = this._game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
+    if (gmOnly || this.ready !== true) {
+      return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await resolveStandaloneBulkCheckDecision(
+      { callSite, formulas },
+      this._companionCheckSeams()
+    );
   }
 
   // --- Faithful copy of Fabricate#_resolveCraftingSources --------------------

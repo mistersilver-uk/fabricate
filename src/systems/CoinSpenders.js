@@ -97,6 +97,21 @@ export function buildAffordCurrencyProbe({ actor, profile, spendStrategy, spende
 }
 
 /**
+ * Resolve a requirement's unit ID from either shape the spender interface is driven with.
+ *
+ * Every caller in `currencyAffordance.js` hands a spender `{ unit: <the resolved unit OBJECT> }`,
+ * while {@link formatCurrencyRequirement} expects `{ unit: <the unit ID> }` and falls back to
+ * rendering whatever it was given. Handing it the object therefore rendered a GM-facing message as
+ * `Could not spend currency (1 [object Object]).`, which is why this resolution is not optional
+ * politeness: the world-scoped affordability answer publishes that message to a companion as its
+ * `messageData.detail` (issue 1289).
+ */
+function requirementUnitId(requirement) {
+  const unit = requirement?.unit;
+  return typeof unit === 'string' ? unit : (unit?.id ?? '');
+}
+
+/**
  * Interpret a currency macro's return value into a uniform `{ valid, message? }` result. Reuses
  * the original currency-macro contract: a bare `true`, or an object with a truthy `success` or
  * `canAfford`, means the gate/deduction passed; `false`, `null`, a thrown error, or an object
@@ -321,6 +336,10 @@ export class ActorInventoryCoinSpender {
  * agreed context (supplied by the engine via `ctx.macroContext`) and passes the macro's return
  * value through the shared, pure {@link interpretMacroSpendResult}, so a `false`/`null`/throw
  * aborts loudly rather than silently granting a free craft or dropping a refund.
+ *
+ * The context carries a `caller` discriminator (`'craft'` or `'award'`) and, on an award call,
+ * `recipe: null` and `craftingSystem: null` — see `CURRENCY_SPEND_CALLERS` in
+ * `currencyAffordance.js`, which builds it.
  */
 export class MacroCoinSpender {
   /**
@@ -337,9 +356,25 @@ export class MacroCoinSpender {
     this._runMacro = typeof runMacro === 'function' ? runMacro : MacroExecutor.run;
   }
 
+  /**
+   * Run one configured macro and normalize its answer.
+   *
+   * The catch branch marks its result `thrown: true` (issue 1289). The field is ADDITIVE and every
+   * existing caller is unaffected: the craft paths read only `valid` and `message`, so a broken
+   * macro still aborts the craft exactly as it did.
+   *
+   * It exists because without it a THROWN macro and a GENUINE SHORTFALL were the same value. Both
+   * returned `{ valid: false, message }`, so nothing downstream could tell "this macro is broken"
+   * from "this actor is poor" — a silent false negative. That cost nothing on the craft path, where
+   * either answer correctly refuses the craft, but the world-scoped affordability answer REPORTS
+   * its result to a companion and a GM, and reporting a well-funded actor as unable to pay because
+   * a craft-shaped macro dereferenced a null `recipe` is a lie. `interpretMacroSpendResult` is
+   * deliberately untouched: a `false`/`null` return already aborts loudly, and only the throw path
+   * was silent.
+   */
   async _runMacroKey(key, actor, requirement, ctx) {
     const macroUuid = this._macros[key];
-    const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement(requirement, ctx?.profile?.units || [])}).`;
+    const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement({ unit: requirementUnitId(requirement), amount: requirement?.amount }, ctx?.profile?.units || [])}).`;
     if (!macroUuid) {
       return { valid: false, message: `No "${key}" currency macro is configured.` };
     }
@@ -349,7 +384,7 @@ export class MacroCoinSpender {
       return interpretMacroSpendResult(result, { fallbackMessage });
     } catch (error) {
       console.error(`Fabricate | Currency ${key} macro failed (${macroUuid}):`, error);
-      return { valid: false, message: fallbackMessage };
+      return { valid: false, thrown: true, message: fallbackMessage };
     }
   }
 
