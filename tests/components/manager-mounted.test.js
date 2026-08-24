@@ -1180,6 +1180,37 @@ function headerSaveButton(target) {
   );
 }
 
+/**
+ * The manager's Back verb, asserted on the route that renders it (issue 1118).
+ *
+ * `.manager-header-actions` paints Back as the SECONDARY treatment beside a Save that
+ * outranks it — `ToolEditView`, the maintainer's authority for what a manager button looks
+ * like, and `ComponentEditorHeader`, which renders its own Back into this very container.
+ * Five routes in the manager root forgot it, all five spelled the same bare
+ * `class="manager-button"`, and the omission was unassertable because four of them carried no
+ * `data-*` handle at all: the only way to name one was "the first button in the header", which
+ * is a statement about DOM order rather than about the control.
+ *
+ * So the hooks landed with the repair, and this addresses one control by name. It is scoped to
+ * `.manager-header-actions` deliberately — several of these routes render a second Back in the
+ * breadcrumb rail, which is a link and not this verb.
+ *
+ * @param {string} hook the control's own `data-*` attribute selector
+ * @param {string} route the `currentView` it renders on, named in the failure message
+ */
+function assertHeaderBackIsGhost(hook, route) {
+  const back = target.querySelector(`.manager-header-actions ${hook}`);
+  assert.ok(Boolean(back), `${route} should render its header Back control at ${hook}`);
+  assert.ok(
+    back.classList.contains('fab-manager-button'),
+    `${route}'s Back should render through the ManagerButton primitive, not a hand-written class`
+  );
+  assert.ok(
+    back.classList.contains('is-ghost'),
+    `${route}'s Back should carry the ghost role, as every other Back in this container does`
+  );
+}
+
 function editRecipeName(target, value) {
   const nameInput = target.querySelector('.manager-main [data-recipe-field="name"]');
   nameInput.value = value;
@@ -6928,6 +6959,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.querySelector('.manager-system-edit-form'));
+    // The lone header action on this route, and the weakest of the five ghost repairs for
+    // exactly that reason: there is no Save here for Back to be secondary TO. It is ghost on
+    // the verb, and this is what holds it there.
+    assertHeaderBackIsGhost('[data-system-edit-back]', 'system-edit');
 
     // The rail's crafting-system card SELECTS (issue 643): a real `<select>` naming the
     // current system and listing every other, so the GM can switch system without a
@@ -12322,7 +12357,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the recipe-item editor body renders'
     );
     // The router owns the header + footer actions.
-    assert.ok(target.querySelector('[data-recipe-item-back]'), 'Back action renders');
+    assertHeaderBackIsGhost('[data-recipe-item-back]', 'recipe-item-edit');
     assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
     const save = target.querySelector('[data-recipe-item-save]');
     assert.ok(save, 'Save action renders');
@@ -12988,6 +13023,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
+    assertHeaderBackIsGhost('[data-gathering-task-back]', 'gathering-task-edit');
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
     assert.ok(coreEditor);
     assert.equal(coreEditor.querySelector('.manager-link-button'), null);
@@ -18815,6 +18851,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'environment-edit'
     );
     assert.ok(calls.some((call) => call[0] === 'createEnvironmentDraft'));
+    assertHeaderBackIsGhost('[data-environment-edit-back]', 'environment-edit');
   });
 
   it('shows create guidance when the gathering task library is empty', async () => {
@@ -22133,6 +22170,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventResult: false };
     await openDirtyGatheringEventEditor(calls, storeOptions);
+    assertHeaderBackIsGhost('[data-gathering-event-back]', 'gathering-event-edit');
 
     assertSaveErrorAbsent(
       '[data-gathering-event-save-error]',

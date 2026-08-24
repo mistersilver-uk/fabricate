@@ -8469,6 +8469,7 @@
               >
             {/if}
             <ManagerButton
+              role="ghost"
               data-recipe-item-back
               onclick={backToBooksScrolls}
               disabled={recipeItemEditSaving}
@@ -8640,6 +8641,8 @@
               >
             {/if}
             <ManagerButton
+              role="ghost"
+              data-environment-edit-back
               onclick={backToEnvironmentsBrowse}
               disabled={$viewState.environmentSaving}
             >
@@ -8678,7 +8681,11 @@
                 >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <ManagerButton onclick={backToGatheringTaskLibrary}>
+            <ManagerButton
+              role="ghost"
+              data-gathering-task-back
+              onclick={backToGatheringTaskLibrary}
+            >
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text(
@@ -8731,7 +8738,11 @@
                 >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
               >
             {/if}
-            <ManagerButton onclick={backToGatheringEventLibrary}>
+            <ManagerButton
+              role="ghost"
+              data-gathering-event-back
+              onclick={backToGatheringEventLibrary}
+            >
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text(
@@ -8774,7 +8785,18 @@
               </p>
             {/if}
           {:else if currentView === 'system-edit'}
-            <ManagerButton onclick={backToSystemsBrowser}>
+            <!--
+              `ghost` here rests on the VERB, not on a neighbour. Every other Back in this
+              container is a peer of a Save that outranks it, and is painted `ghost` for that
+              reason: the `recipe-edit` branch above, `ComponentEditorHeader` (which renders
+              its own Back into THIS div, for `component-edit` and `essence-edit`), and
+              `ToolEditView`, the maintainer's authority for what a manager button looks
+              like. The system editor has no Save to sit beside — it saves per field — so
+              Back is the lone action on this route. It is still the same verb, and a Back
+              that is neutral here and ghost on every other route is the drift this sweep
+              exists to end.
+            -->
+            <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
               <span
                 >{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span
