@@ -3696,17 +3696,21 @@ function bindFabricateGlobal() {
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
     HOOKS: FABRICATE_HOOKS,
     // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289):
-    // `{ schemaVersion, members, outcomes }`, frozen at module load. Assigned here and
+    // `{ schemaVersion, members, outcomes, callSites }`, frozen at module load. `callSites`
+    // was added by issue 1293 with no `schemaVersion` bump — the compatibility promise
+    // permits GAINING a field, never losing one. Assigned here and
     // NOWHERE else, so its version is readable from Fabricate's own `init` onward, before
     // any collaborator exists — that is the whole affordance, and it is what lets a
     // companion version-check before it calls.
     //
-    // The two behavioural members it declares are METHODS ON THE FACADE, not entries in
-    // this class bag, and deliberately so: everything above is a constructor a caller
-    // instantiates, while `grantRecipeKnowledge` is an unbounded, GM-gated write whose only
-    // authorised route is the gated facade method. Publishing a grant symbol beside these
-    // classes would hand out the same capability without the gate — the exact defect that
-    // keeps it off `RecipeVisibilityService` in the first place.
+    // The four `stable` behavioural members it declares — `grantRecipeKnowledge` and
+    // `checkAffordability` from issue 1289, `rollActorCheck` and `resolveBulkCheckDecision`
+    // from issue 1293 — are METHODS ON THE FACADE, not entries in this class bag, and
+    // deliberately so: everything above is a constructor a caller instantiates, while
+    // `grantRecipeKnowledge` is an unbounded, GM-gated write whose only authorised route is
+    // the gated facade method. Publishing a grant symbol beside these classes would hand out
+    // the same capability without the gate — the exact defect that keeps it off
+    // `RecipeVisibilityService` in the first place.
     COMPANION: COMPANION_CONTRACT
   };
   managerExtensions.bindPublicApi(game.fabricate.api);
