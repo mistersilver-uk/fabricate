@@ -1611,6 +1611,59 @@
 }
 
 /*
+  …and the SAME baseline for `<select>` (issue 1286).
+
+  The block above promises that "a NEW field can never bleed again", and for four years it
+  did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
+  Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
+  against these surfaces rather than as a missing border. Selects were themed
+  per-container instead — `.fabricate-manager .manager-field select` and
+  `.manager-component-inline-control` (both further down this file) — so a select that leaves
+  a `.manager-field` and carries only `.manager-input` reverted, exactly as the note on that
+  rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
+  found it: both sit in a revealed input strip rather than a field wrapper, and both painted
+  Foundry's default beside a correctly themed `<input>` on the same row.
+
+  PAINT ONLY, and that split is the whole reason this is a separate rule rather than another
+  selector on the group above.
+
+   - The paint properties are byte-identical to the free-text baseline, so a select and the
+     text input beside it are the same control family. That is measurable: the comparator now
+     matches its own row's expression field rather than the two neighbouring treatments the
+     manager already had (6px in a `.manager-field`, 7px on `.manager-scope-select`), both of
+     which keep their own radius because their rules out-specify this one.
+   - `min-height` is deliberately ABSENT. The text baseline can pin 34px because a bare
+     `<input>` has no other height source; a manager select does — and they disagree on
+     purpose. 28px on a pagination-size picker, 32px on `.manager-scope-select` and the bulk
+     editor, 36px in a `.manager-field`. `min-height` is not a property a higher-specificity
+     `height` declaration can override, so a 34px floor here would silently GROW every one of
+     those and no cascade rule would stop it. A call site that needs a select flush with a
+     34px input states that height itself; `ComponentComplicationsSection` does.
+   - No `appearance: none` either, for the same class of reason: on an `<input>` it is a
+     no-op, on a `<select>` it deletes the dropdown arrow. The `@supports (appearance:
+     base-select)` block below sets `appearance` for the engines that can honour it, and an
+     engine without it must keep the platform widget rather than a chevron-less rectangle.
+
+  Specificity is (0,1,1) — one step below the (0,2,1) of the group above, and below every
+  per-control select rule in this file — so this only ever paints a select that nothing else
+  claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
+  to `.fabricate-manager .manager-field select:disabled` (0,2,2).
+*/
+.fabricate-manager select {
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+}
+
+/*
   The OPEN state of every manager `<select>` (issue 772).
 
   The same baseline reasoning as the block above, for the one part of a select that is
