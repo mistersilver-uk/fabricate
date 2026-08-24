@@ -706,6 +706,11 @@ function compileManagerRoot() {
     // `managerExtensions.js` imports it statically, so omitting it reports every mounted
     // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
     'src/ui/extensionRegistry.js',
+    // The registration-scoped tab-badge store the Manager registry owns (issue 1302). It is a
+    // plain leaf — it imports only the guard in the line above — but `managerExtensions.js`
+    // imports it statically, so omitting it reports every mounted manager test as
+    // `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/ui/navTabBadgeStore.js',
     // The player registry the title bar's PREMIUM badge also reads (issue 1198), plus the
     // shared derivation leaf the player window composes its rail from. Both arrive through
     // this suite because the A2 case registers a player-only provider.
