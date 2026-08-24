@@ -147,6 +147,7 @@
     managerHeaderActionClass,
     WORLD_DOWNTIME_SURFACE_ID,
   } from '../../../managerExtensions.js';
+  import { resolveNavTabBadge, navTabBadgeTotal } from '../../../navTabBadgeStore.js';
 
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
@@ -184,6 +185,10 @@
   // "read the whole registered surface set", so there is nothing about the flag to change.
   let managerRegisteredSurfaceIds = $state([]);
   let playerRegisteredSurfaceIds = $state([]);
+  // The runtime side of a Downtime tab's badge (issue 1302): a frozen, null-prototype record
+  // keyed by tab id, one snapshot per publication. Registration-scoped, not mount-scoped — see
+  // `navTabBadgeStore.js` — so it is read here rather than by the (mount-scoped) extension host.
+  let downtimeNavTabBadges = $state(null);
 
   $effect(() => {
     if (!managerExtensions?.subscribe) return;
@@ -199,6 +204,16 @@
     if (!managerExtensions?.subscribeSurfaceIds) return;
     return managerExtensions.subscribeSurfaceIds((surfaceIds) => {
       managerRegisteredSurfaceIds = surfaceIds;
+    });
+  });
+
+  // The runtime badge channel. This is THE CAPABILITY (issue 1302): an implementation that
+  // renders only a tab's REGISTERED `badge` and never subscribes would satisfy every
+  // registry-level criterion while shipping `setWorldNavTabBadge` as a write-only sink.
+  $effect(() => {
+    if (!managerExtensions?.subscribeNavTabBadges) return;
+    return managerExtensions.subscribeNavTabBadges(WORLD_DOWNTIME_SURFACE_ID, (badges) => {
+      downtimeNavTabBadges = badges;
     });
   });
 
@@ -2736,6 +2751,15 @@
   // "Open the downtime ledger, region". A landmark takes the name of the SCREEN, so it points
   // at the span that holds exactly that: "Ledger".
   const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
+  // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
+  // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
+  const downtimeNavBadgeId = (tabId) => `manager-downtime-nav-badge-${tabId}`;
+  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs
+  // never carry a `badge`, but a runtime badge CAN be stored against one of their ids (the
+  // faulted-provider case), so the mode guard is load-bearing here and not merely defensive.
+  function downtimeSubitemBadge(item) {
+    return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);
+  }
   // Gated on provider mode rather than merely on the channel being empty. The channel already
   // releases itself on every path that ends a mount, so this is belt and braces — but Core's
   // preview is CORE's screen, and no reachable ordering may ever let a companion's copy,
@@ -3061,6 +3085,52 @@
   // future session. Derive what is DISPLAYED instead and leave the stored preference alone, so
   // leaving the route restores it.
   const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
+  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden
+  // behind a closed disclosure, never registered-plus-runtime added together (`navTabBadgeTotal`
+  // sums the RESOLVED value once per tab). Zero in core-fallback: Core's preview tabs never
+  // carry a badge, so there is nothing of the companion's to summarise there.
+  const downtimeNavRollupTotal = $derived(
+    downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
+  );
+  // Renders only while the children are hidden — BOTH disjuncts are load-bearing. The first
+  // covers the default state (the group closed on a fresh Manager); the second covers the GM
+  // who expanded the group this session and then collapsed the rail, where the submenu is
+  // `display: none` and the rollup is the only surviving signal left.
+  const downtimeNavRollupVisible = $derived(
+    !downtimeCoreFallback &&
+      downtimeNavRollupTotal > 0 &&
+      (!railGroupExpanded.worldDowntime || railCollapsedDisplay)
+  );
+  // "{count} update" / "{count} updates" — Core's own generic word, because Core cannot know
+  // whether a companion is counting records or demands and the summed value is heterogeneous
+  // across tabs by construction. Deliberately not "issue": that borrows Checks' severity claim
+  // about data Core cannot inspect.
+  //
+  // Two full literal keys, not a composed base — the repo's lang-key-literal guard pins the
+  // exact count of dynamic `` `${base}.${suffix}` `` namespace bases project-wide, and this key
+  // pair has exactly two shapes, so naming both in full costs nothing and adds no new base.
+  function downtimeRollupName(count) {
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOne'
+        : 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOther';
+    const fallback = count === 1 ? '{count} update' : '{count} updates';
+    return text(key, fallback).replace('{count}', String(count));
+  }
+  // The parent row's composed accessible name while the rollup shows. The row's `aria-label`
+  // replaces its subtree, so a `role="img"` rollup inside it would otherwise be silent — the
+  // same reason the shipped `PREMIUM` chip already is. One Core-owned key carries both tokens
+  // in the translator's word order; `{label}` is SUBSTITUTED from the same value the visible
+  // label renders (never hard-coded), so the row's noun has exactly one source.
+  function downtimeParentName(count) {
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOne'
+        : 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOther';
+    const fallback = count === 1 ? '{label}, {count} update' : '{label}, {count} updates';
+    const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
+    return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
+  }
   // Every rail-toggle attribute reads the DISPLAY value, never the stored one. Forcing the rail
   // open without them gives a GM who arrived collapsed an expanded rail whose control reports
   // `aria-pressed="true"`, is labelled "Expand navigation rail", points its chevron the wrong
@@ -9428,7 +9498,9 @@
                       'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
                       'Downtime Studio is unlocked by Fabricate Premium'
                     )}
-                aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+                aria-label={downtimeNavRollupVisible
+                  ? downtimeParentName(downtimeNavRollupTotal)
+                  : text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
                 aria-current={isWorldDowntimeRoute ? 'page' : undefined}
                 aria-controls="manager-downtime-submenu"
                 aria-expanded={railGroupExpanded.worldDowntime}
@@ -9440,17 +9512,38 @@
                 </span>
                 <!--
                 The chip is MUTED, never removed, once a companion holds the surface (issue
-                1185): with premium installed the title bar carries the loud gold signal, and
-                two shouts of the same word is one too many — but the rail still has to say
-                which route premium provides. `is-installed` re-tones it to a quiet accent
-                marker and leaves its geometry alone.
+                1185) — EXCEPT while a nonzero rollup shows (issue 1302), which REPLACES it
+                outright: the parent row's single trailing track carries either the chip or
+                the rollup, never both, so a second grid item never auto-places into an
+                implicit row under the icon. With premium installed the title bar carries the
+                loud gold signal, and two shouts of the same word is one too many — but the
+                rail still has to say which route premium provides. `is-installed` re-tones
+                the chip to a quiet accent marker and leaves its geometry alone.
               -->
-                <span
-                  class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
-                  data-world-nav-premium
-                  data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
-                  >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
-                >
+                {#if !downtimeNavRollupVisible}
+                  <span
+                    class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                    data-world-nav-premium
+                    data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
+                    >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
+                  >
+                {/if}
+                <!--
+                The rollup — Core's own summary of what the closed disclosure is hiding,
+                identical in shape to the Checks parent badge. Renders in provider mode only,
+                and only while the children are hidden, in the parent's one trailing track.
+              -->
+                {#if !downtimeCoreFallback}
+                  {#if downtimeNavRollupVisible}
+                    <span
+                      class="manager-nav-issue-badge"
+                      data-world-downtime-badge-total
+                      role="img"
+                      aria-label={downtimeRollupName(downtimeNavRollupTotal)}
+                      >{downtimeNavRollupTotal}</span
+                    >
+                  {/if}
+                {/if}
               </button>
               <button
                 type="button"
@@ -9510,12 +9603,34 @@
                       aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
                         ? 'true'
                         : undefined}
+                      aria-describedby={downtimeSubitemBadge(item)
+                        ? downtimeNavBadgeId(item.id)
+                        : undefined}
                       onclick={() => openWorldDowntimePreview(item.id)}
                     >
                       <i class={item.icon} aria-hidden="true"></i>
                       <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
                         >{downtimeTabText(item, 'label')}</span
                       >
+                      <!--
+                      A badge is a DESCRIPTION, never a name: it is a sibling of the label
+                      span above, and it is never nested inside it, because that span names
+                      the whole companion panel region (issue 1213) and a nested badge would
+                      silently rename the region. No `aria-describedby` is present above when
+                      no badge renders here — no dangling IDREF on a 3 → 0 transition.
+                    -->
+                      {#if !downtimeCoreFallback}
+                        {@const badge = downtimeSubitemBadge(item)}
+                        {#if badge}
+                          <span
+                            class="manager-nav-count"
+                            data-world-downtime-badge={item.id}
+                            id={downtimeNavBadgeId(item.id)}
+                            role="img"
+                            aria-label={badge.accessibleName}>{badge.count}</span
+                          >
+                        {/if}
+                      {/if}
                       <!--
                       The padlock and the premium note below advertise CORE'S preview. A
                       companion owning the surface has nothing locked, so neither renders.
