@@ -182,17 +182,6 @@
     outline-offset: 2px;
   }
 
-  /* Apply's half of what used to be one group with the rule above. It is split out rather
-     than left in it because the two controls are no longer the same KIND of element: Clear
-     is written here and carries this component's scoping class, Apply is a `<ManagerButton>`
-     and never will, so one selector cannot reach both. Nothing else in the sheet states an
-     `outline` for a manager button, so this needs no chain — only the `:global()`, without
-     which Apply would silently lose its keyboard focus ring. */
-  :global(.fab-bulk-edit-apply:focus-visible) {
-    outline: 2px solid var(--fab-mv2-accent);
-    outline-offset: 2px;
-  }
-
   .fab-bulk-edit-clear > i {
     font-size: 0.58rem;
   }
@@ -418,5 +407,25 @@
     color: var(--fab-text-disabled);
     background: var(--fab-surface-soft);
     cursor: default;
+  }
+
+  /* Apply's half of what used to be one focus group with `.fab-bulk-edit-clear` above. It is
+     split out because the two controls are no longer the same KIND of element: Clear is
+     written here and carries this component's scoping class, Apply is a `<ManagerButton>` and
+     never will, so one selector cannot reach both.
+
+     ANCHORED AND CHAINED like the three companions above it, and MOVED down here beside them,
+     which is what the paragraph on the base rule already promised (issue 1118). It used to be
+     written as a bare `:global(.fab-bulk-edit-apply:focus-visible)` under a comment claiming
+     nothing else in the sheet states an `outline` for a manager button, so it needed no
+     chain. Both halves of that were wrong. `styles/fabricate.css` states
+     `.fabricate-manager button:focus-visible` — (0,2,1), against this selector's (0,2,0) —
+     with byte-identical declarations, so the ring this rule claimed to be the only source of
+     is the manager's own standing contract, and this rule was carrying no weight. Chained, it
+     wins on specificity rather than on which sheet was injected last, and it is the only one
+     of Apply's four rules that does not restate the ancestor its siblings all name. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
+    outline: 2px solid var(--fab-mv2-accent);
+    outline-offset: 2px;
   }
 </style>
