@@ -73,7 +73,7 @@ export const COMPANION_PROMISES = Object.freeze({
 
 /**
  * WHERE a member is read from. A flat list of member names cannot resolve this set
- * uniformly, because two of the ten members are not facade functions: `schemaVersion` is a
+ * uniformly, because two of the twelve members are not facade functions: `schemaVersion` is a
  * number on the descriptor, and `findComponentItems` is a method on the object a `handle`
  * accessor RETURNS. Every row therefore declares its host and the path read off it, which is
  * what makes the member-resolution test mechanical rather than assumed.
@@ -104,7 +104,7 @@ export const COMPANION_MEMBER_KINDS = Object.freeze({
 /**
  * One member row.
  *
- * The single factory exists so the table below is ten TUPLES rather than ten repeated
+ * The single factory exists so the table below is twelve TUPLES rather than twelve repeated
  * frozen object literals: repeated near-identical literals are how a duplication block gets
  * reported, and a row that silently omits a field is invisible in that shape.
  *
@@ -127,21 +127,27 @@ const { value: VALUE, method: METHOD, accessor: ACCESSOR } = COMPANION_MEMBER_KI
  * The declared member set — the whole of the contract's surface, at exactly one promise tier
  * each.
  *
- * Exactly ONE of the ten members awards anything; the rest read state, roll a check, settle
- * one roll decision, or hand back a collaborator — which is why the contract is named for the
- * companion rather than for awards.
+ * The members that WRITE are `grantRecipeKnowledge`, `awardComponents` and `creditCurrency`;
+ * the rest read state, roll a check, settle one roll decision, or hand back a collaborator —
+ * which is why the contract is named for the companion rather than for any one of them. The
+ * word AWARD is deliberately not used loosely here any more: **Component Award** is a bound
+ * domain term naming what `awardComponents` does, so the knowledge grant is called a grant
+ * and the coin credit is called a credit (issue 1301).
  *
  * `getCraftingEngine().findComponentItems` is named with its full deviations, because a
  * companion that guards only against a null actor still crashes: it takes DOCUMENTS, NOT
  * IDS; its third argument is a crafting-system OBJECT, not an id; and it THROWS on a null
  * actor AND on a null component, with only the system argument tolerant. It is still
- * declared, because it is the one route that lets a component award STACK rather than
- * duplicate, and excluding it would not stop the call — only the deviation being written
- * down.
+ * declared, because a companion legitimately holds its answer — but it is NO LONGER the only
+ * route to a stacking placement: `awardComponents` consumes this very method internally and
+ * is the supported way to place a component on a sheet, so a companion that wants to place
+ * one should call that instead of composing the write itself. Excluding this row would not
+ * stop the call — only the deviation being written down.
  *
  * NEW ROWS ARE APPENDED, never interleaved (issue 1293). `getCraftingEngine().findComponentItems`
- * is named as "the eighth member" by two comments in `tests/companion-facade.test.js`, and
- * inserting a row above it would falsify both without any assertion noticing.
+ * is named as "the eighth member" by four sites in two files — `tests/companion-facade.test.js`
+ * and `tests/companion-contract.test.js` — and inserting a row above it would falsify all four
+ * without any assertion noticing.
  */
 export const COMPANION_MEMBERS = Object.freeze(
   [
@@ -155,6 +161,8 @@ export const COMPANION_MEMBERS = Object.freeze(
     ['getCraftingEngine().findComponentItems', HOST_ENGINE, 'findComponentItems', HANDLE, METHOD],
     ['rollActorCheck', HOST_FACADE, 'rollActorCheck', STABLE, METHOD],
     ['resolveBulkCheckDecision', HOST_FACADE, 'resolveBulkCheckDecision', STABLE, METHOD],
+    ['awardComponents', HOST_FACADE, 'awardComponents', STABLE, METHOD],
+    ['creditCurrency', HOST_FACADE, 'creditCurrency', STABLE, METHOD],
   ].map(companionMember)
 );
 
@@ -171,9 +179,10 @@ export const COMPANION_MEMBERS = Object.freeze(
  * Each token maps to itself so a caller reads
  * `result.outcome === COMPANION_OUTCOMES.alreadyKnown` rather than a bare string literal.
  * The authorization/readiness tokens are SHARED, but NOT uniformly: `gmOnly` and `notReady`
- * are answered by all FOUR `stable` members, while `noActor` is answered by the THREE that
- * target an actor — `resolveBulkCheckDecision` reads no actor and takes no `actorId`, so it
- * can never answer it. Each member answers with its OWN message key, because a failed grant
+ * are answered by all SIX `stable` members that are METHODS — `schemaVersion` is a `stable`
+ * VALUE and answers no outcome at all — while `noActor` is answered by the FIVE of those that
+ * target an actor: `resolveBulkCheckDecision` reads no actor and takes no `actorId`, so it can
+ * never answer it. Each member answers with its OWN message key, because a failed grant
  * must not report itself in the words of a failed currency check.
  */
 export const COMPANION_OUTCOMES = Object.freeze({
@@ -226,6 +235,30 @@ export const COMPANION_OUTCOMES = Object.freeze({
   // resolveBulkCheckDecision
   decided: 'decided',
   nothingToDecide: 'nothingToDecide',
+
+  // awardComponents (issue 1301). `awarded` and `awardFailed` are answered at BOTH levels —
+  // by the call and by an individual placement — deliberately: minting a second word (`placed`)
+  // for the concept `awarded` already names is how a caller ends up branching on both, which is
+  // the reasoning recorded above for keeping the shipped word `cancelled`. The three tokens
+  // below them are ENTRY-LEVEL ONLY and can never be a call-level `outcome`; the list that says
+  // so as DATA is {@link COMPONENT_AWARD_ENTRY_OUTCOMES}.
+  awarded: 'awarded',
+  partiallyAwarded: 'partiallyAwarded',
+  awardFailed: 'awardFailed',
+  componentNotFound: 'componentNotFound',
+  invalidQuantity: 'invalidQuantity',
+  multiUnitUnsupported: 'multiUnitUnsupported',
+  invalidAwards: 'invalidAwards',
+
+  // creditCurrency (issue 1301). FOUR outcomes carrying THREE values of `credited`: the amount
+  // for `credited`, a provable `0` for `creditNotConfigured`, and `null` for both `creditFailed`
+  // and `creditUnavailable` — which is the whole rule stated once, `0` MEANS FABRICATE CAN PROVE
+  // IT AND `null` MEANS IT CANNOT, with `outcome` carrying the distinction between the two
+  // unprovable answers. Nobody should mint a fourth value.
+  credited: 'credited',
+  creditFailed: 'creditFailed',
+  creditUnavailable: 'creditUnavailable',
+  creditNotConfigured: 'creditNotConfigured',
 });
 
 /**
@@ -270,7 +303,7 @@ const SUCCESSFUL_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.notAffordable,
   // A check that ROLLED answered the question, whichever way it landed — so all three rolled
   // outcomes are successes and the caller reads `outcome` to learn what happened. FIVE tokens
-  // here, not three: `buildResult` computes `success` as membership of this list AND the
+  // in this block, not three: `buildResult` computes `success` as membership of this list AND the
   // presence of a message key, so omitting the two bulk outcomes would make both of
   // `resolveBulkCheckDecision`'s answers silently report `success: false`.
   COMPANION_OUTCOMES.checkPassed,
@@ -280,6 +313,16 @@ const SUCCESSFUL_OUTCOMES = Object.freeze([
   // "There is nothing to prompt about" is a CORRECT answer, not a failure: asking a GM for a
   // situational bonus for a batch in which nothing rolls is a dialog with no consequence.
   COMPANION_OUTCOMES.nothingToDecide,
+  // An award that placed SOME of what was asked is a success carrying a partial total, on the
+  // rule this list already states twice: the ACT happened. `awardFailed` is deliberately absent
+  // — an act that did not happen at all answers `false`, which is what separates it from
+  // `notAffordable`, a QUESTION answered no. Omitting any of these three from this list would
+  // make the member silently answer `success: false` for a write that landed, because
+  // `buildResult` computes `success` as membership here AND the presence of a message key
+  // (issue 1301).
+  COMPANION_OUTCOMES.awarded,
+  COMPANION_OUTCOMES.partiallyAwarded,
+  COMPANION_OUTCOMES.credited,
 ]);
 
 /**
@@ -418,6 +461,93 @@ export const BULK_CHECK_DECISION_MESSAGE_KEYS = Object.freeze({
 const BULK_CHECK_DECISION_FALLBACK_KEY = 'FABRICATE.Check.BulkDecision.Failed';
 
 /**
+ * The outcomes an award ENTRY can answer with and a CALL never can (issue 1301).
+ *
+ * Declared as DATA rather than as prose because the split is asserted, not remembered. The
+ * shipped dead-vocabulary sweep requires every declared outcome to appear as a key in SOME
+ * member's key table, so these three have to sit in {@link COMPONENT_AWARD_MESSAGE_KEYS} even
+ * though no call ever answers with one; the member's declared CALL-level set is therefore that
+ * table's keys MINUS this list, computed rather than restated.
+ *
+ * The list is the ENTRY-ONLY tokens, not everything an entry can answer: `awarded` and
+ * `awardFailed` are answered at both levels (see {@link COMPANION_OUTCOMES}), so an entry's
+ * full vocabulary is this list PLUS those two.
+ */
+export const COMPONENT_AWARD_ENTRY_OUTCOMES = Object.freeze([
+  COMPANION_OUTCOMES.componentNotFound,
+  COMPANION_OUTCOMES.invalidQuantity,
+  COMPANION_OUTCOMES.multiUnitUnsupported,
+]);
+
+/**
+ * `awardComponents`' outcome -> localization key table (issue 1301).
+ *
+ * The namespace is `Component.Award.*` — a NEW top-level `Component` namespace, minted at
+ * `lang/en.json`'s domain-noun tier beside `Knowledge`, `Currency`, `Check`, `Gathering`,
+ * `Alchemy`, `Tool` and `System`, where a single-child namespace is entirely normal. (Written
+ * without its dotted `FABRICATE.` prefix on purpose, following the shipped note on the grant's
+ * table: a partial key literal in a comment is captured by the localization guards as a
+ * namespace BASE, and a base declared only by a comment is a reference nothing renders.)
+ * **Component** is the most central noun in `DOMAIN.md` and was the one member of that tier
+ * with no namespace at all; a `Companion.*` namespace was rejected because it names the ASKER.
+ *
+ * The table is the UNION of the call-level and entry-level vocabularies, because every
+ * placement carries its own `message` and because the dead-vocabulary sweep demands it.
+ *
+ * `InvalidAwards` is the one string that interpolates anything, and it interpolates the BOUND
+ * rather than restating it, exactly as `GrantedByTooLong` does — so the string and
+ * {@link AWARD_ENTRIES_MAX} cannot drift apart. Every ENTRY-level key interpolates NOTHING,
+ * and that is load-bearing rather than incidental: a placement carries no `messageData` at
+ * all, so a placeholder there would put literal braces in front of a GM. The three refusals
+ * the FACADE answers with — `gmOnly`, `noActor`, `notReady` — plus `InvalidCallSite` and
+ * `NotElected` are placeholder-free for the shipped reason recorded on the check-roll table.
+ */
+export const COMPONENT_AWARD_MESSAGE_KEYS = Object.freeze({
+  [COMPANION_OUTCOMES.awarded]: 'FABRICATE.Component.Award.Awarded',
+  [COMPANION_OUTCOMES.partiallyAwarded]: 'FABRICATE.Component.Award.PartiallyAwarded',
+  [COMPANION_OUTCOMES.awardFailed]: 'FABRICATE.Component.Award.Failed',
+  [COMPANION_OUTCOMES.componentNotFound]: 'FABRICATE.Component.Award.ComponentNotFound',
+  [COMPANION_OUTCOMES.invalidQuantity]: 'FABRICATE.Component.Award.InvalidQuantity',
+  [COMPANION_OUTCOMES.multiUnitUnsupported]: 'FABRICATE.Component.Award.MultiUnitUnsupported',
+  [COMPANION_OUTCOMES.invalidAwards]: 'FABRICATE.Component.Award.InvalidAwards',
+  [COMPANION_OUTCOMES.systemNotFound]: 'FABRICATE.Component.Award.SystemNotFound',
+  [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Component.Award.InvalidCallSite',
+  [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Component.Award.NotElected',
+  [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Component.Award.GMOnly',
+  [COMPANION_OUTCOMES.noActor]: 'FABRICATE.Component.Award.NoActor',
+  [COMPANION_OUTCOMES.notReady]: 'FABRICATE.Component.Award.NotReady',
+});
+
+/**
+ * `creditCurrency`'s outcome -> localization key table (issue 1301).
+ *
+ * A `Currency.Credit.*` sibling of the shipped `Currency.Affordability.*`, and NOT a reuse of
+ * it: a failed credit must not report itself in the words of a failed check, which is the rule
+ * every member's own table exists to keep.
+ *
+ * `LadderInvalid`, `CreditFailed`, `CreditUnavailable` and `CreditNotConfigured` are the four
+ * strings that interpolate `messageData.detail`, which is where the currency layer's FREE TEXT
+ * rides so that `message` stays a localization key; a caller of any of them MUST supply
+ * `detail`. `Credited` interpolates the actor, the amount and the unit, on the shipped
+ * `Affordability.Affordable` shape.
+ */
+export const CURRENCY_CREDIT_MESSAGE_KEYS = Object.freeze({
+  [COMPANION_OUTCOMES.credited]: 'FABRICATE.Currency.Credit.Credited',
+  [COMPANION_OUTCOMES.creditFailed]: 'FABRICATE.Currency.Credit.CreditFailed',
+  [COMPANION_OUTCOMES.creditUnavailable]: 'FABRICATE.Currency.Credit.CreditUnavailable',
+  [COMPANION_OUTCOMES.creditNotConfigured]: 'FABRICATE.Currency.Credit.CreditNotConfigured',
+  [COMPANION_OUTCOMES.unitNotFound]: 'FABRICATE.Currency.Credit.UnitNotFound',
+  [COMPANION_OUTCOMES.invalidAmount]: 'FABRICATE.Currency.Credit.InvalidAmount',
+  [COMPANION_OUTCOMES.ladderEmpty]: 'FABRICATE.Currency.Credit.LadderEmpty',
+  [COMPANION_OUTCOMES.ladderInvalid]: 'FABRICATE.Currency.Credit.LadderInvalid',
+  [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Currency.Credit.InvalidCallSite',
+  [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Currency.Credit.NotElected',
+  [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Currency.Credit.GMOnly',
+  [COMPANION_OUTCOMES.noActor]: 'FABRICATE.Currency.Credit.NoActor',
+  [COMPANION_OUTCOMES.notReady]: 'FABRICATE.Currency.Credit.NotReady',
+});
+
+/**
  * The two localization keys the GM Knowledge surface's GRANTED source rungs render.
  *
  * Declared beside the contract, and not only in the renderer, for the reason the navigation
@@ -461,6 +591,20 @@ export const GRANTED_SOURCE_MESSAGE_KEYS = Object.freeze({
  * as its `messageData` rather than restating the number.
  */
 export const GRANTED_BY_MAX_LENGTH = 64;
+
+/**
+ * The longest `awards` list `awardComponents` accepts, counted in ENTRIES (issue 1301).
+ *
+ * Bounded because each entry is a Foundry document write, so an unbounded list is an unbounded
+ * write batch driven by a caller Fabricate does not control. It starts bounded on
+ * {@link GRANTED_BY_MAX_LENGTH}'s reasoning: WIDENING what a published member accepts is free
+ * under the compatibility promise, and narrowing it is a `schemaVersion` bump — so the cheap
+ * direction is the one that stays available.
+ *
+ * The refusal string interpolates this bound as `max` rather than restating the number, so a
+ * caller answering `invalidAwards` supplies `{ max: AWARD_ENTRIES_MAX }` as its `messageData`.
+ */
+export const AWARD_ENTRIES_MAX = 64;
 
 function buildResult(outcome, messageKeys, fallbackKey, messageData, extra) {
   const message = messageKeys[outcome] ?? fallbackKey;
@@ -634,6 +778,155 @@ export function bulkCheckDecisionResult(outcome, messageData = null, decision = 
       allowAdvantage: assessed ? decision?.allowAdvantage === true : null,
       covered: Object.freeze(assessed ? (decision?.covered ?? []) : []),
     }
+  );
+}
+
+/**
+ * Build one frozen placement record for {@link componentAwardResult}.
+ *
+ * `index` is the record's POSITION in the answer, taken from the map rather than from the
+ * caller's entry, so it cannot disagree with where the record actually sits. `message` is
+ * attached here rather than by the member: every entry carries a key from this member's own
+ * table, so a caller records each placement without composing free text out of `outcome`,
+ * which would invert the contract's "`message` is always a localization key" rule one level
+ * down.
+ *
+ * @param {{componentId: *, requested: *, placed: number, stacked: boolean|null,
+ *   outcome: string}} entry the member's INTERNAL record of one attempted placement
+ * @param {number} index the entry's position in the caller's own `awards` list
+ * @returns {Readonly<{index: number, componentId: *, requested: *, placed: number,
+ *   stacked: boolean|null, outcome: string, message: string}>}
+ */
+function componentAwardPlacement(entry, index) {
+  const outcome = entry?.outcome;
+  return Object.freeze({
+    index,
+    // `componentId` and `requested` ECHO the caller's own entry, so a caller maps the answer
+    // back onto its request without having kept its own array. An absent value is `null` and
+    // never `undefined`: `undefined` is the one value a published field cannot carry, because
+    // it does not survive being written to a log or a flag.
+    componentId: entry?.componentId ?? null,
+    requested: entry?.requested ?? null,
+    placed: Number.isFinite(entry?.placed) ? entry.placed : 0,
+    stacked: typeof entry?.stacked === 'boolean' ? entry.stacked : null,
+    outcome,
+    message:
+      COMPONENT_AWARD_MESSAGE_KEYS[outcome] ??
+      COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.awardFailed],
+  });
+}
+
+/**
+ * Build `awardComponents`' answer (issue 1301).
+ *
+ * Derived from the outcome and an INTERNAL placement record, on the same rule as
+ * {@link checkRollResult}: nothing here is overridable by a caller bag, which matters most on
+ * a member that WRITES, and doubly so because `buildResult` writes `success` BEFORE it spreads
+ * `extra`.
+ *
+ * - `placements` — one record per attempted entry, in the caller's own order. A LIST, so its
+ *   absence is `[]`; `null` would force every caller to guard a `.length` read. `[]` means
+ *   NOTHING WAS ATTEMPTED and a fully populated list beside `awardFailed` means everything was
+ *   attempted and nothing landed — the same distinction `groupOutcomeRecord`'s `attempted`
+ *   field draws in `currencyAffordance.js`.
+ * - `awarded` — SUMMED from `placements[].placed` here, and never passed in. A caller-supplied
+ *   total could disagree with the placements it accompanies and a reader would have no way to
+ *   know which was right.
+ *
+ *   It is `null` for every pre-attempt refusal and `0` for `awardFailed`. **Read that beside
+ *   `credited`, which is `0` for the same refusal class, and the two are not inconsistent:**
+ *   `awarded` is a SUM OVER `placements[]`, so an empty attempt record makes the sum vacuous
+ *   rather than zero, while `credited` has no companion structure to be vacuous over and falls
+ *   to the pure provability rule (`0` when Fabricate can prove nothing moved).
+ *
+ * The whole answer is DEEP-frozen — the result, the array and every entry — because
+ * `assertContractResult` checks `Object.isFrozen(result)` only, so a one-level freeze here
+ * would publish a mutable log record with nothing failing.
+ *
+ * @param {string} outcome one of {@link COMPANION_OUTCOMES}
+ * @param {object|null} [messageData] interpolation data; carries `max` for `invalidAwards`
+ * @param {{placements: Array<object>}|null} [record] the member's INTERNAL placement record
+ * @returns {Readonly<{success: boolean, awarded: number|null, placements: Array<object>,
+ *   outcome: string, message: string, messageData?: object}>}
+ */
+export function componentAwardResult(outcome, messageData = null, record = null) {
+  const placements = Object.freeze(
+    (Array.isArray(record?.placements) ? record.placements : []).map(componentAwardPlacement)
+  );
+  return buildResult(
+    outcome,
+    COMPONENT_AWARD_MESSAGE_KEYS,
+    COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.awardFailed],
+    messageData,
+    {
+      awarded:
+        placements.length === 0
+          ? null
+          : placements.reduce((total, placement) => total + placement.placed, 0),
+      placements,
+    }
+  );
+}
+
+/**
+ * The outcomes for which Fabricate can PROVE nothing was credited: `creditNotConfigured`, and
+ * every refusal taken before any mechanism ran.
+ *
+ * It is the same set as the member's published ZERO-MUTATION retry set, and that is a property
+ * rather than a coincidence: an answer Fabricate may promise mutated nothing is exactly an
+ * answer whose `credited` it can state as `0`. The three absent tokens are the three under
+ * which a mechanism ran — `credited`, `creditFailed` and `creditUnavailable`.
+ */
+const PROVABLY_ZERO_CREDIT_OUTCOMES = Object.freeze([
+  COMPANION_OUTCOMES.creditNotConfigured,
+  COMPANION_OUTCOMES.invalidAmount,
+  COMPANION_OUTCOMES.ladderEmpty,
+  COMPANION_OUTCOMES.ladderInvalid,
+  COMPANION_OUTCOMES.unitNotFound,
+  COMPANION_OUTCOMES.invalidCallSite,
+  COMPANION_OUTCOMES.notElected,
+  COMPANION_OUTCOMES.gmOnly,
+  COMPANION_OUTCOMES.noActor,
+  COMPANION_OUTCOMES.notReady,
+]);
+
+/**
+ * Build `creditCurrency`'s answer (issue 1301).
+ *
+ * `credited` is DERIVED from the outcome and an INTERNAL credit record, never passed through
+ * from the request — the {@link affordabilityResult} rule, on a member that moves money.
+ * FOUR outcomes carry THREE values, and nobody should mint a fourth:
+ *
+ * - the AMOUNT for `credited`, which the member states only after it has OBSERVED the credit;
+ * - `0` for every outcome in {@link PROVABLY_ZERO_CREDIT_OUTCOMES} — `creditNotConfigured` and
+ *   every refusal taken before any mechanism ran;
+ * - `null` for `creditFailed` and `creditUnavailable` alike, because in both a mechanism ran
+ *   and Fabricate cannot prove what it did. Reporting `0` for `creditFailed` would state a
+ *   third party's word as Fabricate's own proof, which is the collapse the shipped rule at
+ *   {@link affordabilityResult} exists to prevent one member over.
+ *
+ * So `0` MEANS FABRICATE CAN PROVE IT and `null` MEANS IT CANNOT, with `outcome` carrying the
+ * `creditFailed`/`creditUnavailable` distinction — one rule stated twice rather than two fields
+ * that can disagree. An outcome this member does not declare falls to `null` for the same
+ * reason: an unrecognised answer proves nothing.
+ *
+ * @param {string} outcome one of {@link COMPANION_OUTCOMES}
+ * @param {object|null} [messageData] interpolation data; carries `detail` for the four outcomes
+ *   whose underlying failure is free text
+ * @param {{amount: number}|null} [credit] the member's INTERNAL record of what it observed
+ * @returns {Readonly<{success: boolean, credited: number|null, outcome: string, message: string,
+ *   messageData?: object}>}
+ */
+export function currencyCreditResult(outcome, messageData = null, credit = null) {
+  let credited = null;
+  if (outcome === COMPANION_OUTCOMES.credited) credited = credit?.amount ?? null;
+  else if (PROVABLY_ZERO_CREDIT_OUTCOMES.includes(outcome)) credited = 0;
+  return buildResult(
+    outcome,
+    CURRENCY_CREDIT_MESSAGE_KEYS,
+    CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.creditUnavailable],
+    messageData,
+    { credited }
   );
 }
 
