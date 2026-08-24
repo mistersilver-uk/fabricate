@@ -311,6 +311,55 @@ describe('CraftingSystemManager source contract', () => {
       'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
     );
   });
+  // AC-15 — the mode guard on both badge render sites (issue 1302).
+  //
+  // THE FALSIFIABLE FORM FOR AN UNREACHABLE CLAIM. Core's preview tabs are a frozen literal
+  // declaring no badge, so no REGISTERED badge can ever reach core-fallback and a client-mount
+  // assertion of that half passes against an implementation with the guard deleted outright.
+  // The reachable half — a RUNTIME badge stored against a faulted provider's tab, whose ids
+  // are Core's own — is driven in the mounted suite instead.
+  it('keeps both Downtime badge render sites inside the provider-mode branch', () => {
+    // The SUB-ITEM badge, opening immediately inside the mode guard. Asserted as adjacency
+    // rather than as "the file contains both strings", which any two unrelated lines satisfy.
+    assert.match(
+      rootSource,
+      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-count"\s+data-world-downtime-badge=\{item\.id\}/,
+      'the sub-item badge renders inside `downtimeCoreFallback === false`, not beside it'
+    );
+    // The ROLLUP, the same way.
+    assert.match(
+      rootSource,
+      /\{#if !downtimeCoreFallback\}\s*\{#if downtimeNavRollupVisible\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
+      'and so does the parent rollup'
+    );
+    // BOTH, and only those two. A third site added outside a guard would satisfy every
+    // assertion above and render a companion's count over Core's gold upsell.
+    assert.equal(
+      rootSource.split('data-world-downtime-badge').length - 1,
+      2,
+      'there are exactly two badge render sites, and the two matched above are them'
+    );
+
+    // The two DERIVATIONS behind those sites are guarded as well, which is what makes the
+    // markup guards belt and braces rather than the only thing standing between a runtime
+    // badge and a preview row.
+    assert.ok(
+      rootSource.includes(
+        'return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);'
+      ),
+      'the resolved sub-item badge is null in core-fallback, whatever the store holds'
+    );
+    assert.match(
+      rootSource,
+      /downtimeCoreFallback \? 0 : navTabBadgeTotal\(downtimeTabs, downtimeNavTabBadges\)/,
+      'and the rollup total is zero there, so the composed parent name cannot appear either'
+    );
+    assert.match(
+      rootSource,
+      /const downtimeNavRollupVisible = \$derived\(\s*!downtimeCoreFallback &&/,
+      'the rollup’s own visibility opens on the mode, before either of its other terms'
+    );
+  });
   it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
     const closeStart = appSource.indexOf('async close(options) {');
     const closeEnd = appSource.indexOf('  static show()', closeStart);

@@ -16389,6 +16389,70 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   });
 
+  // AC-15, the reachable half. The source contract in `manager-contract.test.js` pins that
+  // both render sites are inside `downtimeCoreFallback === false`; this is the state that
+  // proves the guard is doing work rather than guarding an impossibility.
+  //
+  // A provider whose mount threw KEEPS its registration, so the registry still holds
+  // `downtime` while Core renders its own preview rows — and `downtimeProvider()`'s default
+  // ids are Core's own four, identical in content and order to `CORE_DOWNTIME_PREVIEW_TAB_IDS`.
+  // So a runtime badge really can be stored against an id Core is at that moment rendering.
+  it('AC-15 — a runtime badge stored while a mount is faulted never reaches Core’s preview row', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Broken',
+          mount() {
+            throw new Error('mount exploded');
+          },
+        })
+      );
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      assert.ok(errors.length > 0, 'the mount really did fault');
+      assert.equal(
+        downtimePremiumState(),
+        'preview',
+        'so Core took the surface back and is selling it again'
+      );
+      assert.deepEqual(
+        downtimeTabIds(),
+        ['tracking', 'activities', 'factions', 'settings'],
+        'and Core is rendering its OWN four preview tabs, which is the collision'
+      );
+
+      assert.equal(
+        registry.publicApi.setWorldNavTabBadge('downtime', 'tracking', {
+          count: 4,
+          accessibleName: '4 claims waiting',
+        }),
+        true,
+        'the faulted provider still holds the surface and still declares the tab, so the ' +
+          'setter accepts and STORES: the store is not what protects the preview row'
+      );
+      await settleDowntimeProvider();
+
+      assert.ok(
+        !target.querySelector('[data-world-downtime-badge]'),
+        'the render guard is: no companion count appears on a Core preview row'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-downtime-badge-total]'),
+        'and no rollup summarises a set Core owns'
+      );
+      assert.equal(downtimePremiumState(), 'preview', 'so the gold upsell is exactly what it was');
+    } finally {
+      console.error = originalError;
+    }
+  });
+
   // AC-23 — the four keys tasks 4 and 5 read. `text(key, fallback)` returns the FALLBACK
   // whenever `localize` hands the key back, so an implementation that renders every badge
   // correctly and ships none of these keys keeps every other criterion green while leaving

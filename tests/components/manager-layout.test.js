@@ -8609,6 +8609,302 @@ test('a rail label wraps at a space and ellipsises, and never splits a word', as
   }
 });
 
+// -- Downtime rail tab badges, measured (issue 1302) --------------------------------------
+//
+// A companion's badge is a bare mono numeral in the sub-item's trailing track, and its label
+// is the companion's own and is not Core's to shorten. So the interesting question is not
+// whether the numeral fits — it is what YIELDS when it does not, and that is a computed-layout
+// fact no other harness in the repository can evaluate: happy-dom applies no stylesheet and
+// returns `0` for every box metric.
+//
+// The fixtures below are hand-built markup, which is the shipped idiom in this file and the
+// only way to reach a state at a chosen viewport. The cost of a hand-built fixture is that it
+// keeps passing after the component stops emitting that markup, so each one opens by checking
+// its own marker against the component source; the render sites' BRANCHES are pinned
+// separately, by AC-15 in `manager-contract.test.js`.
+const managerRootPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'
+);
+const managerRootSource = readFileSync(managerRootPath, 'utf8');
+
+function assertBadgeFixtureMirrorsComponent() {
+  assert.ok(
+    managerRootSource.includes('class="manager-nav-count"\n') &&
+      managerRootSource.includes('data-world-downtime-badge={item.id}'),
+    'the sub-item badge fixture below must be the marker the component actually emits'
+  );
+  assert.ok(
+    managerRootSource.includes('class="manager-nav-issue-badge"\n') &&
+      managerRootSource.includes('data-world-downtime-badge-total'),
+    'and so must the parent rollup fixture'
+  );
+}
+
+// The rail chrome every fixture here needs, at the shipped 220px (or the collapsed 56px).
+function railPage(navMarkup, bodyClass = '') {
+  return (
+    `<style>${css}</style>` +
+    `<div class="fabricate-manager"><div class="manager-body${bodyClass}">` +
+    `<aside class="manager-rail"><nav class="manager-nav">${navMarkup}</nav></aside>` +
+    `<main class="manager-main"></main></div></div>`
+  );
+}
+
+// Counting LINE BOXES by distinct top edge, not by rect count: a range yields several rects
+// for one visual line, so `rects.length` reads a single line as two and passes a split as fine.
+const READ_ROW = `(id) => {
+  const row = document.getElementById(id);
+  const label = row.querySelector('.manager-nav-label');
+  const badge = row.querySelector('.manager-nav-count');
+  const range = document.createRange();
+  range.selectNodeContents(label);
+  const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+  const rowBox = row.getBoundingClientRect();
+  const labelBox = label.getBoundingClientRect();
+  const badgeBox = badge.getBoundingClientRect();
+  return {
+    lines: lines.size,
+    clipped: label.scrollWidth > label.clientWidth,
+    wrap: getComputedStyle(label).overflowWrap,
+    labelWidth: +labelBox.width.toFixed(1),
+    labelFirstLineBottom: Math.min(...[...range.getClientRects()].map((rect) => rect.bottom)),
+    badgeWidth: +badgeBox.width.toFixed(1),
+    badgeHeight: +badgeBox.height.toFixed(1),
+    badgeClipped: badge.scrollWidth > badge.clientWidth,
+    badgeCentreY: +(badgeBox.top + badgeBox.height / 2).toFixed(1),
+    badgeInsideRow:
+      badgeBox.left >= rowBox.left - 0.5 &&
+      badgeBox.right <= rowBox.right + 0.5 &&
+      badgeBox.top >= rowBox.top - 0.5 &&
+      badgeBox.bottom <= rowBox.bottom + 0.5,
+    badgeClearsLabel: badgeBox.left >= labelBox.right - 0.5,
+    rowHeight: +rowBox.height.toFixed(1),
+    rowCentreY: +(rowBox.top + rowBox.height / 2).toFixed(1),
+    rowVerticallyClipped: row.scrollHeight > row.clientHeight + 1,
+  };
+}`;
+
+// AC-16 — the widest sub-item case, at the shipped 220px rail.
+test('a four-digit companion badge takes width from the LABEL, which never splits a word', async () => {
+  assertBadgeFixtureMirrorsComponent();
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const subitem = (id, label, count) =>
+      `<button class="manager-nav-subitem manager-downtime-subitem" id="${id}">` +
+      `<i class="fas fa-scroll"></i>` +
+      `<span class="manager-nav-label">${label}</span>` +
+      `<span class="manager-nav-count" data-world-downtime-badge="${id}" role="img" ` +
+      `aria-label="${count} waiting">${count}</span>` +
+      `</button>`;
+    await page.setContent(
+      railPage(
+        `<div class="manager-nav-group is-expanded">` +
+          `<div class="manager-nav-submenu" id="downtime-submenu">` +
+          subitem('wide', 'Trade Administration Overview', '1200') +
+          subitem('control', 'Trade Administration Overview', '7') +
+          subitem('oneword', 'Handelsverwaltungsuebersicht', '1200') +
+          subitem('short', 'Ledger', '1200') +
+          `</div></div>`
+      )
+    );
+    const read = await page.evaluate((body) => {
+      const of = eval(`(${body})`);
+      return {
+        wide: of('wide'),
+        control: of('control'),
+        oneWord: of('oneword'),
+        short: of('short'),
+      };
+    }, READ_ROW);
+
+    // THE NUMERAL IS NEVER TRUNCATED. A truncated numeral actively lies — "12" for "128" —
+    // while a truncated label is fully recoverable from the row's `title` and its
+    // `aria-label`, so the label is the right thing to yield.
+    assert.equal(read.wide.badgeClipped, false, 'a four-digit badge holds its declared size');
+    assert.ok(read.wide.badgeWidth > 0 && read.wide.badgeHeight > 0, 'and is a real box');
+    assert.ok(
+      read.wide.badgeWidth > read.control.badgeWidth,
+      `four digits are wider than one (got ${read.wide.badgeWidth} vs ${read.control.badgeWidth})`
+    );
+    assert.ok(
+      read.wide.labelWidth < read.control.labelWidth,
+      'and the extra width comes out of the LABEL track, which is what `minmax(0, 1fr)` is for'
+    );
+    assert.ok(read.wide.badgeInsideRow, 'the badge stays inside its own row');
+    assert.ok(read.wide.badgeClearsLabel, 'in the trailing track, never over the label');
+
+    // The label degrades by WRAPPING AT A SPACE and then by ellipsis, never by splitting a
+    // word. `white-space: nowrap` would make the first assertion pass and silently reverse
+    // issue 1185's ruling, which is why the one-word row is measured beside it.
+    assert.ok(read.wide.lines >= 2, 'a long multi-word label wraps at its spaces');
+    assert.equal(
+      read.oneWord.lines,
+      1,
+      'a label too wide for its track stays on ONE line rather than breaking mid-word'
+    );
+    assert.ok(read.oneWord.clipped, 'and is clipped, which is what `text-overflow` ellipsises');
+    assert.notEqual(
+      read.oneWord.wrap,
+      'anywhere',
+      '`anywhere` is what produced the reported mid-word break'
+    );
+    assert.equal(read.short.lines, 1, 'a short label needs neither');
+    assert.equal(read.short.clipped, false);
+
+    // THE ROW GROWS rather than clipping, which is what `height: auto` at
+    // `.manager-downtime-subitem` exists for: Foundry core sets a FIXED button height, and a
+    // wrapped label overflowed onto the three rows below it.
+    assert.ok(
+      read.wide.rowHeight > read.short.rowHeight,
+      `a wrapped label grows its row (got ${read.wide.rowHeight} vs ${read.short.rowHeight})`
+    );
+    assert.equal(read.wide.rowVerticallyClipped, false, 'and nothing is cut off inside it');
+
+    // THE TWO-LINE CASE, measured rather than assumed: `.manager-nav-subitem` sets
+    // `align-items: center`, so beside a wrapped label the numeral floats at the row's
+    // vertical middle, BELOW the first line of its own label. That combination ships nowhere
+    // today, and its published frame is to be judged explicitly — if a reviewer reads the
+    // numeral as detached from its label the fix is a one-declaration `align-self: start`,
+    // which puts `styles/fabricate.css` back in the affected set.
+    assert.ok(
+      Math.abs(read.wide.badgeCentreY - read.wide.rowCentreY) <= 1,
+      'the badge is centred on the ROW, not aligned to the label’s first line'
+    );
+    assert.ok(
+      read.wide.badgeCentreY > read.wide.labelFirstLineBottom,
+      'so on a two-line label it sits below the line it counts — the state Decision 8 reopens on'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// AC-17 — the parent row does not regress, expanded and collapsed.
+test('the Downtime parent rollup keeps the row’s label on one line, and survives a collapsed rail', async () => {
+  assertBadgeFixtureMirrorsComponent();
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    // The parent's single trailing track carries EITHER the rollup or the muted chip. Both
+    // rows are rendered so the trade is measured rather than asserted: the chip is ≈47.5px
+    // and the rollup ≈18-26px, so while the rollup shows the label track GROWS.
+    const parentRow = (id, trailing) =>
+      `<div class="manager-nav-group" style="position:relative">` +
+      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
+      `<i class="fas fa-hourglass-half"></i>` +
+      `<span class="manager-nav-label">Downtime</span>` +
+      trailing +
+      `</button>` +
+      `<button class="manager-nav-toggle" id="${id}-toggle">` +
+      `<i class="fas fa-chevron-down"></i></button></div>`;
+    const rollup =
+      `<span class="manager-nav-issue-badge" data-world-downtime-badge-total role="img" ` +
+      `aria-label="5 updates">5</span>`;
+    const chip = `<span class="manager-nav-count manager-nav-premium is-installed">PREMIUM</span>`;
+    const nav =
+      `<section class="manager-world-nav">` +
+      parentRow('rollup', rollup) +
+      parentRow('chip', chip) +
+      `</section>`;
+
+    const readParent = `(id, markSelector) => {
+      const row = document.getElementById(id);
+      const label = row.querySelector('.manager-nav-label');
+      const mark = row.querySelector(markSelector);
+      const toggle = document.getElementById(id + '-toggle');
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+      const rowBox = row.getBoundingClientRect();
+      const markBox = mark.getBoundingClientRect();
+      const toggleBox = toggle.getBoundingClientRect();
+      return {
+        lines: lines.size,
+        clipped: label.scrollWidth > label.clientWidth,
+        labelWidth: +label.getBoundingClientRect().width.toFixed(1),
+        markDisplay: getComputedStyle(mark).display,
+        markWidth: +markBox.width.toFixed(1),
+        markHeight: +markBox.height.toFixed(1),
+        markInsideRow:
+          markBox.left >= rowBox.left - 0.5 &&
+          markBox.right <= rowBox.right + 0.5 &&
+          markBox.top >= rowBox.top - 0.5 &&
+          markBox.bottom <= rowBox.bottom + 0.5,
+        overlapsToggle:
+          markBox.right > toggleBox.left + 0.5 &&
+          markBox.left < toggleBox.right - 0.5 &&
+          markBox.bottom > toggleBox.top + 0.5 &&
+          markBox.top < toggleBox.bottom - 0.5,
+      };
+    }`;
+
+    await page.setContent(railPage(nav));
+    const expanded = await page.evaluate((body) => {
+      const of = eval(`(${body})`);
+      return {
+        rollup: of('rollup', '[data-world-downtime-badge-total]'),
+        chip: of('chip', '.manager-nav-premium'),
+      };
+    }, readParent);
+
+    assert.equal(
+      expanded.rollup.lines,
+      1,
+      'the shipped Downtime label still renders on ONE line with the rollup in the track'
+    );
+    assert.equal(expanded.rollup.clipped, false, 'and unclipped at the shipped 220px rail');
+    assert.ok(expanded.rollup.markInsideRow, 'the rollup sits inside the parent button');
+    assert.ok(
+      !expanded.rollup.overlapsToggle,
+      'and clears the disclosure toggle, which is a `position: absolute` sibling at `right: 4px` ' +
+        'with 36px of padding reserved for it'
+    );
+    assert.ok(
+      expanded.rollup.labelWidth > expanded.chip.labelWidth,
+      `the rollup is narrower than the chip it replaces, so the label track GROWS while it ` +
+        `shows (got ${expanded.rollup.labelWidth} vs ${expanded.chip.labelWidth})`
+    );
+
+    // COLLAPSED. `.manager-nav-button` becomes a single centred column, and the rollup is
+    // deliberately outside the `.manager-nav-count` hide rule — that badge is the only signal
+    // left once the labels and the children are gone. This is the guard chosen for accepted
+    // limitation 8 in place of a further View Lab case: a measurement rather than a picture.
+    await page.setContent(railPage(nav, ' is-rail-collapsed'));
+    const collapsed = await page.evaluate((body) => {
+      const of = eval(`(${body})`);
+      return {
+        rollup: of('rollup', '[data-world-downtime-badge-total]'),
+        chip: of('chip', '.manager-nav-premium'),
+      };
+    }, readParent);
+
+    assert.equal(
+      collapsed.chip.markDisplay,
+      'none',
+      'the collapsed rail really did apply: the chip rides `.manager-nav-count`, which it hides'
+    );
+    assert.notEqual(collapsed.rollup.markDisplay, 'none', 'and the rollup survives that hide');
+    assert.ok(
+      collapsed.rollup.markWidth > 0 && collapsed.rollup.markHeight > 0,
+      `the rollup is a real box on a 56px rail (got ${collapsed.rollup.markWidth}x${collapsed.rollup.markHeight})`
+    );
+    assert.ok(
+      collapsed.rollup.markInsideRow,
+      'and stays inside the parent button, which grows from its 36px floor to hold it'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 // -- The companion Downtime panel's layout contract (issue 1213) -------------------------
 //
 // This is the Manager counterpart of the player seam's panel contract, and every claim in it
