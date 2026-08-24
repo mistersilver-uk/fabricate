@@ -62,9 +62,36 @@
    - triggerSentence / description: the typed body, above.
    - activities: `[{ icon, title, dim }]` — which activities the complication is enabled
      for, with `dim` for one the system does not resolve progressively.
+   - statusLabel / statusTone: the TENSE chip and its `Chip` tone (issue 1286, PR 2).
+     The player band says WHEN as well as WHAT — "This can go wrong" before a roll,
+     "This happened" / "This didn't happen" after one — and the tense is deliberately
+     NOT derivable from `variant`: a player row renders all three, and the GM variants
+     render none. It is also deliberately not folded into the severity tile, which is
+     one vocabulary across all six call sites: a tile recoloured by tense would make one
+     control say two things, and a `severe` complication that has not fired would be
+     indistinguishable from a `minor` one that has. The chip renders FIRST, before the
+     severity chip, so a positional selector can address either without encoding tone.
+   - bodyClamp: 0 (default) clips the body to ONE line with an ellipsis; N > 0 WRAPS it
+     and clamps it to N lines. The default is the GM treatment and is right for it — a
+     GM scanning trigger sentences they wrote needs the row height not to move — and it
+     is wrong for the player, where the description IS the disclosure and an ellipsis at
+     roughly sixty characters in a 300px column removes it. Like `nameEmphasis`, this is
+     not derivable from `variant`: it is a width decision belonging to the column the row
+     is placed in, and a call site that could not say so would reach for an override.
    - expanded / controls / disclosureLabel / onToggle: the authoring disclosure.
    - onDelete / deleteLabel: the authoring delete control. Absent renders no button.
    - children: the expanded editor body, rendered inside the row's card when open.
+
+  ## WHERE THE CHIPS SIT IS A WIDTH DECISION, and the player's differs
+
+  On a GM strip the chips are the LINE's trailing items, beside the copy column. In the
+  player inspector — a 300px column — that leaves the copy roughly 120px of 298 once the
+  border, the padding, the 30px severity tile and the gap are paid, against the 259 the
+  prototype gives it. That is the same failure that made `stacked` necessary on the stage
+  row itself. So in the `player` variant the chips move INSIDE the copy column, onto the
+  name's line, where they share the column's full width and wrap under the name rather
+  than competing with it. The chip markup is a snippet rendered in one of two places, not
+  two copies: SonarCloud's copy-paste detector reads `.svelte`.
 -->
 <script>
   import Chip from './Chip.svelte';
@@ -81,7 +108,10 @@
     playerTitle = '',
     triggerSentence = '',
     description = '',
+    bodyClamp = 0,
     eyebrow = '',
+    statusLabel = '',
+    statusTone = 'neutral',
     activities = [],
     expanded = false,
     controls = '',
@@ -110,8 +140,31 @@
   // The typed body. `isPlayer` decides, so no call site can hand the player the trigger.
   const body = $derived(isPlayer ? description : triggerSentence);
   const showPlayerPill = $derived(!isPlayer && visibility === 'visible' && Boolean(playerLabel));
+  // Normalized here rather than trusted: the value reaches CSS through a custom property,
+  // so a non-numeric one would emit an invalid declaration instead of falling back.
+  const clampLines = $derived(
+    Number.isFinite(Number(bodyClamp)) && Number(bodyClamp) > 0 ? Math.floor(Number(bodyClamp)) : 0
+  );
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
+
+<!-- ONE chip run, rendered in one of two places. The TENSE chip leads the severity chip so
+     that a positional selector — the parity spec's `pi-strip-badge` (first) and
+     `pi-bulk-row-severity` (last) — can address either without naming a tone, which would
+     encode the very fact being measured. -->
+{#snippet chips()}
+  {#if showPlayerPill}
+    <Chip tone="neutral" icon="fas fa-eye" title={playerTitle || undefined} truncate
+      >{playerLabel}</Chip
+    >
+  {/if}
+  {#if statusLabel}
+    <Chip tone={statusTone} truncate>{statusLabel}</Chip>
+  {/if}
+  {#if severityLabel}
+    <Chip tone={gravity.tone} truncate>{severityLabel}</Chip>
+  {/if}
+{/snippet}
 
 <div
   class="fab-complication-row is-{variant} is-gravity-{gravity.tone}"
@@ -125,20 +178,22 @@
     >
     <span class="fab-complication-row-copy">
       {#if eyebrow}<span class="fab-complication-row-eyebrow">{eyebrow}</span>{/if}
-      <span class="fab-complication-row-name is-{nameEmphasis}">{name}</span>
-      <!-- `title` carries the FULL string. The line ellipsises rather than wraps so the row
-           height cannot move, which means a longer localized form is invisible past roughly
-           sixty characters without it. -->
-      <span class="fab-complication-row-body" title={body}>{body}</span>
-    </span>
-    {#if showPlayerPill}
-      <Chip tone="neutral" icon="fas fa-eye" title={playerTitle || undefined} truncate
-        >{playerLabel}</Chip
+      <!-- `display: contents` on every variant but `player`, so the GM strips' copy column
+           is the two children it has always been and no rule keyed on it moves. -->
+      <span class="fab-complication-row-headline">
+        <span class="fab-complication-row-name is-{nameEmphasis}">{name}</span>
+        {#if isPlayer}{@render chips()}{/if}
+      </span>
+      <!-- `title` carries the FULL string in BOTH treatments: unclamped the line ellipsises
+           at roughly sixty characters, and clamped it ellipsises at `bodyClamp` lines. -->
+      <span
+        class="fab-complication-row-body"
+        class:is-clamped={clampLines > 0}
+        style={clampLines > 0 ? `--fab-complication-body-lines:${clampLines}` : undefined}
+        title={body}>{body}</span
       >
-    {/if}
-    {#if severityLabel}
-      <Chip tone={gravity.tone} truncate>{severityLabel}</Chip>
-    {/if}
+    </span>
+    {#if !isPlayer}{@render chips()}{/if}
     {#if activities.length > 0}
       <span class="fab-complication-row-activities">
         {#each activities as activity (activity.icon)}
@@ -234,6 +289,15 @@
     background: none;
   }
 
+  /* The PLAYER row draws no shell at all. It is the only variant whose container is itself
+     a bordered, filled band (the stage row's full-bleed complication band, and the bulk
+     block's group card), so the inherited 1px edge would draw a second box inside a box in
+     a 300px column. `transparent` rather than `none` keeps the box metrics identical to
+     the GM strips', so the two treatments differ in ink and in nothing else. */
+  .fab-complication-row.is-player {
+    border-color: transparent;
+  }
+
   .fab-complication-row-line {
     display: flex;
     gap: 11px;
@@ -241,10 +305,17 @@
     padding: 11px 13px;
   }
 
-  .fab-complication-row.is-readonly-gm .fab-complication-row-line,
-  .fab-complication-row.is-player .fab-complication-row-line {
+  .fab-complication-row.is-readonly-gm .fab-complication-row-line {
     gap: 9px;
     padding: 7px 10px;
+  }
+
+  /* No padding of its own: the band or group card the player row sits in already carries
+     the inset, and paying it twice costs a 300px column ~20px of prose width. */
+  .fab-complication-row.is-player .fab-complication-row-line {
+    gap: 9px;
+    padding: 0;
+    align-items: flex-start;
   }
 
   .fab-complication-severity {
@@ -285,6 +356,21 @@
     min-width: 0;
   }
 
+  /* Transparent on every variant but `player` — see the markup note. */
+  .fab-complication-row-headline {
+    display: contents;
+  }
+
+  /* The player's chips share the copy column's width with the name and WRAP beneath it,
+     rather than taking their width off the prose. */
+  .fab-complication-row.is-player .fab-complication-row-headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+  }
+
   .fab-complication-row-eyebrow {
     color: var(--fab-text-subtle);
     font-size: 8.5px;
@@ -315,6 +401,18 @@
     font-size: 11.5px;
   }
 
+  /* Stated AFTER the two emphases on purpose. `component-complications-section-mounted`
+     reads this file's rules by `indexOf('<selector> {')`, so a selector ENDING in
+     `.fab-complication-row-name {` placed above the base rule would be the block that
+     test measured — and its "the base rule names no face and no size" assertion would
+     pass against the wrong rule. It carries no face and no size itself: it is the
+     player headline's flex behaviour and nothing else. */
+  .fab-complication-row.is-player .fab-complication-row-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   /* Clipped to one line so the row height cannot move under a long authored sentence. The
      `title` above is what keeps the full string reachable. */
   .fab-complication-row-body {
@@ -324,6 +422,19 @@
     line-height: 1.35;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  /* `bodyClamp`: WRAP, bounded. The row height still cannot run away — it is clamped to a
+     stated number of lines and ellipsised there — but the disclosure survives past sixty
+     characters, which one-line clipping does not. `overflow-wrap: anywhere` so a single
+     unbroken token cannot push the column wide, matching the stage row's own name rule. */
+  .fab-complication-row-body.is-clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--fab-complication-body-lines, 3);
+    line-clamp: var(--fab-complication-body-lines, 3);
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .fab-complication-row-activities {

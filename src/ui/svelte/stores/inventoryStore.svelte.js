@@ -26,6 +26,7 @@ import {
   progressiveOrderKey,
 } from '../../../utils/progressiveResultOrder.js';
 import { progressiveStageThresholds } from '../../../utils/progressiveStageThresholds.js';
+import { markFiredStageComplications } from '../../../utils/progressiveStageComplications.js';
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -46,6 +47,13 @@ const BULK_MAX_ITEMS = 25;
 // Reorder writes are replicated `scope: 'user'` document writes, so they are coalesced
 // rather than issued per gesture. Mirrors the crafting store's window.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
+
+// The shared "nothing fired" list (issue 1286). Frozen and hoisted so every un-fired
+// state — pre-roll, time-gated, runless, and a resolution that fired nothing — reaches
+// `markFiredStageComplications` as the SAME empty array, which returns the stage list by
+// identity for it. A fresh `[]` per read would be a new dependency value on every derive
+// and would defeat that identity contract.
+const NO_FIRED_COMPLICATIONS = Object.freeze([]);
 
 // The filter pills. Kept as a local constant so the store never imports the
 // builder's module graph.
@@ -318,6 +326,201 @@ function yieldRowsFor(salvage) {
 }
 
 /**
+ * Whether a RENDERED stage order actually differs from the GM's authored one.
+ *
+ * The one derivation behind both `salvageOrderIsCustom` (the inspected panel's Reset
+ * affordance) and a bulk entry's `orderIsPlayers` (issue 1286), because they are the same
+ * question asked on two screens and a second copy of it would drift.
+ *
+ * IT IS NOT `allowPlayerResultReorder`, AND IT IS NOT "A STORED ORDER EXISTS". The
+ * permission says a player MAY arrange the list; a player who may and has not is looking
+ * at the GM's order, and a panel saying otherwise makes a false claim about their own
+ * arrangement. A stored order can equally name the authored sequence exactly — dragged
+ * away and back, or a GM re-authoring the list into the order the player had already
+ * chosen — so presence is not difference either. `applyPlayerResultOrder` returns its
+ * input BY IDENTITY only for a null/empty order, never for a stored order that happens to
+ * reproduce the authored sequence, so the comparison has to be positional and by id.
+ */
+function orderDiffersFromAuthored(ordered, authored) {
+  return (
+    ordered.length === authored.length &&
+    ordered.some((stage, index) => stage?.id !== authored[index]?.id)
+  );
+}
+
+/**
+ * The player's stored stage order for one participation, or null when it has none.
+ *
+ * The id space is `<systemId>:<componentId>` — the SAME key `CraftingEngine` captures onto
+ * a run record and `BulkSalvageService.forecast` reads — because component ids are not
+ * globally unique across systems (issue 766).
+ */
+function storedStageOrder(participation, orders) {
+  const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(participation) });
+  return key ? (orders?.[key] ?? null) : null;
+}
+
+/**
+ * One row's stage list as the run will spend it, plus whether that order is the PLAYER'S.
+ *
+ * A pinned list (`allowPlayerResultReorder: false`) is the GM's by construction, so it
+ * short-circuits: reconciling it would be the same list back, and reporting it as the
+ * player's would be a lie the permission itself refutes.
+ *
+ * @returns {{stages: Array<object>, orderIsPlayers: boolean}}
+ */
+function playerStageOrder(salvage, storedOrder) {
+  const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
+  if (stages.length === 0 || salvage?.allowPlayerResultReorder === false) {
+    return { stages, orderIsPlayers: false };
+  }
+  const ordered = applyPlayerResultOrder(stages, storedOrder);
+  return { stages: ordered, orderIsPlayers: orderDiffersFromAuthored(ordered, stages) };
+}
+
+/**
+ * WHOSE order a bulk entry's stage list is, as one of three named states (issue 1286).
+ *
+ * `orderIsPlayers` is a BOOLEAN over one question — did the rendered order come from the
+ * player's stored preference and actually differ from the authored one — and the panel
+ * needs a third answer it cannot express. A player who MAY arrange the list and has not
+ * is looking at the GM's order, which is neither "the GM fixed it" nor "the player chose
+ * this": calling it the GM's full stop would imply a fixity they do not have, and calling
+ * it theirs would be a false claim about their own arrangement. So it is its own state.
+ *
+ * - `'players'`   — the rendered order IS the player's stored one, and differs from the
+ *                   authored list. It persists and is re-read on every salvage of this
+ *                   component, which is the fact that makes arranging it worth doing.
+ * - `'arrangeable'` — the GM's authored order, which this player may replace.
+ * - `'gm'`        — the GM's authored order, pinned by `allowPlayerResultReorder: false`.
+ *
+ * NULL when the row has no ordered stage list at all — a `simple` or `routed` row has no
+ * order for anyone to own, and naming the GM as its author would invent a fact. Such a row
+ * publishes no complication forecast either, so no card ever has to render the null.
+ *
+ * It is derived HERE and not in the panel, on the block's standing rule: the bulk card
+ * renders what it is given and re-derives no part of the projection.
+ *
+ * @param {?object} salvage the row's own salvage projection.
+ * @param {boolean} orderIsPlayers whether the rendered order differs from the authored one.
+ * @returns {?('players'|'arrangeable'|'gm')}
+ */
+function bulkOrderProvenance(salvage, orderIsPlayers) {
+  const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
+  if (salvage?.mode !== 'progressive' || stages.length === 0) return null;
+  if (orderIsPlayers) return 'players';
+  return salvage?.allowPlayerResultReorder === false ? 'gm' : 'arrangeable';
+}
+
+/**
+ * One bulk entry's player-visible complication FORECAST (issue 1286), flattened from the
+ * stage rows the builder already attached it to.
+ *
+ * ## Nothing here is an audience decision
+ *
+ * `stage.complications` is `attachStageComplications`' output, which is
+ * `forecastComplications`' output — already filtered to `visibility: 'visible'`, already
+ * stripped of `when`, `rollCondition`, `effectRoll` and `macroUuid`, and already gated on
+ * the activity and on the check block's owned trigger ids. This function selects and
+ * re-keys; it must never grow a filter of its own, because a second copy of the redaction
+ * rule is how the two drift apart. Equally, no PANEL may re-derive any of it: the bulk
+ * block renders what it is given.
+ *
+ * ## `position` counts EVERY stage, and the gaps are the point
+ *
+ * It is the 1-based index in the player's own ordered list over ALL of that row's stages,
+ * not among the complication-bearing ones. A stage authoring no complication therefore
+ * leaves a gap in the numbering, and that gap is what makes the number readable against
+ * the ordered stage list on the single-item panel — a dense 1..N would name rows that
+ * screen does not have.
+ *
+ * ## Unreachable stages are excluded, on the yield preview's own rule
+ *
+ * A null `threshold` marks a stage the award loop skips at every budget (an invalid or
+ * absent difficulty), so no roll can ever reach it and nothing it carries can fire.
+ * `progressiveYieldRows` already omits exactly those, and a forecast that listed them
+ * would promise a consequence the run cannot deliver. The flag is position-independent —
+ * `progressiveStageThresholds` returns null purely on cost validity — so the builder's
+ * authored-order value stays correct after the reorder above.
+ *
+ * @param {Array<object>} orderedStages the row's stages in the player's order.
+ * @returns {Array<{resultId: string|null, position: number, resultName: string,
+ *   resultDifficulty: number|null, id: string|null, name: string, description: string,
+ *   severity: string}>} ordered by `position`.
+ */
+function bulkStageComplications(orderedStages) {
+  const rows = [];
+  for (const [index, stage] of orderedStages.entries()) {
+    if (stage?.threshold === null) continue;
+    const complications = Array.isArray(stage?.complications) ? stage.complications : [];
+    for (const complication of complications) {
+      rows.push({
+        // The stage OCCURRENCE, not the component: a component staged twice is two rows
+        // at two positions, because a complication is evaluated per result entry.
+        resultId: stage?.id ?? null,
+        position: index + 1,
+        resultName: String(stage?.name ?? ''),
+        // The stage's own `component.difficulty` — its progressive DC, which the row
+        // states beside the position so the player can find it in the ordered list.
+        resultDifficulty: stage?.difficulty ?? null,
+        id: complication?.id ?? null,
+        name: String(complication?.name ?? ''),
+        description: String(complication?.description ?? ''),
+        severity: String(complication?.severity ?? ''),
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * The RUN-shaped half of one bulk entry: what this row's own salvage would do, as opposed
+ * to what the card is.
+ *
+ * Extracted from the `bulkEntries` mapper rather than inlined there because that mapper is
+ * already at the edge of the cognitive-complexity budget, and because every field here
+ * answers one question — "in what order, and with what consequences, will THIS row run?" —
+ * which the identity fields around it do not.
+ *
+ * `queued` is the blocked/not-blocked verdict, and it gates the two FORECASTS only. A
+ * blocked row never enters the run, so it can promise neither a yield nor a complication;
+ * its mode, its reorder permission and whose order it is stay true regardless, because they
+ * describe the row rather than a run it will not have.
+ *
+ * @param {?object} salvage the row's own salvage projection.
+ * @param {?Array<string>} storedOrder the player's stored stage order for it.
+ * @param {boolean} queued whether the row is runnable.
+ */
+function bulkRunProjection(salvage, storedOrder, queued) {
+  const { stages, orderIsPlayers } = playerStageOrder(salvage, storedOrder);
+  return {
+    // The row's resolution mode, and whether THIS component honours the player's stored
+    // stage order. The engine captures that order per `(systemId, componentId)` at run
+    // start inside `salvage()`, which the bulk service calls once per queued row — so a
+    // bulk run already respects each row's own order. The panel surfaces it because
+    // nothing else on this screen tells the player that (issue 859).
+    mode: salvage?.mode ?? null,
+    allowsReorder: salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
+    // Whether the order the forecast below is numbered against is the PLAYER'S, and
+    // deliberately NOT `allowsReorder` (issue 1286). The permission says a player MAY
+    // arrange the list; one who may and has not is reading the GM's order, and a note
+    // saying otherwise is a false claim about their own arrangement. Same derivation as
+    // the inspected panel's `salvageOrderIsCustom` — see `orderDiffersFromAuthored`.
+    orderIsPlayers,
+    // The same question as a THIRD state the boolean above cannot hold: the bulk
+    // forecast card names whose order it is numbered against on every card, and "may
+    // arrange it and has not" is neither of the boolean's two answers. Derived here
+    // because a panel deriving it from `allowsReorder` and `orderIsPlayers` together
+    // would be the block re-deriving the projection it exists to merely render.
+    orderProvenance: bulkOrderProvenance(salvage, orderIsPlayers),
+    // The pre-run complication forecast for this entry, in that order and numbered
+    // against ALL of its stages.
+    complications: queued ? bulkStageComplications(stages) : [],
+    yieldRows: queued ? yieldRowsFor(salvage) : [],
+  };
+}
+
+/**
  * Assemble the in-panel report from one bulk run's snapshot + facade result
  * (issue 859). Positional matching against `items[index]` is safe because both
  * `BulkSalvageService.run` and `BulkDestroyService.run` preserve `targets` order
@@ -545,7 +748,7 @@ export function createInventoryStore({ services } = {}) {
    * It recomputes through the SAME helper the builder used, fed SALVAGE's own award
    * mode, which is the only thing that keeps the badge and the award in step.
    */
-  const orderedSalvageStages = $derived.by(() => {
+  const playerOrderedSalvageStages = $derived.by(() => {
     const salvage = selectedParticipation?.salvage ?? null;
     const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
     if (stages.length === 0) return stages;
@@ -569,6 +772,58 @@ export function createInventoryStore({ services } = {}) {
     });
     return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
   });
+
+  /**
+   * The fired record the INSPECTED participation's stage list may be marked with, or the
+   * shared empty list (issue 1286).
+   *
+   * Scoped to the acting `(systemId, componentId)` the ribbon belongs to, because
+   * `salvageResult` outlives a selection change: `heldItem` deliberately pins the salvaged
+   * row through the post-salvage reload, and an unscoped read would badge a DIFFERENT
+   * component's stages the moment the held row was released while the result stood.
+   *
+   * `waiting` and the cleared state carry no record at all, which is the same `[]` the
+   * runless invariant produces — and that identity is deliberate. "No record" is the ONLY
+   * un-fired state the strip needs: pre-roll, time-gated, runless and fired-nothing are
+   * indistinguishable by design, so nothing here needs a second flag to say which it is.
+   */
+  const firedSalvageComplications = $derived.by(() => {
+    const result = salvageResult;
+    if (result?.state !== 'success') return NO_FIRED_COMPLICATIONS;
+    if (result.systemId !== selectedParticipation?.systemId) return NO_FIRED_COMPLICATIONS;
+    if (result.componentId !== selectedParticipation?.componentId) return NO_FIRED_COMPLICATIONS;
+    return result.firedComplications ?? NO_FIRED_COMPLICATIONS;
+  });
+
+  /**
+   * The inspected participation's stages in the player's order, with the resolution's
+   * FIRED tense marked onto the forecast the builder already attached (issue 1286).
+   *
+   * ## Why the mark lands HERE and not in the builder
+   *
+   * The forecast rides on the stage row precisely so the reorder above carries it; marking
+   * has to happen downstream of that reorder and of the threshold recompute, or the marks
+   * would be keyed to positions the panel no longer renders. This is the last point at
+   * which the list is final.
+   *
+   * ## It marks and never adds
+   *
+   * `markFiredStageComplications` only ever flips `fired` on an entry the forecast already
+   * published, so a record naming a complication the forecast withheld — a `gmOnly` one
+   * above all — matches nothing and is dropped. That is why this store re-applies NO
+   * audience filter of its own: the redaction is structural, and `publicComplications`
+   * cannot be re-applied here anyway (it reads a `visibility` its own output does not
+   * carry, so it would return nothing).
+   *
+   * ## Identity is preserved end to end
+   *
+   * Both halves return their input by identity when they change nothing, so a component
+   * authoring no player-visible complication — which is every component predating issue
+   * 1286 — gets back the very array the builder published, exactly as it did before.
+   */
+  const orderedSalvageStages = $derived.by(() =>
+    markFiredStageComplications(playerOrderedSalvageStages, firedSalvageComplications)
+  );
 
   // The selected cards, in CLICK order (issue 859). Stale keys (a card the reload
   // dropped) are silently filtered rather than surfaced — the panel has nothing
@@ -614,15 +869,13 @@ export function createInventoryStore({ services } = {}) {
         blocked: blockedReason !== null,
         blockedReason,
         missingTools: blockedReason === 'toolsUnavailable' ? missingToolNames(salvage) : [],
-        // The row's resolution mode, and whether THIS component honours the player's
-        // stored stage order. The engine captures that order per `(systemId, componentId)`
-        // at run start inside `salvage()`, which the bulk service calls once per queued
-        // row — so a bulk run already respects each row's own order. The panel surfaces
-        // it because nothing else on this screen tells the player that (issue 859).
-        mode: salvage?.mode ?? null,
-        allowsReorder:
-          salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
-        yieldRows: blockedReason === null ? yieldRowsFor(salvage) : [],
+        // How this row would RUN, against its OWN participation and the player's stored
+        // order for it — never the inspected card's (issue 1286).
+        ...bulkRunProjection(
+          salvage,
+          storedStageOrder(participation, progressiveOrders),
+          blockedReason === null
+        ),
       };
     })
   );
@@ -765,10 +1018,7 @@ export function createInventoryStore({ services } = {}) {
       ? selectedParticipation.salvage.stages
       : [];
     if (stages.length === 0) return false;
-    const ordered = orderedSalvageStages;
-    return (
-      ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id)
-    );
+    return orderDiffersFromAuthored(orderedSalvageStages, stages);
   });
 
   /**
@@ -1046,6 +1296,29 @@ export function createInventoryStore({ services } = {}) {
             .map((entry) => entry?.componentId)
             .filter(Boolean),
           outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
+          // What the resolution FIRED, per stage occurrence (issue 1286), published
+          // VERBATIM from the run record.
+          //
+          // The record is `publicComplications`' output already narrowed at the WRITE, in
+          // `CraftingEngine.salvage`, to the four durable keys — `resultId`, `componentId`,
+          // `complicationId`, `buckets`. It is not re-filtered and not re-shaped here: the
+          // container is an actor flag replicated to the owning player, so redaction had to
+          // happen before it was persisted, and `markFiredStageComplications` — the only
+          // consumer — re-resolves the prose from the forecast already on the stage row
+          // rather than from a second copy of it.
+          //
+          // `resultId` is the reason a per-component record would not do: a component may
+          // legitimately be staged several times, and the badge lands on the occurrence
+          // that fired and on none of the others.
+          //
+          // ALWAYS AN ARRAY, NEVER NULL. The runless path (no salvage run manager) leaves
+          // `salvageRun` null, and a salvage that fired nothing player-visible writes no
+          // such key at all — both read as `[]`, which is exactly what "no strip claims
+          // fired" means. Collapsing the three cases to one empty list is what saves the
+          // panel from needing a second "was there a run?" flag to interpret a null.
+          firedComplications: Array.isArray(result?.salvageRun?.firedComplications)
+            ? result.salvageRun.firedComplications
+            : [],
           // The rolled total, so the summary can print "with a roll of N". Read from the
           // engine's top-level `value` (present even runless), NOT from `salvageRun`. A
           // no-check "Guaranteed" salvage rolled nothing and returns null — kept null so

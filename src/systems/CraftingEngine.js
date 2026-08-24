@@ -253,11 +253,12 @@ function salvageCreatedResultRecord({ item, componentId }) {
  * and this narrows: the run record is a durable actor flag, and the player strip that
  * reads it re-resolves the prose from the system record it already holds.
  *
- * `resultId` is required and is not redundant with `componentId`. The player's strip is
- * per STAGE OCCURRENCE and a component may legitimately appear several times in one
- * ordered list, so a `componentId`-only record would badge every occurrence of that
- * component or none of them. `buckets` is a list rather than a scalar because `full`,
- * `partial` and `stageMissed` can all be true at once for one component.
+ * `resultId` is required and is not redundant with `componentId`. A complication fires per
+ * RESULT ENTRY, so a component staged five times can contribute five records that differ in
+ * nothing but `resultId`; a `componentId`-only record would collapse them into one and badge
+ * every occurrence of that component or none of them. `buckets` is a list for the persisted
+ * shape's sake only — a firing belongs to ONE entry, so it now always holds that entry's one
+ * bucket, and a record written before the per-entry rule may still hold several.
  *
  * @param {Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
  * @returns {Array<{resultId: ?string, componentId: ?string, complicationId: ?string,
@@ -5258,11 +5259,26 @@ export class CraftingEngine {
    *     already holds, because a player reading "you missed the iron ingot" on a card that
    *     also granted an iron ingot cannot otherwise reconcile the two.
    *
+   * ## One row per FIRING, repeats are NOT collapsed, and each names its own stage
+   *
+   * A complication fires per result entry, so a component staged twice that went wrong
+   * twice produces two rows carrying the same three strings. That repetition is the
+   * report, not a rendering fault: collapsing it would tell a player one `1d6` was rolled
+   * when two were, and neither this card nor the aggregate bulk card has ever deduped its
+   * rows. They are told APART rather than merged: `position` carries each firing's place in
+   * the ordered stage list — the same 1-based numbering, gaps included, that the salvage
+   * panel's own stage rows use — and the shared renderer states it on a row only when
+   * another row on the same card would otherwise draw identically.
+   *
+   * The DECISION to state it is not taken here. The aggregate bulk card's final row set is
+   * assembled from many separate `salvage()` calls, so no single engine call can see
+   * whether a row is about to collide with another; only the renderer can.
+   *
    * @private
    * @param {?Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
    * @param {?object} system The owning crafting system, for the component-name lookup.
    * @returns {Array<{name: string, description: string, severity: string,
-   *   componentName: string}>}
+   *   componentName: string, position: number|null}>}
    */
   _complicationChatEntries(fired, system) {
     const componentIndex = getDefinitionIndex(system?.components);
@@ -5271,6 +5287,7 @@ export class CraftingEngine {
       description: entry.description,
       severity: entry.severity,
       componentName: findById(componentIndex, entry.componentId)?.name || '',
+      position: entry.position,
     }));
   }
 

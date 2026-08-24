@@ -2944,10 +2944,11 @@ test('salvage(): NEGATIVE CONTROL — simple mode fires nothing, and still selec
   assert.equal(actor.createdItems.length, 1, 'the simple award is untouched');
 });
 
-test('salvage(): a component listed twice fires ONCE, naming the occurrence that matched', async () => {
-  // A component may legitimately appear several times, so `full` and `stageMissed` can
-  // both be true for it — the honest reading. But a `1d6` shrapnel complication on a
-  // component listed twice must not roll twice.
+test('salvage(): a component listed twice fires TWICE, once per result entry', async () => {
+  // Repetition is how a progressive result set asks for more of a result, so listing
+  // item-a twice is two awards. `r-1` is granted and `r-2` halts the loop, so a
+  // complication clausing on both outcomes fires on each entry for the outcome THAT entry
+  // had — and a `1d6` on it rolls twice, because two awards went two ways.
   const { engine, writer, actor, component, system } = progressiveSalvageWorld({
     results: [
       { id: 'r-1', componentId: 'item-a', quantity: 1 },
@@ -2960,16 +2961,20 @@ test('salvage(): a component listed twice fires ONCE, naming the occurrence that
 
   await engine.salvage(actor.uuid, system.id, component.id);
 
-  assert.equal(writer.calls.length, 1);
-  assert.equal(
-    writer.calls[0].complications.length,
-    1,
-    'deduped on (componentId, complicationId), not once per occurrence'
+  assert.equal(writer.calls.length, 1, 'still ONE delivery message for the resolution');
+  assert.deepEqual(
+    writer.calls[0].complications.map((entry) => [entry.resultId, entry.bucket]),
+    [
+      ['r-1', 'full'],
+      ['r-2', 'halted'],
+    ],
+    'one request per firing, each naming its own entry and reporting that entry\'s own bucket'
   );
+  const [first, second] = writer.calls[0].complications;
   assert.equal(
-    writer.calls[0].complications[0].resultId,
-    'r-1',
-    'and it names the first occurrence in fire order that satisfied a matched clause'
+    first.complicationId,
+    second.complicationId,
+    'the SAME complication, delivered twice — the delivery key carries resultId for exactly this'
   );
 });
 

@@ -201,9 +201,9 @@ test('1286: every stage lands in exactly one of the five declared buckets', () =
   }
 });
 
-// ── the per-component dedupe ────────────────────────────────────────────────
+// ── the per-RESULT-ENTRY firing rule ────────────────────────────────────────
 
-test('1286: a component staged three times fires its matching complication ONCE', () => {
+test('1286: a component staged three times fires its matching complication THREE times', () => {
   const shrapnel = complication({ when: { stageMissed: true, stageAwarded: true } });
   const repeated = component('iron', [shrapnel]);
   const stages = [stage('r1', repeated), stage('r2', repeated), stage('r3', repeated)];
@@ -212,16 +212,126 @@ test('1286: a component staged three times fires its matching complication ONCE'
   const plan = planComplications({ activity: 'salvage', stages, award });
 
   assert.deepEqual(bucketsByResultId(plan), { r1: 'full', r2: 'halted', r3: 'unreached' });
-  assert.equal(plan.firings.length, 1, 'deduped on (componentId, complicationId)');
   assert.deepEqual(
-    plan.firings[0].buckets,
-    ['full', 'halted', 'unreached'],
-    'full, partial and missed can all be true at once for one component — the honest reading'
+    plan.firings.map((firing) => [firing.resultId, firing.bucket, firing.buckets]),
+    [
+      ['r1', 'full', ['full']],
+      ['r2', 'halted', ['halted']],
+      ['r3', 'unreached', ['unreached']],
+    ],
+    'three entries were three awards, so each fires on its own and reports its OWN bucket'
   );
-  assert.equal(
-    plan.firings[0].resultId,
-    'r1',
-    'the firing NAMES the occurrence that produced the first matched clause, so a player can reconcile it'
+  assert.deepEqual(
+    plan.firings.map((firing) => firing.complicationId),
+    Array(3).fill(shrapnel.id),
+    'one complication, three firings — a `1d6` staged three times rolls three times'
+  );
+});
+
+test('1286: a stageMissed complication never fires against an entry the loop AWARDED', () => {
+  const missed = complication({ when: { stageMissed: true } });
+  const repeated = component('iron', [missed]);
+  const stages = [stage('r1', repeated), stage('r2', repeated), stage('r3', repeated)];
+  const award = runAward(stages, { r1: 4, r2: 4, r3: 4 }, { budget: 6 });
+
+  const plan = planComplications({ activity: 'salvage', stages, award });
+
+  assert.deepEqual(bucketsByResultId(plan), { r1: 'full', r2: 'halted', r3: 'unreached' });
+  assert.deepEqual(
+    plan.firings.map((firing) => firing.resultId),
+    ['r2', 'r3'],
+    'the awarded entry is not missed, however the component fared on its other entries'
+  );
+  assert.deepEqual(
+    plan.firings.map((firing) => firing.matchedConditions),
+    [['stageMissed'], ['stageMissed']],
+    'each firing reports the clause ITS OWN entry satisfied'
+  );
+});
+
+test('1286: firings come back in RESULT ENTRY order, interleaved across components', () => {
+  const missed = () => complication({ when: { stageMissed: true } });
+  const iron = component('iron', [missed()]);
+  const coal = component('coal', [missed()]);
+  const stages = [stage('r1', iron), stage('r2', coal), stage('r3', iron)];
+  const award = runAward(stages, { r1: 4, r2: 4, r3: 4 }, { budget: 0 });
+
+  const plan = planComplications({ activity: 'salvage', stages, award });
+
+  assert.deepEqual(
+    plan.firings.map((firing) => [firing.resultId, firing.componentId]),
+    [
+      ['r1', 'iron'],
+      ['r2', 'coal'],
+      ['r3', 'iron'],
+    ],
+    'stage order, not a per-component grouping that would emit both iron firings first'
+  );
+});
+
+test('1286: a complication authored TWICE on one component fires once per entry, not twice', () => {
+  const shrapnel = complication({ when: { stageMissed: true } });
+  // The same authored record listed twice — the one dedupe that survives, scoped to the entry.
+  const repeated = component('iron', [shrapnel, shrapnel]);
+  const stages = [stage('r1', repeated), stage('r2', repeated)];
+  const award = runAward(stages, { r1: 4, r2: 4 }, { budget: 0 });
+
+  const plan = planComplications({ activity: 'salvage', stages, award });
+
+  assert.deepEqual(
+    plan.firings.map((firing) => firing.resultId),
+    ['r1', 'r2'],
+    'two entries, one firing each — the within-entry dedupe is on complicationId alone'
+  );
+});
+
+test('1286: each firing carries its entry\u2019s PLACE in the ordered list, gaps and all', () => {
+  // The list the player is looking at: iron at 1, a bare stage at 2 that authors nothing,
+  // iron again at 3. Nothing about the numbering is derived from the FIRINGS \u2014 the
+  // complication-free stage at 2 is what makes that observable, because a dense 1..N over the
+  // rows would number the two iron firings 1 and 2 and name a stage the panel does not have.
+  const shrapnel = complication({ visibility: 'visible', when: { stageMissed: true } });
+  const iron = component('iron', [shrapnel]);
+  const stages = [stage('r1', iron), stage('r2', component('coal')), stage('r3', iron)];
+  const award = runAward(stages, { r1: 4, r2: 4, r3: 4 }, { budget: 0 });
+
+  const plan = planComplications({ activity: 'salvage', stages, award });
+
+  assert.deepEqual(
+    plan.firings.map((firing) => [firing.resultId, firing.position]),
+    [
+      ['r1', 1],
+      ['r3', 3],
+    ],
+    'the ordinal is the entry\u2019s index in the ORDERED stage list, counting every stage'
+  );
+  assert.deepEqual(
+    publicComplications(plan.firings).map((entry) => entry.position),
+    [1, 3],
+    'and it survives the player projection, which is the only one a card may read'
+  );
+});
+
+test('1286: a SKIPPED entry fires nothing, even for a trigger that matched', () => {
+  const triggered = complication({ when: { checkTrigger: 'nat1' } });
+  const repeated = component('iron', [triggered]);
+  const stages = [stage('r1', repeated), stage('r2', repeated), stage('r3', repeated)];
+  // `r2` carries an invalid cost, so the loop skips it while awarding the other two.
+  const award = runAward(stages, { r1: 2, r2: 0, r3: 2 }, { budget: 20 });
+
+  const plan = planComplications({
+    activity: 'salvage',
+    stages,
+    award,
+    matchedTriggerIds: ['nat1'],
+    checkTriggerIds: ['nat1'],
+  });
+
+  assert.equal(bucketsByResultId(plan).r2, 'skipped');
+  assert.deepEqual(
+    plan.firings.map((firing) => firing.resultId),
+    ['r1', 'r3'],
+    'a trigger reads the same on every entry, but a skipped stage is not an award to hang a consequence on'
   );
 });
 
@@ -465,7 +575,7 @@ test('1286: forecastComplications projects only VISIBLE complications for the ac
     }),
   ]);
 
-  const forecast = forecastComplications(authored, { activity: 'salvage' });
+  const forecast = forecastComplications(authored, { activity: 'salvage', checkTriggerIds: [] });
 
   assert.deepEqual(
     forecast.map((entry) => entry.name),
@@ -510,7 +620,7 @@ test('1286: neither player projection ever emits when, rollCondition, effectRoll
   });
   const leaked = ['when', 'rollCondition', 'effectRoll', 'macroUuid', 'activities', 'match'];
 
-  const [forecast] = forecastComplications(component('iron', [secretive]), { activity: 'salvage' });
+  const [forecast] = forecastComplications(component('iron', [secretive]), { activity: 'salvage', checkTriggerIds: [] });
   for (const key of leaked) assert.ok(!(key in forecast), `forecast leaked ${key}`);
   assert.equal(forecast.name, 'Shrapnel');
   assert.equal(forecast.severity, 'major');
@@ -529,6 +639,10 @@ test('1286: neither player projection ever emits when, rollCondition, effectRoll
     resultId: 'r1',
     componentId: 'iron',
     complicationId: secretive.id,
+    // A hand-built firing carries no ordinal, and the projection says so with `null` rather
+    // than by omitting the key: a card tests ONE thing to decide whether it can name a
+    // stage, and an absent key would make "never recorded" indistinguishable from "0".
+    position: null,
     buckets: ['halted'],
     name: 'Shrapnel',
     description: 'Splinters everywhere',

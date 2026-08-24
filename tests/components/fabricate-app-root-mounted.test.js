@@ -72,10 +72,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
+    // The player complication projection (issue 1286). Reached TWICE from this tree:
+    // CraftingListingBuilder attaches the crafting forecast, and `inventoryStore` marks
+    // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
+    'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
+    'src/utils/componentComplications.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/definitionIndex.js',
     'src/utils/objectPath.js',
+    'src/utils/progressiveStageComplications.js',
     'src/utils/progressiveStageThresholds.js',
     'src/utils/recipeCategories.js',
     'src/utils/rollExpressionAverage.js',
@@ -114,6 +120,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
@@ -142,6 +155,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',

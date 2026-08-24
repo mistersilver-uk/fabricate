@@ -500,33 +500,69 @@ The loop can and does award a result it cannot name; it is this classifier that 
 
 `halted` and `unreached` stay DISTINCT even though the `stageMissed` clause below unions them, so a later change can offer "only the stage you nearly reached" without reopening this model, and so an output can say which of the two it was.
 
-#### The per-component facts
+#### The per-entry facts
 
-A component may legitimately appear several times in one ordered list, so its facts are derived over ALL of its occurrences.
+The unit is the RESULT ENTRY, not the component.
+A component may legitimately appear several times in one ordered list, and each occurrence is evaluated on its OWN bucket, against nothing else.
 
 | clause | matches when |
 | --- | --- |
-| `when.stageAwarded` | at least one of its stages is `full` |
-| `when.stagePartial` | at least one of its stages is `partial` |
-| `when.stageMissed` | at least one of its stages is `halted` OR `unreached` |
+| `when.stageAwarded` | this entry is `full` |
+| `when.stagePartial` | this entry is `partial` |
+| `when.stageMissed` | this entry is `halted` OR `unreached` |
 | `when.checkTrigger` | the NAMED trigger on the ACTIVE activity's progressive check block matched this check result |
 
+An entry is in exactly one bucket, so at most one of the three stage clauses can match on it.
+A component whose first entry was awarded and whose third was missed matches `stageAwarded` on the first and `stageMissed` on the third, and neither fact reaches the other entry: a `stageMissed` complication MUST NOT fire against an award the player received.
+The `checkTrigger` and `rollCondition` clauses are per-resolution facts and read the same on every entry, which is what makes a trigger-only complication fire once per entry of the component that carries it.
+
 `skipped` contributes to NOTHING: a GM misconfiguration is not a narrative outcome, and a skipped stage must never appear as one on any output.
-`full`, `partial` and `stageMissed` may all be true at once for one component, and that is the honest reading of a component listed several times.
+That is total rather than clause-by-clause — a `skipped` entry fires nothing at all, including a complication whose only enabled clause is a trigger or a condition roll, because there is no award for the consequence to attach to.
+An entry with no resolvable result id is `skipped` and so fires nothing, on the same rule.
 
 `match: 'all'` requires every ENABLED clause; `match: 'any'` requires one; a complication with nothing enabled never fires.
 A clause the GM did not enable is absent from the quantification rather than false, so `rollCondition.enabled: false` contributes nothing and can never make `all` unsatisfiable.
 The `rollCondition` gate is settled by a live roll and FAILS CLOSED on every uncertainty — no dice engine, a non-finite total, an unparseable comparand, or a comparator the numeric table does not know.
 Its comparand is resolved by SUBSTITUTING roll data without rolling, so a comparand that is itself a dice expression fails the gate closed rather than being re-rolled on every evaluation.
 
-#### At most once per component per resolution
+#### Once per result entry, never once per component
 
-**A complication fires at most once per component per resolution**, deduplicated on `(componentId, complicationId)`.
-A `1d6` complication on a component listed five times must not roll five times.
-Each firing NAMES the stage OCCURRENCE that produced it — the first, in fire order, whose bucket satisfied a matched stage clause; a firing decided only by a trigger or a condition roll names the component's first non-`skipped` occurrence instead, so an output still points at a row.
+**A complication fires at most once per RESULT ENTRY per resolution**, deduplicated on `(result entry, complicationId)`.
+A component listed five times whose complication matched on three of those entries fires three times, rolls its `1d6` three times, and reports three outcomes.
+
+The reason is what repetition MEANS in a progressive result set.
+An entry carries no quantity, so listing the iron ingot five times is the only way to ask for five ingots: each entry is its own award, spent for its own share of the budget, and won or missed on its own.
+A player exercises that by reordering, and a GM mandates it by authoring, so a rule that fired once per component would silently charge one consequence for five awards — and would have to invent which of the five to blame it on.
+
+Each firing NAMES the entry that produced it and reports THAT entry's bucket, which is now a direct read rather than a choice: the firing belongs to the entry it was evaluated on.
 Without that name a player reading "you missed the iron ingot" against an output that also granted an iron ingot cannot reconcile the two.
+There is no `(componentId, complicationId)` firing key anywhere in the runtime, and none may be reintroduced: the delivery de-duplication key (`recipes-and-steps/spec.md`) is `(resolutionId, resultId, complicationId)` and already distinguishes the occurrence.
+
+The only surviving dedupe is WITHIN one entry: a component that authors the same complication id twice fires it once for that entry.
 
 Fire order is the ordered stage list's own order: the player's reordered list for crafting, the order captured onto the run at start for salvage, and the authored order for gathering, which has no reorder feature.
+Firings are emitted in that entry order, and a component's several firings are therefore interleaved with other components' at the positions their entries occupy.
+
+Evaluation and firing are ONE unit, and both readings below are normative on a player surface.
+A component staged five times is FORECAST on all five, because a player reordering the list has to see, on each entry, what that entry could cost them.
+It is MARKED on exactly the entries that fired — between none and all five — because the fired records name entries, one record per firing.
+A surface that collapsed the forecast to one entry per component would hide the cost of the very reordering the list exists for, and one that marked a single occupancy of a component that fired on three would claim one `1d6` was rolled when three were.
+
+Because a complication can now fire more than once in one resolution, an output listing fired complications MAY show the same complication more than once, and MUST NOT de-duplicate those rows: collapsing them under-reports what happened.
+Repeated rows are told APART instead of merged.
+Every player-facing fired-complication row therefore carries the STAGE POSITION of the entry that produced it: the 1-based place of that entry in the ordered stage list, counting every stage so the numbering keeps its gaps.
+It is the same number, meaning the same thing, that a player-facing per-stage list numbers its rows by — the player's own arrangement for crafting and salvage, the authored order for gathering — because a number that named a row the player cannot find would be worse than no number.
+
+A row states that position when, and ONLY when, another row in the SAME rendered output would draw identically to it.
+A complication that fired once is already unambiguous, and a position appended to it is noise.
+"Draws identically" is decided over what the row actually renders, so two DIFFERENT complications a GM named and worded alike on one component are disambiguated on the same rule, and rows for different components never collide.
+The decision belongs to the output that assembles the final row set, never to the resolution that produced one firing: the aggregate bulk card's rows come from many separate resolutions, none of which can see whether its row is about to collide.
+A firing that carries no position — one recorded before positions existed — degrades to an unmarked row rather than to a stated non-number.
+
+The GM-only card deliberately does NOT carry the position.
+The number's referent is the acting client's ordered list, which that card does not draw and the GM has no view of, so on that surface it would be an unverifiable number pointing at an invisible list; and it would add a fourth client-supplied claim to a relay payload specified as addressing-only (`recipes-and-steps/spec.md`).
+Its rows are instead distinguished by the acting client's claimed bucket, by the GM-side effect roll, and by the macro outcome, each reported per firing.
+The residual case is recorded rather than fixed: two firings of one `gmOnly` complication on one component that share a bucket, author no effect roll and name no macro still render as two identical GM rows, and the `resultId` the payload already carries is the field a future fix would render.
 
 #### Documented consequences
 

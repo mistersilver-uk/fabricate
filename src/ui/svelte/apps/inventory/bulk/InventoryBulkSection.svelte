@@ -15,18 +15,36 @@
 
   Props:
    - title: the ALREADY-localized eyebrow.
+   - titleTrailing: an optional snippet pinned to the RIGHT of that eyebrow, on the
+     SAME line — the complication block's "N could fire" count. It is a prop rather
+     than a second hand-rolled copy because `SalvageProgressiveBody` already draws
+     exactly this ("Roll to resolve" / "1 of 3 recovered" beside its own body title,
+     `.salvage-body-hint`), and a second site is what turns an idiom into a
+     primitive. The trailing type is that hint's — 9px/700/subtle — so the two read
+     as one treatment across the inspector rather than two that happen to agree.
    - note: an optional standing note under the title (the blocked list's "these are
      skipped automatically"), rendered before the list because it explains the
      whole section rather than any one row.
    - attrs: extra attributes for the `<section>` (its `data-` hook).
-   - children: the `<li>` rows, normally `InventoryBulkRow`.
+   - children: the `<li>` rows, normally `InventoryBulkRow` or a group card.
 -->
 <script>
-  let { title = '', note = '', attrs = {}, children = null } = $props();
+  let { title = '', titleTrailing = null, note = '', attrs = {}, children = null } = $props();
 </script>
 
 <section class="inventory-detail-section" {...attrs}>
-  <p class="inventory-detail-section-title">{title}</p>
+  <!-- The title is wrapped in its own span unconditionally so the eyebrow keeps ONE
+       shape whether or not a trailing slot is filled; with no trailing content the
+       block stays a plain text line, and the flex row is switched on only when there
+       is a second thing to place. The trailing span is owned HERE rather than by the
+       caller because the snippet's own elements carry the CALLER's style scope, so a
+       rule keyed on them from this component would never match. -->
+  <p class="inventory-detail-section-title" class:has-trailing={titleTrailing != null}>
+    <span>{title}</span>
+    {#if titleTrailing}
+      <span class="bulk-section-title-trailing">{@render titleTrailing()}</span>
+    {/if}
+  </p>
   {#if note}
     <p class="bulk-section-note">{note}</p>
   {/if}
@@ -36,6 +54,22 @@
 </section>
 
 <style>
+  .inventory-detail-section-title.has-trailing {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fab-space-2);
+  }
+
+  /* `.salvage-body-hint`'s type, not a fourth micro-scale. `margin-left: auto` rather
+     than `justify-content: space-between`, which would strand the title when the
+     trailing slot is empty. */
+  .bulk-section-title-trailing {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--fab-text-subtle);
+  }
+
   .bulk-list {
     list-style: none;
     display: flex;

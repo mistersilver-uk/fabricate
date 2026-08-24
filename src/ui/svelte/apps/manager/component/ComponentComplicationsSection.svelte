@@ -1066,39 +1066,10 @@
                       'Receives the component, the character and the complication. It runs on a GM client.'
                     )}
                   >
-                    <div class="fab-complication-macro-controls">
-                      <!-- `ItemDropZone` has no click handler at all — only `use:dragDrop` —
-                           and `SearchablePopover` owns its own trigger and portals to the
-                           manager host. The prototype makes the dashed prompt ITSELF the
-                           trigger; the recorded deviation is that the browse control is a
-                           separate button beside the drop target rather than the target
-                           becoming one. -->
-                      <ItemDropZone
-                        item={complication.macroUuid
-                          ? { name: macroDisplay(complication.macroUuid).name }
-                          : null}
-                        documentType="Macro"
-                        kind="complication-macro"
-                        emptyIcon="fas fa-scroll"
-                        state={macroDisplay(complication.macroUuid).missing ? 'missing' : 'linked'}
-                        title={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.DropTitle',
-                          'Drop a macro here'
-                        )}
-                        hint={complication.macroUuid
-                          ? complication.macroUuid
-                          : text(
-                              'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
-                              'Or browse this world’s script macros.'
-                            )}
-                        disabled={saving}
-                        unlinkLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Unlink',
-                          'Remove macro'
-                        )}
-                        onUnlink={() => setMacro(complication.id, '')}
-                        onDrop={(data) => handleMacroDrop(complication.id, data)}
-                      />
+                    <!-- The browse control acts on the WHOLE macro card, so it sits in the
+                         card's head beside its title rather than in the body inline with the
+                         drop zone it is an alternative to. -->
+                    {#snippet headAction()}
                       <SearchablePopover
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
@@ -1131,6 +1102,40 @@
                           'No script macros in this world'
                         )}
                         onChoose={(uuid) => setMacro(complication.id, uuid)}
+                      />
+                    {/snippet}
+                    <div class="fab-complication-macro-controls">
+                      <!-- `ItemDropZone` has no click handler at all — only `use:dragDrop` —
+                           and `SearchablePopover` owns its own trigger and portals to the
+                           manager host. The prototype makes the dashed prompt ITSELF the
+                           trigger; the recorded deviation is that the browse control is a
+                           separate button beside the drop target rather than the target
+                           becoming one. -->
+                      <ItemDropZone
+                        item={complication.macroUuid
+                          ? { name: macroDisplay(complication.macroUuid).name }
+                          : null}
+                        documentType="Macro"
+                        kind="complication-macro"
+                        emptyIcon="fas fa-scroll"
+                        state={macroDisplay(complication.macroUuid).missing ? 'missing' : 'linked'}
+                        title={text(
+                          'FABRICATE.Admin.Manager.Component.Complications.Macro.DropTitle',
+                          'Drop a macro here'
+                        )}
+                        hint={complication.macroUuid
+                          ? complication.macroUuid
+                          : text(
+                              'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
+                              'Or browse this world’s script macros.'
+                            )}
+                        disabled={saving}
+                        unlinkLabel={text(
+                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Unlink',
+                          'Remove macro'
+                        )}
+                        onUnlink={() => setMacro(complication.id, '')}
+                        onDrop={(data) => handleMacroDrop(complication.id, data)}
                       />
                     </div>
                   </ComplicationEffectRow>
@@ -1423,6 +1428,25 @@
     flex: 1 1 100%;
     gap: 9px;
     align-items: center;
+  }
+
+  /* The browse trigger, now in the macro card's HEAD. Its type is copied from the manager's
+     existing compact in-header control, `.manager-salvage-stage-edit` in styles/fabricate.css
+     — 0.8125rem at weight 600 with a 0.72rem glyph and no wrapping — rather than invented, so
+     the two read as one treatment. `manager-button`'s default type is sized for a footer
+     action and wrapped "Browse macros" onto two lines beside a title it is meant to sit level
+     with. `white-space: nowrap` is the declaration that actually fixes the wrap; the rest is
+     what keeps it from looking like a different button once it no longer does. */
+  .fab-complication-macro :global([data-complication-macro-browse]) {
+    padding: 4px 9px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: normal;
+    white-space: nowrap;
+  }
+
+  .fab-complication-macro :global([data-complication-macro-browse] i) {
+    font-size: 0.72rem;
   }
 
   .fab-complication-macro-controls > :global(.manager-item-drop-zone) {

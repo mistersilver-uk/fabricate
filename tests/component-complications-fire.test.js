@@ -16,11 +16,13 @@
  *     code at GM authority. The key set is asserted exactly, not by sampling.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { evaluateSideRoll } from '../src/systems/checkRoll.js';
 import {
   buildGmComplicationCardContent,
+  complicationReasons,
   fireComplications,
   gmComplicationCardEntries,
   gmComplications,
@@ -662,10 +664,42 @@ function gmRow(overrides = {}) {
     visibility: 'gmOnly',
     componentName: 'Iron Ingot',
     effectRoll: null,
+    effectLabel: '',
+    reasons: [],
     claimed: { bucket: null, effectRollTotal: null },
     macro: null,
     ...overrides,
   };
+}
+
+/**
+ * The card's real English, so a copy assertion reads what a GM reads.
+ *
+ * A key-only stub was fine while the card's strings were labels; they are sentences now, and
+ * a stub would let this suite agree with itself about copy that `lang/en.json` does not carry.
+ */
+const CARD_LANG = JSON.parse(
+  readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8')
+).FABRICATE.Chat.GmComplication;
+
+function cardLocalize(key) {
+  const path = key.replace('FABRICATE.Chat.GmComplication.', '');
+  if (key === 'FABRICATE.Admin.Manager.Component.Complications.Severity.major') return 'Major';
+  return path.split('.').reduce((node, part) => node?.[part], CARD_LANG) ?? key;
+}
+
+/**
+ * The rendered text runs of one section of the FIRST row, by its `data-` token, or `null`
+ * when the card drew no such section at all. The heading is run 0 and each fact follows it.
+ */
+function sectionText(html, section) {
+  const opened = html.split(`data-fabricate-complication-section="${section}"`)[1];
+  if (opened === undefined) return null;
+  const body = opened.slice(opened.indexOf('>') + 1);
+  return body
+    .slice(0, body.indexOf('</span></span>'))
+    .split(/<[^>]*>/)
+    .filter(Boolean);
 }
 
 test('1286: an empty GM card builds NO content, so no empty message is created', () => {
@@ -716,53 +750,173 @@ test('1286: a hostile authored description cannot inject markup into the GM card
   assert.ok(content.includes('&quot;'), 'the quote that would escape an attribute is escaped');
 });
 
-test('1286: the acting client’s bucket and total are presented as an unverified CLAIM', () => {
+test('1286: the row is a STACK of labelled sections, not a run of columns', () => {
+  // The live defect this replaced: the row's notes were siblings of `__label` inside a
+  // `display: flex` grid cell, so a three-letter severity drew as `M o r` down three lines.
+  // The structural half of the fix is asserted here; `tests/crafting-chat-card.test.js`
+  // asserts the stylesheet half, and neither can see the other's.
   const content = buildGmComplicationCardContent(
     {
-      entries: [gmRow({ claimed: { bucket: 'halted', effectRollTotal: 4 } })],
+      entries: [
+        gmRow({
+          name: 'The gland ruptures',
+          componentName: 'Balehound Mordant',
+          description: 'The acid sacs burst as the carcass comes apart.',
+          reasons: ['halted'],
+          effectLabel: 'Acid damage',
+          effectRoll: { requested: true, attempted: true, total: 10, formula: '2d6', posted: true },
+        }),
+      ],
     },
-    (key) =>
-      ({
-        'FABRICATE.Chat.GmComplication.Unverified': 'Reported by the acting client',
-        'FABRICATE.Chat.GmComplication.Stage': 'Stage',
-        'FABRICATE.Chat.GmComplication.Bucket.halted': 'Stopped here',
-        'FABRICATE.Chat.GmComplication.EffectRoll': 'Effect roll',
-      })[key] ?? key
+    cardLocalize
   );
 
+  assert.deepEqual(sectionText(content, 'why'), [
+    'Why it fired',
+    'Their game reports the roll falling short here.',
+  ]);
+  assert.deepEqual(sectionText(content, 'effect'), ['What happens', 'Acid damage: 10 (2d6)']);
+  assert.equal(sectionText(content, 'attention'), null, 'a healthy macro adds no section');
+
+  // Every one of the row's runs is inside the ONE label. That is what makes the column
+  // direction reachable at all: a note left outside it is a flex column again, whatever the
+  // stylesheet says.
+  const [, label] = content.split('__label">');
   assert.ok(
-    content.includes('Reported by the acting client'),
-    'the GM cannot re-derive the bucket or the total, so the card must not state them flat'
-  );
-  assert.ok(content.includes('Stage: Stopped here'));
-  assert.ok(content.includes('Effect roll: 4'));
-
-  const noClaim = buildGmComplicationCardContent(
-    { entries: [gmRow({ claimed: { bucket: 'halted', effectRollTotal: null } })] },
-    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRoll' ? 'Effect roll' : key)
+    label.indexOf('</span></li>') > label.indexOf('data-fabricate-complication-section="effect"'),
+    'the sections are nested inside the label rather than hung off the item beside it'
   );
   assert.equal(
-    noClaim.includes('Effect roll'),
+    content.includes(' — '),
     false,
-    'Number(null) is 0, so a coercing test would report an absent claim as a rolled zero'
+    'the identity fields are separate lines now, not one em-dash-joined run'
   );
+  assert.ok(content.includes('__complication-head">'), 'the name and its severity share a line');
+  assert.ok(
+    content.includes('__complication-severity">Major<'),
+    'severity rides the head line rather than becoming a column of its own'
+  );
+  assert.ok(
+    content.includes('__complication-meta">'),
+    'and the component keeps its own muted context line below it'
+  );
+});
+
+test('1286: the audience note joins the CONTEXT line, not the head line', () => {
+  // It rode the head beside the severity first. `Major · Shown to the player` is 188px of a
+  // 266px chat row as an uppercase tracked eyebrow, so it wrapped and undid the head — and
+  // it is context of the same kind as the component's name anyway.
+  const seen = buildGmComplicationCardContent(
+    { entries: [gmRow({ visibility: 'visible' })] },
+    cardLocalize
+  );
+  const [, meta] = seen.split('__complication-meta">');
+  assert.ok(
+    meta.slice(0, meta.indexOf('</span></span>')).includes('Shown to the player'),
+    'the audience note is inside the context line'
+  );
+  assert.equal(
+    seen.split('__complication-severity">')[1].startsWith('Major<'),
+    true,
+    'and the head line carries the severity alone'
+  );
+});
+
+test('1286: the claimed stage outcome is worded as a REPORT, never stated flat', () => {
+  const reported = Object.entries({
+    full: 'Their game reports this one awarded in full.',
+    partial: 'Their game reports this one only partly awarded.',
+    halted: 'Their game reports the roll falling short here.',
+    unreached: 'Their game reports the roll never reaching this one.',
+  });
+
+  for (const [bucket, sentence] of reported) {
+    const content = buildGmComplicationCardContent(
+      { entries: [gmRow({ reasons: [bucket] })] },
+      cardLocalize
+    );
+    assert.deepEqual(
+      sectionText(content, 'why'),
+      ['Why it fired', sentence],
+      `the ${bucket} bucket reads as a report`
+    );
+    // The obligation, in the form the spec states it: the GM cannot re-derive the bucket, so
+    // the card may not assert it. Each sentence carries the attribution in its own grammar
+    // rather than behind a separate "Reported by the acting client" label a GM must translate
+    // (`openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY").
+    assert.ok(
+      /reports/.test(sentence),
+      `the ${bucket} sentence attributes rather than asserts`
+    );
+  }
+});
+
+test('1286: an authored condition the GM can confirm is stated FLAT, and one it cannot is not guessed at', () => {
+  const cases = [
+    [['checkTrigger'], 'The check hit the trigger you set for it.'],
+    [['rollCondition'], 'Its own condition roll came up.'],
+    [['unknown'], "Fabricate can't tell which of its conditions fired it."],
+  ];
+  for (const [reasons, sentence] of cases) {
+    const content = buildGmComplicationCardContent(
+      { entries: [gmRow({ reasons })] },
+      cardLocalize
+    );
+    assert.deepEqual(sectionText(content, 'why'), ['Why it fired', sentence]);
+  }
+
+  // `match: 'all'` fires on several conditions at once, and each gets its own line: a GM
+  // reading two clauses joined mid-wrap cannot tell which half belongs to which.
+  const both = buildGmComplicationCardContent(
+    { entries: [gmRow({ reasons: ['unreached', 'rollCondition'] })] },
+    cardLocalize
+  );
+  assert.deepEqual(sectionText(both, 'why'), [
+    'Why it fired',
+    'Their game reports the roll never reaching this one.',
+    'Its own condition roll came up.',
+  ]);
+});
+
+test('1286: a reason token outside the vocabulary renders nothing, not a key and not a constructor', () => {
+  const content = buildGmComplicationCardContent(
+    { entries: [gmRow({ reasons: ['constructor', 'toString'] })] },
+    cardLocalize
+  );
+  assert.equal(
+    sectionText(content, 'why'),
+    null,
+    'Object.freeze does not detach Object.prototype, so the lookup has to ask hasOwn'
+  );
+  assert.equal(content.includes('native code'), false);
 });
 
 test('1286: a macro that did not resolve to a script macro is REPORTED, not only logged', () => {
   const content = buildGmComplicationCardContent(
     { entries: [gmRow({ macro: { status: 'skipped', macroUuid: 'Compendium.pack.Macro.abc' } })] },
-    (key) => (key === 'FABRICATE.Chat.GmComplication.MacroSkipped' ? 'Macro skipped' : key)
+    cardLocalize
   );
 
-  assert.ok(content.includes('Macro skipped: Compendium.pack.Macro.abc'));
+  // Its own section, and the uuid on its own line under it: both shipped fault strings end in
+  // a clause of their own, so appending the uuid after a separator read as `…script macro:
+  // Compendium.pack.Macro.abc`.
+  assert.deepEqual(sectionText(content, 'attention'), [
+    'Needs your attention',
+    'Macro skipped: it does not resolve to a script macro',
+    'Compendium.pack.Macro.abc',
+  ]);
 });
 
 test('1286: a macro that threw is reported, and one that ran adds no noise', () => {
   const failed = buildGmComplicationCardContent(
     { entries: [gmRow({ macro: { status: 'failed', macroUuid: 'Macro.x' } })] },
-    (key) => (key === 'FABRICATE.Chat.GmComplication.MacroFailed' ? 'Macro failed' : key)
+    cardLocalize
   );
-  assert.ok(failed.includes('Macro failed: Macro.x'));
+  assert.deepEqual(sectionText(failed, 'attention'), [
+    'Needs your attention',
+    'Macro failed — see the console',
+    'Macro.x',
+  ]);
 
   const ran = buildGmComplicationCardContent({
     entries: [gmRow({ macro: { status: 'ran', macroUuid: 'Macro.x' } })],
@@ -770,8 +924,24 @@ test('1286: a macro that threw is reported, and one that ran adds no noise', () 
   assert.equal(ran.includes('Macro.x'), false, 'a macro that simply worked is not news');
 });
 
-test('1286: the GM-rolled effect roll is reported with its formula and its total', () => {
-  const content = buildGmComplicationCardContent(
+test('1286: the consequence roll leads with its TOTAL, under the name the GM gave it', () => {
+  // `Effect roll: 2d6 = 10` read as though it were the check the complication fired on. It
+  // has no target and nothing to miss, so the number a GM narrates leads and the formula
+  // follows it as provenance.
+  const labelled = buildGmComplicationCardContent(
+    {
+      entries: [
+        gmRow({
+          effectLabel: 'Acid damage',
+          effectRoll: { requested: true, attempted: true, total: 9, formula: '2d6', posted: true },
+        }),
+      ],
+    },
+    cardLocalize
+  );
+  assert.deepEqual(sectionText(labelled, 'effect'), ['What happens', 'Acid damage: 9 (2d6)']);
+
+  const unlabelled = buildGmComplicationCardContent(
     {
       entries: [
         gmRow({
@@ -779,14 +949,15 @@ test('1286: the GM-rolled effect roll is reported with its formula and its total
         }),
       ],
     },
-    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRoll' ? 'Effect roll' : key)
+    cardLocalize
   );
-  assert.ok(content.includes('Effect roll: 2d6 = 9'));
+  assert.deepEqual(sectionText(unlabelled, 'effect'), ['What happens', 'Effect roll: 9 (2d6)']);
 
   const failed = buildGmComplicationCardContent(
     {
       entries: [
         gmRow({
+          effectLabel: 'Acid damage',
           effectRoll: {
             requested: true,
             attempted: true,
@@ -797,9 +968,12 @@ test('1286: the GM-rolled effect roll is reported with its formula and its total
         }),
       ],
     },
-    (key) => (key === 'FABRICATE.Chat.GmComplication.EffectRollFailed' ? 'Effect roll failed' : key)
+    cardLocalize
   );
-  assert.ok(failed.includes('Effect roll failed: 2d6??'));
+  assert.deepEqual(sectionText(failed, 'effect'), [
+    'What happens',
+    "Acid damage: couldn't be rolled (2d6??)",
+  ]);
 });
 
 test('1286: a roll this side DECLINED by audience is not reported as a roll that failed', () => {
@@ -809,18 +983,12 @@ test('1286: a roll this side DECLINED by audience is not reported as a roll that
   // audience — the roll belongs to the acting player's own dice, and the total it produced
   // is already on the card as the acting client's claim. Keyed on `requested`, the card
   // stated "Effect roll: 4" and "Effect roll failed: 1d6" two lines apart.
-  const localize = (key) =>
-    ({
-      'FABRICATE.Chat.GmComplication.EffectRoll': 'Effect roll',
-      'FABRICATE.Chat.GmComplication.EffectRollFailed': 'Effect roll failed',
-      'FABRICATE.Chat.GmComplication.Unverified': 'Reported by the acting client',
-    })[key] ?? key;
-
   const declined = buildGmComplicationCardContent(
     {
       entries: [
         gmRow({
           visibility: 'visible',
+          effectLabel: 'Acid damage',
           claimed: { bucket: null, effectRollTotal: 4 },
           effectRoll: {
             requested: true,
@@ -833,18 +1001,16 @@ test('1286: a roll this side DECLINED by audience is not reported as a roll that
         }),
       ],
     },
-    localize
+    cardLocalize
   );
 
-  assert.equal(
-    declined.includes('Effect roll failed'),
-    false,
-    'this side did not attempt the roll, so it has no failure to report'
+  assert.deepEqual(
+    sectionText(declined, 'effect'),
+    ['What happens', 'Acid damage: 4 (as their game rolled it)'],
+    'this side did not attempt the roll, so it has no failure to report — and the total that ' +
+      'DOES stand carries its provenance where a formula would otherwise sit'
   );
-  assert.ok(
-    declined.includes('Reported by the acting client') && declined.includes('Effect roll: 4'),
-    'the acting client’s total still stands, and still stands as an unverified claim'
-  );
+  assert.equal(declined.includes("couldn't be rolled"), false);
 
   // Non-vacuity: the same row, with the roll actually attempted here and failed, DOES report.
   const attempted = buildGmComplicationCardContent(
@@ -852,6 +1018,7 @@ test('1286: a roll this side DECLINED by audience is not reported as a roll that
       entries: [
         gmRow({
           visibility: 'visible',
+          effectLabel: 'Acid damage',
           claimed: { bucket: null, effectRollTotal: 4 },
           effectRoll: {
             requested: true,
@@ -863,9 +1030,26 @@ test('1286: a roll this side DECLINED by audience is not reported as a roll that
         }),
       ],
     },
-    localize
+    cardLocalize
   );
-  assert.ok(attempted.includes('Effect roll failed: 1d6'));
+  assert.deepEqual(sectionText(attempted, 'effect'), [
+    'What happens',
+    "Acid damage: couldn't be rolled (1d6)",
+    'Acid damage: 4 (as their game rolled it)',
+  ]);
+});
+
+test('1286: an absent claimed total is not a rolled zero, and adds no section at all', () => {
+  const content = buildGmComplicationCardContent(
+    { entries: [gmRow({ claimed: { bucket: 'halted', effectRollTotal: null } })] },
+    cardLocalize
+  );
+  assert.equal(
+    sectionText(content, 'effect'),
+    null,
+    'Number(null) is 0, so a coercing test would report an absent claim as a rolled zero — ' +
+      'and an empty "What happens" heading reads as a consequence that failed to render'
+  );
 });
 
 test('1286: a VISIBLE complication on the GM card says the player saw it too', () => {
@@ -891,7 +1075,25 @@ test('1286: a severity outside the vocabulary resolves no key rather than render
     false,
     'a label key interpolated from an authored token would render as garbage forever'
   );
+  // The other half, and the one a bare `MAP[token]` fails: `Object.freeze` does not detach
+  // `Object.prototype`, so `SEVERITY_KEYS.constructor` is the `Object` CONSTRUCTOR — truthy,
+  // so the guard above passes and the card then renders `function Object() { [native code] }`
+  // as the complication's severity. `constructor` is a reachable token because the persisted
+  // shape deliberately PRESERVES a malformed severity and Fabricate imports third-party
+  // systems, so this is an authored string reaching a lookup, not a hypothetical.
+  assert.equal(content.includes('native code'), false, 'and no prototype member reaches it');
+  assert.equal(content.includes('__complication-tags'), false, 'so the row draws no tags at all');
   assert.ok(content.includes('data-fabricate-complication-severity="constructor"'));
+
+  const status = buildGmComplicationCardContent(
+    { entries: [gmRow({ macro: { status: 'constructor', macroUuid: 'Macro.x' } })] },
+    cardLocalize
+  );
+  assert.equal(
+    sectionText(status, 'attention'),
+    null,
+    'the macro-status lookup has the same prototype reach, and `?? null` never sees it'
+  );
 });
 
 // ── An id-less stage: unclassifiable, so it must fail toward silence ──────────
@@ -1009,6 +1211,137 @@ test('1286: the card row carries the GM-side effect roll, and never the macro uu
   assert.ok(!('macroUuid' in row), 'the row is the GM-facing PROJECTION, not the authored record');
   assert.ok(!('complication' in row));
   assert.equal(row.visibility, 'gmOnly', 'the authored audience still reaches the card');
+});
+
+// ── The reason derivation, against the real planner ──────────────────────────
+
+/** One classified stage in the requested bucket, for the reason oracle below. */
+function planInBucket(authored, { bucket, matchedTriggerIds = [] }) {
+  const produced = { id: 'iron', name: 'Iron Ingot', complications: [authored] };
+  return planComplications({
+    activity: 'salvage',
+    resolutionId: 'res-1',
+    stages: [{ resultId: 'r1', componentId: 'iron', component: produced }],
+    award: {
+      // The partial tail IS a member of `awarded`, and `bucketFor` tests `partial` first —
+      // mirrored here rather than simplified, or the oracle would drive a shape the loop
+      // never produces.
+      awarded: bucket === 'full' || bucket === 'partial' ? [{ id: 'r1' }] : [],
+      partialResult: bucket === 'partial' ? { id: 'r1' } : null,
+      haltedResult: bucket === 'halted' ? { id: 'r1' } : null,
+      skippedResults: [],
+    },
+    matchedTriggerIds,
+  });
+}
+
+/** The stage clause each reason token stands for; the two clause tokens stand for themselves. */
+const CLAUSE_OF_REASON = {
+  full: 'stageAwarded',
+  partial: 'stagePartial',
+  halted: 'stageMissed',
+  unreached: 'stageMissed',
+  checkTrigger: 'checkTrigger',
+  rollCondition: 'rollCondition',
+};
+
+test('1286: every reason the GM card names really did fire the complication', () => {
+  // THE ORACLE. `complicationReasons` re-derives the firing's reasons on the GM client from
+  // the GM's own authored record plus the claimed bucket, deliberately rather than reading a
+  // relayed list — `resolution-modes/spec.md` § Progressive Awarding turns down a fourth
+  // client-supplied claim on that payload by name. Re-derivation means a private mirror of
+  // `complicationPlan.js`'s clause/bucket table, and a mirror drifts. So the mirror is not
+  // trusted: every (match mode, clause set, bucket) the planner can produce is driven through
+  // the REAL planner, and every reason the card would name must appear in that firing's own
+  // matched conditions. The card may say less than the truth; it may never say something else.
+  const buckets = ['full', 'partial', 'halted', 'unreached'];
+  const stageSets = [[], ['stageAwarded'], ['stagePartial'], ['stageMissed'], ['stageAwarded', 'stageMissed']];
+  let named = 0;
+  let admitted = 0;
+  let fired = 0;
+
+  for (const match of ['any', 'all'])
+    for (const stages of stageSets)
+      for (const trigger of [null, 'trig-1'])
+        for (const dice of [false, true])
+          for (const triggerMatched of [false, true])
+            for (const bucket of buckets) {
+              const authored = complication({
+                match,
+                when: {
+                  ...Object.fromEntries(stages.map((clause) => [clause, true])),
+                  ...(trigger ? { checkTrigger: trigger } : {}),
+                },
+                rollCondition: dice ? { enabled: true, expr: '1d20', cmp: 'eq', value: '1' } : {},
+              });
+              const plan = planInBucket(authored, {
+                bucket,
+                matchedTriggerIds: trigger && triggerMatched ? [trigger] : [],
+              });
+              const [firing] = plan.firings;
+              if (!firing) continue;
+              fired += 1;
+              // What `fireComplications` will record on the firing it pushes: the planner's
+              // matched list, plus `rollCondition` when the pending dice settled it.
+              const actual = firing.needsDice
+                ? [...firing.matchedConditions, 'rollCondition']
+                : firing.matchedConditions;
+              const reasons = complicationReasons(authored, bucket);
+              assert.ok(reasons.length > 0, 'a fired complication always says something');
+              if (reasons[0] === 'unknown') {
+                admitted += 1;
+                assert.equal(reasons.length, 1, 'an admission is never mixed with a claim');
+                continue;
+              }
+              named += 1;
+              for (const reason of reasons) {
+                assert.ok(
+                  actual.includes(CLAUSE_OF_REASON[reason]),
+                  `reason "${reason}" (match: ${match}, bucket: ${bucket}, stages: ` +
+                    `[${stages}], trigger: ${trigger}, matched: ${triggerMatched}, dice: ` +
+                    `${dice}) is not in the firing's own [${actual}]`
+                );
+              }
+            }
+
+  // Non-vacuity, both ways: the oracle would pass trivially on a derivation that always
+  // returned `unknown`, and it would pass trivially on a corpus where nothing fired.
+  assert.ok(fired > 100, `the corpus actually fires: ${fired}`);
+  assert.ok(named > 50, `and mostly names a real reason: ${named}`);
+  assert.ok(admitted > 0, `while admitting the ones it cannot name: ${admitted}`);
+});
+
+test('1286: the row model carries the reasons and the authored effect label', () => {
+  const authored = complication({
+    name: 'Curse',
+    when: { stageMissed: true },
+    effectRoll: { enabled: true, expr: '2d6', label: 'Acid damage' },
+  });
+  const [row] = gmComplicationCardEntries([
+    appliedRow({
+      component: { id: 'iron', name: 'Iron Ingot' },
+      complication: authored,
+      entry: { resultId: 'r1', componentId: 'iron', bucket: 'unreached', effectRollTotal: null },
+      report: { effect: null, macro: null },
+    }),
+  ]);
+
+  assert.deepEqual(row.reasons, ['unreached']);
+  assert.equal(row.effectLabel, 'Acid damage');
+
+  // The claimed bucket is the ONLY thing the acting client contributes to a reason: the
+  // clause set, the match mode and the roll-condition toggle all come off the GM's own record.
+  const [awarded] = gmComplicationCardEntries([
+    appliedRow({
+      complication: authored,
+      entry: { resultId: 'r1', componentId: 'iron', bucket: 'full', effectRollTotal: null },
+    }),
+  ]);
+  assert.deepEqual(
+    awarded.reasons,
+    ['unknown'],
+    'no enabled clause reads `full`, so this side cannot say what fired it and does not guess'
+  );
 });
 
 test('1286: a row the GM side could not augment still renders, and claims nothing', () => {

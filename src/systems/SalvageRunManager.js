@@ -136,6 +136,10 @@ export class SalvageRunManager extends RunContainerManagerBase {
    * also be the wrong shape, because history records are read straight off the flag by
    * surfaces that never call back through here.
    *
+   * The list may legitimately hold SEVERAL records differing only in `resultId`: a
+   * complication fires per result entry, so a component staged twice that went wrong twice
+   * wrote two firings. Nothing on the write path may de-duplicate them.
+   *
    * A run that fired nothing player-visible carries no such key at all, matching the
    * omitted-when-default doctrine the rest of the persisted shapes follow.
    *

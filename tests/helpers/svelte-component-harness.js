@@ -312,6 +312,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/progressiveStageThresholds.js',
   // The player's stored stage order is reconciled against the authored list here.
   'src/utils/progressiveResultOrder.js',
+  // Same rule, issue 1286: both progressive read-models attach each stage's player
+  // complication forecast through this leaf, and `inventoryStore` marks the fired tense
+  // with its sibling export. It is a leaf but for `complicationPlan.js`, which is itself a
+  // leaf but for the frozen complication vocabularies — so these three entries close it.
+  'src/utils/progressiveStageComplications.js',
+  'src/utils/complicationPlan.js',
+  'src/utils/componentComplications.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 
@@ -362,6 +369,15 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
   // just the stage-list one.
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  // The per-stage complication band (issue 1286). `ProgressiveStageList` — already listed
+  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` and
+  // imports `RowDisclosure`. All three are in the STATIC graph whether or not a fixture
+  // draws a band, so omitting any of them HANGS every mounted crafting suite (# cancelled)
+  // rather than failing one. `Chip` and `RowDisclosure` are import-free leaves, so these
+  // three entries close it.
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',

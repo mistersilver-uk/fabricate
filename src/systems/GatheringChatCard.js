@@ -189,6 +189,7 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
     entries: model.complications,
     heading: loc(CHAT_KEYS.complications),
     card: 'gather',
+    localize: loc,
   });
 
   return [

@@ -54,6 +54,13 @@ const harness = createMountedComponentHarness({
     // The preview NEVER renders the salvage tree (a book is never salvageable), but the
     // component branch statically imports it, so it must still be compiled here.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',

@@ -2725,6 +2725,16 @@ class Fabricate {
       // GM-side authorization inputs; `COMPLICATION_RATE_LIMIT` is sized against the
       // fanned-out pair count a 25-target selection can produce, not against the row count.
       deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
+      // The executing user's stored progressive stage order, read through the SAME edge
+      // `ResolutionModeService` and `CraftingEngine` are given (issue 1286). The bulk
+      // pre-run forecast consumes it to list a row's complications in the order the roll
+      // will actually be spent down; the RUN path never reads it here, because the order a
+      // row is resolved against is the one its own run captured at start.
+      //
+      // Left unwired the service falls back to `() => null` and the forecast quietly reads
+      // the AUTHORED order while the run reads the player's — a divergence with no symptom
+      // beyond a preview listing the right complications against the wrong stages.
+      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
       // Key-only, matching every card module's `localize` contract; the aggregate card
       // substitutes its own counts.
       localize: (key) => game.i18n?.localize?.(key) ?? key

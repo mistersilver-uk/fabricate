@@ -47,14 +47,30 @@
  * later issue can offer "only the stage you nearly reached" without reopening this model, and
  * so the chat card can say which it was.
  *
- * ## At most once per component per resolution
+ * ## Once per RESULT ENTRY, never once per component
  *
- * A component may legitimately appear several times in one ordered list, so `full`, `partial`
- * and `stageMissed` can all be true at once for it — that is the honest reading. But a `1d6`
- * shrapnel complication on a component listed five times must not roll five times, so firing
- * is deduped on `(componentId, complicationId)` and each firing NAMES the stage occurrence
- * that produced it. Without that name a player reading "you missed the iron ingot" against a
- * card that also granted an iron ingot cannot reconcile the two.
+ * A component may legitimately appear several times in one ordered list, and each occurrence is
+ * its OWN award. Repetition is how a progressive result set asks for more of a result — an
+ * entry carries no quantity, so listing the iron ingot five times IS the request for five
+ * ingots — and it is a request a player can make by reordering and a GM can mandate by
+ * authoring. So each occurrence is evaluated on its own bucket and fires on its own: a `1d6`
+ * shrapnel complication on a component listed five times rolls five times, once per entry that
+ * matched, because five awards went wrong five times.
+ *
+ * The unit of evaluation and the unit of firing are therefore the SAME unit, the result entry,
+ * and each firing names the entry that produced it in `resultId`, states WHERE that entry sits
+ * in the ordered list in `position`, and reports that entry's own
+ * `bucket`. Nothing here consults a component's other occurrences: a `stageMissed` complication
+ * on an entry the loop awarded does not fire, even when a later entry for the same component
+ * was missed.
+ *
+ * The only dedupe left is WITHIN one entry, on `complicationId`, so a component that authors
+ * the same complication id twice still fires it once for that entry. There is no
+ * `(componentId, complicationId)` key any more, and reintroducing one would collapse exactly
+ * the awards this model keeps apart.
+ *
+ * A `skipped` entry never fires. It is not an outcome — it is a stage the award loop refused —
+ * so a firing attributed to one would report a consequence for an award that never happened.
  *
  * ## What this module deliberately cannot do
  *
@@ -74,7 +90,8 @@ import {
 
 /**
  * The five buckets, in the order a projection should present them. Exported so a chat card
- * or a strip orders them the same way this module does rather than restating the list.
+ * or a strip that lists several of them orders them canonically rather than restating the
+ * list; a single firing is in exactly one of them, and never in `skipped`.
  * @type {ReadonlyArray<'full'|'partial'|'halted'|'unreached'|'skipped'>}
  */
 export const COMPLICATION_STAGE_BUCKETS = Object.freeze([
@@ -127,16 +144,29 @@ function idSet(values) {
 
 /**
  * @param {object} stage one ordered stage occurrence
+ * @param {number} index its 0-based index in the ORDERED stage list
  * @returns {{resultId: string|null, componentId: string|null, component: object|null,
- *   complications: Array<object>}}
+ *   complications: Array<object>, position: number}}
  */
-function readStage(stage) {
+function readStage(stage, index) {
   const component = stage?.component ?? null;
   return {
     resultId: idOf(stage?.resultId ?? stage?.result ?? null),
     componentId: idOf(stage?.componentId ?? component ?? null),
     component,
     complications: list(stage?.complications ?? component?.complications),
+    // WHERE IN THE RENDERED LIST THIS ENTRY SITS, 1-based, counting EVERY stage (issue
+    // 1286). The caller's `stages` is already the order the roll spends — the player's
+    // reordered list for crafting, the order captured onto the run at start for salvage,
+    // the authored order for gathering — so this index IS the player's own ordering, and
+    // is the same number the salvage panel's per-stage rows are numbered by
+    // (`FABRICATE.App.Complications.ResultEyebrow`).
+    //
+    // Counting every stage rather than only the complication-bearing ones is the whole
+    // point: a stage authoring nothing leaves a GAP in the numbering, and the gap is what
+    // makes the number findable in the list the player is looking at. A dense 1..N over
+    // the fired rows would name rows that screen does not have.
+    position: index + 1,
   };
 }
 
@@ -183,7 +213,7 @@ function bucketFor(resultId, award) {
  * @param {{awarded?: Array<object>, partialResult?: object|null, haltedResult?: object|null,
  *   skippedResults?: Array<object>}} award the award loop's return, verbatim
  * @returns {Array<{resultId: string|null, componentId: string|null, component: object|null,
- *   complications: Array<object>, bucket: string}>}
+ *   complications: Array<object>, bucket: string, position: number}>}
  */
 function classifyStages(stages, award) {
   const buckets = {
@@ -192,66 +222,29 @@ function classifyStages(stages, award) {
     partialId: idOf(award?.partialResult ?? null),
     haltedId: idOf(award?.haltedResult ?? null),
   };
-  return list(stages).map((stage) => {
-    const read = readStage(stage);
+  return list(stages).map((stage, index) => {
+    const read = readStage(stage, index);
     return { ...read, bucket: bucketFor(read.resultId, buckets) };
   });
 }
 
 /**
- * Group the classified stages by component, preserving FIRE ORDER: a `Map` keyed on first
- * insertion is the ordered stage list's order, which is the player's reordered list and, for
- * salvage, the order captured onto the run at start.
+ * The facts the three stage-outcome clauses read for ONE result entry, from that entry's own
+ * bucket and nothing else.
  *
- * @param {Array<object>} classified
- * @returns {Map<string, {componentId: string, component: object|null,
- *   complications: Array<object>, stages: Array<object>}>}
- */
-function groupByComponent(classified) {
-  const grouped = new Map();
-  for (const stage of classified) {
-    if (!stage.componentId) continue;
-    let entry = grouped.get(stage.componentId);
-    if (!entry) {
-      entry = {
-        componentId: stage.componentId,
-        component: stage.component,
-        complications: stage.complications,
-        stages: [],
-      };
-      grouped.set(stage.componentId, entry);
-    }
-    entry.stages.push(stage);
-  }
-  return grouped;
-}
-
-/**
- * The per-component facts the three stage-outcome clauses read, derived over ALL of that
- * component's occurrences.
+ * This is where the per-entry rule actually lives. Deriving these over a component's other
+ * occurrences is what let a `stageMissed` complication fire against an entry the loop
+ * awarded, and then needed a separate mechanism to decide which entry to blame it on.
  *
- * @param {Array<{bucket: string}>} stages
+ * @param {string} bucket the entry's bucket
  * @returns {{stageAwarded: boolean, stagePartial: boolean, stageMissed: boolean}}
  */
-function stageFacts(stages) {
+function stageFacts(bucket) {
   const facts = {};
   for (const [condition, buckets] of Object.entries(BUCKETS_BY_STAGE_CONDITION)) {
-    facts[condition] = stages.some((stage) => buckets.includes(stage.bucket));
+    facts[condition] = buckets.includes(bucket);
   }
   return facts;
-}
-
-/**
- * The distinct buckets a component's stages landed in, in canonical order and WITHOUT
- * `skipped` — a misconfigured stage is not a narrative outcome and must not appear on a card
- * as one.
- *
- * @param {Array<{bucket: string}>} stages
- * @returns {Array<string>}
- */
-function distinctBuckets(stages) {
-  const held = new Set(stages.map((stage) => stage.bucket));
-  return COMPLICATION_STAGE_BUCKETS.filter((bucket) => bucket !== 'skipped' && held.has(bucket));
 }
 
 /**
@@ -261,6 +254,15 @@ function distinctBuckets(stages) {
  * @returns {boolean} `false` leaves the clause INERT (fail-open), never a validation error:
  *   an id that no longer resolves, or that belongs to another activity's id space, contributes
  *   nothing to `match` rather than blocking it.
+ *
+ * `null` is a fail-OPEN sentinel meaning "the caller cannot say which triggers this block owns",
+ * and it is LIVE on the runtime path: neither `CraftingEngine` nor `GatheringEngine` passes ids
+ * to `planComplications`, so a clause naming an unknown trigger stays evaluable rather than
+ * being made inert. It is NOT live on the forecast path — every `forecastComplications` caller
+ * routes through `checkTriggerIdsOf`, which returns `[]` and never `null` — so that function
+ * requires the ids rather than defaulting them. Defaulting them there would have meant omitting
+ * them silently EXCLUDED a trigger-only complication from a player's forecast, which is a
+ * disclosure decision no call site should be able to take by accident.
  */
 function isOwnedTrigger(triggerId, ownedTriggerIds) {
   return ownedTriggerIds === null || ownedTriggerIds.has(triggerId);
@@ -318,24 +320,6 @@ function decideFiring(complication, clauses) {
 }
 
 /**
- * The stage occurrence a firing NAMES: the first, in fire order, whose bucket satisfied one of
- * the matched stage clauses. A firing decided only by a trigger or a condition roll names the
- * component's first non-`skipped` occurrence instead, so the card still points at a row.
- *
- * @param {Array<{resultId: string|null, bucket: string}>} stages
- * @param {Array<string>} matched the matched clause names
- * @returns {{resultId: string|null, bucket: string|null}}
- */
-function namedOccurrence(stages, matched) {
-  const wanted = new Set(matched.flatMap((name) => BUCKETS_BY_STAGE_CONDITION[name] ?? []));
-  const hit =
-    stages.find((stage) => wanted.has(stage.bucket)) ??
-    stages.find((stage) => stage.bucket !== 'skipped') ??
-    stages[0];
-  return { resultId: hit?.resultId ?? null, bucket: hit?.bucket ?? null };
-}
-
-/**
  * @param {object} complication
  * @param {string} activity
  * @returns {boolean} whether the GM enabled this complication for the activity being resolved.
@@ -345,16 +329,33 @@ function appliesToActivity(complication, activity) {
 }
 
 /**
- * Every firing one component contributes, in authored complication order, at most one per
- * `(componentId, complicationId)`.
+ * Every firing ONE result entry contributes, in authored complication order.
  *
- * @param {object} entry the grouped component
+ * The entry is the unit. Its own bucket decides its stage clauses, its own id is what each
+ * firing names, and its `buckets` list is that one bucket — a list only because the persisted
+ * shape and the two projections have always carried a list, never because an entry can be in
+ * two buckets.
+ *
+ * Two guards refuse an entry outright, and both are total rather than per complication:
+ * an entry naming no component has nothing to read complications off, and a `skipped` entry is
+ * a stage the award loop refused rather than an outcome, so a firing attributed to it would
+ * report a consequence for an award that never happened. That second guard also covers the
+ * id-less entry, which {@link bucketFor} classifies as `skipped` for the same reason.
+ *
+ * The one dedupe is `seen`, scoped to THIS entry and keyed on `complicationId` alone: a
+ * component authoring the same complication id twice fires it once here. It is emphatically
+ * not a `(componentId, complicationId)` key — that key spans entries, and spanning entries is
+ * what the ruling this module implements removed.
+ *
+ * @param {{resultId: string|null, componentId: string|null, component: object|null,
+ *   complications: Array<object>, bucket: string, position: number}} entry one classified
+ *   result entry
  * @param {object} ctx `{ activity, resolutionId, matchedTriggerIds, ownedTriggerIds }`
  * @returns {Array<object>}
  */
-function componentFirings(entry, ctx) {
-  const facts = stageFacts(entry.stages);
-  const buckets = distinctBuckets(entry.stages);
+function entryFirings(entry, ctx) {
+  if (!entry.componentId || entry.bucket === 'skipped') return [];
+  const facts = stageFacts(entry.bucket);
   const firings = [];
   const seen = new Set();
   for (const complication of entry.complications) {
@@ -365,7 +366,6 @@ function componentFirings(entry, ctx) {
     const decision = decideFiring(complication, clauses);
     if (!decision) continue;
     seen.add(complicationId);
-    const occurrence = namedOccurrence(entry.stages, decision.matched);
     firings.push({
       activity: ctx.activity,
       resolutionId: ctx.resolutionId,
@@ -373,9 +373,14 @@ function componentFirings(entry, ctx) {
       componentName: text(entry.component?.name),
       complicationId,
       complication,
-      resultId: occurrence.resultId,
-      bucket: occurrence.bucket,
-      buckets,
+      resultId: entry.resultId,
+      // The entry's place in the ordered list, carried so a player-facing output can name
+      // WHICH occurrence fired without re-deriving an order it does not hold (issue 1286).
+      // `resultId` already identifies the occurrence, but it is an opaque id: it keeps two
+      // firings apart in a dedupe key and tells a player nothing.
+      position: entry.position,
+      bucket: entry.bucket,
+      buckets: [entry.bucket],
       matchedConditions: decision.matched,
       needsDice: decision.needsDice,
     });
@@ -437,8 +442,12 @@ export function planComplications({
     matchedTriggerIds: idSet(matchedTriggerIds),
     ownedTriggerIds: checkTriggerIds === null ? null : idSet(checkTriggerIds),
   };
-  for (const entry of groupByComponent(classified).values()) {
-    plan.firings.push(...componentFirings(entry, ctx));
+  // Fire order IS stage order: the player's reordered list for crafting, the order captured
+  // onto the run at start for salvage, the authored order for gathering. A per-component
+  // grouping pass used to sit here and it is gone — nothing left reads a component's other
+  // occurrences, so grouping by component could only have reintroduced the collapse.
+  for (const entry of classified) {
+    plan.firings.push(...entryFirings(entry, ctx));
   }
   return plan;
 }
@@ -481,13 +490,21 @@ function visibilityOf(entry) {
  * entirely.
  *
  * The four keys the salvage run record stores (`resultId`, `componentId`, `complicationId`,
- * `buckets`) are a SUBSET of what comes back; the extra three are the authored strings the
- * chat card renders, all of them already player-visible by the `visible` filter above. A
- * caller persisting this may narrow it, and must not widen it.
+ * `buckets`) are a SUBSET of what comes back; the extra four are the authored strings the
+ * chat card renders plus the stage POSITION it names them by, all of them already
+ * player-visible by the `visible` filter above. A caller persisting this may narrow it, and
+ * must not widen it.
+ *
+ * `position` is a player-safe fact by construction: it is where this firing's entry sits in
+ * the list that player is looking at, and discloses nothing about the trigger, the effect
+ * roll or the macro. It is what lets a card distinguish two legitimate firings of ONE
+ * complication on ONE twice-staged component, which `resultId` — an opaque id — cannot do on
+ * screen.
  *
  * @param {Array<object>} fired the runtime's fired list (or a plan's firings)
  * @returns {Array<{resultId: string|null, componentId: string|null, complicationId: string|null,
- *   buckets: Array<string>, name: string, description: string, severity: string}>}
+ *   position: number|null, buckets: Array<string>, name: string, description: string,
+ *   severity: string}>}
  */
 export function publicComplications(fired) {
   return list(fired)
@@ -498,6 +515,10 @@ export function publicComplications(fired) {
         resultId: entry?.resultId ?? null,
         componentId: entry?.componentId ?? null,
         complicationId: entry?.complicationId ?? projected.id,
+        // Null rather than absent for a firing minted before this key existed (a run record
+        // read back, a hand-built fixture), so a renderer tests one thing to decide whether
+        // it can name a position at all.
+        position: Number.isFinite(entry?.position) ? entry.position : null,
         buckets: [...list(entry?.buckets)],
         name: projected.name,
         description: projected.description,
@@ -548,8 +569,8 @@ function canEverFire(complication, ownedTriggerIds) {
  * @returns {Array<{id: string|null, name: string, description: string, severity: string,
  *   visibility: string}>}
  */
-export function forecastComplications(component, { activity, checkTriggerIds = null } = {}) {
-  const ownedTriggerIds = checkTriggerIds === null ? null : idSet(checkTriggerIds);
+export function forecastComplications(component, { activity, checkTriggerIds }) {
+  const ownedTriggerIds = idSet(checkTriggerIds);
   return list(component?.complications)
     .filter((complication) => complication?.visibility === 'visible')
     .filter((complication) => appliesToActivity(complication, activity))

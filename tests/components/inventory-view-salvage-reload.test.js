@@ -36,6 +36,12 @@ const harness = createMountedComponentHarness({
     // are import-free, so copying them verbatim resolves the compiled store's graph.
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
+    // And these three since issue 1286: the store marks the fired complication tense onto
+    // the stage rows through `progressiveStageComplications`, whose own closure is
+    // `complicationPlan` -> `componentComplications`.
+    'src/utils/progressiveStageComplications.js',
+    'src/utils/complicationPlan.js',
+    'src/utils/componentComplications.js',
   ],
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [
@@ -49,6 +55,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
@@ -66,6 +79,9 @@ const harness = createMountedComponentHarness({
     // HANGS this suite (# cancelled), and a speculative entry throws outright.
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
+    // The "What could go wrong" group card (issue 1286). `InventoryBulkPanel` imports it
+    // statically, and it renders the shared `ComplicationSummaryRow` already listed above.
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
