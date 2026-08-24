@@ -49,6 +49,8 @@
   import SegmentedControl from '../SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
   import {
@@ -259,6 +261,31 @@
   const comparatorOptions = $derived(
     PREREQUISITE_OPERATORS.filter((operator) => !isValuelessOperator(operator.id))
   );
+
+  /**
+   * Whether the trigger clause has nothing to offer THIS complication (issue 1286 defect 4).
+   *
+   * The section already knows: `triggerOptions` is built from `checkBreakage.triggers` on the
+   * three PROGRESSIVE check blocks, so an empty array means this system's progressive checks
+   * declare no named trigger and the clause can never be satisfied. Offering it anyway gave a
+   * GM a checkbox that opens an empty picker.
+   *
+   * IT IS NOT SIMPLY `triggerOptions.length === 0`, and the second half is the part worth
+   * stating. A complication that ALREADY names a trigger keeps a persisted value: if the
+   * triggers are later deleted from the check, muting the row would strand that value behind
+   * a disabled control — the row would read as unavailable while `when.checkTrigger` stayed
+   * set, and the GM would have no way to clear it. So a complication with an authored
+   * `checkTrigger` stays live and operable whatever the vocabulary now holds; the picker's
+   * existing "Trigger no longer exists" option names the dangling id, and unchecking the row
+   * is what clears it. The unavailable treatment is for the case where there is nothing
+   * authored AND nothing to author with.
+   *
+   * @param {object} complication The authored complication.
+   * @returns {boolean} `true` when the clause is unavailable and must read as such.
+   */
+  function triggerClauseUnavailable(complication) {
+    return triggerOptions.length === 0 && !complication?.when?.checkTrigger;
+  }
 
   const severityOptions = $derived([
     {
@@ -725,62 +752,101 @@
 
                 <!-- The trigger clause is a TRIGGER ID, never a boolean: "any trigger fires
                      any complication" would silently give every already-authored breakage
-                     trigger a fourth effect in every world that has one. -->
-                <ComplicationEffectRow
-                  control="checkbox"
-                  on={Boolean(complication.when?.checkTrigger)}
-                  icon="fas fa-bolt"
-                  tone="accent"
-                  title={text(
-                    'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Title',
-                    'A named progressive check trigger fires'
-                  )}
-                  detail={text(
-                    'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Detail',
-                    'Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.'
-                  )}
-                  disabled={saving || triggerOptions.length === 0}
-                  dataAttr="data-complication-condition"
-                  dataValue="checkTrigger"
-                  onToggle={(next) =>
-                    setWhen(
-                      complication.id,
-                      'checkTrigger',
-                      next ? triggerOptions[0]?.id || null : null
-                    )}
+                     trigger a fourth effect in every world that has one.
+
+                     UNAVAILABLE IS A STATE OF ITS OWN (issue 1286 defect 4). With no named
+                     trigger anywhere in this system's progressive checks the clause cannot
+                     ever be satisfied, and it used to look and sit in the tab order exactly
+                     like the four conditions above it. The treatment is the one this panel
+                     ALREADY uses for an option a GM may see but cannot use — the Applies-to
+                     chip of a non-progressive activity: `opacity` plus a `title` that says
+                     what is wrong. `opacity` is the prototype's own device and is the one
+                     property that composes with whatever tone the row is already wearing,
+                     which is why the chips use it and why a second `is-*` tone could not.
+
+                     Uninteractable is a REAL `disabled`, never `pointer-events: none`. The
+                     row's `disabled` prop reaches `SelectionCheckbox`'s own `<input>`, so
+                     the control leaves the tab order rather than merely refusing the mouse;
+                     and because the row is off, `ComplicationEffectRow` renders no children
+                     at all, so the picker does not exist to be reached either.
+
+                     The hint is a SIBLING of the row rather than a child of it, so the one
+                     line that has to stay readable is not the line wearing the 0.6. -->
+                <div
+                  class="fab-complication-trigger"
+                  class:is-unavailable={triggerClauseUnavailable(complication)}
+                  data-complication-trigger-clause
+                  title={triggerClauseUnavailable(complication)
+                    ? text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.None',
+                        'This system’s progressive checks name no triggers yet — add one under Checks before a complication can wait on it.'
+                      )
+                    : undefined}
                 >
-                  <select
-                    class="manager-input fab-complication-trigger-select"
-                    value={complication.when?.checkTrigger || ''}
-                    data-complication-trigger
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Select',
-                      'Check trigger'
+                  <ComplicationEffectRow
+                    control="checkbox"
+                    on={Boolean(complication.when?.checkTrigger)}
+                    icon="fas fa-bolt"
+                    tone="accent"
+                    title={text(
+                      'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Title',
+                      'A named progressive check trigger fires'
                     )}
-                    disabled={saving}
-                    onchange={(event) =>
-                      setWhen(complication.id, 'checkTrigger', event.currentTarget.value || null)}
+                    detail={text(
+                      'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Detail',
+                      'Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.'
+                    )}
+                    disabled={saving || triggerClauseUnavailable(complication)}
+                    dataAttr="data-complication-condition"
+                    dataValue="checkTrigger"
+                    onToggle={(next) =>
+                      setWhen(
+                        complication.id,
+                        'checkTrigger',
+                        next ? triggerOptions[0]?.id || null : null
+                      )}
                   >
-                    {#each triggerOptions as option (option.id)}
-                      <option value={option.id}
-                        >{option.label}{option.activity
-                          ? ` · ${activityLabel(option.activity)}`
-                          : ''}</option
-                      >
-                    {/each}
-                    {#if complication.when?.checkTrigger && !triggerLabelById.has(complication.when.checkTrigger)}
-                      <!-- An id that no longer resolves leaves the clause INERT rather than
+                    <select
+                      class="manager-input fab-complication-trigger-select"
+                      value={complication.when?.checkTrigger || ''}
+                      data-complication-trigger
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Select',
+                        'Check trigger'
+                      )}
+                      disabled={saving}
+                      onchange={(event) =>
+                        setWhen(complication.id, 'checkTrigger', event.currentTarget.value || null)}
+                    >
+                      {#each triggerOptions as option (option.id)}
+                        <option value={option.id}
+                          >{option.label}{option.activity
+                            ? ` · ${activityLabel(option.activity)}`
+                            : ''}</option
+                        >
+                      {/each}
+                      {#if complication.when?.checkTrigger && !triggerLabelById.has(complication.when.checkTrigger)}
+                        <!-- An id that no longer resolves leaves the clause INERT rather than
                            becoming a validation error, so the authored value is kept and
                            named instead of being silently rewritten to another trigger. -->
-                      <option value={complication.when.checkTrigger}
-                        >{text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
-                          'Trigger no longer exists'
-                        )}</option
-                      >
-                    {/if}
-                  </select>
-                </ComplicationEffectRow>
+                        <option value={complication.when.checkTrigger}
+                          >{text(
+                            'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
+                            'Trigger no longer exists'
+                          )}</option
+                        >
+                      {/if}
+                    </select>
+                  </ComplicationEffectRow>
+                  {#if triggerClauseUnavailable(complication)}
+                    <p class="fab-complication-trigger-hint" data-complication-trigger-hint>
+                      {text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.None',
+                        'This system’s progressive checks name no triggers yet — add one under Checks before a complication can wait on it.'
+                      )}
+                    </p>
+                  {/if}
+                </div>
 
                 <ComplicationEffectRow
                   control="checkbox"
@@ -799,63 +865,119 @@
                   dataAttr="data-complication-roll-condition"
                   onToggle={(next) => setNested(complication.id, 'rollCondition', 'enabled', next)}
                 >
-                  <input
-                    class="manager-input fab-complication-expression"
-                    type="text"
-                    value={complication.rollCondition?.expr || ''}
-                    data-complication-roll-condition-expr
-                    placeholder="2d6 + @abilities.int.mod"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Expression',
-                      'Condition dice expression'
-                    )}
-                    disabled={saving}
-                    oninput={(event) =>
-                      setNested(
-                        complication.id,
-                        'rollCondition',
-                        'expr',
-                        event.currentTarget.value
+                  <!-- ONE LINE, and it needs a row of its own (issue 1286 defect 1).
+
+                       `.fab-complication-effect-reveal` is a WRAPPING flex strip, which is
+                       right for the trigger clause (one control) and for the effect roll
+                       (two), and wrong here: a comparator select's own intrinsic width is
+                       set by its widest option, and under `appearance: base-select` it
+                       resolves `width: auto` against its containing block rather than to
+                       max-content, so the select alone took the full 898px line and pushed
+                       the expression and the comparand onto lines of their own. The three
+                       fields are ONE sentence — "2d6 + @int ≥ 12" — so they get a nowrap
+                       sub-row that occupies one full line of the strip, and the comparator
+                       is given an explicit basis rather than an intrinsic one.
+
+                       THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT rather
+                       than an omission. The manager root is a container-query context, so
+                       one was the obvious reach — but this panel bottoms out: driven from a
+                       1280px manager down to 600px, the strip narrows to 534px and stops,
+                       because the pane carries its own floor. The row's content floor is
+                       260 + 156 + 104 + two 7px gaps = the same 534px, with `min-width: 0`
+                       on every child so it shrinks rather than overflows (measured
+                       `scrollWidth - clientWidth === 0` at 1280/900/760/700/660/600). A
+                       `@container fabricate-manager (max-width: 680px)` rule was written
+                       first and then removed: it fires at a width where the row still has
+                       room, and wrapping there put the three fields on THREE lines rather
+                       than the two it was meant to produce — a worse layout answering a
+                       squeeze that does not happen. -->
+                  <div class="fab-complication-condition-row">
+                    <input
+                      class="manager-input fab-complication-expression"
+                      type="text"
+                      value={complication.rollCondition?.expr || ''}
+                      data-complication-roll-condition-expr
+                      placeholder="2d6 + @abilities.int.mod"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Expression',
+                        'Condition dice expression'
                       )}
-                  />
-                  <!-- The SIX numeric comparators, filtered off the shared prerequisite
-                       table by `isValuelessOperator` rather than hand-listed: a dice total
-                       has no boolean or existence reading, and an `exists` offered against
-                       a roll total is a complication that always fires. -->
-                  <select
-                    class="manager-input fab-complication-comparator"
-                    value={complication.rollCondition?.cmp || ''}
-                    data-complication-roll-condition-cmp
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Comparator',
-                      'Comparison'
-                    )}
-                    disabled={saving}
-                    onchange={(event) =>
-                      setNested(complication.id, 'rollCondition', 'cmp', event.currentTarget.value)}
-                  >
-                    {#each comparatorOptions as operator (operator.id)}
-                      <option value={operator.id}>{operator.symbol} · {operator.label}</option>
-                    {/each}
-                  </select>
-                  <input
-                    class="manager-input fab-complication-comparand"
-                    type="text"
-                    value={complication.rollCondition?.value ?? ''}
-                    data-complication-roll-condition-value
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Value',
-                      'Compare against'
-                    )}
-                    disabled={saving}
-                    oninput={(event) =>
-                      setNested(
-                        complication.id,
-                        'rollCondition',
-                        'value',
-                        event.currentTarget.value
+                      disabled={saving}
+                      oninput={(event) =>
+                        setNested(
+                          complication.id,
+                          'rollCondition',
+                          'expr',
+                          event.currentTarget.value
+                        )}
+                    />
+                    <!-- The SIX numeric comparators, filtered off the shared prerequisite
+                         table by `isValuelessOperator` rather than hand-listed: a dice total
+                         has no boolean or existence reading, and an `exists` offered against
+                         a roll total is a complication that always fires. -->
+                    <select
+                      class="manager-input fab-complication-comparator"
+                      value={complication.rollCondition?.cmp || ''}
+                      data-complication-roll-condition-cmp
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Comparator',
+                        'Comparison'
                       )}
-                  />
+                      disabled={saving}
+                      onchange={(event) =>
+                        setNested(
+                          complication.id,
+                          'rollCondition',
+                          'cmp',
+                          event.currentTarget.value
+                        )}
+                    >
+                      {#each comparatorOptions as operator (operator.id)}
+                        <option value={operator.id}>{operator.symbol} · {operator.label}</option>
+                      {/each}
+                    </select>
+                    <!-- The comparand is a SIGNED INTEGER STEPPER, not a bare field (issue
+                         1286 defect 3). `min`/`max` are left at the primitive's own `null`
+                         precisely so the field stays signed: a complication that fires when
+                         a modified roll comes out at `-1` is a legitimate authoring, and any
+                         bound here would be a rule this section has no basis to invent.
+
+                         `allowUnset` because absence is REAL in the persisted shape — the
+                         normalizer's `text()` renders an unauthored comparand as `''`, and
+                         without it a fresh complication would show a comparand of `0` that
+                         nobody typed. The commit maps back through `String(next)` / `''`,
+                         so the field stays a string on the way out: `componentComplications`
+                         records that the comparand is stored as text, and the operator
+                         vocabulary stays the word tokens (`neq`, never `ne`).
+
+                         A `<div>` wrapper rather than a `<label>`: see the NAMING contract in
+                         `Stepper.svelte` — a `<label>` binds to its first labelable
+                         descendant, which here is the `−` button, so clicking the caption
+                         would DECREMENT. The name arrives through `stepperLabels`. -->
+                    <div class="fab-complication-comparand">
+                      <Stepper
+                        value={complication.rollCondition?.value ?? ''}
+                        step={1}
+                        allowUnset
+                        fill
+                        disabled={saving}
+                        {...stepperLabels(
+                          text(
+                            'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Value',
+                            'Compare against'
+                          )
+                        )}
+                        inputProps={{ 'data-complication-roll-condition-value': '' }}
+                        onChange={(next) =>
+                          setNested(
+                            complication.id,
+                            'rollCondition',
+                            'value',
+                            next === null ? '' : String(next)
+                          )}
+                      />
+                    </div>
+                  </div>
                 </ComplicationEffectRow>
               </div>
             </div>
@@ -1216,14 +1338,79 @@
     font-size: 11.5px;
   }
 
-  .fab-complication-comparator {
-    flex: 0 0 auto;
+  /* THE DICE-CONDITION SENTENCE, on one line (issue 1286 defect 1).
+
+     `nowrap` and `flex: 1 1 100%` together: the basis makes this take a whole line of the
+     wrapping reveal strip above it, and the nowrap keeps its own three fields on that line.
+     `min-width: 0` on every child is what lets them shrink there rather than overflow — the
+     comparator's intrinsic width is its widest option ("≥ · at least"), which is a floor a
+     flex item only drops below when its automatic minimum size is released. */
+  .fab-complication-condition-row {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    gap: 7px;
+    align-items: center;
+    min-width: 0;
   }
 
+  /* An EXPLICIT basis, not `0 0 auto`. Under `appearance: base-select` a select is an
+     ordinary flex container, and `width: auto` on one resolves against its containing block
+     rather than to max-content — measured at the full 898px of the strip, which is what put
+     the other two fields on lines of their own. The width is the six comparator options'
+     own measure plus the picker icon; `flex-shrink: 1` lets it give ground first when the
+     panel narrows, because a truncated "at least" is still readable and a truncated dice
+     expression is not.
+
+     `min-height` matches the free-text baseline's 34px rather than inheriting a height. The
+     select baseline in `styles/fabricate.css` is deliberately PAINT-ONLY — manager selects
+     run 28/32/36px by context and a global floor would grow all of them — so a row that
+     needs its select flush with its inputs says so here. */
+  .fab-complication-comparator {
+    flex: 0 1 156px;
+    min-width: 0;
+    min-height: 34px;
+  }
+
+  /* The comparand SLOT. The Stepper is `fill`, so it needs a slot with an intrinsic width to
+     resolve `100%` against — see the `fill` note in `Stepper.svelte`, which records that
+     dropping `fill` does not fix an unsized slot either.
+
+     `--fab-stepper-fill-height` is how the primitive takes a SIZE from its layout context,
+     which its own CSS note permits (a layout context may set the height; what it must never
+     restyle is the primitive's font, border, radius or fill). 34px is the height the
+     expression input and the comparator beside it both stand at, which is the maintainer's
+     requirement that the three controls agree. */
   .fab-complication-comparand {
-    flex: 0 0 72px;
-    font-family: var(--fab-font-mono);
-    text-align: center;
+    --fab-stepper-fill-height: 34px;
+
+    flex: 0 0 104px;
+    min-width: 0;
+  }
+
+  /* The trigger clause's UNAVAILABLE state (issue 1286 defect 4).
+
+     `opacity`, copied from the Applies-to chips' not-progressive treatment a few rules up,
+     because this panel now has two "you may see it and cannot use it" states and they must
+     read as the same thing. The child combinator off this scoped wrapper is what bounds the
+     `:global` to this one row — `ComplicationEffectRow` declares no `opacity` of its own, so
+     there is no cascade fight here, exactly as with the chips.
+
+     It is applied to the ROW and not to the wrapper, so the hint paragraph beside it keeps
+     full contrast: the one line that explains the state must not be dimmed by it. */
+  .fab-complication-trigger.is-unavailable > :global(.fab-complication-effect) {
+    opacity: 0.6;
+  }
+
+  /* Indented to the reveal strip's own 24px, so it hangs under the row's copy rather than
+     under its checkbox. Subtle rather than the macro card's warning tone: nothing has gone
+     wrong here — the system simply has not been given triggers yet — and the chips' own
+     "· not progressive" note is the precedent for that colour. */
+  .fab-complication-trigger-hint {
+    margin: 6px 0 0 24px;
+    color: var(--fab-text-subtle);
+    font-size: 9.5px;
+    line-height: 1.45;
   }
 
   .fab-complication-trigger-select {

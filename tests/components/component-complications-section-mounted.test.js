@@ -76,6 +76,9 @@ const harness = createMountedComponentHarness({
     'src/utils/complicationSummary.js',
     'src/utils/macroReference.js',
     'src/systems/characterPrerequisites.js',
+    // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
+    // (issue 1050). The roll condition's comparand reaches it (issue 1286).
+    'src/ui/svelte/components/stepperLabels.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -87,6 +90,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
+    // The roll condition's comparand is the shared signed-integer stepper (issue 1286).
+    // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite
+    // does not fail, it HANGS and is reported as `# cancelled`.
+    'src/ui/svelte/components/Stepper.svelte',
     sectionPath,
   ],
   componentPath: sectionPath,
@@ -583,6 +590,155 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       [...select.options].map((option) => option.value),
       ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'],
       'a dice total has no boolean or existence reading, and `exists` would always fire'
+    );
+  });
+
+  /** Open the one row and reveal the dice-condition strip, which renders only while it is ON. */
+  async function openRollCondition(value = '1') {
+    const { target, emitted } = await mountSection({
+      complications: [
+        complication({ rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value } }),
+      ],
+    });
+    await openFirstRow(target);
+    return { target, emitted };
+  }
+
+  it('draws the comparand as the shared Stepper, still typeable, and commits a STRING', async () => {
+    // The primitive's whole point is that its input stays a real field — a click-only stepper
+    // is a keyboard regression, and its own header says so. What THIS call site has to get
+    // right is the boundary: `Stepper` speaks numbers, the persisted comparand is text (it is
+    // `text()`-coerced by `authoredComplications`), so a commit that leaked a number through
+    // would change the persisted shape while every visible thing still looked right.
+    const { target, emitted } = await openRollCondition();
+    const input = target.querySelector('[data-complication-roll-condition-value]');
+    assert.ok(Boolean(input), 'the hook rides `inputProps` onto the real input, not the wrapper');
+    assert.equal(input.tagName, 'INPUT', 'and it is the typeable control, never the wrapper div');
+    assert.equal(input.type, 'number');
+    assert.equal(input.step, '1', 'integer steps');
+    assert.ok(
+      Boolean(target.querySelector('[data-stepper-decrement]')),
+      'the −/+ adjuncts are there too — they are adjuncts to the field, not a replacement'
+    );
+
+    input.value = '12';
+    input.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.equal(emitted.at(-1)[0].rollCondition.value, '12', 'a string, as the normalizer emits');
+    assert.equal(typeof emitted.at(-1)[0].rollCondition.value, 'string');
+  });
+
+  it('lets the comparand go NEGATIVE, because a modified roll can', async () => {
+    // `min`/`max` are left at the primitive's own `null` deliberately. A complication that
+    // fires when a heavily penalised total lands at or below `-1` is legitimate authoring, and
+    // a `min={0}` here would be a rule this section has no basis to invent — it would also
+    // clamp silently rather than refusing, so nothing would say the value had been rewritten.
+    const { target, emitted } = await openRollCondition();
+    const input = target.querySelector('[data-complication-roll-condition-value]');
+    assert.equal(input.min, '', 'no lower bound is declared at all');
+    assert.equal(input.max, '', 'nor an upper one');
+
+    input.value = '-1';
+    input.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.equal(emitted.at(-1)[0].rollCondition.value, '-1', 'the sign survives the round trip');
+  });
+
+  it('keeps the comparator, the expression and the comparand in ONE row element', async () => {
+    // The defect was three fields on three lines. `.fab-complication-effect-reveal` is a
+    // WRAPPING strip — right for the rows with one or two controls, wrong for a three-part
+    // sentence — so the sentence gets its own nowrap row inside it. A mounted test cannot
+    // measure the layout, but it CAN pin that the three fields share one parent and that the
+    // parent is the rule that says `nowrap`; without that they are back to being three
+    // independent flex items in a wrapping strip.
+    const { target } = await openRollCondition();
+    const row = target.querySelector('.fab-complication-condition-row');
+    assert.ok(Boolean(row), 'the sentence has a row of its own');
+    for (const hook of [
+      '[data-complication-roll-condition-expr]',
+      '[data-complication-roll-condition-cmp]',
+      '[data-complication-roll-condition-value]',
+    ]) {
+      assert.ok(row.querySelector(hook), `${hook} is inside it`);
+    }
+    assert.match(
+      blockIn(sectionSource, '.fab-complication-condition-row'),
+      /flex-wrap:\s*nowrap/,
+      'and the row does not wrap, which is what puts them on one line'
+    );
+    assert.match(
+      blockIn(sectionSource, '.fab-complication-comparand'),
+      /--fab-stepper-fill-height:\s*34px/,
+      'the Stepper takes the row height from its layout context — 34px, the inputs beside it'
+    );
+  });
+
+  it('mutes the trigger clause and makes it UNINTERACTABLE when the system names no triggers', async () => {
+    // Defect 4. `disabled` is a real attribute rather than `pointer-events: none`, because the
+    // latter leaves the control in the tab order and reachable by keyboard — a worse bug than
+    // the one being fixed. The muting itself copies the Applies-to chips' not-progressive
+    // treatment, which is the panel's existing answer to "visible but unusable".
+    const { target } = await mountSection({
+      complications: [complication()],
+      triggerOptions: [],
+    });
+    await openFirstRow(target);
+    const wrapper = target.querySelector('[data-complication-trigger-clause]');
+    assert.ok(wrapper.classList.contains('is-unavailable'), 'the clause reads as unavailable');
+    assert.equal(
+      target.querySelector('[data-complication-condition="checkTrigger"] input[type="checkbox"]')
+        .disabled,
+      true,
+      'a real `disabled`, so the checkbox leaves the tab order rather than merely ignoring a click'
+    );
+    assert.ok(
+      !target.querySelector('[data-complication-trigger]'),
+      'and with the row off there is no empty picker to reach either'
+    );
+    assert.match(
+      target.querySelector('[data-complication-trigger-hint]').textContent,
+      /add one under Checks/,
+      'the GM is told what to do about it'
+    );
+    assert.match(
+      blockIn(sectionSource, '.fab-complication-trigger.is-unavailable > :global(.fab-complication-effect)'),
+      /opacity:\s*0\.6/,
+      '`opacity` is the chips’ own device, and the one property that composes with the row’s tone'
+    );
+  });
+
+  it('leaves an ALREADY-NAMED trigger operable after its vocabulary empties', async () => {
+    // The other half of defect 4, and the reason the predicate is not simply
+    // `triggerOptions.length === 0`. A complication that already names a trigger carries a
+    // persisted value; muting the row would strand it behind a disabled control — the row
+    // would read as unavailable while `when.checkTrigger` stayed set, and nothing could clear
+    // it. So this case stays live, the picker names the dangling id, and unchecking clears it.
+    const { target } = await mountSection({
+      complications: [
+        complication({
+          when: {
+            stageAwarded: false,
+            stagePartial: false,
+            stageMissed: false,
+            checkTrigger: 'gone',
+          },
+        }),
+      ],
+      triggerOptions: [],
+    });
+    await openFirstRow(target);
+    const wrapper = target.querySelector('[data-complication-trigger-clause]');
+    assert.ok(!wrapper.classList.contains('is-unavailable'), 'not muted — it has a value');
+    assert.ok(!target.querySelector('[data-complication-trigger-hint]'), 'and no add-one hint');
+    const box = target.querySelector(
+      '[data-complication-condition="checkTrigger"] input[type="checkbox"]'
+    );
+    assert.equal(box.checked, true, 'the row shows the persisted value rather than reading unset');
+    assert.equal(box.disabled, false, 'and stays operable, so the stale value can be cleared');
+    assert.match(
+      target.querySelector('[data-complication-trigger]').textContent,
+      /Trigger no longer exists/,
+      'the dangling id is named rather than silently rewritten'
     );
   });
 

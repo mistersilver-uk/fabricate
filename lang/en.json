@@ -2626,7 +2626,8 @@
                 "Title": "A named progressive check trigger fires",
                 "Detail": "Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.",
                 "Select": "Check trigger",
-                "Unknown": "Trigger no longer exists"
+                "Unknown": "Trigger no longer exists",
+                "None": "This system\u2019s progressive checks name no triggers yet \u2014 add one under Checks before a complication can wait on it."
               }
             },
             "RollCondition": {
