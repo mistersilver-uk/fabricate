@@ -146,9 +146,9 @@ const { value: VALUE, method: METHOD, accessor: ACCESSOR } = COMPANION_MEMBER_KI
  * stop the call — only the deviation being written down.
  *
  * NEW ROWS ARE APPENDED, never interleaved (issue 1293). `getCraftingEngine().findComponentItems`
- * is named as "the eighth member" by four sites in two files — `tests/companion-facade.test.js`
- * and `tests/companion-contract.test.js` — and inserting a row above it would falsify all four
- * without any assertion noticing.
+ * is named as "the eighth member" at four sites — twice in `tests/companion-facade.test.js`,
+ * once in `tests/companion-contract.test.js`, and once HERE — and inserting a row above it would
+ * falsify all four without any assertion noticing.
  */
 export const COMPANION_MEMBERS = Object.freeze(
   [
