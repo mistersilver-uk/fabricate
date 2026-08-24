@@ -109,6 +109,9 @@ It shows under **Custom** with its own value, and it is never rounded to the nea
 
 When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
 
+When the resolution mode is Progressive, each stage row also shows a read-only strip for any complications authored on that stage's own component.
+See [Complications]({% link complications.md %}) to author them.
+
 ## Salvaging From the Inventory Tab
 
 Players salvage from the **Inventory** tab of the Fabricate window.
@@ -152,7 +155,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
 | Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
-| Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**. |
+| Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**, plus a strip for any complications you told the player about. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
 | Simple, with a component left holding more than one result group | **Salvage isn't ready**, with a line saying the component has more than one result group and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single group and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
 
@@ -193,7 +196,8 @@ Pressing Escape clears the whole selection.
 Once at least one item is selected, the inspector shows the bulk panel instead of a single item's detail.
 The panel sorts the selection into two lists:
 
-- **Will be broken down** lists every selected item that can be salvaged, together with a **Best case** preview of what the whole batch could recover if every roll went well.
+- **Will be broken down** lists every selected item that can be salvaged, together with a **Best case** preview of what the whole batch could recover if every roll went well, and a **What could go wrong** card for any queued component whose progressive stages carry a complication.
+  See [Complications]({% link complications.md %}).
 - **Skipped** lists everything in the selection that cannot be salvaged, each with the reason why: it is an essence, it is a book or scroll, salvage is turned off for it, your GM has not finished configuring its salvage setup, a required tool is not available, or you hold none of it.
   Skipped items are never removed from your inventory.
   You can remove any single item from either list before committing, or use **Clear** to empty the whole selection.
@@ -288,3 +292,5 @@ The recipe crafting check works similarly to salvage checks.
 See also consumption-on-failure policies.
 - [Tools]({% link tools.md %}).
 Configure the requirement, breakage, and on-break behaviour of tools required during salvage.
+- [Complications]({% link complications.md %}).
+Author what goes wrong when a progressive salvage stage produces a component.

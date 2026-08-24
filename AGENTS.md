@@ -758,6 +758,11 @@ Do not conflate the two: reading the setting warns once per session; the truthy 
 An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on `CONFIG.ChatMessage.modes[mode]` being undefined.
 Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
 This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
+- **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
+On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
+On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
+So `i18n.format(key, data)` in `src/ui/svelte/util/foundryBridge.js` is correct on both supported builds today, but "modernising" it to `i18n.localize(key, data)` would silently break on V13.351, where `localize` ignores a second argument.
+Do not collapse the two calls into one without re-checking both builds' declared signatures.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

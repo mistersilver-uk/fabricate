@@ -503,6 +503,8 @@ Below the identity strip you set the component's **Category**, its tags, its ess
 When the system's recipe resolution mode is Progressive, a **Progressive difficulty** card appears for setting the value spent against the crafting roll.
 See [Setting Component Difficulty]({% link recipes/progressive.md %}#setting-component-difficulty).
 For the salvage panel, see [Component Salvage]({% link salvage.md %}#component-salvage).
+Once at least one activity in your system resolves progressively, a **Complications** section also appears for authoring the consequences that fire when this component is produced by a progressive result.
+See [Complications]({% link complications.md %}).
 
 ---
 

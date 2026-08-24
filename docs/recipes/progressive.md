@@ -61,6 +61,9 @@ That is the lowest check value that reaches the stage, taking the earlier stages
 It is not a plain running total of the difficulties above it, because each award mode spends the check value differently.
 A stage whose component has no valid difficulty is never produced, so it shows no **Reached at** value rather than a misleading one.
 
+A stage also shows a **This can go wrong** strip when its own component carries a complication you chose to tell the player about.
+See [Complications]({% link complications.md %}) for how to author one.
+
 ## Player Result Re-ordering
 
 Each recipe carries an **Allow player result re-ordering** setting, which you author on the recipe's **Results** tab.
@@ -126,3 +129,4 @@ Progressive mode is ideal when:
 - [Multi-Step Recipes]({% link recipes/multi-step.md %}): combine multiple steps into a single recipe workflow.
 - [Crafting Checks]({% link crafting-checks.md %}): configure the progressive check roll formula.
 - [Recipes overview]({% link recipes/index.md %}): compare all resolution modes side by side.
+- [Complications]({% link complications.md %}): author what goes wrong when a stage is produced.
