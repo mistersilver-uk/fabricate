@@ -269,9 +269,11 @@
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}
-                <!-- Ghost (issue 1118, row 21). One deep link per issue row, in a list
-                     whose severity chip is the loud thing; a solid control on every row
-                     would out-shout the severities the list exists to rank. -->
+                <!-- Ghost (issue 1118, row 21). The quiet NAVIGATIONAL verb of
+                     `ui-integration/spec.md` — it moves the GM to the record and changes
+                     nothing. One per issue row, in a list whose SEVERITY CHIP is the loud
+                     thing: a solid control repeated down every row out-shouts the ranking
+                     the list exists to present. -->
                 <ManagerButton
                   role="ghost"
                   class="manager-system-overview-link"

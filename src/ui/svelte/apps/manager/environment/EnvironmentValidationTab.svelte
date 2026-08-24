@@ -145,6 +145,10 @@
                        declared NOTHING for it in any theme, so it was a test selector
                        wearing a style class's clothes, and it named neither the verb nor
                        the record it opens. -->
+                  <!-- Ghost (issue 1118, row 44), for the reason the system overview's
+                       identical deep link is: the quiet NAVIGATIONAL verb of
+                       `ui-integration/spec.md`, beside a severity chip that is meant to
+                       carry the row's weight. -->
                   <ManagerButton
                     role="ghost"
                     data-environment-issue-action={issue.recordKind}
