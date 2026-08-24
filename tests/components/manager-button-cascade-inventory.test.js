@@ -16,11 +16,42 @@
  * measuring. `tests/helpers/manager-button-cascade.js` derives the set by construction from
  * the real sheet, the real compiled scoped component sheets, and the real markup.
  *
- * ── IT IS A GUARD, NOT JUST A REPORT ─────────────────────────────────────────────────────
+ * ── IT IS A GUARD, AND IT GUARDS A NARROWER THING THAN IT LOOKS ──────────────────────────
  * The shape is `tests/components/mounted-harness-primitive-allowlist.test.js`'s: a reviewed
- * list held next to a mechanically derived one, asserted equal. A rule added to the sheet
- * later — by this sweep or by anything else — lands in the derived set, misses the reviewed
- * list, and REDS the gate instead of shipping a silent repaint.
+ * list held next to a mechanically derived one, asserted equal.
+ *
+ * BE PRECISE ABOUT WHAT ENTERS THE DERIVED SET, because this docblock used to claim more than
+ * the file delivers and a reviewer proved it by experiment: append a fresh
+ * `.fabricate-manager .manager-header-actions .manager-button.is-ghost { font-size: 3rem }`
+ * to the sheet and BOTH guards stay green. A NEW RULE does not red this gate. The instrument
+ * finds a call site by the literal `class="manager-button…"`, task 9 removed the last of
+ * those, so `convertingSites` is empty and `atRisk` is empty BY CONSTRUCTION — a new rule
+ * derives no candidate to be missing from the reviewed list.
+ *
+ * What the derived ⊆ reviewed half actually catches is a RETURNING RAW SITE: a hand-written
+ * `class="manager-button"` re-entering `src/`, which re-populates the site set, makes rules
+ * at risk again, and reds on the ones nobody has reviewed. That is a real regression class
+ * and worth guarding; it is simply not the same one.
+ *
+ * WHAT FORWARD COVER THERE IS COMES FROM TWO OTHER PLACES, and neither is here:
+ *  - the `convertedReach` re-derivation below, which walks the real tree per reviewed entry,
+ *    so a rule whose reach changes reds even with no literal sites left; and
+ *  - `manager-layout.test.js`'s disabled-invariant probe, which DERIVES its container list
+ *    from the sheet and renders all six roles in every one of them, so an ancestor-context
+ *    rule added later is measured in a real browser with no edit there. That probe is what
+ *    caught the two container rules beating `.manager-button:disabled` after this instrument
+ *    had scored both of them and reported neither.
+ *
+ * That probe covers ONE invariant — the disabled paint is role- and container-independent —
+ * and the 3rem experiment above is deliberately outside it, because container GEOMETRY
+ * legitimately varies: the drop inspector's stack states 28px, the Checks Studio's preset row
+ * 30px, and a probe asserting one height everywhere would be asserting a rule the design does
+ * not hold. Re-run the mutation against that probe and it stays green too. So the honest
+ * position is that a new ancestor-context rule stating a NEW GEOMETRY has no automated cover
+ * in this repository today; a new one stating resting PAINT does.
+ *
+ * The honest summary is the one the TERMINAL STATE section below already gives; this heading
+ * used to contradict it two paragraphs earlier.
  *
  * ── THE DISPOSITIONS ─────────────────────────────────────────────────────────────────────
  * - `RECHAIN`  — at risk on a converting site. Re-chain it above the primitive or retire it.
@@ -807,7 +838,10 @@ test('the reviewed cascade list has no duplicate entry', () => {
  * pass over nothing in both directions at once and keep reporting itself satisfied forever.
  *
  * So the two halves are asserted against different things:
- *  - derived ⊆ reviewed keeps its teeth unchanged, and is the half that catches a NEW rule;
+ *  - derived ⊆ reviewed keeps its teeth unchanged, and is the half that catches a returning
+ *    raw SITE — a `class="manager-button"` literal re-entering `src/` — and NOT a new rule,
+ *    which derives no candidate at all while the derived set is empty. See the docblock at
+ *    the head of this file for what does cover a new rule.
  *  - reviewed ⊆ derived is replaced by the obligation each entry now carries — either it still
  *    derives at risk, or it names a `convertedReach` this file re-derives from the tree.
  */
