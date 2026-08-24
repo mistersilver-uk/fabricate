@@ -29,6 +29,7 @@
 <script>
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -712,33 +713,30 @@
       still clearly a real, full-width action rather than a demoted afterthought.
     -->
     <div class="manager-recipe-browser-inspector-actions">
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-duplicate"
+      <ManagerButton
+        class="manager-recipe-browser-inspector-duplicate"
         data-recipe-action="duplicate"
         onclick={() => onDuplicate()}
       >
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
-      </button>
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-edit"
+      </ManagerButton>
+      <ManagerButton
+        class="manager-recipe-browser-inspector-edit"
         data-recipe-action="edit"
         onclick={() => onEdit()}
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-      </button>
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-delete"
+      </ManagerButton>
+      <ManagerButton
+        class="manager-recipe-browser-inspector-delete"
         data-recipe-action="delete"
         onclick={() => onDelete()}
       >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-      </button>
+      </ManagerButton>
     </div>
   </section>
 {:else if recipeCount === 0}
@@ -815,7 +813,7 @@
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}
     >
       {#if componentCount <= 0}
-        <button type="button" class="manager-button is-primary" onclick={() => onAddComponents()}>
+        <ManagerButton role="primary" onclick={() => onAddComponents()}>
           <i class="fas fa-boxes" aria-hidden="true"></i>
           <span
             >{text(
@@ -823,26 +821,24 @@
               'Add components'
             )}</span
           >
-        </button>
+        </ManagerButton>
       {/if}
-      <a
-        class="manager-button"
+      <ManagerButton
+        tag="a"
         href="https://mistersilver-uk.github.io/fabricate/recipes"
         target="_blank"
-        rel="noreferrer"
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
-      </a>
-      <a
-        class="manager-button"
+      </ManagerButton>
+      <ManagerButton
+        tag="a"
         href="https://mistersilver-uk.github.io/fabricate/quickstart"
         target="_blank"
-        rel="noreferrer"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
-      </a>
+      </ManagerButton>
     </div>
   </section>
 {:else}

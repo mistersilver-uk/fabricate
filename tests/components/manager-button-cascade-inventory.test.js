@@ -119,6 +119,29 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte', sites: 1 }),
     ]),
   }),
+  Object.freeze({
+    task: 7,
+    files: Object.freeze([
+      // 14 sites across the two library inspectors and the four shared shells — 11
+      // `<button>` and 3 `<a href>`. Two carried a forgotten `danger`: the Delete at the foot
+      // of each inspector's stacked action column.
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
+        sites: 6,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
+        sites: 4,
+      }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte', sites: 1 }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte', sites: 1 }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+        sites: 1,
+      }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),
+    ]),
+  }),
 ]);
 
 // Code point, not `localeCompare`, for the same reason `sourceScan.js` gives: locale-dependent
@@ -147,14 +170,21 @@ const REVIEWED = [
   // Task 4 reconciled `styles/fabricate.css` and owns nothing else, so these three are the
   // only RECHAIN entries left: each is authored inside the component it styles, and each
   // travels with that component's conversion rather than with the sheet.
-  {
-    id: scopedRule('BulkEditPanelShell.svelte', '.fab-bulk-edit-apply'),
-    disposition: 'RECHAIN',
-    why:
-      'The bulk-apply button at (0,2,0) loses min-height 38px and font-size 0.78rem outright, ' +
-      'against a source comment forbidding exactly that because the control swaps slots with ' +
-      'the inspector primary. Scoped to `BulkEditPanelShell.svelte`; converts with it.',
-  },
+  // `BulkEditPanelShell.svelte`'s `.fab-bulk-edit-apply` was the sharpest of these and is
+  // DISCHARGED (issue 1118, task 7). At (0,2,0) it lost min-height 38px and font-size 0.78rem
+  // outright, against a source comment forbidding exactly that because Apply swaps slots with
+  // the inspector's primary. It converted with its component and is now
+  // `:global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply)` —
+  // (0,4,0), so it beats the primitive on specificity — and its key compound demands
+  // `fab-manager-button`, which makes it a PRIMITIVE rule here rather than a candidate.
+  //
+  // The `:global()` half is the part this instrument could NOT have told anyone, and it is
+  // worth recording where the next batch will look: a SCOPED rule cannot reach a converted
+  // button at all, whatever its specificity, because Svelte stamps its hash onto the elements
+  // a component writes and not onto a child component's internals. That is a reach question
+  // rather than a cascade question, so it has its own guard —
+  // `tests/components/manager-button-scoped-class-reach.test.js` — which found the same
+  // mistake already shipped in `GatheringEconomyView`'s discharge above.
   // `GatheringEconomyView.svelte`'s `.manager-economy-bulk-save` was the third of these and is
   // DISCHARGED (issue 1118, task 6). It converted with its component and its scoped selector was
   // re-chained onto `.manager-button.fab-manager-button.is-primary`, which compiles to (0,5,0)
@@ -409,9 +439,27 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-setup-links .manager-button'),
     disposition: 'NO_CONFLICT',
+    // The sweep has now converted EVERY site this rule reaches, so the instrument can no
+    // longer see one: it finds a site by the literal `class="manager-button…"`, which is
+    // exactly what a conversion removes. Re-asserting "it reaches a converting site" would
+    // have to be deleted or relaxed to nothing — the first loses the guard, the second keeps
+    // its name and its shape while proving nothing.
+    //
+    // So the population is named instead, and VERIFIED against the tree: each entry says
+    // which component renders the container and how many primitives sit inside it, and the
+    // test below re-derives both from source. A container that is renamed, a card that stops
+    // rendering its links, or a count someone adjusted to make a red go away all fail here.
+    // Same shape as the conversion ledger's own floor, one rule down.
+    convertedReach: [
+      { file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte', buttons: 8 },
+      { file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte', buttons: 3 },
+      { file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', buttons: 1 },
+    ],
     why:
-      'The explainer card`s docs-link container. It declares no property the primitive ' +
-      'declares, so its anchor site is untouched.',
+      'The setup card`s docs-link row, and the explainer card`s. It declares `flex`, ' +
+      '`justify-content` and `text-decoration`; the primitive declares none of the three — ' +
+      'the base control states the same `justify-content: center` at (0,2,0) and loses to ' +
+      'this rule anyway — so every site it reaches is untouched by the conversion.',
   },
 
   // ── DEAD: real rules, zero call sites ─────────────────────────────────────────────────
@@ -481,15 +529,91 @@ test('every reviewed EXCLUDE rule would lose to the primitive but reaches no con
   }
 });
 
-test('every reviewed NO_CONFLICT rule reaches a converting site and is derived safe', () => {
-  for (const id of idsWith('NO_CONFLICT')) {
-    const candidate = cascade.candidateFor(id);
-    assert.ok(candidate, `${id} should still be a rule that matches a call site`);
-    assert.equal(candidate.losses.length, 0, `${id} should still share no property it can lose`);
+/**
+ * The `<ManagerButton>` call sites rendered INSIDE an element carrying `containerClass`.
+ *
+ * Bounded to that element, by walking its own tag name to a matching close rather than to the
+ * next `</div>`: the containers here nest, and a count that ran past one into the section
+ * below it would credit this ledger with buttons the rule does not reach. The opening tag's
+ * end is the first `>` that is not the tail of an `=>`, because these tags carry inline
+ * handlers and a `[^<>]` bound cannot span one.
+ *
+ * @param {string} source component source text
+ * @param {string} containerClass the container's own class
+ * @returns {number} how many `<ManagerButton>` tags that container encloses, across every
+ *   occurrence of it in the file
+ */
+function primitivesInside(source, containerClass) {
+  let total = 0;
+  const marker = `class="${containerClass}"`;
+  for (let at = source.indexOf(marker); at >= 0; at = source.indexOf(marker, at + 1)) {
+    const open = source.lastIndexOf('<', at);
+    const tag = /^<([a-zA-Z][\w-]*)/.exec(source.slice(open))?.[1];
+    if (!tag) continue;
+    let cursor = at;
+    do {
+      cursor = source.indexOf('>', cursor + 1);
+    } while (cursor > 0 && source[cursor - 1] === '=');
+    if (cursor < 0) continue;
+    const boundary = new RegExp(`<${tag}\\b|</${tag}>`, 'g');
+    boundary.lastIndex = cursor;
+    let depth = 1;
+    let end = -1;
+    for (let step = boundary.exec(source); step; step = boundary.exec(source)) {
+      depth += step[0].startsWith('</') ? -1 : 1;
+      if (depth === 0) {
+        end = step.index;
+        break;
+      }
+    }
+    if (end < 0) continue;
+    total += source.slice(cursor, end).match(/<ManagerButton[\s/>]/g)?.length ?? 0;
+  }
+  return total;
+}
+
+test('every reviewed NO_CONFLICT rule still reaches a manager button and is derived safe', () => {
+  for (const entry of REVIEWED) {
+    if (entry.disposition !== 'NO_CONFLICT') continue;
+    const candidate = cascade.candidateFor(entry.id);
+
+    if (candidate) {
+      assert.equal(
+        candidate.losses.length,
+        0,
+        `${entry.id} should still share no property it can lose`
+      );
+      assert.ok(
+        candidate.matches.some((match) => match.site.converting) ||
+          Array.isArray(entry.convertedReach),
+        `${entry.id} should still reach a converting site, or name the converted ones`
+      );
+      continue;
+    }
+
+    // No literal call site left. That is either "the sweep converted them all", which the
+    // entry has to have SAID in advance and which is checked against the tree below, or it is
+    // a rule that has quietly gone dead — the case this branch exists to keep separable.
     assert.ok(
-      candidate.matches.some((match) => match.site.converting),
-      `${id} should still reach a converting site, or it is DEAD rather than NO_CONFLICT`
+      Array.isArray(entry.convertedReach) && entry.convertedReach.length > 0,
+      `${entry.id} reaches no call site the instrument can see and names no converted ones, ` +
+        'so it is DEAD rather than NO_CONFLICT'
     );
+    assert.ok(cascade.ruleFor(entry.id), `${entry.id} should still be declared in the sheet`);
+    const container = /\.([\w-]+) \.manager-button$/.exec(entry.id)?.[1];
+    assert.ok(container, `${entry.id} should name the container its converted sites sit in`);
+    for (const { file, buttons } of entry.convertedReach) {
+      const source = readFileSync(resolve(repoRoot, file), 'utf8');
+      assert.equal(
+        primitivesInside(source, container),
+        buttons,
+        `${file} is booked as rendering ${buttons} primitives inside .${container}`
+      );
+      assert.ok(
+        !source.includes('class="manager-button'),
+        `${file} is booked as converted but still writes a literal class="manager-button"`
+      );
+    }
   }
 });
 

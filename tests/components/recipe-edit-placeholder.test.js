@@ -53,7 +53,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
   it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {
     const block = inspectorActionBlock();
-    const buttonCount = (block.match(/<button/g) || []).length;
+    // `<ManagerButton`, not `<button` (issue 1118). The three actions render through the
+    // shared primitive now, and a count of the raw element would read 0 while the group is
+    // intact — a guard going VACUOUS, which is worse than one going red.
+    const buttonCount = (block.match(/<ManagerButton[\s/>]/g) || []).length;
     assert.equal(buttonCount, 3, 'inspector action group should contain exactly three buttons');
     const copyIdx = block.indexOf('fa-copy');
     const penIdx = block.indexOf('fa-pen');
@@ -68,10 +71,26 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   // danger button (issue 643).
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
+    // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
+    // primitive emits `manager-button fab-manager-button` from its own `.join(' ')`, and each
+    // site passes only its BESPOKE class through the appending `class` prop. So the three are
+    // counted by the class each one still contributes — the class the rules below are keyed
+    // on — rather than by a string the component no longer writes.
+    assert.equal((block.match(/<ManagerButton[\s/>]/g) || []).length, 3, 'three controls');
+    for (const bespoke of [
+      'manager-recipe-browser-inspector-duplicate',
+      'manager-recipe-browser-inspector-edit',
+      'manager-recipe-browser-inspector-delete',
+    ]) {
+      assert.ok(
+        block.includes(`class="${bespoke}"`),
+        `${bespoke} should travel through the primitive's appending class prop`
+      );
+    }
     assert.equal(
-      (block.match(/class="manager-button /g) || []).length,
-      3,
-      'all three inspector actions are manager-button controls'
+      block.includes('class="manager-button'),
+      false,
+      'and no site in this group writes the convention class by hand any more'
     );
     // Each of the three is full width, and that is a CASCADE question: which rule wins
     // `width` for this button. It used to be asked as `css.indexOf(<literal selector>)`,

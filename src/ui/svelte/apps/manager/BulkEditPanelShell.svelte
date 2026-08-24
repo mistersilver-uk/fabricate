@@ -36,6 +36,7 @@
      wrapping them — the panel's uniform `gap` is the section rhythm.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -100,16 +101,15 @@
   {@render children?.()}
 
   <div class="fab-bulk-edit-dock">
-    <button
-      type="button"
-      class="manager-button fab-bulk-edit-apply"
+    <ManagerButton
+      class="fab-bulk-edit-apply"
       {...applyHook}
       disabled={!canApply}
       onclick={() => onApply()}
     >
       <i class="fas fa-check-double" aria-hidden="true"></i>
       <span>{applyLabel}</span>
-    </button>
+    </ManagerButton>
   </div>
 </section>
 
@@ -177,8 +177,18 @@
     color: var(--fab-mv2-text);
   }
 
-  .fab-bulk-edit-clear:focus-visible,
-  .fab-bulk-edit-apply:focus-visible {
+  .fab-bulk-edit-clear:focus-visible {
+    outline: 2px solid var(--fab-mv2-accent);
+    outline-offset: 2px;
+  }
+
+  /* Apply's half of what used to be one group with the rule above. It is split out rather
+     than left in it because the two controls are no longer the same KIND of element: Clear
+     is written here and carries this component's scoping class, Apply is a `<ManagerButton>`
+     and never will, so one selector cannot reach both. Nothing else in the sheet states an
+     `outline` for a manager button, so this needs no chain — only the `:global()`, without
+     which Apply would silently lose its keyboard focus ring. */
+  :global(.fab-bulk-edit-apply:focus-visible) {
     outline: 2px solid var(--fab-mv2-accent);
     outline-offset: 2px;
   }
@@ -348,8 +358,33 @@
      moment a box is ticked: 38px and 0.78rem, so the swap does not resize or re-type the
      slot, and `--fab-on-accent` — the token that means "foreground ON an accent fill" —
      rather than `--fab-bg-1`, which is a surface colour and differs from it in all seven
-     themes. */
-  .fab-bulk-edit-apply {
+     themes.
+
+     `:global()` AND CHAINED (issue 1118), and both halves are load-bearing.
+
+     `:global()` first, because Apply is a `<ManagerButton>` now and a scoped selector could
+     not reach it at all. Svelte scopes a rule by appending its `svelte-<hash>` class to the
+     selector and stamping that class onto the elements THIS component writes — it does not
+     stamp a child component's internals, and a `class` prop passed to a child is forwarded
+     verbatim. So `.fab-bulk-edit-apply.svelte-<hash>` matched nothing the moment this button
+     became a component, and Svelte reported NO unused-selector warning for it, because the
+     class literal is right there in the markup. The failure is silent in the compiler, in
+     `lint:svelte:warnings` and in any fixture that stamps the hash by hand
+     (`tests/helpers/scoped-component-css.js` does exactly that) — only
+     `bulk-edit-dock-pinning.test.js`, which mounts the real component, could see it, and it
+     did: Apply lost `width: 100%` and stopped filling the rail.
+
+     Then chained, because `:global()` alone would be (0,2,0) and lose outright to
+     `.fabricate-manager .manager-button.fab-manager-button` (0,3,0): this button would have
+     given up `min-height` 38px for 34px and `font-size` 0.78rem for 0.72rem — the two values
+     the dock comment above says must not change, because Apply swaps places with
+     `.manager-component-browser-inspector-edit` in the rail's bottom slot and a resized or
+     re-typed box desynchronises the swap. Naming the ancestor and both primitive classes
+     takes it to (0,4,0), which wins on specificity rather than on where the sheet happens to
+     be injected — see the header of `tests/helpers/scoped-component-css.js` for why
+     injection order is not a thing a rule may depend on. The `:hover`, `:disabled` and
+     `:focus-visible` companions below are written the same way for the same two reasons. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply) {
     display: flex;
     gap: var(--fab-space-chip);
     align-items: center;
@@ -371,12 +406,14 @@
 
   /* The same accent-strong hover its twin carries. Without it the rail's primary action
      is the only button on the panel with no pointer feedback. */
-  .fab-bulk-edit-apply:not(:disabled):hover {
+  :global(
+    .fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover
+  ) {
     border-color: var(--fab-accent);
     background: var(--fab-accent-strong);
   }
 
-  .fab-bulk-edit-apply:disabled {
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:disabled) {
     border-color: var(--fab-mv2-border);
     color: var(--fab-text-disabled);
     background: var(--fab-surface-soft);

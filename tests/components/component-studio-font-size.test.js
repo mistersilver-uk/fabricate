@@ -228,14 +228,14 @@ const FIXTURE = `
                shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
                child of the panel would go on measuring a box the product no longer renders. -->
           <div class="fab-bulk-edit-dock">
-            <!-- Deliberately NOT yet carrying fab-manager-button (issue 1118). This one is
-                 blocked on its own conversion: .fab-bulk-edit-apply is a SCOPED rule inside
-                 BulkEditPanelShell.svelte at (0,2,0) and is still unchained, so marking the
-                 fixture now would hand the primitive its 34px/0.72rem and break the
-                 bottom-slot equality below against a shipped control that has not moved. The
-                 batch that converts BulkEditPanelShell re-chains that rule and updates this
-                 string in the same commit. -->
-            <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <!-- Carrying fab-manager-button since issue 1118 converted BulkEditPanelShell.
+                 The marking and the re-chain landed in ONE commit, and had to: while
+                 .fab-bulk-edit-apply was a SCOPED rule at (0,2,0), the primitive's (0,3,0)
+                 control would have taken its 38px/0.78rem down to 34px/0.72rem and broken the
+                 bottom-slot equality below against a shipped control that has not moved.
+                 That rule now names .manager-button.fab-manager-button and compiles to
+                 (0,4,0), so the box this fixture measures is the same box it always was. -->
+            <button type="button" class="manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
