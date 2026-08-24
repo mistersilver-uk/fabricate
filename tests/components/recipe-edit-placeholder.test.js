@@ -73,19 +73,32 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       3,
       'all three inspector actions are manager-button controls'
     );
-    // The selectors chain `.manager-button` (0,3,0) so they beat the base
-    // `.manager-button` rule declared later in the sheet — issue 643. Each rule is now
-    // SHARED with the component browser inspector's matching action (issue 676), so the
-    // recipe selector heads a list rather than standing alone: match it either way.
+    // Each of the three is full width, and that is a CASCADE question: which rule wins
+    // `width` for this button. It used to be asked as `css.indexOf(<literal selector>)`,
+    // which is a question about spelling — and the spelling moved. The selectors chained
+    // `.manager-button` (0,3,0) to beat the base rule declared later in the sheet (issue
+    // 643); issue 1118 chained `.fab-manager-button` in beside it, because at (0,3,0) they
+    // only TIED the primitive's own control and held their geometry by source order. The
+    // literal lookup then returned -1 and the assertion failed on `start >= 0`, before
+    // `width` was ever read — a lookup breaking, reported as a stylesheet regressing.
+    //
+    // So this reads the rule by its SELECTOR, tolerant of the chain: the compound may carry
+    // the primitive marker, and a prelude long enough to wrap may be spread over lines.
     for (const selector of [
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
-      const start = css.indexOf(selector);
-      assert.ok(start >= 0, `${selector} should own a rule`);
-      const cssBlock = css.slice(start, css.indexOf('}', start));
-      assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);
+      const pattern = selector
+        .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+        .replaceAll(/\s+/g, String.raw`\s+`)
+        .replaceAll(
+          String.raw`\.manager-button`,
+          String.raw`\.manager-button(?:\.fab-manager-button)?`
+        );
+      const rule = css.match(new RegExp(String.raw`${pattern}[^{}]*\{[^}]*\}`));
+      assert.ok(rule, `${selector} should own a rule`);
+      assert.ok(rule[0].includes('width: 100%;'), `${selector} should be full width`);
     }
   });
 

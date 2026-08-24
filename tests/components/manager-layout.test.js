@@ -94,9 +94,45 @@ function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
+// A caller here names the RULE it wants to read, and a rule's identity is not the exact
+// characters the sheet spells its prelude with. Three things rewrite that prelude without
+// changing which rule it is, all of them from issue 1118: `ManagerButton` chains a second
+// marker class into the same compound wherever a rule had to be lifted above the primitive
+// (`.manager-button` becomes `.manager-button.fab-manager-button`); every rule that states a
+// RESTING PAINT gained a `:not(:disabled)` qualifier, so that a switched-off button paints
+// from the disabled rule rather than from its role; and a prelude that grows past the print
+// width is re-wrapped onto continuation lines.
+//
+// A literal substring lookup cannot see through any of them, and it fails SILENTLY: it
+// returns '', every `.includes(...)` below reads false, and the assertion fails naming a
+// property that is in fact declared. That is a lookup breaking, not a stylesheet regressing,
+// and the two must not be indistinguishable — both of the tests that broke here reported
+// "should use a light green outline treatment" and "should have an amber warning-action
+// button style" about rules that still say exactly that.
+//
+// So this matches a PATTERN of the selector: whitespace flexible, the primitive marker
+// optional at each `.manager-button`, and the enabled-state qualifier optional at the end of
+// each selector in the list. The list is split on a comma-NEWLINE, which is how both this
+// sheet and these callers write one; the comma inside `:is(select, input…)` is left alone.
+const CHAINED_MANAGER_BUTTON = String.raw`\.manager-button(?:\.fab-manager-button)?`;
+const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
+
+function selectorPattern(selector) {
+  return selector
+    .split(',\n')
+    .map(
+      (one) =>
+        one
+          .trim()
+          .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+          .replaceAll(/\s+/g, String.raw`\s+`)
+          .replaceAll(String.raw`\.manager-button`, CHAINED_MANAGER_BUTTON) + OPTIONAL_ENABLED_STATE
+    )
+    .join(String.raw`,\s+`);
+}
+
 function blockIn(source, selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = source.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
+  const match = source.match(new RegExp(`${selectorPattern(selector)}\\s*\\{[\\s\\S]*?\\}`));
   return match?.[0] || '';
 }
 
@@ -1547,7 +1583,6 @@ test('manager gathering settings condition panels use a two-column responsive gr
   const settingsBlock = blockFor('.fabricate-manager .manager-gathering-settings');
   const panelBlock = blockFor('.fabricate-manager .manager-condition-panel');
   const addBlock = blockFor('.fabricate-manager .manager-condition-add');
-  const regionAddBlock = blockFor('.fabricate-manager .manager-region-add');
   const biomeAddBlock = blockFor('.fabricate-manager .manager-biome-add');
   const pillBlock = blockFor('.fabricate-manager .manager-condition-pill');
   const regionPillBlock = blockFor('.fabricate-manager .manager-vocabulary-pill.is-region');
@@ -1584,17 +1619,34 @@ test('manager gathering settings condition panels use a two-column responsive gr
     panelBlock.includes('height: 100%;'),
     'condition panel backgrounds should fill the stretched grid row'
   );
+  // The trailing track is `max-content`, not 48px (issue 1118). A number here sized the
+  // column to the two words the Add button happens to hold today; converted, that button
+  // takes the primary role's `0 var(--fab-space-4)` — 32px of padding in a 48px box — and
+  // clips its own label whatever it says. `.manager-region-add` re-templated this same grid
+  // for a region row and was retired in the same edit: no component carries the class.
   assert.ok(
-    addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 48px;'),
-    'condition add controls should reserve icon picker, label input, and Add button columns'
+    addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) max-content;'),
+    'condition add controls should reserve icon picker, label input, and a content-sized Add column'
+  );
+  assert.equal(
+    blockFor('.fabricate-manager .manager-region-add'),
+    '',
+    'the dead region-add grid override must not come back'
   );
   assert.ok(
-    regionAddBlock.includes('grid-template-columns: minmax(0, 1fr) 48px;'),
-    'region add controls should be text input plus Add button'
+    biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) max-content;'),
+    'biome add controls should align icon, colour, input, and a content-sized Add column'
   );
+  // The one declaration `.manager-add-button` keeps: the height that lines it up with the
+  // input beside it. Its width, padding and font-size are the primitive's now.
   assert.ok(
-    biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) 48px;'),
-    'biome add controls should align icon, colour, input, and Add columns'
+    blockFor('.fabricate-manager .manager-add-button').includes('height: 36px;'),
+    'the Add button still matches the sibling input height'
+  );
+  assert.equal(
+    blockFor('.fabricate-manager .manager-add-button').includes('width: 48px;'),
+    false,
+    'and no longer pins itself to the retired 48px box'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-condition-pill-list {\n  display: grid;'),
@@ -2290,12 +2342,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-tools-component-browser-card'
   );
   const toolInspectorActionsBlock = blockFor('.fabricate-manager .manager-tool-inspector-actions');
-  const toolInspectorActionButtonsBlock = blockFor(
-    '.fabricate-manager .manager-tool-inspector-actions .manager-button'
-  );
-  const toolInspectorActionButtonLabelBlock = blockFor(
-    '.fabricate-manager .manager-tool-inspector-actions .manager-button span'
-  );
   const toolsComponentBrowserHeaderBlock = blockFor(
     '.fabricate-manager .manager-tools-component-browser-header'
   );
@@ -2805,15 +2851,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       toolInspectorActionsBlock.includes('gap: var(--fab-space-2);'),
     'selected tool inspector actions should sit in a stable two-column action row inside the header card'
   );
-  assert.ok(
-    toolInspectorActionButtonsBlock.includes('width: 100%;') &&
-      toolInspectorActionButtonsBlock.includes('padding: 0 var(--fab-space-2);'),
-    'selected tool inspector action buttons should fill their grid columns without overflowing the right rail'
-  );
-  assert.ok(
-    toolInspectorActionButtonLabelBlock.includes('overflow-wrap: anywhere;'),
-    'selected tool inspector action labels should be allowed to wrap in narrow localized layouts'
-  );
+  // The two rules that typed this container's BUTTONS were retired in issue 1118, on the
+  // cascade inventory's `DEAD` evidence: `.manager-tool-inspector-actions` appears in no
+  // component's markup at all, so neither could ever have matched an element. The grid above
+  // is asserted rather than retired with them because that task reconciled the manager-button
+  // cascade, not the sheet at large — the orphaned container family is named in its handoff
+  // for a separate dead-CSS sweep. There is no button here left to assert a treatment for.
   assert.ok(
     toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;') &&
       toolsComponentBrowserBlock.includes('gap: 0;') &&
@@ -7645,9 +7688,9 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
 // The reported defect was that the Modifiers card's buttons did not look like the Tool
 // Studio's: a bare `manager-button` for a destructive verb, and a visibly different label
 // scale. The cause is structural rather than a typo. The Tool Studio's refined treatment
-// comes from an ANCESTOR-CONTEXT rule — `.manager-header-actions .manager-button`, 38px and
-// `0.72rem` — so a card that is not inside a `.manager-header-actions` could never match it
-// however carefully its class string was written.
+// comes from ANCESTOR-CONTEXT rules — `.manager-header-actions .manager-button` and
+// `.manager-tool-edit-actions .manager-button` — so a card that is inside neither could
+// never match them however carefully its class string was written.
 //
 // A shared component that merely emits the same class names would not have caught this and
 // will not catch the next one: the drift lives in the SHEET, not in the markup. So the
@@ -7671,7 +7714,8 @@ const managerButtonRoleClasses = (() => {
   );
 })();
 
-function managerButtonClassesFor(role) {
+// The two unconditional classes, likewise read out of the component rather than restated.
+const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
@@ -7679,12 +7723,20 @@ function managerButtonClassesFor(role) {
     base.includes('manager-button') && base.includes('fab-manager-button'),
     `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
   );
+  return base;
+})();
+
+function managerButtonClassesFor(role) {
+  // `neutral` is the EMPTY modifier — the primitive emits the two base classes and nothing
+  // more — so it is the one role that cannot be probed by looking a class name up, and the
+  // one role a mutation cannot flip by deleting a prop.
+  if (role === 'neutral') return managerButtonBaseClasses.join(' ');
   const modifier = managerButtonRoleClasses[role];
   assert.ok(
     modifier,
     `ManagerButton must declare a class for the '${role}' role, got ${Object.keys(managerButtonRoleClasses).join(' ')}`
   );
-  return `${base.join(' ')} ${modifier}`;
+  return `${managerButtonBaseClasses.join(' ')} ${modifier}`;
 }
 
 const AUTHORITY_PROBES = ['primary', 'danger'];
@@ -7764,8 +7816,9 @@ test('a Modifiers card button renders exactly like the tool studio button of the
     // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
     // UA default on both sides and matches trivially. These pin that the authority's own
     // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
-    // .manager-button` renders — NOT the 38px `.manager-header-actions` declares, which that
-    // later, more specific block overrides.
+    // .manager-button` renders, and 34px is now the whole header cluster's height too: the
+    // 38px `.manager-header-actions` used to declare was RETIRED in issue 1118 rather than
+    // arbitrated, because it tied the primitive at (0,3,0) and won on source order alone.
     assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
     assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
 
@@ -7788,6 +7841,155 @@ test('a Modifiers card button renders exactly like the tool studio button of the
         );
       }
     }
+  } finally {
+    await context.close();
+  }
+});
+
+// ── A SWITCHED-OFF manager button looks switched off, in every role (issue 1118) ──────────
+//
+// The reported state of the sheet was that it did not. `.manager-button:disabled` is (0,3,0);
+// `.manager-button.is-primary`, `.is-danger` and `.is-warning-action` are (0,3,0) too and
+// stand LATER in the file, and the primitive's `is-ghost` and `is-dashed` companions are
+// (0,4,0) and beat it outright. Every one of those declares border-color, colour and
+// background with no `:disabled` requirement, so a disabled button kept its enabled paint in
+// every role. `opacity: 0.62` and `cursor: default` still applied — which is why it read as a
+// dimmed LIVE control rather than a dead one, and why three rounds of plan review walked past
+// it. It was already shipping on the screen this conversion designates as the authority:
+// `ToolEditView` renders `role="ghost"` with `disabled={saving}`, so the Back button looked
+// available for the whole of a tool save.
+//
+// The repair qualifies every resting-paint rule with `:not(:disabled)` rather than chaining
+// the disabled rule above them, because that selector also serves `.manager-icon-button` and
+// every hand-written button the sweep does not convert; chaining it would have taken the
+// disabled paint from exactly the controls with no other. So this measures the INVARIANT the
+// repair states — the disabled paint is role-independent — rather than re-deriving the
+// arithmetic that made it false.
+const DISABLED_ROLE_PROBES = ['neutral', 'primary', 'ghost', 'danger', 'dashed', 'warning'];
+
+test('a disabled manager button paints from the disabled rule in every one of the six roles', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const probes = DISABLED_ROLE_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="on-${role}"><span>Save</span></button>` +
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="off-${role}" disabled><span>Save</span></button>`
+    ).join('');
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <section class="manager-edit-card">${probes}</section>
+            <!-- The tokens the disabled rule NAMES, resolved by the browser in this theme, so
+                 the assertions below pin the paint to that rule rather than to whatever the
+                 six probes happen to agree on. -->
+            <span data-token="border" style="color: var(--fab-overlay-light-12)"></span>
+            <span data-token="ink" style="color: var(--fab-mv2-text-muted)"></span>
+            <span data-token="surface" style="color: var(--fab-overlay-light-04)"></span>
+            <span data-token="ghost-border" style="color: var(--fab-mv2-border)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate((roles) => {
+      const paintOf = (element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderColor: style.borderTopColor,
+          color: style.color,
+          background: style.backgroundColor,
+          opacity: style.opacity,
+          borderStyle: style.borderTopStyle,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+        };
+      };
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        return element ? paintOf(element) : null;
+      };
+      const token = (name) =>
+        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+      return {
+        on: Object.fromEntries(roles.map((role) => [role, read(`on-${role}`)])),
+        off: Object.fromEntries(roles.map((role) => [role, read(`off-${role}`)])),
+        tokens: {
+          border: token('border'),
+          ink: token('ink'),
+          surface: token('surface'),
+          ghostBorder: token('ghost-border'),
+        },
+      };
+    }, DISABLED_ROLE_PROBES);
+
+    for (const role of DISABLED_ROLE_PROBES) {
+      assert.ok(measured.on[role], `the enabled ${role} probe rendered`);
+      assert.ok(measured.off[role], `the disabled ${role} probe rendered`);
+    }
+
+    // NON-VACUITY, and the one that would have caught the defect on its own: the sheet must
+    // actually reach these probes. If it did not, every role would report the UA default and
+    // the equality below would hold over nothing.
+    assert.equal(
+      measured.on.ghost.borderColor,
+      measured.tokens.ghostBorder,
+      "the enabled ghost takes the primitive's resting border, or this fixture is unstyled"
+    );
+
+    for (const role of DISABLED_ROLE_PROBES) {
+      const off = measured.off[role];
+      assert.deepEqual(
+        { borderColor: off.borderColor, color: off.color, background: off.background },
+        {
+          borderColor: measured.tokens.border,
+          color: measured.tokens.ink,
+          background: measured.tokens.surface,
+        },
+        `a disabled ${role} button paints from .manager-button:disabled, not from its role`
+      );
+      assert.equal(off.opacity, '0.62', `and keeps the disabled rule's opacity in ${role}`);
+      assert.notDeepEqual(
+        {
+          borderColor: off.borderColor,
+          color: off.color,
+          background: off.background,
+        },
+        {
+          borderColor: measured.on[role].borderColor,
+          color: measured.on[role].color,
+          background: measured.on[role].background,
+        },
+        `the ${role} role must PAINT differently when enabled, or its probe proves nothing`
+      );
+    }
+
+    // The dashed role is why the reconciliation splits paint from geometry rather than
+    // qualifying one rule: switching a control off must take its colours, never its shape.
+    // A `border` shorthand under `:not(:disabled)` would have taken the dashed edge with it.
+    assert.equal(
+      measured.off.dashed.borderStyle,
+      'dashed',
+      'a disabled dashed button keeps its dashed edge'
+    );
+    assert.equal(
+      measured.off.dashed.height,
+      measured.on.dashed.height,
+      'and keeps the pinned 34px control height it had when enabled'
+    );
   } finally {
     await context.close();
   }

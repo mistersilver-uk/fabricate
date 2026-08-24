@@ -24,13 +24,22 @@
  *
  * ── THE DISPOSITIONS ─────────────────────────────────────────────────────────────────────
  * - `RECHAIN`  — at risk on a converting site. Re-chain it above the primitive or retire it.
- * - `INTENDED` — at risk, and that is the POINT: the primitive is designed to beat this rule,
- *                so re-chaining it would undo the conversion. This disposition is not in the
- *                assignment's original four; the tool forced it, because the derived set
- *                includes the base control rules and the Foundry `button` reset that the
+ * - `INTENDED` — at risk, and that is the POINT: the primitive is designed to SUPERSEDE this
+ *                rule, so re-chaining it would undo the conversion. This disposition is not
+ *                in the assignment's original four; the tool forced it, because the derived
+ *                set includes the base control rules and the Foundry `button` reset that the
  *                primitive exists to supersede, and filing those as `EXCLUDE` would confuse
  *                "must not be re-chained because it serves unconverted sites" with "must not
  *                be re-chained because winning is the design".
+ *
+ *                The stylesheet reconciliation widened it, deliberately and once, to cover a
+ *                CONTAINER rule that states a value the primitive re-states identically with
+ *                no ancestor requirement. `.manager-header-actions .manager-button` and the
+ *                two knowledge clusters are that shape: superseding them is the design, the
+ *                residual tie is provably zero-pixel, and they are what types a button the
+ *                primitive does not render — a hand-written one during the sweep, or an
+ *                `ArmedDangerButton`, which is held out of the conversion for good. Each such
+ *                entry carries its own proof in `why`; none is a RECHAIN filed quietly.
  * - `EXCLUDE`  — would be at risk, but every site it reaches is a `SearchablePopover`
  *                `triggerClass` site that never gains `fab-manager-button`. Re-chaining it
  *                would repaint a control the sweep is not converting.
@@ -63,23 +72,34 @@ const scopedRule = (component, selector) => `src/ui/svelte/apps/manager/${compon
  *
  * Seeded from what plan review r3 established, then CORRECTED by the tool. Every correction is
  * called out in its `why`, because the corrections are the reason this file exists.
+ *
+ * It shrank from 34 entries to 16 when the stylesheet was reconciled against it, and the
+ * shrinkage is the deliverable: a rule chained above the primitive keys on `fab-manager-button`
+ * and therefore leaves the derived candidate set entirely, and a retired one leaves the sheet.
+ * The list and the sheet move in ONE commit for that reason — every edit to either changes the
+ * derived set, so a stale entry here reds this gate instead of shipping a silent repaint.
  */
 const REVIEWED = [
-  // ── RECHAIN: scoped component rules ───────────────────────────────────────────────────
+  // ── RECHAIN: the three that live in a component's own <style> block ───────────────────
+  //
+  // Task 4 reconciled `styles/fabricate.css` and owns nothing else, so these three are the
+  // only RECHAIN entries left: each is authored inside the component it styles, and each
+  // travels with that component's conversion rather than with the sheet.
   {
     id: scopedRule('BulkEditPanelShell.svelte', '.fab-bulk-edit-apply'),
     disposition: 'RECHAIN',
     why:
       'The bulk-apply button at (0,2,0) loses min-height 38px and font-size 0.78rem outright, ' +
       'against a source comment forbidding exactly that because the control swaps slots with ' +
-      'the inspector primary.',
+      'the inspector primary. Scoped to `BulkEditPanelShell.svelte`; converts with it.',
   },
   {
     id: scopedRule('GatheringEconomyView.svelte', '.manager-economy-bulk-save'),
     disposition: 'RECHAIN',
     why:
-      'NOT IN THE SEEDED LIST. A second scoped (0,2,0) bespoke rule in the same band as ' +
-      '`.fab-bulk-edit-apply`: `padding: 3px 10px` and `font-size: 0.82rem` both lose outright.',
+      'A second scoped (0,2,0) bespoke rule in the same band as `.fab-bulk-edit-apply`: ' +
+      '`padding: 3px 10px` and `font-size: 0.82rem` both lose outright. Scoped to ' +
+      '`GatheringEconomyView.svelte`; converts with it.',
   },
   {
     id: scopedRule(
@@ -88,174 +108,12 @@ const REVIEWED = [
     ),
     disposition: 'RECHAIN',
     why:
-      'NOT IN THE SEEDED LIST. A `:global()` scoped rule pinning a 28px control; it ties the ' +
-      'primitive at (0,3,0) and wins only on injection order, and loses its padding outright ' +
-      'to the `is-primary` companion.',
+      'A `:global()` scoped rule pinning a 28px control; it ties the primitive at (0,3,0) ' +
+      'and wins only on injection order, and loses its padding outright to the `is-primary` ' +
+      'companion. Scoped to `ImportFolderMappingModal.svelte`; converts with it.',
   },
 
-  // ── RECHAIN: the ancestor-context band ────────────────────────────────────────────────
-  {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'The largest repaint in the change: 28 confirmed sites in one `<div>` plus 2 in ' +
-      '`ComponentEditorHeader`, min-height 38px → 34px on a tie lost to source order.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-primary'),
-    disposition: 'RECHAIN',
-    why:
-      "NOT IN THE SEEDED LIST. The header cluster's `is-primary` companion ties the " +
-      "primitive's at (0,4,0) and loses on source order; same values today, so it is a latent " +
-      'repaint rather than a live one, and the sweep is licensed to reorder the sheet.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-ghost'),
-    disposition: 'RECHAIN',
-    why:
-      "Ties the primitive's `is-ghost` at (0,4,0) and wins only on source order. The delta " +
-      'rules this pair redundant and retires one; either way it must stop depending on order.',
-  },
-  {
-    id: globalRule(
-      '.fabricate-manager .manager-header-actions .manager-button.is-ghost:not(:disabled):hover'
-    ),
-    disposition: 'RECHAIN',
-    why: 'The hover half of the same redundant pair, at (0,6,0), on the same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-downtime-unlock'),
-    disposition: 'RECHAIN',
-    why:
-      'The premium unlock anchor: min-height, padding and font-size all tie the primitive at ' +
-      '(0,3,0) and survive on source order alone.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-drop-inspector-stack .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'The 28px drop-inspector control. Two confirmed converting sites, not the one the ' +
-      'prose found, and both were certified as needing no change.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'NOT IN THE SEEDED LIST. Same (0,3,0) ancestor band, same values as the primitive, so ' +
-      'no repaint today and total dependence on source order tomorrow.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-knowledge-reset-actions .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'NOT IN THE SEEDED LIST. The sibling of the row-actions rule, declared in the same ' +
-      'comma group and reaching two more converting sites.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-recipe-ingredient-set-add .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'CORRECTION — seeded as EXCLUDE. It does reach converting sites: two `is-dashed` ' +
-      'buttons written directly in `RecipeIngredientSetCard`, whose 0.7rem loses outright to ' +
-      "the primitive's `is-dashed` 11px. Retiring it, as the delta proposes, is a repaint.",
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-recipe-requirement-adds .manager-button'),
-    disposition: 'RECHAIN',
-    why:
-      'CORRECTION — seeded as EXCLUDE. It reaches the four `is-dashed` alternative-add ' +
-      'buttons in `RecipeIngredientGroupCard`, which are population A and do convert.',
-  },
-
-  // ── RECHAIN: the bespoke-class band ───────────────────────────────────────────────────
-  {
-    id: globalRule('.fabricate-manager .manager-clear-filters'),
-    disposition: 'RECHAIN',
-    why:
-      'Six classed clear-filters buttons at (0,2,0): min-height 30px → 34px, font-size ' +
-      '0.78rem → 0.72rem, padding space-2 → space-3, all lost outright.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-add-button'),
-    disposition: 'RECHAIN',
-    why:
-      'Rows 16/17. At (0,2,0) it loses its width, padding and font-size to the primitive and ' +
-      'the `is-primary` companion, inside a 48px grid track.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-sort-direction'),
-    disposition: 'RECHAIN',
-    why:
-      'Sort-direction toggle, (0,3,0), tied and order-dependent on min-height, padding and ' +
-      'font-size.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-component-sort-direction'),
-    disposition: 'RECHAIN',
-    why:
-      'The other half of the sort-direction pair, declared as its own selector in the same ' +
-      'comma group.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate'),
-    disposition: 'RECHAIN',
-    why:
-      'Recipe inspector Duplicate: 36px and 0.78rem tied at (0,3,0). Re-chained with the ' +
-      'rest of its stacked action column or not at all.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-component-browser-inspector-copy'),
-    disposition: 'RECHAIN',
-    why: 'Component inspector Copy source UUID, same column, same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-component-browser-inspector-unlink'),
-    disposition: 'RECHAIN',
-    why: 'Component inspector Unlink, same column, same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit'),
-    disposition: 'RECHAIN',
-    why:
-      'Recipe inspector Edit: 38px accent primary, tied at (0,3,0) on min-height and ' +
-      'font-size.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-component-browser-inspector-edit'),
-    disposition: 'RECHAIN',
-    why: 'Component inspector Edit, same column, same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'),
-    disposition: 'RECHAIN',
-    why: 'Recipe inspector Delete, same column, same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-component-browser-inspector-delete'),
-    disposition: 'RECHAIN',
-    why: 'Component inspector Delete, same column, same tie.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.manager-recipe-add-full'),
-    disposition: 'RECHAIN',
-    why:
-      'The third selector of the recipe dashed-add font-size group, at (0,3,0), tied against ' +
-      'the primitive and beaten outright by its `is-dashed` companion.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button:disabled'),
-    disposition: 'RECHAIN',
-    why:
-      'NOT IN THE SEEDED LIST, and the sharpest correction here. The base disabled paint sits ' +
-      "at (0,3,0); the primitive's `is-ghost` and `is-dashed` companions sit at (0,4,0) and " +
-      'declare border-color, colour and background with no `:disabled` requirement, so after ' +
-      'conversion a DISABLED ghost or dashed button keeps its enabled paint. Five ghost and ' +
-      'ten dashed converting sites are affected. The delta says to preserve these base rules, ' +
-      'which is necessary but not sufficient — they must also outrank the role companions in ' +
-      'the disabled state.',
-  },
-
-  // ── INTENDED: the primitive is designed to beat these ─────────────────────────────────
+  // ── INTENDED: the primitive is designed to supersede these ────────────────────────────
   {
     id: globalRule('.fabricate-manager button'),
     disposition: 'INTENDED',
@@ -275,11 +133,12 @@ const REVIEWED = [
       'deliberately override.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-ghost'),
+    id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled)'),
     disposition: 'INTENDED',
     why:
       "The primitive's `is-ghost` keeps a RESTING border where this rule has none. Beating it " +
-      'is the documented purpose of the companion rule.',
+      'is the documented purpose of the companion rule. The `:not(:disabled)` qualifier is ' +
+      "task 4's disabled repair, not a change of meaning — see `.manager-button:disabled`.",
   },
   {
     id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled):hover'),
@@ -290,14 +149,25 @@ const REVIEWED = [
     id: globalRule('.fabricate-manager .manager-button.is-dashed'),
     disposition: 'INTENDED',
     why:
-      "Accent → muted on 10 converting sites. The delta rules the primitive's treatment the " +
-      'survivor and reconciles the bare selector to match, so the repaint is the decision, not ' +
-      'a casualty of it.',
+      'The geometry half of the RECONCILED bare dashed treatment. Task 4 copied the ' +
+      "primitive's control geometry down onto this selector — minus `width`, which moved to " +
+      '`is-full-width` — so the four `SearchablePopover` dashed triggers that never gain ' +
+      '`fab-manager-button` render the same control as the converted buttons beside them. It ' +
+      "still loses to the primitive's own `is-dashed` at (0,4,0), and now loses to it with " +
+      'identical values, which is the point of the reconciliation.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled)'),
+    disposition: 'INTENDED',
+    why:
+      'The paint half of the same reconciliation, split out so the disabled rule can win. ' +
+      'Accent → muted on the ten converting sites is the ruled repaint, and the four ' +
+      'population-B triggers take it too, deliberately: they sit in the same rows.',
   },
   {
     id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled):hover'),
     disposition: 'INTENDED',
-    why: 'The hover half of the same ruling.',
+    why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
   },
   {
     id: globalRule('.fabricate-manager .manager-button:not(:disabled):hover'),
@@ -306,6 +176,65 @@ const REVIEWED = [
       'The base hover paint, which the role hover companions at (0,6,0) are meant to beat. It ' +
       'also ties the resting role companions at (0,4,0) and wins on order alone, which the ' +
       'sweep must not disturb.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-header-actions .manager-button'),
+    disposition: 'INTENDED',
+    why:
+      'The 38px control this rule declared is RETIRED (task 4): the maintainer ruled 34px, ' +
+      'which is what the Tool Studio renders and what the primitive re-declares. What is left ' +
+      "is the container's own TYPE scale, 0.72rem, which it states across all three of its " +
+      'children — button, chip and save-error. The primitive states the same 0.72rem with no ' +
+      'ancestor requirement, so the remaining tie is provably zero-pixel, and the rule is what ' +
+      'types a header button the primitive does not render.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-primary'),
+    disposition: 'INTENDED',
+    why:
+      "The same container statement for the header's loudest action: `0 var(--fab-space-4)` " +
+      'and weight 700, which are exactly what `.manager-button.fab-manager-button.is-primary` ' +
+      'states. Zero-pixel either way, and it is what emphasises a header primary the primitive ' +
+      'does not render. Its `is-ghost` sibling was RETIRED instead, because a role’s PAINT ' +
+      'belongs to the role — the container keeps only its own scale.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
+    disposition: 'INTENDED',
+    why:
+      'Deliberately NOT re-chained, and the one place where this instrument is wrong about ' +
+      'its own corpus. `collectSites` gives every non-population-B site the primitive class, ' +
+      'including `ArmedDangerButton`, which is held out of the conversion and renders ' +
+      '`class="manager-button is-danger"` from its own markup — so the tool believes a chained ' +
+      'selector would still reach it. It would not. Both knowledge rows render an ' +
+      '`ArmedDangerButton` inside this container, and chaining would leave that Delete at the ' +
+      'ambient ~1rem beside the 0.72rem Expend button next to it, which is the exact ' +
+      'regression this rule was written to fix. Its three values are the ones the primitive ' +
+      'copied FROM this block, so the tie is zero-pixel.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-knowledge-reset-actions .manager-button'),
+    disposition: 'INTENDED',
+    why:
+      'The sibling selector in the same comma group, which also heads `.manager-tool-edit-' +
+      'actions .manager-button` — the Tool Studio cluster that IS the authority the primitive ' +
+      'copied. Same three values, so the tie is zero-pixel; splitting the group to chain one ' +
+      'third of it would restate the authority instead of adopting it.',
+  },
+  {
+    id: globalRule(
+      '.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button'
+    ),
+    disposition: 'INTENDED',
+    why:
+      'NEWLY at risk, and it is task 4 that put it there: at (0,4,0) it used to beat the ' +
+      "primitive's (0,3,0) control outright, and the re-chained bespoke rules are (0,4,0) too, " +
+      'so it now ties them. Every tie is same-value — this rule and the sort-direction rule ' +
+      'both state `var(--fab-recipe-control-font)`, and the primitive states the 0.72rem that ' +
+      'token resolves to. The one overlap that is NOT identical is against ' +
+      '`.manager-clear-filters` (0.78rem), and no `manager-clear-filters` control renders in ' +
+      "the components view — that browser's Clear filters carries no bespoke class. Recorded " +
+      'rather than hidden: if one ever lands there, this rule wins by order.',
   },
 
   // ── EXCLUDE: reaches only population-B triggers ───────────────────────────────────────
@@ -363,7 +292,21 @@ const REVIEWED = [
 
   // ── NO_CONFLICT: reaches converting sites, derived safe (not exhaustive) ──────────────
   {
-    id: globalRule('.fabricate-manager .manager-button.is-primary'),
+    id: globalRule('.fabricate-manager .manager-button:disabled'),
+    disposition: 'NO_CONFLICT',
+    why:
+      'THE REPAIR, RECORDED. This was the sharpest RECHAIN entry the instrument found: the ' +
+      "base disabled paint at (0,3,0), beaten outright by the primitive's `is-ghost` and " +
+      '`is-dashed` companions at (0,4,0) and on source order by every base role paint, so a ' +
+      'DISABLED manager button kept its enabled colours in every role — visibly, on ' +
+      "`ToolEditView`'s ghost Back button for the whole of a tool save. Task 4 qualified every " +
+      'rule that states a resting paint with `:not(:disabled)` rather than chaining this one ' +
+      'above them, because this selector also serves `.manager-icon-button` and every ' +
+      'hand-written button the sweep does not convert. That it now derives NO_CONFLICT is the ' +
+      'proof: no rule anywhere in the corpus can take the disabled paint off a manager button.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-button.is-primary:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     why:
       "30 converting sites, and it declares only paint while the primitive's `is-primary` " +
@@ -371,7 +314,7 @@ const REVIEWED = [
       'the same reasoning the delta gives for `is-warning-action`, now measured.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-danger'),
+    id: globalRule('.fabricate-manager .manager-button.is-danger:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     why: '11 converting sites, paint only, no overlap with any primitive rule that matches them.',
   },
@@ -383,20 +326,15 @@ const REVIEWED = [
       'one property the primitive never touches.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed.manager-recipe-add-full'),
+    id: globalRule('.fabricate-manager .manager-add-button'),
     disposition: 'NO_CONFLICT',
     why:
-      "(0,4,0) over the primitive's `is-dashed`, so it survives on specificity rather than on " +
-      'order — which is why the delta may move it without repainting its four sites.',
-  },
-  {
-    id: globalRule(
-      '.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button'
-    ),
-    disposition: 'NO_CONFLICT',
-    why:
-      'The root attribute lifts it to (0,4,0), so it beats the primitive outright on its 14 ' +
-      'converting sites.',
+      'Was RECHAIN. Rows 16/17: at (0,2,0) it lost its width, padding and font-size to the ' +
+      'primitive and the `is-primary` companion, inside a 48px grid track that clipped the ' +
+      'label. Task 4 retired all three — the pinned 48px box went with them, and the trailing ' +
+      'grid track is `max-content` now — leaving the one declaration that is neither restated ' +
+      'nor overturned: the 36px height it shares with the sibling input. Nothing overlaps any ' +
+      'more, which is why it derives safe rather than needing a chain.',
   },
   {
     id: globalRule('.fabricate-manager .manager-setup-links .manager-button'),
@@ -407,35 +345,23 @@ const REVIEWED = [
   },
 
   // ── DEAD: real rules, zero call sites ─────────────────────────────────────────────────
+  //
+  // Four entries left this list in task 4, retired rather than recorded:
+  // `.manager-region-add`, `.manager-tool-inspector-actions .manager-button` (with its
+  // `span` companion), `.manager-tools-row-editor .manager-button` and
+  // `.manager-tools-create-actions .manager-button`. The remaining container rules of those
+  // last three families are orphaned too — no component carries the classes at all — but
+  // they are outside a manager-button reconciliation and are named in the handoff as a
+  // separate dead-CSS sweep rather than half-cleaned here.
   {
-    id: globalRule('.fabricate-manager .manager-region-add'),
+    id: globalRule('.fabricate-manager .manager-button.is-warning-action:not(:disabled)'),
     disposition: 'DEAD',
     why:
-      'Confirmed dead. No element in any component carries the class, so the rows 16/17 fix ' +
-      'cannot be applied here — the delta already caught this and the tool agrees.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-tool-inspector-actions .manager-button'),
-    disposition: 'DEAD',
-    why: "Confirmed dead: `.manager-tool-inspector-actions` appears in no component's markup.",
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-tools-row-editor .manager-button'),
-    disposition: 'DEAD',
-    why: "Confirmed dead: `.manager-tools-row-editor` appears in no component's markup.",
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-tools-create-actions .manager-button'),
-    disposition: 'DEAD',
-    why: "Confirmed dead: `.manager-tools-create-actions` appears in no component's markup.",
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.is-warning-action'),
-    disposition: 'DEAD',
-    why:
-      "NOT IN THE SEEDED LIST, and it corroborates the delta's `warning` repair from the " +
-      'other side: the treatment exists and NOTHING renders it, because the one site that ' +
-      'means to spells the class `is-warning`, which the sheet declares nowhere.',
+      "DEAD and deliberately KEPT, which is why this list is not a retirement order. It " +
+      "corroborates the delta's `warning` repair from the other side: the treatment exists and " +
+      'NOTHING renders it, because the one site that means to spells the class `is-warning`, ' +
+      'which the sheet declares nowhere. The primitive gains a `warning` role that emits THIS ' +
+      'class, so the entry should go live rather than away.',
   },
 ];
 
