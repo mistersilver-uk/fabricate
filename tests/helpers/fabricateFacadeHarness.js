@@ -37,18 +37,26 @@ import {
   resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
   rollActorCheck as rollStandaloneActorCheck,
 } from '../../src/systems/companionCheckRoll.js';
+import { awardComponents as awardComponentsToActor } from '../../src/systems/companionComponentAward.js';
 import {
   AFFORDABILITY_MESSAGE_KEYS,
   CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_OUTCOMES,
+  COMPONENT_AWARD_MESSAGE_KEYS,
+  CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
+  componentAwardResult,
+  currencyCreditResult,
   knowledgeGrantResult,
 } from '../../src/systems/companionContract.js';
 import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/systems/companionKnowledgeGrant.js';
-import { checkWorldCurrencyAffordability } from '../../src/systems/currencyAffordance.js';
+import {
+  checkWorldCurrencyAffordability,
+  creditWorldCurrency,
+} from '../../src/systems/currencyAffordance.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
 import { classMemberSource } from './boundedSource.js';
@@ -88,6 +96,26 @@ export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
 const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
   noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+});
+
+/**
+ * Faithful copies of `src/main.js`'s hoisted `AWARD_COMPONENTS_GATE_KEYS` and
+ * `CREDIT_CURRENCY_GATE_KEYS` (issue 1301).
+ *
+ * Two pairs on this side as well, and reading from each member's OWN key table, because the
+ * mutation this mirror exists to catch is precisely a hoisted constant that carries the wrong
+ * member's strings: a body-level name assertion still passes, and only the refused answer's
+ * words are wrong — in the mirror alone, where every facade-level case for these two members
+ * runs.
+ */
+const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+});
+
+const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
 });
 
 /**
@@ -284,6 +312,11 @@ export class FabricateFacadeUnderTest {
     // the bag is what a test substitutes. The two DELEGATORS below are faithful copies and are
     // pinned against the production text; the bag they read is not part of that claim.
     companionCheckSeams = null,
+    // The Component Award seam bag (issue 1301), INJECTED for the same reason and NOT part of
+    // the fidelity claim: production's `_componentAwardSeams()` reaches `fromUuid`, the live
+    // crafting-system manager and the real engine, none of which exist here. The DELEGATOR
+    // below is a faithful copy and is pinned; the bag it reads is what a test substitutes.
+    componentAwardSeams = null,
   } = {}) {
     this._alchemyListingBuilder = alchemyListingBuilder;
     this.craftingEngine = craftingEngine;
@@ -301,6 +334,7 @@ export class FabricateFacadeUnderTest {
     this._bulkSalvageService = bulkSalvageService;
     this._bulkDestroyService = bulkDestroyService;
     this._companionCheckSeamBag = companionCheckSeams;
+    this._componentAwardSeamBag = componentAwardSeams;
   }
 
   get _game() {
@@ -413,17 +447,36 @@ export class FabricateFacadeUnderTest {
     return await checkWorldCurrencyAffordability(
       gate.actor,
       { unitId, amount },
-      {
-        getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
-        actorPropertyCoinSpender: this.actorPropertyCoinSpender,
-        actorInventoryCoinSpender: this.actorInventoryCoinSpender,
-      }
+      this._worldCurrencySeams()
     );
+  }
+
+  // --- Faithful copy of Fabricate#_worldCurrencySeams (issue 1301) -----------
+  //
+  // REPRODUCED rather than injected, unlike the two seam bags above it: every seam here is a
+  // field this harness already carries, so the copy costs nothing and the mirror can be pinned
+  // against production key for key. The mutation that matters is an omission — drop
+  // `actorInventoryCoinSpender` here and every facade-level currency case that does not use
+  // that strategy stays green while the mirror has silently stopped mirroring.
+  //
+  // `isElectedExecutor` is absent on both sides: the check gates on no call site, and
+  // `creditCurrency` spreads this bag and adds its own.
+  _worldCurrencySeams() {
+    return {
+      getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
+      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+      actorInventoryCoinSpender: this.actorInventoryCoinSpender,
+    };
   }
 
   // --- The Standalone Check Roll seam bag (INJECTED, see the constructor) -----
   _companionCheckSeams() {
     return this._companionCheckSeamBag;
+  }
+
+  // --- The Component Award seam bag (INJECTED, see the constructor) -----------
+  _componentAwardSeams() {
+    return this._componentAwardSeamBag;
   }
 
   // --- Faithful copy of Fabricate#rollActorCheck (issue 1293) ----------------
@@ -460,10 +513,24 @@ export class FabricateFacadeUnderTest {
   // splitting this run, and the cheapest split is the one already used for the gate keys:
   // hoist the shared shape out of both files rather than paraphrasing either.
   //
-  // For scale, a whole-repo CPD sweep at a 100-token floor finds exactly one >=100 run
-  // anywhere in the tree: a pre-existing 173-token block across `_mergeBulkRows` and
-  // `_buildNotPermittedRow`, which measures 173 at `fdc27c21` too. Issue 1293 introduces no
-  // new duplicated block.
+  // MEASURE AT YOUR OWN MERGE BASE; DO NOT QUOTE THIS COMMENT'S PREDECESSOR, OR ANY OTHER
+  // CHANGE'S PROSE, AS A BASELINE. What stood here was a snapshot — "a whole-repo sweep at a
+  // 100-token floor finds exactly one >=100 run anywhere in the tree" — and it was false when
+  // it was written: `tests/companion-facade.test.js:926` records a 139-token grant-delegator
+  // run, and it landed in the SAME commit. Three consecutive changes then reasoned from it.
+  //
+  // The durable facts are about METHOD, not magnitude. The tree carries many runs at this
+  // floor, and the pairwise `src/main.js` <-> this-file scope carries several delegator runs of
+  // its own, because that is what a hand-maintained mirror IS. So a change that touches these
+  // copies runs the sweep itself, at BOTH scopes, at its own merge base AND at its tip, and is
+  // judged on the DELTA — SonarCloud gates new-code duplication, not a tree with pre-existing
+  // runs. Record the full enumerations in the change's own deviations, never here: a fresh set
+  // of numbers in this comment block would only mint the next false record.
+  //
+  // The mitigation, when a delta does appear, is always the same one: hoist the shared shape
+  // out of BOTH files — as the gate-key constants and the two seam bags already are — and
+  // never paraphrase either copy to break a run, because a paraphrase makes the fidelity claim
+  // this mirror rests on false.
   async rollActorCheck({
     actorId = null,
     callSite = null,
@@ -497,6 +564,46 @@ export class FabricateFacadeUnderTest {
     return await resolveStandaloneBulkCheckDecision(
       { callSite, formulas },
       this._companionCheckSeams()
+    );
+  }
+
+  // --- Faithful copy of Fabricate#awardComponents (issue 1301) ---------------
+  //
+  // The delegator only: the award itself is the REAL free function, so what this copy
+  // reproduces is exactly the part that lives in `src/main.js` — the shared preamble with this
+  // member's OWN hoisted keys, the single readiness guard, and the resolved actor passed
+  // through as the leaf's FIRST argument, which is what makes a caller-supplied `actor` in the
+  // request structurally unable to reach a seam.
+  async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return componentAwardResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await awardComponentsToActor(
+      gate.actor,
+      { systemId, awards, callSite },
+      this._componentAwardSeams()
+    );
+  }
+
+  // --- Faithful copy of Fabricate#creditCurrency (issue 1301) ----------------
+  //
+  // One incidental asymmetry, of the class this file already carries: production reads the
+  // election off the bare `game` global and this copy reads it off `this._game`, exactly as
+  // `resolveBulkCheckDecision` above does. The EXPRESSION is otherwise identical, and the
+  // election is added by this member rather than by `_worldCurrencySeams()` on both sides.
+  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await creditWorldCurrency(
+      gate.actor,
+      { unitId, amount, callSite },
+      {
+        ...this._worldCurrencySeams(),
+        isElectedExecutor: () => this._game.users?.activeGM?.id === this._game.user?.id,
+      }
     );
   }
 
