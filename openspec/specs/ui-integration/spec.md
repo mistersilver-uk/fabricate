@@ -2658,6 +2658,77 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   A blind run's card is whispered **and** blind, so its own author sees hidden content; that is correct, the in-panel report is their feedback channel, and the blind flag must not be dropped to "fix" it.
   The card is created with **`author`**, not the legacy `user` key the single-salvage poster still passes.
 
+#### The GM-only complication card
+
+Posted to the elected GM alone when a resolution's fired complications reach them over the
+complication relay (`recipes-and-steps/spec.md` § Complication Macros).
+It is built by `buildGmComplicationCardContent`, not by the shared complications renderer the
+four player-facing cards draw: that renderer's row is three player-safe strings on one line,
+and this one additionally says why the complication fired, marks the acting client's
+unverifiable claim as a claim while doing so, reports the GM-side effect roll, and reports a
+macro that was skipped or threw — none of which may ever reach a player surface.
+
+- **A row is a VERTICAL STACK of labelled sections, never a run of columns.**
+  In source order: a head line carrying the complication's name with its severity eyebrow at
+  the right; a muted context line naming the component that carried it and, for a `visible`
+  complication, that the player saw it too; the GM's authored description; then **Why it
+  fired**; then **What happens**; then **Needs your attention**.
+  A section with nothing to say is OMITTED rather than drawn empty — an empty "What happens"
+  heading reads as a consequence that failed to render, and a complication that only narrates
+  legitimately has none.
+  The stack is what the row is FOR: its content is several independent statements about one
+  complication, and the previous single-line treatment hung them off the `<li>` as flex
+  siblings, which rendered a five-letter severity down three lines inside a 140px grid track.
+- **Every rule the GM row adds is reached through the card's `--gm` block modifier**, which no
+  player-facing card emits, so the player complication row and its two shipped rules cannot
+  move.
+  The structural half is asserted in `tests/component-complications-fire.test.js` and the
+  RENDERED half — that the runs stack, that each heading sits above its own facts, and that
+  the severity stays on one line flush right at chat width — in the engine-backed gate in
+  `tests/crafting-chat-card.test.js`, against a negative control with the modifier stripped.
+- **"Why it fired" is re-derived on the GM client, never relayed.**
+  The clause set, the `match` mode and the roll-condition toggle come from the GM's own copy of
+  the `craftingSystems` world setting, exactly like every other disclosure decision this card
+  takes; the acting client contributes only the claimed bucket, which is asked no more than
+  which of the GM's own stage clauses it satisfies.
+  Relaying the acting client's `matchedConditions` is refused: it would be a fourth
+  client-supplied claim on a payload specified as addressing-only, which
+  `resolution-modes/spec.md` § Progressive Awarding turns down by name.
+- **The reason is SOUND, not complete, and never guessed.**
+  Every reason named genuinely contributed to that firing.
+  A clause that may also have contributed but cannot be confirmed from the GM side is omitted
+  rather than asserted, and a firing whose deciding clause cannot be named at all says so in
+  one sentence rather than offering the most likely candidate.
+  Three cases reach that admission and all are real: a `checkTrigger` this side cannot
+  evaluate, a `rollCondition` whose dice this side never saw, and a claimed bucket no enabled
+  stage clause reads.
+- **A claimed outcome is worded as a REPORT; an authored condition is stated flat.**
+  The stage bucket is the acting client's unverifiable claim, so each of its four sentences
+  attributes it — "their game reports the roll falling short here" — rather than asserting it.
+  The attribution lives in the sentence's own grammar rather than behind a separate label,
+  because a "Reported by the acting client" prefix is a phrase a GM has to translate and
+  discharges the same obligation less readably.
+  A condition the GM authored is re-read from their own record and is therefore stated flat.
+- **The consequence roll leads with its TOTAL, under the name the GM gave it.**
+  `Acid damage: 10 (2d6)`, from `effectRoll.label` with the field's own name as the fallback.
+  It is a consequence with no target and nothing to miss, so a `formula = total` form read as
+  though it were the check the complication fired on.
+  A `gmOnly` complication's roll happens on the GM client and states the formula it rolled; a
+  `visible` one's happened on the acting client and reaches this card as a claimed number, so
+  it states its provenance where the formula would otherwise sit.
+- **The card carries NO stage position and no "needed N, rolled M" line**, though both would
+  read well.
+  `resolution-modes/spec.md` § Progressive Awarding rules the position off this surface: its
+  referent is the acting client's ordered list, which this card does not draw and the GM has no
+  view of.
+  The threshold and the check total fail the same test and one more — neither is re-derivable
+  GM-side, because a progressive threshold is a function of the ordered list, that order is the
+  PLAYER's per-user preference and is never exported, and a threshold computed from the GM's
+  authored order would be wrong exactly when the player reordered.
+  Carrying them would make them the fourth and fifth client-supplied claims on an
+  addressing-only payload.
+  "Why it fired" therefore states the outcome in words rather than in numbers.
+
 ### Deferred (this iteration)
 
 - No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see §Books & Scrolls learning and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).

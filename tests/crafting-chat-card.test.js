@@ -19,6 +19,7 @@ import { chromium } from 'playwright';
 
 import { buildBulkSalvageChatContent } from '../src/systems/BulkSalvageChatCard.js';
 import { buildCraftingChatContent } from '../src/systems/CraftingChatCard.js';
+import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
 import { buildGatheringChatContent } from '../src/systems/GatheringChatCard.js';
 import { buildSalvageChatContent } from '../src/systems/SalvageChatCard.js';
 
@@ -791,6 +792,143 @@ for (const [card, block] of [
  * goldens above already pin the string; this pins the STYLESHEET, which the goldens cannot
  * see. A rule that named `__item` or `__label` alone would move every card in every world.
  */
+/**
+ * The GM-only card's row, measured at chat width (issue 1286).
+ *
+ * ITS OWN GATE, because its failure mode is not the player row's. The player row overflowed;
+ * the GM row COLLAPSED. It hung its notes off the `<li>` as siblings of `__label`, and `__item`
+ * is `display: flex` in row direction, so each note became a flex track a few characters wide
+ * inside a `minmax(140px, 1fr)` grid cell — the live card drew the three-letter severity
+ * `Major` as `M o r` down three lines, beside two more slivers. Nothing in the markup says so
+ * and nothing in `happy-dom` can see it: it takes a cascade and an engine.
+ *
+ * THE NEGATIVE CONTROL is the `--gm` block modifier, stripped from the same rendered card on
+ * the same page. Every rule the GM row adds is reached through that modifier — which is also
+ * what keeps the player row byte-identical — so the stripped copy is the card with those rules
+ * and only those rules removed.
+ */
+const GM_ROW = Object.freeze({
+  name: 'The gland ruptures',
+  description:
+    'The acid sacs burst as the carcass comes apart, and everything within arm’s reach of ' +
+    'the bench is splashed.',
+  severity: 'major',
+  visibility: 'visible',
+  componentName: 'Balehound Mordant',
+  effectLabel: 'Acid damage',
+  effectRoll: { requested: true, attempted: true, total: 10, formula: '2d6', posted: true },
+  reasons: ['halted'],
+  claimed: { bucket: 'halted', effectRollTotal: null },
+  macro: null,
+});
+
+function measureGmComplication(page, rootId) {
+  return page.evaluate((id) => {
+    const block = 'fabricate-craft-chat';
+    const item = document.querySelector(`#${id} [data-fabricate-complication-severity]`);
+    const label = item.querySelector(`.${block}__label`);
+    const head = item.querySelector(`.${block}__complication-head`);
+    const severity = item.querySelector(`.${block}__complication-severity`);
+    const sections = [...item.querySelectorAll('[data-fabricate-complication-section]')];
+    // The row's RUNS in source order: the three identity lines, then each labelled section.
+    const runs = [
+      head,
+      item.querySelector(`.${block}__complication-meta`),
+      item.querySelector(`.${block}__complication-description`),
+      ...sections,
+    ].map((node) => node.getBoundingClientRect());
+    const labelBox = label.getBoundingClientRect();
+    const headBox = head.getBoundingClientRect();
+    const severityBox = severity.getBoundingClientRect();
+    return {
+      sectionCount: sections.length,
+      // A STACK: every run starts at or below the bottom of the one before it. This is the
+      // claim, and it is false for every inline rendering — including the one the `--gm`
+      // rules were added to replace.
+      stacked: runs.every((box, index) => index === 0 || box.top >= runs[index - 1].bottom - 1),
+      // And INSIDE a section: the heading is its own line above its facts, not a bold word
+      // run into the sentence after it.
+      headingsOwnLine: sections.every((section) => {
+        const heading = section
+          .querySelector(`.${block}__complication-heading`)
+          .getBoundingClientRect();
+        const fact = section.querySelector(`.${block}__complication-fact`).getBoundingClientRect();
+        return fact.top >= heading.bottom - 1;
+      }),
+      narrowestRunShare: Math.min(...runs.map((box) => box.width)) / labelBox.width,
+      overflowsOwnBox: label.scrollWidth > label.clientWidth + 1,
+      // The severity eyebrow on ONE line, at the right of the name it qualifies.
+      severityHeight: severityBox.height,
+      headHeight: headBox.height,
+      severityOnHeadLine:
+        severityBox.top >= headBox.top - 1 && severityBox.bottom <= headBox.bottom + 1,
+      severityFlushRight: labelBox.right - severityBox.right < 2,
+      itemWidth: item.getBoundingClientRect().width,
+      listWidth: item.parentElement.getBoundingClientRect().width,
+    };
+  }, rootId);
+}
+
+test('the GM complication row STACKS its sections at chat width', async () => {
+  const html = buildGmComplicationCardContent(
+    { entries: [GM_ROW], actorName: 'Aldric', reporterName: 'Player One' },
+    // The FULL dotted path, not the leaf: the severity label lives under the manager's
+    // namespace, and a leaf lookup would resolve it to the key itself — a 60-character string
+    // that overflows the row and would make this gate fail on its own stub.
+    (key) => key.split('.').reduce((node, part) => node?.[part], { FABRICATE: LANG.FABRICATE }) ?? key
+  );
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${FOUNDRY_CSS}</style><style>${FABRICATE_CSS}</style>` +
+        `<style>html,body{margin:0}</style>` +
+        `<div id="shipped" style="width:${CHAT_WIDTH}px">${html}</div>` +
+        `<div id="unstyled" style="width:${CHAT_WIDTH}px">` +
+        `${html.replace(' fabricate-craft-chat--gm', '')}</div>`
+    );
+
+    const shipped = await measureGmComplication(page, 'shipped');
+    const unstyled = await measureGmComplication(page, 'unstyled');
+
+    assert.equal(shipped.sectionCount, 2, 'why it fired, and what happens');
+    // THE CONTROL. Without the `--gm` rules every run is an inline span, so the identity
+    // lines share lines with each other and each heading runs into its own facts. That is
+    // what makes each assertion below a measurement rather than a tautology.
+    assert.ok(
+      !unstyled.stacked,
+      'the control runs the row together on shared lines'
+    );
+    assert.ok(!unstyled.headingsOwnLine, 'and runs each heading into the fact after it');
+
+    assert.ok(shipped.stacked, 'each run starts below the one before it');
+    assert.ok(shipped.headingsOwnLine, 'and each section heading sits above its own facts');
+    assert.ok(
+      shipped.narrowestRunShare > 0.9,
+      `every run takes the row's whole width rather than a track of it: ` +
+        `${shipped.narrowestRunShare.toFixed(2)}`
+    );
+    assert.ok(!shipped.overflowsOwnBox, 'nothing is clipped out of the row');
+    assert.ok(shipped.severityOnHeadLine, 'the severity rides the name line');
+    assert.ok(shipped.severityFlushRight, 'at the right of it');
+    assert.ok(
+      shipped.severityHeight < 24 && shipped.headHeight < 24,
+      `both on ONE line — the live defect drew the five-letter severity as three: ` +
+        `severity ${shipped.severityHeight}px in a head of ${shipped.headHeight}px`
+    );
+    assert.ok(
+      Math.abs(shipped.itemWidth - shipped.listWidth) <= 0.5,
+      `the row takes the whole grid rather than one 140px track: ${shipped.itemWidth}px ` +
+        `of ${shipped.listWidth}px`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('the stage-position span is de-emphasised on the same rule as the component it follows', () => {
   // The class ships with the markup or the number shouts on exactly the rows that already
   // repeat, which is the opposite of the job it was added for. It shares the source's rule

@@ -84,13 +84,55 @@ const SEVERITY_KEYS = Object.freeze({
   severe: 'FABRICATE.Admin.Manager.Component.Complications.Severity.severe',
 });
 
-/** The label key for each stage bucket the acting client may CLAIM. Same frozen-map rule. */
-const BUCKET_KEYS = Object.freeze({
-  full: 'FABRICATE.Chat.GmComplication.Bucket.full',
-  partial: 'FABRICATE.Chat.GmComplication.Bucket.partial',
-  halted: 'FABRICATE.Chat.GmComplication.Bucket.halted',
-  unreached: 'FABRICATE.Chat.GmComplication.Bucket.unreached',
-  skipped: 'FABRICATE.Chat.GmComplication.Bucket.skipped',
+/**
+ * The sentence each REASON token renders as, on the GM card's "why it fired" section.
+ *
+ * Same frozen-map rule as the severities above, and read through {@link lookup} so an
+ * authored or relayed token can never reach `Object.prototype`.
+ *
+ * The four stage tokens are four of the five buckets, and every one of them is worded as a REPORT
+ * rather than as a fact — "their game reports the roll falling short here", never "the roll
+ * fell short". The bucket is the acting client's unverifiable claim
+ * (`openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY"),
+ * so the hedge has to survive the humanised copy; carrying it in the sentence's own grammar
+ * is what lets it survive without a separate "reported by the acting client" label the GM has
+ * to translate.
+ *
+ * There is deliberately NO `skipped` entry, even though `skipped` is a bucket: no stage
+ * clause reads it (see {@link STAGE_CLAUSE_BUCKETS}), a `skipped` entry fires nothing in the
+ * first place because it is a stage the award loop REFUSED rather than an outcome, and a
+ * sentence no code path can select is dead vocabulary a locale would still be asked to
+ * translate. A relayed `bucket: 'skipped'` therefore reaches `unknown`, which is true.
+ *
+ * The two clause tokens are the opposite: they name conditions the GM authored, re-read
+ * from the GM's OWN world setting, so they are stated flat. `unknown` is the honest answer
+ * for a firing whose deciding clause this side cannot name — see
+ * {@link complicationReasons} — and never a guess at one of the others.
+ */
+const REASON_KEYS = Object.freeze({
+  full: 'FABRICATE.Chat.GmComplication.Reason.full',
+  partial: 'FABRICATE.Chat.GmComplication.Reason.partial',
+  halted: 'FABRICATE.Chat.GmComplication.Reason.halted',
+  unreached: 'FABRICATE.Chat.GmComplication.Reason.unreached',
+  checkTrigger: 'FABRICATE.Chat.GmComplication.Reason.checkTrigger',
+  rollCondition: 'FABRICATE.Chat.GmComplication.Reason.rollCondition',
+  unknown: 'FABRICATE.Chat.GmComplication.Reason.unknown',
+});
+
+/**
+ * The buckets each stage-outcome clause matches — a PRESENTATION mirror of
+ * `complicationPlan.js`'s `BUCKETS_BY_STAGE_CONDITION`, which is module-private there.
+ *
+ * A mirror is a drift hazard, so it is not left to a comment: an ORACLE test in
+ * `tests/component-complications-fire.test.js` drives the real `planComplications` over every
+ * (clause, bucket) pair and asserts that every reason {@link complicationReasons} names was
+ * genuinely among that firing's `matchedConditions`. If the planner's table moves and this one
+ * does not, that test fails rather than the card quietly naming a reason that did not fire.
+ */
+const STAGE_CLAUSE_BUCKETS = Object.freeze({
+  stageAwarded: Object.freeze(['full']),
+  stagePartial: Object.freeze(['partial']),
+  stageMissed: Object.freeze(['halted', 'unreached']),
 });
 
 /** The BEM block the GM card borrows, so it needs no new CSS and cannot regress the cards
@@ -103,14 +145,46 @@ const GM_CARD_KEYS = Object.freeze({
   title: 'FABRICATE.Chat.GmComplication.Title',
   actor: 'FABRICATE.Chat.GmComplication.Actor',
   reportedBy: 'FABRICATE.Chat.GmComplication.ReportedBy',
-  unverified: 'FABRICATE.Chat.GmComplication.Unverified',
-  stage: 'FABRICATE.Chat.GmComplication.Stage',
+  whyItFired: 'FABRICATE.Chat.GmComplication.WhyItFired',
+  whatHappens: 'FABRICATE.Chat.GmComplication.WhatHappens',
+  needsAttention: 'FABRICATE.Chat.GmComplication.NeedsAttention',
   effectRoll: 'FABRICATE.Chat.GmComplication.EffectRoll',
-  effectRollFailed: 'FABRICATE.Chat.GmComplication.EffectRollFailed',
+  effectRollClaimed: 'FABRICATE.Chat.GmComplication.EffectRollClaimed',
+  effectRollUnrollable: 'FABRICATE.Chat.GmComplication.EffectRollUnrollable',
   playerVisible: 'FABRICATE.Chat.GmComplication.PlayerVisible',
-  macroSkipped: 'FABRICATE.Chat.GmComplication.MacroSkipped',
-  macroFailed: 'FABRICATE.Chat.GmComplication.MacroFailed',
 });
+
+/**
+ * The label key for each macro outcome worth reporting. A macro that simply ran is not news.
+ *
+ * Its OWN map rather than two more entries in the card's keys above, because it is keyed on the
+ * report's `status` token — an untrusted string — and {@link lookup} is what makes that safe.
+ * Two entries in a general-purpose map would be indexed by a token from the same place with
+ * nothing saying so.
+ */
+const MACRO_FAULT_KEYS = Object.freeze({
+  skipped: 'FABRICATE.Chat.GmComplication.MacroSkipped',
+  failed: 'FABRICATE.Chat.GmComplication.MacroFailed',
+});
+
+/**
+ * Read a token out of one of the frozen label maps above, or `null`.
+ *
+ * A bare `MAP[token]` is not safe here and never was: `Object.freeze` does not detach
+ * `Object.prototype`, so a severity of `constructor` — which the persisted shape deliberately
+ * PRESERVES when malformed, and which an imported third-party system can carry — resolves to
+ * the `Object` constructor, and the card then renders `function Object() { [native code] }` as
+ * its severity. Every token reaching these maps is authored or relayed text, so every one of
+ * them is read through here, on the `COMPLICATION_BLOCKS` precedent in `CraftingChatCard.js`.
+ *
+ * @param {object} map one of the frozen key maps in this module
+ * @param {unknown} token
+ * @returns {string|null}
+ */
+function lookup(map, token) {
+  const key = text(token);
+  return Object.hasOwn(map, key) ? map[key] : null;
+}
 
 /** @param {unknown} value @returns {Array<any>} */
 function list(value) {
@@ -451,11 +525,16 @@ export async function fireComplications({ plan, actor = null, context = {} } = {
  * The macro UUID is NOT projected: the GM side re-reads it from its own copy of the world
  * setting, and a projection carrying it would be one step from a payload carrying it.
  *
+ * `effectLabel` is the AUTHORED name of the complication's consequence roll ("Acid damage"),
+ * projected beside the roll itself so the card can say what a total is a total OF. It is
+ * authored GM text like `name` and `description`, re-read from the GM's own world setting on
+ * the GM side, so it is attested rather than claimed even when the number beside it is not.
+ *
  * @param {Array<object>} fired {@link fireComplications}'s `fired` list
  * @returns {Array<{resultId: string|null, componentId: string|null, componentName: string,
  *   complicationId: string|null, name: string, description: string, severity: string,
  *   visibility: string, bucket: string|null, buckets: Array<string>,
- *   matchedConditions: Array<string>, effectRoll: object|null}>}
+ *   matchedConditions: Array<string>, effectRoll: object|null, effectLabel: string}>}
  */
 export function gmComplications(fired) {
   return list(fired).map((entry) => ({
@@ -471,7 +550,69 @@ export function gmComplications(fired) {
     buckets: [...list(entry?.buckets)],
     matchedConditions: [...list(entry?.matchedConditions)],
     effectRoll: entry?.effectRoll ?? null,
+    effectLabel: text(entry?.complication?.effectRoll?.label),
   }));
+}
+
+/**
+ * WHY one complication fired, re-derived on the GM client from the complication the GM
+ * themselves authored plus the one outcome fact the acting client reported.
+ *
+ * ## Why it is re-derived here rather than relayed
+ *
+ * The acting client already computes this — `planComplications` returns `matchedConditions`
+ * and `fireComplications` appends `rollCondition` to it — and relaying that list would be the
+ * obvious move. It is refused: the relay payload is specified as ADDRESSING ONLY plus the
+ * outcome facts an output echoes (`openspec/specs/recipes-and-steps/spec.md`), and
+ * `resolution-modes/spec.md` § Progressive Awarding turns down a FOURTH client-supplied claim
+ * on that payload by name. A reason list is exactly such a claim, and it is one the GM does
+ * not need to be told: the `when` block, the `match` mode and the `rollCondition` toggle are
+ * all in the GM's own copy of the world setting, which is where every other disclosure
+ * decision on this card already comes from.
+ *
+ * ## What it will and will not say
+ *
+ * Sound, not complete. Every token returned is a clause that DID contribute to this firing;
+ * a clause that may also have contributed but cannot be confirmed from here is omitted rather
+ * than asserted, and a firing whose deciding clause cannot be named at all returns `unknown`
+ * rather than the most likely candidate. The three cases that force `unknown` are all real:
+ * a `checkTrigger` this side cannot evaluate (matching one means evaluating its condition
+ * against the roll, which is the acting client's job), a `rollCondition` whose dice this side
+ * never saw, and a claimed bucket that no enabled stage clause matches.
+ *
+ * Under `match: 'all'` every enabled clause matched or the complication would not have fired,
+ * so all of them are named. Under `match: 'any'` a matched stage clause SETTLES the firing —
+ * `decideFiring` stops consulting the dice the moment one matches — so the stage reason is
+ * named and the trigger, which may or may not also have matched, is not.
+ *
+ * @param {object|null} complication the AUTHORED complication, from the GM's own record
+ * @param {string|null} bucket the acting client's claimed stage bucket
+ * @returns {Array<string>} reason tokens for {@link REASON_KEYS}, never empty
+ */
+export function complicationReasons(complication, bucket) {
+  const claimed = text(bucket);
+  // Whether an enabled stage clause READS the claimed bucket. `some`, not `find`: the three
+  // bucket sets are disjoint, so at most one clause can match and its identity adds nothing —
+  // the reason token IS the bucket.
+  const stageMatched = Object.entries(STAGE_CLAUSE_BUCKETS).some(
+    ([clause, buckets]) => complication?.when?.[clause] === true && buckets.includes(claimed)
+  );
+  const trigger = text(complication?.when?.checkTrigger).trim() !== '';
+  const dice = complication?.rollCondition?.enabled === true;
+  if (complication?.match === 'all') {
+    const reasons = [
+      stageMatched ? claimed : '',
+      trigger ? 'checkTrigger' : '',
+      dice ? 'rollCondition' : '',
+    ];
+    const named = reasons.filter(Boolean);
+    return named.length > 0 ? named : ['unknown'];
+  }
+  if (stageMatched) return [claimed];
+  // No stage clause matched, so the firing rests on the trigger, on the condition roll, or on
+  // both — and only when exactly one of the two is authored does "both" stop being possible.
+  if (trigger !== dice) return [trigger ? 'checkTrigger' : 'rollCondition'];
+  return ['unknown'];
 }
 
 /**
@@ -498,6 +639,12 @@ export function gmComplications(fired) {
  * rather than stating it flat (`openspec/specs/recipes-and-steps/spec.md` § "The relay
  * payload carries ADDRESSING ONLY").
  *
+ * `reasons` is the one field assembled from BOTH sides: {@link complicationReasons} reads the
+ * `when` block, the `match` mode and the `rollCondition` toggle off the GM's own authored
+ * record and asks the claimed bucket only which of the GM's own stage clauses it satisfies.
+ * It is therefore re-derived here rather than relayed, and the reason SENTENCES it selects
+ * carry their hedge in their own grammar — see {@link REASON_KEYS}.
+ *
  * @param {Array<{component?: object, complication?: object, entry?: object,
  *   report?: {effect?: object, macro?: object}}>} applied
  *   {@link ../systems/complicationSocket.js applyAuthoredComplications}'s return.
@@ -518,6 +665,7 @@ export function gmComplicationCardEntries(applied) {
     ]);
     return {
       ...projected,
+      reasons: complicationReasons(row?.complication, row?.entry?.bucket ?? null),
       claimed: {
         bucket: row?.entry?.bucket ?? null,
         effectRollTotal: row?.entry?.effectRollTotal ?? null,
@@ -543,92 +691,223 @@ function isReportableTotal(total) {
 }
 
 /**
- * The notes one GM card row carries under its name, already escaped and in reading order.
+ * The severity eyebrow, at the right of the name it qualifies.
  *
- * Three separate jobs, and the order is what makes them readable as a sentence about ONE
- * complication: what the GM authored (severity, audience), what the acting client CLAIMS about
- * the outcome, and what this GM client actually did with the macro.
+ * The one authored fact that rides the HEAD line, because it is the one a GM triages on and
+ * the only one short enough: the audience note beside it made the pair 188px of a 266px chat
+ * row, which wrapped the eyebrow onto its own line and undid the head. It goes on the muted
+ * context line below instead — see {@link gmComplicationMeta}.
  *
- * `bucket` and `effectRollTotal` are the acting client's unverifiable claim — the GM cannot
- * re-derive either, because the award happened on the acting client — so they are labelled as
- * reported rather than stated flat. That labelling is required by
- * `openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY", not
- * a presentational choice.
+ * Read through {@link lookup}, because `severity` is the one token on this row that the
+ * persisted shape deliberately PRESERVES when malformed.
  *
- * @param {object} entry one row of {@link buildGmComplicationCardContent}'s model
+ * @param {object} entry
  * @param {(key: string) => string} loc
- * @returns {Array<string>} escaped HTML fragments
+ * @returns {string} escaped HTML, or '' for a severity outside the vocabulary
  */
-function gmComplicationNotes(entry, loc) {
-  const notes = [];
-  const severityKey = SEVERITY_KEYS[text(entry?.severity)];
-  const authored = [
-    severityKey ? esc(loc(severityKey)) : '',
-    entry?.visibility === VISIBLE ? esc(loc(GM_CARD_KEYS.playerVisible)) : '',
-  ].filter(Boolean);
-  if (authored.length > 0) notes.push(authored.join(' · '));
-
-  const bucketKey = BUCKET_KEYS[text(entry?.claimed?.bucket)];
-  const claimedTotal = entry?.claimed?.effectRollTotal;
-  const claim = [
-    bucketKey ? `${esc(loc(GM_CARD_KEYS.stage))}: ${esc(loc(bucketKey))}` : '',
-    isReportableTotal(claimedTotal)
-      ? `${esc(loc(GM_CARD_KEYS.effectRoll))}: ${esc(claimedTotal)}`
-      : '',
-  ].filter(Boolean);
-  if (claim.length > 0) notes.push(`${esc(loc(GM_CARD_KEYS.unverified))} — ${claim.join(' · ')}`);
-
-  // `attempted`, never `requested`. `requested` is true for an authored roll this client
-  // DECLINED by audience — a `visible` complication carrying a macro reaches the GM client
-  // for the macro's sake, and its roll belongs to the acting player's dice. Reading
-  // `requested` here rendered "the roll failed" directly under the acting client's claimed
-  // total for that exact case, so the card stated an outcome and its own contradiction.
-  const effect = entry?.effectRoll;
-  if (effect?.attempted === true) {
-    notes.push(
-      isReportableTotal(effect.total)
-        ? `${esc(loc(GM_CARD_KEYS.effectRoll))}: ${esc(effect.formula)} = ${esc(effect.total)}`
-        : `${esc(loc(GM_CARD_KEYS.effectRollFailed))}: ${esc(effect.formula)}`
-    );
-  }
-
-  // The macro miss is REPORTED here rather than only to the console, because
-  // `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" states that a uuid
-  // which does not resolve to a script macro "is skipped and reported on the GM-facing output":
-  // compendium ownership is GM-configurable per role, so a broken link is a real GM-facing case
-  // and a console warning on the ONE client that can fix it is not a report.
-  const macroKey =
-    { skipped: GM_CARD_KEYS.macroSkipped, failed: GM_CARD_KEYS.macroFailed }[
-      text(entry?.macro?.status)
-    ] ?? null;
-  if (macroKey) notes.push(`${esc(loc(macroKey))}: ${esc(entry?.macro?.macroUuid)}`);
-  return notes;
+function gmComplicationSeverity(entry, loc) {
+  const severityKey = lookup(SEVERITY_KEYS, entry?.severity);
+  if (!severityKey) return '';
+  return `<span class="${GM_CARD_BLOCK}__complication-severity">${esc(loc(severityKey))}</span>`;
 }
 
 /**
- * Render one GM card row.
+ * The muted context line: WHICH component carried this, and whether the player saw it too.
+ *
+ * One line rather than two, because both answer "where does this sit" rather than "what
+ * happened", and a stack of one-word lines is as unreadable in the other direction. They are
+ * separate spans inside it rather than one joined string so the audience note can be found and
+ * styled without also finding the component's name.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} loc
+ * @returns {string} escaped HTML, or '' when the row has neither
+ */
+function gmComplicationMeta(entry, loc) {
+  const runs = [
+    entry?.componentName
+      ? `<span class="${GM_CARD_BLOCK}__complication-source">${esc(entry.componentName)}</span>`
+      : '',
+    entry?.visibility === VISIBLE
+      ? `<span class="${GM_CARD_BLOCK}__complication-audience">${esc(loc(GM_CARD_KEYS.playerVisible))}</span>`
+      : '',
+  ].filter(Boolean);
+  if (runs.length === 0) return '';
+  return `<span class="${GM_CARD_BLOCK}__complication-meta">${runs.join(' · ')}</span>`;
+}
+
+/**
+ * WHY IT FIRED: one sentence per reason {@link complicationReasons} could name.
+ *
+ * Several lines rather than one joined sentence, because under `match: 'all'` they are
+ * genuinely several independent conditions and a GM reading "and" between two of them at the
+ * end of a wrapped line cannot tell which clause each half belongs to.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} loc
+ * @returns {Array<string>} escaped HTML fragments
+ */
+function gmComplicationReasonFacts(entry, loc) {
+  return list(entry?.reasons)
+    .map((reason) => lookup(REASON_KEYS, reason))
+    .filter(Boolean)
+    .map((key) => esc(loc(key)));
+}
+
+/**
+ * WHAT HAPPENS: the complication's own consequence roll, in the GM's own words for it.
+ *
+ * ## It is a consequence, not a test, so it is never phrased as one
+ *
+ * The effect roll has NO target and nothing to miss. `Effect roll: 2d6 = 10` read as though
+ * it were the check the complication fired on, which is the opposite of what it is, so the
+ * total leads and the formula follows it as provenance: `Acid damage: 10 (2d6)`. The label is
+ * the GM's own `effectRoll.label`, falling back to the field's own name when unauthored.
+ *
+ * ## Two totals, two provenances, never confused
+ *
+ * A `gmOnly` complication's roll happens HERE, so it is stated with the formula this client
+ * actually rolled. A `visible` one's roll happened on the acting client and reaches this card
+ * only as a claimed number, so it is stated with its provenance in place of a formula. The
+ * two are mutually exclusive in practice — `runEffectRoll` and `rollGmComplicationEffect`
+ * each refuse the other's audience — but both are rendered independently, so a row that
+ * somehow carried both would report two totals rather than silently pick one.
+ *
+ * `attempted`, never `requested`: `requested` is true for an authored roll this client
+ * DECLINED by audience, and keying on it rendered "the roll failed" directly under the acting
+ * client's claimed total for that exact case, so the card stated an outcome and its own
+ * contradiction two lines apart.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} loc
+ * @returns {Array<string>} escaped HTML fragments
+ */
+function gmComplicationEffectFacts(entry, loc) {
+  const label = esc(text(entry?.effectLabel).trim() || loc(GM_CARD_KEYS.effectRoll));
+  const facts = [];
+  const effect = entry?.effectRoll;
+  if (effect?.attempted === true) {
+    facts.push(
+      isReportableTotal(effect.total)
+        ? `${label}: ${esc(effect.total)} (${esc(effect.formula)})`
+        : `${label}: ${esc(loc(GM_CARD_KEYS.effectRollUnrollable))} (${esc(effect.formula)})`
+    );
+  }
+  const claimed = entry?.claimed?.effectRollTotal;
+  if (isReportableTotal(claimed))
+    facts.push(`${label}: ${esc(claimed)} (${esc(loc(GM_CARD_KEYS.effectRollClaimed))})`);
+  return facts;
+}
+
+/**
+ * NEEDS YOUR ATTENTION: a macro link only the GM can repair.
+ *
+ * Its own section rather than a note among the narration, because it is the one thing on this
+ * card that is not narration: `recipes-and-steps/spec.md` § "The `script` gate is a call-site
+ * check" states that a uuid which does not resolve to a script macro "is skipped and reported
+ * on the GM-facing output". Compendium ownership is GM-configurable per role, so a broken link
+ * is a real GM-facing case and a console warning on the ONE client that can fix it is not a
+ * report. The status is read through {@link lookup} for the reason that helper gives: a
+ * two-key object literal still inherits `Object.prototype`, so a `constructor` status would
+ * resolve truthy and `?? null` would never see it.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} loc
+ * @returns {Array<string>} escaped HTML fragments
+ */
+function gmComplicationFaultFacts(entry, loc) {
+  const key = lookup(MACRO_FAULT_KEYS, entry?.macro?.status);
+  // The uuid on its OWN line rather than appended after a colon: both fault strings already
+  // end in a clause of their own — one with a colon, one with an em dash — so appending a
+  // second separator produced `…script macro: Compendium.x` and `…see the console — Macro.x`.
+  // A line of its own also leaves the uuid selectable on its own, which is what a GM does with
+  // it: paste it into the editor to find the link they have to repair.
+  return key ? [esc(loc(key)), esc(entry?.macro?.macroUuid)] : [];
+}
+
+/**
+ * One LABELLED SECTION of a row, or '' when it has nothing to say.
+ *
+ * Empty sections are omitted rather than drawn empty: a "what happens" heading over nothing
+ * reads as a complication whose consequence failed to render, and a complication that only
+ * narrates legitimately has no consequence to report.
+ *
+ * The `attention` section additionally carries its own class rather than a modifier suffix,
+ * because the stylesheet guard in `tests/crafting-chat-card.test.js` requires each branch of a
+ * complication rule to END on a complication-only class.
+ *
+ * @param {string} section the section token, also emitted as a `data-` hook for tests
+ * @param {string} headingKey
+ * @param {Array<string>} facts already-escaped HTML fragments
+ * @param {(key: string) => string} loc
+ * @returns {string}
+ */
+function gmComplicationSection(section, headingKey, facts, loc) {
+  if (facts.length === 0) return '';
+  const fault = section === 'attention' ? ` ${GM_CARD_BLOCK}__complication-fault` : '';
+  return [
+    `<span class="${GM_CARD_BLOCK}__complication-block${fault}" data-fabricate-complication-section="${section}">`,
+    `<span class="${GM_CARD_BLOCK}__complication-heading">${esc(loc(headingKey))}</span>`,
+    ...facts.map((fact) => `<span class="${GM_CARD_BLOCK}__complication-fact">${fact}</span>`),
+    '</span>',
+  ].join('');
+}
+
+/**
+ * Render one GM card row as a VERTICAL STACK of labelled sections (issue 1286).
+ *
+ * ## Why it is not a run of em-dash-joined phrases any more
+ *
+ * It was, and the em dashes were never the problem: the row put its identity in one `__label`
+ * and then hung its notes off the `__item` as SIBLINGS of that label. `__item` is
+ * `display: flex` in row direction, so those notes became columns inside a grid cell, each one
+ * a flex track a few characters wide — the live card rendered a three-letter severity as
+ * `M o r` down three lines. The fix is structural rather than a width tweak: everything the
+ * row draws now lives inside the one `__label`, which the GM card's own `--gm` block modifier
+ * turns into a column. Reaching every new selector through `--gm` is also what keeps the
+ * PLAYER complication row byte-identical, since no player card emits that modifier.
+ *
+ * ## The order is what makes it readable
+ *
+ * Identity first (what fired, how bad, who saw it, on which component), then the GM's authored
+ * prose, then the two questions a GM actually has — why did this fire, and what does it do —
+ * each under its own heading, then anything only they can repair. The two headings are the
+ * sections the maintainer approved; the third appears only on a macro fault.
  *
  * @param {object} entry
  * @param {(key: string) => string} loc
  * @returns {string}
  */
 function renderGmComplication(entry, loc) {
-  const parts = [`<span class="${GM_CARD_BLOCK}__complication-name">${esc(entry?.name)}</span>`];
-  if (entry?.componentName)
-    parts.push(
-      `<span class="${GM_CARD_BLOCK}__complication-source">${esc(entry.componentName)}</span>`
-    );
-  if (entry?.description)
-    parts.push(
-      `<span class="${GM_CARD_BLOCK}__complication-description">${esc(entry.description)}</span>`
-    );
-  const notes = gmComplicationNotes(entry, loc).map(
-    (note) => `<span class="${GM_CARD_BLOCK}__complication-note">${note}</span>`
-  );
+  const head = `<span class="${GM_CARD_BLOCK}__complication-name">${esc(entry?.name)}</span>${gmComplicationSeverity(entry, loc)}`;
+  const stack = [
+    `<span class="${GM_CARD_BLOCK}__complication-head">${head}</span>`,
+    gmComplicationMeta(entry, loc),
+    entry?.description
+      ? `<span class="${GM_CARD_BLOCK}__complication-description">${esc(entry.description)}</span>`
+      : '',
+    gmComplicationSection(
+      'why',
+      GM_CARD_KEYS.whyItFired,
+      gmComplicationReasonFacts(entry, loc),
+      loc
+    ),
+    gmComplicationSection(
+      'effect',
+      GM_CARD_KEYS.whatHappens,
+      gmComplicationEffectFacts(entry, loc),
+      loc
+    ),
+    gmComplicationSection(
+      'attention',
+      GM_CARD_KEYS.needsAttention,
+      gmComplicationFaultFacts(entry, loc),
+      loc
+    ),
+  ].filter(Boolean);
   return [
     `<li class="${GM_CARD_BLOCK}__item ${GM_CARD_BLOCK}__item--complication" data-fabricate-complication-severity="${esc(entry?.severity)}">`,
-    `<span class="${GM_CARD_BLOCK}__label">${parts.join(' — ')}</span>`,
-    ...notes,
+    `<span class="${GM_CARD_BLOCK}__label">${stack.join('')}</span>`,
     '</li>',
   ].join('');
 }
@@ -639,12 +918,14 @@ function renderGmComplication(entry, loc) {
  * ## Why this is not `renderComplications`
  *
  * That renderer's whole contract is "the caller has already redacted", and its row is the
- * three player-safe strings. This row must additionally mark the acting client's unverifiable
- * CLAIM as a claim, report the GM-side effect roll, and report a macro that was skipped or
- * threw — none of which may ever reach a player surface. Widening the one shared renderer to
- * carry them would put GM-only fields inside the function every player-facing card calls,
+ * three player-safe strings on ONE line. This row must additionally say why the complication
+ * fired, mark the acting client's unverifiable CLAIM as a claim while doing so, report the
+ * GM-side effect roll, and report a macro that was skipped or threw — none of which may ever
+ * reach a player surface, and none of which fits on one line. Widening the one shared renderer
+ * to carry them would put GM-only fields inside the function every player-facing card calls,
  * which is exactly the ambiguity the audience split exists to remove. It borrows that
- * renderer's BEM block and its `esc`, so the markup and the escaping rule stay single-sourced.
+ * renderer's BEM block and its `esc`, so the markup and the escaping rule stay single-sourced,
+ * and reaches its own layout through the `--gm` block modifier so the player row cannot move.
  *
  * ## Escaping
  *
@@ -657,7 +938,7 @@ function renderGmComplication(entry, loc) {
  *
  * @param {object} model
  * @param {Array<{name: string, description: string, severity: string, visibility: string,
- *   componentName: string, effectRoll: ?object,
+ *   componentName: string, effectRoll: ?object, effectLabel: ?string, reasons: ?Array<string>,
  *   claimed: ?{bucket: ?string, effectRollTotal: ?number}, macro: ?{status: string,
  *   macroUuid: ?string}}>} [model.entries] one row per delivered complication, projected
  *   through {@link gmComplications} and augmented with the GM-side outcome.

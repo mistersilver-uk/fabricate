@@ -1287,19 +1287,23 @@
         "Title": "Complications (GM only)",
         "Actor": "Actor",
         "ReportedBy": "Reported by",
-        "Unverified": "Reported by the acting client",
-        "Stage": "Stage",
+        "WhyItFired": "Why it fired",
+        "WhatHappens": "What happens",
+        "NeedsAttention": "Needs your attention",
         "EffectRoll": "Effect roll",
-        "EffectRollFailed": "Effect roll failed",
+        "EffectRollClaimed": "as their game rolled it",
+        "EffectRollUnrollable": "couldn't be rolled",
         "PlayerVisible": "Shown to the player",
         "MacroSkipped": "Macro skipped: it does not resolve to a script macro",
         "MacroFailed": "Macro failed \u2014 see the console",
-        "Bucket": {
-          "full": "Awarded",
-          "partial": "Partly awarded",
-          "halted": "Stopped here",
-          "unreached": "Never reached",
-          "skipped": "Skipped"
+        "Reason": {
+          "full": "Their game reports this one awarded in full.",
+          "partial": "Their game reports this one only partly awarded.",
+          "halted": "Their game reports the roll falling short here.",
+          "unreached": "Their game reports the roll never reaching this one.",
+          "checkTrigger": "The check hit the trigger you set for it.",
+          "rollCondition": "Its own condition roll came up.",
+          "unknown": "Fabricate can't tell which of its conditions fired it."
         }
       },
       "CraftSuccess": "Crafting Successful",

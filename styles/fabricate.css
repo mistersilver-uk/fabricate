@@ -20722,6 +20722,108 @@
   opacity: 0.72;
 }
 
+/* ── THE GM-ONLY COMPLICATION ROW IS A STACK, NOT A ROW OF COLUMNS (issue 1286) ────
+   Every selector in this block is reached through `.fabricate-craft-chat--gm`, the block
+   modifier ONLY `buildGmComplicationCardContent` emits. That is not decoration: the player
+   complication row above shares the `__item--complication` element and its two rules, and a
+   sibling change pins that two repeated player rows are not byte-identical, so the GM
+   treatment has to be unreachable from a player card by construction rather than by care.
+
+   WHAT WAS WRONG. The GM row hung its notes off the `__item` as siblings of `__label`.
+   `__item` is `display: flex` in ROW direction, so each note became a flex track inside a
+   `minmax(140px, 1fr)` grid cell: the live card drew the severity `Major` as `M o r` down
+   three lines, and the stage note and the effect roll as two more slivers beside it. Widening
+   the track would not have fixed it — the content is four independent statements about one
+   complication, and four statements want four lines.
+
+   WHAT IS RIGHT. The whole row now nests inside the one `__label`, which becomes the column.
+   Nothing here introduces a new colour, weight or spacing idiom: the section headings reuse
+   the card's own `__heading` treatment (uppercase, tracked, 0.58 opacity) and the facts
+   inherit the label's body size, so the card reads as the same card with room to breathe. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__item--complication .fabricate-craft-chat__label {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+/* Name left, severity eyebrow right, sharing one baseline. `space-between` rather than a
+   `margin-left: auto` on the eyebrow so a row with no severity at all still draws its name
+   flush.
+
+   It WRAPS, because both children legitimately refuse to shrink: the eyebrow is `nowrap` and
+   the name is a GM-authored string of unbounded length, and the chat sidebar this is read in
+   is 300px wide. Without the wrap the pair overflow the row together, which is a smaller copy
+   of the defect this whole block exists to remove — the eyebrow drops to its own line instead.
+   The name SHRINKS rather than grows: with `flex-grow` it would swallow the free space and
+   push a severity that fits perfectly well onto that second line. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fab-space-chip) var(--fab-space-2);
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Severity: the card's own eyebrow treatment, sized against the 0.85em label rather than
+   against the card root (0.74 / 0.85), and never wrapped — a two-word severity broken across
+   lines is the same defect this block exists to remove, one element smaller. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-severity {
+  flex: 0 0 auto;
+  font-size: 0.87em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.58;
+  white-space: nowrap;
+}
+
+/* The audience note shares the component's de-emphasis rather than getting one of its own:
+   it is context of the same kind, and the row already carries an eyebrow. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-audience {
+  opacity: 0.72;
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-heading {
+  font-size: 0.87em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.58;
+}
+
+/* A macro only the GM can repair is not narration, so it reads in the danger ramp the
+   failure notice above already uses rather than in the neutral one its neighbours use.
+
+   Its own CLASS rather than a `--fault` modifier on the block above, because the guard in
+   `tests/crafting-chat-card.test.js` requires every branch of every complication rule to end
+   its complication-only class at a word boundary — a modifier suffix would read to that scan
+   as an ungated selector, and the scan is worth more than the naming symmetry. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault {
+  color: var(--fab-danger);
+}
+
+/* Its heading keeps the eyebrow's SHAPE and drops the eyebrow's fade. 0.58 of the danger ramp
+   on a parchment chat background is the lowest-contrast run on the card, and this is the one
+   run that has to be read: everything else here is narration a GM can skim, and this is a
+   broken link only they can repair. */
+.fabricate-craft-chat--gm
+  .fabricate-craft-chat__complication-fault
+  .fabricate-craft-chat__complication-heading {
+  opacity: 0.95;
+}
+
 .fabricate-gather-chat__footer {
   display: flex;
   flex-wrap: wrap;
