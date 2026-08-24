@@ -86,6 +86,11 @@ class FakeActor {
     if (this._failUpdate) throw new Error('update refused');
     this._updates.push(payload);
     for (const [path, value] of Object.entries(payload)) setProperty(this, path, value);
+    // Resolves THE DOCUMENT, as a real `Document#update` does when it applied a change.
+    // `ActorPropertyCoinSpender.refund` judges its write by this return (issue 1301), so a
+    // stub resolving `undefined` asserts the empty-diff case that means nothing was written —
+    // which would make every currency refund on this fixture report a failure.
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (this._failCreate) throw new Error('createEmbeddedDocuments refused');

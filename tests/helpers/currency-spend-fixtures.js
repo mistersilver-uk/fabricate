@@ -219,6 +219,10 @@ export class CurrencyCraftingActorFake {
       const key = String(path).split('.').pop();
       this.system.currency[key] = value;
     }
+    // Resolves THE DOCUMENT, as a real `Document#update` does when it applied a change.
+    // `ActorPropertyCoinSpender.refund` now judges its write by this return (issue 1301), and a
+    // stub resolving `undefined` models the empty-diff case that means nothing was written.
+    return this;
   }
 
   async createEmbeddedDocuments(_type, data) {

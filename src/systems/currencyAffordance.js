@@ -136,15 +136,17 @@ export function getCurrencyRequirementConfig(recipe, seams = {}) {
  * spender (injected or via the `game.fabricate` accessor); `macro` builds a per-config macro
  * spender; `actorProperty` (default) is the generic property spender.
  *
- * `runMacro` is an optional seam on the `macro` branch alone, so a test can drive the REAL
- * {@link MacroCoinSpender} — including its throw handling — without a Foundry macro document.
- * Omitting it is byte-equivalent to the previous construction: the spender's own constructor falls
- * back to `MacroExecutor.run` for anything that is not a function.
+ * `runMacro` and `resolveMacro` are optional seams on the `macro` branch alone, so a test can
+ * drive the REAL {@link MacroCoinSpender} — including its throw handling and its resolve-then-gate
+ * refusals — without a Foundry macro document or a `fromUuid` global. Omitting either is
+ * byte-equivalent to the previous construction: the spender's own constructor falls back to
+ * `MacroExecutor.run` and to a guarded `fromUuid` for anything that is not a function.
  *
  * @param {{ spendStrategy?: string, macros?: object }} config
  * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
  *   getCraftingSystemManager?: () => object,
- *   runMacro?: (uuid: string, context: object) => Promise<any> }} [seams]
+ *   runMacro?: (uuid: string, context: object) => Promise<any>,
+ *   resolveMacro?: (uuid: string) => Promise<object|null> }} [seams]
  */
 export function resolveCoinSpender(config = {}, seams = {}) {
   if (config.spendStrategy === 'actorInventory') {
@@ -153,7 +155,11 @@ export function resolveCoinSpender(config = {}, seams = {}) {
     );
   }
   if (config.spendStrategy === 'macro') {
-    return new MacroCoinSpender({ macros: config.macros, runMacro: seams.runMacro });
+    return new MacroCoinSpender({
+      macros: config.macros,
+      runMacro: seams.runMacro,
+      resolveMacro: seams.resolveMacro,
+    });
   }
   return (
     seams.actorPropertyCoinSpender ||

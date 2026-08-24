@@ -22,6 +22,24 @@ import {
  * authoritative insufficient-funds signal. The pure spend math and validation stay in
  * `currencyProfile.js`; the spenders own the actor I/O. `readCoins` remains on the
  * actor-property/inventory spenders as the shared affordability primitive that `check` wraps.
+ *
+ * ## The two markers on a refusal, and what each one claims (issue 1301)
+ *
+ * A refusal is `{ valid: false, message }` and may carry either or both of:
+ *
+ * - **`thrown: true`** — the mechanism DELIVERED NO ANSWER. Named for the outcome class rather
+ *   than for a stack unwinding, which is why it is also set where this module refuses BEFORE
+ *   delegating to a mechanism that would have thrown. `currencyAffordance.js` reads it to
+ *   answer `checkUnavailable`, so what it must keep meaning is "do not report this actor as
+ *   poor".
+ * - **`wroteNothing: true`** — NOTHING WAS WRITTEN, and this module can prove it, because the
+ *   refusal was taken before the write or the write's own return said Foundry accepted no
+ *   change. The world-scoped currency credit reads it to answer `creditNotConfigured`.
+ *
+ * Both are ADDITIVE for every existing caller: the craft paths read only `valid` and `message`,
+ * so a broken macro still aborts a craft exactly as it did. The ONE exception is declared where
+ * it is made — see {@link ActorPropertyCoinSpender#refund}, which now reports a discarded
+ * `actor.update` as a failure and moves the player-cancel refund's shipped answer.
  */
 
 /**
@@ -188,10 +206,35 @@ export class ActorPropertyCoinSpender {
   /**
    * Refund a previously spent requirement (issue 848) — adds `amount` of the unit's own
    * denomination back to the actor's balance via a single batched `actor.update(...)`.
+   *
+   * **The write is judged by its own return, and that is a DECLARED BEHAVIOUR CHANGE**
+   * (issue 1301). `Document#update` resolves `undefined` when the whole diff is empty, which is
+   * exactly what a GM-authored `actorPath` that is not in the actor's data model produces:
+   * `SchemaField` prunes the unknown key and the empty diff is skipped, with no error, no hook
+   * and no notification. This method answered `{ valid: true }` regardless, so a discarded
+   * write reported a successful refund.
+   *
+   * It now answers `{ valid: false, wroteNothing: true }` there, and that answer is READ: it
+   * flows through `applySpenderToGroup` and `refundCurrencySpends` to
+   * `CraftingEngine._refundCraftCurrency`, whose `console.error` now fires, and on to
+   * `cancelCraft` — so a player cancelling a craft in a mis-typed `actorProperty` world moves
+   * from `refunded: true` to `refunded: false, partialRefund: true`. That is the correct
+   * report: a discarded write is not a refund.
+   *
+   * The test sits INSIDE the existing zero-updates guard deliberately.
+   * `buildCurrencyRefundUpdates` legitimately answers `{ valid: true, updates: {} }` for a
+   * non-positive amount, and outside the guard that no-op would become a reported failure.
+   *
+   * The pre-write refusal above it is marked `wroteNothing` too, and that one is provably
+   * correct rather than merely judged: it RETURNS before `actor.update` is reached. Its
+   * producer is a unit whose `actorPath` resolves a value that is present but non-numeric,
+   * which `readCurrencyBalances` refuses — on the DEFAULT spend strategy, where an unmarked
+   * refusal would otherwise read as a domain answer.
+   *
    * @param {object} actor
    * @param {{ unit: object, amount: number }} requirement
    * @param {{ profile: object }} profileContext
-   * @returns {Promise<{ valid: boolean, message?: string }>}
+   * @returns {Promise<{ valid: boolean, wroteNothing?: boolean, message?: string }>}
    */
   async refund(actor, { unit, amount } = {}, { profile } = {}) {
     const refund = buildCurrencyRefundUpdates(
@@ -199,9 +242,16 @@ export class ActorPropertyCoinSpender {
       { unit: unit?.id, amount },
       profile?.units || []
     );
-    if (!refund.valid) return { valid: false, message: refund.message };
+    if (!refund.valid) return { valid: false, wroteNothing: true, message: refund.message };
     if (Object.keys(refund.updates || {}).length > 0) {
-      await actor.update(refund.updates);
+      const written = await actor.update(refund.updates);
+      if (written === undefined || written === null) {
+        return {
+          valid: false,
+          wroteNothing: true,
+          message: `Foundry accepted no change when refunding ${formatCurrencyRequirement({ unit: unit?.id, amount }, profile?.units || [])}. The configured currency path may not exist on this actor.`,
+        };
+      }
     }
     return { valid: true, formatted: refund.formatted };
   }
@@ -320,8 +370,12 @@ export class ActorInventoryCoinSpender {
       return (await refund.call(adapter, actor, requirement)) ?? { valid: true };
     } catch (error) {
       console.error('Fabricate | Failed to refund inventory currency', error);
+      // `thrown` and NOT `wroteNothing`: a system adapter that threw part-way may already have
+      // created a treasure item, so nothing here can prove the zero. Symmetric with
+      // `MacroCoinSpender`'s shipped marker (issue 1301).
       return {
         valid: false,
+        thrown: true,
         message: `Could not refund currency (${formatCurrencyRequirement(requirement, profile?.units || [])}).`,
       };
     }
@@ -346,14 +400,72 @@ export class MacroCoinSpender {
    * @param {object} [options]
    * @param {{ canAfford?: string, increment?: string, decrement?: string }} [options.macros]
    * @param {(uuid: string, context: object) => Promise<any>} [options.runMacro]
+   * @param {(uuid: string) => Promise<object|null>} [options.resolveMacro] resolves a macro
+   *   document for the gate below; defaults to a guarded `fromUuid`, in the shape
+   *   {@link ActorInventoryCoinSpender} already uses for `game.system.id`, so the class stays
+   *   drivable without a Foundry global.
    */
-  constructor({ macros = {}, runMacro = MacroExecutor.run } = {}) {
+  constructor({ macros = {}, runMacro = MacroExecutor.run, resolveMacro } = {}) {
     this._macros = {
       canAfford: String(macros?.canAfford || '').trim(),
       increment: String(macros?.increment || '').trim(),
       decrement: String(macros?.decrement || '').trim(),
     };
     this._runMacro = typeof runMacro === 'function' ? runMacro : MacroExecutor.run;
+    this._resolveMacro =
+      typeof resolveMacro === 'function'
+        ? resolveMacro
+        : async (uuid) => {
+            if (typeof fromUuid !== 'function') return null;
+            try {
+              return await fromUuid(uuid);
+            } catch {
+              return null;
+            }
+          };
+  }
+
+  /**
+   * Why this macro cannot be run, or `null` when it can.
+   *
+   * The RESOLVE-THEN-GATE half of the idiom `MacroExecutor.js:4-18` records: the `type ===
+   * 'script'` check is a CALL-SITE check and must not be centralised in the executor, because
+   * centralising it would turn a `chat`-type essence property macro from a silent warn into a
+   * per-essence-per-result error notification. This is the call site.
+   *
+   * Four spellings of "the macro never ran", answered identically, because from the GM's side
+   * deleting a macro and switching its type to `chat` are the same action. The MARKERS differ
+   * by one field, and the split is chosen so that no shipped answer moves:
+   *
+   * - a uuid resolving to nothing, and a document with no string `command`, THROW today inside
+   *   `MacroExecutor.run`, so both keep `thrown: true` and `checkAffordability` keeps answering
+   *   `checkUnavailable` for them;
+   * - a BLANK or whitespace-only command compiles today and returns `undefined`, which
+   *   `interpretMacroSpendResult` turns into an unmarked refusal and `checkAffordability`
+   *   answers `notAffordable`. It is therefore `wroteNothing`-only: marking it `thrown` would
+   *   move a published member's shipped answer as a side effect of a marker placement, which
+   *   belongs to its own change;
+   * - a non-`script` type carries `thrown: true`, because a chat macro's text is chat text: it
+   *   is compiled as JavaScript at `MacroExecutor.js:90` and throws for any body that is not
+   *   also valid JS, so `checkUnavailable` IS its shipped answer in every non-pathological
+   *   case, and answering `notAffordable` instead would report a well-funded actor as poor.
+   *   The residual is a chat macro whose text happens to be valid JS returning falsy, which
+   *   moves from `notAffordable` to `checkUnavailable`.
+   *
+   * Every one of the four carries `wroteNothing: true`, which is what the world-scoped credit
+   * reads to answer `creditNotConfigured` — the same answer for all four, which is the point.
+   *
+   * @param {object|null} macro
+   * @returns {{ reason: string, thrown: boolean }|null}
+   */
+  static _macroRefusal(macro) {
+    if (!macro) return { reason: 'could not be found', thrown: true };
+    if (typeof macro.command !== 'string') return { reason: 'has no command', thrown: true };
+    if (macro.type !== 'script') {
+      return { reason: `is a "${macro.type}" macro rather than a script macro`, thrown: true };
+    }
+    if (macro.command.trim() === '') return { reason: 'is empty', thrown: false };
+    return null;
   }
 
   /**
@@ -376,8 +488,25 @@ export class MacroCoinSpender {
     const macroUuid = this._macros[key];
     const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement({ unit: requirementUnitId(requirement), amount: requirement?.amount }, ctx?.profile?.units || [])}).`;
     if (!macroUuid) {
-      return { valid: false, message: `No "${key}" currency macro is configured.` };
+      // `wroteNothing` and NOT `thrown`, so a `macro` world with no `canAfford` configured
+      // answers `checkAffordability` exactly what it answers today. That answer is itself a
+      // misconfiguration reported as a domain answer, and it is now DETECTABLE because this
+      // marker exists — but widening the reader is a different change's decision.
+      return {
+        valid: false,
+        wroteNothing: true,
+        message: `No "${key}" currency macro is configured.`,
+      };
     }
+
+    const refusal = MacroCoinSpender._macroRefusal(await this._resolveMacro(macroUuid));
+    if (refusal) {
+      const message = `The configured "${key}" currency macro ${refusal.reason}, so it did not run.`;
+      return refusal.thrown
+        ? { valid: false, thrown: true, wroteNothing: true, message }
+        : { valid: false, wroteNothing: true, message };
+    }
+
     const context = ctx?.macroContext || {};
     try {
       const result = await this._runMacro(macroUuid, context);
