@@ -48,6 +48,19 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  // The complications section (issue 1286). Four leaves, each reached only through it:
+  // the persisted vocabulary it seeds a new complication from, the ONE localized trigger
+  // sentence it renders in the summary row, the operator table it filters the six numeric
+  // comparators out of, and the macro link/drop pair the effect card uses.
+  // `complicationSummary.js` imports `characterPrerequisites.js` for the operator GLYPH, so
+  // the two travel together; the rest are import-free leaves and one entry each suffices.
+  'src/utils/componentComplications.js',
+  'src/utils/complicationSummary.js',
+  'src/systems/characterPrerequisites.js',
+  'src/utils/macroReference.js',
+  // `ItemDropZone`'s payload resolver — it covers BOTH shipped drag shapes, so the macro
+  // drop and the identity strip's item drop read one implementation.
+  'src/ui/svelte/util/dropUtils.js',
 ]);
 
 /**
@@ -79,5 +92,18 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // The complications section and its two shared rows (issue 1286). `ComponentEditView`
+  // imports the section STATICALLY, so all four are in this tree's module closure whether
+  // or not a given test turns the section on — and an omission HANGS the suite (# cancelled)
+  // rather than failing it.
+  // The severity picker and the Any/All match control are the shared segmented track.
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
+  // the summary row its own docblock named as the site that would adopt it.
+  'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

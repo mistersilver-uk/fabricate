@@ -48,6 +48,9 @@
     // The rebuilt list has no columns, so it lands in the badge run rather than being
     // dropped — the read-only parity it gives the GM is the whole reason it exists.
     difficultyBadge = '',
+    // The badge's own text is the VALUE alone, so the thing it measures is named here
+    // instead. Pre-localized by the caller, like every other string this row takes.
+    difficultyBadgeTitle = '',
     originLabel = '',
     originTone = 'subtle',
     originIcon = '',
@@ -100,6 +103,7 @@
         tone="info"
         icon="fas fa-gauge-high"
         class="manager-component-difficulty-badge"
+        title={difficultyBadgeTitle}
         data-component-difficulty
       >
         <span>{difficultyBadge}</span>

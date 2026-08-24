@@ -1,3 +1,4 @@
+import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -12,6 +13,67 @@ import {
   routedOutcomeTierNames,
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
+
+/**
+ * The progressive `meta` for a resolution that awarded nothing because the recipe
+ * authors no result group. Present in FULL rather than abbreviated: a consumer that
+ * reads five keys on one branch and two on another learns two shapes for one fact.
+ * @returns {{awardedResultIds: Array<string>, remaining: number, partialResultId: null,
+ *   haltedResultId: null, skippedResultIds: Array<string>}}
+ */
+function emptyProgressiveMeta() {
+  return {
+    awardedResultIds: [],
+    remaining: 0,
+    partialResultId: null,
+    haltedResultId: null,
+    skippedResultIds: [],
+  };
+}
+
+/**
+ * The ids of the ACTIVE progressive check block's triggers, split into "every id this
+ * block owns" and "the ones this roll matched" (issue 1286).
+ *
+ * A `when.checkTrigger` clause names a trigger id, never a boolean. That distinction is
+ * the whole point: an "any trigger fires any complication" flag would hand every trigger
+ * a GM already authored a fourth effect with no GM action at all.
+ *
+ * A trigger matches on its CONDITION alone, through the same shared predicate the
+ * breakage seam evaluates ({@link evaluateCheckBreakageCondition}), regardless of its
+ * `breakTools` / `outcome` / `tierStep` values — a trigger's match is a fact about the
+ * roll and its three effects are independent of it. Note that an `outcomeTier` condition
+ * can never match a progressive roll, because `runFormulaProgressive` returns a null
+ * outcome; that is a documented consequence, not a gap.
+ *
+ * It lives in THIS module, beside the other publishers of resolution facts, because all
+ * three engines need it and none of them may own it: `CraftingEngine` importing it from
+ * `GatheringEngine` (or the reverse) would couple two engines and drag one's whole import
+ * closure into the other, and a copy in each is the drift the shared
+ * `evaluateCheckBreakageCondition` seam already exists to prevent.
+ *
+ * The owned-id list is what makes a clause naming ANOTHER activity's trigger inert
+ * (fail-open) rather than a validation error: each of `craftingCheck` /
+ * `salvageCraftingCheck` / `gatheringCraftingCheck` owns its own id space.
+ *
+ * @param {?{triggers?: Array<object>}} checkBreakage the active check's breakage block
+ * @param {?object} checkResult the resolved check result
+ * @returns {{matchedTriggerIds: Array<string>, checkTriggerIds: Array<string>}}
+ */
+export function resolveCheckTriggerMatches(checkBreakage, checkResult) {
+  const triggers = Array.isArray(checkBreakage?.triggers) ? checkBreakage.triggers : [];
+  const checkTriggerIds = [];
+  const matchedTriggerIds = [];
+  for (const trigger of triggers) {
+    const id = typeof trigger?.id === 'string' ? trigger.id.trim() : '';
+    if (!id) continue;
+    checkTriggerIds.push(id);
+    if (evaluateCheckBreakageCondition(trigger?.condition, checkResult)) {
+      matchedTriggerIds.push(id);
+    }
+  }
+  return { matchedTriggerIds, checkTriggerIds };
+}
 
 /**
  * Handles mode-specific validation and result resolution logic.
@@ -513,6 +575,20 @@ export class ResolutionModeService {
   }
 
   /**
+   * The candidate result groups for an execution: the STEP's when it authors any, else
+   * the recipe's. Extracted so {@link progressiveStageOccurrences} selects its group by
+   * the same precedence {@link resolveResultGroups} does rather than restating it.
+   * @private
+   * @returns {Array<object>}
+   */
+  _allResultGroups({ recipe, step }) {
+    if (Array.isArray(step?.resultGroups) && step.resultGroups.length > 0) {
+      return step.resultGroups;
+    }
+    return Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
+  }
+
+  /**
    * Resolve the result group(s) awarded for a craft attempt, dispatching on the
    * system resolution mode. Thin dispatcher: each mode's logic lives in a private
    * `_resolve*ResultGroups` helper so this method stays a simple switch.
@@ -521,12 +597,7 @@ export class ResolutionModeService {
   resolveResultGroups({ recipe, step, ingredientSet, checkResult, selectedResultGroupId = null }) {
     const system = this.getSystem(recipe);
     const mode = this.getMode(recipe);
-    const allGroups =
-      Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
-        ? step.resultGroups
-        : Array.isArray(recipe?.resultGroups)
-          ? recipe.resultGroups
-          : [];
+    const allGroups = this._allResultGroups({ recipe, step });
 
     if (mode === 'simple') {
       return this._resolveSimpleResultGroups({ checkResult, allGroups, system });
@@ -760,48 +831,138 @@ export class ResolutionModeService {
   }
 
   /**
+   * The ordered stage occurrences a progressive craft's award will be spent down, ONE
+   * ENTRY PER OCCURRENCE, in fire order (issue 1286).
+   *
+   * It exists because the ordering rule — the GM's `allowPlayerResultReorder` permission
+   * and the executing user's stored order — has to be applied in exactly one place. The
+   * engine needs the same ordered list the award ran over in order to classify stages
+   * downstream of the award, and re-deriving it there would give the two a second chance
+   * to disagree. So `_resolveProgressiveResultGroups` and this method share
+   * {@link _orderProgressiveResults}, and `meta` is left carrying id lists only.
+   *
+   * PURE, like every other read on this class: no dice, no writes, no Foundry globals.
+   * Asking for it after the award is committed answers exactly what the award saw.
+   *
+   * The unreached stages are the reason this cannot be recovered from `meta`: `meta`
+   * names the awarded, partial, halted and skipped ids, and everything else in the list
+   * is `unreached` — but nothing in `meta` says what "everything else" IS, nor in which
+   * order. A complication authored on the stage a player never got near is exactly the
+   * headline case, so the list is published rather than inferred.
+   *
+   * @param {object} options
+   * @param {object} options.recipe the recipe being resolved
+   * @param {?object} [options.step] the executing step, whose result groups win over the
+   *   recipe's when present — the same precedence {@link resolveResultGroups} applies
+   * @returns {Array<{resultId: string|null, componentId: string|null, component: ?object}>}
+   *   empty for any non-progressive mode, and for a progressive recipe authoring no group.
+   */
+  progressiveStageOccurrences({ recipe, step = null } = {}) {
+    if (this.getMode(recipe) !== 'progressive') return [];
+    const system = this.getSystem(recipe);
+    const allGroups = this._allResultGroups({ recipe, step });
+    const group = allGroups[0];
+    if (!group) return [];
+    const index = getDefinitionIndex(system?.components);
+    return this._orderProgressiveResults(recipe, group.results || []).map((result) => {
+      const componentId = result?.componentId || result?.systemItemId || null;
+      return {
+        resultId: result?.id ?? null,
+        componentId,
+        component: componentId ? (findById(index, componentId) ?? null) : null,
+      };
+    });
+  }
+
+  /**
+   * Apply the progressive ORDER to a group's authored results — the one definition of
+   * "which order does this craft spend its budget down".
+   *
+   * The recipe's GM-authored permission decides whether the player's stored order is
+   * honoured at all; default-true, so only an explicit `false` pins the authored order.
+   *
+   * This reads the EXECUTING user's order, not the actor owner's: a GM invoking `craft`
+   * via the API resolves down the GM's order. That is deliberate and specified — the
+   * recipe path resolves on the acting client. (Salvage cannot do this; its order is
+   * captured onto the run at start — see `CraftingEngine._resolveSalvageResultGroups`.)
+   *
+   * ONE flat id list reconciles EVERY step's results. That is only correct while result
+   * ids are unique across a recipe's steps, which nothing enforces (copy-mode import
+   * preserves ids by design) — issue 651 D6 records the assumption.
+   *
+   * @private
+   * @param {object} recipe
+   * @param {Array<object>} authored the group's authored results
+   * @returns {Array<object>} the same elements, reordered; `===`-identical to the input
+   *   when nothing moved (a property `applyPlayerResultOrder` guarantees and downstream
+   *   threshold recomputation depends on).
+   */
+  _orderProgressiveResults(recipe, authored) {
+    if (recipe?.allowPlayerResultReorder === false) return authored;
+    return applyPlayerResultOrder(
+      authored,
+      this.getPlayerResultOrder({ scope: 'recipe', id: recipe?.id })
+    );
+  }
+
+  /**
    * Progressive mode resolution: spend the check `value` against ordered result
    * difficulties using the system `awardMode` (`equal` | `exceed` | `partial`).
    *
    * Order is applied HERE, not in `resolveProgressiveAward` — that helper orders nothing
    * by contract; the caller owns order (issue 651 D0).
-   * @returns {{groups: Array, meta: object}}
+   *
+   * ## THIS IS NOT A FIRING SITE, AND MUST NOT BECOME ONE (issue 1286)
+   *
+   * Component complications fire from the ENGINE, after the award is committed and
+   * before the chat card is posted. Moving the firing in here would look like a
+   * simplification — the buckets are decided here, so why not act on them — and it
+   * breaks two ways at once:
+   *
+   *  - **It would fire more than once.** `resolveResultGroups` is called UP TO THREE
+   *    TIMES for one craft: `CraftingEngine.js:1082` (the pre-consumption
+   *    misconfiguration gate), `:1910` (the failure-award preflight), and again inside
+   *    `_createResultItems` at `:3489` when the results are actually created.
+   *  - **It would fire on a craft that then aborts.** The first of those calls runs
+   *    BEFORE any consumption precisely so a misconfigured recipe can abort having
+   *    consumed nothing. A complication fired there would be a consequence of a craft
+   *    that never happened.
+   *
+   * The reason the engine may ask three times at all is that this method is PURE: asking
+   * it twice agrees with itself. Firing is an effect, and an effect here would destroy
+   * that property — which is also what every one of those three call sites relies on.
+   *
+   * It PUBLISHES the facts instead. The `meta` below is deliberately FLAT and
+   * id-list-shaped rather than carrying a nested `progressive` sub-object, so no consumer
+   * has to learn a second shape to read one more field.
+   *
+   * @returns {{groups: Array, meta: {awardedResultIds: Array<string>, remaining: number,
+   *   partialResultId: string|null, haltedResultId: string|null,
+   *   skippedResultIds: Array<string>}}} the five stage-classification facts, from which a
+   *   consumer derives the buckets: `full` is `awardedResultIds` minus `partialResultId`
+   *   (the tail award IS a member of `awarded`), `halted` is the one stage that stopped
+   *   the loop unawarded, `skipped` is every invalid cost in the WHOLE ordered list, and
+   *   everything else in {@link progressiveStageOccurrences} is `unreached`.
    */
   _resolveProgressiveResultGroups({ recipe, checkResult, system, allGroups }) {
     const group = allGroups[0];
-    if (!group) return { groups: [], meta: { awardedResultIds: [], remaining: 0 } };
+    if (!group) return { groups: [], meta: emptyProgressiveMeta() };
 
-    const authored = group.results || [];
-    // The recipe's GM-authored permission decides whether the player's stored order is
-    // honoured at all; default-true, so only an explicit `false` pins the authored order.
-    //
-    // This reads the EXECUTING user's order, not the actor owner's: a GM invoking `craft`
-    // via the API resolves down the GM's order. That is deliberate and specified — the
-    // recipe path resolves on the acting client. (Salvage cannot do this; its order is
-    // captured onto the run at start — see `_resolveSalvageResultGroups`.)
-    //
-    // ONE flat id list reconciles EVERY step's results. That is only correct while result
-    // ids are unique across a recipe's steps, which nothing enforces (copy-mode import
-    // preserves ids by design) — issue 651 D6 records the assumption.
-    const results =
-      recipe?.allowPlayerResultReorder === false
-        ? authored
-        : applyPlayerResultOrder(
-            authored,
-            this.getPlayerResultOrder({ scope: 'recipe', id: recipe?.id })
-          );
+    const results = this._orderProgressiveResults(recipe, group.results || []);
 
     // Crafting normalizes the budget with `Number(value || 0)` (divergence 4) and
     // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`), zeroing the
     // budget after a `partial` tail award (divergence 2: `zeroRemainingOnPartial`).
-    const { awarded, remaining } = resolveProgressiveAward({
-      results,
-      initialRemaining: Number(checkResult?.value || 0),
-      costFor: (result) => this._getDifficulty(system, result?.componentId || result?.systemItemId),
-      awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',
-      invalidCost: 'skip',
-      zeroRemainingOnPartial: true,
-    });
+    const { awarded, remaining, partialResult, haltedResult, skippedResults } =
+      resolveProgressiveAward({
+        results,
+        initialRemaining: Number(checkResult?.value || 0),
+        costFor: (result) =>
+          this._getDifficulty(system, result?.componentId || result?.systemItemId),
+        awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',
+        invalidCost: 'skip',
+        zeroRemainingOnPartial: true,
+      });
 
     // Progressive results are a quantity-less ordered list: each entry is awarded
     // once and the GM expresses "more of X" by listing X again. Force `quantity: 1`
@@ -810,7 +971,16 @@ export class ResolutionModeService {
     // `quantity > 1` authored before the editor dropped the field.
     return {
       groups: [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }],
-      meta: { awardedResultIds: awarded.map((r) => r.id), remaining },
+      // The three additive ids are taken from the award loop's own report and are NEVER
+      // re-derived from `awarded` + `remaining`: the break index is not recoverable once
+      // a skipped stage sits between the last award and the halt (issue 1286).
+      meta: {
+        awardedResultIds: awarded.map((r) => r.id),
+        remaining,
+        partialResultId: partialResult?.id ?? null,
+        haltedResultId: haltedResult?.id ?? null,
+        skippedResultIds: skippedResults.map((r) => r.id),
+      },
     };
   }
 

@@ -786,6 +786,12 @@ A composed event whose required `weather` or `timeOfDay` values are not satisfie
 7. Events may reference per-system character modifiers. `eventModifier` adjusts the d100 roll; `characterModifiers` adjust the threshold.
 The two surfaces are evaluated independently.
 8. Event output must respect blind task and GM-only redaction rules.
+9. **A Gathering Event is NOT a component Complication, and the two must never be merged.**
+   They are Fabricate's two GM-authored consequence records and they sit adjacent, so the difference is stated rather than left to be inferred.
+   An **Event** is ENVIRONMENT-scoped, composed into an environment by TAG matching, selected by the d100 roll against its own `dropRate`, and exists only in gathering.
+   A **Complication** is COMPONENT-scoped, attached directly to one component with no composition step, selected by the stage outcome a progressive award produced for that component, and fires across all three activities — progressive crafting, progressive salvage and progressive gathering.
+   An Event answers "what else happened while you were out there"; a Complication answers "what went wrong with THIS thing".
+   Neither is a special case of the other, and a system may author both.
 
 ## EnvironmentTask
 
@@ -1750,6 +1756,25 @@ Diagnostics from the check evaluator (missing formula or a malformed numeric res
 4. The single result group must contain at least one ordered result.
 5. Every referenced `Component` must have `difficulty >= 1`.
 6. If a check resolves to `failure`, progressive awarding is skipped.
+
+### Component Complications
+
+A progressive gathering attempt fires the component complications its committed award earned, on the contract `resolution-modes/spec.md` § Component Complications defines for all three activities.
+
+1. The firing point is inside the terminal side-effect commit, WITHIN the guard that decides whether the outcome awards results at all, and immediately AFTER the award.
+   An outcome that guard refuses awarded nothing, so its stages never happened and it fires nothing.
+   The chat card is posted by the caller, after this.
+2. Gathering has no player reorder step, so the AUTHORED result order is fire order — the same rule § Award Modes states for the award itself.
+3. **An attempt aborted by the `fail` invalid-cost policy fires NOTHING.**
+   Progressive gathering is the one activity that treats an invalid progressive difficulty as a hard misconfiguration rather than a skip, and it aborts before the award, so the firing point is never reached.
+   That is the same rule the crafting misconfiguration gate states, and for the same reason: a GM authoring gap is not a narrative outcome.
+4. **The macro contract is CROSS-ACTIVITY and is defined in `recipes-and-steps/spec.md` § Complication Macros**, which this domain references rather than restates.
+   Everything there applies unchanged to a gathering-fired complication: GM-authoritative execution, the addressing-only relay payload, the attested-sender and actor re-authorization rules, the drop when no GM is connected, and the tolerate-running-twice rule.
+5. **This path ships DORMANT.**
+   Progressive gathering is unreachable from any GM-selectable configuration today: the runtime task conversion pins the d100 resolution mode and the economy editor renders both formula-rolled modes disabled, pending issue 683.
+   The wiring lands anyway, on the same precedent as the other dormant gathering seams, so that issue 683 flips one switch rather than reopening this design.
+   Its tests MUST drive the progressive outcome resolution and the terminal commit DIRECTLY: an end-to-end gathering test of this passes VACUOUSLY, asserting that nothing fires on a d100 attempt, which is true whether or not any of it works.
+   No player-facing progressive gathering surface is built, because none is reachable.
 
 ## Execution Lifecycle
 

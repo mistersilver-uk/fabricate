@@ -144,7 +144,7 @@ const FIXTURE = `
               </button>
               <span class="manager-component-row-meta">
                 <span class="manager-chip manager-component-category-badge" data-m="row-badge">Reagent</span>
-                <span class="manager-chip is-info manager-component-difficulty-badge" data-m="row-difficulty"><span>Progressive difficulty 2</span></span>
+                <span class="manager-chip is-info manager-component-difficulty-badge" data-m="row-difficulty" title="Progressive difficulty"><span>2</span></span>
               </span>
             </li>
           </ul>

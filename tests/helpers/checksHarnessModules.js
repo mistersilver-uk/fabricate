@@ -82,6 +82,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkRoll.js',
+  'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
   // The progressive PREVIEW SANDBOX derivation (issue 1097). BOTH halves of the checks tree
   // import it — `ChecksView` to read and write the order, `ChecksRightMenu` to keep the

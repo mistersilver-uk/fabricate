@@ -1266,6 +1266,26 @@
       }
     },
     "Chat": {
+      "Complications": "Complications",
+      "GmComplication": {
+        "Title": "Complications (GM only)",
+        "Actor": "Actor",
+        "ReportedBy": "Reported by",
+        "Unverified": "Reported by the acting client",
+        "Stage": "Stage",
+        "EffectRoll": "Effect roll",
+        "EffectRollFailed": "Effect roll failed",
+        "PlayerVisible": "Shown to the player",
+        "MacroSkipped": "Macro skipped: it does not resolve to a script macro",
+        "MacroFailed": "Macro failed \u2014 see the console",
+        "Bucket": {
+          "full": "Awarded",
+          "partial": "Partly awarded",
+          "halted": "Stopped here",
+          "unreached": "Never reached",
+          "skipped": "Skipped"
+        }
+      },
       "CraftSuccess": "Crafting Successful",
       "CraftFailure": "Crafting Failed",
       "Actor": "Crafter",
@@ -2600,6 +2620,117 @@
           "ProgressiveDifficultyLabel": "Difficulty value",
           "ProgressiveDifficultyHint": "Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.",
           "NoDifficulty": "No difficulty",
+          "Complications": {
+            "Title": "Complications",
+            "Hint": "What goes wrong when this component is produced as a stage of a progressive result — a progressive craft, salvage or gathering. A complication does not fire when this component is itself salvaged or spent.",
+            "Empty": "Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence.",
+            "Add": "Add complication",
+            "Remove": "Remove complication",
+            "NewName": "New complication",
+            "PlayerPill": "Player",
+            "PlayerPillTitle": "Shown to the player when it fires.",
+            "StripTitle": "{count} complications on {name}",
+            "StripTitleOne": "1 complication on {name}",
+            "StripEdit": "Edit complications on {name}",
+            "ActivityProgressiveCount": "{activity} uses progressive resolution in this system \u2014 {count} complications.",
+            "ActivityProgressiveCountOne": "{activity} uses progressive resolution in this system \u2014 1 complication.",
+            "Activity": {
+              "gathering": "Gathering",
+              "salvage": "Salvage",
+              "crafting": "Crafting"
+            },
+            "ActivityCount": "{activity} · {count}",
+            "ActivityNone": "{activity} · n/a",
+            "ActivityProgressive": "{activity} uses progressive resolution in this system.",
+            "ActivityNotProgressive": "{activity} does not use progressive resolution in this system, so a complication enabled for it is stored but never fires.",
+            "NotProgressive": "· not progressive",
+            "Name": "Name",
+            "NamePlaceholder": "What goes wrong",
+            "SeverityLabel": "Severity",
+            "Severity": {
+              "minor": "Minor",
+              "major": "Major",
+              "severe": "Severe"
+            },
+            "TellPlayer": "Tell the player",
+            "Description": "What happens",
+            "DescriptionPlaceholder": "Read-aloud or GM note for the moment it fires.",
+            "AppliesTo": "Applies to",
+            "When": "When",
+            "MatchLabel": "How the conditions combine",
+            "Match": {
+              "any": "Any",
+              "all": "All"
+            },
+            "MatchHintAny": "any checked condition is enough",
+            "MatchHintAll": "every checked condition must be true",
+            "Condition": {
+              "StageMissed": {
+                "Title": "The award is missed",
+                "Detail": "The roll never reaches this stage, or stops before it — nothing is granted for it."
+              },
+              "StagePartial": {
+                "Title": "The award is only partly covered",
+                "Detail": "The roll covers some of this stage’s difficulty but not all of it. Only reachable where the system awards partial stages."
+              },
+              "StageAwarded": {
+                "Title": "The award is granted",
+                "Detail": "Fires on a clean stage — for consequences that come with the prize."
+              },
+              "CheckTrigger": {
+                "Title": "A named progressive check trigger fires",
+                "Detail": "Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.",
+                "Select": "Check trigger",
+                "Unknown": "Trigger no longer exists",
+                "None": "This system\u2019s progressive checks name no triggers yet \u2014 add one under Checks before a complication can wait on it."
+              }
+            },
+            "RollCondition": {
+              "Title": "A dice expression resolves true",
+              "Detail": "Rolled against the character at the moment the result is decided.",
+              "Expression": "Condition dice expression",
+              "Comparator": "Comparison",
+              "Value": "Compare against"
+            },
+            "Then": "Then",
+            "ThenHint": "both optional — leave them off and the complication is narration only",
+            "EffectRoll": {
+              "Title": "Roll a dice expression",
+              "Detail": "Rolled and posted to chat when the complication fires.",
+              "Expression": "Effect dice expression",
+              "Label": "Effect roll label",
+              "LabelPlaceholder": "Label for the roll — e.g. Shrapnel damage"
+            },
+            "Macro": {
+              "Title": "Run a macro",
+              "Detail": "Receives the component, the character and the complication. It runs on a GM client.",
+              "DropTitle": "Drop a macro here",
+              "DropHint": "Or browse this world’s script macros.",
+              "Browse": "Browse macros",
+              "Search": "Search macros...",
+              "None": "No script macros in this world",
+              "Unlink": "Remove macro",
+              "NotScript": "That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.",
+              "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium."
+            },
+            "Summary": {
+              "StageMissed": "the award is missed",
+              "StagePartial": "the award is only partly covered",
+              "StageAwarded": "the award is granted",
+              "CheckTrigger": "a check trigger fires",
+              "CheckTriggerNamed": "{name} fires",
+              "RollCondition": "{expr} {operator} {value}",
+              "JoinAny": " or ",
+              "JoinAll": " and ",
+              "Sentence": "When {clauses}",
+              "SentenceWithEffects": "When {clauses} · {effects}",
+              "EffectJoin": ", ",
+              "EffectRoll": "rolls {expr}",
+              "EffectMacro": "runs {name}",
+              "EffectMacroUnnamed": "runs a macro",
+              "NoTrigger": "No trigger set — never fires"
+            }
+          },
           "Salvage": "Salvage",
           "SalvageReorder": {
             "Title": "Allow player result re-ordering",

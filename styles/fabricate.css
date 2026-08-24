@@ -1489,7 +1489,23 @@
   grid-template-rows: auto auto 1fr;
   height: 100%;
   min-width: 0;
-  overflow: hidden;
+
+  /* CLIP, NOT HIDDEN (issue 1286).
+
+     `overflow: hidden` still creates a SCROLL CONTAINER: the user gets no scrollbar, but the
+     box remains scrollable PROGRAMMATICALLY — and focus does exactly that. This root is a grid
+     whose `1fr` body row can be shorter than its own content, so a tall panel leaves the root
+     with real scrollable overflow. The first click on a control low in such a panel then makes
+     the browser scroll that control into view, taking the whole app with it: rail and body
+     slide up out of the frame and the lower third of the window becomes an UNRECOVERABLE void,
+     because with no scrollbar there is no way back.
+
+     The complications editor is what first made this reachable — tall enough to give the root
+     ~738px of scrollable overflow — but the trap belongs to the root, not to that panel, and
+     any future panel of the same height would spring it again. `clip` creates no scroll
+     container at all, so there is nothing for focus to scroll. Nothing scrolls this root
+     programmatically; the real scrollers are further in and are untouched. */
+  overflow: clip;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
 
@@ -1592,6 +1608,59 @@
   min-height: 68px;
   padding: var(--fab-space-2);
   line-height: 1.4;
+}
+
+/*
+  …and the SAME baseline for `<select>` (issue 1286).
+
+  The block above promises that "a NEW field can never bleed again", and for four years it
+  did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
+  Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
+  against these surfaces rather than as a missing border. Selects were themed
+  per-container instead — `.fabricate-manager .manager-field select` and
+  `.manager-component-inline-control` (both further down this file) — so a select that leaves
+  a `.manager-field` and carries only `.manager-input` reverted, exactly as the note on that
+  rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
+  found it: both sit in a revealed input strip rather than a field wrapper, and both painted
+  Foundry's default beside a correctly themed `<input>` on the same row.
+
+  PAINT ONLY, and that split is the whole reason this is a separate rule rather than another
+  selector on the group above.
+
+   - The paint properties are byte-identical to the free-text baseline, so a select and the
+     text input beside it are the same control family. That is measurable: the comparator now
+     matches its own row's expression field rather than the two neighbouring treatments the
+     manager already had (6px in a `.manager-field`, 7px on `.manager-scope-select`), both of
+     which keep their own radius because their rules out-specify this one.
+   - `min-height` is deliberately ABSENT. The text baseline can pin 34px because a bare
+     `<input>` has no other height source; a manager select does — and they disagree on
+     purpose. 28px on a pagination-size picker, 32px on `.manager-scope-select` and the bulk
+     editor, 36px in a `.manager-field`. `min-height` is not a property a higher-specificity
+     `height` declaration can override, so a 34px floor here would silently GROW every one of
+     those and no cascade rule would stop it. A call site that needs a select flush with a
+     34px input states that height itself; `ComponentComplicationsSection` does.
+   - No `appearance: none` either, for the same class of reason: on an `<input>` it is a
+     no-op, on a `<select>` it deletes the dropdown arrow. The `@supports (appearance:
+     base-select)` block below sets `appearance` for the engines that can honour it, and an
+     engine without it must keep the platform widget rather than a chevron-less rectangle.
+
+  Specificity is (0,1,1) — one step below the (0,2,1) of the group above, and below every
+  per-control select rule in this file — so this only ever paints a select that nothing else
+  claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
+  to `.fabricate-manager .manager-field select:disabled` (0,2,2).
+*/
+.fabricate-manager select {
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
 }
 
 /*
@@ -11214,6 +11283,30 @@
   background: var(--fab-mv2-bg);
 }
 
+/* A recipe stage row that draws a complication strip hands its PADDING to the row's own
+   line (`.manager-recipe-stage-line`, in RecipeResultItemRow.svelte) and clips itself, so
+   the strip below can run edge to edge with its `border-top` acting as a card divider —
+   which is exactly how the prototype builds this card: `flex-direction: column;
+   overflow: hidden` with the padding on an inner top row and the band as its sibling.
+   Inset by the card's padding instead, the band's rule drew as a short line floating
+   inside the card rather than as a divider across it (issue 1286).
+
+   `overflow: hidden` is what keeps the band's warning fill inside the card's 8px radius.
+   It cannot clip the row's component picker: `SearchablePopover` portals its popover to
+   the manager host rather than rendering it in flow.
+
+   The grip and the ordinal moved INSIDE that line, so this no longer needs the
+   `align-items: flex-start` it once carried to stop them centring against the whole card —
+   they now centre against the line they label, which is what they always meant to do.
+
+   Additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
+   and moves no existing stage row in either studio — the join above stays the one place
+   the two surfaces share values. */
+.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications) {
+  overflow: hidden;
+  padding: 0;
+}
+
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is
    `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×)
    but wrong here: a stage row carries four more controls, so a greedy field took ~85% of
@@ -11242,10 +11335,19 @@
 
 /* Extra separation between the trailing controls, on top of the row's 12px gap: these are
    four unrelated affordances (a read-only fact, a deep link, a reorder rocker and a
-   delete), and packed at 8px they read as one undifferentiated clump. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-reorder,
-.fabricate-manager .manager-salvage-stage-row > .manager-icon-button,
+   delete), and packed at 8px they read as one undifferentiated clump.
+
+   The three salvage selectors now go through `.manager-salvage-stage-line` (issue 1286),
+   keeping `.manager-salvage-stage-row` ahead of it so each compound still outranks the
+   shared `.manager-salvage-stage-edit` rule below, which declares `margin: 0`. That
+   wrapper is `display: contents` on every row, so it matches exactly the controls this
+   rule already matched and no stage row moves; what it buys is that a row which ALSO draws
+   a complication band no longer hands this 4px to the BAND's own Edit link, which belongs
+   to the band's eyebrow rather than to the row's trailing cluster. The recipe selectors are
+   untouched — that row nests its controls in `.manager-recipe-option-controls`. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-edit,
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-reorder,
+.fabricate-manager .manager-salvage-stage-row > .manager-salvage-stage-line > .manager-icon-button,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-edit,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-reorder,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-result-remove {
@@ -20567,6 +20669,51 @@
   font-size: 0.85em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── A FIRED COMPLICATION IS PROSE, NOT A CHIP (issue 1286) ────────────────────────
+   The base `__item` / `__label` treatment above is built for "3x Iron Ingot": the grid
+   packs items into `minmax(140px, 1fr)` tracks and the label is
+   `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`. A complication row
+   puts its NAME, the component that carries it and a free-prose DESCRIPTION into that one
+   label, so on the base treatment it renders as a single ellipsed line in a 140-250px
+   cell — clipped partway through the name, with the description, which is the only reason
+   the authoring section exists, never drawn at all.
+
+   The block deliberately emitted `--complication` with no rule on the reasoning that an
+   unstyled modifier lands safely on the base treatment. That reasoning is right for
+   regression safety and wrong for this content, so the modifier gets a rule and the
+   regression safety is kept by construction instead: EVERY selector below is reached only
+   through a class no card emits unless a complication fired, so a card without one cannot
+   move. `tests/crafting-chat-card.test.js` pins both halves — byte-identity for the
+   no-complication card, and a rendered gate that the description is actually on screen. */
+.fabricate-gather-chat__item--complication,
+.fabricate-craft-chat__item--complication {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fabricate-gather-chat__item--complication .fabricate-gather-chat__label,
+.fabricate-craft-chat__item--complication .fabricate-craft-chat__label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+/* The three runs inside that one label are separated by WEIGHT rather than by more
+   punctuation — the renderer already joins them with an em dash, and a second visual
+   separator on top of it reads as a list. The name leads; the component that carries the
+   complication is context; the description keeps the body treatment because it is the
+   sentence a GM wrote for the table to read. */
+.fabricate-gather-chat__complication-name,
+.fabricate-craft-chat__complication-name {
+  font-weight: 700;
+}
+
+.fabricate-gather-chat__complication-source,
+.fabricate-craft-chat__complication-source {
+  opacity: 0.72;
 }
 
 .fabricate-gather-chat__footer {

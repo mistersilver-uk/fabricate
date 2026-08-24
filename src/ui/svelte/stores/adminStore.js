@@ -395,6 +395,23 @@ function _buildManagedItemOptions(managedItems = []) {
     ...(item.originItemUuid && { originItemUuid: item.originItemUuid }),
     ...(item.registeredItemUuid && { registeredItemUuid: item.registeredItemUuid }),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && { difficulty: item.difficulty }),
+    // The AUTHORED complication list (issue 1286), for the two GM read-only strips: the
+    // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
+    // rows. Both draw the complications of the component the row REFERENCES, which is never
+    // the component the editor is editing, so this option list is the only feed either strip
+    // has — the same reason `difficulty` is projected here.
+    //
+    // It is the UNREDACTED authored list, and deliberately NOT `forecastComplications`:
+    // that projection filters to `visibility: 'visible'`, which is the PLAYER's view, while
+    // the authored default is `gmOnly`. A GM screen fed from it would show nothing at all
+    // for exactly the complications a GM authors by default.
+    //
+    // Absence-preserving on `difficulty`'s idiom above, not `|| []`:
+    // `authoredComplications` keys the persisted field on a NON-EMPTY array, so a component
+    // with none carries no key and this projection must not invent an empty one.
+    ...(Object.prototype.hasOwnProperty.call(item, 'complications') && {
+      complications: _clonePlain(item.complications),
+    }),
   }));
 }
 

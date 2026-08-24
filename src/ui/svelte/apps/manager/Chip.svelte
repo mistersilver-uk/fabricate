@@ -26,9 +26,9 @@
      surrounding markup demands it — a chip inside a `role="list"` must be a list item,
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
-     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `tag`, or '' for the
-     default neutral fill. Tone is colour only and never changes the size; a tone that
-     resized would reintroduce the drift this component removes.
+     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
+     `tag`, or '' for the default neutral fill. Tone is colour only and never changes the
+     size; a tone that resized would reintroduce the drift this component removes.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
@@ -108,6 +108,20 @@
     'danger',
     'neutral',
     'negative',
+    // ACCENT (issue 1286): the chip is a real, chosen, ON state — the complications
+    // section's "Applies to" chips are accent-when-on — and none of the nine tones above
+    // could say it. `active`/`positive` is the SUCCESS family and reads as "this passed";
+    // `tag` is the purple membership fill. The accent family already ships the four
+    // tokens a chip tone needs (`-border`, `-text`, `-soft`), so this states the family
+    // rather than inventing a treatment.
+    'accent',
+    // MUTED (issue 1286): an explicitly DIMMED, unavailable chip — "Salvage · n/a" on a
+    // system whose salvage is not progressive. It is genuinely distinct from `neutral`,
+    // which has two dozen call sites and is the RECESSIVE DEFAULT for a fact that is
+    // merely present. The tone that reads "unavailable" today is `is-disabled` — and that
+    // is joined to the WARNING family two rules below, so routing an n/a pill there would
+    // paint it amber and read as a hazard the GM must act on.
+    'muted',
     // An item TAG (issue 772). Tags are purple across the manager, and the component
     // editor's tag pill carried that colour in the global sheet before it converted onto
     // this component. Without the tone here, `TONES` would DROP `tag` silently at the
@@ -302,6 +316,27 @@
   .manager-chip.is-neutral {
     border-color: var(--fab-border);
     color: var(--fab-text-muted);
+  }
+
+  /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
+     is the ink, for the reason that token was added at all — the raw accent over
+     `--fab-accent-soft` measures under AA in `ironblood-forge`, and every other semantic
+     family here already inks its soft fill with its own `*-text`. */
+  .manager-chip.is-accent {
+    border-color: var(--fab-accent-border);
+    color: var(--fab-accent-text);
+    background: var(--fab-accent-soft);
+  }
+
+  /* MUTED (issue 1286): dimmed and unavailable — an outline with the disabled ink and NO
+     fill, so it recedes behind every toned chip beside it without borrowing the warning
+     family's alarm. Deliberately not `opacity`: an opacity on the chip would also fade a
+     leading glyph and any swatch dot to a different degree than the label, and it composes
+     unpredictably with a caller's own container opacity. */
+  .manager-chip.is-muted {
+    border-color: var(--fab-border);
+    color: var(--fab-text-disabled);
+    background: none;
   }
 
   /* ROW density (issue 1096): the Checks Studio modifier row's in-line annotation chip

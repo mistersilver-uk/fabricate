@@ -2708,3 +2708,379 @@ test('_resolveSalvageResultGroups: routed selects the FAILING tier name through 
     ['rg-ruined']
   );
 });
+
+// ---------------------------------------------------------------------------
+// Group 12: Progressive component complications (issue 1286)
+//
+// The firing site sits between `_awardSalvageResultGroups` and
+// `_postSalvageChatMessage`: after the award is committed, before the card. These
+// assert WHAT fires and — at least as importantly — the four places that must fire
+// NOTHING (the failure branch, the two non-progressive modes, and a second occurrence
+// of an already-fired complication).
+// ---------------------------------------------------------------------------
+
+/**
+ * One authored complication. `visibility` defaults to `gmOnly`, so every firing
+ * produces a GM request and the delivery spy counts firings end to end. Neither roll
+ * is enabled: a condition roll and an effect roll are the RUNTIME's concern and are
+ * covered by that module's own suite; enabling either here would only stub Foundry's
+ * `Roll` back into a test about the engine's call sites.
+ */
+function complication({
+  id = 'cx',
+  name = 'Shrapnel',
+  when = { stageAwarded: true },
+  match = 'any',
+  visibility = 'gmOnly',
+  activities = { salvage: true },
+} = {}) {
+  return {
+    id,
+    name,
+    description: `${name} description`,
+    severity: 'minor',
+    visibility,
+    activities,
+    match,
+    when,
+    rollCondition: { enabled: false },
+    effectRoll: { enabled: false },
+  };
+}
+
+/** A delivery writer that records every `deliver` call rather than emitting. */
+function recordingWriter() {
+  const calls = [];
+  return {
+    calls,
+    deliver(args) {
+      calls.push(args);
+      return true;
+    },
+  };
+}
+
+/**
+ * A progressive salvage world: two output components (cost 2 and cost 5) and a
+ * component that breaks down into them. `value` decides which stages are awarded.
+ */
+function progressiveSalvageWorld({
+  results = [
+    { id: 'r-1', componentId: 'item-a', quantity: 2 },
+    { id: 'r-2', componentId: 'item-b', quantity: 1 },
+  ],
+  complicationsA = [complication()],
+  complicationsB = [],
+  value = 3,
+  checkSuccess = true,
+  awardMode = 'equal',
+  salvageRunManager = null,
+  allowPlayerResultReorder,
+} = {}) {
+  const itemAComp = {
+    id: 'item-a',
+    name: 'Item A',
+    registeredItemUuid: null,
+    difficulty: 2,
+    complications: complicationsA,
+  };
+  const itemBComp = {
+    id: 'item-b',
+    name: 'Item B',
+    registeredItemUuid: null,
+    difficulty: 5,
+    complications: complicationsB,
+  };
+  const engine = makeEngine({
+    resolutionModeService: {
+      validateSalvage: () => ({ valid: true, errors: [] }),
+      resolveResultGroups: () => ({ groups: [], meta: {} }),
+    },
+    salvageRunManager,
+  });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: checkSuccess,
+    outcome: null,
+    value,
+    data: { total: value },
+    engineEvaluated: true,
+    message: checkSuccess ? undefined : 'Check failed',
+  });
+  const writer = recordingWriter();
+  engine.installComplicationDelivery({ writer });
+
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const actor = makeActor('actor-1', [compItem]);
+  const salvage = {
+    enabled: true,
+    ingredientQuantity: 1,
+    resultGroups: [{ id: 'rg-1', name: 'Loot', results }],
+  };
+  if (allowPlayerResultReorder !== undefined) {
+    salvage.allowPlayerResultReorder = allowPlayerResultReorder;
+  }
+  const component = { id: 'comp-1', name: 'Test Component', salvage };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: [],
+      progressive: { awardMode },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+    },
+    components: [component, itemAComp, itemBComp],
+  });
+  setupGame(system, actor);
+  return { engine, writer, actor, component, system };
+}
+
+test('salvage(): a progressive award fires its awarded stage and delivers the GM request once', async () => {
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld();
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true, 'the salvage still succeeds');
+  assert.equal(writer.calls.length, 1, 'exactly one delivery for one resolution');
+  const [delivered] = writer.calls;
+  assert.equal(delivered.craftingSystemId, 'sys-1');
+  assert.equal(delivered.actorUuid, actor.uuid);
+  assert.equal(delivered.complications.length, 1);
+  assert.deepEqual(
+    {
+      componentId: delivered.complications[0].componentId,
+      complicationId: delivered.complications[0].complicationId,
+      resultId: delivered.complications[0].resultId,
+      activity: delivered.complications[0].activity,
+      bucket: delivered.complications[0].bucket,
+    },
+    {
+      componentId: 'item-a',
+      complicationId: 'cx',
+      // The STAGE OCCURRENCE, not just the component: a card that could not name the row
+      // cannot be reconciled against a component listed more than once.
+      resultId: 'r-1',
+      activity: 'salvage',
+      bucket: 'full',
+    }
+  );
+  // The engine never mints: the writer does, once per `deliver` call.
+  assert.equal('resolutionId' in delivered, false, 'the engine does not mint a resolution id');
+});
+
+test('salvage(): a MISSED stage fires, and reads the halt the award loop reported', async () => {
+  // Budget 3 awards `item-a` (cost 2) and halts on `item-b` (cost 5). A `stageMissed`
+  // complication on the halted component is the headline case for this feature.
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld({
+    complicationsA: [],
+    complicationsB: [complication({ id: 'cy', name: 'Shattered', when: { stageMissed: true } })],
+  });
+
+  await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(writer.calls.length, 1);
+  assert.deepEqual(
+    writer.calls[0].complications.map((entry) => [entry.componentId, entry.bucket]),
+    [['item-b', 'halted']]
+  );
+});
+
+test('salvage(): NEGATIVE CONTROL — the FAILURE branch fires nothing at all', async () => {
+  // `_resolveSalvageResultGroups` returns [] for a failed progressive check, so there are
+  // no stages, no award and no candidates. That is a stated requirement, not an accident:
+  // a failed salvage must not fire the complications a successful one would have.
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld({
+    checkSuccess: false,
+    complicationsA: [complication()],
+    complicationsB: [complication({ id: 'cy', when: { stageMissed: true } })],
+  });
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false, 'the check failed');
+  assert.equal(writer.calls.length, 0, 'a failed salvage delivers nothing');
+  // NOT a vacuous pass. The same component and the same rolled value DO produce plan
+  // inputs — two stages and two candidate complications — so the only thing keeping this
+  // at zero is that the firing site sits after the award, on the success path, and the
+  // failure branch returns before ever reaching it.
+  const wouldHaveFired = engine._progressiveSalvagePlanInputs(
+    component,
+    system,
+    { value: 3 },
+    null
+  );
+  assert.equal(wouldHaveFired.stages.length, 2);
+  assert.deepEqual(
+    engine._resolveSalvageResultGroups(component, system, { value: 3 }, null, 'failure'),
+    []
+  );
+});
+
+test('salvage(): NEGATIVE CONTROL — simple mode fires nothing, and still selects by index', async () => {
+  const outputComp = {
+    id: 'result-comp',
+    name: 'Scrap',
+    difficulty: 1,
+    complications: [complication()],
+  };
+  const engine = makeEngine({
+    resolutionModeService: {
+      validateSalvage: () => ({ valid: true, errors: [] }),
+      resolveResultGroups: () => ({ groups: [], meta: {} }),
+    },
+  });
+  const writer = recordingWriter();
+  engine.installComplicationDelivery({ writer });
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent();
+  const system = makeSystem({ components: [component, outputComp] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(writer.calls.length, 0, 'complications are a progressive-only consequence');
+  assert.equal(actor.createdItems.length, 1, 'the simple award is untouched');
+});
+
+test('salvage(): a component listed twice fires ONCE, naming the occurrence that matched', async () => {
+  // A component may legitimately appear several times, so `full` and `stageMissed` can
+  // both be true for it — the honest reading. But a `1d6` shrapnel complication on a
+  // component listed twice must not roll twice.
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld({
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 1 },
+      { id: 'r-2', componentId: 'item-a', quantity: 1 },
+      { id: 'r-3', componentId: 'item-b', quantity: 1 },
+    ],
+    complicationsA: [complication({ when: { stageAwarded: true, stageMissed: true } })],
+    value: 3,
+  });
+
+  await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(writer.calls.length, 1);
+  assert.equal(
+    writer.calls[0].complications.length,
+    1,
+    'deduped on (componentId, complicationId), not once per occurrence'
+  );
+  assert.equal(
+    writer.calls[0].complications[0].resultId,
+    'r-1',
+    'and it names the first occurrence in fire order that satisfied a matched clause'
+  );
+});
+
+test('salvage(): the RUN RECORD order decides which stage fires, not the authored order', async () => {
+  // The order is captured onto the run at start, so a world-time-resumed salvage is
+  // independent of whichever client wins the race. Reversing it moves the budget onto a
+  // different stage, and the firing must follow the award rather than the authored list.
+  const salvageRunManager = new SalvageRunManager();
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld({
+    complicationsA: [complication({ id: 'ca', when: { stageAwarded: true } })],
+    complicationsB: [complication({ id: 'cb', when: { stageAwarded: true } })],
+    value: 5,
+    salvageRunManager,
+  });
+  // The starting user's stored order, read ONCE at run start and captured on the record.
+  engine.getPlayerResultOrder = () => ['r-2', 'r-1'];
+
+  await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(writer.calls.length, 1);
+  assert.deepEqual(
+    writer.calls[0].complications.map((entry) => entry.componentId),
+    ['item-b'],
+    'the reordered list spends the whole budget on item-b (cost 5), so only it is awarded'
+  );
+});
+
+test('salvage(): a THROWING delivery writer never costs the salvage its results', async () => {
+  const { engine, actor, component, system } = progressiveSalvageWorld();
+  engine.installComplicationDelivery({
+    writer: {
+      deliver() {
+        throw new Error('socket exploded');
+      },
+    },
+  });
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true, 'the award is committed and stays committed');
+  assert.equal(actor.createdItems.length, 1, 'the awarded item is still on the actor');
+});
+
+test('_resolveProgressiveSalvageAward: reports the ORDERED list and the award verbatim', () => {
+  // The split exists so two callers can take two halves of one computation: the award
+  // path needs the awarded results, the classifier needs the whole ordered list plus the
+  // loop's own report of why it stopped.
+  const engine = makeEngine();
+  const component = makeComponent({
+    resultGroups: [
+      {
+        id: 'rg-1',
+        name: 'Loot',
+        results: [
+          { id: 'r-1', componentId: 'item-a', quantity: 2 },
+          { id: 'r-2', componentId: 'item-b', quantity: 1 },
+        ],
+      },
+    ],
+  });
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    components: [
+      { id: 'item-a', name: 'A', difficulty: 2 },
+      { id: 'item-b', name: 'B', difficulty: 5 },
+    ],
+  });
+
+  const resolved = engine._resolveProgressiveSalvageAward(component, system, { value: 3 }, null);
+
+  assert.deepEqual(
+    resolved.results.map((r) => r.id),
+    ['r-1', 'r-2'],
+    'the WHOLE ordered list, not just the awarded prefix'
+  );
+  assert.deepEqual(
+    resolved.award.awarded.map((r) => r.id),
+    ['r-1']
+  );
+  assert.equal(resolved.award.haltedResult?.id, 'r-2', 'the loop reports why it stopped');
+  assert.equal(resolved.award.partialResult, null);
+  assert.deepEqual(resolved.award.skippedResults, []);
+  // The `quantity: 1` force belongs to the AWARD path and must not leak in here.
+  assert.equal(resolved.award.awarded[0].quantity, 2, 'the authored result is handed back as-is');
+});
+
+test('salvage(): deferComplicationDelivery FIRES but does not emit, returning the requests to batch', async () => {
+  // The bulk-salvage sibling of `suppressChat`, and required for the same reason: the
+  // GM-side rate limiter is sized on the stated assumption that a bulk salvage of any
+  // size emits ONE message, so a per-row emit would silently drop a long run's tail.
+  const { engine, writer, actor, component, system } = progressiveSalvageWorld();
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, {
+    deferComplicationDelivery: true,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(writer.calls.length, 0, 'nothing was emitted from the row');
+  assert.deepEqual(
+    result.complicationRequests.map((entry) => [entry.componentId, entry.complicationId]),
+    [['item-a', 'cx']],
+    'and the requests came back for the caller to batch'
+  );
+});
+
+test('salvage(): an undeferred salvage carries NO complicationRequests key at all', async () => {
+  // The key is present only when a caller asked to batch: adding it unconditionally would
+  // change the return shape of every salvage in the module for one caller's benefit.
+  const { engine, actor, component, system } = progressiveSalvageWorld();
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal('complicationRequests' in result, false);
+});

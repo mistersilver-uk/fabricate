@@ -131,6 +131,10 @@ Import MUST surface that collection to the GM in a readable report, grouped by r
 Every `kind` and every `ownerType` the import can emit MUST have a localized label, including the values that reach the report only through a dynamic pass-through helper; the report MUST never display a raw localization key.
 A component's salvage result and catalyst references are owned by that COMPONENT, not by a recipe, and the report MUST label them accordingly.
 
+A component **complication**'s `macroUuid` (issue 1286) is an external macro reference and MUST be collected as one, with `ownerType: 'component'` — a type that already carries a localized label — and with the OWNING COMPONENT's id and name.
+It is collected by a dedicated walk rather than by the flat one-level-deep collector, for a REPORTING reason as much as a structural one: the flat collector cannot reach a nested list, and a flattened form would take the owner id and name from the complication, so the report would name a record the GM cannot open instead of the component they have to go and fix.
+Left uncollected, the uuid is never remapped and the complication runs the WRONG macro in the importing world.
+
 ### Copy-mode identifier rebinding
 
 Copy-mode import MUST rebind record-container identifiers: the system identifier and environment record identifiers.
@@ -143,6 +147,7 @@ A `recipeIds[]` entry is protected from the component-id remap but IS rewritten 
 A membership entry naming a recipe id absent from the payload MUST be preserved verbatim and reported as a broken internal reference.
 After the transform, no within-payload reference may point at a pre-regeneration or absent component id, and no `recipeIds[]` membership entry may point at a pre-regeneration recipe id.
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.
+Component **complication** identifiers join that preserve list: nothing outside the owning component references one, and the runtime de-duplication key is `(componentId, complicationId)`, which the component-id remap already rebinds on its own half.
 Keep-mode import MUST NOT regenerate component identifiers or any reference.
 
 ### Environment persistence
@@ -203,6 +208,7 @@ A bundle carrying the pre-`3` per-system currency block is upcast by the hoist a
 The world `travelConfig` slice MUST round-trip under keep mode into an UNCONFIGURED destination world — every realm, its `sceneMappings`, its biomes and modifiers, the reveal mode and the modifier visibility.
 Into an ALREADY-CONFIGURED destination the round trip is deliberately NOT identity, on the same terms as currency: a destination realm id wins over the incoming definition and the destination's scalars are left alone.
 A bundle carrying the pre-`4` per-system realm library is upcast by the hoist above and is NOT required to round-trip in its legacy form.
+`Component.complications` MUST round-trip under keep mode in full, macro uuids included, and an ABSENT `complications` MUST stay absent — absence and an empty list are the same state by `data-models/spec.md` § Component requirement 20, so a round trip that materialized an empty array would be inventing a key the normalizer refuses to write.
 
 ## Out of Scope
 

@@ -566,6 +566,45 @@ export function installFoundryShim(world) {
     getSpeaker(options = {}) {
       return { alias: options.actor?.name ?? 'Fabricate', actor: options.actor?.id ?? null };
     },
+
+    // Visibility, and why BOTH statics are modelled rather than the one this lab's version needs.
+    //
+    // Production asks for `applyMode` first and falls back to `applyRollMode`, because V14 renamed
+    // the static and deprecated the old name (`client/documents/chat-message.mjs`: `applyMode` at
+    // :151, `applyRollMode` at :654 carrying a `logCompatibilityWarning` until v16). Fabricate
+    // supports both, so the shim has to answer for both or the lab silently exercises one branch.
+    //
+    // These were absent while the production call was OPTIONAL (`applyRollMode?.(...)`), which made
+    // a missing static a silent no-op: the lab rendered a bulk salvage card that had never had any
+    // visibility applied and looked correct doing it. Issue 1286 made the call unconditional so a
+    // future rename cannot quietly turn a whispered GM card into table-wide chat, and that turned
+    // the same gap into a thrown TypeError that failed `player-inventory-bulk-report`. Both
+    // outcomes came from the shim, not from production — the fail-closed call is right, and a lab
+    // that cannot answer a documented static is what was wrong.
+    applyMode(chatData, mode) {
+      const data = chatData ?? {};
+      let whisper = data.whisper ?? [];
+      if (mode === 'public') whisper = [];
+      else if (mode === 'self') whisper = [globalThis.game?.user?.id].filter(Boolean);
+      else if (whisper.length === 0 && (mode === 'gm' || mode === 'blind')) {
+        whisper = (globalThis.game?.users?.filter((user) => user.isGM) ?? []).map((user) => user.id);
+      }
+      data.whisper = whisper;
+      data.blind = mode === 'blind';
+      return data;
+    },
+    applyRollMode(chatData, mode) {
+      // The deprecated spelling maps the legacy token and delegates, exactly as V14 does. Kept
+      // deliberately: production reaches it only when `applyMode` is absent, and a lab that
+      // omitted it could never exercise that fallback at all.
+      const V14_MODE_BY_LEGACY = {
+        publicroll: 'public',
+        gmroll: 'gm',
+        blindroll: 'blind',
+        selfroll: 'self',
+      };
+      return globalThis.ChatMessage.applyMode(chatData, V14_MODE_BY_LEGACY[mode] ?? mode);
+    },
   };
 
   // The smoke's world-document block opens by deleting stale data from a previous run. In a lab

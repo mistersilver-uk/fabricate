@@ -1,5 +1,6 @@
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -90,6 +91,12 @@ const RAW_MODULES = [
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,
+  // A progressive stage row draws its component's complications read-only (issue 1286), and
+  // builds the one-line trigger sentence with this pure leaf. It reads the operator glyph
+  // from `characterPrerequisites.js`, which is itself import-free, so these two close the
+  // graph the harness validator walks.
+  'src/utils/complicationSummary.js',
+  'src/systems/characterPrerequisites.js',
 ];
 
 // The new tab + section components the editor shell composes.
@@ -116,6 +123,12 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+  // The ONE complication summary row, rendered by the progressive stage row's read-only
+  // strip (issue 1286), and the disclosure it imports. A `.svelte` the tree renders but this
+  // list omits HANGS the suite (`# cancelled`) rather than failing it — so both are listed
+  // even though only the first is named at a call site here.
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
@@ -2566,6 +2579,200 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ───────────────────────────────────
+  //
+  // A progressive stage row already refuses to edit `component.difficulty` and links out
+  // instead. Complications get the identical treatment for the identical reason: they belong
+  // to the referenced component, whose own editor owns their save lifecycle. The Recipe
+  // Studio prototype draws an inline DC stepper beside the strip; the row's read-only-badge
+  // doctrine OVERRIDES the prototype on that control, and the strip inherits the override.
+
+  const CRAFTING_COMPLICATION = Object.freeze({
+    id: 'cx-1',
+    name: 'The spring lets go',
+    severity: 'severe',
+    visibility: 'gmOnly',
+    activities: { crafting: true },
+    when: { stageMissed: true },
+    effectRoll: { enabled: true, expr: '2d6' },
+  });
+
+  // One complication for crafting, one for salvage only. Both halves matter: the strip must
+  // show the first and withhold the second.
+  const COMPLICATED_COMPONENT_OPTIONS = Object.freeze([
+    Object.freeze({
+      id: 'cmp-herb',
+      name: 'Mountain Herb',
+      img: 'icons/herb.webp',
+      difficulty: 12,
+      complications: [
+        CRAFTING_COMPLICATION,
+        {
+          id: 'cx-2',
+          name: 'Metal fatigue',
+          severity: 'minor',
+          visibility: 'visible',
+          activities: { salvage: true },
+          when: { stagePartial: true },
+        },
+      ],
+    }),
+    Object.freeze({ id: 'cmp-water', name: 'Pure Water', img: 'icons/water.webp' }),
+  ]);
+
+  const stageStrips = (target) => [
+    ...target.querySelectorAll('[data-recipe-result-complications]'),
+  ];
+
+  it('1286: a progressive stage whose component authors crafting complications grows a strip', async () => {
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    const found = stageStrips(target);
+    assert.equal(found.length, 1, 'only the stage whose component authors one gets a strip');
+    assert.equal(found[0].getAttribute('data-recipe-result-complications'), 'cmp-herb');
+
+    const rows = [...found[0].querySelectorAll('[data-recipe-result-complication]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-recipe-result-complication')),
+      ['cx-1'],
+      'a complication authored for salvage alone says nothing about a recipe stage, and ' +
+        'listing it would tell the GM this result carries a consequence it does not'
+    );
+    assert.match(rows[0].textContent, /The spring lets go/, 'the row names it');
+    assert.match(rows[0].textContent, /When the award is missed/, 'and states when it fires');
+    assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
+    // The severity WORD, which this prototype draws and the Component Studio's strip does
+    // not — the shared row takes it as a prop precisely so the two can differ.
+    assert.match(rows[0].textContent, /Severe/, 'the severity is named, not only tinted');
+    editHarness.remount();
+  });
+
+  it('1286: the band is FULL-BLEED — the grip and the ordinal ride the stage line, not the card', async () => {
+    // The prototype's stage card is `flex-direction: column; overflow: hidden` with NO
+    // padding of its own: the padding is on an inner top ROW and the band is that row's
+    // sibling, so the band's `border-top` runs the full width and reads as a card DIVIDER.
+    // Left as the card's own leading flex items, the grip and the ordinal pushed the band
+    // ~58px in and its top rule drew as a short line floating inside the card.
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    const banded = target.querySelector(
+      '[data-recipe-result-row]:has([data-recipe-result-complications])'
+    );
+    assert.ok(Boolean(banded), 'the herb stage draws a band');
+
+    const line = banded.querySelector('.manager-recipe-stage-line');
+    assert.ok(Boolean(line), 'the row has a line of its own for the band to sit beneath');
+    assert.ok(line.querySelector('.manager-recipe-stage-grip'), 'the grip rides that line');
+    assert.ok(line.querySelector('.manager-recipe-stage-ordinal'), 'so does the ordinal');
+    // The band is the LINE's sibling, never its child: nested inside it the band would be
+    // inset by the line's padding and would still not reach the card's edges.
+    assert.equal(
+      line.querySelector('[data-recipe-result-complications]'),
+      null,
+      'the band is a sibling of the line, not part of it'
+    );
+    assert.equal(
+      banded.querySelector('[data-recipe-result-complications]').parentElement,
+      line.parentElement,
+      'both are children of the one wrapper, which is what makes the band full-width'
+    );
+
+    // A row with no band keeps the OLD anatomy exactly: both wrappers are `display:
+    // contents`, so grip, ordinal and option row are the card's own flex items.
+    const plain = [...target.querySelectorAll('[data-recipe-result-row]')].find(
+      (row) => !row.querySelector('[data-recipe-result-complications]')
+    );
+    assert.ok(plain.querySelector('.manager-recipe-stage-grip'), 'an unbanded row still grips');
+    editHarness.remount();
+  });
+
+  it('1286: a banded stage card sheds its own padding so the band can reach the edges', async () => {
+    // Stated in the sheet, not measurable from the mounted markup: the harness mounts
+    // markup without `styles/fabricate.css`, and the visual-parity harness measures the
+    // band's own box rather than the card's. `manager-layout.test.js` reads the sheet the
+    // same way for the same reason.
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const selector =
+      '.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications)';
+    const start = sheet.indexOf(`${selector} {`);
+    assert.notEqual(start, -1, 'the banded stage card is still scoped by `:has()`');
+    const block = sheet.slice(start, sheet.indexOf('}', start));
+    assert.match(block, /padding:\s*0/, 'the card hands its padding to the line inside it');
+    assert.match(block, /overflow:\s*hidden/, "so the band's fill stays inside the card radius");
+  });
+
+  it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
+    // The trap: feeding the strip `forecastComplications` — which filters to
+    // `visibility: "visible"` — reads as a working surface right up until a GM authors a
+    // complication with the DEFAULT visibility, which is `gmOnly`. Then the GM's own screen
+    // shows nothing, and every fixture that happened to use `visible` still passed.
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    const row = stageStrips(target)[0].querySelector('[data-recipe-result-complication="cx-1"]');
+    assert.ok(row, 'the gmOnly complication renders on the GM strip');
+    editHarness.remount();
+  });
+
+  it('1286: the strip edits nothing — the row is still the only route to the component', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    const strip = stageStrips(target)[0];
+    assert.ok(
+      !strip.querySelector('input, select, textarea, button'),
+      'no control at all: editing here would either write across an aggregate boundary or ' +
+        'make "Save recipe" persist a Component change — the same ruling the DC badge takes'
+    );
+    // The row's existing Edit link already targets the component that owns the strip, so the
+    // deep-link is not duplicated per complication (the prototype does, because ITS strip
+    // draws complications from other components — that is issue 1287, not this build).
+    const edit = target.querySelector('[data-recipe-result-edit]');
+    assert.equal(edit.getAttribute('data-recipe-result-edit'), 'cmp-herb');
+    editHarness.remount();
+  });
+
+  it('1286: a row with no strip is laid out exactly as before — the wrapper is display: contents', async () => {
+    // The strip renders INSIDE the stage card, so the row is wrapped. If that wrapper ever
+    // participated in layout unconditionally it would make the row a column item inside a
+    // card that is `display: flex; align-items: center`, moving EVERY progressive stage row
+    // in the Studio for a feature almost no recipe uses.
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    assert.equal(stageStrips(target).length, 0, 'no strip for a component authoring none');
+    const wrap = target.querySelector('.manager-recipe-stage-complications-wrap');
+    assert.ok(wrap, 'the wrapper is always present, so there is ONE row anatomy');
+    assert.equal(
+      wrap.classList.contains('has-complications'),
+      false,
+      'and it stays out of layout until there is something to draw'
+    );
+    editHarness.remount();
+  });
+
+  it('1286: no strip outside progressive mode — a complication has no stage to fire from', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { progressive: false, props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
+    assert.equal(stageStrips(target).length, 0);
+    editHarness.remount();
+  });
+
   it('non-progressive: result rows show no difficulty badge', async () => {
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
@@ -2733,8 +2940,7 @@ describe('RecipeEditView (mounted)', () => {
       'the popover lists every unattached library tool'
     );
     for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
-      const expectedName =
-        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
+      const expectedName = testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
       const option = options.find((node) => node.textContent.includes(expectedName));
       assert.ok(option, `${testCase.id}: the picker option shows "${expectedName}"`);
       assert.equal(
@@ -4019,9 +4225,7 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-water', amount: 1 } }],
       { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger')
-      .click();
+    target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger').click();
     await flushRender();
 
     const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>

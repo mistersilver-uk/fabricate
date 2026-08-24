@@ -439,11 +439,104 @@ This is the key distinction from the routed modes, which select exactly one resu
 Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - `equal`: award result when `remaining >= cost`; then `remaining -= cost`.
+  **Otherwise STOP**: the first stage the budget cannot afford ends the award, and every later stage is left unevaluated.
 - `exceed`: award result when `remaining > cost`; then `remaining -= cost`.
+  **Otherwise STOP**, on the same terms as `equal`.
+  A stage whose cost EXACTLY equals `remaining` therefore stops an `exceed` award where `equal` would have awarded it.
 - `partial`:
   - if `remaining >= cost`, award and decrement.
   - else if `remaining > 0`, award the current result (with only partial credit), set `remaining = 0`, stop.
   - else stop.
+
+**All three modes STOP at the first unaffordable stage; none of them skips it and carries on.**
+That is stated explicitly because it is the difference between "the player did not receive the later stages" and "the player nearly reached the next stage", and every consumer that classifies stages depends on it.
+The one case that CONTINUES rather than stopping is an invalid cost (a `costFor` that is non-finite or below 1), and only under the `skip` policy; under the `fail` policy an invalid cost aborts the whole award as a misconfiguration.
+An invalid cost is a GM authoring gap rather than a budget outcome, and it is reported separately for that reason.
+
+### Award Loop Reporting
+
+The award loop is the only place that knows WHY it stopped, so it REPORTS that rather than leaving each caller to re-derive it.
+Alongside `awarded`, `remaining` and the misconfiguration `invalidResultId`, it returns three additive facts:
+
+- `partialResult` — the `partial`-mode tail award, or `null`.
+  **It is a MEMBER of `awarded`**, so "fully awarded" is `awarded` MINUS `partialResult`; a consumer reading "fully awarded = every member of `awarded`" classifies a partial-only component as both fully awarded and partial at once.
+- `haltedResult` — the ONE stage that stopped the loop and was NOT awarded, or `null`.
+  A partial tail award and a halt are MUTUALLY EXCLUSIVE, because the `partial` branch awards the tail and only THEN stops; under `partial` a resolution has a halted stage only when the budget reached zero exactly, or started at or below it.
+  `haltedResult` is `null` when the budget covered the whole list, and `null` for an aborted `fail` resolution, which is a misconfiguration rather than a budget halt.
+- `skippedResults` — every invalid-cost stage in the WHOLE ordered list, not merely in the prefix the loop visited before stopping, so a misconfigured stage sitting after the halt is reported as skipped rather than mistaken for a stage that was never reached.
+
+These three are ADDITIVE: `awarded`, `remaining` and `invalidResultId` are unchanged, and every existing caller reads only those.
+Re-deriving any of them in a caller is forbidden rather than merely discouraged.
+The break index is not recoverable from `awarded` plus `remaining` once a skipped stage sits between the last award and the halt; and the salvage path does not zero the budget after a partial tail, so "was there a partial" is not inferable from `remaining` there either.
+Re-derivation is what makes the crafting and salvage classifiers disagree about the same resolution.
+
+Every progressive resolution PUBLISHES those facts to its engine as one flat, id-list-shaped record — `awardedResultIds`, `remaining`, `partialResultId`, `haltedResultId`, `skippedResultIds` — and the same five keys are published by all three activities, so a consumer learns one shape rather than one per activity.
+It is published in full on every branch, including a resolution that awarded nothing: a consumer that reads five keys on one branch and two on another learns two shapes for one fact.
+
+### Component Complications
+
+A `Component` may carry GM-authored **complications** (`data-models/spec.md` § Component requirements 19-25) that fire when that component takes part in a progressive resolution.
+Progressive mode is the only resolution mode that has stages, so it is the only mode that can fire one.
+
+#### The five stage buckets
+
+Each stage in the ordered list lands in EXACTLY ONE bucket, and the partition is total.
+
+| bucket | definition |
+| --- | --- |
+| `full` | in `awarded` and NOT `partialResult` |
+| `partial` | `partialResult`, the `partial`-mode tail award, which is itself a member of `awarded` |
+| `halted` | `haltedResult`: the one stage that stopped the loop and was not awarded |
+| `unreached` | every stage after the stop point — the halt, or the partial tail the loop stops on — which the loop never evaluated |
+| `skipped` | a stage this classifier must not read as an outcome: an invalid cost, derived over the WHOLE ordered list rather than the visited prefix, OR a stage with no resolvable result id |
+
+Classification order is load-bearing three times: the id-less test runs FIRST OF ALL, because a stage with no resolvable result id is in none of the id sets the other four tests consult and would otherwise fall out of the bottom of the chain; `skipped` is tested next so an invalid cost sitting after the stop point is never read as `unreached`; and `partial` is tested before `full` because the tail award is a member of `awarded`.
+
+**A stage with no resolvable result id is `skipped`, and MUST NOT be `unreached`.**
+The partition must be total, so an id-less stage has to land somewhere, and `skipped` is the one bucket that contributes to nothing.
+`unreached` is the worst reading available: the award loop pushes a result into `awarded` whatever its id, and only the id set drops the id-less ones, so an id-less stage the loop DID award would classify as `unreached` and fire a `stageMissed` complication naming a component the player is holding.
+The loop can and does award a result it cannot name; it is this classifier that cannot recognise it afterwards, and a complication must fail toward silence rather than toward accusing the player of a miss.
+`_normalizeSalvageResult` mints an id for every salvage result, so no shipped path reaches this today — but this spec contemplates an id-less progressive result, so the branch is specified rather than left to fall through.
+
+`halted` and `unreached` stay DISTINCT even though the `stageMissed` clause below unions them, so a later change can offer "only the stage you nearly reached" without reopening this model, and so an output can say which of the two it was.
+
+#### The per-component facts
+
+A component may legitimately appear several times in one ordered list, so its facts are derived over ALL of its occurrences.
+
+| clause | matches when |
+| --- | --- |
+| `when.stageAwarded` | at least one of its stages is `full` |
+| `when.stagePartial` | at least one of its stages is `partial` |
+| `when.stageMissed` | at least one of its stages is `halted` OR `unreached` |
+| `when.checkTrigger` | the NAMED trigger on the ACTIVE activity's progressive check block matched this check result |
+
+`skipped` contributes to NOTHING: a GM misconfiguration is not a narrative outcome, and a skipped stage must never appear as one on any output.
+`full`, `partial` and `stageMissed` may all be true at once for one component, and that is the honest reading of a component listed several times.
+
+`match: 'all'` requires every ENABLED clause; `match: 'any'` requires one; a complication with nothing enabled never fires.
+A clause the GM did not enable is absent from the quantification rather than false, so `rollCondition.enabled: false` contributes nothing and can never make `all` unsatisfiable.
+The `rollCondition` gate is settled by a live roll and FAILS CLOSED on every uncertainty — no dice engine, a non-finite total, an unparseable comparand, or a comparator the numeric table does not know.
+Its comparand is resolved by SUBSTITUTING roll data without rolling, so a comparand that is itself a dice expression fails the gate closed rather than being re-rolled on every evaluation.
+
+#### At most once per component per resolution
+
+**A complication fires at most once per component per resolution**, deduplicated on `(componentId, complicationId)`.
+A `1d6` complication on a component listed five times must not roll five times.
+Each firing NAMES the stage OCCURRENCE that produced it — the first, in fire order, whose bucket satisfied a matched stage clause; a firing decided only by a trigger or a condition roll names the component's first non-`skipped` occurrence instead, so an output still points at a row.
+Without that name a player reading "you missed the iron ingot" against an output that also granted an iron ingot cannot reconcile the two.
+
+Fire order is the ordered stage list's own order: the player's reordered list for crafting, the order captured onto the run at start for salvage, and the authored order for gathering, which has no reorder feature.
+
+#### Documented consequences
+
+These follow from the model above and are recorded rather than fixed.
+
+- An `outcomeTier` trigger condition can NEVER match a progressive check, because a progressive roll produces a null outcome.
+- A trigger condition reading the forced progressive value and one reading the raw roll total can disagree on the same roll.
+- `when.stagePartial` can never match under `equal` or `exceed`, because neither mode produces a partial tail.
+- Under `exceed`, a stage whose cost exactly equals `remaining` is `halted` where `equal` calls it `full`.
+- A resolution the award loop aborted on an invalid cost under the `fail` policy fires NOTHING.
 
 ### Player Reorder
 

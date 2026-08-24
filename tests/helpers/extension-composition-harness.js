@@ -40,9 +40,15 @@ export async function withFabricateLifecycleReplay(run) {
   const originalFetch = globalThis.fetch;
   const originalConfig = globalThis.CONFIG;
   let world = null;
+  // NO FILE WATCHER. `root` is the repository, and a developer who has harvested Foundry chrome
+  // for the View Lab has ~7,100 read-only art files under `.foundry-chrome/`. Vite watches what it
+  // serves, chokidar costs one inotify handle per file, and a stock Linux box allows 65,536 for the
+  // whole user session — so one harvest exhausts it and these suites die with
+  // `ENOSPC ... watch '<something>.webp'` raised from inside chokidar, on tests about window
+  // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
   const vite = await createServer({
     root: repoRoot,
-    server: { middlewareMode: true, hmr: false },
+    server: { middlewareMode: true, hmr: false, watch: null },
     appType: 'custom',
   });
 
@@ -113,9 +119,15 @@ export async function captureCloseOrdering({
   globalThis.Hooks = { on: () => 1, off: () => {}, once: () => 1 };
   globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
 
+  // NO FILE WATCHER. `root` is the repository, and a developer who has harvested Foundry chrome
+  // for the View Lab has ~7,100 read-only art files under `.foundry-chrome/`. Vite watches what it
+  // serves, chokidar costs one inotify handle per file, and a stock Linux box allows 65,536 for the
+  // whole user session — so one harvest exhausts it and these suites die with
+  // `ENOSPC ... watch '<something>.webp'` raised from inside chokidar, on tests about window
+  // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
   const vite = await createServer({
     root: repoRoot,
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, watch: null },
     appType: 'custom',
   });
   try {

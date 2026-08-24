@@ -144,6 +144,57 @@ test('resolver: all three dispositions can co-occur', async () => {
   assert.ok(dispositions.has('reported'));
 });
 
+// --- Component complication macros (issue 1286) ---
+
+test('resolver: a component complication macro is remapped IN PLACE and owned by the component', async () => {
+  const payload = payloadFromFixture();
+  const component = payload.system.components[0];
+  component.complications = [
+    { id: 'cx-1', name: 'Shrapnel Burst', macroUuid: 'Macro.shrapnel' },
+    { id: 'cx-2', name: 'Narrative only' },
+    { id: 'cx-3', name: 'Blank macro', macroUuid: '' },
+  ];
+
+  const { resolved, unresolvedReferences } = await resolveImportReferences(payload, {
+    resolveUuid: async (uuid) =>
+      uuid === 'Macro.shrapnel' ? { uuid: 'Macro.shrapnel-v2' } : { uuid },
+  });
+
+  const reference = unresolvedReferences.find((r) => r.referenceValue === 'Macro.shrapnel');
+  assert.ok(reference, 'the nested complication macro is registered');
+  assert.equal(reference.kind, REFERENCE_KINDS.MACRO);
+  assert.equal(reference.disposition, 'remapped');
+  // The report must name the COMPONENT the GM has to open, never the complication.
+  assert.equal(reference.ownerType, 'component');
+  assert.equal(reference.ownerId, component.id);
+  assert.equal(reference.ownerName, component.name);
+
+  // Remapped in place on the resolved payload, or the complication runs the wrong macro.
+  const [remapped] = resolved.system.components[0].complications;
+  assert.equal(remapped.macroUuid, 'Macro.shrapnel-v2');
+  // A complication with no macro emits nothing at all.
+  const componentMacros = unresolvedReferences.filter(
+    (r) => r.kind === REFERENCE_KINDS.MACRO && r.ownerId === component.id
+  );
+  assert.equal(componentMacros.length, 1, 'only the macro-carrying complication emits');
+});
+
+test('resolver: an absent complication macro is reported, and a malformed list is inert', async () => {
+  const payload = payloadFromFixture();
+  payload.system.components[0].complications = [{ id: 'cx-1', macroUuid: 'Macro.missing' }];
+  // A junk `complications` value must not throw the whole import.
+  payload.system.components[1].complications = 'not a list';
+
+  const { unresolvedReferences } = await resolveImportReferences(payload, {
+    resolveUuid: async (uuid) => (uuid === 'Macro.missing' ? null : { uuid }),
+  });
+
+  const reference = unresolvedReferences.find((r) => r.referenceValue === 'Macro.missing');
+  assert.ok(reference, 'an absent macro is reported rather than nulled out');
+  assert.equal(reference.disposition, 'reported');
+  assert.equal(reference.ownerType, 'component');
+});
+
 // --- Copy-mode container rebind (D3: preserve task/event/modifier ids) ---
 
 test('rebindCopyContainerIds: regenerates env ids, preserves realm + task/event/modifier ids', () => {

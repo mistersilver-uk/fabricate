@@ -9,12 +9,14 @@ import {
   buildInteractiveRollOptions,
   promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { fireComplications } from './complicationRuntime.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
@@ -48,6 +50,7 @@ import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { readStoredStackQuantity } from './itemStackQuantity.js';
+import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -136,6 +139,14 @@ export class GatheringEngine {
    * @type {Function|null}
    */
   relayBlindStart = null;
+
+  /**
+   * Complication delivery writer (issue 1286). Declared here and installed by
+   * {@link GatheringEngine#installComplicationDelivery} for the same
+   * constructor-complexity reason as the two fields above.
+   * @type {?{deliver: (args: object) => boolean}}
+   */
+  complicationDeliveryWriter = null;
 
   constructor({
     environmentStore,
@@ -314,6 +325,135 @@ export class GatheringEngine {
     // the same constructor-complexity reason as above.
     this.listingBuilder?.useBlindRunSecrets?.((runId) => this._blindRunSecret(runId));
     return this;
+  }
+
+  /**
+   * Install the complication delivery writer (issue 1286).
+   *
+   * Post-construction for exactly the reason {@link installBlindRunRelay} records: this
+   * constructor already sits at the cognitive-complexity ceiling, and the repo's rule is
+   * to extract rather than add one more branch to a giant.
+   *
+   * DORMANT ON ARRIVAL, like the three seams already noted in this file. Progressive
+   * gathering is unreachable from any GM-selectable configuration —
+   * `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` and
+   * `GatheringEconomyView` renders both formula-rolled modes disabled, pending issue 683
+   * — so nothing a GM can configure today reaches the firing site this writer serves. It
+   * lands anyway so the shape is complete on arrival rather than half-threaded, and so
+   * issue 683 flips one switch.
+   *
+   * @param {object} deps
+   * @param {?{deliver: (args: object) => boolean}} [deps.writer] The delivery writer
+   *   composed in `main.js`, which owns the emit and mints the resolution id.
+   * @returns {GatheringEngine} this, for chaining at the bootstrap site.
+   */
+  installComplicationDelivery({ writer = null } = {}) {
+    this.complicationDeliveryWriter = writer;
+    return this;
+  }
+
+  /**
+   * The complication delivery writer, injected or ambient — the same
+   * `this.x || game.fabricate?.x` idiom the recipe manager read above it uses.
+   * @private
+   * @returns {?{deliver: (args: object) => boolean}}
+   */
+  _complicationWriter() {
+    return (
+      this.complicationDeliveryWriter ||
+      globalThis.game?.fabricate?.complicationDeliveryWriter ||
+      null
+    );
+  }
+
+  /**
+   * FIRE the component complications a committed progressive gathering award earned
+   * (issue 1286).
+   *
+   * ## Ships dormant, and its test must drive this path DIRECTLY
+   *
+   * `_resolveProgressiveOutcome` is unreachable from any GM-selectable configuration
+   * (see {@link installComplicationDelivery}), so an end-to-end gathering test of this
+   * would pass VACUOUSLY — it would assert that nothing fires on a d100 attempt, which
+   * is true whether or not any of this works. The suite therefore drives
+   * `_resolveProgressiveOutcome` and `_commitTerminalSideEffects` directly, exactly as
+   * the other dormant seams in this file are exercised.
+   *
+   * ## Everything is guarded
+   *
+   * A complication is strictly downstream of a committed award: the items are on the
+   * actor, the run record is written. Nothing here may turn that into a thrown attempt,
+   * so the plan, the trigger evaluation, the firing and the delivery are all inside one
+   * `try` (guard 3 of 3 — the per-complication and per-effect guards live inside
+   * {@link fireComplications}, which resolves rather than rejects).
+   *
+   * The delivery writer owns the emit AND mints the resolution id; this engine does
+   * neither.
+   *
+   * @private
+   * @param {object} options
+   * @param {?object} options.actor the acting actor
+   * @param {?object} options.system the owning crafting system
+   * @param {?object} options.task the runtime task, whose FIRST result group is the
+   *   ordered stage list — gathering has no player reorder, so authored order IS fire
+   *   order
+   * @param {?object} options.outcome the terminal outcome, carrying the award report on
+   *   `checkResult.resolutionMeta`
+   * @returns {Promise<?object>} `fireComplications`'s return, or null when nothing ran.
+   */
+  async _fireGatheringComplications({ actor, system, task, outcome }) {
+    try {
+      if (stringOrNull(task?.resolutionMode) !== 'progressive') return null;
+      const meta = outcome?.checkResult?.resolutionMeta;
+      if (!Array.isArray(meta?.awardedResultIds)) return null;
+      const group = normalizeList(task?.resultGroups)[0];
+      const stages = normalizeList(group?.results).map((result) => {
+        const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
+        return {
+          resultId: stringOrNull(result?.id),
+          componentId,
+          component: componentId
+            ? (normalizeList(system?.components).find((entry) => entry?.id === componentId) ?? null)
+            : null,
+        };
+      });
+      if (stages.length === 0) return null;
+      const plan = planComplications({
+        activity: 'gathering',
+        stages,
+        award: {
+          awarded: meta.awardedResultIds,
+          remaining: Number(meta.remaining ?? 0),
+          partialResult: meta.partialResultId ?? null,
+          haltedResult: meta.haltedResultId ?? null,
+          skippedResults: normalizeList(meta.skippedResultIds),
+        },
+        ...resolveCheckTriggerMatches(
+          system?.gatheringCraftingCheck?.progressive?.checkBreakage,
+          outcome?.checkResult
+        ),
+      });
+      const fired = await fireComplications({
+        plan,
+        actor,
+        context: {
+          craftingSystemId: stringOrNull(system?.id),
+          actorUuid: stringOrNull(actor?.uuid),
+          speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+        },
+      });
+      if (fired.gmRequests.length > 0) {
+        this._complicationWriter()?.deliver({
+          craftingSystemId: stringOrNull(system?.id),
+          actorUuid: stringOrNull(actor?.uuid),
+          complications: fired.gmRequests,
+        });
+      }
+      return fired;
+    } catch (error) {
+      console.error('Fabricate | Component complications failed to fire', error);
+      return null;
+    }
   }
 
   /**
@@ -799,7 +939,7 @@ export class GatheringEngine {
           }
         : completedRun;
 
-    await this._commitTerminalSideEffects({
+    const { complications } = await this._commitTerminalSideEffects({
       viewer,
       actor,
       system,
@@ -823,6 +963,7 @@ export class GatheringEngine {
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications,
       initiatedBy: 'timed',
     });
   }
@@ -2682,7 +2823,7 @@ export class GatheringEngine {
       };
     }
 
-    await this._commitTerminalSideEffects({
+    const { complications } = await this._commitTerminalSideEffects({
       viewer,
       actor,
       system,
@@ -2704,6 +2845,7 @@ export class GatheringEngine {
       createdResults: plan.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications,
     });
   }
 
@@ -2888,8 +3030,20 @@ export class GatheringEngine {
     // the run record, `response.createdResults` and the posted chat card. Gating only
     // this half would create items on the actor that all three report as zero — a state
     // an item-count-only assertion cannot detect — so the two read the SAME predicate.
+    //
+    // REDACTED AT THE SOURCE (issue 1286): the raw fired list never leaves this method.
+    // What comes back is `publicComplications`' output, so the caller — which threads it
+    // into the terminal response a player reads and into the chat card a player sees —
+    // has no unredacted list to thread by mistake, whatever the acting user's role is.
+    let complications = [];
     if (awardsResultsFor(outcome, system)) {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
+      // Component complications (issue 1286), INSIDE the award gate and immediately after
+      // the award: an outcome this predicate refuses awarded nothing, so its stages never
+      // happened. Progressive attempts only — every d100 and routed outcome returns
+      // without planning anything. The chat card is posted by the caller, after this.
+      const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+      complications = publicComplications(fired?.fired);
     }
     await this._applyTerminalTools({
       viewer,
@@ -2919,6 +3073,7 @@ export class GatheringEngine {
       environment,
       task,
     });
+    return { complications };
   }
 
   async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
@@ -3464,6 +3619,9 @@ export class GatheringEngine {
     createdResults,
     usedTools = [],
     checkResult,
+    // ALREADY REDACTED by `_commitTerminalSideEffects`, which applies `publicComplications`
+    // at the source (issue 1286). Nothing here re-filters, and nothing here may widen it.
+    complications = [],
     initiatedBy = 'immediate',
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
@@ -3494,6 +3652,10 @@ export class GatheringEngine {
       response.createdResults = createdResults;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
+      // Inside the opaque-blind guard with everything else a blind attempt withholds, and
+      // set only when something fired, so a transparent attempt with no complications
+      // returns exactly the response it did before this feature existed.
+      if (complications.length > 0) response.complications = complications;
 
       // Blind tasks are redacted; only post the rich summary for transparent runs.
       await this._postGatheringChatMessage({
@@ -3505,6 +3667,7 @@ export class GatheringEngine {
         usedTools,
         checkResult,
         run,
+        complications,
       });
     }
 
@@ -3560,6 +3723,10 @@ export class GatheringEngine {
    * @param {Array}   params.usedTools      - Tool breakage plan entries.
    * @param {object}  [params.checkResult]  - Outcome detail (events, items).
    * @param {object}  params.run            - Terminal run (carries economyEvidence).
+   * @param {Array}   [params.complications] - Fired component complications, ALREADY
+   *   redacted to the player-visible set by `_commitTerminalSideEffects` (issue 1286).
+   *   The component name each row shows is resolved here, against the same
+   *   `componentsById` index the awarded components use.
    * @private
    */
   async _postGatheringChatMessage({
@@ -3571,6 +3738,7 @@ export class GatheringEngine {
     usedTools,
     checkResult,
     run,
+    complications = [],
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -3629,6 +3797,13 @@ export class GatheringEngine {
           };
         });
 
+      const complicationRows = normalizeList(complications).map((entry) => ({
+        name: stringOrEmpty(entry?.name),
+        description: stringOrEmpty(entry?.description),
+        severity: stringOrEmpty(entry?.severity),
+        componentName: stringOrEmpty(componentsById.get(stringOrNull(entry?.componentId))?.name),
+      }));
+
       const content = buildGatheringChatContent(
         {
           status,
@@ -3637,6 +3812,7 @@ export class GatheringEngine {
           components,
           events,
           brokenTools,
+          complications: complicationRows,
           staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
           // A chat message is a permanent world document, so never state a node count
           // this client only guessed. When the depletion was relayed to the active GM
@@ -4147,16 +4323,21 @@ function resolveProgressiveAward({ system, task, checkResult }) {
   // short-circuits with `invalidResultId`, which we raise as a misconfiguration
   // here (the loop never builds that shape). Divergence 2 zeroes the budget after a
   // `partial` tail award (`zeroRemainingOnPartial: true`).
-  const { awarded, remaining, invalidResultId } = resolveProgressiveAwardLoop({
-    results: normalizeList(group.results),
-    initialRemaining: Math.max(0, value),
-    costFor: (result) => difficultyForResult(system, result),
-    awardMode,
-    invalidCost: 'fail',
-    zeroRemainingOnPartial: true,
-  });
+  const { awarded, remaining, invalidResultId, partialResult, haltedResult, skippedResults } =
+    resolveProgressiveAwardLoop({
+      results: normalizeList(group.results),
+      initialRemaining: Math.max(0, value),
+      costFor: (result) => difficultyForResult(system, result),
+      awardMode,
+      invalidCost: 'fail',
+      zeroRemainingOnPartial: true,
+    });
 
   if (invalidResultId !== undefined) {
+    // A gathering resolution aborted on an invalid cost fires NO complications, matching
+    // the crafting misconfiguration gate: a GM authoring gap is not a narrative outcome
+    // (issue 1286). Nothing needs to enforce that here — the abort returns before the
+    // award, so `_commitTerminalSideEffects` is never reached.
     return misconfiguredOutcome({
       code: 'INVALID_PROGRESSIVE_DIFFICULTY',
       message: 'Progressive gathering result references a component without valid difficulty',
@@ -4169,9 +4350,15 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     resultGroups: [{ ...group, results: awarded }],
     checkResult: {
       ...checkResult,
+      // The same FLAT five keys `ResolutionModeService._resolveProgressiveResultGroups`
+      // publishes (issue 1286), so a consumer classifying stages reads one shape across
+      // all three activities rather than one per activity.
       resolutionMeta: {
         awardedResultIds: awarded.map((result) => result.id),
         remaining,
+        partialResultId: partialResult?.id ?? null,
+        haltedResultId: haltedResult?.id ?? null,
+        skippedResultIds: skippedResults.map((result) => result.id),
       },
     },
   };

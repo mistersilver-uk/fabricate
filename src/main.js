@@ -37,6 +37,8 @@ import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessa
 import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
+import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
+import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { buildInteractiveRollOptions, promptBulkCheckRoll, promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
@@ -198,6 +200,14 @@ const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 // Separate budget for the blind-start relay (issue 901) so a burst of gathers and
 // a burst of starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
+// Third budget, for the complication relay (issue 1286). Charged per MESSAGE, and one
+// resolution — including a whole bulk salvage — emits exactly one.
+const complicationDeliveryRateLimiter = createComplicationRateLimiter();
+// Suppresses a complication re-delivered to THIS context. Module scope for the same
+// reason the limiters are: a per-message set would remember nothing. It cannot cover an
+// elected GM with the world open in two tabs — two realms, two sets — which is a stated,
+// accepted residual rather than an oversight (see `complicationSocket.js`).
+const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
 
 // The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
 // could not be read, or could not be written. One complete localized sentence per reason,
@@ -399,6 +409,352 @@ async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, ta
     interactableRef,
     interactive: false
   });
+}
+
+/**
+ * Resolve an addressed actor synchronously, or `null` when it names nothing reachable.
+ *
+ * @param {string} actorUuid
+ * @returns {object|null}
+ */
+function resolveComplicationActor(actorUuid) {
+  const resolve = globalThis.fromUuidSync;
+  if (typeof resolve !== 'function' || !actorUuid) return null;
+  try { return resolve(String(actorUuid)) ?? null; } catch (_) { return null; }
+}
+
+/**
+ * The components the ADDRESSED crafting system holds on THIS client — the corpus the
+ * GM-side re-read resolves against (issue 1286).
+ *
+ * Split out so `applyComplicationDelivery` reads as authorize-then-apply and so the
+ * addressing-only contract itself is enforced by `findAuthoredComplication`, which is pure
+ * and lives in `complicationSocket.js` where it can be driven with real inputs.
+ *
+ * @param {string} craftingSystemId
+ * @returns {object[]}
+ */
+function complicationComponentsFor(craftingSystemId) {
+  return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
+}
+
+/**
+ * The token and speaker the GM side resolves for an addressed actor, NEVER read from the
+ * payload — a payload carries no speaker, so a forged one cannot make the GM's card or a
+ * macro's scope speak as anything.
+ *
+ * Guarded because it is on the delivery path: a `getSpeaker` that threw would otherwise
+ * reject out of the writer's fire-and-forget local apply, where nothing catches it.
+ *
+ * @param {object|null} actor
+ * @returns {{token: object|null, speaker: object|null}}
+ */
+function resolveComplicationSpeaker(actor) {
+  try {
+    const token = actor?.token ?? actor?.getActiveTokens?.(false, true)?.[0] ?? null;
+    return { token, speaker: globalThis.ChatMessage?.getSpeaker?.({ actor, token }) ?? null };
+  } catch (error) {
+    console.warn('Fabricate | Could not resolve a complication speaker', error);
+    return { token: null, speaker: null };
+  }
+}
+
+/**
+ * Run one complication's authored macro on this (elected GM) client, and REPORT what
+ * happened. Never throws: one bad complication must not cost a resolution its others.
+ *
+ * The `type === 'script'` gate is a CALL-SITE check and this is the call site. It sits HERE
+ * rather than on the acting client because compendium ownership is GM-configurable per role,
+ * so a player's `fromUuid` can miss a macro the GM resolves fine, which would silently drop a
+ * valid macro. The uuid is resolved here AND again inside `MacroExecutor.run` for the reason
+ * the essence-property macro records: only settling "is this a script macro at all" before the
+ * try can tell a broken link from a macro that blew up.
+ *
+ * The return is a REPORT rather than the macro's own return value, for two reasons. Nothing in
+ * Fabricate may read a macro's return (`recipes-and-steps/spec.md` § Extend, never constitute),
+ * and the miss has to be reportable: `recipes-and-steps/spec.md` § "The `script` gate is a
+ * call-site check" requires a uuid that does not resolve to a script macro to be "skipped and
+ * reported on the GM-facing output", and a `console.warn` on the one client that can fix the
+ * link is not a report.
+ *
+ * @param {object} args
+ * @returns {Promise<{status: 'none'|'skipped'|'ran'|'failed', macroUuid: string|null}>}
+ */
+async function runComplicationMacro({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
+  const macroUuid = complication.macroUuid;
+  if (!macroUuid) return { status: 'none', macroUuid: null };
+  let macro;
+  try {
+    macro = await fromUuid(macroUuid);
+  } catch {
+    macro = null;
+  }
+  if (!isRunnableComplicationMacro(macro)) {
+    console.warn(
+      `Fabricate | Complication "${complication.name || complication.id}" names a macro that could not be resolved to a script macro and was skipped (${macroUuid})`
+    );
+    return { status: 'skipped', macroUuid };
+  }
+  try {
+    await MacroExecutor.run(macroUuid, buildComplicationMacroContext({
+      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+    }));
+    return { status: 'ran', macroUuid };
+  } catch (error) {
+    console.error(`Fabricate | Complication macro failed (${macroUuid})`, error);
+    return { status: 'failed', macroUuid };
+  }
+}
+
+/**
+ * Everything the elected GM DOES for one re-read complication: roll a `gmOnly` effect roll,
+ * then run the macro.
+ *
+ * Both are effects of the same authored complication and are independent of each other, so
+ * each carries its own guard and neither can cost the other. The effect roll goes first only
+ * because the card reports it; the macro is explicitly unordered relative to any chat output.
+ *
+ * @param {object} args
+ * @returns {Promise<{effect: object, macro: object}>}
+ */
+async function runComplicationDelivery({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
+  const effect = await rollGmComplicationEffect({ complication, actor, speaker });
+  const macro = await runComplicationMacro({
+    craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+  });
+  return { effect, macro };
+}
+
+/**
+ * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286).
+ *
+ * `features.chatOutput` is a per-system GM toggle and every other Fabricate chat poster
+ * consults it — `CraftingEngine#_postCraftChatMessage`, its salvage sibling,
+ * `GatheringEngine`'s poster and `BulkSalvageService#_postAggregateCard`. The GM
+ * complication card is unambiguously chat, so it consults it too; a GM who turned Fabricate's
+ * narration off would otherwise still be whispered a card per resolution.
+ *
+ * NEITHER the macro NOR the effect roll is gated by this, and the rule is card-vs-dice-message
+ * rather than chat-vs-not-chat. `features.chatOutput` has only ever gated the cards Fabricate
+ * composes about its own resolutions; it has never gated a die. `evaluateCheckRoll` posts a
+ * crafting check roll on `options.interactive` alone (`checkRoll.js`), so a `chatOutput: false`
+ * system already puts check rolls in chat with no card, and gating a complication's effect roll
+ * would make this one path stricter than every other roll in the module. The effect roll is not
+ * orphaned without the card either: its message carries `flavor: effectRoll.label ||
+ * complication.name`, so the GM can attribute it.
+ *
+ * Note the argument is NOT "the roll and its posting are one call, so gating would suppress the
+ * roll itself". That is false here — `evaluateSideRoll` takes an explicit `post` option and a
+ * gated variant that evaluates without posting is one argument away. The reason is the rule
+ * above, not an inability to separate them.
+ *
+ * The toggle is NARROWER than "the card is chat", and deliberately so. What it suppresses is
+ * the result NARRATION Fabricate composes about its own resolutions; it has never been a
+ * request to stop being told that a configuration is broken. A `macroUuid` that does not
+ * resolve to a script macro is a configuration error only the GM can repair, and
+ * `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" requires it to be
+ * "reported on the GM-facing output" without qualifying that on any toggle. So this predicate
+ * does not veto the card: {@link postGmComplicationCard} consults it to choose which ROWS the
+ * card is built from, and a faulted row is reported whichever way it answers.
+ *
+ * Read from THIS client's own copy of the world setting, like every other GM-side re-read on
+ * this path, and defaulted CLOSED for a system that does not resolve — an addressing that
+ * names no system on this client has nothing to narrate about.
+ *
+ * @param {string} craftingSystemId
+ * @returns {boolean}
+ */
+function complicationChatOutputEnabled(craftingSystemId) {
+  return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
+}
+
+/**
+ * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome.
+ *
+ * `skipped` is a `macroUuid` that did not resolve to a script macro — a broken link, a pack
+ * this client cannot see, or a `chat`-type macro authored where a `script` was meant. `failed`
+ * is a script macro whose body threw. Both are the GM's OWN authorship to repair, and both are
+ * invisible everywhere else: the acting client is never told, and {@link runComplicationMacro}'s
+ * `console.warn` and `console.error` reach only the elected GM's dev tools. `none` (no macro
+ * authored) and `ran` are outcomes rather than faults and report nothing on their own.
+ *
+ * @param {{report?: {macro?: {status?: string}}}} row One applied-complication row.
+ * @returns {boolean}
+ */
+function hasComplicationMacroFault(row) {
+  const status = row?.report?.macro?.status;
+  return status === 'skipped' || status === 'failed';
+}
+
+/**
+ * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly`
+ * complication (issue 1286).
+ *
+ * `gmOnly` is the AUTHORED DEFAULT, so this is the common case rather than an edge: without
+ * it a `gmOnly` complication with no macro fires, pays the whole socket cost, and produces
+ * nothing observable anywhere.
+ *
+ * ## Every DELIVERED complication gets a row, not only the `gmOnly` ones
+ *
+ * A delivery only reaches this client for a complication that is `gmOnly` OR carries a macro,
+ * so the `visible` rows here are exactly the ones that asked this GM to run something. Their
+ * macro outcome has to be reported somewhere — `recipes-and-steps/spec.md` says the GM-facing
+ * output — and a card reporting "macro skipped" against a complication it does not name would
+ * be unreadable. One whisper per resolution is the price; the alternative is a report the GM
+ * cannot act on.
+ *
+ * ## `features.chatOutput` selects the ROWS; it does not veto the card
+ *
+ * The toggle suppresses per-resolution NARRATION — a card carrying a row for every
+ * complication this GM was asked to run. It is not a request to stop being told that a macro
+ * link is broken. `recipes-and-steps/spec.md` § "The `script` gate is a call-site check"
+ * states without qualification that a uuid which does not resolve to a script macro "is
+ * skipped and reported on the GM-facing output", and this card is the only GM-facing output
+ * there is; a gate that vetoed the card outright left that report in the elected GM's console,
+ * which is the very thing {@link runComplicationMacro}'s docblock refuses to call a report.
+ *
+ * So the gate chooses the SET OF ROWS the card is built from: every delivered row when the
+ * system narrates, and the faulted rows ALONE when it does not. A GM who switched narration
+ * off and has a broken link is whispered a card naming exactly the complications whose macros
+ * did not run, and nothing about the ones that did. `failed` joins `skipped` in
+ * {@link hasComplicationMacroFault} because a macro body that threw is equally the GM's own
+ * authorship to repair and equally invisible anywhere else.
+ *
+ * A surviving row is NOT re-projected for that case, and the residual is stated rather than
+ * hidden: it still carries the acting client's claimed stage and this client's effect roll,
+ * which are narration. That is accepted for two reasons. A fault row naming only a uuid could
+ * not be acted on — the GM has to locate that complication, on that component, in the editor
+ * to fix it — so the identity fields have to survive anyway; and a second, hand-rolled row
+ * model would sit in `main.js`, which cannot be imported under `node --test` and could
+ * therefore only ever be pinned by a text search. The bound that matters is met: this is one
+ * row per broken link, not one card per resolution.
+ *
+ * ## Four steps, in an order that is load-bearing
+ *
+ * 1. **The `chatOutput` gate first, over the ROW SET rather than over the card** — see
+ *    {@link complicationChatOutputEnabled} and the section above. A gated-off system with
+ *    nothing faulted still costs this client nothing at all: the selection is taken from
+ *    `applied` itself, so that case returns before the projection and before any
+ *    localization. The gate has never reached the macro, which has already run by the time
+ *    this is called.
+ * 2. **Speaker before the visibility pass.** `applyBulkChatVisibility` states as a caller
+ *    contract that `chatData.speaker` is already set, so the speaker is built onto `chatData`
+ *    at its construction rather than after it. (V14's `applyMode` reads `speaker.actor` only
+ *    inside its `ic` branch, which the literal `'gmroll'` below cannot reach — the ordering
+ *    is the module's contract, not a live crash on this call site.)
+ * 3. **Visibility before `create`**, through `applyBulkChatVisibility` with an EXPLICIT
+ *    `gmroll` — never `core.rollMode`, which is `scope: "client"` and would be the GM's own
+ *    selector. The legacy `rollMode` CREATE OPTION is honoured only for a message carrying
+ *    rolls and this card carries none, so passing it to `create` would post the card publicly.
+ * 4. **`create` inside the same guard**, so a token the running Foundry cannot map throws
+ *    BEFORE the message exists. Failing closed matters here in a way it does not for the bulk
+ *    card: a GM-only card that could not be made GM-only must not be posted at all.
+ *
+ * The row MODEL is `gmComplicationCardEntries`, in `complicationRuntime.js`, so that a suite
+ * can drive it with rows that disagree; what is left here is the Foundry edge only.
+ *
+ * The whole body is contained, because a complication is strictly downstream of a committed
+ * award and a chat failure must never propagate — and there is nothing to propagate it TO: the
+ * acting client has already returned.
+ *
+ * @param {object} args
+ * @returns {Promise<object|null>} the created message, or null when none was posted.
+ */
+async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
+  try {
+    // The toggle SELECTS rows; it does not veto the card. A configuration error is reported
+    // whatever it says, narration is not. The filter runs over `applied` rather than over the
+    // projected entries so that the suppressed case — gate off, nothing faulted — still
+    // returns before any projection or localization, which is what made an early gate worth
+    // having in the first place.
+    const delivered = Array.isArray(applied) ? applied : [];
+    const reported = complicationChatOutputEnabled(craftingSystemId)
+      ? delivered
+      : delivered.filter((row) => hasComplicationMacroFault(row));
+    if (reported.length === 0) return null;
+    // `gmComplicationCardEntries` — the GM-facing projection (the counterpart to
+    // `publicComplications`, and deliberately the only one that may carry an authored
+    // description or a severity to a GM surface) augmented with what THIS client did, which
+    // is the half no projection of the acting client's report could ever hold.
+    const entries = gmComplicationCardEntries(reported);
+    const content = buildGmComplicationCardContent(
+      { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
+      (key) => game.i18n?.localize?.(key) ?? key
+    );
+    if (!content) return null;
+
+    const chatData = { author: game.user?.id, speaker, content };
+    applyBulkChatVisibility(chatData, 'gmroll');
+    return await ChatMessage.create(chatData);
+  } catch (error) {
+    console.error('Fabricate | Failed to post the GM complication card', error);
+    return null;
+  }
+}
+
+/**
+ * ELECTED-GM edge for a relayed complication delivery (issue 1286).
+ *
+ * Runs strictly downstream of an award the acting client has already committed, so it
+ * never influences one and never reports back: the acting client has returned. What it
+ * adds is AUTHORITY — the macro runs on a GM client, the GM-only card is authored by a GM,
+ * and both come from the complication the GM's OWN world setting holds.
+ *
+ * The `senderId` is Foundry's server-attested socket sender, never a payload field, and
+ * the actor is re-authorized against THAT user rather than against this client's own
+ * ambient permissions. Each complication is isolated: one that resolves to nothing is
+ * dropped and the rest still run.
+ *
+ * This function is the Foundry EDGE only. The addressing-only re-read, the `script`
+ * discriminant, the macro scope and the per-entry isolation are pure and live in
+ * `complicationSocket.js`, where a test can drive them with real inputs — a source-text pin
+ * on this file cannot tell an exact id match apart from one with a positional fallback.
+ *
+ * @param {object} payload Validated delivery request plus the attested sender.
+ * @returns {Promise<Array<{component: object, complication: object, entry: object,
+ *   report: ?object}>|null>} One row per complication that RESOLVED against this client's
+ *   own record, or null when the delivery was refused outright. Returned for testability and
+ *   symmetry only: the acting client has already returned and nothing reads this.
+ */
+async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid, resolutionId, complications = [] } = {}) {
+  const senderUser = game.users?.get?.(senderId) ?? null;
+  if (!senderUser) return null;
+  const actor = resolveComplicationActor(actorUuid);
+  // Failing CLOSED is right — nothing may run against an actor whose permissions cannot be
+  // asked — but the drop has to be VISIBLE. `fromUuidSync` resolves a compendium uuid to a
+  // plain index entry, which carries no `testUserPermission` at all, so a perfectly
+  // well-formed delivery addressed at a compendium actor is refused here with no roll, no
+  // macro, no card and, until this line, no trace anywhere for the one client that could
+  // diagnose it.
+  if (!actor || typeof actor.testUserPermission !== 'function') {
+    console.warn('Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document', {
+      senderId, actorUuid
+    });
+    return null;
+  }
+  // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first
+  // disjunct reads `actor.isOwner` — `isGatheringActorSelectableByUser` included —
+  // resolves that disjunct against the AMBIENT `game.user`, which on the elected GM's
+  // client (the only client that runs this) owns every actor in the world. Such a
+  // predicate passes for a sender who owns nothing and never consults the sender at all,
+  // reintroducing exactly the escalation the addressing-only contract exists to remove.
+  // The shipped blind-gather relay has that defect today (issue 1288); do not copy it.
+  if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
+    console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
+      senderId, actorUuid
+    });
+    return null;
+  }
+  const { token, speaker } = resolveComplicationSpeaker(actor);
+  const applied = await applyAuthoredComplications({
+    components: complicationComponentsFor(craftingSystemId),
+    complications,
+    execute: ({ component, complication, entry }) => runComplicationDelivery({
+      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+    })
+  });
+  await postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied });
+  return applied;
 }
 
 /**
@@ -954,6 +1310,41 @@ class Fabricate {
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
+    // A complication's GM-only card and its macro must happen on a GM client: a player
+    // cannot author a message as the GM (it would render in the player's own sidebar),
+    // and a macro run on the acting client would carry the acting client's authority.
+    // Relayed over the same `module.fabricate` channel, addressing only — the elected GM
+    // re-reads the authored complication from its own `craftingSystems` record (issue
+    // 1286). On the elected GM's own client the writer applies locally, because a
+    // broadcast excludes the emitter.
+    this.complicationDeliveryWriter = createComplicationDeliveryWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      hasActiveGM: () => !!game.users?.activeGM,
+      // Unlike the blind-start relay this DROPS rather than blocks: a complication is
+      // strictly downstream of a committed award, so refusing it would strand a
+      // completed craft. The award, the player-facing card and the run record are
+      // already written and stay unaffected; only the GM-only card and the macro are
+      // lost, and there is no store to defer them into.
+      onUnroutable: ({ resolutionId }) => console.warn(
+        'Fabricate | Complications were not delivered: no active GM is connected to run them',
+        { resolutionId }
+      ),
+      // Minted here rather than inside the socket module, which touches no Foundry
+      // global. `randomID` and not `Math.random()`.
+      mintResolutionId: () => globalThis.foundry?.utils?.randomID?.(),
+      emitComplications: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      // The local-apply branch (this client IS the elected GM) has no socket sender to
+      // attest, so supply the current user — who is, on that branch, the acting user.
+      applyComplications: (payload) => applyComplicationDelivery({ senderId: game.user?.id, ...payload })
+    });
+    // EXPLICIT injection into both engines that fire complications. Each engine also falls
+    // back to `game.fabricate.complicationDeliveryWriter`, but a seam only the fallback ever
+    // satisfies is not a seam: it cannot be substituted in a test that constructs its own
+    // engine, and it makes the wiring invisible at the bootstrap site. Optional-chained
+    // because `craftingEngine` is assigned during `initialize()` and a future reorder must
+    // not be able to take the whole boot down over a narrative beat.
+    this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
+    gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
     // Housekeeping that drops entries naming deleted content. Each pass is
     // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
     // refused or otherwise failed write must never prevent `this.ready` below —
@@ -2326,6 +2717,14 @@ class Fabricate {
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
       promptRollDecision: promptBulkCheckRoll,
       postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
+      // The BATCHED complication relay (issue 1286). Read off `this` at call time like every
+      // other collaborator here, because the writer is composed during `initialize()` and
+      // this service is cached. The service collects each row's addressing-only requests and
+      // hands them over as one message per addressed (system, actor) pair, rather than the
+      // engine emitting per ROW. The pair is the batching unit because both halves of it are
+      // GM-side authorization inputs; `COMPLICATION_RATE_LIMIT` is sized against the
+      // fanned-out pair count a 25-target selection can produce, not against the row count.
+      deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
       // Key-only, matching every card module's `localize` contract; the aggregate card
       // substitutes its own counts.
       localize: (key) => game.i18n?.localize?.(key) ?? key
@@ -3981,6 +4380,32 @@ Hooks.once('ready', async () => {
           // here or it lands as an unhandled rejection on the GM's client.
           Promise.resolve(applyGatheringBlindStart(args))
             .catch(error => console.warn('Fabricate | Blind gathering start failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
+    // Same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only
+    // card and the macro must run on a GM client, from the complication the GM's OWN
+    // `craftingSystems` record holds. Addressing only — nothing on the wire names a
+    // macro, a visibility or any content. Guarded for the same reason as the routes
+    // above: a throw here must not starve the Interactable payload.
+    try {
+      routeComplicationDeliveryMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        // Applied LAST of the refusal gates, so a malformed or unauthenticated message
+        // never consumes a sender's budget. Charged per MESSAGE: one resolution — a whole
+        // bulk salvage included — emits exactly one.
+        allowSender: complicationDeliveryRateLimiter,
+        // An elected GM holding two sockets in ONE context receives the same message
+        // twice; two tabs are two contexts and remain a stated, accepted residual.
+        isFreshDelivery: complicationDeliveryDedupe,
+        applyComplications: (args) => {
+          // Nothing awaits a socket handler, so a rejected apply must be caught here or
+          // it lands as an unhandled rejection on the GM's client.
+          Promise.resolve(applyComplicationDelivery(args))
+            .catch(error => console.warn('Fabricate | Complication delivery failed', error));
         }
       });
     } catch (_error) {

@@ -385,6 +385,259 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
+  // ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ───────────────────────────────────
+  //
+  // A progressive salvage row produces the component it names, so what the GM has said goes
+  // WRONG when that component is produced belongs on the row. It is read-only and links out,
+  // taking the difficulty badge's doctrine wholesale: the complications belong to the
+  // referenced component, whose own editor owns their save lifecycle.
+
+  const COMPLICATION = Object.freeze({
+    id: 'cx-1',
+    name: 'The spring lets go',
+    severity: 'severe',
+    visibility: 'gmOnly',
+    activities: { salvage: true },
+    when: { stageMissed: true },
+    effectRoll: { enabled: true, expr: '2d6' },
+  });
+
+  // A yield carrying complications, one of which is enabled for salvage and one only for
+  // crafting. Both halves matter: the strip must show the first and withhold the second.
+  const COMPLICATED_OPTIONS = [
+    {
+      id: 'cmp-scrap',
+      name: 'Scrap Metal',
+      img: 'icons/svg/item-bag.svg',
+      difficulty: 4,
+      complications: [
+        COMPLICATION,
+        {
+          id: 'cx-2',
+          name: 'Metal fatigue',
+          severity: 'minor',
+          visibility: 'visible',
+          activities: { crafting: true },
+          when: { stagePartial: true },
+        },
+      ],
+    },
+    { id: 'cmp-dust', name: 'Dust', img: 'icons/svg/item-bag.svg', difficulty: 9 },
+  ];
+
+  function complicatedProps(overrides = {}) {
+    return props({
+      componentOptions: COMPLICATED_OPTIONS,
+      component: {
+        salvage: {
+          enabled: true,
+          resultGroups: [
+            {
+              id: 'grp-1',
+              name: 'S',
+              results: [
+                { id: 'res-1', componentId: 'cmp-scrap', quantity: 1 },
+                { id: 'res-2', componentId: 'cmp-dust', quantity: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      ...overrides,
+    });
+  }
+
+  const strips = (target) => [...target.querySelectorAll('[data-salvage-stage-complications]')];
+
+  it('1286: a stage whose yield authors salvage complications grows a strip; one that does not, does not', async () => {
+    const target = await harness.mount(complicatedProps());
+    const list = target.querySelector('.manager-salvage-stage-list');
+    const found = strips(target);
+    assert.equal(found.length, 1, 'only the yield that authors one gets a strip');
+    assert.equal(
+      found[0].getAttribute('data-salvage-stage-complications'),
+      'cmp-scrap',
+      'and it is bound to the component that owns the complications'
+    );
+
+    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, so the two draw
+    // as ONE card the way the Recipe Studio's do. It used to be the list's next sibling —
+    // the Component Studio prototype's detached treatment — and the maintainer superseded
+    // that. What made the sibling shape attractive is still true and is still honoured:
+    // `.manager-salvage-stage-row` is JOINED with the Recipe Studio's
+    // `.manager-recipe-result-row.is-reorderable`, so nothing here relaxes that rule. The
+    // row turns into a column only under `:has(.manager-salvage-stage-complications)`, which
+    // a band-less row cannot match — the assertion below this one is what pins that.
+    const row = target.querySelector('[data-salvage-result="res-1"]');
+    // `assert.ok` on the identity, never `assert.equal(node, node)`: on failure
+    // `node:assert` serialises a mounted element's circular tree to build its diff and the
+    // heap dies, which surfaces as a `# cancelled` suite with no message at all.
+    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
+    assert.ok(
+      [...list.children].every((child) => child.matches('.manager-salvage-stage-row')),
+      'and the list itself holds nothing but stage rows, so no band is a stage of its own'
+    );
+    // The row's own controls moved into `.manager-salvage-stage-line`, which is what lets the
+    // row shed its padding to the line and let the band bleed. The band is NOT in that line:
+    // it is the line's sibling, or its `border-top` could never be the card's divider.
+    const line = row.querySelector('.manager-salvage-stage-line');
+    assert.ok(line, 'the row wraps its own controls in a line');
+    assert.ok(
+      line.querySelector('[data-salvage-result-edit]') &&
+        line.querySelector('[data-salvage-result-difficulty]'),
+      "the row's picker cluster and its trailing controls are the LINE's children"
+    );
+    assert.ok(
+      found[0].parentElement === row,
+      "and the band is the row's own child, beside that line rather than inside it"
+    );
+    // Not a stage: it annotates the one above it, and announcing it as a stage would have a
+    // screen reader count one more stage than the award loop ever spends down.
+    assert.equal(found[0].getAttribute('role'), 'presentation');
+    harness.remount();
+  });
+
+  it('1286: a stage row with no complications grows no wrapper state, so it is unchanged', async () => {
+    // The constraint the attached band had to respect: `.manager-salvage-stage-row` is JOINED
+    // with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so anything
+    // that re-shaped the row itself would have moved every progressive stage row in BOTH
+    // studios. Everything the band needs is scoped to `:has(.manager-salvage-stage-complications)`,
+    // and this pins the DOM half of that: the second stage draws no band, so it cannot match.
+    const target = await harness.mount(complicatedProps());
+    const plain = target.querySelector('[data-salvage-result="res-2"]');
+    assert.ok(plain, 'the yield that authors no complication still renders its stage');
+    assert.equal(
+      plain.querySelectorAll('[data-salvage-stage-complications]').length,
+      0,
+      'and draws no band, so the `:has()` that re-shapes the row cannot match it'
+    );
+    // `display: contents` on the line is what keeps this row's flex items the ROW's own. The
+    // markup is identical for both rows; only the band's presence differs.
+    assert.ok(
+      plain.querySelector('.manager-salvage-stage-line'),
+      'the line wraps its controls exactly as the banded row does'
+    );
+    harness.remount();
+  });
+
+  it('1286: the strip shows only the complications enabled for SALVAGE', async () => {
+    const target = await harness.mount(complicatedProps());
+    const rows = [...strips(target)[0].querySelectorAll('[data-salvage-stage-complication]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-salvage-stage-complication')),
+      ['cx-1'],
+      'a complication authored for crafting alone says nothing about a salvage stage, and ' +
+        'listing it would tell the GM this yield carries a consequence it does not'
+    );
+    assert.match(
+      rows[0].textContent,
+      /The spring lets go/,
+      'the row names the complication'
+    );
+    // The GM body is the generated TRIGGER SENTENCE — the fact a player must never be shown,
+    // and the fact a GM most needs on a read-only strip.
+    assert.match(
+      rows[0].textContent,
+      /When the award is missed/,
+      'and states when it fires'
+    );
+    assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
+    harness.remount();
+  });
+
+  it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
+    // The trap this pins: feeding the strip `forecastComplications` — which filters to
+    // `visibility: "visible"` — reads as a working surface right up until a GM authors a
+    // complication with the DEFAULT visibility, which is `gmOnly`. Then the GM's own screen
+    // shows nothing, and every fixture that happened to use `visible` still passed.
+    const target = await harness.mount(complicatedProps());
+    const row = strips(target)[0].querySelector('[data-salvage-stage-complication="cx-1"]');
+    assert.ok(row, 'the gmOnly complication renders on the GM strip');
+    assert.ok(
+      !row.querySelector('.manager-chip'),
+      'and carries no Player pill, because it is not shown to the player'
+    );
+    harness.remount();
+  });
+
+  it('1286: a complication the player is told about carries the Player pill', async () => {
+    const target = await harness.mount(
+      complicatedProps({
+        componentOptions: [
+          {
+            ...COMPLICATED_OPTIONS[0],
+            complications: [{ ...COMPLICATION, visibility: 'visible' }],
+          },
+          COMPLICATED_OPTIONS[1],
+        ],
+      })
+    );
+    const row = strips(target)[0].querySelector('[data-salvage-stage-complication="cx-1"]');
+    assert.match(row.textContent, /Player/, 'the pill states the disclosure on a GM screen');
+    harness.remount();
+  });
+
+  it('1286: the strip is READ-ONLY and deep-links to the component that owns it', async () => {
+    const opened = [];
+    const target = await harness.mount(
+      complicatedProps({
+        onOpenComponent: (id) => {
+          opened.push(id);
+        },
+      })
+    );
+    const strip = strips(target)[0];
+    assert.ok(
+      !strip.querySelector('input, select, textarea'),
+      'nothing here edits the referenced component — that would be a cross-aggregate write ' +
+        'from an editor whose Save button belongs to a different component'
+    );
+    const edit = strip.querySelector('[data-salvage-stage-complications-edit]');
+    assert.ok(edit, 'the deep-link is the only route to changing any of this');
+    // Distinguishable from the ROW's own Edit link, which targets the same component for its
+    // DC: two buttons on one stage with the same accessible name would be unusable.
+    assert.match(edit.getAttribute('aria-label'), /complications/i);
+    assert.match(edit.getAttribute('aria-label'), /Scrap Metal/);
+    edit.click();
+    assert.deepEqual(opened, ['cmp-scrap']);
+    harness.remount();
+  });
+
+  it('1286: the strip COUNTS and names its owning component, and is progressive-only', async () => {
+    const target = await harness.mount(complicatedProps());
+    // The COUNT leads, on the prototype's own rule
+    // (`list.length + ' complication' + s + ' on ' + component.name`). On a band the GM has
+    // not opened, the number is the half of that sentence worth reading — the component is
+    // already named by the row above and by this band's own Edit control — and a title that
+    // dropped it made every band look alike however much was hiding in it.
+    assert.match(
+      strips(target)[0].textContent,
+      /1 complication on Scrap Metal/,
+      'the band states how much it is hiding, and whose it is'
+    );
+    harness.remount();
+
+    for (const mode of ['simple', 'routed']) {
+      const other = await harness.mount(complicatedProps({ salvageResolutionMode: mode }));
+      assert.equal(
+        strips(other).length,
+        0,
+        `no strip in ${mode} salvage — a complication has no stage to fire from there`
+      );
+      harness.remount();
+    }
+  });
+
+  it('1286: the strip disables its deep-link while the editor is saving', async () => {
+    const target = await harness.mount(complicatedProps({ saving: true }));
+    assert.equal(
+      strips(target)[0].querySelector('[data-salvage-stage-complications-edit]').disabled,
+      true,
+      "navigating away mid-save is the same hazard the row's own Edit link guards against"
+    );
+    harness.remount();
+  });
+
   it('simple salvage KEEPS its quantity stepper — the count is real there', async () => {
     // The other half of the ruling, and the reason the change above is a mode-scoped
     // deletion rather than a global one: simple/routed award the whole authored group, so

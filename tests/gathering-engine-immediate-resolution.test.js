@@ -26,6 +26,7 @@ function makeEngine({
   terminalRunError = null,
   runManager = null,
   gatheringCraftingCheck = null,
+  systemManager = null,
   calls = {}
 } = {}) {
   calls.resolveProgressive = [];
@@ -138,7 +139,8 @@ function makeEngine({
         };
       }
     },
-    localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
+    localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key,
+    ...(systemManager ? { systemManager } : {})
   });
 }
 
@@ -1348,6 +1350,493 @@ test('a tier whose group EXISTS but is empty still succeeds — deliberate no-aw
     assert.equal(result.accepted, true, 'an explicitly empty group is legal authoring');
     assert.equal(result.state, 'succeeded');
     assert.deepEqual(result.createdResults, [], 'and it awards nothing');
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Progressive component complications: the gathering call site (issue 1286)
+//
+// PROGRESSIVE GATHERING SHIPS DORMANT. `_libraryTaskToRuntimeTask` hardcodes
+// `resolutionMode: 'd100'` and `GatheringEconomyView` renders both formula-rolled modes
+// disabled, pending issue 683, so `_resolveProgressiveOutcome` is unreachable from any
+// GM-selectable configuration today. An end-to-end `startAttempt` test of this would
+// therefore pass VACUOUSLY — it would assert that a d100 attempt fires nothing, which is
+// true whether or not any of this works. These drive `_resolveProgressiveOutcome` and
+// `_commitTerminalSideEffects` DIRECTLY, exactly as the other dormant seams in this file
+// are exercised, so that issue 683 flips a switch onto tested behaviour.
+// ---------------------------------------------------------------------------
+
+/**
+ * An authored complication; `gmOnly` by default, so every firing produces a GM
+ * request. `visibility: 'visible'` is the audience the terminal response and the
+ * chat card may echo — see the redaction tests below (issue 1286).
+ */
+function gatheringComplication({
+  id = 'cx',
+  name = 'Cave-in',
+  description = 'Cave-in description',
+  visibility = 'gmOnly',
+  when = { stageAwarded: true },
+  match = 'any',
+  activities = { gathering: true }
+} = {}) {
+  return {
+    id,
+    name,
+    description,
+    severity: 'major',
+    visibility,
+    activities,
+    match,
+    when,
+    rollCondition: { enabled: false },
+    effectRoll: { enabled: false }
+  };
+}
+
+/**
+ * A progressive gathering system whose three ore components cost 3, 5 and 7, with the
+ * complications attached per component id.
+ */
+function progressiveGatheringSystem({ complications = {}, difficulties = {}, triggers = [] } = {}) {
+  // A component with no authored complications carries NO `complications` key at all,
+  // matching the absence-preserving normalizer: the plan must cope with the field being
+  // absent rather than an empty array.
+  const component = (id, difficulty) => {
+    const record = { id, name: id, difficulty: difficulties[id] ?? difficulty };
+    if (complications[id]) record.complications = complications[id];
+    return record;
+  };
+  return {
+    id: 'system-a',
+    enabled: true,
+    features: { gathering: true },
+    components: [component('comp-a', 3), component('comp-b', 5), component('comp-c', 7)],
+    gatheringCraftingCheck: {
+      progressive: { rollFormula: '1d20', awardMode: 'equal', checkBreakage: { triggers } }
+    }
+  };
+}
+
+/** Resolve a progressive gathering outcome and commit its terminal side effects. */
+async function driveProgressiveGathering({ engine, system, task, total = 8 }) {
+  stubRoll(total, [{ number: 1, faces: 20, total }]);
+  try {
+    const environment = targetedEnvironment({ tasks: [task] });
+    const outcome = await engine._resolveProgressiveOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task
+    });
+    if (outcome.status !== 'misconfigured') {
+      await engine._commitTerminalSideEffects({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult: outcome.checkResult
+      });
+    }
+    return outcome;
+  } finally {
+    delete globalThis.Roll;
+  }
+}
+
+test('progressive gathering (DORMANT): a committed award fires its awarded stages once', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    complications: {
+      'comp-a': [gatheringComplication({ id: 'ca' })],
+      'comp-c': [gatheringComplication({ id: 'cc', when: { stageMissed: true } })]
+    }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'succeeded');
+  // Budget 8: comp-a (3) and comp-b (5) are awarded, comp-c (7) halts the loop.
+  assert.deepEqual(outcome.checkResult.resolutionMeta, {
+    awardedResultIds: ['result-a', 'result-b'],
+    remaining: 0,
+    partialResultId: null,
+    haltedResultId: 'result-c',
+    skippedResultIds: []
+  });
+  assert.equal(writer.calls.length, 1, 'one delivery for one resolution');
+  assert.deepEqual(
+    writer.calls[0].complications.map(entry => [entry.componentId, entry.bucket, entry.activity]),
+    [
+      ['comp-a', 'full', 'gathering'],
+      ['comp-c', 'halted', 'gathering']
+    ]
+  );
+  assert.equal(writer.calls[0].actorUuid, actor.uuid);
+  assert.equal(writer.calls[0].craftingSystemId, 'system-a');
+});
+
+test('progressive gathering (DORMANT): NEGATIVE CONTROL — an invalid-cost abort fires nothing', async () => {
+  // `invalidCost: 'fail'` makes gathering raise INVALID_PROGRESSIVE_DIFFICULTY, and a GM
+  // misconfiguration is not a narrative outcome — matching the crafting misconfiguration
+  // gate. The abort returns before the award, so the commit is never reached at all.
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    complications: {
+      'comp-a': [gatheringComplication({ id: 'ca' })],
+      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })]
+    },
+    difficulties: { 'comp-b': 0 }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'misconfigured');
+  assert.equal(outcome.code, 'INVALID_PROGRESSIVE_DIFFICULTY');
+  assert.equal(writer.calls.length, 0, 'a misconfigured resolution fires nothing');
+});
+
+test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never reaches the site', async () => {
+  const calls = {};
+  const task = routedTask();
+  const engine = makeEngine({ task, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    // Deliberately a complication that would match on EVERY bucket. Without the mode
+    // guard a d100 stage would classify as `unreached` — never having been "awarded" by
+    // a loop that never ran — and this would fire. That is the failure mode the control
+    // exists to catch, so a `stageAwarded`-only complication would prove nothing.
+    complications: {
+      'comp-a': [gatheringComplication({ when: { stageAwarded: true, stageMissed: true } })]
+    }
+  });
+
+  // A d100 outcome carries no progressive resolution meta, and the guard reads the
+  // task's own mode before anything else.
+  await engine._commitTerminalSideEffects({
+    viewer,
+    actor,
+    system,
+    environment: targetedEnvironment({ tasks: [task] }),
+    task,
+    outcome: { status: 'succeeded', resultGroups: task.resultGroups, checkResult: { provider: 'd100' } },
+    checkResult: { provider: 'd100' }
+  });
+
+  assert.equal(writer.calls.length, 0, 'complications are a progressive-only consequence');
+});
+
+test('progressive gathering (DORMANT): a THROWING delivery writer never costs the attempt its award', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  engine.installComplicationDelivery({
+    writer: {
+      deliver() {
+        throw new Error('socket exploded');
+      }
+    }
+  });
+  const system = progressiveGatheringSystem({
+    complications: { 'comp-a': [gatheringComplication()] }
+  });
+
+  const outcome = await driveProgressiveGathering({ engine, system, task });
+
+  assert.equal(outcome.status, 'succeeded');
+  assert.equal(calls.createResults.length, 1, 'the gathered results were still created');
+});
+
+// ---------------------------------------------------------------------------
+// Progressive component complications: redaction and chat rendering (issue 1286)
+//
+// The tests above pin the FIRING side of the seam — the plan and the GM delivery
+// writer. These pin the other half two lanes split apart and neither could test end
+// to end on its own: `_commitTerminalSideEffects` redacts the fired list with
+// `publicComplications` BEFORE it reaches the terminal response `_terminalStart`
+// returns and the chat card `_postGatheringChatMessage` posts, and that redaction is
+// keyed on the complication's own authored `visibility`, never on the acting user's
+// role. Still DORMANT for the reason recorded above: driven directly, not through
+// `startAttempt`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Stub `globalThis.game` and `globalThis.ChatMessage` for the tests below, which
+ * drive `_terminalStart` / `_postGatheringChatMessage` all the way to a posted chat
+ * card. No test above this line needs either global: none sets `chatOutput: true`,
+ * so `_postGatheringChatMessage` returns before touching them.
+ *
+ * `isGM` defaults to `true` DELIBERATELY (issue 1286, `_terminalStart`'s docblock,
+ * `complicationPlan.js`'s `publicComplications`): the redaction below is a filter on
+ * the complication's OWN authored `visibility`, never on the acting user's role. A
+ * filter that read `game.user.isGM` instead — the exact leak `publicComplications`'s
+ * docblock names — would still pass a test where the acting user is a player, so the
+ * redaction tests below pin the correct behaviour under the adversarial condition
+ * where it would actually leak: a GM running (or relaying) the attempt.
+ */
+function stubGatheringChat({ isGM = true, userId = 'gm-1' } = {}) {
+  const messages = [];
+  const originalGame = globalThis.game;
+  const originalChatMessage = globalThis.ChatMessage;
+  globalThis.game = { user: { id: userId, isGM } };
+  globalThis.ChatMessage = {
+    create(data) {
+      messages.push(data);
+      return Promise.resolve({ id: `msg-${messages.length}` });
+    },
+    getSpeaker({ actor: forActor } = {}) {
+      return { alias: forActor?.name || 'Unknown' };
+    }
+  };
+  return {
+    messages,
+    restore() {
+      if (originalGame === undefined) delete globalThis.game;
+      else globalThis.game = originalGame;
+      if (originalChatMessage === undefined) delete globalThis.ChatMessage;
+      else globalThis.ChatMessage = originalChatMessage;
+    }
+  };
+}
+
+/**
+ * Drive a progressive gathering resolution all the way through
+ * `_commitTerminalSideEffects` AND `_terminalStart` — the full seam from the roll to
+ * the response a player reads and the chat card a player sees. `driveProgressiveGathering`
+ * above stops at `_commitTerminalSideEffects`; the redaction tests below must also
+ * inspect the terminal RESPONSE and the posted chat CONTENT.
+ *
+ * Returns `sideEffects: null, response: null` for a misconfigured outcome, mirroring
+ * production: `_resolveProgressiveOutcome` returns before `_commitTerminalSideEffects`
+ * is ever reached (see `resolveProgressiveAward`'s `INVALID_PROGRESSIVE_DIFFICULTY`
+ * comment above).
+ */
+async function driveProgressiveGatheringToResponse({
+  engine,
+  system,
+  task,
+  total = 8,
+  run = null,
+  createdResults = [],
+  usedTools = []
+}) {
+  stubRoll(total, [{ number: 1, faces: 20, total }]);
+  try {
+    const environment = targetedEnvironment({ tasks: [task] });
+    const outcome = await engine._resolveProgressiveOutcome({ viewer, actor, system, environment, task });
+    if (outcome.status === 'misconfigured') {
+      return { outcome, sideEffects: null, response: null };
+    }
+    const sideEffects = await engine._commitTerminalSideEffects({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult: outcome.checkResult
+    });
+    const response = await engine._terminalStart({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      status: outcome.status,
+      run: run ?? { id: 'run-x', status: outcome.status, economyEvidence: {} },
+      createdResults,
+      usedTools,
+      checkResult: outcome.checkResult,
+      complications: sideEffects.complications
+    });
+    return { outcome, sideEffects, response };
+  } finally {
+    delete globalThis.Roll;
+  }
+}
+
+test('progressive gathering complications (issue 1286): the terminal response and chat card carry only the VISIBLE complication, keyed on audience not on game.user.isGM', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const system = progressiveGatheringSystem({
+    complications: {
+      // Budget 8 (equal mode): comp-a (3) and comp-b (5) are both fully awarded;
+      // comp-c (7) halts the loop — the same budget the first DORMANT test above uses.
+      'comp-a': [gatheringComplication({
+        id: 'ca',
+        name: 'Rockslide',
+        description: 'A rockslide buries the vein.',
+        visibility: 'visible'
+      })],
+      'comp-b': [gatheringComplication({ id: 'cb', name: 'Cave-in', description: 'The tunnel roof gives way.' })]
+    }
+  });
+  system.features.chatOutput = true;
+  system.components.find(component => component.id === 'comp-a').name = 'Iron Ore';
+  system.components.find(component => component.id === 'comp-b').name = 'Silver Ore';
+  const engine = makeEngine({
+    task,
+    includeProgressiveResolver: false,
+    calls,
+    systemManager: { getItems: () => system.components }
+  });
+  const chat = stubGatheringChat({ isGM: true });
+  try {
+    const { outcome, sideEffects, response } = await driveProgressiveGatheringToResponse({
+      engine,
+      system,
+      task,
+      createdResults: [
+        { actorUuid: actor.uuid, itemUuid: 'Item.iron-ore', quantity: 1 },
+        { actorUuid: actor.uuid, itemUuid: 'Item.silver-ore', quantity: 1 }
+      ]
+    });
+
+    assert.equal(outcome.status, 'succeeded');
+    assert.deepEqual(sideEffects.complications.map(entry => entry.name), ['Rockslide']);
+    assert.equal('when' in sideEffects.complications[0], false, 'never emits the authored trigger');
+    assert.equal('macroUuid' in sideEffects.complications[0], false, 'never emits the macro uuid');
+
+    // The response never carries the gmOnly complication's name or description,
+    // whatever `game.user.isGM` says.
+    const serializedResponse = JSON.stringify(response);
+    assert.equal(serializedResponse.includes('Cave-in'), false, 'gmOnly complication name absent from the response');
+    assert.equal(serializedResponse.includes('tunnel roof'), false, 'gmOnly complication description absent from the response');
+    assert.deepEqual(response.complications.map(entry => entry.name), ['Rockslide']);
+
+    // The chat card renders the visible complication's name AND the resolved
+    // component name, inside the section the shared `renderComplications` renderer
+    // emits — and never the gmOnly complication's name or description.
+    assert.equal(chat.messages.length, 1);
+    const { content } = chat.messages[0];
+    assert.match(content, /fabricate-gather-chat__section--complications/);
+    assert.match(content, /fabricate-gather-chat__complication-name">Rockslide</);
+    assert.ok(content.includes('Iron Ore'), 'the resolved component name is rendered alongside the complication');
+    assert.equal(content.includes('Cave-in'), false, 'gmOnly complication name never reaches the card');
+    assert.equal(content.includes('tunnel roof'), false, 'gmOnly complication description never reaches the card');
+  } finally {
+    chat.restore();
+  }
+});
+
+test('progressive gathering complications (issue 1286): a resolution that fires nothing produces neither the response key nor the card section', async () => {
+  const calls = {};
+  const task = progressiveTask();
+  const system = progressiveGatheringSystem(); // no component carries a `complications` key at all
+  system.features.chatOutput = true;
+  const engine = makeEngine({
+    task,
+    includeProgressiveResolver: false,
+    calls,
+    systemManager: { getItems: () => system.components }
+  });
+  const chat = stubGatheringChat();
+  try {
+    const { outcome, sideEffects, response } = await driveProgressiveGatheringToResponse({ engine, system, task });
+
+    assert.equal(outcome.status, 'succeeded');
+    assert.deepEqual(sideEffects.complications, []);
+    assert.equal('complications' in response, false, 'no key at all when nothing fired — not merely an empty array');
+    assert.equal(chat.messages.length, 1);
+    assert.equal(
+      chat.messages[0].content.includes('fabricate-gather-chat__section--complications'),
+      false,
+      'no complications section when nothing fired'
+    );
+  } finally {
+    chat.restore();
+  }
+});
+
+test('gathering chat card (issue 1286): an empty complications list is byte-identical to omitting complications entirely', async () => {
+  const baseArgs = {
+    actor,
+    system: { id: 'system-a', features: { chatOutput: true } },
+    task: { id: 'task-a', name: 'Gather Ore' },
+    status: 'succeeded',
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+    usedTools: [],
+    checkResult: { items: [], events: [] },
+    run: { id: 'run-x', status: 'succeeded', economyEvidence: {} }
+  };
+  const engine = new GatheringEngine({});
+
+  const chatWithEmptyArray = stubGatheringChat();
+  try {
+    await engine._postGatheringChatMessage({ ...baseArgs, complications: [] });
+  } finally {
+    chatWithEmptyArray.restore();
+  }
+
+  const chatWithNoKey = stubGatheringChat();
+  try {
+    await engine._postGatheringChatMessage(baseArgs); // `complications` argument omitted entirely
+  } finally {
+    chatWithNoKey.restore();
+  }
+
+  assert.equal(chatWithEmptyArray.messages.length, 1);
+  assert.equal(chatWithNoKey.messages.length, 1);
+  assert.equal(
+    chatWithEmptyArray.messages[0].content,
+    chatWithNoKey.messages[0].content,
+    'an explicit empty list renders BYTE-IDENTICAL output to no complications argument at all'
+  );
+});
+
+test('progressive gathering complications (issue 1286): NEGATIVE CONTROL — an invalidCost abort fires nothing even if _commitTerminalSideEffects were reached directly', async () => {
+  // `resolveProgressiveAward`'s own comment says the abort "returns before the
+  // award, so `_commitTerminalSideEffects` is never reached" — production never
+  // calls it here. This defends the SITE itself rather than trusting that comment:
+  // even handed the misconfigured outcome directly, `awardsResultsFor` refuses it
+  // (status is 'misconfigured', neither 'succeeded' nor 'failed') and the
+  // misconfigured `checkResult` carries no `resolutionMeta` for
+  // `_fireGatheringComplications` to read either way.
+  const calls = {};
+  const task = progressiveTask();
+  const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
+  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  engine.installComplicationDelivery({ writer });
+  const system = progressiveGatheringSystem({
+    complications: {
+      'comp-a': [gatheringComplication({ id: 'ca' })],
+      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })]
+    },
+    difficulties: { 'comp-b': 0 }
+  });
+  stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
+  try {
+    const environment = targetedEnvironment({ tasks: [task] });
+    const outcome = await engine._resolveProgressiveOutcome({ viewer, actor, system, environment, task });
+    assert.equal(outcome.status, 'misconfigured');
+    assert.equal(outcome.code, 'INVALID_PROGRESSIVE_DIFFICULTY');
+
+    const sideEffects = await engine._commitTerminalSideEffects({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult: outcome.checkResult
+    });
+
+    assert.deepEqual(sideEffects.complications, []);
+    assert.equal(writer.calls.length, 0, 'a misconfigured resolution fires nothing even if committed directly');
   } finally {
     delete globalThis.Roll;
   }

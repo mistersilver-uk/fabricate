@@ -69,6 +69,10 @@ function everyReferencePayload() {
         {
           id: 'c1',
           name: 'Iron Ore',
+          // A progressive component complication's macro (issue 1286) reaches the report
+          // through a NESTED walk of its own, so the flat `collectMacroDescriptors` sweep
+          // does not cover it and the behavioural view has to trip it here.
+          complications: [{ id: 'cx1', name: 'Shrapnel Burst', macroUuid: 'Macro.missing0004' }],
           salvage: {
             resultGroups: [{ id: 'g1', results: [{ componentId: 'ghost-salvage-result' }] }],
             catalysts: [{ componentId: 'ghost-salvage-catalyst' }],
@@ -230,6 +234,21 @@ test('the assembled report renders no raw localization key', async () => {
   ];
   const raw = rendered.filter((label) => String(label).startsWith('FABRICATE.'));
   assert.deepEqual(raw, [], `the report rendered raw keys: ${raw.join(', ')}`);
+});
+
+test('a complication macro is owned by the component, and its owner type has a label', async () => {
+  const references = await emittedReferences();
+  const complicationMacro = references.find(
+    (reference) => reference.referenceValue === 'Macro.missing0004'
+  );
+  assert.ok(complicationMacro, 'the nested complication macro reached the report');
+  assert.equal(complicationMacro.kind, REFERENCE_KINDS.MACRO);
+  // The GM cannot open a complication; they open the component that carries it. A
+  // flattened `collectMacroDescriptors` call would have named the complication instead.
+  assert.equal(complicationMacro.ownerType, 'component');
+  assert.equal(complicationMacro.ownerId, 'c1');
+  assert.equal(complicationMacro.ownerName, 'Iron Ore');
+  assert.equal(typeof REPORT_STRINGS.OwnerType.component, 'string');
 });
 
 test('a component salvage reference is owned by the component, not by a recipe', async () => {

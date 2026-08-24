@@ -1,9 +1,14 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const segmentedSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/SegmentedControl.svelte'),
+  'utf8'
+);
 
 // Shared mounted-component harness (no inlined mount boilerplate — that trips the
 // Sonar duplication gate).
@@ -115,6 +120,47 @@ describe('SegmentedControl (mounted)', () => {
       false,
       'and the neutral variant is likewise inactive-clean'
     );
+  });
+
+  // ── The semantic variant ramp (issue 1286) ─────────────────────────────────────
+  //
+  // `info` and `warning` were added so a three-way minor/major/severe control can name
+  // every one of its segments. The CSS declared only `success` and `danger` before, so two
+  // of the three severity segments rendered as the plain active tile — the class was there
+  // and the colour was not, which is the failure a class-only assertion cannot see.
+  it('tints the active segment for EVERY declared variant, and paints each one', async () => {
+    const options = [
+      { value: 'minor', variant: 'info', fallback: 'Minor' },
+      { value: 'major', variant: 'warning', fallback: 'Major' },
+      { value: 'severe', variant: 'danger', fallback: 'Severe' }
+    ];
+    for (const { value, variant } of [
+      { value: 'minor', variant: 'info' },
+      { value: 'major', variant: 'warning' },
+      { value: 'severe', variant: 'danger' }
+    ]) {
+      const root = await harness.mount({ options, value, groupName: 'severity' });
+      const active = root.querySelector('.manager-segment.is-active');
+      assert.ok(
+        active.classList.contains(`is-${variant}`),
+        `the active ${value} segment carries is-${variant}`
+      );
+      assert.ok(
+        segmentedSource.includes(`.manager-segment.is-active.is-${variant}`),
+        `and the scoped style block actually PAINTS is-${variant}`
+      );
+      const others = [...root.querySelectorAll('.manager-segment')].filter(
+        (node) => node !== active
+      );
+      for (const other of others) {
+        assert.deepEqual(
+          [...other.classList].filter((name) => name.startsWith('is-')),
+          [],
+          'an inactive segment stays the muted track colour whatever it would become'
+        );
+      }
+      harness.remount();
+    }
   });
 
   it('leaves a variant-free consumer’s markup unchanged', async () => {

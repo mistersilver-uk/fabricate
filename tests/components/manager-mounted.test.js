@@ -126,7 +126,11 @@ function compileManagerRoot() {
   // evidence map globs the two separately. ComponentSourceInspector and
   // ComponentDifficultyInspector are gone: decision 4 removed the right rail, and both
   // rehomed into the single scrolling column.
-  for (const componentEditorPart of ['ComponentEditorHeader', 'ComponentIdentityStrip']) {
+  for (const componentEditorPart of [
+    'ComponentEditorHeader',
+    'ComponentIdentityStrip',
+    'ComponentComplicationsSection',
+  ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/component/${componentEditorPart}.svelte`);
   }
   // The library's row and its inspector, both extracted out of the browser / the root
@@ -318,6 +322,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComplicationEffectRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RosterRow.svelte');
   // Folder-aware import mapping modal + its inline vocabulary add-form (issue 771). Both
   // are always rendered in the root tree, so omitting either HANGS the mounted suite.
@@ -619,6 +625,8 @@ function compileManagerRoot() {
     // is in this mounted tree, so omitting this entry HANGS the WHOLE suite as
     // `# cancelled 225` — which is exactly what it did before this line existed.
     'src/utils/macroReference.js',
+    'src/utils/componentComplications.js',
+    'src/utils/complicationSummary.js',
     // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
     // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
     // Omitting it kills this suite in its `before` hook, which `node --test` reports as
@@ -760,6 +768,7 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/checks/checkPreview.js',
     'src/ui/svelte/apps/manager/checks/checkOdds.js',
     'src/systems/checkRoll.js',
+    'src/systems/bulkChatVisibility.js',
     'src/utils/progressiveAward.js',
     // The progressive PREVIEW SANDBOX derivation (issue 1097). THREE importers put it in
     // this root's static graph: the root's own `cloneProgressiveCheck`, `ChecksView` and
@@ -8541,7 +8550,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.ok(target.textContent.includes('Progressive difficulty'));
+    // The badge reads as the VALUE alone and names itself through its TOOLTIP, so the words
+    // are asserted on the title rather than in the row's text (issue 1286, maintainer request).
+    const difficultyChip = target.querySelector('[data-component-difficulty]');
+    assert.equal(
+      difficultyChip?.getAttribute('title'),
+      'Progressive difficulty',
+      'the shortened badge must still name what it measures, via its tooltip'
+    );
+    assert.equal(
+      target.textContent.includes('Progressive difficulty'),
+      false,
+      'the words belong in the tooltip only: repeating them on every row crowded the description'
+    );
     assert.ok(target.textContent.includes('Missing'));
 
     // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
@@ -8551,11 +8572,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       '[data-component-id="c1"] [data-component-difficulty]'
     );
     assert.ok(c1Difficulty, 'a difficulty badge renders for a progressive system');
-    assert.match(c1Difficulty.textContent, /2/, 'the set difficulty value is shown');
+    // EXACT, not /2/: a loose match still passes against the old "Progressive difficulty 2"
+    // long form, so it could not detect the label creeping back into the badge text.
+    assert.equal(c1Difficulty.textContent.trim(), '2', 'the badge shows the VALUE alone');
     const c2Difficulty = target.querySelector(
       '[data-component-id="c2"] [data-component-difficulty]'
     );
-    assert.match(c2Difficulty.textContent, /None/, 'an unset difficulty shows "None"');
+    assert.equal(c2Difficulty.textContent.trim(), 'None', 'an unset difficulty shows "None" alone');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();

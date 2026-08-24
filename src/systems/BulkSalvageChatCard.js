@@ -6,10 +6,10 @@
  * {@link module:src/systems/CraftingChatCard}'s `buildResultCard` cannot express that
  * — it carries one `subjectName`, one `rollValue` and one `status` — so this module
  * composes its own layout out of that module's exported markup ATOMS (`esc`,
- * `renderSection` — which renders each entry through `renderItem` — `renderRollTotal`
- * and `tierStepText`). Every class it emits is an existing `fabricate-craft-chat`
- * class, so the aggregate card inherits the shipped stylesheet verbatim and needs no
- * new CSS.
+ * `renderSection` — which renders each entry through `renderItem` — `renderRollTotal`,
+ * `tierStepText` and `renderComplications`). Every class it emits is an existing
+ * `fabricate-craft-chat` class, so the aggregate card inherits the shipped stylesheet
+ * verbatim and needs no new CSS.
  *
  * ## This module is a MARKUP BUILDER and nothing else
  *
@@ -40,7 +40,13 @@
  * ripple through every card module and its tests.
  */
 
-import { esc, renderRollTotal, renderSection, tierStepText } from './CraftingChatCard.js';
+import {
+  esc,
+  renderComplications,
+  renderRollTotal,
+  renderSection,
+  tierStepText,
+} from './CraftingChatCard.js';
 import { SALVAGE_CHAT_KEYS } from './SalvageChatCard.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
@@ -187,6 +193,12 @@ function renderSubject(subject, loc) {
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] Every
  *   source broken down, summed per component.
  * @param {Array<{name:string,img:string}>} [model.tools] Tools that broke, deduped.
+ * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
+ *   [model.complications] Every ROW's fired complications, collected onto this card and
+ *   already redacted to the player-visible set by the caller (issue 1286). They ride the
+ *   aggregate card because a bulk salvage is not one resolution — each row has its own run
+ *   record — so there is no single run to hang them on, and because the GM-side emit is
+ *   batched into ONE socket message beside this card rather than one per row.
  * @param {(key:string)=>string} [localize] Key-only lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
  */
@@ -242,6 +254,12 @@ export function buildBulkSalvageChatContent(model = {}, localize = (key) => key)
     }),
   ].filter(Boolean);
 
+  const complications = renderComplications({
+    entries: model.complications,
+    heading: loc(SALVAGE_CHAT_KEYS.complications),
+    card: 'craft',
+  });
+
   return [
     `<div class="fabricate-craft-chat fabricate-craft-chat--${STATUS_MODIFIERS[status]}">`,
     '<header class="fabricate-craft-chat__header">',
@@ -251,6 +269,7 @@ export function buildBulkSalvageChatContent(model = {}, localize = (key) => key)
     summary,
     subjectSection,
     ...sections,
+    complications,
     '</div>',
   ]
     .filter(Boolean)

@@ -421,8 +421,42 @@ function collectExternalDescriptors(payload) {
   // carries the `essence` owner type (it is used for `componentLink`), so no new
   // owner-type label is needed.
   collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');
+  collectComplicationMacroDescriptors(system.components, descriptors);
 
   return descriptors;
+}
+
+/**
+ * Component complication macros (issue 1286). `collectMacroDescriptors` reads
+ * `record[field]` ONE level deep and so cannot reach a nested list; this walk is dedicated
+ * rather than a flattened call for a REPORTING reason as much as a structural one. A
+ * flattened call would take `ownerId`/`ownerName` from the complication, so the import
+ * report would name the complication — which the GM cannot open — instead of the component
+ * that carries it. `ownerType: 'component'` already has a localized label, so no new one is
+ * needed.
+ *
+ * Unregistered, the uuid is never remapped and the complication runs the WRONG macro in the
+ * importing world.
+ *
+ * @param {unknown} components
+ * @param {object[]} descriptors
+ */
+function collectComplicationMacroDescriptors(components, descriptors) {
+  for (const component of arrayOf(components)) {
+    for (const complication of arrayOf(component?.complications)) {
+      if (typeof complication?.macroUuid !== 'string' || !complication.macroUuid) continue;
+      descriptors.push({
+        kind: REFERENCE_KINDS.MACRO,
+        ownerType: 'component',
+        ownerId: component.id ?? null,
+        ownerName: component.name ?? '',
+        referenceValue: complication.macroUuid,
+        set: (v) => {
+          complication.macroUuid = v;
+        },
+      });
+    }
+  }
 }
 
 function collectMacroDescriptors(records, ownerType, descriptors, field = 'macroUuid') {
