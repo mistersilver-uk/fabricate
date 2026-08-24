@@ -32,6 +32,9 @@ const harness = createMountedComponentHarness({
     // The shared no-state primitive (issue 785). Same rule, same consequence.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'

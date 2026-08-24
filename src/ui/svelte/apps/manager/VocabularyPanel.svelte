@@ -27,6 +27,7 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
 
   let {
     label = '',
@@ -275,13 +276,13 @@
           >
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <span class="manager-vocabulary-confirm-copy">{confirmSentence(row)}</span>
-            <button type="button" class="manager-button" onclick={cancelRemove}
-              >{cancelRemoveLabel}</button
+            <ManagerButton data-vocabulary-cancel-remove onclick={cancelRemove}
+              >{cancelRemoveLabel}</ManagerButton
             >
-            <button
-              type="button"
-              class="manager-button is-danger"
-              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</button
+            <ManagerButton
+              role="danger"
+              data-vocabulary-confirm-remove
+              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</ManagerButton
             >
           </div>
         {/if}

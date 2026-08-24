@@ -10,6 +10,7 @@
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -760,9 +761,8 @@
                     {/if}
                   </div>
                 {:else}
-                  <button
-                    type="button"
-                    class="manager-button manager-environment-restore"
+                  <ManagerButton
+                    class="manager-environment-restore"
                     data-action="restore"
                     onclick={() => onRestore(kind, entry.id)}
                   >
@@ -773,7 +773,7 @@
                         'Restore'
                       )}</span
                     >
-                  </button>
+                  </ManagerButton>
                 {/if}
               </div>
             </li>
@@ -918,9 +918,8 @@
                   </div>
                 {:else}
                   {#if mode === 'manual' && entry.compositionState === 'notMatching'}
-                    <button
-                      type="button"
-                      class="manager-button is-warning manager-environment-force-include"
+                    <ManagerButton
+                      class="is-warning manager-environment-force-include"
                       data-action="force-include"
                       onclick={() => onForceInclude(kind, entry.id)}
                     >
@@ -931,7 +930,7 @@
                           'Force add'
                         )}</span
                       >
-                    </button>
+                    </ManagerButton>
                   {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
                     <span class="manager-muted manager-environment-comp-disabled-note"
                       >{text(

@@ -119,6 +119,9 @@ describe('CompositionList mounted layout', () => {
       // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
       // the harness omits HANGS the suite (# cancelled) rather than failing it.
       'src/ui/svelte/apps/manager/EmptyState.svelte',
+      // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
+      // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
+      'src/ui/svelte/components/ManagerButton.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',

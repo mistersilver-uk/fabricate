@@ -19940,9 +19940,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
-      .find((button) => button.textContent.includes('View event'))
-      .click();
+    // Selected by the control's OWN hook rather than by its label text (issue 1118). The
+    // bespoke `manager-environment-issue-action` class it used to be found by styled nothing
+    // in any theme — it was a test selector wearing a style class's clothes — and matching on
+    // `textContent` could not tell the two deep links apart except by the words on them.
+    target.querySelector('[data-environment-issue-action="event"]').click();
     await tick();
     flushSync();
 
@@ -19963,9 +19965,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
-      .find((button) => button.textContent.includes('View task'))
-      .click();
+    target.querySelector('[data-environment-issue-action="task"]').click();
     await tick();
     flushSync();
 

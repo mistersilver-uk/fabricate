@@ -55,6 +55,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRecipeItemsTab.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRecipesTab.svelte',
+    // THE manager's labelled push-button (issue 1118). Both resets and the owned-copy row`s Expend use render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/KnowledgeView.svelte',

@@ -7,6 +7,7 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
@@ -1173,16 +1174,14 @@
                   >
                 </div>
               {/each}
-              <button
-                type="button"
-                class="manager-button manager-task-stamina-add"
+              <ManagerButton
                 disabled={(characterModifierLibrary || []).length === 0}
                 onclick={addStaminaCostModifier}
                 data-gathering-add-stamina-modifier
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
-              </button>
+              </ManagerButton>
             </div>
           </div>
         </div>
@@ -1936,11 +1935,11 @@
               )}
             />
           </label>
-          <button type="button" class="manager-button" onclick={onAddDrop}>
+          <ManagerButton onclick={onAddDrop} data-gathering-add-drop="toolbar">
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
             >
-          </button>
+          </ManagerButton>
         </div>
       </div>
 
@@ -1959,8 +1958,11 @@
               'No drops have been added.'
             )}
           >
-            <button type="button" class="manager-button is-primary" onclick={onAddDrop}
-              >{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</button
+            <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.AddDrop',
+                'Add drop rule'
+              )}</ManagerButton
             >
           </EmptyState>
         {:else if filteredRows.length === 0}
@@ -2421,9 +2423,5 @@
     grid-template-columns: minmax(0, 1fr) 56px 102px 102px auto;
     gap: var(--fab-space-2);
     align-items: center;
-  }
-
-  .manager-task-stamina-add {
-    justify-self: start;
   }
 </style>

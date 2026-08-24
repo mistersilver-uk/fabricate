@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
 
   let { environment = null, composition = { counts: {} }, onSelectRecord = () => {} } = $props();
@@ -139,9 +140,13 @@
                 >
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
-                  <button
-                    type="button"
-                    class="manager-button manager-environment-issue-action"
+                  <!-- `data-environment-issue-action` replaces the bespoke
+                       `manager-environment-issue-action` class (issue 1118): the sheet
+                       declared NOTHING for it in any theme, so it was a test selector
+                       wearing a style class's clothes, and it named neither the verb nor
+                       the record it opens. -->
+                  <ManagerButton
+                    data-environment-issue-action={issue.recordKind}
                     onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}
                   >
                     {issue.recordKind === 'event'
@@ -153,7 +158,7 @@
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask',
                           'View task'
                         )}
-                  </button>
+                  </ManagerButton>
                 {/if}
               </li>
             {/each}

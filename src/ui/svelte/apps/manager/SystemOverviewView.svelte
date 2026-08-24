@@ -11,6 +11,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -268,14 +269,13 @@
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}
-                <button
-                  type="button"
-                  class="manager-button manager-system-overview-link"
+                <ManagerButton
+                  class="manager-system-overview-link"
                   data-overview-link={issue.kind}
                   onclick={() => onSelectIssue(issue)}
                 >
                   {kindLinkLabel(issue.kind)}
-                </button>
+                </ManagerButton>
               {/if}
             </li>
           {/each}

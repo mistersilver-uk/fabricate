@@ -3,6 +3,7 @@
   import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
@@ -1679,9 +1680,7 @@
                takes a progressive component from zero groups to one, which the
                normalizer's clamp requires before `enabled` can ever be true. That is
                Ruling A's invariant in progressive mode, and it stays literally testable. -->
-            <button
-              type="button"
-              class="manager-button"
+            <ManagerButton
               data-add-salvage-result
               data-add-salvage-group={salvageStageGroup ? undefined : ''}
               onclick={() => addSalvageStage()}
@@ -1694,7 +1693,7 @@
                   'Add result'
                 )}</span
               >
-            </button>
+            </ManagerButton>
           {:else}
             <span class="manager-component-readonly-label">
               <span
@@ -1812,9 +1811,7 @@
                       </p>
                     {/if}
 
-                    <button
-                      type="button"
-                      class="manager-button"
+                    <ManagerButton
                       data-add-salvage-result
                       onclick={() => addSalvageResult(group.id)}
                       disabled={saving}
@@ -1826,7 +1823,7 @@
                           'Add result'
                         )}</span
                       >
-                    </button>
+                    </ManagerButton>
                   </li>
                 {/each}
               </ul>
@@ -1842,9 +1839,7 @@
                multi-group list and this Add control; Simple with no success group yet
                still shows it so the GM can author the one group. -->
             {#if !salvageHideAddGroup}
-              <button
-                type="button"
-                class="manager-button"
+              <ManagerButton
                 data-add-salvage-group
                 onclick={() => addSalvageGroup()}
                 disabled={saving}
@@ -1856,7 +1851,7 @@
                     'Add group'
                   )}</span
                 >
-              </button>
+              </ManagerButton>
             {/if}
           {/if}
         </div>
@@ -2017,9 +2012,8 @@
             <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this
                  link). The zero-authored-tiers case is the COMMON one and is exactly
                  why it exists: with no presets to choose, this is the way forward. -->
-            <button
-              type="button"
-              class="manager-button manager-salvage-manage-presets"
+            <ManagerButton
+              class="manager-salvage-manage-presets"
               data-salvage-manage-presets
               onclick={() => onManageCheckPresets()}
               disabled={saving}
@@ -2031,7 +2025,7 @@
                   'Manage presets'
                 )}</span
               >
-            </button>
+            </ManagerButton>
           </div>
         {/if}
       </section>
