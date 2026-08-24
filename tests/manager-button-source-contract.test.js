@@ -104,7 +104,7 @@ const FIXTURE_ALLOWLIST = Object.freeze([
     why:
       'Population B: `SearchablePopover` renders this trigger itself from a `triggerClass` ' +
       'STRING (`recipe/RecipeIngredientOption.svelte`), so it never gains the primitive class. ' +
-      'The 16 such sites are named debt in the issue delta, and a fixture that converted this ' +
+      'The 17 such sites are named debt in the issue delta, and a fixture that converted this ' +
       'one would be modelling a control the product does not render.',
   }),
   Object.freeze({
@@ -204,8 +204,8 @@ test('no .svelte under src writes the manager-button class literal', () => {
   //
   // The floor is `<ManagerButton` call-site FILES, not the literal it replaced, because the
   // literal is what this test asserts the absence of — a floor stated over the same string
-  // would be self-contradictory. 47 `.svelte` files under `src/` render the primitive as this
-  // lands: 41 converted by the sweep plus the seven that already used it, less one orphan
+  // would be self-contradictory. 48 `.svelte` files under `src/` render the primitive as this
+  // lands: 42 converted by the sweep plus the seven that already used it, less one orphan
   // component the sweep deleted rather than converting. 41 is a real floor with headroom, and
   // it is deliberately below the measured number so that deleting a screen does not red this.
   const callSiteFiles = svelte.filter((path) =>

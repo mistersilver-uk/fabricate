@@ -83,17 +83,17 @@
  * exactly the thing a conversion removes. Task 9 converted the last of the (then) 128, and the
  * post-plan batch above converts the one literal site issue #1286 landed on `main` after that
  * — caught by this file naming it on rebase, per its own non-vacuity floor below — so the only
- * literal sites left in `src/` are the 16 population-B `SearchablePopover` triggers and
- * `ArmedDangerButton`, and every rule in the sheet is now judged against those 17 alone. Two
+ * literal sites left in `src/` are the 17 population-B `SearchablePopover` triggers and
+ * `ArmedDangerButton`, and every rule in the sheet is now judged against those 18 alone. Two
  * things follow, and both are re-filings rather than changes of fact:
  *
- *  - A rule that still reaches one of the 17 and would lose to the primitive derives EXCLUDE,
+ *  - A rule that still reaches one of the 18 and would lose to the primitive derives EXCLUDE,
  *    because "every site it reaches is unconverted" is now true of it. Nine entries moved
  *    INTENDED or NO_CONFLICT → EXCLUDE for that reason alone, including the base control
  *    rules and Foundry's `button` reset. Their meaning is unchanged — superseding them on a
  *    CONVERTED button is still the design — and EXCLUDE now carries the operative half:
- *    re-chaining one would repaint the 17 controls the sweep deliberately did not convert.
- *  - A rule that reaches NONE of the 17 derives no candidate at all, and the instrument cannot
+ *    re-chaining one would repaint the 18 controls the sweep deliberately did not convert.
+ *  - A rule that reaches NONE of the 18 derives no candidate at all, and the instrument cannot
  *    tell "alive, but only on converted buttons" from "dead" without being told. Filing those
  *    as DEAD would be a lie that costs the guard its teeth, so each names its `convertedReach`
  *    instead — which components render the buttons it reaches, and how many — and the tests
@@ -325,7 +325,7 @@ const byCodePoint = (left, right) => (left === right ? 0 : left < right ? -1 : 1
 const MOVED_POPULATION =
   'MOVED to EXCLUDE by task 9, on the POPULATION and not on the reasoning: superseding this ' +
   'rule on a converted button is still the design, but the last literal site converted, so ' +
-  'every site the tool can still derive it to reach is one of the 17 the sweep holds back. ';
+  'every site the tool can still derive it to reach is one of the 18 the sweep holds back. ';
 
 const SHEET = 'styles/fabricate.css';
 // The sweep's one population-C site: the only `class={…}` template that ever carried the
@@ -560,9 +560,9 @@ const REVIEWED = [
   // These six are the base control band, and every one of them was INTENDED or NO_CONFLICT
   // until the last literal site converted. Nothing about them changed: the primitive still
   // supersedes them on a converted button, which is still the design. What changed is the only
-  // population the tool can derive for them — the 16 population-B triggers and
+  // population the tool can derive for them — the 17 population-B triggers and
   // `ArmedDangerButton` — and against THAT population the operative instruction is EXCLUDE's:
-  // do not re-chain, because the 17 controls left would be repainted by it.
+  // do not re-chain, because the 18 controls left would be repainted by it.
   {
     id: globalRule('.fabricate-manager button'),
     disposition: 'EXCLUDE',
@@ -570,7 +570,7 @@ const REVIEWED = [
       MOVED_POPULATION +
       "Foundry's `font: inherit` reset. It was the font-size winner for 55 converting sites " +
       'plus 11 that declared nothing at all, and the primitive pins 0.72rem over every one of ' +
-      'them; the 17 unconverted controls still take their size from it.',
+      'them; the 18 unconverted controls still take their size from it.',
   },
   {
     id: globalRule('.fabricate-manager .manager-button'),
@@ -1097,7 +1097,7 @@ test('a site the sweep does not convert is never modelled as carrying the primit
   // The other half used to read "every converting site IS scored with the primitive class".
   // With the sweep complete there are none, so that assertion is vacuously true and says
   // nothing; the fact it was defending is now stated positively instead. Every site the tool
-  // can still see is one of the 17 the sweep deliberately does not convert, and it is scored
+  // can still see is one of the 18 the sweep deliberately does not convert, and it is scored
   // on its literal classes — so `converting` and `carries fab-manager-button` remain the SAME
   // question rather than two that happen to agree on an empty set.
   assert.equal(
