@@ -18,6 +18,19 @@
   omit it silently — it either passes `role="danger"` or it is visibly neutral in the
   source.
 
+  The sixth role, `warning`, is the proof that the class string is the wrong place to
+  keep this knowledge even when a developer remembers to write one (issue 1118).
+  `environment/CompositionList.svelte` renders ONE verb — same `onForceInclude`
+  handler, same `data-action="force-include"`, same localization key — from two places,
+  and one of them spells the modifier `is-warning`. The sheet declares
+  `.manager-button.is-warning-action` and declares `.manager-button.is-warning`
+  NOWHERE, so that site shipped with no warning treatment at all and the amber
+  treatment shipped with no call site: a defect and a dead rule, from one typo, in a
+  pair of buttons that are the same verb. That is why the role-to-class relation is a
+  NAMED MAPPING below rather than an `is-${role}` template — the roles are a
+  vocabulary, and the class each one emits is an implementation detail of the sheet
+  that the vocabulary must not be forced to mirror.
+
   ── THE TOOL STUDIO IS THE AUTHORITY ──────────────────────────────────────────────
   The maintainer's ruling: `ToolEditView.svelte`'s header buttons define the correct
   rendering, and where another screen differs, THAT SCREEN CHANGES. Those buttons get
@@ -45,14 +58,20 @@
   truth for the same control and would begin to disagree with the global sheet — the
   exact failure this component exists to end. `InspectorActionButton` made the
   opposite choice for the opposite reason: it is a DIFFERENT treatment from
-  `.manager-button`, so it owns its own tones.
+  `.manager-button`, so it owns its own tones. That invariant is why the anchor's
+  `text-decoration: none` and the `is-full-width` rule live in `styles/fabricate.css`
+  and not here, even though this component is what emits their classes.
 
   Consequence: this button is only styled inside `.fabricate-manager`. It is a manager
   primitive, not an app-agnostic one. `manager-layout.test.js` pins the equivalence in
   a real browser — it renders a tool studio button and a Modifiers card button of the
   same role and compares the COMPUTED `font-size`, `font-weight`, `padding`, `height`
   and `border-radius`, so a scoped rule landing on one screen and not the other reds
-  the gate instead of shipping as drift.
+  the gate instead of shipping as drift. That harness READS `ROLE_CLASSES` and the
+  `classes` array literal out of this file, so keep the mapping a named object
+  declared outside the array and keep the array's own string literals to the two
+  unconditional classes: an inline conditional there puts its tokens into every probe
+  and the gate goes green while measuring markup this component never emits.
 
   ── RELATIONSHIP TO `ArmedDangerButton` ───────────────────────────────────────────
   INDEPENDENT, not composed. `ArmedDangerButton` also renders
@@ -69,12 +88,24 @@
 
   Props:
    - role: `'neutral'` (default — the bare `.manager-button`, which is a real and
-     correct treatment for a secondary verb), `'primary'`, `'ghost'` or `'danger'`.
-     Neutral is the default because it is what a bare `class="manager-button"`
-     already renders, so converting an existing site is mechanical.
+     correct treatment for a secondary verb), `'primary'`, `'ghost'`, `'danger'`,
+     `'dashed'` or `'warning'`. Neutral is the default because it is what a bare
+     `class="manager-button"` already renders, so converting an existing site is
+     mechanical. The set is CLOSED: a per-site visual tweak is a pass-through class
+     on `class`, never a seventh role — see `ui-integration/spec.md`.
+   - tag: `'button'` (default) or `'a'`. Named `tag` because `Chip.svelte`, the same
+     manager primitive family, already spells this capability that way; one meaning,
+     one name. An unrecognised value renders a `<button>`.
+   - href / target / rel: the anchor's own attributes, emitted only when an anchor is
+     actually rendered.
    - type: the native button type, defaulting to `'button'` — a manager button inside
-     a `<form>`-adjacent card must never submit by accident.
-   - disabled / onclick: forwarded.
+     a `<form>`-adjacent card must never submit by accident. Emitted only on a
+     `<button>`; `type` on an anchor is invalid markup.
+   - fullWidth: emits `is-full-width`. It is deliberately NOT a role. `dashed` used to
+     pin `width: 100%` itself, which is a statement about the CONTAINER rather than
+     about the verb, and it stacked a four-up wrapping row into four rows.
+   - disabled / onclick: forwarded. `disabled` is not a valid attribute on an anchor,
+     so it is ignored (and warned about) when an anchor is rendered.
    - children: the label snippet. Content is a snippet rather than a `label` string
      because the shipped call sites interleave an `<i>` glyph with localized text and
      some wrap the text in its own `<span>`.
@@ -85,7 +116,12 @@
 <script>
   let {
     role = 'neutral',
+    tag = 'button',
+    href = '',
+    target = undefined,
+    rel = undefined,
     type = 'button',
+    fullWidth = false,
     disabled = false,
     onclick = () => {},
     children = undefined,
@@ -98,20 +134,84 @@
     ...rest
   } = $props();
 
-  // An unrecognised role renders the neutral treatment rather than emitting an unstyled
-  // `is-*` class, so a typo shows up as the default button instead of silently doing
-  // nothing. `neutral` is in no way absent from the set — it is the empty modifier.
-  // `dashed` is the FULL-WIDTH ADD action that sits at the foot of a list it appends to —
-  // the Checks Studio's "Add outcome tier", the prototype's own treatment for every
-  // add-a-row verb. It is a role rather than a per-screen class because the shape is a
-  // statement about the verb (append to the list above me), not about one card: a dashed
-  // outline reads as an empty slot waiting to be filled, which a solid button does not.
-  const ROLES = new Set(['primary', 'ghost', 'danger', 'dashed']);
+  // The role vocabulary, and the class each role emits. An unrecognised role renders the
+  // neutral treatment rather than emitting an unstyled `is-*`, so a typo shows up as the
+  // default button instead of silently doing nothing. `neutral` is in no way absent from
+  // the set — it is the EMPTY MODIFIER, which is why it has no entry here.
+  //
+  // `dashed` is the ADD action that sits at the foot of a list it appends to — the Checks
+  // Studio's "Add outcome tier", the prototype's own treatment for every add-a-row verb. It
+  // is a role rather than a per-screen class because the shape is a statement about the
+  // verb (append to the list above me), not about one card: a dashed outline reads as an
+  // empty slot waiting to be filled, which a solid button does not.
+  //
+  // `danger` and `warning` are NOT a strength ordering of one idea, and the mapping is the
+  // place that is worth saying so, because the two words are close enough to be picked by
+  // feel: `danger` is the DESTRUCTIVE verb — the action removes or unlinks a record —
+  // while `warning` is the OVERRIDE verb — the action proceeds against a rule the system
+  // has already flagged, and destroys nothing. A control that does both is `danger`.
+  //
+  // `warning` is also the one role whose class is not `is-${role}`. The sheet's amber
+  // treatment is `.manager-button.is-warning-action`; `.manager-button.is-warning` is
+  // declared nowhere, and a call site that guessed the obvious spelling is exactly the
+  // defect this mapping exists to make impossible to repeat.
+  const ROLE_CLASSES = {
+    primary: 'is-primary',
+    ghost: 'is-ghost',
+    danger: 'is-danger',
+    dashed: 'is-dashed',
+    warning: 'is-warning-action',
+  };
+
+  // Hoisted out of the `classes` array for the same reason `ROLE_CLASSES` is: the parity
+  // harness scrapes that array's string literals into its probes.
+  const FULL_WIDTH_CLASS = 'is-full-width';
+
+  const TAGS = new Set(['button', 'a']);
+
+  // An anchor with no `href` is not focusable, has no implicit link role and does not
+  // activate on Enter — it is a `<div>` that looks like a link. Several anchor call sites
+  // take their `href` from caller data, so the empty case is reachable in the product and
+  // not merely a typo: render the control that actually works instead.
+  const resolvedTag = $derived(
+    TAGS.has(tag) && !(tag === 'a' && !String(href ?? '').trim()) ? tag : 'button'
+  );
+
+  const roleClass = $derived(ROLE_CLASSES[role] ?? '');
   const classes = $derived(
-    ['manager-button', 'fab-manager-button', ROLES.has(role) ? `is-${role}` : '', extraClass]
+    [
+      'manager-button',
+      'fab-manager-button',
+      roleClass,
+      fullWidth ? FULL_WIDTH_CLASS : '',
+      extraClass,
+    ]
       .filter(Boolean)
       .join(' ')
   );
+
+  // A primitive that owns the anchor shape owns its safety default too, or the conversion
+  // preserves the per-site inconsistency this component exists to end. An explicit `rel`
+  // still wins — `noopener noreferrer` is a legitimate thing for a caller to want.
+  const resolvedRel = $derived(rel ?? (target === '_blank' ? 'noreferrer' : undefined));
+
+  // Built conditionally rather than let through the rest spread, because the two element
+  // shapes have DISJOINT attribute sets: `type` and `disabled` are invalid on an anchor,
+  // and `href`, `target` and `rel` are invalid on a button.
+  const attributes = $derived(
+    resolvedTag === 'a' ? { href, target, rel: resolvedRel } : { type, disabled }
+  );
+
+  $effect(() => {
+    if (resolvedTag === 'a' && disabled) {
+      console.warn(
+        'Fabricate | ManagerButton: `disabled` is not a valid attribute on an anchor and was ignored. ' +
+          'Render a <button> (drop `tag="a"`, or leave `href` empty) if the control needs a disabled state.'
+      );
+    }
+  });
 </script>
 
-<button {type} class={classes} {disabled} {onclick} {...rest}>{@render children?.()}</button>
+<svelte:element this={resolvedTag} class={classes} {...attributes} {onclick} {...rest}
+  >{@render children?.()}</svelte:element
+>

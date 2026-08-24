@@ -7658,6 +7658,19 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
 const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
 const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
 
+// The role modifier is read from the component's NAMED mapping rather than rebuilt here as
+// `is-${role}`. `warning` emits `is-warning-action` — the sheet declares no
+// `.manager-button.is-warning` at all — so a template would hand this harness a class string
+// the product never renders, and the probe would measure a selector that matches nothing
+// while reporting green (issue 1118).
+const managerButtonRoleClasses = (() => {
+  const mapping = managerButtonSource.match(/const ROLE_CLASSES = \{([\s\S]*?)\};/);
+  assert.ok(mapping, 'ManagerButton declares its role-to-class mapping as one named object');
+  return Object.fromEntries(
+    [...mapping[1].matchAll(/(\w+):\s*'([\w-]+)'/g)].map(([, role, className]) => [role, className])
+  );
+})();
+
 function managerButtonClassesFor(role) {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
@@ -7666,12 +7679,12 @@ function managerButtonClassesFor(role) {
     base.includes('manager-button') && base.includes('fab-manager-button'),
     `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
   );
-  assert.match(
-    literal[1],
-    /is-\$\{role\}/,
-    'ManagerButton must derive its role modifier from the prop, not hard-code one'
+  const modifier = managerButtonRoleClasses[role];
+  assert.ok(
+    modifier,
+    `ManagerButton must declare a class for the '${role}' role, got ${Object.keys(managerButtonRoleClasses).join(' ')}`
   );
-  return `${base.join(' ')} is-${role}`;
+  return `${base.join(' ')} ${modifier}`;
 }
 
 const AUTHORITY_PROBES = ['primary', 'danger'];
