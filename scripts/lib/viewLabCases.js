@@ -675,19 +675,19 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-system-edit-lists',
-    label: 'Manager — System edit lists',
+    label: 'Manager — World Modifiers list ergonomics',
     smokeLabels: ['manager-system-edit-lists'],
-    // The three settings-list cards together — Modifiers, Character prerequisites and
-    // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
-    // section collapsed to show whole-section collapse. Herbalism carries all three and is
-    // the system whose Modifiers library the checks screens select over. (The card is no
-    // longer gated on `gathering`, per issue 1117 — it now holds every CHECK modifier too —
-    // but herbalism remains the fixture with a populated library.)
+    // The settings-list ergonomics card, with one modifier open and its IconPicker down.
+    //
+    // It framed all THREE lists together while they shared the System Settings page. Issue 1278
+    // took Currency Units to its own World route and issue 1311 took these two, so the three are
+    // now three frames — this one, `currency-actor-property`, and `world-prerequisites` — and
+    // this case keeps the ergonomics half. It also no longer needs a selected system: the library
+    // is world scope since issue 1308, so the `system` query is gone with it.
     reaches: 'exact',
-    query: { system: 'lab-herbalism' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
       { selector: '[data-world-modifier] [data-toggle-modifier]' },
       { selector: '[data-world-modifier] .essence-icon-picker-trigger' },
       // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
@@ -697,7 +697,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // checks-entries case records for the same cause.
       { selector: '[data-world-modifiers] .manager-card-title', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-modifiers',
     // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
     // Checks-tab editor rather than only on the section it already had: the open row's `min`
     // Stepper is what proves the check-only bounds pair reached this card, and it is the only
@@ -708,9 +708,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-bounds] [data-world-modifier-field="min"])',
     position: { width: 1280, height: 980 },
-    kinds: ['manager', 'system-edit'],
+    kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
       // itself is a BROAD SIGNAL and reaches this case through
       // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
@@ -719,7 +719,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-system-edit-modifier-rolls',
-    label: 'Manager — System edit rolling modifier',
+    label: 'Manager — World Modifiers rolling entry',
     // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
     // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
     reaches: 'beyond',
@@ -734,22 +734,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
     // what this frame exists for, and `manager-system-edit-lists` already frames the card from
     // its heading.
-    query: { system: 'lab-herbalism' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
       { selector: '[data-world-modifier="hb-mod-luck"] [data-toggle-modifier]' },
       { selector: '[data-world-modifier="hb-mod-luck"]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-modifiers',
     // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
     // rule's copy occupied and the only one that cannot render if the note is dropped.
     expectSelector:
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-roll-note="hb-mod-luck"])',
     position: { width: 1280, height: 980 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-actor-property',

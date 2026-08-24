@@ -8796,13 +8796,14 @@ async function main() {
           .catch(() => {});
 
         // --- Settings-list ergonomics (issue 768) ---
-        // The seeded system carries two Modifiers, two Character
-        // Prerequisites and two Currency Units. Capture the three lists together
-        // proving the three increment-1 features: (a) the shared IconPicker open on
-        // a modifier (icon-picker parity), (b) a whole-section collapse on the
-        // Currency Units card, and (c) the row-level copy buttons on the summary
-        // rows. Reset afterwards so the Currency captures below start expanded.
+        // The three lists no longer share a page. Currency Units left for its own World route in
+        // issue 1278, and Modifiers and Character prerequisites followed in issue 1311, so this
+        // walk navigates to World > Rules & Resources > Modifiers and captures the ergonomics
+        // there: the shared IconPicker open on a modifier (icon-picker parity) and the row-level
+        // copy button on a summary row.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
+        await page.locator('#manager-world-nav-rules').first().click();
+        await page.locator('#manager-rules-nav-modifiers').first().click();
         const modifierCard = page.locator('.fabricate-manager [data-world-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
         const modifierRows = modifierCard.locator('[data-world-modifier]');
