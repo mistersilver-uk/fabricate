@@ -258,6 +258,7 @@ export function buildBulkSalvageChatContent(model = {}, localize = (key) => key)
     entries: model.complications,
     heading: loc(SALVAGE_CHAT_KEYS.complications),
     card: 'craft',
+    localize: loc,
   });
 
   return [

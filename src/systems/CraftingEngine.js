@@ -5259,20 +5259,26 @@ export class CraftingEngine {
    *     already holds, because a player reading "you missed the iron ingot" on a card that
    *     also granted an iron ingot cannot otherwise reconcile the two.
    *
-   * ## One row per FIRING, and repeats are NOT collapsed
+   * ## One row per FIRING, repeats are NOT collapsed, and each names its own stage
    *
    * A complication fires per result entry, so a component staged twice that went wrong
    * twice produces two rows carrying the same three strings. That repetition is the
    * report, not a rendering fault: collapsing it would tell a player one `1d6` was rolled
    * when two were, and neither this card nor the aggregate bulk card has ever deduped its
-   * rows. The rows carry no per-entry disambiguator, which is a recorded presentation gap
-   * (`openspec/specs/resolution-modes/spec.md`) and not a licence to merge them.
+   * rows. They are told APART rather than merged: `position` carries each firing's place in
+   * the ordered stage list — the same 1-based numbering, gaps included, that the salvage
+   * panel's own stage rows use — and the shared renderer states it on a row only when
+   * another row on the same card would otherwise draw identically.
+   *
+   * The DECISION to state it is not taken here. The aggregate bulk card's final row set is
+   * assembled from many separate `salvage()` calls, so no single engine call can see
+   * whether a row is about to collide with another; only the renderer can.
    *
    * @private
    * @param {?Array<object>} fired {@link fireComplications}'s `fired` list, unredacted.
    * @param {?object} system The owning crafting system, for the component-name lookup.
    * @returns {Array<{name: string, description: string, severity: string,
-   *   componentName: string}>}
+   *   componentName: string, position: number|null}>}
    */
   _complicationChatEntries(fired, system) {
     const componentIndex = getDefinitionIndex(system?.components);
@@ -5281,6 +5287,7 @@ export class CraftingEngine {
       description: entry.description,
       severity: entry.severity,
       componentName: findById(componentIndex, entry.componentId)?.name || '',
+      position: entry.position,
     }));
   }
 

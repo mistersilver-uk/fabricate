@@ -1280,6 +1280,7 @@
     },
     "Chat": {
       "Complications": "Complications",
+      "ComplicationResult": "Result {position}",
       "GmComplication": {
         "Title": "Complications (GM only)",
         "Actor": "Actor",

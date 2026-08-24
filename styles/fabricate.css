@@ -20701,7 +20701,7 @@
   line-height: 1.4;
 }
 
-/* The three runs inside that one label are separated by WEIGHT rather than by more
+/* The runs inside that one label are separated by WEIGHT rather than by more
    punctuation — the renderer already joins them with an em dash, and a second visual
    separator on top of it reads as a list. The name leads; the component that carries the
    complication is context; the description keeps the body treatment because it is the
@@ -20711,8 +20711,14 @@
   font-weight: 700;
 }
 
+/* The stage position joins the component on the SAME de-emphasis rather than getting a rule
+   of its own, because it is context of the same kind: which of that component's places in
+   the ordered list this row is about. It is drawn only when two rows would otherwise be
+   identical, so at full weight it would shout on exactly the rows that already repeat. */
 .fabricate-gather-chat__complication-source,
-.fabricate-craft-chat__complication-source {
+.fabricate-craft-chat__complication-source,
+.fabricate-gather-chat__complication-position,
+.fabricate-craft-chat__complication-position {
   opacity: 0.72;
 }
 

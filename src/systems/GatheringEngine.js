@@ -3797,11 +3797,17 @@ export class GatheringEngine {
           };
         });
 
+      // `position` is where this firing's entry sits in the ordered stage list — gathering
+      // has no player reorder, so that is the AUTHORED order, which is also the order this
+      // task's results are shown in. It rides along so the shared renderer can tell two
+      // legitimate firings of one complication on one twice-staged component apart; the
+      // renderer decides whether to draw it, because only it sees the final row set.
       const complicationRows = normalizeList(complications).map((entry) => ({
         name: stringOrEmpty(entry?.name),
         description: stringOrEmpty(entry?.description),
         severity: stringOrEmpty(entry?.severity),
         componentName: stringOrEmpty(componentsById.get(stringOrNull(entry?.componentId))?.name),
+        position: entry?.position ?? null,
       }));
 
       const content = buildGatheringChatContent(

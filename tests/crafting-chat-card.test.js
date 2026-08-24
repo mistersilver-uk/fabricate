@@ -419,6 +419,135 @@ test('a complication with no prose and no source renders just its name', () => {
   assert.ok(!html.includes('__complication-source'), 'no empty source span');
 });
 
+// ---------------------------------------------------------------------------
+// Two firings of ONE complication, told apart by their stage position (issue 1286)
+// ---------------------------------------------------------------------------
+
+/**
+ * The exact case the per-result-entry ruling created: a component staged TWICE that went
+ * wrong twice. Two firings, two independently rolled consequences, and — before the stage
+ * position reached the row — two byte-identical rows.
+ *
+ * The positions are 3 and 5, deliberately not 1 and 2. They are places in the PLAYER'S
+ * ordered stage list, which counts every stage including the ones that author no
+ * complication, so a 1..N renumbering of the complication rows themselves would be a
+ * different number naming a row that list does not have.
+ */
+const TWICE_STAGED = Object.freeze([
+  {
+    name: 'Shrapnel Burst',
+    description: 'Splinters spray across the bench.',
+    severity: 'major',
+    componentName: 'Steel Shard',
+    position: 3,
+  },
+  {
+    name: 'Shrapnel Burst',
+    description: 'Splinters spray across the bench.',
+    severity: 'major',
+    componentName: 'Steel Shard',
+    position: 5,
+  },
+]);
+
+/** Every complication `<li>` in a card, in document order. */
+function complicationRows(html) {
+  return [...html.matchAll(/<li class="[^"]*__item--complication"[\s\S]*?<\/li>/g)].map(
+    (match) => match[0]
+  );
+}
+
+for (const card of Object.keys(BUILDERS)) {
+  test(`${card}: two firings of one complication on one component are DISTINGUISHABLE`, () => {
+    const html = BUILDERS[card](
+      { ...NO_COMPLICATION_MODELS[card], complications: TWICE_STAGED },
+      shippedLocalize
+    );
+    const rows = complicationRows(html);
+
+    assert.equal(rows.length, 2, 'both firings are reported — the rows are never collapsed');
+    assert.ok(rows[0] !== rows[1], 'and the two rows are not byte-identical');
+    assert.ok(rows[0].includes('Result 3'), 'the first row names its own stage position');
+    assert.ok(rows[1].includes('Result 5'), 'the second names its own, which is a DIFFERENT one');
+    assert.ok(!html.includes('{position}'), 'the shipped placeholder is substituted, not printed');
+    // The position qualifies the component it follows, so the identity half of the row —
+    // name, source, position — reads as one phrase before the authored prose.
+    assert.ok(
+      /__complication-source">Steel Shard<\/span> — <span class="[^"]*__complication-position">Result 3</.test(
+        rows[0]
+      ),
+      'the position follows the component it disambiguates'
+    );
+  });
+}
+
+test('a complication that fired ONCE states no position, because there is nothing to resolve', () => {
+  const html = buildCraftingChatContent(
+    { ...NO_COMPLICATION_MODELS.crafting, complications: [TWICE_STAGED[0]] },
+    shippedLocalize
+  );
+  assert.ok(html.includes('Shrapnel Burst'), 'the row still renders');
+  assert.ok(!html.includes('__complication-position'), 'no position span');
+  assert.ok(!html.includes('Result 3'), 'and no number for a reader to check for nothing');
+});
+
+test('rows for DIFFERENT components never collide, so neither states a position', () => {
+  // The aggregate bulk card's normal shape: many rows, each from its own resolution, and two
+  // of them at their own position 1. They are already told apart by the component they name.
+  const html = buildBulkSalvageChatContent(
+    {
+      ...NO_COMPLICATION_MODELS.bulk,
+      complications: [
+        { ...TWICE_STAGED[0], componentName: 'Steel Shard', position: 1 },
+        { ...TWICE_STAGED[0], componentName: 'Copper Wire', position: 1 },
+      ],
+    },
+    shippedLocalize
+  );
+  assert.equal(complicationRows(html).length, 2, 'both rows render');
+  assert.ok(!html.includes('__complication-position'), 'and neither needs a position');
+});
+
+test('two DIFFERENT complications a GM worded identically are disambiguated on the same rule', () => {
+  // The rule is keyed on what the row DRAWS, not on `(componentId, complicationId)`: two
+  // records with different ids that a GM named and worded alike are exactly as unreadable
+  // as one complication fired twice, and want the same treatment.
+  const html = buildCraftingChatContent(
+    {
+      ...NO_COMPLICATION_MODELS.crafting,
+      complications: [
+        { ...TWICE_STAGED[0], position: 2 },
+        { ...TWICE_STAGED[0], position: 4 },
+      ],
+    },
+    shippedLocalize
+  );
+  assert.ok(html.includes('Result 2') && html.includes('Result 4'), 'both are named');
+});
+
+test('a repeated row carrying no position degrades to silence, never to "Result null"', () => {
+  // A firing recorded before positions existed. The card is a permanent world document, so
+  // the safe failure is an unmarked row rather than a stated non-number.
+  const unpositioned = { ...TWICE_STAGED[0], position: null };
+  const html = buildCraftingChatContent(
+    { ...NO_COMPLICATION_MODELS.crafting, complications: [unpositioned, unpositioned] },
+    shippedLocalize
+  );
+  assert.equal(complicationRows(html).length, 2, 'both rows still render, undeduped');
+  assert.ok(!html.includes('__complication-position'), 'no position span');
+  assert.ok(!/Result\s*(?:null|undefined|NaN|0\b)/.test(html), 'and no broken sentence');
+});
+
+test('the position sentence is a real shipped key, and reads as the panel numbers stages', () => {
+  // The number in chat must mean what the number in the salvage panel means, or it is worse
+  // than nothing. Both are "Result {position}" over the player's own ordered list.
+  assert.equal(LANG.FABRICATE.Chat.ComplicationResult, 'Result {position}');
+  assert.ok(
+    LANG.FABRICATE.App.Complications.ResultEyebrow.startsWith('Result {position}'),
+    'the panel eyebrow the chat row borrows its vocabulary from still leads with it'
+  );
+});
+
 /**
  * Every attribute in `html` whose value is NOT double-quoted, by name.
  *
@@ -662,6 +791,25 @@ for (const [card, block] of [
  * goldens above already pin the string; this pins the STYLESHEET, which the goldens cannot
  * see. A rule that named `__item` or `__label` alone would move every card in every world.
  */
+test('the stage-position span is de-emphasised on the same rule as the component it follows', () => {
+  // The class ships with the markup or the number shouts on exactly the rows that already
+  // repeat, which is the opposite of the job it was added for. It shares the source's rule
+  // rather than getting one of its own because it is context of the same kind.
+  const rule = FABRICATE_CSS.replaceAll(/\/\*[\s\S]*?\*\//g, '')
+    .split('}')
+    .map((chunk) => chunk.trim())
+    .find((chunk) => chunk.includes('__complication-position'));
+
+  assert.ok(Boolean(rule), 'the position span is styled at all');
+  assert.ok(rule.includes('__complication-source'), 'and by the same rule as the source');
+  for (const block of ['craft', 'gather']) {
+    assert.ok(
+      rule.includes(`.fabricate-${block}-chat__complication-position`),
+      `both card blocks style it — ${block} would otherwise ship unstyled`
+    );
+  }
+});
+
 test('every rule the complications block adds is reached through a complication-only class', () => {
   // Comments are removed FIRST. Prose in this sheet discusses the very classes this scan
   // looks for, and a comment left in place would be read as a selector.

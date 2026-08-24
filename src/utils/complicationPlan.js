@@ -58,7 +58,8 @@
  * matched, because five awards went wrong five times.
  *
  * The unit of evaluation and the unit of firing are therefore the SAME unit, the result entry,
- * and each firing names the entry that produced it in `resultId` and reports that entry's own
+ * and each firing names the entry that produced it in `resultId`, states WHERE that entry sits
+ * in the ordered list in `position`, and reports that entry's own
  * `bucket`. Nothing here consults a component's other occurrences: a `stageMissed` complication
  * on an entry the loop awarded does not fire, even when a later entry for the same component
  * was missed.
@@ -143,16 +144,29 @@ function idSet(values) {
 
 /**
  * @param {object} stage one ordered stage occurrence
+ * @param {number} index its 0-based index in the ORDERED stage list
  * @returns {{resultId: string|null, componentId: string|null, component: object|null,
- *   complications: Array<object>}}
+ *   complications: Array<object>, position: number}}
  */
-function readStage(stage) {
+function readStage(stage, index) {
   const component = stage?.component ?? null;
   return {
     resultId: idOf(stage?.resultId ?? stage?.result ?? null),
     componentId: idOf(stage?.componentId ?? component ?? null),
     component,
     complications: list(stage?.complications ?? component?.complications),
+    // WHERE IN THE RENDERED LIST THIS ENTRY SITS, 1-based, counting EVERY stage (issue
+    // 1286). The caller's `stages` is already the order the roll spends — the player's
+    // reordered list for crafting, the order captured onto the run at start for salvage,
+    // the authored order for gathering — so this index IS the player's own ordering, and
+    // is the same number the salvage panel's per-stage rows are numbered by
+    // (`FABRICATE.App.Complications.ResultEyebrow`).
+    //
+    // Counting every stage rather than only the complication-bearing ones is the whole
+    // point: a stage authoring nothing leaves a GAP in the numbering, and the gap is what
+    // makes the number findable in the list the player is looking at. A dense 1..N over
+    // the fired rows would name rows that screen does not have.
+    position: index + 1,
   };
 }
 
@@ -199,7 +213,7 @@ function bucketFor(resultId, award) {
  * @param {{awarded?: Array<object>, partialResult?: object|null, haltedResult?: object|null,
  *   skippedResults?: Array<object>}} award the award loop's return, verbatim
  * @returns {Array<{resultId: string|null, componentId: string|null, component: object|null,
- *   complications: Array<object>, bucket: string}>}
+ *   complications: Array<object>, bucket: string, position: number}>}
  */
 function classifyStages(stages, award) {
   const buckets = {
@@ -208,8 +222,8 @@ function classifyStages(stages, award) {
     partialId: idOf(award?.partialResult ?? null),
     haltedId: idOf(award?.haltedResult ?? null),
   };
-  return list(stages).map((stage) => {
-    const read = readStage(stage);
+  return list(stages).map((stage, index) => {
+    const read = readStage(stage, index);
     return { ...read, bucket: bucketFor(read.resultId, buckets) };
   });
 }
@@ -325,7 +339,8 @@ function appliesToActivity(complication, activity) {
  * what the ruling this module implements removed.
  *
  * @param {{resultId: string|null, componentId: string|null, component: object|null,
- *   complications: Array<object>, bucket: string}} entry one classified result entry
+ *   complications: Array<object>, bucket: string, position: number}} entry one classified
+ *   result entry
  * @param {object} ctx `{ activity, resolutionId, matchedTriggerIds, ownedTriggerIds }`
  * @returns {Array<object>}
  */
@@ -350,6 +365,11 @@ function entryFirings(entry, ctx) {
       complicationId,
       complication,
       resultId: entry.resultId,
+      // The entry's place in the ordered list, carried so a player-facing output can name
+      // WHICH occurrence fired without re-deriving an order it does not hold (issue 1286).
+      // `resultId` already identifies the occurrence, but it is an opaque id: it keeps two
+      // firings apart in a dedupe key and tells a player nothing.
+      position: entry.position,
       bucket: entry.bucket,
       buckets: [entry.bucket],
       matchedConditions: decision.matched,
@@ -461,13 +481,21 @@ function visibilityOf(entry) {
  * entirely.
  *
  * The four keys the salvage run record stores (`resultId`, `componentId`, `complicationId`,
- * `buckets`) are a SUBSET of what comes back; the extra three are the authored strings the
- * chat card renders, all of them already player-visible by the `visible` filter above. A
- * caller persisting this may narrow it, and must not widen it.
+ * `buckets`) are a SUBSET of what comes back; the extra four are the authored strings the
+ * chat card renders plus the stage POSITION it names them by, all of them already
+ * player-visible by the `visible` filter above. A caller persisting this may narrow it, and
+ * must not widen it.
+ *
+ * `position` is a player-safe fact by construction: it is where this firing's entry sits in
+ * the list that player is looking at, and discloses nothing about the trigger, the effect
+ * roll or the macro. It is what lets a card distinguish two legitimate firings of ONE
+ * complication on ONE twice-staged component, which `resultId` — an opaque id — cannot do on
+ * screen.
  *
  * @param {Array<object>} fired the runtime's fired list (or a plan's firings)
  * @returns {Array<{resultId: string|null, componentId: string|null, complicationId: string|null,
- *   buckets: Array<string>, name: string, description: string, severity: string}>}
+ *   position: number|null, buckets: Array<string>, name: string, description: string,
+ *   severity: string}>}
  */
 export function publicComplications(fired) {
   return list(fired)
@@ -478,6 +506,10 @@ export function publicComplications(fired) {
         resultId: entry?.resultId ?? null,
         componentId: entry?.componentId ?? null,
         complicationId: entry?.complicationId ?? projected.id,
+        // Null rather than absent for a firing minted before this key existed (a run record
+        // read back, a hand-built fixture), so a renderer tests one thing to decide whether
+        // it can name a position at all.
+        position: Number.isFinite(entry?.position) ? entry.position : null,
         buckets: [...list(entry?.buckets)],
         name: projected.name,
         description: projected.description,

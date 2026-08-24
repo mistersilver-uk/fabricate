@@ -285,6 +285,33 @@ test('1286: a complication authored TWICE on one component fires once per entry,
   );
 });
 
+test('1286: each firing carries its entry\u2019s PLACE in the ordered list, gaps and all', () => {
+  // The list the player is looking at: iron at 1, a bare stage at 2 that authors nothing,
+  // iron again at 3. Nothing about the numbering is derived from the FIRINGS \u2014 the
+  // complication-free stage at 2 is what makes that observable, because a dense 1..N over the
+  // rows would number the two iron firings 1 and 2 and name a stage the panel does not have.
+  const shrapnel = complication({ visibility: 'visible', when: { stageMissed: true } });
+  const iron = component('iron', [shrapnel]);
+  const stages = [stage('r1', iron), stage('r2', component('coal')), stage('r3', iron)];
+  const award = runAward(stages, { r1: 4, r2: 4, r3: 4 }, { budget: 0 });
+
+  const plan = planComplications({ activity: 'salvage', stages, award });
+
+  assert.deepEqual(
+    plan.firings.map((firing) => [firing.resultId, firing.position]),
+    [
+      ['r1', 1],
+      ['r3', 3],
+    ],
+    'the ordinal is the entry\u2019s index in the ORDERED stage list, counting every stage'
+  );
+  assert.deepEqual(
+    publicComplications(plan.firings).map((entry) => entry.position),
+    [1, 3],
+    'and it survives the player projection, which is the only one a card may read'
+  );
+});
+
 test('1286: a SKIPPED entry fires nothing, even for a trigger that matched', () => {
   const triggered = complication({ when: { checkTrigger: 'nat1' } });
   const repeated = component('iron', [triggered]);
@@ -612,6 +639,10 @@ test('1286: neither player projection ever emits when, rollCondition, effectRoll
     resultId: 'r1',
     componentId: 'iron',
     complicationId: secretive.id,
+    // A hand-built firing carries no ordinal, and the projection says so with `null` rather
+    // than by omitting the key: a card tests ONE thing to decide whether it can name a
+    // stage, and an absent key would make "never recorded" indistinguishable from "0".
+    position: null,
     buckets: ['halted'],
     name: 'Shrapnel',
     description: 'Splinters everywhere',

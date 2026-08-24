@@ -77,6 +77,20 @@ const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 const COMPLICATIONS_HEADING_KEY = 'FABRICATE.Chat.Complications';
 
 /**
+ * The key that names WHICH stage occurrence a complication row belongs to (issue 1286).
+ *
+ * Deliberately the salvage panel's own vocabulary — `FABRICATE.App.Complications.ResultEyebrow`
+ * reads `Result {position} · {name} · DC {difficulty}` — reduced to the part a chat row needs.
+ * The number MUST mean on this card exactly what it means on that panel: the 1-based place of
+ * the entry in the list the player is looking at, counting every stage, gaps included. A number
+ * that meant anything else would be worse than no number at all, because the player would look
+ * for it in a list where it names a different row.
+ *
+ * A FLAT leaf in the `Chat` namespace, on the same rule as the heading key above.
+ */
+const COMPLICATION_POSITION_KEY = 'FABRICATE.Chat.ComplicationResult';
+
+/**
  * The card BEM blocks a complications block can be rendered into, by token.
  *
  * A token rather than a free-text prefix, and resolved through `Object.hasOwn` for the
@@ -229,14 +243,23 @@ export function renderSection({ heading, entries, modifier }) {
  * the row because a player reading "you missed the iron ingot" against a card that also
  * GRANTED an iron ingot cannot otherwise reconcile the two.
  *
+ * `positionText` is the already-localized "Result N" sentence, or `''`. It sits between the
+ * component and the prose because it QUALIFIES the component — it says which of that
+ * component's occupancies of the list this row is about — so the identity half of the row
+ * reads as one phrase and the authored prose still ends it.
+ *
  * @param {{name?: string, description?: string, severity?: string, componentName?: string}} entry
  * @param {string} block The resolved BEM block, from {@link COMPLICATION_BLOCKS}.
+ * @param {string} [positionText] The localized stage-position sentence, or '' for none.
  * @returns {string}
  */
-function renderComplication(entry, block) {
+function renderComplication(entry, block, positionText = '') {
   const parts = [`<span class="${block}__complication-name">${esc(entry?.name)}</span>`];
   if (entry?.componentName) {
     parts.push(`<span class="${block}__complication-source">${esc(entry.componentName)}</span>`);
+  }
+  if (positionText) {
+    parts.push(`<span class="${block}__complication-position">${esc(positionText)}</span>`);
   }
   if (entry?.description) {
     parts.push(`<span class="${block}__complication-description">${esc(entry.description)}</span>`);
@@ -246,6 +269,65 @@ function renderComplication(entry, block) {
     `<span class="${block}__label">${parts.join(' — ')}</span>`,
     '</li>',
   ].join('');
+}
+
+/**
+ * The RENDERED identity of one complication row: every string the row actually emits.
+ *
+ * Two entries sharing this produce byte-identical markup, whatever differs underneath —
+ * which is the only definition of "indistinguishable" that answers the reader's question.
+ * Keyed on what is drawn rather than on `(componentId, complicationId)` deliberately: two
+ * DIFFERENT complications that a GM happened to name and word identically on one component
+ * are just as unreadable as one complication fired twice, and want the same treatment.
+ *
+ * `severity` is in the key even though it draws no visible text, because it is emitted as a
+ * `data-` attribute and drives the row's styling — two rows differing in it already differ.
+ *
+ * @param {object} entry
+ * @returns {string}
+ */
+function complicationSignature(entry) {
+  return JSON.stringify([
+    String(entry?.name ?? ''),
+    String(entry?.description ?? ''),
+    String(entry?.severity ?? ''),
+    String(entry?.componentName ?? ''),
+  ]);
+}
+
+/**
+ * The signatures that occur more than once in ONE rendered list.
+ *
+ * @param {Array<object>} entries
+ * @returns {Set<string>}
+ */
+function repeatedComplicationSignatures(entries) {
+  const seen = new Set();
+  const repeated = new Set();
+  for (const entry of entries) {
+    const signature = complicationSignature(entry);
+    if (seen.has(signature)) repeated.add(signature);
+    else seen.add(signature);
+  }
+  return repeated;
+}
+
+/**
+ * The localized "Result N" sentence for one row, or '' when this row cannot state a
+ * position.
+ *
+ * A non-integer or non-positive `position` degrades to no sentence rather than to
+ * "Result null": the field is absent on a firing minted before it existed, and a card is a
+ * permanent world document, so the safe failure is silence.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} localize Key-only lookup.
+ * @returns {string}
+ */
+function complicationPositionText(entry, localize) {
+  const position = entry?.position;
+  if (!Number.isInteger(position) || position < 1) return '';
+  return String(localize(COMPLICATION_POSITION_KEY)).replace('{position}', String(position));
 }
 
 /**
@@ -265,22 +347,55 @@ function renderComplication(entry, block) {
  * reach a player. Putting a filter here as well would put the disclosure guarantee in two
  * places and make it ambiguous which one is authoritative.
  *
+ * ## The stage position appears ONLY where it disambiguates (issue 1286)
+ *
+ * A complication fires once per RESULT ENTRY, so a component staged twice that went wrong
+ * twice legitimately contributes two rows carrying the same authored strings. Those rows
+ * must not be merged — `openspec/specs/resolution-modes/spec.md` forbids de-duplicating
+ * them, because each is an independently rolled consequence — so they are told apart
+ * instead, by naming the entry's place in the list the player is looking at.
+ *
+ * The rule is: a row states its position when, and only when, ANOTHER row in the SAME
+ * rendered list would draw identically. That is the whole test, and it is deliberately
+ * narrower than "every row states its position": a complication that fired once is already
+ * unambiguous, and a number appended to it is noise a reader has to check against the panel
+ * before learning nothing. The decision therefore belongs HERE and nowhere upstream — this
+ * is the one place that sees the FINAL row set, which for the aggregate bulk card is
+ * assembled from many separate resolutions that no single engine call can see.
+ *
+ * Rows from different components never collide, because the component name is part of the
+ * identity; a bulk card listing two components each at their own position 1 stays silent.
+ *
  * @param {object} options
  * @param {Array<object>} [options.entries] Already-redacted complication rows.
  * @param {string} [options.heading] The already-localized section heading.
  * @param {'craft'|'gather'} [options.card] Which card's BEM block to emit.
+ * @param {(key: string) => string} [options.localize] Key-only lookup for the position
+ *   sentence. Defaults to identity, matching every other builder in this module.
  * @returns {string} HTML, or '' when there is nothing to render.
  */
-export function renderComplications({ entries, heading, card = 'craft' } = {}) {
+export function renderComplications({
+  entries,
+  heading,
+  card = 'craft',
+  localize = (key) => key,
+} = {}) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const block = Object.hasOwn(COMPLICATION_BLOCKS, card)
     ? COMPLICATION_BLOCKS[card]
     : COMPLICATION_BLOCKS.craft;
+  const repeated = repeatedComplicationSignatures(entries);
   return [
     `<section class="${block}__section ${block}__section--complications">`,
     `<div class="${block}__heading">${esc(heading)}</div>`,
     `<ul class="${block}__grid">`,
-    ...entries.map((entry) => renderComplication(entry, block)),
+    ...entries.map((entry) =>
+      renderComplication(
+        entry,
+        block,
+        repeated.has(complicationSignature(entry)) ? complicationPositionText(entry, localize) : ''
+      )
+    ),
     '</ul>',
     '</section>',
   ].join('');
@@ -379,6 +494,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     entries: model.complications,
     heading: loc(keys.complications),
     card: 'craft',
+    localize: loc,
   });
 
   return [

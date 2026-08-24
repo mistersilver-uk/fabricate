@@ -549,8 +549,20 @@ It is MARKED on exactly the entries that fired — between none and all five —
 A surface that collapsed the forecast to one entry per component would hide the cost of the very reordering the list exists for, and one that marked a single occupancy of a component that fired on three would claim one `1d6` was rolled when three were.
 
 Because a complication can now fire more than once in one resolution, an output listing fired complications MAY show the same complication more than once, and MUST NOT de-duplicate those rows: collapsing them under-reports what happened.
-Neither the crafting/salvage result card nor the aggregate bulk card de-duplicates, and neither carries a per-entry disambiguator on the row today, so two firings of one complication on one component render as two identical rows.
-That is a recorded presentation gap and not a licence to merge them; the GM-only card is unaffected, because each of its rows already states the acting client's claimed bucket.
+Repeated rows are told APART instead of merged.
+Every player-facing fired-complication row therefore carries the STAGE POSITION of the entry that produced it: the 1-based place of that entry in the ordered stage list, counting every stage so the numbering keeps its gaps.
+It is the same number, meaning the same thing, that a player-facing per-stage list numbers its rows by — the player's own arrangement for crafting and salvage, the authored order for gathering — because a number that named a row the player cannot find would be worse than no number.
+
+A row states that position when, and ONLY when, another row in the SAME rendered output would draw identically to it.
+A complication that fired once is already unambiguous, and a position appended to it is noise.
+"Draws identically" is decided over what the row actually renders, so two DIFFERENT complications a GM named and worded alike on one component are disambiguated on the same rule, and rows for different components never collide.
+The decision belongs to the output that assembles the final row set, never to the resolution that produced one firing: the aggregate bulk card's rows come from many separate resolutions, none of which can see whether its row is about to collide.
+A firing that carries no position — one recorded before positions existed — degrades to an unmarked row rather than to a stated non-number.
+
+The GM-only card deliberately does NOT carry the position.
+The number's referent is the acting client's ordered list, which that card does not draw and the GM has no view of, so on that surface it would be an unverifiable number pointing at an invisible list; and it would add a fourth client-supplied claim to a relay payload specified as addressing-only (`recipes-and-steps/spec.md`).
+Its rows are instead distinguished by the acting client's claimed bucket, by the GM-side effect roll, and by the macro outcome, each reported per firing.
+The residual case is recorded rather than fixed: two firings of one `gmOnly` complication on one component that share a bucket, author no effect roll and name no macro still render as two identical GM rows, and the `resultId` the payload already carries is the field a future fix would render.
 
 #### Documented consequences
 
