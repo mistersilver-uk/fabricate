@@ -1778,23 +1778,38 @@ The environments editor must block save when:
 - a task is missing required routed or progressive fields
 - a task's result groups violate reserved failure keyword rules
 
-### GM World Currency Route
+### GM World Rules & Resources Route
 
-World always exposes `Currency` beside `Parties`, including with no selected system.
-It is the ONE place the world coin ladder, spend strategy, provider and GM macro set are authored (`data-models/spec.md` -> CurrencyConfig); a crafting system's Settings tab keeps only the participation toggle.
+World always exposes `Rules & Resources` beside `Parties` and `Travel`, including with no selected system.
+It is the ONE place the three world-scoped libraries are authored: the coin ladder, spend strategy, provider and GM macro set (`data-models/spec.md` -> CurrencyConfig), the character prerequisite library, and the modifier library (`data-models/spec.md` -> CharacterLibraries).
+A crafting system's Settings tab keeps only the currency participation toggle; it carries neither library and offers no authoring surface for one.
 
-- **The route is UNGATED**, like Parties and unlike experimental-gated Downtime.
-  It is reachable with no crafting system selected, with every system's currency toggle off, and with `fabricate.experimentalFeatures` disabled, because a GM must be able to author the coins BEFORE any system opts in — gating the authoring surface on the participation flag would make the ladder unauthorable from a standing start.
-- The rail entry sits directly under `Parties` inside the existing `.manager-world-nav` section, carries the stable id `manager-world-nav-currency` and the hook `data-world-nav-item="currency"`, uses the `fa-coins` icon and a localized accessible name, and surfaces the configured unit count on `.manager-nav-count`.
-  The route token is `world-currency`; it survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and it participates in the Manager confirm-discard route-exit chain like every other destination.
-- The page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries the page hook `data-world-currency-page`.
-  It is full-width with no right inspector, matching World Parties: the route MUST be excluded from the shell's shared `.manager-inspector` aside, not merely left without an inspector branch of its own.
+- **Every route in the group is UNGATED**, like Parties and Travel and unlike experimental-gated Downtime.
+  Each is reachable with no crafting system selected, with every system's currency toggle off, and with `fabricate.experimentalFeatures` disabled, because a GM must be able to author these libraries BEFORE any system references them — gating an authoring surface on a participation flag would make it unauthorable from a standing start.
+- The group is a rail GROUP, not a leaf, following the shipped Travel and Downtime groups: a parent row, a disclosure toggle and a submenu.
+  The parent carries the stable id `manager-world-nav-rules` and the hook `data-world-nav-item="rules"`, uses the `fa-scale-balanced` icon and a localized accessible name, and surfaces the total entry count across all three libraries on `.manager-nav-count`.
+  Activating the parent navigates to Currency rather than opening an empty group.
+- The group has THREE DESTINATIONS, each a route token of its own — `world-currency`, `world-prerequisites`, `world-modifiers` — with sub-item ids `manager-rules-nav-currency`, `manager-rules-nav-prerequisites` and `manager-rules-nav-modifiers` and the hook `data-world-rules-item`.
+  Three sibling tokens rather than one token plus a sub-tab variable, which is what Travel and Downtime use: the Checks group is the precedent for a group whose children are real routes, and preserving `world-currency` avoids renaming a token the View Lab cases, the route-scoped CSS and the documentation all name.
+  The active destination is stamped on the shell as `data-world-rules-tab`.
+  Each survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and each participates in the Manager confirm-discard route-exit chain, carrying its destination as the route-exit subject id so a guard can tell a real move from re-entering the page the GM is already on.
+- Each page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries a page hook: `data-world-currency-page`, `data-world-prerequisites-page`, `data-world-modifiers-page`.
+- **Full width is TWO edits, and neither is correct alone.**
+  The route MUST be excluded from the shell's shared `.manager-inspector` aside in the component, AND its `.manager-body` grid column MUST be released in the stylesheet, in both the normal and the `.is-rail-collapsed` rule.
+  Suppress the aside without releasing the column and the page renders against a permanent ~300px dead strip; release the column without suppressing the aside and the empty aside wraps to an implicit grid row beneath the editor.
+  This has been got wrong twice: once on the Checks route, and once on `world-currency`, which was suppressed in the component from the day it shipped and never released in the stylesheet.
+  A route appended to the END of an existing grouped selector list is invisible to the parity gate, which inspects only the selector that closes a group, so a newly released route belongs in its own rule pair.
   The aside's fall-through renders a generic "Select a system" panel, so a route omitted from the exclusion list gains a permanent 300px column of unrelated content beside an editor that has no selected system at all.
   The route also carries a `grid-template-rows: minmax(0, 1fr)` layout override, as the Downtime route does and for the same reason: the tab renders a single child straight into `.manager-main`, so on the shared three-row shell it would land in an auto-sized row and a tall ladder would grow the Manager instead of scrolling inside its own panel.
 - **The page header offers NO actions.** The route's own two actions — Add currency unit and Seed presets — live on the card header, where the provider read-only condition that hides them is computed.
   The exclusion is required rather than incidental: the header-actions block falls through to Import / Export / Create for any route without a branch of its own, and those act on CRAFTING SYSTEMS — so on a route that deliberately has no selected system, "Create" would create a crafting system and "Export" would sit permanently disabled against an id the route does not have.
   This is where World Currency departs from World Parties, which lifts its single New party action into the page header instead.
-- **The editor moved wholesale rather than being redesigned.** Every control below is the one that stood in the System Settings units card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*`; no new primitive is introduced.
+- **Each editor moved wholesale rather than being redesigned.** Every control is the one that stood in its System Settings card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*` and `data-system-modifier*` / `data-system-character-prerequisite*` -> `data-world-modifier*` / `data-world-character-prerequisite*`; no new primitive is introduced.
+  The whole-section collapse does NOT move with them: these are pages, not accordions, so the body always renders and the per-ROW summary collapse is the only collapse that survives.
+- **The cross-copy between the prerequisite and modifier libraries becomes a NAVIGATION.**
+  A page component cannot perform one, so each page hands the source entry to a callback and does nothing else; the route owns the mapping, the write to the destination library, the route change, the open request and the aria-live confirmation.
+  The confirmation MUST be rendered by the destination rather than the source: rendered on the source page it is torn down by the navigation before an assistive technology reaches it.
+  The destination opens the new entry and reveals it, because a copy is appended to the end of a library and an entry that is open but off-screen is indistinguishable from one that was never created.
 
 Shipped controls:
 
@@ -2106,7 +2121,7 @@ It renders the **Combination rule** as one `RadioCardGroup` of four options in `
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
 The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
 
-**NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, System settings › Modifiers.
+**NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, World › Rules & Resources › Modifiers (issue 1311; it was System settings › Modifiers until the library moved to world scope).
 Crafting used to carry an entry editor here, which made the Checks screen a second editor for a system-level library and made salvage and gathering second-class states of that asymmetry; two editors for one array is how two screens come to disagree about which wrote last.
 **Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
 The Checks saver carries no library half at all, so the removal is structural rather than a hidden control.
@@ -2138,7 +2153,7 @@ There is no longer a **"Default modifiers"** sub-heading and no standing intro s
 The intro sits **ABOVE the rows it governs**, not below the rule grid.
 It states what switching an entry on MEANS under the rule the GM just chose, so it belongs where that switching happens; below the grid it landed far under the controls it explains and read as a footnote about the pick cap.
 The rule grid re-renders it the moment the rule changes, so its position cannot leave it describing a rule the GM is about to change.
-The **empty-library state is ONE sentence on all three activities** (issue 1117): it names System settings › Modifiers, because no activity here has an add button and "Add one" would be an instruction this screen cannot carry out.
+The **empty-library state is ONE sentence on all three activities** (issue 1117): it names World › Rules & Resources › Modifiers, because no activity here has an add button and "Add one" would be an instruction this screen cannot carry out.
 
 ### The system Modifiers library — the ONE authoring surface (issue 1117)
 

@@ -136,7 +136,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 1. Open the Crafting Admin panel, select the system, and open **Checks › Crafting › Modifiers**.
 2. Confirm the library has at least one modifier.
    The **Named modifiers** card lists them, and it is read-only.
-   If it is empty, follow its **Edit in system settings** link to **System settings › Modifiers** and choose **Add modifier** there.
+   If it is empty, follow its **Edit in system settings** link to **World › Rules & Resources › Modifiers** and choose **Add modifier** there.
 3. Check the **Combination rule** on the **How they combine** card.
    If it is anything other than **By recipe**, that is why no recipe has a control.
    Choose **By recipe** to hand the selection to your recipes.
