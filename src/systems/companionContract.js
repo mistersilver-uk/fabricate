@@ -497,7 +497,9 @@ export const COMPONENT_AWARD_ENTRY_OUTCOMES = Object.freeze([
  *
  * `InvalidAwards` is the one string that interpolates anything, and it interpolates the BOUND
  * rather than restating it, exactly as `GrantedByTooLong` does — so the string and
- * {@link AWARD_ENTRIES_MAX} cannot drift apart. Every ENTRY-level key interpolates NOTHING,
+ * {@link AWARD_ENTRIES_MAX} cannot drift apart. `Awarded` and `Failed` are the two strings
+ * answered at BOTH levels, so both are phrased to read as a statement about ONE placement —
+ * which is what a caller records per entry — while staying true of a whole call. Every ENTRY-level key interpolates NOTHING,
  * and that is load-bearing rather than incidental: a placement carries no `messageData` at
  * all, so a placeholder there would put literal braces in front of a GM. The three refusals
  * the FACADE answers with — `gmOnly`, `noActor`, `notReady` — plus `InvalidCallSite` and

@@ -1459,7 +1459,7 @@
     },
     "Component": {
       "Award": {
-        "Awarded": "Every component asked for was placed on the character sheet.",
+        "Awarded": "Placed on the character sheet.",
         "PartiallyAwarded": "Some of the components asked for were placed on the character sheet, and the rest were not; each entry reports its own result.",
         "Failed": "The component award could not be completed.",
         "ComponentNotFound": "No such component to award in this crafting system.",
