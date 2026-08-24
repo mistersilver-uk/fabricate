@@ -349,10 +349,10 @@ test('manager root defines a scoped responsive app container', () => {
 
 test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
   const managerFocusBlock = blockFor(
-    '.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus'
+    '.fabricate-manager a:focus,\n.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus'
   );
   const managerFocusVisibleBlock = blockFor(
-    '.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
+    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
   );
   const shellFocusBlock = blockFor(
     '.fabricate-app button:focus,\n.fabricate-app input:focus,\n.fabricate-app select:focus,\n.fabricate-app textarea:focus,\n.fabricate-app [tabindex]:focus'
@@ -377,6 +377,30 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     shellFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'unified shell keyboard focus should remain visible'
   );
+
+  // THE TWO HALVES ARE A PAIR AND MUST NAME THE SAME ELEMENTS (issue 1118). The suppressing
+  // half strips whatever ring Foundry's core or the browser draws; the supplying half puts the
+  // manager's own back on keyboard focus. An element in the first list and not the second gets
+  // NO ring at all, which is what a focused manager `textarea` did, and an element in neither
+  // keeps the host's, which is what the twelve anchor manager buttons did. Both were live and
+  // both were invisible to the two blocks read above, because each of those only asks whether
+  // its own block declares an outline.
+  const elementsIn = (prelude) => [
+    ...new Set(
+      [...prelude.matchAll(/\.fabricate-\w+\s+([a-z]+|\[tabindex])(?=:)/g)].map(([, one]) => one)
+    ),
+  ];
+  for (const [area, suppressing, supplying] of [
+    ['manager', managerFocusBlock, managerFocusVisibleBlock],
+    ['app shell', shellFocusBlock, shellFocusVisibleBlock],
+  ]) {
+    assert.deepEqual(
+      elementsIn(supplying).sort(),
+      elementsIn(suppressing).sort(),
+      `the ${area}'s focus-visible list must name exactly the elements its :focus list ` +
+        'suppresses, or one element type is stripped of a ring and given none'
+    );
+  }
 });
 
 test('Fabricate app shell suppresses the host outline on the selected-tab state class', () => {
@@ -773,7 +797,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
   );
   const focusBlock = blockFor(
-    '.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
+    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
   );
 
   assert.ok(

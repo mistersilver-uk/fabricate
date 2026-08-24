@@ -1805,6 +1805,19 @@
   cursor: default;
 }
 
+/* THE MANAGER'S FOCUS-RING CONTRACT, and it is a PAIR: the first half suppresses whatever
+   ring Foundry's core or the browser would draw, and the second supplies the manager's own on
+   keyboard focus only. The two element lists must therefore match, or an element type is
+   stripped of a ring by the first half and given none by the second.
+
+   `a` joins both lists in issue 1118. Twelve manager buttons are anchors now — docs links,
+   the premium unlock, the explainer card's links — and an anchor matched neither list, so
+   those twelve were the only manager buttons with no accent ring on keyboard focus.
+
+   `textarea` joins the second list in the same edit, and it is a repair rather than a
+   symmetry tidy-up: it was in the suppressing half and absent from the supplying one, so a
+   focused manager textarea drew NO ring at all. */
+.fabricate-manager a:focus,
 .fabricate-manager button:focus,
 .fabricate-manager input:focus,
 .fabricate-manager select:focus,
@@ -1814,9 +1827,11 @@
   box-shadow: none;
 }
 
+.fabricate-manager a:focus-visible,
 .fabricate-manager button:focus-visible,
 .fabricate-manager input:focus-visible,
 .fabricate-manager select:focus-visible,
+.fabricate-manager textarea:focus-visible,
 .fabricate-manager [tabindex]:focus-visible {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 2px;
