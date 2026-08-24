@@ -127,6 +127,12 @@ export default defineConfig({
     // do with art. Nothing here is ever edited mid-run, so watching it buys nothing at any price.
     watch: {
       ignored: [
+        // Agent lane worktrees live INSIDE the repo, each a full checkout. The lab's root is
+        // the repo, so without this it watches every lane's `src/` as well as its own — tens
+        // of thousands of files that are never the ones under test — and dies with
+        // `ENOSPC ... watch '<some lane>/src/…'`, naming a file in a checkout the run has
+        // nothing to do with.
+        '**/.worktrees/**',
         ...(chromeCache ? [join(chromeCache.dir, '**')] : []),
         ...(existsSync(dnd5eRoot) ? [join(dnd5eRoot, '**')] : []),
       ],

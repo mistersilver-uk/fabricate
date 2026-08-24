@@ -93,6 +93,13 @@
     dataValue = '',
     onToggle = () => {},
     children = undefined,
+    // A trailing action for the HEAD, rendered where a `switch` control would sit. The macro
+    // card's browse control uses it: that button acts on the whole card, so it belongs beside
+    // the card's own title rather than in the body inline with the drop target it is an
+    // alternative to. Mutually exclusive with `control="switch"` in practice — a head with
+    // both would put two trailing controls on one line — but not enforced, because a future
+    // row may legitimately want a switch and a link.
+    headAction = undefined,
   } = $props();
 
   // Declared tones only, so a typo renders the default glyph rather than an unstyled class.
@@ -151,6 +158,8 @@
       >
     </button>
   {/if}
+  {#if headAction}<span class="fab-complication-effect-head-action">{@render headAction()}</span
+    >{/if}
 {/snippet}
 
 <div
@@ -292,6 +301,15 @@
 
   .fab-complication-effect-glyph.is-tone-subtle {
     color: var(--fab-text-subtle);
+  }
+
+  /* The head's trailing action. `flex: 0 0 auto` so the copy column keeps the slack, and
+     `margin-left: auto` is NOT needed — the copy above is `flex: 1 1 auto` and already
+     pushes this to the edge, which is how the switch control lands there too. */
+  .fab-complication-effect-head-action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
   }
 
   .fab-complication-effect-copy {
