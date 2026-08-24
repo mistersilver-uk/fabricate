@@ -1101,19 +1101,30 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       // that can photograph the runtime route-chrome channel: every other Downtime case rests
       // on a list screen, which renders identically whether or not that channel exists.
       'manager-world-downtime-companion-chrome',
+      // Issue 1302 — the parent rollup, appended after the four tab cases (never inserted
+      // among them): the manifest above is order-sensitive and `cases.slice(0, 4)` below is
+      // index-based, so a new case has to land after both without disturbing either.
+      'manager-world-downtime-rollup',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
   // share one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane
   // are Core's own content, and the spec says neither is rendered over a companion's screens
   // — so requiring the CTA of every downtime case would pin exactly the defect it forbids.
-  // Both PROVIDER-MODE frames are excluded from the Core-preview loop, and for the one reason:
-  // over a companion's screens Core renders no preview pane and no CTA at all, so every
-  // assertion below is about markup the spec forbids there.
+  // All THREE provider-mode frames are excluded from the Core-preview loop, and for the one
+  // reason: over a companion's screens Core renders no preview pane and no CTA at all, so
+  // every assertion below is about markup the spec forbids there. The rollup case joins the
+  // premium-installed and companion-chrome frames for the same reason — it is reached on
+  // `expectView: 'systems'`, not `'world-downtime'`, and asserts a DOM-removal claim the
+  // Core-preview loop below has no vocabulary for.
   const premium = allCases.find((entry) => entry.id.endsWith('-premium-installed'));
   const companionChrome = allCases.find((entry) => entry.id.endsWith('-companion-chrome'));
+  const rollup = allCases.find((entry) => entry.id.endsWith('-rollup'));
   assert.ok(Boolean(companionChrome), 'the runtime route-chrome frame is still registered');
-  const cases = allCases.filter((entry) => entry !== premium && entry !== companionChrome);
+  assert.ok(Boolean(rollup), 'the parent rollup frame is still registered');
+  const cases = allCases.filter(
+    (entry) => entry !== premium && entry !== companionChrome && entry !== rollup
+  );
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
@@ -1301,6 +1312,45 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     mountSource,
     /longDowntimeLabels[\s\S]{0,900}registerWorldNavProvider/,
     'long-copy evidence keeps the real Core fallback provider active'
+  );
+
+  // Issue 1302 — the parent rollup, on a closed disclosure with zero interaction (AC-19). This
+  // is the persona state a fresh Manager open actually lands on: `railGroupUserExpanded.worldDowntime`
+  // seeds `false` and nothing locks the group open off the Downtime route, so no GM ever sees the
+  // rollup's counterpart today without navigating away from the one place the badge would matter.
+  assert.equal(rollup.expectView, 'systems', 'reached with no interaction, on the systems browser');
+  assert.equal(rollup.query?.downtimeProvider, '1', 'a provider is registered so the rollup can render');
+  assert.deepEqual(rollup.steps, [], 'the default state, not a state reached by clicking anything');
+  assert.match(
+    rollup.expectSelector,
+    /data-world-downtime-badge-total/,
+    'proves the rollup itself is present'
+  );
+  assert.match(
+    rollup.expectSelector,
+    /:not\(:has\(\[data-world-nav-premium\]\)\)/,
+    'and proves the muted PREMIUM chip is a DOM removal here, not merely restyled — the two ' +
+      'never coexist in the parent row’s one trailing track'
+  );
+  const rollupLabelAttribute = rollup.expectAttributes.find(
+    (entry) => entry.selector === '[data-world-downtime-badge-total]' && entry.name === 'aria-label'
+  );
+  assert.ok(rollupLabelAttribute, 'the rollup states its own accessible name');
+  // The lab provider's only badge lives on `ledger`, so the total is that badge's own count —
+  // proving the arithmetic sums the RESOLVED value once per tab, never registered-plus-runtime.
+  const labBadge = mountSource.match(
+    /id: 'ledger',[\s\S]{0,400}?badge: \{ count: (\d+), accessibleName: '[^']+' \}/
+  );
+  assert.ok(labBadge, "the lab companion's ledger tab still declares a badge");
+  assert.equal(
+    rollupLabelAttribute.value,
+    `${labBadge[1]} updates`,
+    "the rollup's aria-label states the lab provider's own badge total, unformatted"
+  );
+  assert.deepEqual(
+    rollup.expectContained,
+    [{ container: '#manager-world-nav-downtime', target: '[data-world-downtime-badge-total]' }],
+    'the rollup sits inside the parent row it replaces the chip in'
   );
 });
 

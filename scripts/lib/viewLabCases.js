@@ -4151,6 +4151,58 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
+  // Issue 1302 — the Downtime parent rollup, the state Core reaches on a fresh Manager open:
+  // the disclosure closed and never yet visited (`railGroupUserExpanded.worldDowntime` seeds
+  // `false`, and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it
+  // open). No other frame reaches this with zero interaction, and it is the only frame that
+  // can photograph the chip/rollup swap without also proving the rail-collapse or group-toggle
+  // path — see the `manager-world-downtime-premium-installed` and `-collapsed` frames for those.
+  managerCase({
+    id: 'manager-world-downtime-rollup',
+    label: 'Manager — World Downtime rollup on a closed disclosure',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [],
+    expectView: 'systems',
+    // One selector proves both halves of the swap: the rollup is present inside the parent
+    // button, and — because `:not(:has(...))` is scoped to that same button — the muted
+    // `PREMIUM` chip is NOT a descendant of it. The two are mutually exclusive by contract
+    // (`{#if !downtimeNavRollupVisible}` wraps the chip), so proving one absent while the
+    // other is present is a DOM-removal claim, not a restyling one.
+    expectSelector:
+      '#manager-world-nav-downtime:not(:has([data-world-nav-premium])) [data-world-downtime-badge-total]',
+    expectAttributes: [
+      {
+        selector: '[data-world-downtime-badge-total]',
+        name: 'aria-label',
+        // The lab provider's only badge is the four-digit one on `ledger` (1284), so the
+        // rollup total is that same value — Core sums the RESOLVED badge once per tab it
+        // renders, never registered-plus-runtime. `{count} update`/`updates` is rendered
+        // unformatted (issue 1302 accepted limitation 5), so no thousands separator here.
+        value: '1284 updates',
+      },
+    ],
+    expectContained: [
+      {
+        container: '#manager-world-nav-downtime',
+        target: '[data-world-downtime-badge-total]',
+      },
+    ],
+    // The Downtime parent row is the LAST rail entry, below Parties, Travel and Currency, and
+    // nothing scrolls it into view without a step this state deliberately takes none of. Every
+    // assertion above still passes against the un-scrolled DOM regardless of window height, but
+    // 1000px — the tallest the capture viewport's `.application` max-height clamp allows — is
+    // what actually keeps the row in the published frame, so a human can judge it too.
+    position: { width: 1330, height: 1000 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/navTabBadgeStore\.js$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
   managerCase({
     // World > Travel is UNGATED (issue 1282). This case used to prove the opposite — that the
     // selected-system Travel group DISAPPEARED when that system's Travel & Realms toggle was
