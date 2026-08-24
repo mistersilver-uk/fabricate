@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Define the requirements for Fabricate's **outbound behavioural** contract: the capabilities Fabricate publishes so a companion module can settle work against an actor — grant the knowledge an activity teaches, ask what a cost comes to, read what the actor already holds, roll a check for an actor, or settle one roll decision for many.
+Define the requirements for Fabricate's **outbound behavioural** contract: the capabilities Fabricate publishes so a companion module can settle work against an actor — grant the knowledge an activity teaches, ask what a cost comes to, read what the actor already holds, roll a check for an actor, settle one roll decision for many, place components on the actor's sheet, or credit currency to it.
+The last two are the first published capabilities that are neither a read nor a roll: they **place value**, and every rule below that separates a question from an act binds harder on them than on anything published before.
 
 This specification governs a companion **consuming Fabricate's behaviour**.
 Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md`.
@@ -19,6 +20,8 @@ This spec governs:
 
 Behaviour stays with its domain.
 The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-integration/spec.md`.
+The award members split the same way.
+The currency credit's ladder rules, its spender write-truth rules and its consequences for a GM's `increment` macro are specified in `data-models/spec.md`; the reciprocal statement that the knowledge grant's idempotency has no counterpart on these two members is in `recipe-visibility/spec.md`; and the **gathering** award's own stacking rules, which are not these, stay in `gathering-and-harvesting/spec.md`.
 
 ## The Published Contract
 
@@ -46,6 +49,10 @@ It guarantees **nothing about that object's method surface** beyond a declared c
 
 `getCraftingEngine().findComponentItems` declares its carve-outs in full: it takes **documents, not ids**; its third argument is a crafting-system **object**, not an id; and it **throws on a null actor and on a null component**, with only the system argument tolerant.
 The carve-out is stated in full because a companion that guards only against a null actor still crashes.
+
+The **awarding** half of that pair is now published in its own right.
+`awardComponents` is a `stable` member that consumes the carve-out internally, so a companion placing a component on a sheet has a supported route that never requires it to call the carve-out at all, and never has to defend against either of its throw conditions.
+The carve-out remains published because a companion still reads what an actor already holds through it, and because the award deliberately publishes no item handle of its own.
 
 ## Behavioural Member Rules
 
@@ -87,6 +94,11 @@ A member that itself produces an externally observable effect — opening a dial
 **Fabricate discharges this obligation for such a member only for a call site truthfully declared `broadcast`**, by refusing `notElected` on an unelected client.
 **A companion that declares `gmAction` from a synced hook bypasses the gate entirely and reinstates the caller's obligation in full**, because the declaration is the only signal Fabricate has and nothing in the environment can check it.
 The deeper harm is not the duplicated dialog or the duplicated chat message: N clients roll N **different totals** and hand them to N companion instances, which then apply N sets of consequences Fabricate can neither see nor reconcile.
+
+A member that **writes value** — placing items on a sheet, or crediting coin — is neither of the two cases above, and for it the deeper harm inverts.
+N clients do not produce N different answers to reconcile; they produce **N copies of the same value** on a player's sheet, with no `alreadyKnown` no-op and no natural key to absorb the repeat.
+The obligation therefore binds hardest exactly where the "a read is harmless" justification is weakest, which is why both award members require a `callSite` and why neither is idempotent.
+The `gmAction`-from-a-synced-hook bypass is correspondingly more consequential for a member that moves inventory than for one that posts chat: a duplicated message is noise a GM deletes, while a duplicated award is items and coin a GM must find and reverse by hand.
 
 ## The Standalone Check Roll
 
@@ -151,6 +163,8 @@ What this capability restores is a **different** dialog — Fabricate's own roll
 
 A second shared rule exists **once**, beside the authorization preamble and deliberately separate from it, because it answers a different question: the preamble asks WHO is calling, this asks WHERE FROM.
 It is sited **after** readiness, because it is request validation.
+It binds every member that declares a call site — `rollActorCheck`, `resolveBulkCheckDecision`, `awardComponents` and `creditCurrency` — and it exists as **one** implementation, sited in the Foundry-free contract module beside the published `callSites` vocabulary rather than inside any one member's module.
+A member carrying its own copy would be free to drift on exactly the question a write may not be wrong about.
 
 `callSite` is **required and has no default**.
 Nothing in the request or the environment distinguishes a GM's deliberate click from a synced tick that fires on every connected client, so a default would be a coin flip rather than a bad inference.
@@ -175,10 +189,144 @@ A bare `failed` answering `success: true` is a trap, because `success: false` al
 `invalidRollDecision` exists because a pre-resolved roll decision supplied alongside a non-interactive roll is **silently discarded** by the shared evaluator, which consults one only on its interactive path.
 The caller's bonus, Advantage and roll mode would otherwise all vanish with no error while the base formula rolled, so the decision is **refused** rather than dropped.
 
+## The Award Members
+
+Fabricate publishes two `stable` members that place value on an actor.
+`awardComponents({ actorId, callSite, systemId, awards })` places one or more components on an actor's sheet and answers `{ success, awarded, placements, outcome, message }`.
+`creditCurrency({ actorId, callSite, unitId, amount })` credits one denomination of the world coin ladder to an actor and answers `{ success, credited, outcome, message }`.
+
+Both request key sets are **closed**, including the nested `awards[i]` set, which is exactly `componentId` and `quantity`.
+No caller-supplied bag is spread into any collaborator, seam or item payload: a spread would put caller-controlled arbitrary keys onto a created Foundry document, which is itself a leading cause of a create the client silently drops.
+`awards` holds at most 64 entries, because every entry is a document write and an unbounded list is an unbounded write batch driven by an external caller; the bound starts small because widening what a member accepts is free under the compatibility promise while narrowing it is a version bump.
+`systemId` is declared once per call rather than per entry, and every entry resolves within it, so a mixed-system award is two calls.
+
+**Both award members target WORLD actors, and cannot address an unlinked token actor.**
+Every actor-targeted member resolves `actorId` against the world actor collection through the shared resolver named above, never against a token, a token id or a uuid.
+An unlinked token's synthetic actor carries its **base actor's id**, so no `actorId` can name one — and not because Fabricate declines to look: every unlinked token created from one base actor shares that id, so an `actorId` could not tell two synthetic actors apart even in principle, and widening the resolver could not fix it.
+A caller that passes such an id therefore addresses the **world prototype** and receives `success: true`.
+For these two members alone among the actor-targeted set the consequence is that the value lands where the player will never see it, which is why the resolver's limit is restated with them.
+The published remedies are: **link the token, or do not use these members for it.**
+Foundry does publish a handle for a synthetic actor — `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")` — so this is Fabricate's deliberate `actorId`-not-uuid convention rather than a Foundry gap, and it is the shape any future widening would take.
+
+**A write seam is judged by its RETURN VALUE.**
+Neither member reports an amount it did not observe.
+A Foundry document create can resolve with fewer documents than requested, or with none, carrying no error and raising no notification; an update whose path is not in the target's data model is discarded just as quietly; and a currency spender may report success for a write it never observed.
+Both members therefore derive every reported amount from what the write itself returned, and — on a spend strategy whose own answer carries no information — from a balance read taken before and after.
+**A reported `placed` or `credited` is an observation, never a restatement of the request.**
+
+**Neither award member is idempotent, and the caller owns not double-awarding.**
+An award has no natural key: awarding 3 hides twice is legitimately 6 hides, and crediting 50 gp twice is legitimately 100 gp.
+`grantRecipeKnowledge` is idempotent only because the learned map is its own key, and no equivalent state exists here.
+Fabricate will not add an idempotency key: a per-actor ledger of caller-supplied award ids is a new persisted shape with unbounded growth and no restore semantics, and a partial guarantee is more dangerous than a published non-guarantee because it invites a caller to stop defending itself.
+The recommended caller discipline is a **claim recorded in front of the irreversible act**, not a guard inside it, and Fabricate cannot supply that claim because it does not own the activity the award settles.
+
+The election gate is a mitigation rather than a lock, and its strength is stated exactly.
+It removes the **steady-state** multi-client duplication class, but the activity flag it reads is client-local and maintained by a broadcast, so immediately after a higher-role GM joins there is a window in which two clients both consider themselves elected.
+Two concurrent awards of the same component to the same actor may also produce two documents rather than one stack, because the matcher reads the actor's items at call time and there is no lease.
+Where two concurrent awards do land on one stack the loss is arithmetic rather than structural: each reads the stored count and writes that count plus its own quantity, so one update overwrites the other while **both** answers report their full `placed`.
+
+**Retry is safe for an enumerated ZERO-MUTATION SET, and for nothing else.**
+`success` is not the axis, and neither is a zero amount, so each member publishes by name the set of outcomes Fabricate declares to have mutated nothing.
+`awardComponents` declares `gmOnly`, `noActor`, `notReady`, `invalidCallSite`, `notElected`, `invalidAwards`, `systemNotFound` and **`awardFailed`**.
+`creditCurrency` declares `gmOnly`, `noActor`, `notReady`, `invalidCallSite`, `notElected`, `invalidAmount`, `ladderEmpty`, `ladderInvalid`, `unitNotFound` and **`creditNotConfigured`**.
+Every other outcome — including `partiallyAwarded`, `creditFailed` and `creditUnavailable` — may have moved value, and retrying one double-awards.
+
+The asymmetry between the two failure tokens is why the sets are published separately from the scalars.
+`awardFailed` is inside its set because that member runs no third-party code: every one of its failures is a refusal taken before any write, a create that returned no document, a stack write whose own return said Foundry accepted no change, or a server-side rejection — each an **observed non-write**.
+`creditFailed` is outside its set because under two of the three spend strategies the mechanism is code Fabricate does not own, so a mechanism that wrote and then reported failure is a possibility Fabricate cannot rule out.
+
+**Both award members require a `callSite`, where `grantRecipeKnowledge` does not.**
+An award is a write with no absorbing repeat, so the election gate is the one structural mitigation Fabricate provides against a synced handler awarding N times.
+`grantRecipeKnowledge` needs none, because N grants of one recipe are one write and N−1 `alreadyKnown` no-ops.
+The asymmetry is stated positively so a companion author who notices only that one write member takes a `callSite` and another does not cannot infer that the field is optional decoration.
+
+**`awardComponents`' answer expresses partial success structurally.**
+`placements` is a list of `{ index, componentId, requested, placed, stacked, outcome, message }` in the caller's own order with `placements[i].index === i`, and `componentId` and `requested` echo the caller's entry verbatim, so the map-back does not depend on the caller having kept its own array.
+It holds **exactly one entry per requested award whenever anything was attempted**, including for `awardFailed`, and is `[]` for every pre-attempt refusal.
+That pair is the distinction between *everything was attempted and nothing landed* and *nothing was attempted*, and neither half carries it alone.
+`stacked` is `true` when the member added to an existing item, `false` for a successful create, and `null` for an entry that placed nothing; it is published because it is the fact the resolver was published to enable, and a caller writing an append-only log needs "added 3 to an existing stack" to read differently from "created a new item".
+
+`awarded` is the **sum of `placements[].placed`**, computed by the member from its own record and never supplied by a caller, because a caller-supplied total could disagree with the placements it accompanies and a reader would have no way to know which was right.
+It is `null` for every pre-attempt refusal and `0` for `awardFailed`.
+**Read that beside `creditCurrency`'s `credited`, which is `0` for the same refusal class, and the two are not inconsistent:** `awarded` is a sum over `placements[]`, so an empty attempt record makes the sum vacuous rather than zero, while `credited` has no companion structure to be vacuous over and falls to the provability rule alone.
+
+Every entry carries its own `message`, a localization key from this member's own table, because the whole purpose of `placements` is that a caller records each entry and without a key it would have to compose free text from `outcome`.
+Every **entry-level** key interpolates nothing: the entry already carries `componentId` and `requested`, so a placeholder would only put literal braces in front of a GM.
+The answer is **deep-frozen** — the result, the array, and every entry.
+
+**The award loop accumulates and does not abort.**
+A failing entry does not stop the entries after it.
+The currency deduction bounds loss by stopping and the currency refund bounds stranding by continuing; an award is a give, so stopping compounds nothing and withholds value the GM authorised.
+Accumulating is also what makes one placement per requested entry an invariant rather than a range.
+
+**`awardComponents` validates every quantity as a whole number.**
+A `quantity` must be a positive safe integer, or a numeric string naming one.
+`0`, a negative, a fraction, a non-finite value, a boolean, an array, a missing value and anything above the safe-integer range each refuse that entry with `invalidQuantity` and place nothing.
+This is required rather than defensive: the underlying stacking seam coerces a non-finite or non-positive quantity to **one** on its stack path while writing a fraction verbatim on its create path, so an unvalidated request awards a quantity nobody asked for.
+
+**`awardComponents` refuses a multi-unit award the world cannot express, and never invents a count.**
+Fabricate writes the requested quantity into the item payload and then **reads back what it wrote**.
+When the stored value is not the requested one — because the item schema carries no field at the configured stack-quantity path, or because the configured path resolves an object rather than a count — a request for more than one unit refuses that entry with `multiUnitUnsupported` and places nothing, rather than creating a single item and reporting N.
+A request for exactly one unit succeeds, and a second single-unit request for the same component creates a second document rather than inventing a count on the first.
+
+Two causes reach this outcome and their remedies differ, so the published guidance names both.
+A game system whose item schema genuinely carries no quantity field is a real capability limit.
+A **wrong GM-configured stack-quantity path** is a misconfiguration Fabricate already diagnoses through its own stack-quantity advisory, and a companion whose world hits that cause must **not** respond by looping single awards: that produces N loose documents that will never stack, which is the duplicate-versus-stack failure these members exist to prevent.
+
+**`awardComponents` resolves its stack targets through the published resolver and nowhere else.**
+It resolves matches through `getCraftingEngine().findComponentItems` — the member published for exactly this — so what an award stacks onto and what salvage consumes can never disagree.
+The stack write itself is this member's own; the shared create-or-stack seam is consumed as the **create** primitive alone.
+
+That resolver applies the list-aware different-component veto on its durable-identity branch, and falls back to a **case-sensitive exact-name** match with no veto **whenever no owned item resolved to the component by durable identity**.
+The fallback is therefore not a legacy edge: a fully stamped component whose actor happens to hold an *unstamped* item of the same name reaches it, which in an unmigrated world is the ordinary case rather than the exception.
+The companion award inherits both branches rather than growing a second matcher, and it differs on that second branch from the **gathering** award, whose rules are specified under "Award Item Stacking" in `gathering-and-harvesting/spec.md` and whose own fallback is shared raw source references rather than a name match at all.
+
+The member calls the resolver **only after** its own component resolution has succeeded, which is what makes the carve-out's two throw conditions unreachable from a member that may not throw.
+**Within one call, two entries naming the same component stack onto one item wherever the world can express a stack count**: the member carries forward what it has already placed rather than depending on the actor's item collection having caught up.
+Where the world cannot express a count the second entry creates a second document instead, so nothing is invented and nothing is refused.
+
+**`creditCurrency` has no partial success and answers a three-valued `credited`.**
+It publishes no per-part shape, because the spender interface answers one boolean.
+It makes no atomicity claim about Foundry: one strategy performs a single batched actor update, one delegates to a game system adapter's own item mutation, and one runs GM-authored macro code.
+
+Four outcomes carry three values of `credited`, and nobody should mint a fourth.
+It is **the amount** for `credited`; **`0` for `creditNotConfigured` and for every refusal taken before any mechanism ran**; and **`null` for both `creditFailed` and `creditUnavailable`**.
+So `0` means *provably zero* and `null` means *Fabricate cannot say*, exactly as `affordable: null` already separates "this actor is short" from "this question could not be answered", with `outcome` carrying the rest.
+Reporting `0` for `creditFailed` would state a third party's word as Fabricate's own proof.
+
+`creditNotConfigured` names a world whose currency configuration cannot express the credit and where **nothing was written**, and it is the GM's to fix.
+Its producers are: no spender for the configured spend strategy, a spender with no refund method, no `increment` macro configured — which is a documented-normal state, because `increment` alone among the three macro keys is optional — an `increment` uuid naming nothing runnable, a configured actor path Foundry discarded, a configured actor path holding a value that is not a number, and a pre-write balance read that failed or threw before any mechanism was invoked.
+Collapsing it into `creditFailed` would report a misconfiguration as a domain answer; collapsing it into `creditUnavailable` would tell a log that something may have landed when nothing possibly could.
+
+**`creditCurrency` resolves its denomination through the same resolution as `checkAffordability`.**
+One shared resolution answers both members, so the check and the credit cannot disagree about what a unit is.
+The four ladder refusals `invalidAmount`, `ladderEmpty`, `ladderInvalid` and `unitNotFound` are reused **by token**, each member answering with its own message key, because a fifth spelling of "no such unit" would be new vocabulary for an identical fact while a failed credit must not report itself in the words of a failed check.
+`creditCurrency` **requires a positive safe-integer amount rather than truncating one**, because a truncated amount is a different amount and because the credit's own arithmetic stops being exact beyond the safe-integer range; a numeric string naming such an amount is accepted.
+`checkAffordability` continues to accept a fraction and is deliberately **not** harmonised with it, because narrowing what a published member accepts is a `schemaVersion` bump.
+
+**Neither award member takes a provenance label in v1, and neither publishes an item handle.**
+Nothing persists a provenance label, and a field a caller fills that nothing reads is worse than its absence.
+A companion re-derives an item handle through the published `findComponentItems`, and a handle published before its form is settled cannot be withdrawn.
+Either member may gain either later without a version bump, on the compatibility promise's asymmetry.
+
+## The Outcome Vocabulary Added By The Award Members
+
+The award members add exactly these outcomes: `awarded`, `partiallyAwarded`, `awardFailed`, `componentNotFound`, `invalidQuantity`, `multiUnitUnsupported`, `invalidAwards`, `credited`, `creditFailed`, `creditUnavailable`, and `creditNotConfigured`.
+Of these, `awarded`, `partiallyAwarded` and `credited` answer `success: true`.
+An award is an **act** rather than a question, so an award that landed nothing answers `success: false`, where `notAffordable` — a question answered *no* — answers `success: true`.
+
+`componentNotFound`, `invalidQuantity` and `multiUnitUnsupported` are **entry-level only** and can never be a call-level `outcome`; `awarded` and `awardFailed` are answered at both levels.
+The split is declared as data a test can read rather than as prose a reviewer remembers, because the contract's own rule that every declared outcome must be answerable by some member forces the three entry-only tokens into a member's key table, where a reader would otherwise take them for call-level answers.
+A second word for the concept `awarded` already names was rejected at the entry level, because a caller would then have to branch on both.
+
+They also reuse the already-declared `systemNotFound`, `unitNotFound`, `invalidAmount`, `ladderEmpty`, `ladderInvalid`, `invalidCallSite` and `notElected`, and the shared `gmOnly`, `noActor` and `notReady`.
+
 ## The Compatibility Promise
 
 While `game.fabricate.api.COMPANION.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
 A member may gain an optional argument or an additional result field; it may not lose one, change the meaning of one, or begin throwing where it returned a result.
 A new member may be added without a version change, because adding one cannot break a companion that does not call it.
+**Rows in the published member set are appended and never interleaved**, so a member's declared position is stable.
+That is a requirement rather than an observation: sites inside and outside this specification name a member by its position, and an interleaved row falsifies every one of them at once and silently.
 Removing a member, renaming one, or narrowing what one accepts is a `schemaVersion` bump, announced in the release notes, with the previous member retained as a deprecated delegate for at least one minor release.
 **Nothing outside the declared set is contract, however reachable it is.**
