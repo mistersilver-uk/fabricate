@@ -142,6 +142,44 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),
     ]),
   }),
+  Object.freeze({
+    task: 8,
+    files: Object.freeze([
+      // 14 sites across the recipe editor tree, all `<button>`. Ten already carried
+      // `is-dashed` and repaint accent -> muted under task 4's reconciliation, which is the
+      // ruled outcome rather than a casualty. One carried a forgotten `dashed`: the "Add a
+      // step" at the foot of the Step durations accordion.
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
+        sites: 4,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+        sites: 2,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
+        sites: 2,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
+        sites: 2,
+      }),
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+        sites: 1,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
+        sites: 1,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte',
+        sites: 1,
+      }),
+    ]),
+  }),
 ]);
 
 // Code point, not `localeCompare`, for the same reason `sourceScan.js` gives: locale-dependent
@@ -236,36 +274,6 @@ const REVIEWED = [
     why: 'The hover half of the same deliberate override.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed'),
-    disposition: 'INTENDED',
-    why:
-      'The geometry half of the RECONCILED bare dashed treatment. Task 4 copied the ' +
-      "primitive's control geometry down onto this selector — minus `width`, which moved to " +
-      '`is-full-width` — so the four `SearchablePopover` dashed triggers that never gain ' +
-      '`fab-manager-button` render the same control as the converted buttons beside them. It ' +
-      "still loses to the primitive's own `is-dashed` at (0,4,0), and now loses to it with " +
-      'identical values, which is the point of the reconciliation.\n' +
-      'The report prints one divergent TIE for it — 11px against the base primitive rule`s ' +
-      '0.72rem — and that one is inert in both directions, which is why it carries no ' +
-      '`tieDivergence` claim. A CONVERTED dashed button also matches the (0,4,0) companion, ' +
-      'which states 11px and wins outright; an unconverted one matches no primitive rule at ' +
-      'all. There is no arrangement of this sheet in which the 0.72rem reaches a dashed ' +
-      'control, so the tie cannot be made visible by reordering.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled)'),
-    disposition: 'INTENDED',
-    why:
-      'The paint half of the same reconciliation, split out so the disabled rule can win. ' +
-      'Accent → muted on the ten converting sites is the ruled repaint, and the four ' +
-      'population-B triggers take it too, deliberately: they sit in the same rows.',
-  },
-  {
-    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled):hover'),
-    disposition: 'INTENDED',
-    why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
-  },
-  {
     id: globalRule('.fabricate-manager .manager-button:not(:disabled):hover'),
     disposition: 'INTENDED',
     why:
@@ -340,6 +348,42 @@ const REVIEWED = [
   },
 
   // ── EXCLUDE: reaches only population-B triggers ───────────────────────────────────────
+  //
+  // The three bare `is-dashed` rules below were INTENDED until task 8, and the move is the
+  // reconciliation finishing rather than a change of mind. Task 4 copied the primitive's
+  // control geometry and paint down onto this selector precisely so that the dashed
+  // `SearchablePopover` triggers — rendered from a class STRING, so they never gain
+  // `fab-manager-button` — would keep a complete treatment while population B stays deferred.
+  // While ten literal dashed buttons were still awaiting conversion the rules also reached
+  // them, and losing to the primitive's (0,4,0) companion with identical values was the thing
+  // worth recording. Task 8 converted the last of those ten, so every site these rules now
+  // reach is a population-B trigger and re-chaining any of them would repaint a control the
+  // sweep is not converting. That is the definition of EXCLUDE, and the EXCLUDE assertion
+  // re-derives it: it demands each rule still reach a site, and that no site it reaches
+  // converts. They are NOT dead — a dead rule is one nothing renders, and four triggers do.
+  {
+    id: globalRule('.fabricate-manager .manager-button.is-dashed'),
+    disposition: 'EXCLUDE',
+    why:
+      'The geometry half of the RECONCILED bare dashed treatment, and now population B only. ' +
+      "Task 4 copied the primitive's control geometry down onto this selector — minus " +
+      '`width`, which moved to `is-full-width` — so the four `SearchablePopover` dashed ' +
+      'triggers render the same control as the converted buttons beside them in the same row.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled)'),
+    disposition: 'EXCLUDE',
+    why:
+      'The paint half of the same reconciliation, split out so the disabled rule can win. ' +
+      'Accent → muted was the ruled repaint on the ten literal dashed sites, and the four ' +
+      'population-B triggers took it too, deliberately: they sit in the same rows. With the ' +
+      'ten converted (task 8) the triggers are all that is left.',
+  },
+  {
+    id: globalRule('.fabricate-manager .manager-button.is-dashed:not(:disabled):hover'),
+    disposition: 'EXCLUDE',
+    why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
+  },
   {
     id: globalRule('.fabricate-manager .manager-button.manager-checks-preview-actor-trigger'),
     disposition: 'EXCLUDE',

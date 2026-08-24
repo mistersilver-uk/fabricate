@@ -11,8 +11,10 @@
  *    component's internals, and a `class` prop handed to a child is forwarded verbatim — so
  *    `.fab-bulk-edit-apply.svelte-<hash>` matches nothing the moment Apply becomes a
  *    `<ManagerButton>`, while the element still carries `fab-bulk-edit-apply`.
- *  - The compiler emits NO `css_unused_selector` warning, because the class literal is right
- *    there in the markup on the component tag. `lint:svelte:warnings` therefore passes.
+ *  - The compiler emits no `css_unused_selector` warning for the compound case, because the
+ *    class literal is right there in the markup on the component tag and its siblings in the
+ *    selector are on elements this component writes. `lint:svelte:warnings` therefore passes.
+ *    (A BARE bespoke selector is pruned and warned about instead — see the next section.)
  *  - A fixture built with `tests/helpers/scoped-component-css.js` STAMPS the hash onto its
  *    hand-written markup, which is faithful for an element the component writes and wrong for
  *    one a child renders — so a computed-style fixture keeps measuring the rule that the
@@ -23,15 +25,35 @@
  * `bulk-edit-dock-pinning.test.js` caught the same mistake in `BulkEditPanelShell` because
  * it measures Apply's rendered box, and nothing at all was measuring the other two.
  *
+ * ── AND THE OTHER HALF, WHICH IS PRUNED RATHER THAN SCOPED ───────────────────────────────
+ * A dead rule of this kind reaches the compiler in one of TWO states, and only one of them
+ * survives into the emitted CSS. Which one you get depends on whether the same class token
+ * also appears somewhere on an element the component itself writes:
+ *
+ *  - It does (or the selector is a compound whose other classes do): the rule is EMITTED with
+ *    the hash appended, matches nothing, and no warning is raised. `GatheringEconomyView`'s
+ *    `.manager-button.fab-manager-button.is-primary.manager-economy-bulk-save` is that case.
+ *  - It does not: Svelte PRUNES the rule to a `/* (unused) … *\/` comment and raises
+ *    `css_unused_selector`. Both `.manager-recipe-tab-action` blocks — declared identically in
+ *    `RecipeAccessTab` and `RecipeBooksScrollsTab` — were that case (issue 1118, task 8).
+ *
+ * The rule is equally dead either way, and the repair is the same, so both are checked here.
+ * The pruned half is nominally also covered by `lint:svelte:warnings`, which fails on any
+ * compiler warning — but that gate reports "Unused CSS selector" with no hint that the class
+ * is on a child component and no hint that deleting the rule would unstyle the control. This
+ * one names the defect.
+ *
  * ── WHAT THIS ASSERTS ────────────────────────────────────────────────────────────────────
  * For every class token a `.svelte` under `src/` hands to a `<ManagerButton>` through the
  * appending `class` prop, no rule in that component's own compiled CSS may select that token
- * with the component's scoping class attached. `:global(...)` is the fix and passes here,
- * because a `:global` rule compiles without the hash.
+ * with the component's scoping class attached, and no rule the compiler pruned as unused may
+ * select it either. `:global(...)` is the fix for the first and passes here, because a
+ * `:global` rule compiles without the hash; hoisting into `styles/fabricate.css` is the fix
+ * for either, and is the right one when two components declare the same rule.
  *
  * The check is run against the REAL compiler output rather than a hand-parse of the `<style>`
- * block, so `:global()` nesting, selector rewriting and the hash's exact placement are the
- * compiler's answers and not this file's guesses.
+ * block, so `:global()` nesting, selector rewriting, pruning and the hash's exact placement
+ * are the compiler's answers and not this file's guesses.
  *
  * It deliberately says nothing about SPECIFICITY — `manager-button-cascade-inventory.test.js`
  * owns that question, and a `:global()` rule that reaches the button but loses to the
@@ -82,14 +104,31 @@ function managerButtonClassTokens(source) {
   return tokens;
 }
 
-/** A component's compiled CSS with comments blanked, so prose cannot be read as a selector. */
+/**
+ * A component's compiled CSS with comments blanked, plus the selectors the compiler PRUNED.
+ *
+ * The pruned ones are taken from the `css_unused_selector` warnings rather than by reading
+ * the `/* (unused) … *\/` comments back out of the emitted text, because the warning is the
+ * compiler stating which selector it dropped, while the comment is formatting that a future
+ * release is free to change.
+ *
+ * @param {string} file repo-relative component path
+ * @param {string} source component source text
+ * @returns {{css: string, pruned: string[]}} the emitted CSS with comments blanked, and every
+ *   selector the compiler reported as unused
+ */
 function compiledCss(file, source) {
   const emitted = compile(source, {
     filename: join(repoRoot, file),
     css: 'external',
     generate: 'client',
   });
-  return (emitted.css?.code ?? '').replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+  return {
+    css: (emitted.css?.code ?? '').replaceAll(/\/\*[\s\S]*?\*\//g, ' '),
+    pruned: (emitted.warnings ?? [])
+      .filter((warning) => warning.code === 'css_unused_selector')
+      .map((warning) => /Unused CSS selector "(.*)"/.exec(warning.message)?.[1] ?? ''),
+  };
 }
 
 test('no component scopes a rule onto a class it hands to a ManagerButton', () => {
@@ -103,7 +142,16 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
     if (tokens.size === 0) continue;
     sitesScanned += tokens.size;
 
-    const css = compiledCss(file, source);
+    const { css, pruned } = compiledCss(file, source);
+
+    // The pruned half needs no hash to be found — the rule never reached the output at all.
+    for (const selector of pruned) {
+      for (const token of tokens) {
+        if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
+        violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')} [pruned as unused]`);
+      }
+    }
+
     const hash = /\.(svelte-[a-z0-9]+)\b/.exec(css)?.[1];
     if (!hash) continue;
     componentsWithScopedCss += 1;
@@ -133,10 +181,13 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
   assert.deepEqual(
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
-    'these rules carry their component`s scoping class but select a class that only a ' +
-      '<ManagerButton> carries, so they match NOTHING and the control is silently unstyled. ' +
-      'Wrap each in `:global(...)` — and chain the primitive`s classes while you are there, ' +
-      'because a `:global` rule at (0,2,0) then loses to the primitive on specificity:\n  ' +
+    'these rules select a class that only a `<ManagerButton>` carries, so they match NOTHING ' +
+      'and the control is silently unstyled — either emitted with this component`s scoping ' +
+      'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
+      'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +
+      '`:global` rule at (0,2,0) then loses to the primitive on specificity — or hoist the ' +
+      'rule into `styles/fabricate.css`, which is the right answer when two components ' +
+      'declare the same one:\n  ' +
       violations.join('\n  ')
   );
 });

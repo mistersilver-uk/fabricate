@@ -107,6 +107,10 @@ const RECIPE_COMPILED = [
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  // The manager's labelled push-button (issue 1118). Eight components in this tree render
+  // their adds, deep-links and issue views through it, and a `.svelte` the tree renders but
+  // the harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the
@@ -166,6 +170,8 @@ const stepsHarness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // The card's "Add a step" footer renders through the primitive (issue 1118).
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
@@ -2033,6 +2039,92 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // ── `fullWidth` is a statement about the CONTAINER, not about the verb ─────────────────
+  //
+  // The four adds below sit at the FOOT of a full-width list and span it, because they
+  // extend it. They said so through `manager-recipe-add-full`, a recipe-namespaced class
+  // declaring `width: 100%`; issue 1118 retired that class and the `dashed` role's own
+  // pinned width with it, and the meaning moved to the primitive's `fullWidth` prop and the
+  // `is-full-width` class it emits. That is a pass-through with no rule behind it any more,
+  // so nothing except this assertion notices if a call site forgets the prop — the button
+  // simply stops spanning its list.
+  //
+  // Asserted per ELEMENT, through the `data-recipe-add` token that names that one control,
+  // and scoped to its own section so the ingredients add and the results add cannot stand in
+  // for each other. The counterpart negative — the four adds in a WRAPPING row, which must
+  // NOT span — is asserted where those four are enumerated, because a `fullWidth` that leaked
+  // onto them stacks a four-up row into four rows, which is the defect that split the role.
+  it('spans the list with the two list-foot adds, and only those', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        canAddSet: true,
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [{ id: 'set-1' }, { id: 'set-2' }],
+          resultGroups: [
+            { id: 'grp-1', results: [] },
+            { id: 'grp-2', results: [] },
+          ],
+        },
+      })
+    );
+
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const addSet = target.querySelector(
+      '[data-recipe-section="ingredients"] [data-recipe-add="ingredient-set"]'
+    );
+    assert.ok(
+      addSet?.classList.contains('is-full-width'),
+      `the multi-set "Add ingredient set" spans its list, got ${addSet?.className}`
+    );
+
+    clickTab(target, 'results');
+    await flushRender();
+    const addGroup = target.querySelector(
+      '[data-recipe-section="results"] [data-recipe-add="result-set"]'
+    );
+    assert.ok(
+      addGroup?.classList.contains('is-full-width'),
+      `the multi-group "Add result set" spans its list, got ${addGroup?.className}`
+    );
+    editHarness.remount();
+  });
+
+  it('spans the panel with the promotion add and the empty-results add', async () => {
+    // The other two call sites of the same verb: the chromeless single-set promotion
+    // affordance, and the one inside the results EmptyState panel. The EmptyState one is the
+    // load-bearing case for the prop — that panel centres its children (`place-items: center`
+    // over a column stack that does not stretch), so without `is-full-width` the button hugs
+    // its own label rather than spanning the panel.
+    const promotion = await editHarness.mount(identityProps({ canAddSet: true }));
+    clickTab(promotion, 'ingredients');
+    await flushRender();
+    const addSet = promotion.querySelector(
+      '[data-recipe-section="ingredients"] [data-recipe-add="ingredient-set"]'
+    );
+    assert.ok(
+      addSet?.classList.contains('is-full-width'),
+      `the single-set promotion add spans its panel, got ${addSet?.className}`
+    );
+    editHarness.remount();
+
+    const routed = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        recipe: { ...RECIPE, resultGroups: [] },
+      })
+    );
+    clickTab(routed, 'results');
+    await flushRender();
+    const emptyAdd = routed.querySelector('.manager-empty [data-recipe-add="result-set"]');
+    assert.ok(
+      emptyAdd?.classList.contains('is-full-width'),
+      `the empty-results add spans its panel, got ${emptyAdd?.className}`
+    );
+    editHarness.remount();
+  });
+
   it('appends an ingredient set via onUpdateRecipe when + Add ingredient set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(
@@ -3475,6 +3567,13 @@ describe('RecipeEditView (mounted)', () => {
     );
     for (const button of buttons) {
       assert.ok(button.classList.contains('is-dashed'), 'each add-button is dashed');
+      // …and none of them spans. This is a WRAPPING flex row, so a `fullWidth` leaking onto
+      // one of these stacks the four-up row into four rows — the defect that took `width:
+      // 100%` off the `dashed` role and put it on a `fullWidth` prop (issue 1118).
+      assert.ok(
+        !button.classList.contains('is-full-width'),
+        `a wrapping-row add must not span: ${button.className}`
+      );
     }
     editHarness.remount();
   });
@@ -5051,6 +5150,45 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     await openTab(target, 'books-scrolls');
     target.querySelector('[data-recipe-open-books]').click();
     assert.deepEqual(opened, [true], 'the Open Books & Scrolls button routes to the owning screen');
+    editHarness.remount();
+  });
+
+  // ── The deep-link's own class, and why it is asserted on the ELEMENT ──────────────────
+  //
+  // `manager-recipe-tab-action` is what sizes these two buttons to their label
+  // (`align-self: flex-start`) instead of letting them stretch the width of a tab body that
+  // no longer shrinks its children to content. It was declared TWICE, once in each tab's own
+  // scoped `<style>` — and issue 1118 hoisted it into `styles/fabricate.css` because a scoped
+  // rule cannot reach a `<ManagerButton>`: Svelte stamps its `svelte-<hash>` onto the elements
+  // a component writes, never onto a child's internals, so both blocks were pruned to
+  // `(unused)` the moment the tag changed.
+  //
+  // That makes the class a bare pass-through with its only rule in the global sheet, and
+  // `class` is exactly the prop `ManagerButton` warns about dropping — a rest-spread `class`
+  // REPLACES the primitive's own string. So it is asserted here, on each button found by its
+  // own `data-recipe-open-*` hook, alongside the primitive's two classes: dropping the
+  // pass-through reds, and so does dropping the primitive.
+  it('keeps the tab-action class on both deep-links, beside the primitive`s own', async () => {
+    const books = await editHarness.mount(contextProps());
+    await openTab(books, 'books-scrolls');
+    const openBooks = books.querySelector('[data-recipe-open-books]');
+    assert.equal(
+      openBooks?.className,
+      'manager-button fab-manager-button manager-recipe-tab-action',
+      'Open Books & Scrolls keeps its own class and the primitive`s'
+    );
+    editHarness.remount();
+
+    const access = await editHarness.mount(
+      contextProps({ visibilityEffect: { showAccess: true, showBooksScrolls: false } })
+    );
+    await openTab(access, 'access');
+    const openAccess = access.querySelector('[data-recipe-open-access]');
+    assert.equal(
+      openAccess?.className,
+      'manager-button fab-manager-button manager-recipe-tab-action',
+      'Manage access keeps its own class and the primitive`s'
+    );
     editHarness.remount();
   });
 

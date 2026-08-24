@@ -10760,6 +10760,28 @@
   font-weight: 600;
 }
 
+/* The deep-link out of a recipe tab to the canonical authoring screen — "Manage access" on
+   the Access tab, "Open Books & Scrolls" on the Books & Scrolls tab. `align-self: flex-start`
+   so it sizes to its own label rather than stretching the full width of a tab body that no
+   longer shrinks its children to content.
+
+   HOISTED here from TWO scoped blocks (issue 1118). `RecipeAccessTab.svelte` and
+   `RecipeBooksScrollsTab.svelte` each declared this identical rule in their own `<style>`,
+   which is two sources of truth for one control and could only ever drift; and neither
+   survived its button becoming a `<ManagerButton>`, because Svelte scopes a rule by stamping
+   its `svelte-<hash>` onto the elements a component WRITES and never onto a child component's
+   internals. Both were pruned to an `(unused)` comment the moment the tag changed. One
+   declaration, in the sheet that can actually reach the element.
+
+   Chained onto the primitive's own classes for the reason every re-chained bespoke rule in
+   this sweep is: at (0,2,0) it would be arbitrated against
+   `.fabricate-manager .manager-button.fab-manager-button` by injection order rather than by
+   specificity. `align-self` is a property the primitive does not declare, so nothing is being
+   won BACK here — the chain is what keeps that true if either side grows. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-tab-action {
+  align-self: flex-start;
+}
+
 .fabricate-manager .manager-recipe-tools-tab,
 .fabricate-manager .manager-recipe-results-tab,
 .fabricate-manager .manager-recipe-ingredients-tab {
