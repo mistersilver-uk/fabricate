@@ -49,6 +49,7 @@
   import SegmentedControl from '../SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -1152,16 +1153,24 @@
       </div>
     {/if}
 
-    <button
-      type="button"
-      class="manager-button fab-complications-add"
+    <!-- Dashed, and fullWidth: the append-a-row verb at the foot of `.fab-complications-list`,
+         which spans this panel's single-column grid track — the same shape as
+         `RecipeStepsCard`'s "Add a step" and `ComponentEditView`'s "Add result"/"Add group"
+         sites (issue 1118). The bespoke `.fab-complications-add` scoped rule this replaced
+         declared nothing the role and `fullWidth` do not already state — `display`,
+         `align-items` and `justify-content` come from the base `.manager-button` contract,
+         `border-style: dashed` and the icon/label gap from `is-dashed`, and `width: 100%`
+         from `is-full-width` — so it is retired rather than re-chained under `:global(...)`. -->
+    <ManagerButton
+      role="dashed"
+      fullWidth
       data-complications-add
       disabled={saving}
       onclick={addComplication}
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Component.Complications.Add', 'Add complication')}</span>
-    </button>
+    </ManagerButton>
   </section>
 {/if}
 
@@ -1203,15 +1212,6 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-  }
-
-  .fab-complications-add {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    border-style: dashed;
   }
 
   .fab-complication-fields {

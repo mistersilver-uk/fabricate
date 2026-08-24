@@ -80,7 +80,9 @@
  *
  * ── THE TERMINAL STATE, AND WHY IT MOVES DISPOSITIONS ────────────────────────────────────
  * This instrument finds a call site by the LITERAL `class="manager-button…"` — which is
- * exactly the thing a conversion removes. Task 9 converted the last of the 128, so the only
+ * exactly the thing a conversion removes. Task 9 converted the last of the (then) 128, and the
+ * post-plan batch above converts the one literal site issue #1286 landed on `main` after that
+ * — caught by this file naming it on rebase, per its own non-vacuity floor below — so the only
  * literal sites left in `src/` are the 16 population-B `SearchablePopover` triggers and
  * `ArmedDangerButton`, and every rule in the sheet is now judged against those 17 alone. Two
  * things follow, and both are re-filings rather than changes of fact:
@@ -119,9 +121,11 @@ const cascade = managerButtonCascade();
  * The conversion LEDGER: the batches whose sites no longer appear in the derived corpus.
  *
  * A converted site stops being a call site in this instrument's terms — it no longer writes
- * `class="manager-button…"`, so nothing keys on it — while remaining one of the 128 the sweep
- * is accountable for. Recording each landed batch here is what lets the non-vacuity floor keep
- * asserting the WHOLE population instead of shrinking with it.
+ * `class="manager-button…"`, so nothing keys on it — while remaining one of the 129 the sweep
+ * is accountable for (128 across the planned tasks 1-9, plus the one post-plan site issue
+ * #1286 landed on `main` mid-sweep and this guard caught on rebase). Recording each landed
+ * batch here is what lets the non-vacuity floor keep asserting the WHOLE population instead of
+ * shrinking with it.
  *
  * It is not merely bookkeeping: the floor verifies every entry against the tree, so a batch
  * cannot book sites it did not convert, and cannot book a file it emptied by deleting controls.
@@ -287,6 +291,23 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
+        sites: 1,
+      }),
+    ]),
+  }),
+  Object.freeze({
+    // Not one of tasks 1-9: issue #1286 landed a NEW hand-written manager button —
+    // `ComponentComplicationsSection.svelte`'s "Add complication" — on `main` while this sweep
+    // was still in flight, and this branch's own standing guard (this file) caught it on
+    // rebase by naming the file. It converts the same way task 8's "Add a step" and task 9's
+    // three `ComponentEditView` "Add result"/"Add group" sites did — `dashed` and `fullWidth`,
+    // the append-a-row verb at the foot of the single-column list it appends to — so the
+    // conserved totals below move from 128/41 to 129/42, the SAME numbers the sweep was
+    // planned against before `GatheringRealmQuickList` was found to be dead code.
+    task: 'post-plan (issue 1118, catching #1286)',
+    files: Object.freeze([
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
         sites: 1,
       }),
     ]),
@@ -1164,28 +1185,33 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // satisfied.
   //
   // So the floor is stated over BOTH halves — the sites still awaiting conversion plus the
-  // sites already converted — and it stays 128 across 41 for the whole sweep. Each batch adds
-  // its own line to the ledger and touches neither total, and a batch that DELETED a control
-  // instead of converting it fails here rather than looking like progress.
+  // sites already converted — and it stays 129 across 42 for the whole sweep plus its one
+  // post-plan catch. Each batch adds its own line to the ledger and touches neither total, and
+  // a batch that DELETED a control instead of converting it fails here rather than looking
+  // like progress.
   //
-  // The totals were 129 across 42 when the sweep was planned. They are one lower because ONE
-  // of the 42 components turned out to be unreachable dead code — `GatheringRealmQuickList`,
+  // The totals were 129 across 42 when the sweep was planned, dropped to 128 across 41 when
+  // ONE of the 42 components turned out to be unreachable dead code — `GatheringRealmQuickList`,
   // imported by nothing under `src/` since #1283 moved realm authoring to world scope — and
-  // was deleted rather than converted. That is the one licensed way to move these numbers, and
-  // it is licensed precisely because the site left the product rather than leaving the
-  // instrument's view: the ledger assertions below re-read every booked file from the tree, so
-  // a deleted component cannot stay booked, and the paragraph above is the reason a number
+  // was deleted rather than converted, and are 129 across 42 again because issue #1286 landed
+  // a new hand-written manager button, `ComponentComplicationsSection.svelte`'s "Add
+  // complication", on `main` while this sweep was in flight; this guard caught it on rebase by
+  // naming the file, and the post-plan batch above converts it. Both are licensed ways to move
+  // these numbers, and both are licensed precisely because the site left or entered the
+  // product rather than leaving or entering the instrument's view: the ledger assertions below
+  // re-read every booked file from the tree, so neither a deleted nor a booked-but-unconverted
+  // component can stay silently mismatched, and the paragraph above is the reason a number
   // that moved needs a stated cause rather than a quiet edit.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    128,
-    'the conversion is 128 sites, whether or not a given one has been converted yet'
+    129,
+    'the conversion is 129 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    41,
-    'across 41 components'
+    42,
+    'across 42 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
@@ -1208,10 +1234,18 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
       `${file} is booked as converted but the instrument still derives call sites in it`
     );
   }
+  // Population B has no converted-ledger half — it is named DEBT, never converted by this
+  // sweep — so a new one is not a batch to book, only a count to move. #1286 landed a 17th
+  // alongside the literal button the post-plan batch above converts:
+  // `component/ComponentComplicationsSection.svelte`'s macro `SearchablePopover`'s "Browse
+  // macros" trigger (`triggerClass="manager-button"`), which the plan's 16-site enumeration
+  // could not have named because the file did not exist yet when it was written. It is left
+  // unconverted, exactly like the other 16, for the same reason: converting a `triggerClass`
+  // site changes `SearchablePopover`'s own trigger contract rather than this call site's.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    16,
-    'plus the 16 SearchablePopover triggerClass sites named as debt'
+    17,
+    'plus the 17 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been
