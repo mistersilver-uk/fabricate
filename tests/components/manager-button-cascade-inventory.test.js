@@ -808,9 +808,14 @@ const REVIEWED = [
   // `.manager-region-add`, `.manager-tool-inspector-actions .manager-button` (with its
   // `span` companion), `.manager-tools-row-editor .manager-button` and
   // `.manager-tools-create-actions .manager-button`. The remaining container rules of those
-  // last three families are orphaned too — no component carries the classes at all — but
-  // they are outside a manager-button reconciliation and are named in the handoff as a
-  // separate dead-CSS sweep rather than half-cleaned here.
+  // last three families are orphaned too — no component carries the classes at all.
+  // `.manager-tools-create-actions` was the exception that had to be finished rather than
+  // filed: that retirement MERGED the dead `.manager-button` rule's declarations into an
+  // equally dead `select` rule on the way past, so the class read as freshly maintained, and
+  // its three remaining rules are retired with it. `.manager-tool-inspector-actions` and
+  // `.manager-tools-row-editor` keep their orphaned container rules and are named in the
+  // handoff as a separate dead-CSS sweep, alongside `.manager-tools-create-prompt`,
+  // `.manager-tools-item-shortcuts` and `.manager-tools-library-toolbar`.
   // The list is EMPTY, and that is the change task 9 made to it.
   // `.manager-button.is-warning-action:not(:disabled)` was the one entry: DEAD and deliberately
   // kept, because it corroborated the `warning` repair from the other side — the amber treatment
