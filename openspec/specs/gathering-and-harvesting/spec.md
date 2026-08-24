@@ -1355,6 +1355,8 @@ A candidate whose pool is fully reserved is excluded from the blind candidate dr
 7. Because only a GM may write world-scoped state, and because the draw must not run on a client the acting player controls, a player's blind start that would create a waiting run is routed to the active GM.
 The GM re-runs the whole attempt with the requesting user as the viewer — re-evaluating actor authorization, scene, visibility, tool, stamina, and reservation-aware node availability against that user — then resolves the task, takes the reservation, and writes both records.
 The requesting user is the server-attested socket sender, never a value carried in the request.
+Every one of those gates must be answered about the **requesting user's own document permissions**, never about the applying client's ambient identity: a GM holds owner permission on every document in the world, so a gate that consults the applying client is satisfied for a requester who owns nothing and authorizes nothing at all.
+The run the relay creates is owned by the **requesting user** rather than by the GM that applied it, because a matured run resolves its viewer from the run's owning user — and a GM viewer would write the drawn task's identity into the player-readable actor record this whole rule exists to keep it out of.
 8. Where no GM is connected the start is reported as blocked rather than silently dropped.
 9. A GM's run listing shows the real task behind an in-flight blind run, explicitly marked as a secret preview the acting player cannot see.
 Player-facing listings continue to show the generic blind label and no task identity.
@@ -1996,7 +1998,7 @@ Actor.flags.fabricate.gatheringRuns = {
 GatheringRun = {
   id: string,
   actorUuid: string,
-  userId: string,
+  userId: string, // the user who REQUESTED the run, never the client that applied it
   craftingSystemId: string,
   environmentId: string,
   taskId: string,

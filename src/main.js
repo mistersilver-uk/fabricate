@@ -733,12 +733,14 @@ async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid
     return null;
   }
   // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first
-  // disjunct reads `actor.isOwner` — `isGatheringActorSelectableByUser` included —
-  // resolves that disjunct against the AMBIENT `game.user`, which on the elected GM's
-  // client (the only client that runs this) owns every actor in the world. Such a
-  // predicate passes for a sender who owns nothing and never consults the sender at all,
-  // reintroducing exactly the escalation the addressing-only contract exists to remove.
-  // The shipped blind-gather relay has that defect today (issue 1288); do not copy it.
+  // disjunct reads `actor.isOwner` resolves that disjunct against the AMBIENT
+  // `game.user`, which on the elected GM's client (the only client that runs this) owns
+  // every actor in the world. Such a predicate passes for a sender who owns nothing and
+  // never consults the sender at all, reintroducing exactly the escalation the
+  // addressing-only contract exists to remove. The blind-gather relay shipped with that
+  // defect and issue 1288 removed it from `isGatheringActorSelectableByUser`; the rule
+  // it recorded is that NO ownership predicate on a GM-side apply path may read
+  // `isOwner`, so do not reintroduce one here either.
   if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
     console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
       senderId, actorUuid
