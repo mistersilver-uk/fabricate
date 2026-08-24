@@ -169,17 +169,39 @@
      `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, which every
      Fabricate surface carries. */
 
-  /* A NOTE ON SPECIFICITY, because it decides what may stay in the global sheet.
-     Svelte compiles these selectors to `.manager-chip.svelte-<hash>` — two classes,
-     (0,2,0) — and `css: 'injected'` (svelte.config.js) puts them in `document.head`
-     AFTER Foundry's `<link>` for styles/fabricate.css. So a global rule at (0,2,0), such
-     as `.fabricate-manager .manager-vocabulary-chip-unused`, TIES with this block and
-     loses on source order. Every global rule that must still beat a chip declaration is
-     therefore written at three classes or more, e.g.
-     `.fabricate-manager .manager-chip.manager-vocabulary-chip-unused`. What legitimately
-     remains global is what a scoped block cannot reach: an ancestor-context rule (a chip
-     in the header action bar matches the 34px control beside it) and the chip's position
-     inside a parent's layout. */
+  /* A NOTE ON LAYERS FIRST, THEN SPECIFICITY, because the two used to be written here the
+     other way round and the order is the whole of it (corrected in issue 1118). The `density`
+     note in this component's props block already had it right; this one did not, and both are
+     load-bearing, so they now say the same thing.
+
+     LAYERS DECIDE. `module.json` gives `styles/fabricate.css` no explicit layer, so Foundry
+     imports it at `layer(modules)` — `tests/view-lab/cascade.css` mirrors that, and
+     `vite.config.js` strips the JS-side import from the production build, so it is the only
+     way the sheet loads in the product. `css: 'injected'` (svelte.config.js) puts THIS block
+     in `document.head` unlayered, and an unlayered author declaration beats every layered one
+     at ANY specificity. So a global rule that restates a property declared below cannot win,
+     however many classes it is written with. Measured, not reasoned: with the sheet layered,
+     `.manager-header-actions .manager-chip { min-height: 34px }` at three classes leaves the
+     chip at this block's 20px; unlayered, the same markup reports 34px. Two such rules were
+     retired from the header cluster in issue 1118 for exactly that reason, and
+     `styles/fabricate.css` records the same finding from a parity run at
+     `.manager-checks-card .manager-modifier-readonly-expression`.
+
+     SPECIFICITY DECIDES ONLY AMONG UNLAYERED RULES — which is to say, among this block and
+     other components' scoped blocks. Svelte compiles these selectors to
+     `.manager-chip.svelte-<hash>`, two classes, (0,2,0). A CALLER's own `:global(...)` rule
+     is unlayered too, so at three classes it does out-specify this block and render, which is
+     what `CraftingModifierCatalogueCard.svelte` did before `density` existed. That is still a
+     second implementation of the one chip's geometry, which is what issue 883 retired and
+     what `manager-layout.test.js`'s hand-rolled-chip ratchet exists to catch.
+
+     What legitimately remains in the global sheet is what this block cannot reach and does
+     not declare: the chip's POSITION inside a parent's layout. Not its geometry — a chip that
+     must be a different size in one context takes a variant prop here, as `density="row"`
+     does. `.fabricate-manager .manager-chip.manager-vocabulary-chip-unused` is written at
+     three classes and states `color`/`background`, which this block also declares, so it is
+     in the same position the header rules were in: a candidate for the same treatment rather
+     than an example to copy. */
 
   /* Pill (issue 643): fully-rounded rather than 6px-cornered, matching the Recipe Studio
      language. The COMPACT scale (issue 883) is the only scale — 20px tall, `0.62rem`,

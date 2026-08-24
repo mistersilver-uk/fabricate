@@ -1934,11 +1934,21 @@
    below re-declares the Tool Studio's 34px against `fab-manager-button` at the SAME (0,3,0)
    — a tie the 38 won only by standing earlier in the sheet, across 27 buttons in one
    `<div>`. The maintainer ruled 34px the correct outcome rather than arbitrating the tie:
-   34px is what the Tool Studio, the authority for a manager button, has always rendered,
-   and `.manager-header-actions .manager-chip` below is already 34px and says in its own
-   comment that it was made tall "to align with adjacent 34px controls". The header's
-   `is-warning` chip comes down off its own 38px with it, or every editor header ships a
-   34px button beside a 38px "Unsaved" chip.
+   34px is what the Tool Studio, the authority for a manager button, has always rendered.
+   That repaint stands, and it is a real one: 27 buttons in one `<div>` come down 4px.
+
+   WHAT DOES NOT STAND is the second half this comment used to carry — that the chip beside
+   them came down off 38px with it. IT WAS NEVER 38px AND IT IS NOT 34px. This sheet is
+   imported at `layer(modules)` and `Chip.svelte`'s `css: 'injected'` block is UNLAYERED, so
+   the chip's own `min-height: 20px` beats anything stated here at any specificity — the same
+   ownership fact `.manager-checks-card .manager-modifier-readonly-expression` below records
+   from a parity run. Measured both ways in Chromium against the real compiled component:
+   layered, the header chip is 20px tall with a 10px radius at 9.92px; unlayered — which is
+   only the dev server, since `vite.config.js` strips the JS-side import from the production
+   build — the same markup reports 34px. The product is the layered one. So the header
+   cluster is a 34px button beside a Chip-owned ~20px pill, both of the chip rules that
+   claimed otherwise are retired below, and deleting the 38px `is-warning` rule was a no-op
+   rather than the alignment this comment used to claim it was.
 
    What survives is the container's TYPE scale, which it states across all three of its
    children — this button, the chip and the save-error alert are all 0.72rem. The primitive
@@ -2083,25 +2093,6 @@
   width: 100%;
 }
 
-/* The header "Unsaved" state chip sits in the button row, so it takes the button's
-   6px rounded-rectangle corners and compact header height rather than the default
-   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6).
-
-   Kept as-is through issue 883. This is an ANCESTOR-CONTEXT rule — a chip sized for the
-   container it sits in, like the tab badge's deliberate 18px/0.56rem — not a second
-   default scale a screen can opt into, which is what that issue removed. It is already
-   at four classes, so it still outranks the scoped block.
-
-   Its HEIGHT is retired in issue 1118, not re-chosen: 38px was here to match the header
-   button, and the header button is 34px. The chip now falls through to
-   `.manager-header-actions .manager-chip` below, which is 34px and whose own comment
-   already says it was made tall "to align with adjacent 34px controls". Leaving the 38
-   would have shipped a 34px button beside a 38px "Unsaved" chip in every editor header. */
-.fabricate-manager .manager-header-actions .manager-chip.is-warning {
-  border-radius: 6px;
-  font-size: 0.72rem;
-}
-
 /* The attempted-and-failed save alert that the editor toolbars render beside Save
    (issue 919). It borrows the danger TOKENS from `.manager-travel-error` rather than
    reusing that class: the travel rule is a page-body callout sized at a fixed 13px,
@@ -2146,16 +2137,29 @@
   flex-wrap: wrap;
 }
 
-.fabricate-manager .manager-header-actions .manager-chip,
-.fabricate-manager .manager-action-group .manager-chip {
-  min-height: 34px;
+/* NO CHIP RULE LIVES HERE ANY MORE, and the reason is ownership rather than taste
+   (issue 1118). Two rules did: `.manager-header-actions .manager-chip.is-warning`
+   (`border-radius: 6px; font-size: 0.72rem`, and a `min-height: 38px` before it) and
+   `.manager-header-actions .manager-chip, .manager-action-group .manager-chip`
+   (`min-height: 34px; border-radius: 999px`). Between them they claimed the header chip was
+   a tall rounded rectangle sized to the button beside it, and they said so at four and three
+   classes respectively, which is what the note in `Chip.svelte` used to say was enough.
 
-  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
-     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
-     height it would read as a rounded rectangle instead of the pill it has always been
-     (issue 883). */
-  border-radius: 999px;
-}
+   It is not enough, and specificity is not the axis. This sheet is imported at
+   `layer(modules)` — `tests/view-lab/cascade.css` mirrors how Foundry loads a module
+   stylesheet, and `vite.config.js` strips the JS-side import from the production build so
+   that is the only way it loads — while Svelte's `css: 'injected'` blocks land UNLAYERED. An
+   unlayered author declaration beats every layered one at any specificity. `Chip.svelte`
+   declares `min-height`, `border-radius` and `font-size` itself, so every declaration these
+   two rules made was inert. Measured in Chromium against the real compiled component: with
+   the sheet in `layer(modules)` the header chip renders 20px tall, 10px radius, 9.92px;
+   without the layer the same markup reports the 34px and 6px these rules asked for. The
+   product is the layered one.
+
+   What legitimately remains here is what a scoped block cannot reach and Chip does not
+   declare: the chip's POSITION inside this row, which the flex rule above states for every
+   child at once. A geometry opinion about the chip belongs in `Chip.svelte`, through a
+   variant prop, exactly as `density="row"` does. */
 
 .fabricate-manager .manager-breadcrumbs {
   display: flex;

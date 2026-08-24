@@ -36,16 +36,29 @@
   rendering, and where another screen differs, THAT SCREEN CHANGES. Those buttons get
   their refined treatment from an ANCESTOR-CONTEXT rule —
   `.fabricate-manager .manager-tool-edit-actions .manager-button` (34px, `0 space-3`,
-  `0.72rem`), plus the `.manager-header-actions .manager-button.is-primary` and
-  `.manager-tool-edit-actions .manager-button.is-ghost` companions — which is
-  precisely why the Modifiers card could not match them: it is not inside either
-  ancestor, so it landed on the base control at the app's INHERITED body size. "The
-  fonts differ from the tool studio's" is that missing `font-size`, exactly.
+  `0.72rem`), plus the `.manager-header-actions .manager-button.is-primary`
+  companion — which is precisely why the Modifiers card could not match them: it is
+  not inside either ancestor, so it landed on the base control at the app's INHERITED
+  body size. "The fonts differ from the tool studio's" is that missing `font-size`,
+  exactly.
 
   Worth knowing when reading the sheet: `.manager-header-actions .manager-button`
-  declares a 38px control, and the Tool Studio never renders it — its own
-  `.manager-tool-edit-actions` block is later and more specific and pins 34px. The
-  authority is what that cluster RENDERS, so 34px is what this primitive reproduces.
+  USED to declare a 38px control that the Tool Studio never rendered, because its own
+  `.manager-tool-edit-actions` block stood later and pinned 34px. The authority is
+  what that cluster RENDERS, so 34px is what this primitive reproduces, and the header
+  rule's height is retired rather than arbitrated (issue 1118) — a real 4px repaint
+  across the 27 buttons in an editor header's `<div>`. What that repaint does NOT do is
+  align the button with the chip beside it: `styles/fabricate.css` loads at
+  `layer(modules)` and `Chip.svelte`'s injected block does not, so the chip is
+  Chip-owned at ~20px whatever the sheet says, and the two rules that claimed otherwise
+  are retired as inert. An editor header is a 34px button beside a ~20px pill.
+
+  The Tool Studio's own `.manager-tool-edit-actions .manager-button.is-ghost` companion
+  is retired too, and for a sharper reason: at (0,4,0) and unqualified it beat
+  `.manager-button:disabled` (0,3,0), so `ToolEditView`'s `disabled={saving}` Back
+  button kept its switched-on colours for the whole of a save. The role's own
+  `:not(:disabled)` companion in the sheet states the same three values, so the paint
+  belongs to the role and the container keeps only its scale.
 
   So the primitive emits a SECOND class, `fab-manager-button`, and the global sheet
   re-declares the tool studio's values against it with no ancestor requirement. The
