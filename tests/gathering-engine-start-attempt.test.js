@@ -252,7 +252,8 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
   assert.deepEqual(calls.createTerminalRun[0][1], {
     craftingSystemId: 'system-a',
     environmentId: 'env-a',
-    taskId: 'task-a'
+    taskId: 'task-a',
+    userId: viewer.id
   });
   assert.equal(calls.createTerminalRun[0][2], 'succeeded');
   assert.deepEqual(calls.createTerminalRun[0][3].createdResults, []);
@@ -324,7 +325,13 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
   assert.deepEqual(calls.createWaitingRun[0][1], {
     craftingSystemId: 'system-a',
     environmentId: 'env-a',
-    taskId: 'timed-task'
+    taskId: 'timed-task',
+    // Load-bearing (issue 1288): a WAITING run is the only run a relayed blind start
+    // creates, and it is created on the ELECTED GM's client. Without the requesting
+    // viewer's id here the run manager's ambient fallback stamps the GM, and
+    // `getGatheringRunViewer` reads that back at maturity as a GM viewer — which
+    // un-blinds the terminal history written to the player's own actor flag.
+    userId: viewer.id
   });
   assert.equal('usedTools' in calls.createWaitingRun[0][1], false);
   assert.equal('createdResults' in calls.createWaitingRun[0][1], false);

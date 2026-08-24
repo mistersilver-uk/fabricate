@@ -1050,8 +1050,8 @@ test('a GM-side apply refuses a sender who owns nothing, whatever the running us
 
   // `actor.isOwner` resolves against the AMBIENT `game.user` and is therefore true for
   // every actor on the GM client that evaluates it, so an `isOwner`-first predicate
-  // passes for a sender who owns nothing. That defect is live in the blind-gather relay
-  // (issue 1288) and must not be copied here.
+  // passes for a sender who owns nothing. The blind-gather relay shipped with that
+  // defect; issue 1288 removed it there, and it must not be reintroduced here.
   for (const inert of ['isGatheringActorSelectableByUser', '.isOwner', 'game.user?.isGM']) {
     assert.equal(
       complicationApplySource().includes(inert),

@@ -37,23 +37,40 @@ function redactActor(actor) {
 const player = { id: 'player', isGM: false };
 const gm = { id: 'gm', isGM: true };
 
+/**
+ * Foundry's ownership answer for a fixture actor, as the PASSED user's question.
+ *
+ * `isOwner` is deliberately absent from every fixture here (issue 1288): Foundry defines
+ * it as `testUserPermission(game.user, 'OWNER')` against the AMBIENT user, so a fixture
+ * that hard-codes it asserts nothing at all about the `viewer` these cases vary — and
+ * would have reported the GM-side relay's inert authorization as healthy.
+ *
+ * @param {string} userId The one user holding OWNER.
+ * @returns {{testUserPermission: Function}}
+ */
+function ownedBy(userId) {
+  return {
+    testUserPermission: (user, level) => level === 'OWNER' && user?.id === userId
+  };
+}
+
 const ownedPc = {
   id: 'pc-1', uuid: 'Actor.pc-1', name: 'Aria', img: 'icons/a.webp',
-  type: 'character', isOwner: true,
+  type: 'character', ...ownedBy(player.id),
   system: { secret: 'gm-only' }
 };
 const ownedNpc = {
   id: 'npc-1', uuid: 'Actor.npc-1', name: 'Goblin', img: null,
-  type: 'npc', isOwner: true
+  type: 'npc', ...ownedBy(player.id)
 };
 const otherPc = {
   id: 'pc-2', uuid: 'Actor.pc-2', name: 'Borin', img: null,
-  type: 'character', isOwner: false
+  type: 'character', ...ownedBy('someone-else')
 };
 // GoldenGamin's reported actor: a Fallout PC on the second player-character sheet.
 const ownedRobot = {
   id: 'pc-3', uuid: 'Actor.pc-3', name: 'Robby', img: null,
-  type: 'robot', isOwner: true
+  type: 'robot', ...ownedBy(player.id)
 };
 
 function makeBarGetter(actors, isPlayerCharacter = isPlayerCharacterActor) {

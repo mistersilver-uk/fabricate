@@ -233,16 +233,48 @@ test('preserves lastGatheringActor when cleanup runs without gathering actor res
 test('gathering actor selectability is based on actor existence and ownership only', () => {
   assert.equal(isGatheringActorSelectableByUser(null, { isGM: true }), false);
   assert.equal(isGatheringActorSelectableByUser({ id: 'npc-1', type: 'npc' }, { isGM: true }), true);
-  assert.equal(isGatheringActorSelectableByUser({ id: 'group-1', type: 'group', isOwner: true }, { isGM: false }), true);
+  // Ownership is asked of the PASSED user and no one else (issue 1288). A fixture
+  // asserting `isOwner: true` used to pass here, which is precisely why the GM-side relay
+  // could not see that `isOwner` answers about the AMBIENT user instead.
+  assert.equal(
+    isGatheringActorSelectableByUser({
+      id: 'group-1',
+      type: 'group',
+      isOwner: true
+    }, { id: 'user-1', isGM: false }),
+    false,
+    'a hard-coded isOwner is not an answer about this user and must not authorize one'
+  );
   assert.equal(
     isGatheringActorSelectableByUser({
       id: 'npc-2',
       type: 'npc',
       testUserPermission: (_user, permission) => permission === 'OWNER'
-    }, { isGM: false }),
+    }, { id: 'user-1', isGM: false }),
     true
   );
-  assert.equal(isGatheringActorSelectableByUser({ id: 'actor-1', type: 'character' }, { isGM: false }), false);
+  assert.equal(isGatheringActorSelectableByUser({ id: 'actor-1', type: 'character' }, { id: 'user-1', isGM: false }), false);
+});
+
+// The two shapes that became REACHABLE once the `isOwner` disjunct stopped short-circuiting
+// ahead of `testUserPermission` (issue 1288). Both must DENY: a security predicate that
+// throws is an outage, and one that falls through to `ownership.default` is an escalation.
+test('the ownership predicate denies a nullish or id-string user rather than throwing', () => {
+  const actor = {
+    id: 'actor-1',
+    type: 'character',
+    // Foundry's real `testUserPermission` reads `user.isGM` as its FIRST statement, so a
+    // null viewer throws there rather than returning false. `GatheringListingBuilder`
+    // defaults `viewer` to exactly that on two public read paths.
+    testUserPermission: (user, permission) => user.isGM === true || permission === 'OWNER'
+  };
+
+  assert.equal(isGatheringActorSelectableByUser(actor, null), false, 'null denies');
+  assert.equal(isGatheringActorSelectableByUser(actor, undefined), false, 'undefined denies');
+  // `getUserLevel` reads `this.ownership[user.id]`; a string has no `.id`, so it falls
+  // through to `ownership.default` and would return true for ANY string in a world whose
+  // actor grants "All Players" Owner. The predicate takes a User document, never an id.
+  assert.equal(isGatheringActorSelectableByUser(actor, 'user-1'), false, 'a user id denies');
 });
 
 // ---------------------------------------------------------------------------

@@ -263,7 +263,10 @@ test('immediate routed success creates result items and writes succeeded termina
     assert.deepEqual(calls.createTerminalRun[0][1], {
       craftingSystemId: 'system-a',
       environmentId: 'env-a',
-      taskId: 'task-a'
+      taskId: 'task-a',
+      // The run belongs to the VIEWER that requested it (issue 1288), never to whichever
+      // client happens to be executing the attempt.
+      userId: viewer.id
     });
     assert.equal(calls.createTerminalRun[0][2], 'succeeded');
     // The terminal history carries the formula-derived check result; the routed
@@ -632,7 +635,8 @@ test('blind non-GM terminal success response redacts task, tool, provider, and r
     assert.deepEqual(calls.createTerminalRun[0][1], {
       craftingSystemId: 'system-a',
       environmentId: 'env-a',
-      taskId: 'blind'
+      taskId: 'blind',
+      userId: viewer.id
     });
     assert.deepEqual(calls.createTerminalRun[0][3], {
       createdResults: [],
@@ -681,7 +685,8 @@ test('blind non-GM terminal failure response redacts task, tool, provider diagno
     assert.deepEqual(calls.createTerminalRun[0][1], {
       craftingSystemId: 'system-a',
       environmentId: 'env-a',
-      taskId: 'blind'
+      taskId: 'blind',
+      userId: viewer.id
     });
     assert.deepEqual(calls.createTerminalRun[0][3], {
       createdResults: [],

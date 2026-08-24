@@ -2508,6 +2508,13 @@ export class GatheringEngine {
       craftingSystemId: stringOrNull(system.id),
       environmentId: stringOrNull(environment.id),
       taskId: opaqueBlind ? blindWaitingTaskId(environment) : stringOrNull(task.id),
+      // The run belongs to the VIEWER who requested it, not to whoever is running this
+      // (issue 1288). A relayed blind start executes on the elected GM's client, and the
+      // run manager's fallback would otherwise stamp the GM — which `getGatheringRunViewer`
+      // reads back at maturity as a GM viewer, un-blinding the terminal history it writes
+      // to the player's own actor flag. Null falls back to the manager's ambient default,
+      // which is right for the direct in-session start that supplies no viewer.
+      userId: idOf(viewer),
     };
     // Persist the scene-interactable ref so a timed run that matures later
     // decrements the SAME scoped node it gated against (issue 302). Null/absent
@@ -2912,6 +2919,7 @@ export class GatheringEngine {
           craftingSystemId: stringOrNull(system.id),
           environmentId: stringOrNull(environment.id),
           taskId: 'blind',
+          userId: idOf(viewer),
         },
         payload: {
           createdResults: [],
@@ -2937,6 +2945,7 @@ export class GatheringEngine {
         craftingSystemId: stringOrNull(system.id),
         environmentId: stringOrNull(environment.id),
         taskId: stringOrNull(task.id),
+        userId: idOf(viewer),
       },
       payload,
     };
