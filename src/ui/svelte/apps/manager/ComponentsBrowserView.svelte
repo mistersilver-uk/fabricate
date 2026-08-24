@@ -432,16 +432,17 @@
   // salvage-only or gathering-only progressive system.
   const showProgressiveDifficulty = $derived(difficultyAxisProgressive === true);
 
+  // The badge reads as the VALUE ALONE — `3`, or `None` — and names itself through its
+  // tooltip rather than its text. In a row of badges the words "Progressive difficulty"
+  // repeated on every component crowded out the description they sit beside, and the gauge
+  // glyph plus a bare number is already unambiguous once the tooltip is there to confirm it.
+  // The label is not dropped, only moved: `difficultyBadgeTitle` carries it.
   function difficultyBadgeFor(item) {
     if (!showProgressiveDifficulty) return '';
     const difficulty = Number(item?.difficulty);
-    const label = text(
-      'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
-      'Progressive difficulty'
-    );
     return Number.isFinite(difficulty) && difficulty >= 1
-      ? `${label} ${difficulty}`
-      : `${label} ${text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}`;
+      ? String(difficulty)
+      : text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None');
   }
 
   // The row carries ONE action — Edit. Copy-source-UUID and Delete moved into the
@@ -454,6 +455,10 @@
       selected: isSelectedComponent(item),
       categoryBadge: categoryBadgeFor(item),
       difficultyBadge: difficultyBadgeFor(item),
+      difficultyBadgeTitle: text(
+        'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
+        'Progressive difficulty'
+      ),
       originLabel: origin.label,
       originTone: origin.tone,
       originIcon: origin.icon,

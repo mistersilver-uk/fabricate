@@ -8546,7 +8546,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.ok(target.textContent.includes('Progressive difficulty'));
+    // The badge reads as the VALUE alone and names itself through its TOOLTIP, so the words
+    // are asserted on the title rather than in the row's text (issue 1286, maintainer request).
+    const difficultyChip = target.querySelector('[data-component-difficulty]');
+    assert.equal(
+      difficultyChip?.getAttribute('title'),
+      'Progressive difficulty',
+      'the shortened badge must still name what it measures, via its tooltip'
+    );
+    assert.equal(
+      target.textContent.includes('Progressive difficulty'),
+      false,
+      'the words belong in the tooltip only: repeating them on every row crowded the description'
+    );
     assert.ok(target.textContent.includes('Missing'));
 
     // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
@@ -8556,11 +8568,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       '[data-component-id="c1"] [data-component-difficulty]'
     );
     assert.ok(c1Difficulty, 'a difficulty badge renders for a progressive system');
-    assert.match(c1Difficulty.textContent, /2/, 'the set difficulty value is shown');
+    // EXACT, not /2/: a loose match still passes against the old "Progressive difficulty 2"
+    // long form, so it could not detect the label creeping back into the badge text.
+    assert.equal(c1Difficulty.textContent.trim(), '2', 'the badge shows the VALUE alone');
     const c2Difficulty = target.querySelector(
       '[data-component-id="c2"] [data-component-difficulty]'
     );
-    assert.match(c2Difficulty.textContent, /None/, 'an unset difficulty shows "None"');
+    assert.equal(c2Difficulty.textContent.trim(), 'None', 'an unset difficulty shows "None" alone');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
