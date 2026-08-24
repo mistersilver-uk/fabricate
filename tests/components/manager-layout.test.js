@@ -3662,11 +3662,22 @@ test('manager components browser defines drop target and compact responsive list
     ).includes('height: 34px;'),
     'every studio filter bar dresses its own selects rather than inheriting Foundry core chrome'
   );
+  // The ESSENCE browser's toggle is the third selector in that group (issue 1118). It is
+  // addressed by its `data-*` hook because the class it used to carry styled nothing at all —
+  // the sheet declared `.manager-essence-sort-direction` NOWHERE — so the third instance of
+  // this control rendered at the base 6px/700 scale beside two siblings at 9px/600. Naming all
+  // three here is what makes `blockFor` read the whole group: it anchors on `{`, so a selector
+  // appended to the list leaves a two-selector lookup matching nothing and failing silently.
+  const sortDirectionBlock = blockFor(
+    '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction,\n.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction]'
+  );
   assert.ok(
-    blockFor(
-      '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction'
-    ).includes('border-radius: 9px;'),
+    sortDirectionBlock.includes('border-radius: 9px;'),
     'the component sort-direction button escapes the boxy base .manager-button scale'
+  );
+  assert.ok(
+    sortDirectionBlock.includes('font-weight: 600;'),
+    'and all three sort-direction toggles are typed by one rule rather than three scales'
   );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);') ||
@@ -7990,6 +8001,117 @@ test('a disabled manager button paints from the disabled rule in every one of th
       measured.on.dashed.height,
       'and keeps the pinned 34px control height it had when enabled'
     );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── One toolbar control, three browsers, one scale (issue 1118) ───────────────────────────
+//
+// Asc/Desc beside a sort select is the same control in the recipe, component and essence
+// browsers, and the essence one has never rendered like the other two. It carried
+// `manager-essence-sort-direction`, a class this sheet declares NOWHERE — so it matched no
+// rule of its own and painted from the base control: a 6px corner at weight 700 beside two
+// siblings at 9px and 600, in a toolbar whose selects and segmented toggles are all at the
+// compact scale.
+//
+// That divergence PRE-DATES the conversion sweep, which is why it is measured rather than
+// asserted from the sheet. A source pin cannot tell "this rule reaches the control" from
+// "this rule exists and reaches nothing", and the whole defect was the second of those: the
+// class was written, looked deliberate, and styled nothing for as long as it shipped.
+//
+// The essence probe is addressed by the `data-*` hook rather than a class because the dead
+// class went with the conversion — the primitive emits the two base classes and the site
+// keeps the hook it always had.
+const SORT_DIRECTION_PROBES = Object.freeze([
+  Object.freeze({ probe: 'recipe', attributes: 'class="manager-recipe-sort-direction"' }),
+  Object.freeze({ probe: 'component', attributes: 'class="manager-component-sort-direction"' }),
+  Object.freeze({ probe: 'essence', attributes: 'data-essence-sort-direction="asc"' }),
+]);
+
+test('all three browser sort-direction toggles render as one control', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const base = managerButtonClassesFor('neutral');
+    const toggles = SORT_DIRECTION_PROBES.map(({ probe, attributes }) => {
+      // The bespoke class travels through the primitive's APPENDING `class` prop, so the
+      // rendered element carries both — build the string the way the component joins it
+      // rather than restating one of the two spellings.
+      const extra = /class="([^"]*)"/.exec(attributes)?.[1] ?? '';
+      const hook = extra ? '' : ` ${attributes}`;
+      return `<button type="button" class="${[base, extra].filter(Boolean).join(' ')}"${hook} data-probe="${probe}"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    }).join('');
+    // NEGATIVE CONTROL: the same primitive with neither the class nor the hook. It is what
+    // the essence toggle measured before this rule, so if it matched the three below, the
+    // rule would be reaching nothing and every equality here would hold trivially.
+    const bare = `<button type="button" class="${base}" data-probe="bare"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+            .fas::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="manager-toolbar">${toggles}${bare}</div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          gap: style.gap,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          borderRadius: style.borderRadius,
+        };
+      };
+      return Object.fromEntries(
+        ['recipe', 'component', 'essence', 'bare'].map((probe) => [probe, read(probe)])
+      );
+    });
+
+    for (const probe of ['recipe', 'component', 'essence', 'bare']) {
+      assert.ok(measured[probe], `the ${probe} probe rendered`);
+    }
+
+    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares, and
+    // the base control declares 6px and 700, so agreeing on these two is what "the rule
+    // matched" means here.
+    assert.equal(measured.recipe.borderRadius, '9px', 'the toolbar rule reached the fixture');
+    assert.equal(measured.bare.borderRadius, '6px', 'and the bare primitive is still at 6px');
+    assert.equal(measured.bare.fontWeight, '700', 'and at the base weight');
+
+    for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+      assert.equal(
+        measured.essence[property],
+        measured.recipe[property],
+        `the essence toggle's ${property} (${measured.essence[property]}) must match the recipe browser's (${measured.recipe[property]})`
+      );
+      assert.equal(
+        measured.component[property],
+        measured.recipe[property],
+        `the component toggle's ${property} (${measured.component[property]}) must match the recipe browser's (${measured.recipe[property]})`
+      );
+    }
   } finally {
     await context.close();
   }

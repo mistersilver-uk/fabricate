@@ -6893,9 +6893,21 @@
    this to (0,3,0), which was enough to beat the base rule but only TIES the primitive's own
    (0,3,0) control — and a tie is decided by source order, which the conversion sweep is
    licensed to change. At (0,4,0) the compact scale and the 9px radius no longer depend on
-   where in this file anything sits. */
+   where in this file anything sits.
+
+   The ESSENCE browser's toggle joins them in the same issue, addressed by its `data-*` hook
+   rather than by a class. It is the third instance of one control — same verb, same place in
+   the same toolbar shape, Asc/Desc beside a sort select — and it never matched this rule at
+   all: it carried `manager-essence-sort-direction`, which this sheet declared NOWHERE, so it
+   painted from the base control instead. That is a divergence this sweep INHERITED rather than
+   caused; measured in Chromium against the two siblings, `gap`, `font-size`, `height`,
+   `min-height` and `padding` already agreed, and only `border-radius` (6px against their 9px)
+   and `font-weight` (700 against their 600) did not. The dead class went with the conversion,
+   so the hook is the honest handle: an attribute selector counts as one class-level component,
+   which puts this third selector at the same (0,4,0) as the other two. */
 .fabricate-manager .manager-button.fab-manager-button.manager-recipe-sort-direction,
-.fabricate-manager .manager-button.fab-manager-button.manager-component-sort-direction {
+.fabricate-manager .manager-button.fab-manager-button.manager-component-sort-direction,
+.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction] {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;

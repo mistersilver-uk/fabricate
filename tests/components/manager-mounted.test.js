@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   existsSync,
   readFileSync,
-  readdirSync,
   writeFileSync,
   mkdirSync,
   mkdtempSync,
@@ -273,7 +272,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   // The library inspector, extracted out of the root (issue 643). It lives under
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
@@ -24519,84 +24517,5 @@ describe('CraftingSystemManager mounted behavior', () => {
         'the counters CAN go up — reading either field is what does it'
       );
     });
-  });
-});
-
-/**
- * `GatheringRealmQuickList.svelte` — the realm authoring surface nothing renders (issue 1118).
- *
- * This suite COMPILES that component (see the `writeCompiledSvelte` list above) and mounts a
- * tree that never reaches it, because no module under `src/` imports it any more. #1283 moved
- * realm authoring to world scope, dropped the import from `CraftingSystemManagerRoot.svelte`
- * and left the file — and its stale entry in the compile list — behind. Its own docblock still
- * calls it "the canonical realm authoring surface for the gathering `Travel` route"; the route
- * it names renders `GatheringRealmsTab.svelte`, and the create verb the audit filed under this
- * component ships from the manager root's own header, already `role="primary"`.
- *
- * That is why the forgotten `primary` here is asserted from SOURCE rather than from a rendered
- * node: there is no route to drive to it, and the View Lab — which photographs WINDOWS — has no
- * case that can contain it, so a change to this file selects the fallback frame of an unrelated
- * window. `view-lab-source-coverage.test.js` cannot see that, because it gates the import
- * closure of the two mounted roots and this file is outside it. The conversion still happens,
- * because the sweep's end-state invariant is that no `.svelte` under `src/` writes a literal
- * `class="manager-button"`.
- *
- * The first test is the one that matters most: it pins the ORPHAN status, so the day something
- * imports this component again it fails and says to move the role assertion below into a real
- * mount. Without it, a source assertion over dead code would quietly outlive its subject.
- */
-describe('GatheringRealmQuickList source contract', () => {
-  const quickListPath = 'src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte';
-  const quickListSource = readFileSync(resolve(repoRoot, quickListPath), 'utf8');
-
-  /** Every `.svelte` and `.js` file beneath `src/`, as repo-relative POSIX paths. */
-  function sourceModules(directory = 'src') {
-    return readdirSync(resolve(repoRoot, directory), { withFileTypes: true }).flatMap((entry) => {
-      const child = `${directory}/${entry.name}`;
-      if (entry.isDirectory()) return sourceModules(child);
-      return /\.(svelte|js)$/.test(entry.name) ? [child] : [];
-    });
-  }
-
-  it('is imported by nothing under src/, so no mounted tree and no captured frame reaches it', () => {
-    const modules = sourceModules().filter((modulePath) => modulePath !== quickListPath);
-    assert.ok(
-      modules.length > 200,
-      `walked ${modules.length} modules under src/, which is not the tree`
-    );
-    const importers = modules.filter((modulePath) =>
-      readFileSync(resolve(repoRoot, modulePath), 'utf8').includes('GatheringRealmQuickList.svelte')
-    );
-    assert.deepEqual(
-      importers,
-      [],
-      'GatheringRealmQuickList has a consumer again — move the role assertion below onto the ' +
-        'rendered node, add a View Lab case for the window that now contains it, and delete ' +
-        'this guard'
-    );
-  });
-
-  it('asks for the primary role on the element carrying data-realm-create', () => {
-    // Bounded by `[^<>]`, so the match cannot run past this element's own `>` into the next
-    // control's attributes, and addressed by the hook the conversion added rather than by
-    // proximity: the role and the handler have to be on ONE tag, not merely near each other.
-    const createTag = /<ManagerButton[^<>]*\bdata-realm-create\b[^<>]*>/.exec(quickListSource);
-    assert.ok(
-      createTag,
-      'the realm create form should render its submit as a ManagerButton carrying data-realm-create'
-    );
-    assert.ok(
-      createTag[0].includes('role="primary"'),
-      'the realm create submit should carry the primary role, as the shipped create realm does'
-    );
-    assert.ok(
-      createTag[0].includes('type="submit"'),
-      'the element carrying data-realm-create should be the one that submits the create form'
-    );
-    assert.ok(
-      createTag[0].includes('disabled={saving || !createInput.trim()}'),
-      'and the one disabled until the new realm has a name — otherwise the role above is ' +
-        'asserted on some other control'
-    );
   });
 });

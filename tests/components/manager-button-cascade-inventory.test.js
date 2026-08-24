@@ -68,7 +68,7 @@ const cascade = managerButtonCascade();
  * The conversion LEDGER: the batches whose sites no longer appear in the derived corpus.
  *
  * A converted site stops being a call site in this instrument's terms — it no longer writes
- * `class="manager-button…"`, so nothing keys on it — while remaining one of the 129 the sweep
+ * `class="manager-button…"`, so nothing keys on it — while remaining one of the 128 the sweep
  * is accountable for. Recording each landed batch here is what lets the non-vacuity floor keep
  * asserting the WHOLE population instead of shrinking with it.
  *
@@ -90,8 +90,16 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 6,
     files: Object.freeze([
-      // 24 sites across the nine browser views. Three carried a forgotten `primary`: the two
-      // inline `Add` submits in the environment Settings tab and the realm quick list's own.
+      // 23 sites across eight browser views. Two carried a forgotten `primary`: the inline
+      // `Add` submits in the environment Settings tab.
+      //
+      // The batch converted a NINTH file, `GatheringRealmQuickList.svelte`, and its 24th site
+      // went with it: that component was imported by nothing under `src/` — #1283 moved realm
+      // authoring to world scope, replaced the surface with `GatheringRealmsTab.svelte` and
+      // left the file behind — so issue 1118 deleted it rather than converting dead code
+      // twice. The totals below drop by one site and one component to match; a conversion the
+      // sweep is no longer accountable for must leave the conserved quantity, or the floor
+      // would be defending a component that does not exist.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
         sites: 7,
@@ -108,7 +116,6 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte', sites: 2 }),
-      Object.freeze({ file: 'src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte', sites: 1 }),
     ]),
   }),
@@ -581,24 +588,34 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
 
   // The sweep's total is a CONSERVED quantity, not a countdown, and this floor has to say so
   // or it decays into one. The instrument finds a site by its literal `class="manager-button…"`,
-  // which is exactly the thing a conversion removes: after task 5 the derived population is 90
-  // across 41 components, after task 9 it is 0 across 0, and a floor pinned to whatever the
-  // last batch left would ratchet down to nothing while reporting itself satisfied.
+  // which is exactly the thing a conversion removes: after task 5 the derived population was 90
+  // across 40 of these components, after task 9 it is 0 across 0, and a floor pinned to
+  // whatever the last batch left would ratchet down to nothing while reporting itself
+  // satisfied.
   //
   // So the floor is stated over BOTH halves — the sites still awaiting conversion plus the
-  // sites already converted — and it stays 129 across 42 for the whole sweep. Each batch adds
+  // sites already converted — and it stays 128 across 41 for the whole sweep. Each batch adds
   // its own line to the ledger and touches neither total, and a batch that DELETED a control
   // instead of converting it fails here rather than looking like progress.
+  //
+  // The totals were 129 across 42 when the sweep was planned. They are one lower because ONE
+  // of the 42 components turned out to be unreachable dead code — `GatheringRealmQuickList`,
+  // imported by nothing under `src/` since #1283 moved realm authoring to world scope — and
+  // was deleted rather than converted. That is the one licensed way to move these numbers, and
+  // it is licensed precisely because the site left the product rather than leaving the
+  // instrument's view: the ledger assertions below re-read every booked file from the tree, so
+  // a deleted component cannot stay booked, and the paragraph above is the reason a number
+  // that moved needs a stated cause rather than a quiet edit.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    129,
-    'the conversion is 129 sites, whether or not a given one has been converted yet'
+    128,
+    'the conversion is 128 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    42,
-    'across 42 components'
+    41,
+    'across 41 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
