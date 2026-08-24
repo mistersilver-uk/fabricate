@@ -1007,6 +1007,9 @@ It is dropped only when your provider itself leaves the registry, so unregisteri
 Fabricate renders it with `role="img"` and your `accessibleName`, points the rail sub-item's `aria-describedby` at it, and leaves the sub-item's own accessible name as the tab's `accessibleName`.
 When no badge is set — including right after a runtime badge is cleared with `null` — the sub-item carries no `aria-describedby` at all, so nothing is left pointing at a description that is not there.
 
+Core also **sums** the resolved badge counts of every tab the rail renders onto the Downtime parent row, as a single summary mark, while that group is collapsed or the rail is collapsed.
+That rollup is Core's arithmetic over your numbers, it replaces the rail's muted `PREMIUM` chip for as long as it shows, and for most GMs — whose Downtime disclosure is closed on every fresh Manager open — it is the only place your count is ever seen.
+
 ### The Mount Context
 
 `mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
