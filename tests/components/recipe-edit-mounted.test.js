@@ -5793,6 +5793,40 @@ describe('RecipeStepsCard (mounted)', () => {
     stepsHarness.remount();
   });
 
+  // ── "Add a step" is a `dashed` add, and the sweep found it painted as a neutral one ────
+  //
+  // The forgotten-role repair for audit row 20 (issue 1118). This control sits in the
+  // accordion FOOTER appending to the list above it, which is the whole meaning of the
+  // `dashed` role — an empty slot waiting to be filled — and every other add-a-row in the
+  // recipe studio already reads that way. It shipped as a bare `manager-button`, so a
+  // developer looking at the Step durations card saw a solid secondary button where its
+  // siblings on the Ingredients and Results tabs show a dashed outline.
+  //
+  // Bound to `[data-recipe-step-add]`, which names this control and no other in the card:
+  // dropping the role reds, and moving it onto the per-step DELETE beside it reds too, which
+  // is the control a "does is-dashed appear in this card" assertion would have passed. The
+  // delete is asserted negatively for exactly that reason — it is a destructive verb, and
+  // `dashed` on it would be a real defect rather than a harmless spare class.
+  it('paints the footer add as the dashed role, spanning its row, and nothing else in the card', async () => {
+    const target = await stepsHarness.mount(stepsProps());
+    const add = target.querySelector('[data-recipe-step-add]');
+    assert.ok(
+      add?.classList.contains('is-dashed'),
+      `the footer add takes the dashed role, got ${add?.className}`
+    );
+    assert.ok(
+      add?.classList.contains('is-full-width'),
+      `and spans its full-width <li>, got ${add?.className}`
+    );
+    for (const other of target.querySelectorAll('button:not([data-recipe-step-add])')) {
+      assert.ok(
+        !other.classList.contains('is-dashed'),
+        `only the append verb is dashed, not ${other.getAttribute('data-recipe-step-delete') ? 'the step delete' : other.className}`
+      );
+    }
+    stepsHarness.remount();
+  });
+
   it('shows a duration trigger with the formatted time, and an Add duration trigger when none is set', async () => {
     const target = await stepsHarness.mount(stepsProps());
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');

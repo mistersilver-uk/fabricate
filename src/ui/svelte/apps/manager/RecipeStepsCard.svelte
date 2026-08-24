@@ -85,7 +85,7 @@
 
     {#snippet footer()}
       <li class="manager-recipe-steps-add">
-        <ManagerButton data-recipe-step-add onclick={() => onAddStep()}>
+        <ManagerButton role="dashed" fullWidth data-recipe-step-add onclick={() => onAddStep()}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddStep', 'Add a step')}</span>
         </ManagerButton>
