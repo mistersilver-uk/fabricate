@@ -102,11 +102,19 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
  * Faithful copies of `src/main.js`'s hoisted `AWARD_COMPONENTS_GATE_KEYS` and
  * `CREDIT_CURRENCY_GATE_KEYS` (issue 1301).
  *
- * Two pairs on this side as well, and reading from each member's OWN key table, because the
- * mutation this mirror exists to catch is precisely a hoisted constant that carries the wrong
- * member's strings: a body-level name assertion still passes, and only the refused answer's
- * words are wrong — in the mirror alone, where every facade-level case for these two members
- * runs.
+ * Two pairs on this side as well, reading from each member's OWN key table — and what that
+ * buys is SOURCE FIDELITY over a value that is currently INERT, not a behavioural guard. Both
+ * delegators read `gate.outcome` and discard `gate.message`, and their result builders derive
+ * `message` from their own tables, so swapping a pair's strings today changes no answer either
+ * member gives. `_requireGmActor`'s `message` is read at exactly one site in `src/main.js`,
+ * `resetActorKnowledge`, which answers with it directly.
+ *
+ * The pair is still worth copying faithfully and still worth pinning: the parameter is part of
+ * the preamble's published shape, a fifth member could answer with it tomorrow the way
+ * `resetActorKnowledge` does today, and a mirror carrying another member's strings is drift in
+ * the one artefact this whole change's facade-level evidence rests on. What must not be said —
+ * and was said here before — is that the swap makes a refused award report itself in the
+ * grant's words. It does not.
  */
 const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
   gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],

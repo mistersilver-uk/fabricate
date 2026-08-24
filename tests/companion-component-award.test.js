@@ -107,11 +107,18 @@ function makeComponent(id, extra = {}) {
  * An item document double whose `update` records its payload and applies it.
  *
  * `update` answers what a REAL `Document#update` answers: the document when it applied a
- * change. The two failure shapes are NAMED (`'resolves-undefined'`, `'resolves-null'`) rather
- * than passed as the values themselves, because passing `updateResult: undefined` silently
- * takes the default and drives the opposite of the cell that asked for it —
- * `'resolves-undefined'` is the empty-diff case, where the GM-authored path is not in the
- * item's data model, Foundry discards the key and the promise resolves with nothing.
+ * change. The shapes are NAMED rather than passed as the values themselves, because passing
+ * `updateResult: undefined` silently takes the default and drives the opposite of the cell that
+ * asked for it:
+ *
+ * - `'document'` — accepted AND visible on a re-read, the ordinary case;
+ * - `'resolves-undefined'` — the empty-diff case, where the GM-authored path is not in the
+ *   item's data model, Foundry discards the key and the promise resolves with nothing;
+ * - `'resolves-null'` — the same, spelled the other way a stub might;
+ * - `'document-without-applying'` — ACCEPTED and invisible: `readStoredStackQuantity` reads the
+ *   PREPARED document, not `_source`, so a game system that recomputes the configured path in
+ *   data preparation masks a write Foundry took. It is the shape that separates judging the
+ *   write's own return from re-reading the stored value across it.
  */
 function makeItem(id, { stored, updateResult = 'document' } = {}) {
   const item = {
@@ -120,9 +127,11 @@ function makeItem(id, { stored, updateResult = 'document' } = {}) {
     updates: [],
     update(payload) {
       item.updates.push(payload);
-      if (updateResult === 'document') {
-        for (const [path, value] of Object.entries(payload)) {
-          if (path === QUANTITY_PATH) storeQuantity(item, value);
+      if (updateResult === 'document' || updateResult === 'document-without-applying') {
+        if (updateResult === 'document') {
+          for (const [path, value] of Object.entries(payload)) {
+            if (path === QUANTITY_PATH) storeQuantity(item, value);
+          }
         }
         return Promise.resolve(item);
       }
@@ -782,6 +791,74 @@ describe('AC-18 — the driven vocabulary equals the declared vocabulary, at bot
 // AC-21 to AC-25 — the quantity, the two branches, and the carry map
 // ---------------------------------------------------------------------------
 
+/**
+ * The path is resolved ONCE PER CALL and threaded, asserted where the property has content.
+ *
+ * **Configuring a non-default path for the suite does not test this, and believing it did was
+ * the gap this section closes.** `configureItemStackQuantityPath` sets the module state that
+ * `itemStackQuantityPath()` itself reads, so for the whole file AMBIENT EQUALS CONFIGURED — an
+ * implementation that re-resolves the ambient path at every site produces the identical value
+ * and every assertion above still passes. Writing the literal rather than
+ * `itemStackQuantityPath()` closed a tautology in the ASSERTION; it did not close the mutation.
+ *
+ * The property is only observable across a MID-CALL reconfiguration, which the member's own
+ * docblock names as the reason for resolving once: the per-entry body spans two `await`s, so a
+ * GM changing the setting between them makes a re-resolving lane write at one path and read at
+ * another. The `findComponentItems` seam is the natural place to reproduce it — it is called
+ * inside the per-entry body, after resolution and before either write.
+ */
+describe('the stack-quantity path is resolved ONCE, across a mid-call reconfiguration', () => {
+  /** Reconfigure the ambient path the first time the resolver seam is consulted. */
+  function reconfiguringResolver(answer = () => []) {
+    let reconfigured = false;
+    return (component) => {
+      if (!reconfigured) {
+        configureItemStackQuantityPath('system.other.value');
+        reconfigured = true;
+      }
+      return answer(component);
+    };
+  }
+
+  it('creates at the path the call STARTED with, never the one it ended with', async (t) => {
+    t.after(() => configureItemStackQuantityPath(QUANTITY_PATH));
+
+    const { result, calls } = await runAward({
+      components: [makeComponent('c1')],
+      awards: [entry('c1', 3)],
+      matching: reconfiguringResolver(),
+    });
+
+    assert.equal(result.placements[0].placed, 3);
+    const [call] = calls.createOrStack;
+    assert.equal(call.quantityPath, QUANTITY_PATH, 'the seam is told the ORIGINAL path');
+    assert.equal(storedQuantity(call.itemData), 3, 'and the payload authors the count there');
+    assert.equal(
+      call.itemData.system.other,
+      undefined,
+      'nothing is authored at the path the GM switched to mid-call'
+    );
+  });
+
+  it('stacks at the path the call STARTED with, in the write payload itself', async (t) => {
+    t.after(() => configureItemStackQuantityPath(QUANTITY_PATH));
+
+    const stack = makeItem('owned', { stored: 2 });
+    const { result } = await runAward({
+      components: [makeComponent('c1')],
+      awards: [entry('c1', 3)],
+      matching: reconfiguringResolver(() => [stack]),
+    });
+
+    assert.equal(result.placements[0].stacked, true, 'the base was read at the original path');
+    assert.deepEqual(
+      stack.updates,
+      [{ [QUANTITY_PATH]: 5 }],
+      'ONE key, at the path resolved once — a re-resolving lane reads at one and writes at another'
+    );
+  });
+});
+
 describe('AC-21 (D0) — the create path writes the quantity onto the PAYLOAD', () => {
   it('authors the count at the configured path, as well as passing awardedQuantity', async () => {
     const { calls } = await runAward({
@@ -860,6 +937,30 @@ describe('AC-22 (D0) — the stack write is judged by its OWN return, with no re
     assert.equal(result.placements[0].outcome, COMPANION_OUTCOMES.multiUnitUnsupported);
     assert.equal(result.placements[0].placed, 0);
     assert.deepEqual(stack.updates, [], 'nothing was written');
+    assert.equal(calls.createOrStack.length, 0);
+  });
+
+  it('(e) a write Foundry ACCEPTED but a re-read cannot see still counts as awarded', async () => {
+    // The second mutation AC-22 names, and the one its other four cells cannot catch: implement
+    // verification as a pre-read/post-read inequality and this cell flips to `awardFailed` —
+    // which D4a publishes as RETRY-SAFE, so its failure mode is a DOUBLE AWARD.
+    //
+    // No concurrency is needed to reach it. `readStoredStackQuantity` reads the PREPARED
+    // document rather than `_source` — the divergence `probeStackQuantityPath`'s own
+    // `'schema-discard'` verdict exists for — so a system that recomputes the configured path
+    // during data preparation masks a successful write from any re-read.
+    const stack = makeItem('owned', { stored: 2, updateResult: 'document-without-applying' });
+    const { result, calls } = await runAward({
+      components,
+      matching: () => [stack],
+      awards: [entry('c1', 3)],
+    });
+
+    assert.equal(result.placements[0].outcome, COMPANION_OUTCOMES.awarded);
+    assert.equal(result.placements[0].placed, 3, 'the write ANSWERED, so the award landed');
+    assert.equal(result.placements[0].stacked, true);
+    assert.deepEqual(stack.updates, [{ [QUANTITY_PATH]: 5 }], 'and it wrote base + quantity');
+    assert.equal(storedQuantity(stack), 2, 'while a re-read still answers the OLD value');
     assert.equal(calls.createOrStack.length, 0);
   });
 

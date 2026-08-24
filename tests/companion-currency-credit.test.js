@@ -124,6 +124,40 @@ const MACROS = { canAfford: 'Macro.afford', decrement: 'Macro.dec', increment: '
 /** A resolver answering a runnable SCRIPT macro, since no `fromUuid` exists under `node --test`. */
 const runnableMacro = async () => ({ type: 'script', command: 'return true;' });
 
+/**
+ * What `credited` must be for EVERY declared outcome, at the standard 50 gp request.
+ *
+ * Written out as the RULE rather than computed from the member's own list of provably-zero
+ * outcomes, and that is the whole point: an expectation read back from the implementation
+ * agrees with the implementation by construction, so deleting six outcomes from that list would
+ * change the code and the expectation together and nothing would fail. The rule itself is
+ * three-valued — the AMOUNT when Fabricate observed the credit, `0` when it can PROVE nothing
+ * moved (`creditNotConfigured` and every refusal taken before any mechanism ran), and `null`
+ * when a mechanism ran and it cannot prove what that mechanism did.
+ *
+ * The regression this catches runs the DANGEROUS way: a provable zero reporting itself as
+ * `null` reads as "unknown", which is the collapse the three-token vocabulary exists to
+ * prevent, and `null` is what a caller is told not to treat as retry-safe.
+ */
+const EXPECTED_CREDITED = new Map([
+  // the mechanism ran and Fabricate OBSERVED the credit
+  [COMPANION_OUTCOMES.credited, 50],
+  // a mechanism ran and Fabricate cannot prove what it did
+  [COMPANION_OUTCOMES.creditFailed, null],
+  [COMPANION_OUTCOMES.creditUnavailable, null],
+  // nothing ran, and Fabricate can prove it
+  [COMPANION_OUTCOMES.creditNotConfigured, 0],
+  [COMPANION_OUTCOMES.invalidAmount, 0],
+  [COMPANION_OUTCOMES.ladderEmpty, 0],
+  [COMPANION_OUTCOMES.ladderInvalid, 0],
+  [COMPANION_OUTCOMES.unitNotFound, 0],
+  [COMPANION_OUTCOMES.invalidCallSite, 0],
+  [COMPANION_OUTCOMES.notElected, 0],
+  [COMPANION_OUTCOMES.gmOnly, 0],
+  [COMPANION_OUTCOMES.noActor, 0],
+  [COMPANION_OUTCOMES.notReady, 0],
+]);
+
 const actor = (currency = {}) => new CurrencyCraftingActorFake('Idrin', currency);
 
 /** Seams for one credit, named only where they differ from the default world. */
@@ -668,11 +702,22 @@ describe('AC-18 — the driven vocabulary equals the declared vocabulary', () =>
       assertMessageIsFromTable(answer, CURRENCY_CREDIT_MESSAGE_KEYS, 'the credit');
       assertMessageDataCovers(answer, `the ${answer.outcome} answer`);
       assert.equal(foreign.includes(answer.message), false, `${answer.outcome} borrowed a key`);
-      assert.ok(
-        answer.credited === null || answer.credited === 0 || answer.credited === 50,
-        `${answer.outcome} answered an unexpected credited value: ${String(answer.credited)}`
+      assert.equal(
+        answer.credited,
+        EXPECTED_CREDITED.get(answer.outcome),
+        `${answer.outcome} must answer credited ${String(EXPECTED_CREDITED.get(answer.outcome))}: ` +
+          '`0` is a claim Fabricate can prove, and `null` is a claim it cannot make'
       );
     }
+  });
+
+  it('states a credited value for every declared outcome, so a new one cannot skip the rule', () => {
+    // Set equality against the KEY TABLE, so an outcome added without a decision about what it
+    // may claim fails here rather than sliding through the loop above unasserted.
+    assert.deepEqual(
+      [...EXPECTED_CREDITED.keys()].sort(),
+      Object.keys(CURRENCY_CREDIT_MESSAGE_KEYS).sort()
+    );
   });
 
   it('answers the happy path as a WHOLE, field for field', async () => {

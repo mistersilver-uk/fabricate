@@ -1131,11 +1131,16 @@ describe('the harness copies are faithful to src/main.js', () => {
   it('AC-29 — each new delegator keeps its OWN refusal strings, where hoisting put them', () => {
     // `bothTexts` returns a METHOD-BODY slice, and D12 hoisted these pairs out of that slice —
     // so the body-level assertion above proves delegation to the shared preamble and can say
-    // nothing about WHICH strings each member delegates with. The mutation this closes is
-    // giving the harness's hoisted constant the grant's message keys: every body-level name
-    // assertion still passes, and a refused award reports itself in the grant's words in the
-    // MIRROR ONLY — where every facade-level case for these two members runs, because there is
-    // no Foundry smoke by design.
+    // nothing about WHICH strings each member delegates with. This is a SOURCE-FIDELITY pin
+    // over a parameter that is currently inert, and saying so is the point: both delegators
+    // read `gate.outcome` and discard `gate.message`, and each builder derives `message` from
+    // its own table, so giving a hoisted pair another member's strings changes no answer today.
+    // It is pinned anyway because the pair is part of the preamble's published shape, because
+    // one shipped member (`resetActorKnowledge`) does answer with `gate.message` and a sixth
+    // could, and because a mirror carrying another member's strings is drift in the one
+    // artefact every facade-level case for these two members runs against — there is no
+    // Foundry smoke by design. The claim this comment used to make, that the swap makes a
+    // refused award report itself in the grant's words, was simply false.
     const PAIRS = [
       ['awardComponents', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
       ['creditCurrency', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
@@ -1193,6 +1198,66 @@ describe('the harness copies are faithful to src/main.js', () => {
         squashed.includes('isElectedExecutor'),
         false,
         `${label}: the shared bag carries no election`
+      );
+    }
+  });
+
+  it('binds every seam `awardComponents` injects, to the collaborator production ships', () => {
+    // PRODUCTION-SIDE ONLY, and that asymmetry is the reason this pin is needed rather than an
+    // excuse for not having one: the mirror INJECTS this bag — production reaches `fromUuid`,
+    // the live crafting-system manager and the real engine, none of which exist under
+    // `node --test` — so every facade-level case for this member runs against a bag the suite
+    // supplied, and nothing else looks at the one production builds.
+    //
+    // Two of its mutations are silent to the entire suite, and one of them makes a `stable`
+    // member THROW. Renaming `resolveSystem` leaves the leaf calling `seams.resolveSystem(...)`
+    // on `undefined`, in `awardComponents`' own body BEFORE the per-entry `try` — so the first
+    // real call raises a `TypeError` out of a member that publishes "never throws". Dropping
+    // `findComponentItems` is silent the other way: every entry answers `awardFailed`, and the
+    // member's published claim to resolve its stack targets through the ONE shipped resolver is
+    // disconnected in production while every stacking case here keeps passing against the
+    // injected bag.
+    const AWARD_SEAM_BINDINGS = [
+      [
+        'resolveSystem',
+        'resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null',
+        'the leaf calls undefined and a `stable` member throws on its first real call',
+      ],
+      [
+        'resolveComponent',
+        'resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null',
+        'every entry answers componentNotFound, so no award ever lands',
+      ],
+      [
+        'findComponentItems',
+        'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
+        'the award stops resolving its stack targets through the published resolver',
+      ],
+      [
+        'resolveSourceItem',
+        'resolveSourceItem: (uuid) => fromUuid(uuid)',
+        'every award falls back to a synthesised payload, or fails inside its own try',
+      ],
+      [
+        'isElectedExecutor',
+        'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
+        'a broadcast award is unelectable and the duplicate-write gate is gone',
+      ],
+    ];
+
+    const bag = mainMethodSource('_componentAwardSeams() {');
+    assert.ok(bag.length > 250, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
+    assert.deepEqual(
+      [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
+      AWARD_SEAM_BINDINGS.map(([key]) => key),
+      'the bag binds exactly these five seams — the sixth the leaf declares, `createOrStack`, ' +
+        'is deliberately absent so the create primitive keeps ONE spelling'
+    );
+    const squashed = bag.replaceAll(/\s+/g, ' ');
+    for (const [key, binding, harm] of AWARD_SEAM_BINDINGS) {
+      assert.ok(
+        squashed.includes(binding),
+        `${key} is no longer bound as authored, so in production ${harm}`
       );
     }
   });
