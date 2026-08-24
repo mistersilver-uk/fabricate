@@ -311,8 +311,15 @@ describe('CompositionList mounted layout', () => {
     );
     assert.ok(
       !target.querySelector('.manager-environment-force-include'),
-      'and the labelled Force add is unreachable in every mode this component offers, which ' +
-        'is a defect in its own right — see the source contract for the role it carries'
+      'in MANUAL mode the standalone Non-matching section is not rendered at all, so the ' +
+        'labelled Force add is absent here for a STRUCTURAL reason and this assertion is ' +
+        'scoped to that. It is a defect in its own right that no other mode renders it ' +
+        'either: the section is gated `mode !== \'manual\'` and the control is gated ' +
+        '`mode === \'manual\'`. WHOEVER REPAIRS THAT CONTRADICTION — by moving the control ' +
+        'into Available-to-add, which reds this line and wants it inverted here; or by ' +
+        're-gating the branch to `mode !== \'manual\'`, which leaves this line correct and ' +
+        'wants its presence asserted in the automatic-mode test above — should not delete ' +
+        'this assertion. See the source contract for the role it carries.'
     );
 
     assert.equal(
