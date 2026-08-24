@@ -33,7 +33,15 @@ const FIXTURE = `
           <p class="manager-subtitle" data-m="subtitle">Ammunition · Routed by check · DC 10</p>
         </div>
         <div class="manager-header-actions">
-          <button class="manager-button is-ghost" data-m="header-button"><span>Back</span></button>
+          <!-- Carries fab-manager-button because the shipped Back button does (issue 1118).
+               The number below does not move: .manager-header-actions .manager-button and the
+               primitive both state 0.72rem, which is exactly why the header rule's type scale
+               survived while its 38px height was retired. What moves is which rule this
+               fixture proves — the container's, or the one the product will match. The resting
+               BORDER moved too: .manager-header-actions .manager-button.is-ghost was retired
+               as a role paint restated in a container, and the primitive's is-ghost companion
+               states the same colours. -->
+          <button class="manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
         </div>
         <div class="manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
@@ -45,7 +53,10 @@ const FIXTURE = `
           <span class="manager-nav-count" data-m="nav-count">105</span>
         </div>
         <div class="manager-recipe-ingredient-set-add">
-          <button class="manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
+          <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
+               see the expected value below: this is the one row in this file that changed
+               size. -->
+          <button class="manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
         <!-- The FLAT (non-progressive) ingredient/result row's component picker (issue
@@ -228,6 +239,11 @@ const FIXTURE = `
                shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
                child of the panel would go on measuring a box the product no longer renders. -->
           <div class="fab-bulk-edit-dock">
+            <!-- Deliberately NOT yet carrying fab-manager-button (issue 1118): the scoped
+                 .fab-bulk-edit-apply rule in BulkEditPanelShell.svelte is (0,2,0) and is still
+                 unchained, so marking this fixture now would hand the primitive its
+                 34px/0.72rem while the shipped control has not moved. It travels with the
+                 batch that converts BulkEditPanelShell. -->
             <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
           </div>
         </section>
@@ -296,7 +312,16 @@ const EXPECTED = {
   'tab-badge': 8.96, // 0.56rem
   'nav-label': 12.48, // 0.78rem — bleed fix (was inheriting 14)
   'nav-count': 10, // 0.625rem
-  'dashed-add': 11.2, // 0.7rem
+  // 11px, NOT the 0.7rem (11.2px) this row committed before issue 1118 — a real change, and
+  // the one number in this file that moved. It used to come from a CONTAINER rule,
+  // `.manager-recipe-ingredient-set-add .manager-button`, which existed because the dashed
+  // adds "inherit the ambient ~1rem" and so each recipe container had to state a size for
+  // them. That group is RETIRED: the `is-dashed` role states 11px itself now, on every screen
+  // and for the `SearchablePopover` triggers among them, so the bleed it defended against
+  // cannot happen. Keeping it would have left this button at 11.2px and the popover trigger in
+  // the same row at 11px — two treatments for one verb, in one row, which is the defect the
+  // reconciliation exists to remove.
+  'dashed-add': 11,
   muted: 10.24, // 0.64rem — recipe-view-scoped
   // ── The FLAT component picker (issue 676). Same shared rule as the stage/salvage
   // triggers below, so it reads at the same 0.82rem — a flat row and a stage row name a
