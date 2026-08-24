@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     // The unified modifier library's bounds pair and roll classification (issue 1117).
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/systems/toolCheckBonus.js',

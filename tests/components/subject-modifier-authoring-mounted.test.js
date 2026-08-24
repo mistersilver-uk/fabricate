@@ -262,6 +262,7 @@ const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
   rawModules: [
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',

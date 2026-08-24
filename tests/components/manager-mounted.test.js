@@ -747,6 +747,7 @@ function compileManagerRoot() {
     // `maxModifierPicks` means. This list has NO dependency validator, so
     // omitting it does not fail the suite: every mounted manager test is reported as
     // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     // …and issue 1118 gave it another: the deterministic average a rolling modifier is
     // ranked by, which is also what tells the resolver that a modifier rolls at all.

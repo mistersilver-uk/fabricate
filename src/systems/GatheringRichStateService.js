@@ -1,6 +1,7 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 
+import { resolveModifierLibrary } from './characterLibraries.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
@@ -1743,11 +1744,13 @@ export class GatheringRichStateService {
    * @returns {Array<object>} The library entries, possibly empty.
    */
   _systemModifierLibrary(system, systemId) {
-    if (Array.isArray(system?.modifiers)) return system.modifiers;
-    const resolved = globalThis.game?.fabricate
-      ?.getCraftingSystemManager?.()
-      ?.getSystem?.(String(systemId || ''));
-    return Array.isArray(resolved?.modifiers) ? resolved.modifiers : [];
+    // Issue 1308: ONE read of the world library, replacing the registry round-trip this used to
+    // fall back on. That fallback existed only because the library lived on the crafting system,
+    // so a caller without the system in hand had to go and fetch it; the library is world scope
+    // now, so there is nothing system-specific left to look up. `systemId` is retained for the
+    // signature's callers and no longer resolves anything.
+    void systemId;
+    return resolveModifierLibrary(system);
   }
 
   /**
