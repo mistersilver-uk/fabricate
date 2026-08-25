@@ -17,6 +17,16 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // cycle and `VIEW_RECIPES` above is a top-level `Object.freeze([...])` a cyclic partial-evaluation
 // order can observe as `undefined`.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+// The View Lab's own case registry, for the two things a published frame needs and this file
+// cannot derive: what to CALL it, and whether it needs a caption. It imports only Node builtins,
+// so it makes no cycle of the kind the `decideScreenshotGate` note above warns about.
+//
+// `labelForCaseId` has always documented itself as wired into this path and never was: the
+// lookup fell through `VIEW_RECIPES` — a table keyed on SMOKE recipe ids, which a View Lab case
+// id is not — and landed on the bare id. Every lab frame in every PR body has therefore been
+// captioned `manager-world-downtime-premium-installed` rather than with the sentence the
+// registry already held.
+import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -1622,10 +1632,22 @@ export function sanitizeLabel(label = '') {
   );
 }
 
+// A frame's caption, when it has one, sits BENEATH the image as its own paragraph rather than
+// inside the alt text. Alt text is read by a screen reader and by nothing else a PR reviewer uses,
+// so a warning hidden there is a warning most readers never meet — which is the whole failure this
+// caption exists to fix. It is sanitized on the same terms the label is: the text is this
+// repository's own today, and a caption that could break the managed block is a hazard whoever
+// wrote it.
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded.map(({ label, url }) => `![${prefix}${sanitizeLabel(label)}](${url})`).join('\n\n');
+  return uploaded
+    .map(({ label, note, url }) => {
+      const image = `![${prefix}${sanitizeLabel(label)}](${url})`;
+      const caption = sanitizeLabel(note ?? '');
+      return caption ? `${image}\n\n> ${caption}` : image;
+    })
+    .join('\n\n');
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -1713,7 +1735,7 @@ function normalizeHeadShaSegment(headSha) {
 // caller supply labels from its own registry; otherwise labels resolve from
 // `VIEW_RECIPES` and fall back to the id (the id is DERIVED from the filename here, so
 // the pairing is unambiguous by construction).
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId } = {}) {
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId = labelForCaseId, noteForId = evidenceNoteForCaseId } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
@@ -1732,7 +1754,8 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
     const label = (labelForId && labelForId(viewId)) || (recipe ? recipe.label : viewId);
-    uploaded.push({ viewId, label, url: `${cfg.baseUrl}/${key}`, key, file });
+    const note = (noteForId && noteForId(viewId)) || '';
+    uploaded.push({ viewId, label, note, url: `${cfg.baseUrl}/${key}`, key, file });
   }
   return uploaded;
 }
