@@ -2603,7 +2603,11 @@ const ENVIRONMENTS = [
     biomes: ['forest'],
     dangerTags: ['hazardous'],
     includedRealmIds: ['hb-realm-verdant'],
-    forcedTaskIds: ['hb-task-forage', 'hb-task-fungi'],
+    // Manual composition is exactly this list (issue 1315): these two lived in `forcedTaskIds`
+    // when manual mode still filtered by match and a force was the only way past it. The world
+    // migration folds forced into enabled for manual environments; this authored fixture is not
+    // migrated, so it carries the folded shape directly.
+    enabledTaskIds: ['hb-task-forage', 'hb-task-fungi'],
     enabledEventIds: ['hb-event-wolves', 'hb-event-storm'],
     blindSelection: { weights: { 'hb-task-forage': 3, 'hb-task-fungi': 2 } },
     conditions: { weather: 'rain', timeOfDay: 'night', visibility: '', notes: '' },
@@ -2681,7 +2685,8 @@ const ENVIRONMENTS = [
     // header alert and the travel guidance in its tooltip. That is the one environment card
     // state selection cannot reach, and it sorts last, exactly as its smoke counterpart does.
     includedRealmIds: ['sm-realm-deep'],
-    forcedTaskIds: ['sm-task-prospect'],
+    // Folded for the same reason as `hb-env-thicket` (issue 1315).
+    enabledTaskIds: ['sm-task-prospect'],
     enabledEventIds: ['sm-event-collapse'],
     conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
     nodeRuntime: {},
