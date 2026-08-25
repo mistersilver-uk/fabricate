@@ -192,7 +192,7 @@ const READINESS_ISSUE_MESSAGES = {
   disabledIncomplete: 'Recipe is disabled and cannot be enabled until its gaps are fixed.',
   noAvailableTasks: 'Environment has no available gathering tasks.',
   activeNoComposition: 'Environment is active but composes no available tasks.',
-  staleIncluded: 'Environment includes a task/event that is no longer available.',
+  staleIncluded: 'Environment includes a task/event that does not match it.',
   noScene: 'Environment has no linked scene.',
   noEventsAtDanger: 'Environment carries danger but composes no events.',
   taskNoDescription: 'A gathering task has no description.',

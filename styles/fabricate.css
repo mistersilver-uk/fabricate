@@ -13522,14 +13522,17 @@
    four are dead for one reason. Manual mode grew its own Available-to-add section, with an
    icon Force add that does render and does spell the class correctly, and these were left
    behind. Which way to repair that is a product decision about where a manual force-add
-   belongs, so it is reported rather than re-gated here. Until it is taken, this rule's only
-   consumer outside the icon control is a branch nothing can reach, so treat "has a call site"
-   as a statement about the vocabulary and not about pixels on a screen.
+   As of issue 1315 the role has a real rendering consumer for the first time: the labelled
+   Force add in the automatic-mode Non-matching list, which is where overriding a filter — and
+   therefore the word "warning" — actually means something. The `.manager-icon-button` half of
+   these two selectors is retired with it: its only consumer was the manual-mode icon Force add
+   that 1315 deletes, `manager-icon-button` is hand-applied at call sites rather than emitted by
+   a primitive with a role, so nothing can write that pair again without deliberately reaching
+   for it.
 
    The three declarations are paint only. That is what makes the role order-independent
    against `.manager-button.fab-manager-button`, which states geometry and no colour. */
-.fabricate-manager .manager-button.is-warning-action:not(:disabled),
-.fabricate-manager .manager-icon-button.is-warning-action:not(:disabled) {
+.fabricate-manager .manager-button.is-warning-action:not(:disabled) {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
@@ -13560,8 +13563,7 @@
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-button.is-warning-action:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-warning-action:not(:disabled):hover {
+.fabricate-manager .manager-button.is-warning-action:not(:disabled):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);

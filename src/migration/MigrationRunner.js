@@ -23,6 +23,7 @@ import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateInvertRecipeItemLink } from './migrateInvertRecipeItemLink.js';
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
+import { migrateManualCompositionForces } from './migrateManualCompositionForces.js';
 import { migrateMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
@@ -596,6 +597,29 @@ const MIGRATIONS = [
     downgradeTo: '1.27.0',
     downgradeLosesData: true,
     migrate: (data) => migrateCharacterLibrariesToWorldScope(data),
+  },
+  {
+    version: '1.29.0',
+    label:
+      'Give every gathering environment ONE list that decides what it composes. Force add is ' +
+      "now an override of AUTOMATIC mode's biome-and-danger filter, which is the only mode " +
+      'that has a filter to override; MANUAL mode composes exactly the records you picked, ' +
+      "matching or not. So each manual environment's force-added tasks and events are FOLDED " +
+      'into its picked list — appended in order, de-duplicated, with the display order left ' +
+      'alone — because force add rendered in manual mode until now, and a manual environment ' +
+      'whose picks were all force-added would otherwise compose NOTHING after the upgrade. ' +
+      'Force lists are then cleared on every environment, automatic ones included: force add ' +
+      'has never rendered in automatic mode in any released version, so an entry there is ' +
+      'residue from a manual editing session or from an imported bundle, it composed nothing ' +
+      'before and it must compose nothing now — which is what keeps the documented guarantee ' +
+      'that switching a manual environment to automatic does not silently make its force-added ' +
+      'non-matching records available. NO ENVIRONMENT LOSES OR GAINS A COMPOSED RECORD. ' +
+      'DOWNGRADING IS NOT LOSSLESS: 1.28.0 filters a manual environment by match and reads an ' +
+      'empty force list, so every non-matching record this migration rescued would vanish from ' +
+      'the environment again, with no force list left to re-express it',
+    downgradeTo: '1.28.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateManualCompositionForces(data),
   },
   // Future migrations added here in version order
 ];

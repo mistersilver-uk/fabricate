@@ -800,6 +800,41 @@ The `1.28.0` settings-data migration (`src/migration/migrateCharacterLibrariesTo
     A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.28.0`, so the pass does not re-run, and the allowlist rebuild discards the re-authored libraries on that system's next save.
 13. **The `label` string is the one string a GM ever reads about this migration**, so it names the collision outcome, tells them to check the two library editors afterwards, and says what the downgrade costs.
 
+### Manual Composition Force-List Fold (`1.29.0`, `downgradeTo: '1.28.0'`, pure, copy-on-write, idempotent)
+
+Issue 1315 gives every gathering environment ONE list that decides what it composes: force add becomes an override of AUTOMATIC mode's biome-and-danger filter — the only mode that has a filter to override — and MANUAL mode composes exactly the records the GM picked in `enabled*Ids`, matching or not (*gathering-and-harvesting* §12a, §12b).
+Both halves of that rule move records, so the `1.29.0` settings-data migration (`src/migration/migrateManualCompositionForces.js`) exists to make sure none are lost: it reads the `environments` payload, folds and clears, and returns it.
+It mutates no input, throws no `FatalMigrationError`, and skips a malformed environment rather than repairing it, because repair is the normalizer's job.
+
+1. **The FOLD applies to `compositionMode === 'manual'` environments only.**
+   Every id in `forcedTaskIds` is appended to `enabledTaskIds` and every id in `forcedEventIds` to `enabledEventIds`, de-duplicated by normalized id, existing entries left byte-identical and in place and new ids appended in the order the force list held them.
+   `taskOrder` and `eventOrder` are DISPLAY order and are untouched, so composed order does not move.
+   Without the fold those records would simply stop composing: force add RENDERED in manual mode until this change — that is the defect 1315 reports — so a real world holds manual environments whose entire composed set lives in a force list.
+2. **The CLEAR applies to EVERY environment, manual and automatic alike.**
+   Force add has never rendered in automatic mode in any released version (`09d8e5f1`, the environment editor's first commit, already gated those branches on the mode their own enclosing section excludes) and `setEnvironmentCompositionMode` clears nothing when a GM flips a mode, so an automatic force entry is residue from a manual editing session or from an imported bundle.
+   It composed nothing before this migration and it must compose nothing after it, which is the ONLY thing keeping `docs/gathering-environments.md`'s documented guarantee true: switching from manual to automatic does not silently make force-added non-matching records available.
+   Activating those entries instead would have been the reverse of a repair — it would make every world that ever edited an environment in manual mode gain composed records at upgrade, silently.
+3. **NO ENVIRONMENT LOSES OR GAINS A COMPOSED RECORD**, which is the property the whole pass is shaped around and the one an acceptance test states directly.
+   A manual environment composes the union of its prior picked and forced lists, which is what it composed before; an automatic environment composes what its filter and `disabled*Ids` already gave it; and a record disabled in the library never composed and still does not, because the library-enabled gate precedes both modes.
+4. **The mode predicate is STRICT `=== 'manual'`**, matching `resolveGatheringCompositionMode` and the store's own gate.
+   An absent, `undefined`, wrong-case (`'Manual'`, `'MANUAL'`) or garbage (`42`, `{}`) mode is automatic everywhere else in the module, so reading any of them as manual here would fold force entries into a list automatic mode ignores — a silent loss dressed as a rescue.
+5. **A cleared list is a DELETED KEY, not `[]`.**
+   `GatheringEnvironmentStore._normalizeEnvironment` emits `forced*Ids` only when it is non-empty, so absence is the shape the world's own next save produces; writing `[]` would invent a shape this module never writes for itself, and — because the runner detects change by `JSON.stringify` — would rewrite the whole environment list of every world that has no force lists at all.
+   Both shapes exist in the wild regardless, and every consumer reads through `normalizeIdList` or `gatheringComposition`'s `idList`, which map an absent key and an empty array to the same `[]`.
+6. **An already-empty force list is left exactly as found, key and all**, and its environment is returned BY REFERENCE and counts as unmigrated.
+   The reference identity is load-bearing for the same reason it is in `1.28.0` requirement 6: the runner compares JSON over the whole corpus, so rebuilding every environment into an equal copy would report a change in every world and rewrite the corpus for nothing.
+   An untouched corpus returns the INPUT ARRAY itself with `migratedCount` 0.
+7. **Idempotence is proven twice**: the pure function re-run is byte-identical with `migratedCount` 0 because there is no force list left to find, AND the runner's version gate blocks re-entry.
+   Neither depends on the other, which is what makes a regression in either one visible.
+8. **The transform is SHARED with the export-payload upcast** (`applyManualCompositionForceFold`), not reimplemented, and `migrateExportPayload` applies it branch-independently.
+   Import is a second ingress for the very records this pass rescues, because `importReferenceResolver` carries `forcedTaskIds` and `forcedEventIds` through import untouched; see *import-export*.
+9. **Mutated setting keys:** `environments` (rewritten in place).
+   The runner's payload does not grow: `environments` is already one of the settings it threads, so unlike `1.26.0`, `1.27.0` and `1.28.0` this pass adds no read, snapshot, pass or writeback point.
+10. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the literal string `DOWNGRADING IS NOT LOSSLESS` in the `label` beside the very Downgrade button it is about.
+    `1.28.0` filters a manual environment by match and reads an empty force list, so after the fold every non-matching record this migration rescued vanishes from its environment again — exactly the records it rescued, and with no force list left to re-express them.
+    The `enabled*Ids` entries themselves survive the downgrade; what is lost is their COMPOSITION, silently, because the old engine drops a picked record that no longer matches rather than reporting it.
+11. **The `label` string is the one string a GM ever reads about this migration**, so it states the new rule in both modes, says the fold is what stops a manual environment composing nothing after the upgrade, says the clear is what keeps the manual-to-automatic guarantee, and names the downgrade cost.
+
 ### Catalyst → Tool Migration (`0.6.0`)
 
 The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.

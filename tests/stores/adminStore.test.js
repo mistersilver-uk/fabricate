@@ -6267,14 +6267,18 @@ describe('createAdminStore', () => {
       assert.equal(staleManualDisabled.runtimeState, 'unavailable');
       assert.equal(composition.counts.excludedTasks, 0);
 
+      // The editor offers no force add in manual mode any more (issue #1315), but the store
+      // method survives for the automatic-mode control, so this pins that writing the force list
+      // on a MANUAL environment classifies nothing: manual mode reads `enabledTaskIds` and no
+      // other list. A flip that made forces manual-only again reds here, on the draft state the
+      // GM would actually be looking at.
       store.forceIncludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
-      assert.ok(draft.forcedTaskIds.includes('t-desert'));
+      assert.ok(draft.forcedTaskIds.includes('t-desert'), 'the write itself still lands');
       composition = get(store.viewState).environmentComposition;
-      assert.equal(
-        composition.tasks.find((entry) => entry.id === 't-desert').compositionState,
-        'forceIncluded'
-      );
+      const inertForce = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(inertForce.compositionState, 'notMatching');
+      assert.equal(inertForce.runtimeState, 'unavailable');
 
       store.excludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
@@ -6284,6 +6288,57 @@ describe('createAdminStore', () => {
       const removedForced = composition.tasks.find((entry) => entry.id === 't-desert');
       assert.equal(removedForced.compositionState, 'notMatching');
       assert.equal(removedForced.runtimeState, 'unavailable');
+    });
+
+    it('automatic composition classifies a forced record as forceIncluded, matching or not', async () => {
+      // The mode where force add LIVES (issue #1315), and the classification arm that did not
+      // exist before it: without this, a flip making `forceIncluded` unreachable in either mode
+      // would ship green, because every other force test in this suite is a manual-mode one.
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [
+              { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
+              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
+              { id: 't-off', name: 'Retired', enabled: false, biomes: ['desert'], dropRows: [] },
+            ],
+            events: [],
+          },
+        },
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.createEnvironmentDraft();
+      store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'automatic' });
+
+      store.forceIncludeEnvironmentRecord('task', 't-desert');
+      let draft = get(store.viewState).environmentDraft;
+      assert.ok(draft.forcedTaskIds.includes('t-desert'));
+      let composition = get(store.viewState).environmentComposition;
+      const forced = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(forced.matches, false, 'the record still does not match the environment');
+      assert.equal(forced.compositionState, 'forceIncluded');
+      assert.equal(forced.runtimeState, 'available', 'and it composes anyway, which is the point');
+
+      // Exclude beats force on the same record, and the GM-visible state says which won.
+      store.updateEnvironmentDraft({ disabledTaskIds: ['t-desert'] });
+      composition = get(store.viewState).environmentComposition;
+      const collided = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(collided.compositionState, 'excluded');
+      assert.equal(collided.runtimeState, 'unavailable');
+
+      // A force cannot reach past the library gate either.
+      store.updateEnvironmentDraft({ disabledTaskIds: [] });
+      store.forceIncludeEnvironmentRecord('task', 't-off');
+      draft = get(store.viewState).environmentDraft;
+      assert.ok(draft.forcedTaskIds.includes('t-off'));
+      composition = get(store.viewState).environmentComposition;
+      const libraryDisabled = composition.tasks.find((entry) => entry.id === 't-off');
+      assert.equal(libraryDisabled.compositionState, 'libraryDisabled');
+      assert.equal(libraryDisabled.runtimeState, 'unavailable');
     });
 
     it('manual event removal clears include and force state without local exclusion', async () => {
@@ -6339,6 +6394,9 @@ describe('createAdminStore', () => {
       );
     });
 
+    // AUTOMATIC mode, because the two populations this test needs — records that compose by
+    // matching and a record that composes by force — can only coexist there since issue #1315.
+    // Manual mode composes exactly the picked list and ignores `forcedEventIds` entirely.
     it('reorders all included events including condition-blocked force-added events', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
@@ -6388,25 +6446,23 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({
         biomes: ['cave'],
         dangerLevel: 'hazardous',
-        compositionMode: 'manual',
+        compositionMode: 'automatic',
       });
 
-      store.includeEnvironmentRecord('event', 'h-cave');
-      store.includeEnvironmentRecord('event', 'h-gas');
-      store.includeEnvironmentRecord('event', 'h-storm');
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
+      // Seeded explicitly: force-adding appends to `eventOrder`, so without this the forced row
+      // would rank first and every index below would address a different record.
+      store.updateEnvironmentDraft({ eventOrder: ['h-cave', 'h-gas', 'h-storm', 'h-desert'] });
 
       let composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter((entry) =>
-            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
-          )
+          .filter((entry) => ['includedByMatch', 'forceIncluded'].includes(entry.compositionState))
           .map((entry) => entry.id),
         ['h-cave', 'h-gas', 'h-storm', 'h-desert']
       );
       const conditionBlocked = composition.events.find((entry) => entry.id === 'h-storm');
-      assert.equal(conditionBlocked.compositionState, 'explicitlyIncluded');
+      assert.equal(conditionBlocked.compositionState, 'includedByMatch');
       assert.equal(conditionBlocked.runtimeState, 'unavailable');
       const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.compositionState, 'forceIncluded');
@@ -6419,9 +6475,7 @@ describe('createAdminStore', () => {
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter((entry) =>
-            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
-          )
+          .filter((entry) => ['includedByMatch', 'forceIncluded'].includes(entry.compositionState))
           .map((entry) => entry.id),
         ['h-storm', 'h-cave', 'h-gas', 'h-desert']
       );
@@ -6432,6 +6486,9 @@ describe('createAdminStore', () => {
     });
 
     it('keeps force-added events included after environment edits make them match', async () => {
+      // AUTOMATIC mode (issue #1315): force add is an automatic-mode override, so this is where a
+      // force can outlive the mismatch that motivated it. `h-cave` spans both biomes so that the
+      // edit below moves the FORCED record's match state without emptying the included list.
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -6443,7 +6500,7 @@ describe('createAdminStore', () => {
               {
                 id: 'h-cave',
                 name: 'Cave Event',
-                biomes: ['cave'],
+                biomes: ['cave', 'desert'],
                 dangerTags: ['hazardous'],
                 dropRate: 25,
               },
@@ -6464,18 +6521,29 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({
         biomes: ['cave'],
         dangerLevel: 'hazardous',
-        compositionMode: 'manual',
+        compositionMode: 'automatic',
       });
 
-      store.includeEnvironmentRecord('event', 'h-cave');
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
+      let composition = get(store.viewState).environmentComposition;
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-desert').matches,
+        false,
+        'the force starts out overriding a real mismatch'
+      );
+
       store.updateEnvironmentDraft({ biomes: ['desert'] });
 
-      let composition = get(store.viewState).environmentComposition;
+      composition = get(store.viewState).environmentComposition;
       const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.matches, true);
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'available');
+
+      // Seeded explicitly, because force-adding a record appends it to `eventOrder` and nothing
+      // else here writes that list — the matched record would otherwise rank last by default and
+      // the drag below would read as moving the wrong row.
+      store.updateEnvironmentDraft({ eventOrder: ['h-cave', 'h-desert'] });
 
       assert.equal(store.reorderEnvironmentRecord('event', 0, 1), true);
       const draft = get(store.viewState).environmentDraft;
@@ -6488,7 +6556,7 @@ describe('createAdminStore', () => {
               'includedByMatch',
               'explicitlyIncluded',
               'forceIncluded',
-              'includedButUnavailable',
+              'includedNotMatching',
             ].includes(entry.compositionState)
           )
           .map((entry) => entry.id),

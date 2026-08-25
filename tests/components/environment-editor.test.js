@@ -51,6 +51,25 @@ const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'))
 // whitespace-tolerant regex because Prettier prints an import list on one line or several
 // depending on the importing file's path depth, and a needle that only matched one of those
 // spellings would go quietly green the day the other one was printed.
+/**
+ * The slice of `CompositionList.svelte` belonging to one `data-section`, from its marker to the
+ * next section's (or end of file).
+ *
+ * Force add is ONE verb rendered from two places in that file, and since issue #1315 both live in
+ * the same section — the automatic-mode Non-matching list — while the manual Available-to-add list
+ * has none at all. A file-wide `includes('data-action="force-include"')` therefore cannot tell the
+ * surviving control from the deleted one, and an assertion carrying a manual-mode message would go
+ * on passing on the automatic-mode twin. Every assertion about where a composition control lives
+ * is scoped through here.
+ */
+function listSection(name) {
+  const start = listSource.indexOf(`data-section="${name}"`);
+  assert.ok(start !== -1, `CompositionList.svelte should still render a ${name} section`);
+  const rest = listSource.slice(start + 1);
+  const next = rest.indexOf('data-section="');
+  return listSource.slice(start, next === -1 ? listSource.length : start + 1 + next);
+}
+
 const SHARED_INCLUDED_STATES_IMPORT =
   /import\s*\{[^}]*\bENVIRONMENT_INCLUDED_COMPOSITION_STATES\b[^}]*\}\s*from\s*'[^']*systems\/gatheringComposition\.js'/;
 
@@ -106,7 +125,12 @@ describe('environment editor localization', () => {
       ['Composition.ColEvent', 'Event'],
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
-      ['Composition.ManualHint', 'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.'],
+      // BOTH modes are pinned (issue #1315), because the sentences are a matched pair and the
+      // defect being guarded is a mode learning the other's affordance: manual must not offer a
+      // force add, and automatic must say it has one. Pinning only the mode that changed would
+      // leave the other free to drift back.
+      ['Composition.ManualHint', 'Only the tasks and events you add are available, whether or not they match this environment.'],
+      ['Composition.AutomaticHint', 'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.'],
       ['Inspector.OverridesHintTask', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.'],
       ['Inspector.OverridesHintEvent', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source event.'],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
@@ -118,12 +142,33 @@ describe('environment editor localization', () => {
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
-      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
-      ['Events.ManualIntro', 'Only events you explicitly include apply here. You can add matching events or force add non-matching events.']
+      ['Tasks.ManualIntro', 'Only tasks you add are available to players, whether or not they match this environment.'],
+      ['Tasks.AutomaticIntro', 'All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.'],
+      ['Events.ManualIntro', 'Only events you add apply here, whether or not they match this environment.'],
+      ['Events.AutomaticIntro', 'All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.']
     ];
 
     for (const [path, value] of expected) {
       assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
+    }
+
+    // The mutation-proof half of the pair above: no manual-mode sentence may offer a force add,
+    // and every automatic-mode one must. A re-word that reintroduced the retired affordance into
+    // the manual copy would satisfy every byte-equality assertion above by simply being updated
+    // alongside them; this reds on the WORDS, wherever the sentence is re-written next.
+    for (const path of ['Composition.ManualHint', 'Tasks.ManualIntro', 'Events.ManualIntro']) {
+      const value = path.split('.').reduce((node, part) => node?.[part], editor);
+      assert.ok(
+        !/force/i.test(value),
+        `EnvironmentEditor.${path} must not offer a force add: manual mode has no filter to override (${value})`
+      );
+    }
+    for (const path of ['Composition.AutomaticHint', 'Tasks.AutomaticIntro', 'Events.AutomaticIntro']) {
+      const value = path.split('.').reduce((node, part) => node?.[part], editor);
+      assert.ok(
+        /force add/i.test(value),
+        `EnvironmentEditor.${path} must name the force add, which is an automatic-mode override (${value})`
+      );
     }
 
     // Region is no longer a composition axis; the readiness check and its
@@ -152,16 +197,23 @@ describe('environment editor localization', () => {
       !validationSource.includes('CheckRegion') && !validationSource.includes('hasRegion'),
       'the region readiness check and its dynamic fallback should be removed'
     );
-    for (const snippet of [
-      'task: [\'IssueStaleIncludedTask\', \'The task "{name}" no longer matches this environment.\']',
-      'event: [\'IssueStaleIncludedEvent\', \'The event "{name}" no longer matches this environment.\']',
-      'task: [\'IssueTaskNoDescriptionTask\', \'The task "{name}" has no player-facing description.\']'
+    // Prettier prints these two entries across several lines once the sentence grows, so they are
+    // matched as whitespace-tolerant patterns rather than as one-line needles that would silently
+    // stop matching (and read green) the next time the copy is re-wrapped.
+    for (const pattern of [
+      /'IssueStaleIncludedTask',\s*'The task "\{name\}" does not match this environment, and composes anyway\.'/,
+      /'IssueStaleIncludedEvent',\s*'The event "\{name\}" does not match this environment, and composes anyway\.'/,
+      /'IssueTaskNoDescriptionTask',\s*'The task "\{name\}" has no player-facing description\.'/
     ]) {
-      assert.ok(validationSource.includes(snippet), `${snippet} should match the English catalog`);
+      assert.match(validationSource, pattern, 'the dynamic fallback should match the English catalog');
     }
     assert.ok(
-      /descFallback:\s*'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events\.'/.test(modeControlSource),
+      /descFallback:\s*'Only the tasks and events you add are available, whether or not they match this environment\.'/.test(modeControlSource),
       'ManualHint dynamic fallback should match the English catalog'
+    );
+    assert.ok(
+      /descFallback:\s*'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one\.'/.test(modeControlSource),
+      'AutomaticHint dynamic fallback should match the English catalog'
     );
   });
 
@@ -274,7 +326,7 @@ describe('environment composition editor structure', () => {
   });
 
   it('the runtime preview inspector carries the full runtime counts', () => {
-    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-events', 'excluded-events', 'unavailable-included']) {
+    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-events', 'excluded-events', 'included-not-matching']) {
       assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
     }
     assert.ok(summaryInspectorSource.includes('manager-fact-grid manager-environment-runtime-grid'), 'runtime preview uses the shared inspector fact grid');
@@ -297,16 +349,22 @@ describe('environment composition editor structure', () => {
 
   it('collapses task row actions into the overflow menu while preserving event row controls', () => {
     assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
-    assert.ok(/data-action="include"\s+onclick=\{\(\) => \{\s*onInclude/.test(listSource), 'task include action is available from a menu item');
-    assert.ok(/data-action="force-include"\s+onclick=\{\(\) => \{\s*onForceInclude/.test(listSource), 'task force-add action is available from a menu item');
+    assert.ok(/data-action="include"\s+onclick=\{\(\) => \{\s*onInclude/.test(listSection('available-to-add')), 'the manual Available to add menu offers a plain include');
+    assert.ok(/data-action="force-include"\s+onclick=\{\(\) => \{\s*onForceInclude/.test(listSection('non-matching')), 'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)');
     assert.ok(/data-action="restore"\s+onclick=\{\(\) => \{\s*onRestore/.test(listSource), 'task restore action is available from a menu item');
     assert.ok(/data-action="exclude"\s+onclick=\{\(\) => \{\s*onExclude/.test(listSource), 'task remove/exclude action remains available from a menu item');
     assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
     assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick remove action through the shared exclude handler');
     assert.ok(listSource.includes('Composition.QuickRemove'), 'manual included task quick action uses Remove copy');
     assert.ok(listSource.includes('Composition.Remove'), 'manual included task menu action uses Remove from environment copy');
-    assert.ok(listSource.includes("data-quick-action=\"include\""), 'available matching task rows expose a quick add action');
-    assert.ok(listSource.includes("data-quick-action=\"force-include\""), 'available non-matching task rows expose a quick force-add action');
+    assert.ok(listSection('available-to-add').includes("data-quick-action=\"include\""), 'available task rows expose a quick add action');
+    // The deleted manual force add (issue #1315). Manual mode has no filter for a force to
+    // override, so a non-matching row is plainly added: one verb, one icon, whether it matches or
+    // not. Scoped to the section, because the surviving control spells the same `data-action` and
+    // a file-wide negative would red on it.
+    assert.ok(!listSection('available-to-add').includes('force-include'), 'the manual Available to add list offers no force add at all');
+    assert.ok(/availableRowAction\(entry\) === 'include'/.test(listSource), 'and its rows key off the plain include action');
+    assert.ok(!/return 'force-include'/.test(listSource), 'availableRowAction no longer returns a force-add action for any row');
     assert.ok(listSource.includes("{#if showEventRankControls}"), 'ranked event rows keep their distinct action/reorder branch');
     assert.ok(listSource.includes('showEventRankControls'), 'event drag reordering is tied to ranked event controls');
     assert.ok(!listSource.includes('{#if showEventRankControls}<span class="manager-environment-comp-handle"></span>{/if}'), 'non-ranked event sections do not render blank handle placeholders');
@@ -433,8 +491,14 @@ describe('environment composition editor structure', () => {
     assert.ok(/nonMatching = \$derived\(\s*records\.filter\(\s*\(entry\) =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\s*\)\s*\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
     assert.ok(listSource.includes('<Pagination'), 'the standalone non-matching list is still paginated where it remains visible');
     assert.ok(!listSource.includes('DiagnosticsDisclosure'), 'the diagnostics disclosure is replaced by the non-matching list');
-    assert.ok(listSource.includes('data-action="include"'), 'matching available-to-add rows expose an include action');
-    assert.ok(listSource.includes('data-action="force-include"'), 'manual mode exposes a force-add action on non-matching rows');
+    assert.ok(listSection('available-to-add').includes('data-action="include"'), 'manual available-to-add rows expose an include action');
+    // Was a file-wide `includes('data-action="force-include"')` asserting that MANUAL mode offers
+    // a force add — a claim its own regex could not check, since the two twins spell the attribute
+    // identically. Issue #1315 deleted the manual control and revived the automatic one, so the
+    // original assertion would have kept passing on the opposite control while stating the
+    // opposite rule. Both halves are now scoped and asserted.
+    assert.ok(listSection('non-matching').includes('data-action="force-include"'), 'automatic mode exposes the force-add action on non-matching rows');
+    assert.ok(!listSection('available-to-add').includes('data-action="force-include"'), 'and manual mode does not');
     assert.ok(listSource.includes('LibraryDisabledNote'), 'library-disabled rows show an "enable in library first" note');
     assert.ok(listSource.includes('OpenSource'), 'available-to-add rows keep open-source in the overflow menu');
   });
@@ -503,13 +567,14 @@ describe('environment composition editor structure', () => {
   it('tab badges count composition membership and split validation severities', () => {
     assert.ok(!shellSource.includes('tasks: counts.availableTasks || 0'), 'Tasks badge should not use runtime availableTasks');
     assert.ok(!shellSource.includes('events: counts.availableEvents || 0'), 'Events badge should not use runtime availableEvents');
-    // RENAMED from `countComposedRecords` (issue #1321). It filters the four-state INCLUDED
-    // set and always did; `includedButUnavailable` is shown as an included row and is NOT
-    // composed. With both sets now exported one declaration apart from
-    // `src/systems/gatheringComposition.js`, the old name was an instruction to swap the
-    // import and silently drop a row from both badges. The negative carries a trailing `(`
-    // so it forbids the CALL and the DECLARATION while leaving the source comment that
-    // records the rename free to name it.
+    // RENAMED from `countComposedRecords` (issue #1321). It filters the four-state INCLUDED set
+    // and always did. The two sets hold the same four members since issue #1315 made
+    // `includedNotMatching` compose, so swapping the import changes nothing TODAY — which is
+    // exactly why the name still matters: with both exported one declaration apart from
+    // `src/systems/gatheringComposition.js`, a name that says "composed" while counting "included"
+    // is an instruction to swap it, and the next state to join one set and not the other turns
+    // that into a silently wrong badge. The negative carries a trailing `(` so it forbids the CALL
+    // and the DECLARATION while leaving the source comment that records the rename free to name it.
     assert.ok(shellSource.includes('countIncludedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
     assert.ok(shellSource.includes('countIncludedRecords(composition?.events)'), 'Events badge should derive from event composition records');
     assert.ok(!shellSource.includes('countComposedRecords('), 'the badge count no longer carries a name that says "composed" while counting "included"');
@@ -570,29 +635,38 @@ describe('evaluateEnvironmentReadiness', () => {
 
   it('does not block enabling when only advisory issues are present', () => {
     const composition = {
-      counts: { availableTasks: 1, unavailableTasks: 1 },
-      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedButUnavailable', record: { name: 'Stale Task' } }],
+      counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
+      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
       events: []
     };
     const { issues } = evaluateEnvironmentReadiness(environment, composition);
     const stale = issues.find(issue => issue.id === 'staleIncluded');
-    // staleIncluded is advisory critical and carries no blocks field.
+    // The not-matching note carries no blocks field and never did.
     assert.equal(stale.blocks, undefined);
     assert.equal(blocksEnable(issues), false);
   });
 
-  it('raises a critical issue for an included-but-unavailable record', () => {
+  it('raises an informational note for a picked record that does not match', () => {
+    // `info`, not `critical` (issue #1315). Manual mode composes exactly the picked list with no
+    // match filter, so a non-matching pick RUNS — it is a deliberate choice, not stale state, and
+    // a critical error told the GM to undo what the product's own contract invites. The note
+    // survives because the Included list would otherwise show it identically to a matching pick.
     const composition = {
-      counts: { availableTasks: 1, unavailableTasks: 1 },
-      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedButUnavailable', record: { name: 'Stale Task' } }],
+      counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
+      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
       events: []
     };
     const { issues, checks } = evaluateEnvironmentReadiness(environment, composition);
     const stale = issues.find(issue => issue.id === 'staleIncluded');
-    assert.ok(stale, 'should flag stale included record');
+    assert.ok(stale, 'should flag the non-matching pick');
+    assert.equal(stale.severity, 'info');
     assert.equal(stale.recordId, 'stale');
-    assert.equal(stale.recordName, 'Stale Task');
-    assert.equal(checks.find(check => check.id === 'noStaleIncluded').satisfied, false);
+    assert.equal(stale.recordName, 'Picked Task');
+    assert.equal(
+      checks.find(check => check.id === 'noStaleIncluded'),
+      undefined,
+      'a deliberate non-matching pick is a note, not an unmet readiness check'
+    );
   });
 
   it('reports informational issues for locally excluded records', () => {

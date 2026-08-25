@@ -156,8 +156,8 @@ How a triggered event affects the attempt is controlled by the system's **Event 
 Return to the **Environments** tab and select the environment from Step 4 to add your tasks and events into it.
 
 1. In the environment's **Overview**, set a **Composition mode**:
-   - **Automatic:** every matching, enabled task and event applies unless you explicitly exclude it
-   - **Manual:** only tasks and events you explicitly **add** apply
+   - **Automatic:** every matching, enabled task and event applies unless you explicitly exclude it, and you can **Force add** a non-matching one
+   - **Manual:** only the tasks and events you explicitly **add** apply, matching or not
 2. On the **Tasks** and **Events** tabs, confirm the tasks and events you want are included for this environment
 3. Enable the environment and save
 

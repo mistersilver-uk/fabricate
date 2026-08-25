@@ -639,8 +639,14 @@ export class CompendiumImporter {
       : [];
     const resolvedConfig = resolved.gatheringConfig;
 
-    await this._persistEnvironments(system.id, resolvedEnvironments);
+    // The task LIBRARY lands before the environments that reference it. An environment's
+    // enable gate asks whether it composes at least one task, and in automatic mode that
+    // question can only be answered against the library — so persisting environments first
+    // validates them against whatever the destination world already had. That ordering was
+    // latent until issue 1315 closed the gate's mode-blind `enabledTaskIds` guard, which had
+    // been answering "yes" for automatic environments without consulting the library at all.
     await this._persistGatheringConfig(system.id, resolvedConfig);
+    await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistCurrencyConfig(packData.currencyConfig);
     await this._persistTravelConfig(resolved.travelConfig);
   }

@@ -3646,22 +3646,25 @@ export function createAdminStore(services) {
         conditions,
         { includeDanger, conditionSettings }
       );
+      // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
+      // issue 1315); manual mode has no filter to override, so it has neither.
       const excluded = compositionMode !== 'manual' && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
-      // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
-      const forceIncluded = compositionMode === 'manual' && forced.includes(id);
+      const forceIncluded = compositionMode !== 'manual' && forced.includes(id);
 
       let compositionState;
       if (!libraryEnabled) compositionState = 'libraryDisabled';
+      // Exclude is checked before force so the two can collide on the same record without a
+      // branch order bug deciding it silently: exclude wins.
       else if (excluded) compositionState = 'excluded';
       else if (forceIncluded) compositionState = 'forceIncluded';
-      // In automatic mode the enabled allow-list is ignored (matching the runtime composition
-      // service), so a non-matching record is always "not matching" — never a stale
-      // "included but unavailable". Only manual mode honors the explicit inclusion.
+      // Manual mode composes exactly `enabled*Ids`, with no match filter (maintainer ruling), so
+      // a picked non-matching record still composes — it is `includedNotMatching`, not a stale
+      // unreachable state, and stays distinct from `notMatching` so the Included list can flag it.
       else if (!matches)
         compositionState =
           compositionMode === 'manual' && explicitlyIncluded
-            ? 'includedButUnavailable'
+            ? 'includedNotMatching'
             : 'notMatching';
       else if (compositionMode === 'manual')
         compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
@@ -3669,10 +3672,9 @@ export function createAdminStore(services) {
 
       // A record is runtime-available only when its composition state would compose it AND
       // the current weather/time satisfy the record's required conditions. `composed` is the
-      // projection of `environmentComposesRecord` onto the vocabulary — the shared three-state
-      // set, deliberately narrower than the four-state `ENVIRONMENT_INCLUDED_COMPOSITION_STATES`
-      // used to build the "Included" list, since a stale `includedButUnavailable` row is shown
-      // but not composed.
+      // projection of `environmentComposesRecord` onto the vocabulary — the shared four-state
+      // set (see `gatheringComposition.js`), which now includes `includedNotMatching` because a
+      // manual pick composes whether or not it currently matches.
       const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
       const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
@@ -3812,11 +3814,11 @@ export function createAdminStore(services) {
       availableTasks: 0,
       excludedTasks: 0,
       candidateTasks: 0,
-      unavailableTasks: 0,
+      includedNotMatchingTasks: 0,
       availableEvents: 0,
       excludedEvents: 0,
       candidateEvents: 0,
-      unavailableEvents: 0,
+      includedNotMatchingEvents: 0,
       diagnosticTasks: 0,
       diagnosticEvents: 0,
       requiredTools: 0,
@@ -3851,13 +3853,18 @@ export function createAdminStore(services) {
       const available = records.filter((r) => r.runtimeState === 'available').length;
       const excluded = records.filter((r) => r.compositionState === 'excluded').length;
       const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-      const unavailable = records.filter(
-        (r) => r.compositionState === 'includedButUnavailable'
+      // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime
+      // available whenever conditions are met. The field was called `unavailable*` and fed a
+      // GM-facing fact labelled "Included but unavailable" — a number that had inverted against
+      // its own label — so producer, consumers, `data-runtime-fact` and label key were renamed
+      // with it.
+      const includedNotMatching = records.filter(
+        (r) => r.compositionState === 'includedNotMatching'
       ).length;
       const diagnostic = records.filter(
         (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
       ).length;
-      return { available, excluded, candidate, unavailable, diagnostic };
+      return { available, excluded, candidate, includedNotMatching, diagnostic };
     };
     const t = tally(tasks);
     const h = tally(events);
@@ -3865,12 +3872,12 @@ export function createAdminStore(services) {
       availableTasks: t.available,
       excludedTasks: t.excluded,
       candidateTasks: t.candidate,
-      unavailableTasks: t.unavailable,
+      includedNotMatchingTasks: t.includedNotMatching,
       diagnosticTasks: t.diagnostic,
       availableEvents: h.available,
       excludedEvents: h.excluded,
       candidateEvents: h.candidate,
-      unavailableEvents: h.unavailable,
+      includedNotMatchingEvents: h.includedNotMatching,
       diagnosticEvents: h.diagnostic,
       requiredTools: _requiredToolCount(tasks),
     };
@@ -5608,7 +5615,7 @@ export function createAdminStore(services) {
     const records = kind === 'event' ? viewModel.events : viewModel.tasks;
     // Both kinds filter on the shared four-state included set, not `runtimeState`. The prior
     // task-kind branch (`runtimeState === 'available' || compositionState ===
-    // 'includedButUnavailable'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
+    // 'includedNotMatching'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
     // included record whose current weather/time did not match would drop out of `ids`, and this
     // function writes `ids` as the entire new order array — an ambient runtime condition would
     // silently discard that record's saved rank. Using the same predicate-derived set as the

@@ -79,15 +79,17 @@ function validateEnvironmentForFakeCreate(environment) {
   // Mirrors GatheringEnvironmentStore#_environmentHasTaskSource (the ENABLE gate — "may this
   // environment be turned on" — not the composition rule in src/systems/gatheringComposition.js,
   // which answers a different question, "does this record compose"). enabledTaskIds counts as a
-  // task source in ANY mode (a stale allow-list still counts as authored intent); forcedTaskIds
-  // only counts in manual mode — an automatic environment's forcedTaskIds, if ever populated, is
-  // not consulted by the real gate, since forces are a manual-mode affordance. The real gate's
-  // remaining branch, "no ids but an automatic environment matches a library task", needs a
-  // gathering-library fixture this suite does not wire up, so it is intentionally not replicated
-  // here.
+  // task source in MANUAL mode only, because manual composition IS that list. Automatic mode
+  // ignores it and asks the composition predicate instead; that branch needs a gathering-library
+  // fixture this suite does not wire up, so it is intentionally not replicated here and the
+  // `.tasks` stand-in below covers those fixtures. A force list is not a task source in either
+  // mode: issue 1315 moved force add into automatic, where the predicate honours it, and manual
+  // never consults it.
   const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
-  const hasIdTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0)
-    || (compositionMode === 'manual' && Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0);
+  const hasIdTaskSource =
+    compositionMode === 'manual' &&
+    Array.isArray(environment.enabledTaskIds) &&
+    environment.enabledTaskIds.length > 0;
   // Real environments never carry an embedded `tasks` array as a task source — the production gate
   // above does not read `.tasks` at all, and an automatic-mode environment with no ids populated
   // instead falls to matching against the system's gathering library. This fixture predates that:
@@ -1346,13 +1348,47 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(entry.compositionState, 'notMatching');
   });
 
-  it('warns and enumerates auto-mode and manually-enabled environments when an edit drops the match', async () => {
+  it('classifies a forced non-matching task as forceIncluded in automatic mode and notMatching in manual', async () => {
+    // The mode split, in the layer that decides what the GM sees on the row (issue #1315). There
+    // was no automatic-mode `forceIncluded` case anywhere in this suite, so a flip that made the
+    // state unreachable in BOTH modes would have shipped green.
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [
+        makeEnvironment({ id: 'auto', name: 'Auto Cavern', compositionMode: 'automatic', biomes: ['cavern'], forcedTaskIds: ['lib-task'] }),
+        makeEnvironment({ id: 'manual', name: 'Manual Cavern', compositionMode: 'manual', biomes: ['cavern'], forcedTaskIds: ['lib-task'] })
+      ],
+      gatheringConfig: gatheringConfigWithTask()
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.setTab('environments');
+
+    await store.selectEnvironment('auto');
+    const automatic = get(store.viewState).environmentComposition.tasks.find(task => task.id === 'lib-task');
+    assert.equal(automatic.matches, false, 'the forest task does not match a cavern environment');
+    assert.equal(automatic.compositionState, 'forceIncluded');
+    assert.equal(automatic.runtimeState, 'available', 'the force overrides the match filter');
+
+    await store.selectEnvironment('manual');
+    const manual = get(store.viewState).environmentComposition.tasks.find(task => task.id === 'lib-task');
+    assert.equal(manual.compositionState, 'notMatching', 'manual mode has no force to read');
+    assert.equal(manual.runtimeState, 'unavailable');
+  });
+
+  it('warns and enumerates only the environments that can actually lose the record to a match edit', async () => {
+    // Only a mode with a match filter can lose a record to a match edit (issue #1315). Automatic
+    // composes by matching, so it loses one; manual composes exactly the GM's picked list with no
+    // match filter, so a picked record survives any edit to its tags and its environment must NOT
+    // be named — warning a GM about a loss that will not happen is the defect this inverts.
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [
         makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] }),
         makeEnvironment({ id: 'manual-enabled', name: 'Manual Enabled', compositionMode: 'manual', biomes: ['forest'], enabledTaskIds: ['lib-task'] }),
         makeEnvironment({ id: 'manual-forced', name: 'Manual Forced', compositionMode: 'manual', biomes: ['forest'], forcedTaskIds: ['lib-task'] }),
+        makeEnvironment({ id: 'auto-forced', name: 'Auto Forced', compositionMode: 'automatic', biomes: ['cavern'], forcedTaskIds: ['lib-task'] }),
         makeEnvironment({ id: 'auto-excluded', name: 'Auto Excluded', compositionMode: 'automatic', biomes: ['forest'], disabledTaskIds: ['lib-task'] })
       ],
       gatheringConfig: gatheringConfigWithTask(),
@@ -1366,9 +1402,10 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 1);
     const { content } = services._confirmCalls[0];
-    assert.match(content, /Auto Forest/);
-    assert.match(content, /Manual Enabled/);
-    assert.doesNotMatch(content, /Manual Forced/); // force-included records stay regardless of match
+    assert.match(content, /Auto Forest/); // automatic composition is the only kind a match edit can drop
+    assert.doesNotMatch(content, /Manual Enabled/); // a manual pick composes whether or not it matches
+    assert.doesNotMatch(content, /Manual Forced/); // manual mode ignores `forcedTaskIds` entirely
+    assert.doesNotMatch(content, /Auto Forced/); // an automatic force overrides the match filter, so nothing is lost
     assert.doesNotMatch(content, /Auto Excluded/); // locally excluded records are not surfaced today
   });
 
@@ -1439,10 +1476,13 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
-  it('lists manual force-included environments when deleting a library event even without a match', async () => {
+  it('lists automatic force-included environments when deleting a library event even without a match', async () => {
+    // Force add is an automatic-mode override of the match filter (issue #1315), so this is the
+    // mode in which a non-matching record is composed by a force and the delete dialog owes the
+    // GM the environment's name.
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
-      environments: [makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedEventIds: ['lib-haz'] })],
+      environments: [makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'automatic', biomes: ['cavern'], forcedEventIds: ['lib-haz'] })],
       gatheringConfig: { systems: { 'system-a': { tasks: [], events: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
       confirmResult: false
     });
@@ -1457,11 +1497,12 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
-  it('does not list a manual environment whose stale enabled entry no longer matches when deleting', async () => {
+  it('lists a manual environment whose picked record does not match, because it composes anyway', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
-      // Manual environment keeps a stale enabled entry, but the task no longer matches its biome,
-      // so runtime composition does not include it — the delete dialog must not claim it is used.
+      // The manual environment picked a task that does not match its biome. Since issue #1315 that
+      // is not a stale entry at all — manual mode has no match filter, the task composes, and
+      // deleting it really would take it out of this environment.
       environments: [makeEnvironment({ id: 'manual', name: 'Manual Cavern', compositionMode: 'manual', biomes: ['cavern'], enabledTaskIds: ['lib-task'] })],
       gatheringConfig: gatheringConfigWithTask(),
       confirmResult: false
@@ -1473,8 +1514,8 @@ describe('adminStore gathering library match-loss handling', () => {
 
     assert.equal(removed, false);
     assert.equal(services._confirmCalls.length, 1);
-    assert.doesNotMatch(services._confirmCalls[0].content, /Manual Cavern/);
-    assert.doesNotMatch(services._confirmCalls[0].content, /Used by/);
+    assert.match(services._confirmCalls[0].content, /Manual Cavern/);
+    assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
   it('does not warn on match loss for a library-disabled task', async () => {
@@ -1493,10 +1534,11 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(services._confirmCalls.length, 0);
   });
 
-  it('does not warn on match loss for a manual environment that also force-includes the task', async () => {
+  it('does not warn on match loss for a manual environment carrying a leftover force entry', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
-      // Both enabled and forced: force-inclusion keeps it composed after the match edit, so no loss.
+      // Both picked and forced. The PICK is what keeps it composed after the match edit; the force
+      // entry is inert residue from before issue #1315 and changes nothing either way.
       environments: [makeEnvironment({ id: 'manual', name: 'Manual Forest', compositionMode: 'manual', biomes: ['forest'], enabledTaskIds: ['lib-task'], forcedTaskIds: ['lib-task'] })],
       gatheringConfig: gatheringConfigWithTask(),
       confirmResult: true
@@ -1532,8 +1574,10 @@ describe('adminStore gathering library match-loss handling', () => {
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [
         makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] }),
-        // Force-included into a non-matching environment: disabling still removes it here.
-        makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedTaskIds: ['lib-task'] })
+        // Force-added into a non-matching AUTOMATIC environment (issue #1315: the only mode with a
+        // filter for a force to override): disabling in the library still removes it here, because
+        // the library gate precedes both modes and no force can reach past it.
+        makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'automatic', biomes: ['cavern'], forcedTaskIds: ['lib-task'] })
       ],
       gatheringConfig: gatheringConfigWithTask()
     });
@@ -1589,8 +1633,10 @@ describe('adminStore gathering library match-loss handling', () => {
   //   - progressive resolution mode with the crafting check DISABLED and no
   //     progressive rollFormula → a `progressiveNoCheck` system-blocker; and
   //   - a manual environment that explicitly includes a non-matching library task
-  //     (biome mismatch) → an `includedButUnavailable` record → a `staleIncluded`
-  //     task-kind issue that deep-links to the owning environment.
+  //     (biome mismatch) → an `includedNotMatching` record → a `staleIncluded`
+  //     task-kind issue that deep-links to the owning environment. Since issue #1315 that
+  //     record COMPOSES and the issue is an `info` note rather than a critical blocker, but
+  //     it is still the fixture's task-kind row and the smoke capture still needs it.
   it('builds a populated system-validation report for the broken-system fixture', async () => {
     const brokenGatheringConfig = {
       systems: {

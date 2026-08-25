@@ -22,7 +22,8 @@ A system export carries every supported GM-authored record type for that system:
 
 - The crafting system itself: metadata, feature flags, components (with categories, tags, difficulty, and source-item references), essences, recipe-item definitions, tools, item tags, and realms.
 - Its recipes: identity, steps, ingredients (including grouped and alternative options), outputs, checks, tools, and outcomes.
-- Its gathering environments: identity, enabled state, selection and composition mode, scene gate, realm membership, biomes, danger, manual include/exclude/force lists, and local adjustments.
+- Its gathering environments: identity, enabled state, selection and composition mode, scene gate, realm membership, biomes, danger, the manual include list and the automatic exclude and force lists, and local adjustments.
+  An automatic environment's force list survives an export and import unchanged; a manual one is folded into its include list on the way in, because manual composition is that list and has no force add.
 - Its per-system gathering configuration: gathering rules, the biome, danger, weather, and time-of-day options you have configured, reusable Gathering Tasks, reusable events, gathering tools, per-drop modifiers, and your stamina and resource-node settings.
 - Your world's currency configuration: the coin ladder, the spend strategy, the provider, and the currency macros.
 This is carried along with every export because currency is a world setting shared by every crafting system, not something each system configures on its own.

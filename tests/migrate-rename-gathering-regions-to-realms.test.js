@@ -169,7 +169,7 @@ test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at t
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.28.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.29.0', 'advances to the new highest version');
 
   // 1.27.0 runs after this rename and LIFTS the realms to world scope (issue 1282), so the
   // renamed realms land in `travelConfig` rather than back on the system. That the rename
@@ -211,5 +211,5 @@ test('runner: gatheringParties is left untouched (no write) when it is already c
 
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringParties'), false, 'no rewrite when nothing to change');
-  assert.equal(settings.store.get('migrationVersion'), '1.28.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.29.0');
 });

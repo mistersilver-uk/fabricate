@@ -193,7 +193,12 @@ export function buildFullAuthoringFixture() {
       biomes: ['forest'],
       dangerTags: ['unsafe'],
       includedRealmIds: [FIXTURE_REALM_ID],
-      forcedTaskIds: [FIXTURE_TASK_ID],
+      // `enabledTaskIds`, not `forcedTaskIds`: after issue 1315 manual composition IS this list,
+      // and there is no force add in manual mode to produce the other one. A world authored
+      // before that carried the task in `forcedTaskIds`; the 1.29.0 migration folds it to here,
+      // and the import upcast applies the same fold, so this fixture states the folded shape a
+      // GM can actually author today rather than the pre-migration one.
+      enabledTaskIds: [FIXTURE_TASK_ID],
       blindSelection: { weights: { [FIXTURE_TASK_ID]: 3 } },
       conditions: { weather: 'rain', timeOfDay: 'night', visibility: '', notes: '' },
       nodeRuntime: {},

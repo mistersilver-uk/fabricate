@@ -218,17 +218,26 @@ describe('CompositionList mounted layout', () => {
     includeQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'task', 'candidate']);
 
-    const forceIncludeQuick = quickAction('nonmatching', 'force-include');
-    assert.ok(forceIncludeQuick, 'non-matching available task rows render a quick force-add action');
-    assert.equal(forceIncludeQuick.getAttribute('title'), 'Force add');
-    assert.equal(forceIncludeQuick.getAttribute('aria-label'), 'Force add');
-    assert.ok(forceIncludeQuick.querySelector('.fa-circle-plus'), 'quick force add uses the circle-plus icon');
-    forceIncludeQuick.click();
-    assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'nonmatching']);
+    // A non-matching row in MANUAL mode is plainly added (issue #1315): manual composes exactly
+    // the GM's picked list with no match filter, so there is no filter for a force to override and
+    // the row offers the same Add as a matching one.
+    const nonMatchingQuick = quickAction('nonmatching', 'include');
+    assert.ok(nonMatchingQuick, 'non-matching available task rows render the same quick add action');
+    assert.equal(nonMatchingQuick.getAttribute('title'), 'Add');
+    assert.equal(nonMatchingQuick.getAttribute('aria-label'), 'Add');
+    nonMatchingQuick.click();
+    assert.deepEqual(calls.at(-1), ['include', 'task', 'nonmatching']);
+    assert.ok(
+      !target.querySelector('[data-action="force-include"]'),
+      'and manual mode renders no force add anywhere: not on this row, not in any menu'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-force-include'),
+      'nor the labelled one, which lives in the automatic-mode Non-matching section'
+    );
 
-    assert.equal(
-      target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
       'library-disabled rows do not render a quick composition action'
     );
 
@@ -237,25 +246,48 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['include', 'task', 'candidate']);
 
     menu = await openRowMenu('nonmatching');
-    menu.querySelector('[data-action="force-include"]').click();
-    assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'nonmatching']);
+    menu.querySelector('[data-action="include"]').click();
+    assert.deepEqual(calls.at(-1), ['include', 'task', 'nonmatching']);
 
     menu = await openRowMenu('disabled');
     assert.ok(menu.textContent.includes('Enable in library first'));
-    assert.equal(menu.querySelector('[data-action="include"]'), null);
-    assert.equal(menu.querySelector('[data-action="force-include"]'), null);
+    assert.ok(!menu.querySelector('[data-action="include"]'), 'the library gate precedes both modes, so a disabled record cannot be added');
+    assert.ok(!menu.querySelector('[data-action="force-include"]'), 'and no force can reach past it either');
     menu.querySelectorAll('button').item(1).click();
     assert.deepEqual(calls.at(-1), ['openSource', 'task', 'disabled']);
   });
 
-  it('task automatic mode retains Excluded and standalone Non-matching sections', async () => {
-    await renderComposition({ kind: 'task', mode: 'automatic' });
+  it('task automatic mode retains Excluded and standalone Non-matching sections, and force-adds from the row menu', async () => {
+    const calls = [];
+    await renderComposition({
+      kind: 'task',
+      mode: 'automatic',
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
+    });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.equal(target.querySelector('[data-section="available-to-add"]'), null);
+    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
+    assert.ok(!target.querySelector('.manager-environment-comp-quick-action'), 'automatic rows carry no icon-only quick actions');
+
+    // The revived control (issue #1315). Its guard demanded `mode === 'manual'` inside a section
+    // gated `mode !== 'manual'`, so it rendered in NO state at all; rendering it is half the fix,
+    // and CLICKING it is the other half — a control that renders and calls nothing is exactly the
+    // state this issue found it in.
+    const menu = await openRowMenu('nonmatching');
+    const forceAdd = menu.querySelector('[data-action="force-include"]');
+    assert.ok(Boolean(forceAdd), 'the automatic-mode Non-matching row menu offers Force add');
+    assert.ok(forceAdd.textContent.includes('Force add'));
+    forceAdd.click();
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'nonmatching']);
+
+    const disabledMenu = await openRowMenu('disabled');
+    assert.ok(disabledMenu.textContent.includes('Enable in library first'));
+    assert.ok(
+      !disabledMenu.querySelector('[data-action="force-include"]'),
+      'a force cannot revive a library-disabled record, so the row offers a note instead'
+    );
   });
 
   it('event manual mode renders Included plus Available to add with task-style quick actions', async () => {
@@ -298,48 +330,29 @@ describe('CompositionList mounted layout', () => {
     includeQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'event', 'candidate']);
 
-    const forceIncludeQuick = quickAction('nonmatching', 'force-include');
-    assert.ok(forceIncludeQuick, 'non-matching available event rows render a quick force-add action');
-    forceIncludeQuick.click();
-    assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
+    const nonMatchingQuick = quickAction('nonmatching', 'include');
+    assert.ok(nonMatchingQuick, 'non-matching available event rows render the same quick add action');
+    nonMatchingQuick.click();
+    assert.deepEqual(calls.at(-1), ['include', 'event', 'nonmatching']);
 
-    // THE `warning` REPAIR's reachable half (issue 1118). Force add is ONE verb — one
-    // `onForceInclude`, one `data-action`, one localization key — rendered from two places in
-    // this component, and the two spelt their amber modifier differently: this icon control
-    // wrote `is-warning-action`, which the sheet declares, and the labelled control wrote
-    // `is-warning`, which it declares nowhere. That is the defect that put a sixth role in the
-    // primitive's vocabulary.
-    //
-    // Only this half can be asserted from a mount, and the reason is a SECOND defect on the
-    // same pair: the labelled control sits in the standalone Non-matching section, which the
-    // markup gates on `mode !== 'manual'`, while its own guard demands `mode === 'manual'`. It
-    // renders in no state at all, which is also why the misspelling survived — nobody ever saw
-    // it. Its role is pinned from source in `tests/manager-button-source-contract.test.js`,
-    // with the reachability defect reported rather than repaired here.
-    assert.ok(
-      forceIncludeQuick.classList.contains('is-warning-action'),
-      `the icon Force add carries the amber class the sheet declares, got ${forceIncludeQuick.className}`
-    );
-    assert.ok(
-      !forceIncludeQuick.classList.contains('is-warning'),
-      'and not the spelling that matches no rule at all'
-    );
+    // The absence assertion this file has always carried, kept and re-scoped rather than deleted
+    // (issue #1315 settled the contradiction it described). The labelled Force add sits in the
+    // standalone Non-matching section, which is gated `mode !== 'manual'`; its own guard used to
+    // demand `mode === 'manual'`, so it rendered in NO state. The guard now takes its mode from
+    // the enclosing section, which makes this absence structural AND correct — manual mode has no
+    // filter for a force to override — and puts the control's presence, its amber class and its
+    // click-through in the automatic-mode test below, where they can be asserted for real.
     assert.ok(
       !target.querySelector('.manager-environment-force-include'),
-      'in MANUAL mode the standalone Non-matching section is not rendered at all, so the ' +
-        'labelled Force add is absent here for a STRUCTURAL reason and this assertion is ' +
-        'scoped to that. It is a defect in its own right that no other mode renders it ' +
-        'either: the section is gated `mode !== \'manual\'` and the control is gated ' +
-        '`mode === \'manual\'`. WHOEVER REPAIRS THAT CONTRADICTION — by moving the control ' +
-        'into Available-to-add, which reds this line and wants it inverted here; or by ' +
-        're-gating the branch to `mode !== \'manual\'`, which leaves this line correct and ' +
-        'wants its presence asserted in the automatic-mode test above — should not delete ' +
-        'this assertion. See the source contract for the role it carries.'
+      'the labelled Force add belongs to automatic mode and must not render in manual mode'
+    );
+    assert.ok(
+      !target.querySelector('[data-action="force-include"]'),
+      'and neither does its row-menu twin: manual mode is plain add and remove'
     );
 
-    assert.equal(
-      target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
       'library-disabled event rows do not render a quick composition action'
     );
 
@@ -435,15 +448,53 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
   });
 
-  it('event automatic mode retains Excluded and standalone Non-matching sections', async () => {
-    await renderComposition({ kind: 'event', mode: 'automatic' });
+  it('event automatic mode retains Excluded and standalone Non-matching sections, and renders the labelled Force add', async () => {
+    const calls = [];
+    await renderComposition({
+      kind: 'event',
+      mode: 'automatic',
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
+    });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.equal(target.querySelector('[data-section="available-to-add"]'), null);
-    assert.equal(target.querySelector('[data-section="candidates"]'), null);
+    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
+    assert.ok(!target.querySelector('[data-section="candidates"]'), 'nor a separate candidates list');
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.equal(target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), null);
-    assert.equal(target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), null);
+    assert.ok(!target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), 'excluded rows reserve no rank handle');
+    assert.ok(!target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), 'non-matching rows reserve no rank handle');
+
+    // THE `warning` role's first reachable call site (issues 1118 and #1315), asserted from a
+    // MOUNT. It could only be pinned from source before, because the control rendered in no state
+    // at all: the section is gated `mode !== 'manual'` and the control's own guard demanded
+    // `mode === 'manual'`. That is also how it shipped asking for `is-warning`, a class the sheet
+    // declares nowhere — nobody ever saw it. The source-level guard in
+    // `tests/manager-button-source-contract.test.js` is retired in favour of these four lines.
+    const forceAdd = target.querySelector('[data-record-id="nonmatching"] .manager-environment-force-include');
+    assert.ok(Boolean(forceAdd), 'the automatic-mode Non-matching list renders the labelled Force add');
+    assert.ok(forceAdd.textContent.includes('Force add'));
+    assert.ok(
+      forceAdd.classList.contains('fab-manager-button'),
+      `the labelled Force add renders through the ManagerButton primitive, got ${forceAdd.className}`
+    );
+    assert.ok(
+      forceAdd.classList.contains('is-warning-action'),
+      `and carries the amber class the sheet actually declares, got ${forceAdd.className}`
+    );
+    assert.ok(
+      !/\bis-warning\b(?!-action)/.test(forceAdd.className),
+      `and not the misspelling that matches no rule at all, got ${forceAdd.className}`
+    );
+    forceAdd.click();
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
+
+    assert.ok(
+      !target.querySelector('[data-record-id="disabled"] .manager-environment-force-include'),
+      'a library-disabled row gets the enable-in-library note instead, because no force can revive it'
+    );
+    assert.ok(
+      target.querySelector('[data-record-id="disabled"]').textContent.includes('Enable in library first'),
+      'and that note is what it renders'
+    );
   });
 });

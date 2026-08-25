@@ -62,13 +62,14 @@
     activeTab = kind === 'event' ? 'events' : 'tasks';
   }
 
-  // INCLUDED, not COMPOSED — the tab badges count what the Included list SHOWS, which is
-  // the four-state set: `includedButUnavailable` is displayed as an included row (so the
-  // GM can see and fix the stale entry) but is NOT composed at runtime. This was named
+  // INCLUDED, not COMPOSED — the tab badges count what the Included list SHOWS. The two
+  // sets hold the same four members today (issue 1315 made `includedNotMatching` compose),
+  // but they answer different questions — "shown in the Included list" versus "composes at
+  // runtime" — and the next change to the vocabulary can part them again. This was named
   // `countComposedRecords` while filtering the included set, and now that
   // `src/systems/gatheringComposition.js` exports both sets one line apart, that name was
-  // an invitation to "correct" the import to the three-state composed set and silently
-  // drop a row from every badge (issue 1321).
+  // an invitation to "correct" the import to the other set and silently change every badge
+  // (issue 1321).
   function countIncludedRecords(records = []) {
     return Array.isArray(records)
       ? records.filter((entry) =>

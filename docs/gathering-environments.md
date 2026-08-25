@@ -157,11 +157,12 @@ The per-task **Weight** column only appears while the environment is in blind mo
 
 Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and events apply:
 
-- **Automatic** means every matching, library-enabled record is available unless you explicitly exclude it.
-- **Manual** means only records you explicitly **include** apply.
+- **Automatic** means every matching, library-enabled record is available unless you explicitly exclude it, and you can **Force add** a non-matching record from the Non-matching section to compose it anyway.
+- **Manual** means only records you explicitly **include** apply, whether or not they match this environment's biomes and danger.
+  A hand-picked list is not filtered, so manual mode has no Force add and no Exclude: you add a record or you remove it.
   On both the Tasks and Events tabs, manual mode shows **Included in this environment** and **Available to add** only.
   Available to add lists matching records first, then non-matching and library-disabled records.
-  Matching rows use **Add**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note.
+  Matching and non-matching enabled rows both use **Add**, and library-disabled rows show an "enable in library first" note.
   Removing an included manual record returns it to Available to add as a normal matching, non-matching, or library-disabled entry.
   It does not create a local Excluded state.
 
@@ -169,8 +170,12 @@ Automatic composition can be fully library-backed.
 An automatic environment does not need a placeholder task when matching library Gathering Tasks provide the gatherable records.
 
 In automatic mode, Excluded and Non-matching are separate sections.
-Non-matching is read-only and informational only, because automatic mode does not force-add records.
-Switching from manual to automatic does not silently make force-added non-matching records available, and automatic mode still honors records you explicitly excluded.
+Non-matching lists the records this environment's biome and danger filter rejected, and each enabled row offers **Force add** to compose it in spite of the filter; library-disabled rows offer an "enable in library first" note instead, because a record disabled in the library composes nowhere and no force can override that.
+A record you both force-add and exclude stays out: excluding wins.
+Manual mode cannot create a force list — it has no Force add — and the upgrade that moved Force add into automatic mode cleared any force list an older version had left behind, so switching a manual environment to automatic does not conjure force-added records out of nothing.
+One case is worth knowing: if you force-add in automatic mode, switch that environment to manual, and later switch it back, the force list is still there and those records become available again.
+Switching modes does not clear your lists — that is what lets you switch back and forth without losing your work — so check the Non-matching list after switching if you are not sure what an environment carries.
+Automatic mode still honors records you explicitly excluded.
 
 **Weather and time-of-day are runtime gates, not matching criteria.**
 A task or event whose required weather or time of day is not currently satisfied still matches the environment (by biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn").

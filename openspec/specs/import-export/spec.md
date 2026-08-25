@@ -95,6 +95,18 @@ This hoist MUST also run branch-independently, for the reason every other field-
 Keying on the lists is safe here precisely because this slice has NO scalars — unlike currency and travel, there is no configured-but-empty state an emptiness check could mistake for absence.
 The guard MUST be a TWO-LIST DISJUNCTION for the reason the world migration's is: either populated library proves the lift already ran, so an export from a world that authored only modifiers does not get its prerequisite half rebuilt from a system block already stripped.
 
+A payload whose gathering environments carry `forcedTaskIds` / `forcedEventIds` MUST have the world-side `1.29.0` transform applied to `gatheringEnvironments`, using the SAME function that migration applies (`applyManualCompositionForceFold`), not a second implementation of it.
+Import is a second ingress for exactly the records that migration rescues: `importReferenceResolver` carries the force lists through untouched, so a bundle exported before the upgrade and imported after it would arrive with a manual environment's composed records sitting in a list the engine no longer honours in that mode (see *gathering-and-harvesting* §12a/§12b).
+The MANUAL FOLD is NOT keyed on `schemaVersion` and MUST run branch-independently: the force lists are an old ARRANGEMENT of current fields, so every bundle the shipping build writes carries the current schema and would skip a legacy-branch-only transform.
+It is safe unconditionally because after `1.29.0` no manual environment can carry a force list at all — the control that wrote one does not exist in that mode — so a manual force list is pre-upgrade by construction.
+
+**Clearing an AUTOMATIC force list MUST NOT run on the current-schema branch.**
+That branch runs on every payload forever, so clearing there would delete a legitimate automatic-mode force add on every export/import round-trip, permanently, for the very affordance `1315` moved into that mode.
+The legacy branch MUST still clear, because a bundle carrying no schema marker predates the upgrade and its automatic force entries are the residue `1.29.0` repairs.
+The residual case is a bundle stamped at the current schema but authored before the upgrade: its automatic residue is carried through and, under the new rule, composes.
+That is accepted as the lesser cost — it affects only worlds exporting across the upgrade boundary, whereas clearing would break the feature for every world forever.
+It is idempotent, because a second pass finds no manual force list to fold and does not clear what it preserved.
+
 ### Currency configuration merge on import
 
 Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.
