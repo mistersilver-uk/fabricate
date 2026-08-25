@@ -3363,6 +3363,70 @@
       ? selectedGatheringEconomy.nodes.enabled === true
       : selectedGatheringEconomy.mode === 'nodes'
   );
+  // ─────────────────────────────────────────────────────────────────────────────────────────
+  // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
+  //
+  // The recipe, component and tool editors have always named their subject — "Ravenglass Ink",
+  // not "Edit recipe" — and four editors did not: the environment, the gathering task, the
+  // gathering event and the recipe item each read `Edit <type>`. That is a trail that says what
+  // KIND of screen you are on when you can already see the screen, and withholds the one fact
+  // only the trail can carry, which is WHICH of them you opened. Four rungs of a ladder all
+  // reading `Edit gathering task` are four identical trails over four different subjects.
+  //
+  // Each falls back to the type name for the case the subject has none yet: a draft a GM has
+  // created and not named. `.trim()` matters there — a field cleared to spaces is not a name,
+  // and `||` alone would put a run of blanks in the trail.
+  const crumbSubject = (name, key, fallback) => {
+    const trimmed = String(name ?? '').trim();
+    return trimmed || text(key, fallback);
+  };
+  const environmentCrumb = $derived(
+    crumbSubject(
+      environmentDraftForDisplay?.name,
+      'FABRICATE.Admin.Manager.Environment.EditBreadcrumb',
+      'Edit environment'
+    )
+  );
+  const gatheringTaskCrumb = $derived(
+    crumbSubject(
+      gatheringTaskDraft?.name,
+      'FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb',
+      'Edit gathering task'
+    )
+  );
+  const gatheringEventCrumb = $derived(
+    crumbSubject(
+      gatheringEventDraft?.name,
+      'FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb',
+      'Edit gathering event'
+    )
+  );
+  // THE LINKED ITEM'S name rather than a field on the draft, because a recipe item HAS no name
+  // of its own: it is a world item plus the recipes it contains, and `recipeItemEditorLinkedItem`
+  // is the one resolution of that already used by the editor's own Overview preview. A second
+  // resolution here would be a second answer to "what is this thing called".
+  const recipeItemCrumb = $derived(
+    crumbSubject(
+      recipeItemEditorLinkedItem?.name,
+      'FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb',
+      'Edit recipe item'
+    )
+  );
+
+  // WHICH GATHERING SUB-TAB IS ON SCREEN, in the label the rail gives it.
+  //
+  // Gathering is a group of four screens — Environments, Tasks, Events, Settings — and its trail
+  // named only the group, so all four read `<system> > Gathering` and the trail could not tell
+  // you which one you were looking at. Checks already names its own sub-tab; this is the same
+  // rule applied to the other group that has one.
+  //
+  // Read off `gatheringNavItems` rather than written out, so the crumb is the same string as the
+  // rail item it corresponds to and a fifth tab needs nothing here.
+  const gatheringTabLabel = $derived.by(() => {
+    const item = gatheringNavItems.find((entry) => entry.id === activeGatheringTab);
+    return item ? text(item.labelKey, item.labelFallback) : '';
+  });
+
   const gatheringTaskDefinitions = $derived(
     Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []
   );
@@ -8353,9 +8417,9 @@
               >{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text('FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb', 'Edit recipe item')}</span
-            >
+            <!-- Name the item, not the generic "Edit recipe item" — the same rule the recipe
+               and component breadcrumbs already follow. -->
+            <span title={recipeItemCrumb}>{recipeItemCrumb}</span>
           {/if}
           {#if currentView === 'components'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -8412,7 +8476,21 @@
           {/if}
           {#if currentView === 'environments'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!-- THE GROUP, THEN THE SCREEN. Gathering is four screens under one name, so a trail
+               that stopped at the group read identically on all four. Checks already names its
+               own sub-tab; this is that rule applied to the other group that has one.
+
+               A SPAN HERE AND A BUTTON IN THE EDITORS BELOW, which is one rule rather than two:
+               a crumb is a control when pressing it goes somewhere the GM is not. From the
+               library, `Gathering` names the screen already on the screen — `backToEnvironmentsBrowse`
+               returns to this route and leaves the active tab where it is, so a button would sit
+               there doing nothing. From an editor it really does leave, so there it is a control.
+               Same rule the Downtime tab crumb follows. -->
             <span>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
+            {#if gatheringTabLabel}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span data-breadcrumb-gathering-tab={activeGatheringTab}>{gatheringTabLabel}</span>
+            {/if}
           {/if}
           {#if currentView === 'environment-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -8420,27 +8498,34 @@
               >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
+            <button type="button" onclick={backToEnvironmentsBrowse}
               >{text(
-                'FABRICATE.Admin.Manager.Environment.EditBreadcrumb',
-                'Edit environment'
-              )}</span
+                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
+                'Environments'
+              )}</button
             >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span title={environmentCrumb}>{environmentCrumb}</span>
           {/if}
           {#if currentView === 'gathering-task-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!-- THE GROUP IS NOT SKIPPED. `Tasks` is a screen INSIDE Gathering, so a trail that
+               jumped from the system straight to it described a path that does not exist. -->
+            <button type="button" onclick={backToEnvironmentsBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
+            >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={backToGatheringTaskLibrary}
               >{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks', 'Tasks')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb',
-                'Edit gathering task'
-              )}</span
-            >
+            <span title={gatheringTaskCrumb}>{gatheringTaskCrumb}</span>
           {/if}
           {#if currentView === 'gathering-event-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToEnvironmentsBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
+            >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={backToGatheringEventLibrary}
               >{text(
@@ -8449,28 +8534,7 @@
               )}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb',
-                'Edit gathering event'
-              )}</span
-            >
-          {/if}
-          {#if currentView === 'tools'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
-          {/if}
-          {#if currentView === 'tool-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToToolsBrowser}
-              >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{focusedToolDraft?.label ||
-                focusedToolDraft?.name ||
-                text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span
-            >
+            <span title={gatheringEventCrumb}>{gatheringEventCrumb}</span>
           {/if}
           {#if isChecksRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -9060,6 +9124,14 @@
           class="manager-breadcrumbs"
           aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
         >
+          <!-- THE ROOT, WHICH THIS TRAIL ALONE WAS MISSING (issue 1328). The Tool LIBRARY has its
+             own header rather than sharing the root nav above, and it began at the system name —
+             so of the two Tool screens, the EDITOR carried `Crafting Systems` and the library did
+             not. Two screens one press apart disagreed about how deep they were. -->
+          <button type="button" onclick={() => selectSystemAndShowBrowser()}
+            >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
+          >
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={() => editSystem(selectedSystem.id)}
             >{selectedSystem.name}</button
           >
