@@ -59,11 +59,19 @@ export const COMPOSITION_STATE_META = Object.freeze({
     fallback: 'Matching candidate',
   },
   excluded: { tone: 'danger', icon: 'fas fa-ban', key: 'Excluded', fallback: 'Excluded' },
-  includedButUnavailable: {
-    tone: 'warning',
-    icon: 'fas fa-triangle-exclamation',
-    key: 'IncludedButUnavailable',
-    fallback: 'Included but unavailable',
+  // Manual mode has no match filter (issue #1315), so a picked record that does not
+  // match its environment COMPOSES. The chip therefore states a fact, not a fault: the
+  // `info` tone and `fas fa-circle-info` glyph read as a note rather than the amber
+  // `warning` + `fas fa-triangle-exclamation` this entry carried while the state meant
+  // "picked, does not match, therefore unavailable". The glyph is deliberately neither
+  // `fas fa-circle-question` (`candidate`) nor `fas fa-circle-exclamation` (the unknown
+  // fallback below), because a state that reuses another's glyph is the confusion that
+  // fallback's own note exists to prevent. Font Awesome Free, like every glyph here.
+  includedNotMatching: {
+    tone: 'info',
+    icon: 'fas fa-circle-info',
+    key: 'IncludedNotMatching',
+    fallback: 'Included, not matching',
   },
   notMatching: {
     tone: 'disabled',

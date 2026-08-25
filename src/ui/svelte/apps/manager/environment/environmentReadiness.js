@@ -35,8 +35,12 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     || Boolean(trimmed(environment?.risk));
   const hasCompositionMode = environment?.compositionMode === 'manual' || environment?.compositionMode === 'automatic' || environment?.compositionMode === undefined;
   const hasAvailableTask = Number(counts.availableTasks || 0) > 0;
-  const staleIncluded = Number(counts.unavailableTasks || 0) + Number(counts.unavailableEvents || 0);
-  const noStaleIncluded = staleIncluded === 0;
+  // `counts.unavailable*` is the admin store's tally of `includedNotMatching` rows. Since
+  // issue #1315 those rows COMPOSE (manual mode has no match filter), so the producer's
+  // field name outlives its meaning; renaming it is the store's to do, not this consumer's.
+  // Read here purely as "how many picked records do not match", which is a note, not a fault.
+  const includedNotMatching = Number(counts.unavailableTasks || 0) + Number(counts.unavailableEvents || 0);
+  const noStaleIncluded = includedNotMatching === 0;
 
   const checks = [
     { id: 'hasName', satisfied: hasName },
@@ -57,19 +61,26 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (active && !hasAvailableTask) {
     issues.push({ id: 'activeNoComposition', severity: 'critical', blocks: 'enable' });
   }
+  // `info`, NOT `critical` (issue #1315). Manual mode composes exactly the GM's picked
+  // list with no match filter, so a picked record that does not match still runs — it is a
+  // deliberate choice, not stale state. Raising a critical error here told the GM to undo
+  // the thing the product's own contract invites, which is worse than not checking at all.
+  // The issue survives as a NOTE because the fact is still worth surfacing: the Included
+  // list would otherwise show a non-matching pick identically to a matching one. It carries
+  // no `blocks: 'enable'` (it never did) and must not gain one — this state composes, so it
+  // cannot be a reason to refuse enabling.
+  //
   // This literal STAYS a literal (issue 1321). Its neighbours in the editor now import
   // `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` from `src/systems/gatheringComposition.js`;
   // this one deliberately does not, for two reasons. It tests a SINGLE state rather than
   // membership of a set, so there is no set to share — and this module's contract, stated
   // at the top of the file, is that it has no Svelte, Foundry or store dependencies and
-  // therefore no import graph to grow. More importantly it is the one home in this
-  // vocabulary where a state nobody registered does not render wrongly: it silently stops
-  // raising `staleIncluded`, and an environment that should be blocked ships enabled. The
-  // guard is `tests/systems/gatheringComposition.test.js`, which calls the exported
-  // predicate once per state in the vocabulary rather than trusting this line to notice.
+  // therefore no import graph to grow. The guard is
+  // `tests/systems/gatheringComposition.test.js`, which calls the exported predicate once
+  // per state in the vocabulary rather than trusting this line to notice a rename.
   for (const entry of [...tasks, ...events]) {
-    if (entry.compositionState === 'includedButUnavailable') {
-      issues.push({ id: 'staleIncluded', severity: 'critical', recordKind: entry.kind, recordId: entry.id, recordName: entry.record?.name || entry.id });
+    if (entry.compositionState === 'includedNotMatching') {
+      issues.push({ id: 'staleIncluded', severity: 'info', recordKind: entry.kind, recordId: entry.id, recordName: entry.record?.name || entry.id });
     }
   }
 
