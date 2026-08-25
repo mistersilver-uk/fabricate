@@ -16,6 +16,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';

@@ -40,6 +40,7 @@ const harness = createMountedComponentHarness({
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     'src/ui/svelte/apps/manager/world/WorldPrerequisitesTab.svelte',
   ],
