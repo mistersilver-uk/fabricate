@@ -15658,11 +15658,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(managerTitle(), 'Marn the Quartermaster');
     assert.equal(managerSubtitle(), 'Crew member · two projects in flight');
     assert.equal(
-      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
-      'Marn',
-      'the leaf crumb follows the drill-down, not the tab it started on'
-    );
-    assert.equal(
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'Crew member actions'
     );
@@ -15781,6 +15776,90 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
     assert.equal(managerTitle(), 'crew title', 'returning to the route starts from the tab again');
     assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+  });
+
+  it('hangs a drill-down under a tab crumb that takes the GM back up to it', async () => {
+    // THE BREADCRUMB'S OWN HALF OF THE RE-ACTIVATION SEAM (issue 1322). The rail already offers
+    // the click on the sub-item of the tab already on screen; a GM reading `... > Downtime >
+    // Factions > Emberwatch` will press `Factions` for the same reason, and it is the same
+    // question with the same answer. Core cannot pop the level itself — the drill-down is inside
+    // the companion's target — so the crumb goes through the channel the rail goes through.
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    const events = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    const stop = mounts[0].onRouteReselect(() => events.push('pop'));
+    await settleDowntimeProvider();
+
+    // ON THE TAB'S OWN SCREEN THERE IS NO LEAF AND NOTHING TO GO BACK TO, so the crumb is a
+    // span even though a handler is registered: it names the screen the GM is already on.
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').tagName.toLowerCase(),
+      'span'
+    );
+    assert.equal(target.querySelector('[data-breadcrumb-downtime-leaf]'), null);
+
+    // DRILLED IN, it becomes a button — and pressing it reaches the companion's own handler.
+    assert.equal(mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME), true);
+    await settleDowntimeProvider();
+    const crumb = target.querySelector('[data-breadcrumb-downtime-tab]');
+    assert.equal(crumb.tagName.toLowerCase(), 'button');
+    crumb.click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop'], 'the crumb does not reach the companion');
+    assert.equal(mounts.length, 1, 'and it is a re-activation, not a remount');
+
+    // AND IT IS NOT A ONE-SHOT, which is the property a crumb wired to a navigation would lose:
+    // Core's own route has not changed, so nothing about the second press is different.
+    crumb.click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop']);
+
+    // WITH THE HANDLER GONE it falls back to a span rather than leaving a dead button behind.
+    stop();
+    await settleDowntimeProvider();
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').tagName.toLowerCase(),
+      'span'
+    );
+  });
+
+  it('roots a World route at World, and never under Crafting Systems', async () => {
+    // TWO ROOTS, NOT ONE (issue 1322). `Crafting Systems` used to lead every trail in the
+    // Manager, so a GM configuring their world read `Crafting Systems > World > Downtime > ...`
+    // — which says World is a page inside a crafting system. It is not: World routes are
+    // `every system`, and several of them are reachable before any system has opted in.
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const crumbs = () =>
+      Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
+        .filter((node) => node.tagName.toLowerCase() !== 'i')
+        .map((node) => node.textContent.trim());
+    assert.deepEqual(crumbs(), ['World', 'Downtime', 'ledger crumb']);
+    assert.equal(
+      crumbs().includes('Crafting Systems'),
+      false,
+      'a World route is still rooted at Crafting Systems'
+    );
+
+    // AND `World` NAVIGATES, because an intermediate crumb that names a reachable screen should
+    // reach it — which is the rule every other crumb in this trail already follows.
+    const world = target.querySelector('[data-breadcrumb-world]');
+    assert.equal(world.tagName.toLowerCase(), 'button');
+    world.click();
+    await settleRouteExit();
+    assert.deepEqual(crumbs(), ['World'], 'the World crumb did not reach the World route');
+    // ON THE WORLD ROUTE IT IS THE LEAF and stops being a control, which is that same rule read
+    // the other way: the last crumb in a trail names the screen you are on.
+    assert.equal(target.querySelector('[data-breadcrumb-world]').tagName.toLowerCase(), 'span');
   });
 
   it('offers the rail sub-item of the tab already on screen to the companion', async () => {

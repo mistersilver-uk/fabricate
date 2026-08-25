@@ -4145,11 +4145,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     // screen — and its medallion carrying a real image rather than the glyph fallback.
     expectSelector: '[data-downtime-chrome-heading] [data-medallion="image"] img',
     expectAttributes: [
-      // The leaf crumb follows the drill-down rather than the tab it started on.
+      // THE TRAIL GROWS BY ONE CRUMB rather than changing its last word (issue 1322): the tab
+      // crumb keeps its own name and the drill-down's hangs beneath it, so a GM inside a
+      // companion's detail can still see -- and press -- the tab they reached it through.
       {
         selector: '[data-breadcrumb-downtime-tab]',
         name: 'data-breadcrumb-downtime-tab',
         value: 'ledger',
+      },
+      {
+        selector: '[data-breadcrumb-downtime-leaf]',
+        name: 'data-breadcrumb-downtime-leaf',
+        value: '',
       },
       { selector: '.manager-header-actions', name: 'aria-label', value: 'Crew member actions' },
       // Core's own three treatments, reached through the seam's `tone`.
