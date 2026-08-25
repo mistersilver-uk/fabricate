@@ -550,6 +550,11 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 Automatically published evidence MUST be identifiable as belonging to the pull request's current head.
 The evidence gate MUST NOT decide before the automated producer for that same head has concluded, UNLESS the pull request body already carries evidence sufficient to satisfy the gate for that head.
 
+Published evidence MUST be **legible to a reader who has only the picture**.
+Each frame MUST be named from the canonical view-case registry rather than by its case id, and a frame that depicts a surface the module does not ship MUST carry a visible caption saying so and naming where that surface comes from.
+This repository is public and its pull requests are readable by anyone; a frame that photographs Core's own companion seam necessarily shows a stand-in module registered by the test harness, and an uncaptioned picture of it reads as a shipped feature to precisely the readers who know it is not one.
+The caption MUST sit beside the image rather than in its alt text, which is read by a screen reader and by almost nothing else a reviewer uses.
+
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)

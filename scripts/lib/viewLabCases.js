@@ -7313,6 +7313,49 @@ export function labelForCaseId(id) {
   return getCaseById(id)?.label ?? null;
 }
 
+/**
+ * The sentence a published frame carries beneath it, or the empty string for a frame that needs
+ * none.
+ *
+ * ## Why any frame needs one
+ *
+ * A published frame is a bare image in a PR body on a PUBLIC repository, and a reader has nothing
+ * but the picture. Most frames need nothing: they show the shipped Manager, and what they show is
+ * what a GM would see.
+ *
+ * The COMPANION frames are the exception. Core's World-nav seam is a public API that a separate
+ * module implements, and this repository cannot depend on the module that implements it — so the
+ * lab registers a stand-in of its own, with invented tabs (`Ledger Administration`, `Crew`,
+ * `Writs`) and an invented character. That is deliberate: naming them after the real companion's
+ * tabs would make a Core-seam frame read as evidence about a module Core cannot see. But it also
+ * means the frame shows a screen that exists nowhere, in a picture that looks exactly like a
+ * feature — and a reader who knows the product is MORE likely to be misled by it, not less,
+ * because they know those tabs are not in either the free module or the premium one.
+ *
+ * ## Derived from the case rather than hand-tagged
+ *
+ * A frame needs this note exactly when it asked the lab to register the stand-in, which is a fact
+ * already on the case: the `downtimeProvider` and `playerProvider` query parameters are what turn
+ * it on. Reading them means a frame added later gets the note without anyone remembering to.
+ *
+ * @param {string} id Case id.
+ * @returns {string} The note, or `''`.
+ */
+export function evidenceNoteForCaseId(id) {
+  const query = getCaseById(id)?.query ?? {};
+  const standIn = query.downtimeProvider === '1' || query.playerProvider === '1';
+  return standIn ? STAND_IN_COMPANION_NOTE : '';
+}
+
+/**
+ * What that note says, verbatim.
+ *
+ * It names the FILE rather than describing the situation, because the one question a reader has —
+ * *is this real?* — is answered by being able to go and look.
+ */
+export const STAND_IN_COMPANION_NOTE =
+  'The companion tabs in this frame come from a stand-in registered by `tests/view-lab/mount.js` so that Core can photograph its own companion seam. They are not a shipped Fabricate surface and appear in neither the free module nor Fabricate Premium.';
+
 export function fallbackCase() {
   return getCaseById(FALLBACK_CASE_ID);
 }
