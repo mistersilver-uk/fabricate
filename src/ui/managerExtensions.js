@@ -305,6 +305,53 @@ const DEFAULT_STATUS_TONE = 'warning';
  *   it cannot: a browser reload, a Foundry logout, and a remount — whether the companion
  *   asked for one through `requestRemount()` or a context value such as the selected crafting
  *   system changed — all end the mount without consulting the guard.
+ * @property {(tabId: string) => (boolean|Promise<boolean>)} navigateToTab Take the GM to
+ *   another of THIS PROVIDER'S OWN tabs, so a companion can draw a control that reaches the
+ *   screen it names. It is the rail sub-item's own click, reached programmatically: asking for
+ *   the tab already on screen RE-ACTIVATES it through `onRouteReselect` rather than remounting;
+ *   any other tab is offered to this mount's `onBeforeNavigate` guard with reason `'tab'`, so a
+ *   companion holding unsaved work can still stop its own navigation; and an allowed move
+ *   expands the rail group and activates the view exactly as a click does. Answers `true` when
+ *   the request was honoured — which INCLUDES the re-activation, where nothing moves because
+ *   nothing had to — `false` when it was refused, and a PROMISE of either whenever the guard
+ *   answers asynchronously, because a veto may be a dialog and a synchronous `true` would be a
+ *   claim about a question still on screen.
+ *
+ *   WHAT IT REFUSES, and why each refusal is deliberate. It refuses every destination that is
+ *   not one of the tabs THIS provider registered — another provider's surface, a Core route,
+ *   and an id this provider never declared. That is the mirror of the rule `onBeforeNavigate`
+ *   already states, that the destination is Core's business: a companion may ask for the
+ *   screens it owns, and Core's routing is not a public control surface. It refuses a call from
+ *   a RETIRED mount, returning `false` harmlessly — the rule `setRouteChrome` states, and for
+ *   the same reason: a companion holding a stale context must not be able to move a GM who has
+ *   already gone elsewhere.
+ *
+ *   IT REFUSES TO RUN INSIDE AN ANSWER IT IS STILL WAITING FOR. Calling it from within a
+ *   `onBeforeNavigate` handler's own body — the tempting "veto this move, and send the GM to
+ *   Settings instead" — returns `false` and moves nobody, because that request is not the
+ *   question the guard is currently answering. Nesting it would re-enter the same guard without
+ *   bound when a companion always redirects, and would commit the inner route before the outer
+ *   veto had been applied when it redirects conditionally. Ask AFTER answering instead: a
+ *   redirect is a consequence of the decision, not part of making it. The same refusal covers
+ *   the window in which a guard's returned promise is still pending.
+ *
+ *   TWO THINGS THAT ARE NOT REFUSALS, and are stated because a companion author meets both.
+ *   The mount context is LIVE for the duration of `mount()` itself, so calling this from inside
+ *   `mount` re-enters Core's routing mid-mount rather than being refused; a companion that must
+ *   redirect on arrival should do it from its own first data callback, not from `mount`. And
+ *   asking for the tab already on screen invokes this mount's `onRouteReselect` handler
+ *   SYNCHRONOUSLY, before this call returns — so a handler that tears down what the caller is
+ *   standing in has already done so by the next line.
+ *
+ *   AN UNKNOWN-BUT-WELL-FORMED TAB ID ANSWERS `false` RATHER THAN THROWING, deliberately, and
+ *   it is the one refusal here that had a real alternative. Membership is a RUNTIME fact that
+ *   moves under the companion's feet: a provider may re-register with a different tab set at
+ *   any time (Core re-points the route itself when it does), and a companion whose tab set is
+ *   conditional — a Settings tab only while some feature is on — is asking a legitimate
+ *   question rather than making a coding error. Throwing would make Core's own re-registration
+ *   race raise from a companion's correct code. Malformed input is the opposite case: a
+ *   non-string or an empty id can never be a runtime question, so it throws a `TypeError` and
+ *   moves nobody, exactly as `setRouteChrome` does with a malformed update.
  */
 
 /**

@@ -1105,6 +1105,11 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       // among them): the manifest above is order-sensitive and `cases.slice(0, 4)` below is
       // index-based, so a new case has to land after both without disturbing either.
       'manager-world-downtime-test-companion-rollup',
+      // Issue 1332 — the companion NAVIGATING, appended for the same reason. It is the only
+      // frame reached by pressing a control the COMPANION drew rather than one of Core's, which
+      // is the whole of what `navigateToTab` added: before it, such a control could name its
+      // destination and not reach it, and a dead button photographs exactly like a live one.
+      'manager-world-downtime-test-companion-tab-navigation',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
@@ -1126,8 +1131,8 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   const withCompanion = allCases.filter((entry) => entry.query?.downtimeProvider === '1');
   assert.equal(
     withCompanion.length,
-    3,
-    'the frames that register the stand-in companion are no longer three'
+    4,
+    'the frames that register the stand-in companion are no longer four'
   );
   const named = (id) => {
     const found = withCompanion.find((entry) => entry.id === id);
@@ -1388,6 +1393,40 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       },
     ],
     'the premium-installed frame pins its own tab-id-keyed badge containment, not just the rollup'
+  );
+
+  // Issue 1332 — the navigating frame. Its whole evidence value rests on HOW it is reached: a
+  // rail sub-item click lands on the same panel and photographs the same pixels, so a case that
+  // drifted to one would publish a frame that says nothing about the seam it was added for.
+  const tabNavigation = named('manager-world-downtime-test-companion-tab-navigation');
+  assert.deepEqual(
+    tabNavigation.steps.map((step) => step.selector),
+    ['#manager-world-nav-downtime', '[data-lab-companion-tab-link]'],
+    'the destination is reached by pressing the COMPANION’s own control'
+  );
+  assert.ok(
+    tabNavigation.steps.every((step) => !step.selector.startsWith('#manager-downtime-nav-')),
+    'and never by pressing the rail sub-item, which would reach the same frame for free'
+  );
+  assert.match(
+    mountSource,
+    /data-lab-companion-tab-link[\s\S]{0,600}navigateToTab/,
+    'and the control it presses is the one the stand-in wires to context.navigateToTab'
+  );
+  assert.equal(
+    tabNavigation.expectSelector,
+    '[data-downtime-extension-panel="crew"]',
+    'the frame asserts the DESTINATION tab’s panel, not the one that asked'
+  );
+  const followed = tabNavigation.expectAttributes.filter((entry) => entry.name === 'aria-current');
+  assert.deepEqual(
+    followed,
+    [
+      { selector: '#manager-downtime-nav-crew', name: 'aria-current', value: 'true' },
+      { selector: '#manager-downtime-nav-ledger', name: 'aria-current', value: null },
+    ],
+    'and asserts the RAIL followed — both that it moved and that it left, which one side alone ' +
+      'would not distinguish from a rail that marks every sub-item current'
   );
 });
 

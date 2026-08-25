@@ -918,3 +918,103 @@ test('AC-22 — navTabBadgeTotal sums the RESOLVED badge once per tab, never reg
   harness.setBadge(WORLD_DOWNTIME_SURFACE_ID, 'ledger', null);
   assert.equal(navTabBadgeTotal(registeredTabs, harness.snapshot()), 5);
 });
+
+/**
+ * The mount context's typedef is the seam's contract for a module this repository cannot see,
+ * and it is a hand-maintained mirror of a literal in a Svelte file — so it rots in the silent
+ * direction. A member added to the context without a `@property` is a public capability with
+ * no contract at all: nothing fails, nothing warns, and a companion author reading the typedef
+ * is reading a list that is no longer the list. Issue 1332 added the fourth such member, which
+ * is the point at which "remember to document it" stops being a plan.
+ *
+ * It reads the CONTEXT LITERAL rather than a mounted context on purpose. Mounting is what
+ * `tests/components/manager-mounted.test.js` does, and it can only see the members Core
+ * happened to build for that mount; the literal is every member there is.
+ *
+ * @param {string} block The typedef's own comment text.
+ * @returns {string[]} Every property name it documents, in order.
+ */
+function documentedProperties(block) {
+  const names = [];
+  for (const chunk of block.split('@property ').slice(1)) {
+    // Step past the balanced `{type}`, which spans lines and carries its own braces on this
+    // typedef — `onBeforeNavigate`'s type is a function returning a function.
+    let depth = 0;
+    let index = 0;
+    for (; index < chunk.length; index += 1) {
+      if (chunk[index] === '{') depth += 1;
+      else if (chunk[index] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          index += 1;
+          break;
+        }
+      }
+    }
+    // The name may sit on the next comment line when the type filled the first one.
+    const name = chunk.slice(index).replace(/^[\s*]+/, '').match(/^\[?([\w$]+)/);
+    if (name) names.push(name[1]);
+  }
+  return names;
+}
+
+test('every member Core puts on the mount context is documented in its typedef', () => {
+  const rootSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
+    'utf8'
+  );
+  const literalStart = rootSource.indexOf('const context = Object.freeze({');
+  assert.notEqual(literalStart, -1, 'the Manager root still builds one frozen mount context');
+  const literal = rootSource.slice(
+    literalStart,
+    rootSource.indexOf('\n    });', literalStart) + 1
+  );
+  // `[,:]` because the literal mixes keyed members with shorthand ones (`revision`), and a
+  // colon-only pattern would silently drop every shorthand member from the comparison — which
+  // would be this very guard failing in the direction it exists to catch.
+  const supplied = [...literal.matchAll(/^ {6}(\w+)\s*[,:]/gm)].map((match) => match[1]);
+
+  const extensionsSource = readFileSync(resolve(repoRoot, 'src/ui/managerExtensions.js'), 'utf8');
+  const typedefStart = extensionsSource.indexOf(' * @typedef {object} WorldNavMountContext');
+  assert.notEqual(typedefStart, -1, 'the typedef is still named WorldNavMountContext');
+  const typedef = extensionsSource.slice(
+    typedefStart,
+    extensionsSource.indexOf('\n */', typedefStart)
+  );
+  const documented = documentedProperties(typedef);
+
+  // TEETH, both ways round. A slice that silently matched nothing would make every assertion
+  // below vacuously true, which is exactly the failure this guard exists to catch elsewhere.
+  assert.ok(supplied.includes('schemaVersion'), 'the context literal was found and parsed');
+  assert.ok(documented.includes('requestRemount'), 'the typedef was found and parsed');
+  assert.deepEqual(
+    [...supplied].sort(),
+    [...documented].sort(),
+    'the typedef documents every context member, and invents none'
+  );
+  assert.ok(
+    supplied.includes('navigateToTab'),
+    'the Manager root still publishes the tab-navigation member this contract describes'
+  );
+});
+
+test('the typedef names what navigateToTab refuses, as its three siblings do', () => {
+  // The acceptance this pins is documentary, so it is asserted structurally rather than by
+  // matching prose: the member's own paragraph must state the two refusals a companion cannot
+  // discover by calling it once — that a retired mount is refused, and that an unknown tab id
+  // answers rather than throws while malformed input throws. A `@property` line that merely
+  // named the member would pass a "is it documented" check and teach a companion nothing.
+  const extensionsSource = readFileSync(resolve(repoRoot, 'src/ui/managerExtensions.js'), 'utf8');
+  const start = extensionsSource.indexOf('navigateToTab Take the GM to');
+  assert.notEqual(start, -1, 'the navigateToTab property is still documented on the typedef');
+  const paragraph = extensionsSource.slice(start, extensionsSource.indexOf('\n */', start));
+  for (const claim of [
+    'WHAT IT REFUSES',
+    'RETIRED',
+    '`false`',
+    '`TypeError`',
+    'registered',
+  ]) {
+    assert.ok(paragraph.includes(claim), `the member's contract still states ${claim}`);
+  }
+});
