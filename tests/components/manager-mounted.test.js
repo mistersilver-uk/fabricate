@@ -20682,7 +20682,12 @@ describe('CraftingSystemManager mounted behavior', () => {
                 img: 'icons/svg/hazard.svg',
                 dropRate: 10,
               },
-              compositionState: 'includedButUnavailable',
+              // `includedNotMatching` (issue #1315): a picked record that does not match its
+              // environment. It COMPOSES — manual mode has no match filter — so it renders as an
+              // Included row here, which is what makes it reachable from the validation deep link
+              // this test follows. It is also the only record-scoped EVENT issue the readiness
+              // evaluator raises, so the "View event" link exists because of this state.
+              compositionState: 'includedNotMatching',
               runtimeState: 'unavailable',
               evidence: {},
             },
@@ -20826,11 +20831,11 @@ describe('CraftingSystemManager mounted behavior', () => {
               kind: 'event',
               record: {
                 name: 'Stale Event',
-                description: 'No longer matches.',
+                description: 'Does not match, and composes anyway.',
                 img: 'icons/svg/hazard.svg',
                 dropRate: 10,
               },
-              compositionState: 'includedButUnavailable',
+              compositionState: 'includedNotMatching',
               runtimeState: 'unavailable',
               evidence: {},
             },
@@ -20877,11 +20882,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(
       eventBadges.map((node) => node.textContent.trim()),
       ['2'],
-      'force-included and stale included events should count, library-disabled event should not'
+      'force-included and not-matching included events should count, library-disabled event should not'
     );
     assert.deepEqual(
       validationBadges.map((node) => node.textContent.trim()),
-      ['3', '2'],
+      ['2', '2'],
+      // TWO errors, not three (issue #1315): `noAvailableTasks` and `activeNoComposition`. The
+      // third used to be `staleIncluded` on the not-matching event, and that is now an `info`
+      // note — the record composes deliberately, so refusing to enable the environment over it
+      // told the GM to undo what manual mode invites. Only critical and warning are badged.
       'validation badges should show counts only'
     );
     assert.equal(

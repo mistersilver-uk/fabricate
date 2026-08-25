@@ -9,13 +9,20 @@
  *
  * **The rule, and the two sentences that are the whole of it.**
  *
- * - **automatic** — `matches − disabled*Ids`, bounded by NO id list. Neither `enabled*Ids` (a
- *   stale allow-list left over from manual mode) nor `forced*Ids` (a manual-mode affordance) is
- *   consulted.
- * - **manual** — `enabled*Ids ∪ forced*Ids`. A force composes whether or not the record matches;
- *   an `enabled*Ids` entry composes only while it still matches. `disabled*Ids` is IGNORED.
+ * - **automatic** — `(matches ∪ forced*Ids) − disabled*Ids`. Force add and exclude are its two
+ *   overrides of its own match filter and they can collide on one record: **exclude wins**.
+ *   `enabled*Ids` is NOT consulted — a stale allow-list left over from manual mode neither admits
+ *   nor suppresses anything here.
+ * - **manual** — exactly `enabled*Ids`, full stop. A hand-picked list has no filter, therefore
+ *   nothing to override: a listed record composes whether or not it currently matches, and
+ *   `disabled*Ids` and `forced*Ids` are BOTH ignored.
  *
- * Over both: a record disabled in the library (`enabled === false`) composes nowhere.
+ * Over both: a record disabled in the library (`enabled === false`) composes nowhere, so a force
+ * can never revive one.
+ *
+ * Those two sentences are the maintainer's ruling on issue #1315: force add and exclude belong to
+ * automatic mode, the one mode with a filter for them to override, and manual mode is plain add
+ * and remove.
  *
  * **The oracle is the rule, not the implementation.** {@link COMPOSITION_RULE} spells the answer
  * out as thirty-two literal booleans, and the first test below re-derives every one of them from
@@ -114,8 +121,9 @@ const MEMBERSHIPS = Object.freeze(['none', 'E', 'D', 'F', 'ED', 'EF', 'DF', 'EDF
  * as a gate over the whole table rather than doubling its rows.
  */
 const COMPOSITION_RULE = Object.freeze({
-  // Automatic — `matches − disabled`. E and F are never read, which is why every `E`/`F` row
-  // here reads exactly like its `none` counterpart and every `D` row reads false.
+  // Automatic — `(matches ∪ F) − D`. `E` is never read, which is why every `E` row reads exactly
+  // like its `E`-less counterpart; every `D` row is false whatever else is on it, because exclude
+  // wins over a force; and `F` is true on its own, which is the whole point of a force.
   'automatic|match|none': true,
   'automatic|match|E': true,
   'automatic|match|D': false,
@@ -127,29 +135,30 @@ const COMPOSITION_RULE = Object.freeze({
   'automatic|nomatch|none': false,
   'automatic|nomatch|E': false,
   'automatic|nomatch|D': false,
-  'automatic|nomatch|F': false,
+  'automatic|nomatch|F': true,
   'automatic|nomatch|ED': false,
-  'automatic|nomatch|EF': false,
+  'automatic|nomatch|EF': true,
   'automatic|nomatch|DF': false,
   'automatic|nomatch|EDF': false,
-  // Manual — `enabled ∪ forced`, with `enabled` conditional on still matching and `disabled`
-  // ignored. Every `F` row is true whether the record matches or not; every `D` row reads
-  // exactly like its non-`D` counterpart.
+  // Manual — exactly `E`. `D` and `F` are both ignored, so every row here is simply "is `E` in the
+  // membership", and the `nomatch` block is IDENTICAL to the `match` block above it. That identity
+  // is the rule, not a copy-paste: manual mode has no match filter, so `matches` cannot move a
+  // manual answer. A future edit that makes these two blocks differ has re-introduced one.
   'manual|match|none': false,
   'manual|match|E': true,
   'manual|match|D': false,
-  'manual|match|F': true,
+  'manual|match|F': false,
   'manual|match|ED': true,
   'manual|match|EF': true,
-  'manual|match|DF': true,
+  'manual|match|DF': false,
   'manual|match|EDF': true,
   'manual|nomatch|none': false,
-  'manual|nomatch|E': false,
+  'manual|nomatch|E': true,
   'manual|nomatch|D': false,
-  'manual|nomatch|F': true,
-  'manual|nomatch|ED': false,
+  'manual|nomatch|F': false,
+  'manual|nomatch|ED': true,
   'manual|nomatch|EF': true,
-  'manual|nomatch|DF': true,
+  'manual|nomatch|DF': false,
   'manual|nomatch|EDF': true,
 });
 
@@ -335,7 +344,7 @@ describe('the composition rule, stated as data', () => {
           const inDisabled = membership.includes('D');
           const inForced = membership.includes('F');
           const prose =
-            mode === 'manual' ? inForced || (inEnabled && matches) : matches && !inDisabled;
+            mode === 'manual' ? inEnabled : !inDisabled && (matches || inForced);
           assert.equal(
             COMPOSITION_RULE[ruleKey(mode, matches, membership)],
             prose,
@@ -385,15 +394,23 @@ describe('the case matrix', () => {
         const slice = CASES.filter((entry) => axis(entry) === value).map((entry) =>
           EXPECTED.get(entry.id)
         );
-        // Two axis values are one-sided BY THE RULE, and are asserted as such rather than
-        // exempted: a library-disabled record composes nowhere, and a record whose only listing
-        // is `disabled*Ids` composes nowhere either — automatic excludes it, and manual has
-        // neither an enable nor a force to admit it. Anything else being one-sided is a broken
-        // fixture, not a property of the rule.
-        if (value === 'false' || value === 'D') {
+        // THREE axis values are one-sided BY THE RULE, and are asserted as such rather than
+        // exempted: a library-disabled record composes nowhere; a record whose only listing is
+        // `disabled*Ids` composes nowhere either (automatic excludes it, manual has no pick to
+        // admit it); and `DF` — excluded AND forced — composes nowhere because exclude wins over
+        // force in automatic and manual reads neither list. `DF` joined this group with issue
+        // #1315: while manual honoured forces it was the one membership that composed in one mode
+        // and not the other. Anything else being one-sided is a broken fixture, not a property of
+        // the rule.
+        const oneSided = {
+          false: 'a library-disabled record',
+          D: 'a disabled-only listing',
+          DF: 'an excluded record that is also forced',
+        };
+        if (oneSided[value]) {
           assert.ok(
             slice.every((answer) => !answer),
-            `${value === 'D' ? 'a disabled-only listing' : 'a library-disabled record'} never composes`
+            `${oneSided[value]} never composes`
           );
           continue;
         }
@@ -741,8 +758,12 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
 
   it('keeps its two id-list guards coarser than the predicate, and they are named divergences', () => {
     // Reported, not absorbed. Each of these is a case where the gate says "this environment has a
-    // task source" and the predicate says "this record does not compose" — deliberately, because
-    // an authored id is authored intent even when nothing composes from it today.
+    // task source" and the predicate says "this record does not compose". The FIRST is deliberate
+    // — an authored id is authored intent even when nothing composes from it today. The SECOND is
+    // not: issue #1315 moved forces to automatic mode, so a manual-mode force list composes
+    // nothing at all, and this gate still accepts one as a task source. This arm pins TODAY's
+    // behaviour and names it, rather than asserting the repair from a lane that cannot make it;
+    // `GatheringEnvironmentStore` belongs to issue #1315's enable-gate task, not to this suite.
     let config = {};
     const store = makeEnvironmentStore(() => config);
     const nonComposing = (mode, membership) =>
@@ -765,15 +786,59 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
       'guard 1 accepts a stale automatic-mode allow-list as a task source'
     );
 
-    // Guard 2 fires in MANUAL mode on a force, which composes — so it is guard 1 in manual mode,
-    // on a non-matching enabled id, that is the second divergence.
-    const staleManualEntry = nonComposing('manual', 'E');
-    config = { systems: { [SYSTEM_ID]: { tasks: [staleManualEntry.record] } } };
-    assert.equal(EXPECTED.get(staleManualEntry.id), false, 'the record does not compose');
+    // Guard 1 in MANUAL mode is no longer a divergence at all, and that is a consequence of the
+    // rule worth pinning: manual mode composes exactly `enabled*Ids` with no match filter, so a
+    // picked record that stopped matching still composes and the gate and the predicate agree.
+    const pickedNotMatching = nonComposing('manual', 'E');
+    config = { systems: { [SYSTEM_ID]: { tasks: [pickedNotMatching.record] } } };
     assert.equal(
-      store._environmentHasTaskSource(soleRecordEnvironment(staleManualEntry)),
+      EXPECTED.get(pickedNotMatching.id),
       true,
-      'guard 1 accepts a no-longer-matching manual-mode entry as a task source'
+      'a manual pick composes whether or not it matches'
+    );
+    assert.equal(
+      store._environmentHasTaskSource(soleRecordEnvironment(pickedNotMatching)),
+      true,
+      'and the gate agrees, so guard 1 in manual mode is coarse about nothing'
+    );
+
+    // Guard 2 is the divergence issue #1315 CREATED and has not yet closed: it fires on a
+    // manual-mode `forcedTaskIds`, and a manual-mode force composes nothing whatsoever now. The
+    // result is an environment that may be enabled while composing no task at all — the failure
+    // the gate exists to prevent, in its own words. Asserted as it behaves, not as it should.
+    const manualForce = CASES.find(
+      (entry) =>
+        entry.kind === 'task' &&
+        entry.mode === 'manual' &&
+        entry.libraryEnabled &&
+        entry.membership === 'F'
+    );
+    config = { systems: { [SYSTEM_ID]: { tasks: [manualForce.record] } } };
+    assert.equal(EXPECTED.get(manualForce.id), false, 'a manual-mode force composes nothing');
+    assert.equal(
+      store._environmentHasTaskSource(soleRecordEnvironment(manualForce)),
+      true,
+      'guard 2 still accepts a manual-mode force list as a task source (issue #1315, enable gate)'
+    );
+
+    // The other direction is already correct, and is asserted so the report above is precise
+    // about what is broken: an AUTOMATIC environment whose only task source is a forced
+    // non-matching library task composes it, and the gate finds it through the shared predicate
+    // in its fallback rather than through either guard.
+    const automaticForce = CASES.find(
+      (entry) =>
+        entry.kind === 'task' &&
+        entry.mode === 'automatic' &&
+        entry.shape === 'biomeMismatch' &&
+        entry.libraryEnabled &&
+        entry.membership === 'F'
+    );
+    config = { systems: { [SYSTEM_ID]: { tasks: [automaticForce.record] } } };
+    assert.equal(EXPECTED.get(automaticForce.id), true, 'an automatic force composes');
+    assert.equal(
+      store._environmentHasTaskSource(soleRecordEnvironment(automaticForce)),
+      true,
+      'and the fallback finds it, so a force-only automatic environment can be enabled'
     );
 
     // And the divergence the spec amendment records: after conversion the automatic arm of the
@@ -1066,38 +1131,58 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
     }
   });
 
-  it('fixes the manual over-count: hb-env-thicket has an EMPTY enabledTaskIds', () => {
-    // `hb-env-thicket` is MANUAL with no `enabledTaskIds` at all and `forcedTaskIds` carrying two
-    // tasks. The deleted rule read the empty list as allow-all, so every biome-less task counted
-    // thicket; manual composition is `enabled ∪ forced`, so `hb-task-spring` — in neither list —
-    // does not compose there.
+  it('composes a manual environment as exactly its picked list, matching or not', () => {
+    // `hb-env-thicket` is MANUAL. It held its whole composed set in `forcedTaskIds` and no
+    // `enabledTaskIds` at all, because manual mode used to filter by match and a force was the
+    // only way past that filter; issue #1315 removed the filter, and the world migration folds
+    // forced into enabled, so the authored fixture now carries the folded shape. What the seam
+    // composes there is the picked list and nothing else — `hb-task-spring`, in no list, does not
+    // compose into thicket even though it is biome-less and matches everything.
     const thicket = LAB_ENVIRONMENTS.find((entry) => entry.id === 'hb-env-thicket');
     assert.equal(thicket.compositionMode, 'manual');
-    assert.ok(!thicket.enabledTaskIds, 'the manual environment still declares no enabledTaskIds');
-    assert.ok(
-      deletedTaskCountRule(labRecord('hb-task-spring')).includes('hb-env-thicket'),
-      'the deleted rule counted thicket'
+    assert.deepEqual(
+      thicket.enabledTaskIds,
+      ['hb-task-forage', 'hb-task-fungi'],
+      'the folded pick list is still there'
     );
+    assert.deepEqual(thicket.forcedTaskIds, undefined, 'and the force list is gone');
+    for (const id of thicket.enabledTaskIds) {
+      assert.ok(seamIds(id, 'task').includes('hb-env-thicket'), `${id} composes into thicket`);
+    }
     assert.ok(
       !seamIds('hb-task-spring', 'task').includes('hb-env-thicket'),
-      'the seam does not compose spring into thicket'
+      'and an unpicked task does not, however well it matches'
     );
   });
 
-  it('hb-task-spring moves without its integer moving, which is why membership is asserted', () => {
-    // The case that makes a count-based criterion useless: two environments before, two after,
-    // and not the same two. An assertion on `.length` here passes while the answer changed
-    // completely — so this arm compares the SETS, and pins the equal lengths as the reason.
-    const before = deletedTaskCountRule(labRecord('hb-task-spring'));
-    const after = seamIds('hb-task-spring', 'task');
-    assert.deepEqual(before.toSorted(byCodeUnit), ['hb-env-grove', 'hb-env-thicket']);
-    assert.deepEqual(after.toSorted(byCodeUnit), ['hb-env-grove', 'hb-env-ridge']);
-    assert.equal(before.length, after.length, 'the integer does not move');
-    assert.notDeepEqual(
-      before.toSorted(byCodeUnit),
-      after.toSorted(byCodeUnit),
-      'the membership does'
+  it('an answer can move without its integer moving, which is why membership is asserted', () => {
+    // The case that makes a count-based criterion useless: one environment before, one after, and
+    // not the same one. An assertion on `.length` here passes while the answer changed completely.
+    //
+    // Authored rather than taken from the lab corpus, and that is the point of the pair of
+    // environments below: `env-stale-auto` is AUTOMATIC carrying an allow-list that does not name
+    // the record — the deleted rule dropped it, the seam composes it, because automatic mode does
+    // not read `enabled*Ids` — while `env-empty-manual` is MANUAL with no lists at all, which the
+    // deleted rule read as allow-all and the seam composes nothing into. The lab world showed
+    // exactly this shape until issue #1315 folded its manual force lists into its pick lists.
+    const record = { id: 'r', name: 'R', enabled: true };
+    const environments = [
+      { id: 'env-stale-auto', compositionMode: 'automatic', enabledTaskIds: ['someone-else'] },
+      { id: 'env-empty-manual', compositionMode: 'manual' },
+    ];
+    const before = environments
+      .filter((environment) => {
+        const enabled = environment.enabledTaskIds ?? [];
+        return enabled.length === 0 || enabled.includes(record.id);
+      })
+      .map((environment) => environment.id);
+    const after = activeEnvironmentsForRecord(record, environments, 'task', {}).map(
+      (environment) => environment.id
     );
+    assert.deepEqual(before, ['env-empty-manual'], 'the deleted allow-list rule counted the manual one');
+    assert.deepEqual(after, ['env-stale-auto'], 'the seam composes the automatic one instead');
+    assert.equal(before.length, after.length, 'the integer does not move');
+    assert.notDeepEqual(before, after, 'the membership does');
   });
 
   it('fixes the event fact, which was `enabledEventIds` membership and nothing else', () => {
@@ -1244,19 +1329,19 @@ describe('the composition-state vocabulary', () => {
       'excluded',
       'explicitlyIncluded',
       'forceIncluded',
-      'includedButUnavailable',
       'includedByMatch',
+      'includedNotMatching',
       'libraryDisabled',
       'notMatching',
     ]);
   });
 
-  it('the INCLUDED subset is exactly four states, and carries includedButUnavailable', () => {
+  it('the INCLUDED subset is exactly four states, and carries includedNotMatching', () => {
     assert.deepEqual([...ENVIRONMENT_INCLUDED_COMPOSITION_STATES].toSorted(byCodeUnit), [
       'explicitlyIncluded',
       'forceIncluded',
-      'includedButUnavailable',
       'includedByMatch',
+      'includedNotMatching',
     ]);
     // The retired `:498-499` guard, restored as a positive assertion.
     for (const absent of ['excluded', 'candidate', 'notMatching', 'libraryDisabled']) {
@@ -1267,20 +1352,32 @@ describe('the composition-state vocabulary', () => {
     }
   });
 
-  it('the COMPOSED subset is exactly three states, and does NOT carry includedButUnavailable', () => {
-    // The four-state and three-state sets are different things and conflating them is a silent
-    // one-record error in either direction: a stale `enabled*Ids` entry for a record that no
-    // longer matches is SHOWN to the GM and is NOT composed at runtime.
+  it('the COMPOSED subset is exactly four states, and DOES carry includedNotMatching', () => {
+    // It grew from three to four with issue #1315: manual mode has no match filter, so a picked
+    // record that does not match COMPOSES. The state survives the ruling — as
+    // `includedNotMatching` rather than `includedButUnavailable` — because the Included list still
+    // has to tell a GM which of its rows do not match, and this is the only carrier of that fact.
     assert.deepEqual([...ENVIRONMENT_COMPOSED_COMPOSITION_STATES].toSorted(byCodeUnit), [
       'explicitlyIncluded',
       'forceIncluded',
       'includedByMatch',
+      'includedNotMatching',
     ]);
-    assert.ok(!ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has('includedButUnavailable'));
-    assert.equal(
-      ENVIRONMENT_INCLUDED_COMPOSITION_STATES.size - ENVIRONMENT_COMPOSED_COMPOSITION_STATES.size,
-      1,
-      'the included set is the composed set plus exactly one shown-but-not-composed state'
+    assert.ok(ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has('includedNotMatching'));
+    // The two sets now hold the same four members, and that is a COINCIDENCE of this vocabulary,
+    // not an identity: "shown in the Included list" and "composes at runtime" are different
+    // questions and the next state to join either one can part them again. Asserted as equal
+    // membership rather than as the same object, so a consumer swapping one import for the other
+    // is still a real change that a future vocabulary edit will catch here first.
+    assert.deepEqual(
+      [...ENVIRONMENT_INCLUDED_COMPOSITION_STATES].toSorted(byCodeUnit),
+      [...ENVIRONMENT_COMPOSED_COMPOSITION_STATES].toSorted(byCodeUnit),
+      'the included and composed sets happen to agree today; they are still two sets'
+    );
+    assert.notEqual(
+      ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
+      ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
+      'and they are not the same Set re-exported under two names'
     );
   });
 
@@ -1339,11 +1436,10 @@ describe('the vocabulary consumers that cannot import it', () => {
   });
 
   it('environmentReadiness raises staleIncluded for exactly one state in the vocabulary', () => {
-    // `environmentReadiness.js` keeps its `'includedButUnavailable'` STRING LITERAL: it tests a
-    // single state rather than set membership, and the module's contract is that it has no import
-    // graph. It is also the one home where an unregistered state does not render wrongly — it
-    // silently stops raising the critical issue, and an environment ships enabled that should not
-    // be. So the guard is behavioural: call the exported predicate once per state.
+    // `environmentReadiness.js` keeps its state name as a STRING LITERAL: it tests a single state
+    // rather than set membership, and the module's contract is that it has no import graph. That
+    // makes it the one consumer where an unregistered state fails silently — it simply stops
+    // raising the issue — so the guard is behavioural: call the exported predicate once per state.
     const raising = [];
     for (const state of ENVIRONMENT_COMPOSITION_STATES) {
       const { issues } = evaluateEnvironmentReadiness(
@@ -1358,12 +1454,12 @@ describe('the vocabulary consumers that cannot import it', () => {
     }
     assert.deepEqual(
       raising,
-      ['includedButUnavailable'],
-      'the stale-included enable blocker fires for exactly the shown-but-not-composed state'
+      ['includedNotMatching'],
+      'the not-matching note fires for exactly the state that means "picked, does not match"'
     );
   });
 
-  it('that staleIncluded issue is critical and blocks enable, so the guard above has teeth', () => {
+  it('that staleIncluded issue is an unblocking note, so the guard above has teeth', () => {
     const { issues } = evaluateEnvironmentReadiness(
       { name: 'Env', enabled: true },
       {
@@ -1372,7 +1468,7 @@ describe('the vocabulary consumers that cannot import it', () => {
           {
             id: 'stale',
             kind: 'task',
-            compositionState: 'includedButUnavailable',
+            compositionState: 'includedNotMatching',
             record: { name: 'Stale' },
           },
         ],
@@ -1381,7 +1477,13 @@ describe('the vocabulary consumers that cannot import it', () => {
     );
     const stale = issues.find((issue) => issue.id === 'staleIncluded');
     assert.ok(stale, 'the issue is raised');
-    assert.equal(stale.severity, 'critical');
+    // `info`, and NOT `blocks: 'enable'` (issue #1315). This state composes, so it cannot be a
+    // reason to refuse enabling, and a critical error here told the GM to undo the very thing
+    // manual mode invites. The severity is asserted rather than left to the copy because it is
+    // the difference between a note and a blocker on the screen that decides whether an
+    // environment may be turned on.
+    assert.equal(stale.severity, 'info');
+    assert.ok(!stale.blocks, 'a composing record never blocks enable');
     assert.equal(stale.recordId, 'stale');
   });
 });
