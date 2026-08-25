@@ -4019,8 +4019,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   // and the installed-state rail tooltip have no frame at all, and a push would publish an
   // unrelated free-module frame as evidence for them.
   managerCase({
-    id: 'manager-world-downtime-premium-installed',
-    label: 'Manager — World Downtime with the premium companion installed',
+    id: 'manager-world-downtime-test-companion-installed',
+    label: 'Manager — premium-installed chrome, driven by a TEST companion',
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', downtimeProvider: '1' },
@@ -4131,8 +4131,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   // Fabricate's own — same medallion identity block, same `Unsaved` chip, same ghost/danger/
   // primary trio — which is a claim about pixels that no assertion here can make on its own.
   managerCase({
-    id: 'manager-world-downtime-companion-chrome',
-    label: 'Manager — World Downtime with a companion driving the route header',
+    id: 'manager-world-downtime-test-companion-chrome',
+    label: 'Manager — route header driven by a TEST companion',
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', downtimeProvider: '1' },
@@ -4202,10 +4202,10 @@ export const VIEW_LAB_CASES = Object.freeze([
   // `false`, and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it
   // open). No other frame reaches this with zero interaction, and it is the only frame that
   // can photograph the chip/rollup swap without also proving the rail-collapse or group-toggle
-  // path — see the `manager-world-downtime-premium-installed` and `-collapsed` frames for those.
+  // path — see the `manager-world-downtime-test-companion-installed` and `-collapsed` frames for those.
   managerCase({
-    id: 'manager-world-downtime-rollup',
-    label: 'Manager — World Downtime rollup on a closed disclosure',
+    id: 'manager-world-downtime-test-companion-rollup',
+    label: 'Manager — Downtime rollup on a closed disclosure, with a TEST companion',
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', downtimeProvider: '1' },
@@ -7174,8 +7174,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   // the live smoke walk has no companion installed and no player-extension screen at all, so
   // there is no counterpart these frames could fall short of.
   playerCase({
-    id: 'player-extension-surface',
-    label: 'Player app — companion navigation surface',
+    id: 'player-test-companion-surface',
+    label: 'Player app — navigation surface from a TEST companion',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1' },
@@ -7202,8 +7202,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: PLAYER_EXTENSION_SOURCES,
   }),
   playerCase({
-    id: 'player-extension-surface-narrow',
-    label: 'Player app — companion navigation surface, narrow with long labels',
+    id: 'player-test-companion-surface-narrow',
+    label: 'Player app — TEST companion navigation surface, narrow with long labels',
     smokeLabels: [],
     reaches: 'beyond',
     // Both gaps in one frame: the enforced minimum window size, rendered directly rather than
@@ -7234,8 +7234,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: PLAYER_EXTENSION_SOURCES,
   }),
   playerCase({
-    id: 'player-extension-fault',
-    label: 'Player app — companion surface fault state',
+    id: 'player-test-companion-fault',
+    label: 'Player app — TEST companion surface fault state',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', playerProviderFault: '1' },

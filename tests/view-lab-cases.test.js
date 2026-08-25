@@ -1096,15 +1096,15 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-settings',
       'manager-world-downtime-narrow',
       'manager-world-downtime-collapsed',
-      'manager-world-downtime-premium-installed',
+      'manager-world-downtime-test-companion-installed',
       // The companion driving Core's own route header. It is the only frame in the corpus
       // that can photograph the runtime route-chrome channel: every other Downtime case rests
       // on a list screen, which renders identically whether or not that channel exists.
-      'manager-world-downtime-companion-chrome',
+      'manager-world-downtime-test-companion-chrome',
       // Issue 1302 — the parent rollup, appended after the four tab cases (never inserted
       // among them): the manifest above is order-sensitive and `cases.slice(0, 4)` below is
       // index-based, so a new case has to land after both without disturbing either.
-      'manager-world-downtime-rollup',
+      'manager-world-downtime-test-companion-rollup',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
@@ -1117,14 +1117,27 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   // premium-installed and companion-chrome frames for the same reason — it is reached on
   // `expectView: 'systems'`, not `'world-downtime'`, and asserts a DOM-removal claim the
   // Core-preview loop below has no vocabulary for.
-  const premium = allCases.find((entry) => entry.id.endsWith('-premium-installed'));
-  const companionChrome = allCases.find((entry) => entry.id.endsWith('-companion-chrome'));
-  const rollup = allCases.find((entry) => entry.id.endsWith('-rollup'));
-  assert.ok(Boolean(companionChrome), 'the runtime route-chrome frame is still registered');
-  assert.ok(Boolean(rollup), 'the parent rollup frame is still registered');
-  const cases = allCases.filter(
-    (entry) => entry !== premium && entry !== companionChrome && entry !== rollup
+  // SELECTED BY WHAT MAKES THEM DIFFERENT, not by how they are spelled. These three used to be
+  // picked out with `id.endsWith('-premium-installed')` and two siblings like it, which is an
+  // instrument whose reach exceeds its claim: renaming a frame silently dropped it back into the
+  // Core-preview loop below, where every assertion is about content a companion's screens must
+  // NOT carry. The fact that separates them is that they register the lab's stand-in companion,
+  // and that is on the case as `query.downtimeProvider`.
+  const withCompanion = allCases.filter((entry) => entry.query?.downtimeProvider === '1');
+  assert.equal(
+    withCompanion.length,
+    3,
+    'the frames that register the stand-in companion are no longer three'
   );
+  const named = (id) => {
+    const found = withCompanion.find((entry) => entry.id === id);
+    assert.ok(Boolean(found), `${id} is no longer registered as a stand-in companion frame`);
+    return found;
+  };
+  const premium = named('manager-world-downtime-test-companion-installed');
+  const companionChrome = named('manager-world-downtime-test-companion-chrome');
+  const rollup = named('manager-world-downtime-test-companion-rollup');
+  const cases = allCases.filter((entry) => !withCompanion.includes(entry));
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
@@ -3813,9 +3826,9 @@ test('parsePlayerMountRegions refuses every shape whose spans would be a guess',
 });
 
 test('the player companion cases photograph the seam through the production registry', () => {
-  const surface = getCaseById('player-extension-surface');
-  const narrow = getCaseById('player-extension-surface-narrow');
-  const fault = getCaseById('player-extension-fault');
+  const surface = getCaseById('player-test-companion-surface');
+  const narrow = getCaseById('player-test-companion-surface-narrow');
+  const fault = getCaseById('player-test-companion-fault');
   const mountSource = readFileSync(resolve(ROOT, LAB_MOUNT_PATH), 'utf8');
   const lang = JSON.parse(readFileSync(resolve(ROOT, 'lang/en.json'), 'utf8'));
 

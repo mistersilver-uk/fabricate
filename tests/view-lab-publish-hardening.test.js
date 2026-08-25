@@ -45,7 +45,7 @@ test('a published frame is named and captioned from the CASE REGISTRY with no wi
   // documented itself as wired into this path and was not: no caller passed `labelForId`, so the
   // lookup fell through `VIEW_RECIPES` -- a table keyed on SMOKE recipe ids, which a View Lab case
   // id is not -- and landed on the bare id. Every lab frame in every PR body was captioned
-  // `manager-world-downtime-premium-installed`, which is why a maintainer reading one asked what
+  // `manager-world-downtime-test-companion-installed`, which is why a maintainer reading one asked what
   // "Ledger Administration" was and why it shipped.
   //
   // NOTHING IS INJECTED HERE, deliberately. Every existing case in this file passes its own
@@ -54,13 +54,13 @@ test('a published frame is named and captioned from the CASE REGISTRY with no wi
   try {
     const dir = join(root, 'frames');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'manager-world-downtime-premium-installed.png'), 'a');
+    writeFileSync(join(dir, 'manager-world-downtime-test-companion-installed.png'), 'a');
     writeFileSync(join(dir, 'manager-world-downtime-factions.png'), 'b');
     const uploaded = await uploadScreenshotObjects({
       prNumber: 251,
       headSha: 'abc1234',
       files: [
-        join(dir, 'manager-world-downtime-premium-installed.png'),
+        join(dir, 'manager-world-downtime-test-companion-installed.png'),
         join(dir, 'manager-world-downtime-factions.png'),
       ],
       root,
@@ -69,14 +69,14 @@ test('a published frame is named and captioned from the CASE REGISTRY with no wi
     });
 
     const [standIn, shipped] = uploaded;
-    assert.equal(standIn.label, labelForCaseId('manager-world-downtime-premium-installed'));
-    assert.notEqual(standIn.label, 'manager-world-downtime-premium-installed');
-    assert.match(standIn.label, /premium companion installed/);
+    assert.equal(standIn.label, labelForCaseId('manager-world-downtime-test-companion-installed'));
+    assert.notEqual(standIn.label, 'manager-world-downtime-test-companion-installed');
+    assert.match(standIn.label, /TEST companion/);
 
     // AND THE CAPTION IS ON THE FRAME THAT NEEDS IT AND NOT ON THE ONE THAT DOES NOT. Both are
     // World Downtime frames, so a caption applied by route rather than by what the case asked the
     // lab to register would land on both.
-    assert.equal(standIn.note, evidenceNoteForCaseId('manager-world-downtime-premium-installed'));
+    assert.equal(standIn.note, evidenceNoteForCaseId('manager-world-downtime-test-companion-installed'));
     assert.match(standIn.note, /tests\/view-lab\/mount\.js/);
     assert.match(standIn.note, /neither the free module nor Fabricate Premium/);
     assert.equal(shipped.note, '', 'a frame with no stand-in companion was captioned as if it had one');
