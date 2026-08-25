@@ -46,6 +46,17 @@ export default defineConfig(({ command }) => {
     return {
       plugins,
       server: {
+        // PIN THE IPv4 ADDRESS. Vite's default host ('localhost') binds whichever single
+        // address the OS resolves that name to — on Windows that is `[::1]`, leaving the IPv4
+        // `127.0.0.1:5173` unclaimed. `strictPort` then cannot do its job: another process (a
+        // stray test that starts its own dev server on import, say) takes the half Vite never
+        // asked for, no conflict is ever detected, and the browser — which resolves
+        // `localhost` to IPv4 first — is served that other app instead of the Foundry proxy
+        // below. The dev server looks broken while it is in fact healthy one stack over.
+        // Binding IPv4 explicitly claims the address browsers actually reach for, and makes a
+        // squatted port fail loudly at startup. Same choice, same reason, as
+        // `tests/view-lab/vite.config.js`.
+        host: '127.0.0.1',
         port: 5173,
         strictPort: true,
         hmr: { port: 5174 },
