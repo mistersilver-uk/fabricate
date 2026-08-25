@@ -187,6 +187,9 @@
     onReselectAvailable: (available) => {
       downtimeCanReselect = available;
     },
+    // The channel gates a companion's `navigateToTab` on liveness and hands the survivors here,
+    // where the registered provider's tab set and the rail's own navigation already live.
+    onNavigate: (tabId) => navigateWorldDowntimeTab(tabId),
   });
   // Every surface a companion currently claims, not just Core's Downtime one. The title bar
   // reports the MODULE, so it must not be keyed on one route: a premium module whose only
@@ -2885,6 +2888,7 @@
       setRouteChrome: (chrome) => downtimeChromeChannel.setChrome(self.context, chrome),
       onRouteReselect: (handler) => downtimeChromeChannel.onReselect(self.context, handler),
       onBeforeNavigate: (handler) => downtimeChromeChannel.onBeforeNavigate(self.context, handler),
+      navigateToTab: (tabId) => downtimeChromeChannel.navigate(self.context, tabId),
     });
     self.context = context;
     return context;
@@ -7240,6 +7244,49 @@
       railGroupUserExpanded.worldDowntime = true;
       activeView = 'world-downtime';
     });
+  }
+
+  /**
+   * A mounted companion asking Core to take the GM to another of its OWN tabs (issue 1332).
+   *
+   * ROUTED THROUGH THE RAIL'S OWN HANDLER, never around it. A companion's programmatic request
+   * and a GM's click are the same navigation and must not come to mean different things: the
+   * tab already on screen re-activates rather than remounting, any other tab is offered to the
+   * companion's own `onBeforeNavigate` guard with reason `'tab'`, and an allowed move expands
+   * the group and commits the route. A second implementation would be a second set of those
+   * rules, correct on the day it was written.
+   *
+   * MEMBERSHIP COMES FROM THE REGISTERED PROVIDER, never from `downtimeTabs`. That chain
+   * answers "what is Core RENDERING", and it falls back to Core's own preview tab ids — which
+   * no companion registered. The window where the two differ is real rather than theoretical:
+   * between a companion's `unregister()` and Core's next render its mount is still the live
+   * one, and reading the rendered list there would hand a provider that no longer exists a
+   * working route onto Core's own screens.
+   *
+   * The two REFUSALS below are stated here rather than read back out of the handler, because
+   * the handler reports both by returning `undefined`, which is also what it returns when it
+   * re-activates and when there is no guard to ask. Reading its return for them would make a
+   * refusal indistinguishable from the two things that did exactly what was asked.
+   *
+   * @param {string} tabId A tab id the live mount's own provider registered.
+   * @returns {boolean|Promise<boolean>} Whether the GM moved; a promise when the companion's
+   *   own guard answers asynchronously, so the answer is never a claim about an open dialog.
+   */
+  function navigateWorldDowntimeTab(tabId) {
+    // A well-formed id this provider does not declare is `false`, not a throw: the tab set is a
+    // runtime fact that moves under a companion — a provider may re-register with a different
+    // one, and a conditional tab may not exist yet — so this is a question, not a defect. The
+    // channel has already thrown on a malformed id, which never is one.
+    if (!downtimeProvider?.tabs?.some((tab) => tab.id === tabId)) return false;
+    // Issue 1257's gate, restated for the same reason `openWorldDowntime` restates it: the
+    // route is unreachable while the gate is shut, so a companion cannot be routed onto it.
+    if (!worldDowntimeAvailable) return false;
+    const moved = openWorldDowntimePreview(tabId);
+    // `undefined` reaches here only from the re-activation branch or from a route exit with
+    // nothing to ask — both did what the companion asked, so both are `true`. Only an explicit
+    // `false` is a veto, which is the `=== false` reading every guard on this route uses.
+    if (isPromise(moved)) return moved.then((value) => value !== false);
+    return moved !== false;
   }
 
   // World > Travel (issue 1282). No availability refusal: the route is ungated, exactly like

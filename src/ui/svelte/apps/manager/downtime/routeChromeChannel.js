@@ -1,3 +1,4 @@
+import { requireNonEmptyString } from '../../../../extensionRegistry.js';
 import { normalizeRouteChrome } from '../../../../managerExtensions.js';
 
 /**
@@ -56,6 +57,8 @@ import { normalizeRouteChrome } from '../../../../managerExtensions.js';
  * @property {(reason: string) => (undefined|boolean|Promise<boolean>)} confirmNavigation Ask
  *   the live mount's guard whether one navigation may proceed. `undefined` means there is
  *   nothing to ask.
+ * @property {(caller: object, tabId: string) => (boolean|Promise<boolean>)} navigate Move the
+ *   GM to one of the live mount's own tabs on `caller`'s behalf.
  * @property {object|null} chrome The chrome Core should render, or `null` for the tab's own.
  */
 
@@ -82,12 +85,27 @@ const GUARD_FAILURE = 'Fabricate | Downtime navigation guard failed:';
  *   the other. Core needs it because its breadcrumb offers the tab crumb as a way back up
  *   into the companion's own list — and a crumb rendered as a button over a mount that
  *   registered no handler is a control that visibly does nothing when pressed.
+ * @param {(tabId: string) => (boolean|Promise<boolean>)} [options.onNavigate] Perform one
+ *   companion-requested tab navigation, and answer whether the GM moved.
+ *
+ *   INJECTED RATHER THAN IMPLEMENTED, because the two halves of `navigateToTab` belong to
+ *   different owners. LIVENESS is this channel's — it is the same per-mount identity rule
+ *   `setChrome`, `onReselect` and `onBeforeNavigate` are already bound by, and a fourth copy of
+ *   it elsewhere would be a copy that agrees today and drifts the day one of them learns about
+ *   a lifecycle path the other does not. MEMBERSHIP and the navigation itself are Core's: this
+ *   module is a plain leaf that knows no tab set and owns no route, and the host is where the
+ *   registered provider's tabs and the rail's own click handler already are. So a call that
+ *   survives the liveness gate arrives here, and what it may reach is decided there.
+ *
+ *   The default refuses everything, so a channel created without a host — every unit test of
+ *   the three members above — cannot navigate a GM who is not there.
  * @param {(...args: unknown[]) => void} [options.reportError] Sink for a throwing handler.
  * @returns {RouteChromeChannel} Frozen channel.
  */
 export function createRouteChromeChannel({
   onChange = () => {},
   onReselectAvailable = () => {},
+  onNavigate = () => false,
   // Read through `console` at CALL time rather than defaulting to the bare `console.error`
   // reference. A channel is created once, when the Manager root initialises, so a captured
   // reference would pin whatever `console.error` was at that instant — which is what makes a
@@ -259,6 +277,22 @@ export function createRouteChromeChannel({
         if (pendingNavigation === settled) pendingNavigation = null;
       });
       return settled;
+    },
+
+    navigate(caller, tabId) {
+      // Validated FIRST and unconditionally, for the reason `setChrome` states: a malformed
+      // argument is refused with the same message whoever sent it and whatever the mount's
+      // liveness, so a companion cannot be told its own defect is a dead mount. The `TypeError`
+      // travels back up the companion's own call stack, where a programming error belongs.
+      requireNonEmptyString(
+        tabId,
+        'Fabricate World navigation navigateToTab requires a non-empty tab id'
+      );
+      // A RETIRED MOUNT MOVES NOBODY. Same identity rule as `setChrome`, and the stakes are
+      // higher here: repainting a header the GM has left is a cosmetic wrong, and dragging them
+      // off the screen they chose is not.
+      if (!isLive(caller)) return false;
+      return onNavigate(tabId);
     },
 
     get chrome() {

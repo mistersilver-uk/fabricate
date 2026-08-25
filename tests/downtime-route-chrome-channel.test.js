@@ -387,3 +387,104 @@ test('the channel refuses a non-function navigation guard', () => {
   channel.beginMount(context);
   assert.throws(() => channel.onBeforeNavigate(context, 'nope'), /requires a function/);
 });
+
+/**
+ * WHAT THIS CHANNEL OWNS OF `navigateToTab`, and what it deliberately does not (issue 1332).
+ *
+ * It owns LIVENESS and the shape of the argument — the same two things it owns for every other
+ * member — and nothing else. It knows no tab set and owns no route, so which destinations a
+ * caller may reach and what reaching one does are the host's, injected as `onNavigate`. These
+ * cases therefore assert what ARRIVES at that edge, which is the only claim this file can make
+ * honestly; `tests/components/manager-mounted.test.js` asserts what Core then does with it.
+ */
+function navigatingChannel(answer = true) {
+  const asked = [];
+  const channel = createRouteChromeChannel({
+    onNavigate: (tabId) => {
+      asked.push(tabId);
+      return answer;
+    },
+  });
+  return { channel, asked };
+}
+
+test('a live mount reaches the host, and a retired one is refused without reaching it', () => {
+  const { channel, asked } = navigatingChannel();
+  const ledger = contextFor('ledger');
+  const crew = contextFor('crew');
+
+  assert.equal(channel.navigate(ledger, 'crew'), false, 'with no mount at all, nobody moves');
+  assert.deepEqual(asked, [], 'and the host is never asked to move them');
+
+  channel.beginMount(ledger);
+  assert.equal(channel.navigate(ledger, 'crew'), true);
+  assert.deepEqual(asked, ['crew'], 'the destination arrives at the host verbatim');
+
+  // The mount that asked has been replaced by the one it navigated to. A companion holding the
+  // retired context — a pending promise, a stray listener — must not be able to move a GM who
+  // has already gone somewhere else.
+  channel.beginMount(crew);
+  assert.equal(channel.navigate(ledger, 'ledger'), false, 'a retired context moves nobody');
+  assert.deepEqual(asked, ['crew'], 'and is refused BEFORE the host could act on it');
+
+  channel.endMount(crew);
+  assert.equal(channel.navigate(crew, 'ledger'), false, 'and the member dies with its mount');
+  assert.deepEqual(asked, ['crew']);
+});
+
+test('the host’s answer is passed back unchanged, including a pending one', async () => {
+  // The host answers a companion's veto asynchronously, because the veto may be a dialog. The
+  // channel must hand that promise back rather than resolving it into a boolean of its own: a
+  // synchronous `false` here would tell a companion it had been refused while its own dialog
+  // was still open, and a synchronous `true` would be worse.
+  let settle;
+  const pending = new Promise((resolve) => {
+    settle = resolve;
+  });
+  const { channel } = navigatingChannel(pending);
+  const ledger = contextFor('ledger');
+  channel.beginMount(ledger);
+
+  const answer = channel.navigate(ledger, 'crew');
+  assert.equal(answer, pending, 'the host’s own promise, not a wrapper around it');
+  settle(false);
+  assert.equal(await answer, false);
+
+  const refusing = createRouteChromeChannel({ onNavigate: () => false });
+  refusing.beginMount(ledger);
+  assert.equal(refusing.navigate(ledger, 'crew'), false, 'a veto is reported as a veto');
+});
+
+test('a malformed tab id throws whoever sent it, and moves nobody', () => {
+  const { channel, asked } = navigatingChannel();
+  const ledger = contextFor('ledger');
+  const retired = contextFor('gone');
+  channel.beginMount(ledger);
+
+  for (const malformed of [undefined, null, '', '   ', 42, { id: 'crew' }, ['crew']]) {
+    assert.throws(
+      () => channel.navigate(ledger, malformed),
+      /navigateToTab requires a non-empty tab id/,
+      `expected ${String(malformed)} to be refused`
+    );
+    // VALIDATED BEFORE LIVENESS, which is the half a `TypeError`-shaped assertion alone would
+    // miss: a companion whose mount has quietly ended must still be told its ARGUMENT is wrong,
+    // rather than reading a silent `false` and hunting a lifecycle bug it does not have.
+    assert.throws(
+      () => channel.navigate(retired, malformed),
+      /navigateToTab requires a non-empty tab id/,
+      `expected ${String(malformed)} to be refused from a dead mount too`
+    );
+  }
+  assert.deepEqual(asked, [], 'and no malformed request ever reached the host');
+});
+
+test('a channel created without a host refuses to navigate rather than pretending to', () => {
+  // Every unit of the three older members constructs a channel with no `onNavigate`. The
+  // default has to be a refusal: a `true` there would let one of those cases silently claim a
+  // GM had been moved by a channel wired to nothing that could move them.
+  const { channel } = recordingChannel();
+  const ledger = contextFor('ledger');
+  channel.beginMount(ledger);
+  assert.equal(channel.navigate(ledger, 'crew'), false);
+});

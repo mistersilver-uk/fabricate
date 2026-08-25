@@ -4249,6 +4249,66 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
+  // Issue 1332 — the companion NAVIGATING. Every other Downtime frame is reached by pressing
+  // something of CORE'S: a rail entry, a rail sub-item, a preview tab. This one is reached by
+  // pressing a control the COMPANION drew, whose only job is to take the GM to another of that
+  // companion's own screens — and until Core published `navigateToTab` such a control could name
+  // its destination and not reach it. That is a distinction no resting frame can carry, because
+  // a dead button and a working one photograph identically until one of them is pressed.
+  //
+  // It earns a case of its own rather than a step on `-test-companion-installed`, whose subject
+  // is the rail LOCK and whose every assertion is about the `ledger` panel this navigation
+  // deliberately leaves. Adding the press there would have swapped that frame's subject for this
+  // one and photographed neither well.
+  managerCase({
+    id: 'manager-world-downtime-test-companion-tab-navigation',
+    label: 'Manager — a TEST companion sending the GM to another of its own tabs',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-lab-companion-tab-link]' },
+    ],
+    expectView: 'world-downtime',
+    // The DESTINATION tab's panel, reached without the rail ever being touched.
+    expectSelector: '[data-downtime-extension-panel="crew"]',
+    expectAttributes: [
+      {
+        selector: '[data-downtime-extension-panel]',
+        name: 'data-downtime-extension-panel',
+        value: 'crew',
+      },
+      // The RAIL FOLLOWED, which is what makes this a navigation rather than a panel swap: the
+      // sub-item nobody pressed is now the current one, and the tab that asked is not.
+      { selector: '#manager-downtime-nav-crew', name: 'aria-current', value: 'true' },
+      { selector: '#manager-downtime-nav-ledger', name: 'aria-current', value: null },
+      {
+        selector: '#world-downtime-panel-crew',
+        name: 'aria-labelledby',
+        value: 'manager-downtime-nav-label-crew',
+      },
+    ],
+    // The destination screen carries its OWN cross-navigation control, pointing on to the third
+    // tab — so the frame shows a capability every screen has rather than one button that worked
+    // once. Matched on the stable prefix; the destination's own label is the fixture's.
+    expectVisible: '[data-lab-companion-tab-link]:has-text("Go to Test Companion")',
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '[data-world-downtime-submenu]',
+    ],
+    expectOverflowY: '[data-lab-companion-scroll]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
   managerCase({
     // World > Travel is UNGATED (issue 1282). This case used to prove the opposite — that the
     // selected-system Travel group DISAPPEARED when that system's Travel & Realms toggle was

@@ -377,39 +377,48 @@ async function mountPlayerApp(content, params) {
  * @returns {object} An API-v1 World navigation provider.
  */
 function labDowntimeProvider() {
+  // NAMED ONCE, then used twice: as the provider's tab set, and as the source the
+  // cross-navigation control below reads its destination's real label out of (issue 1332). A
+  // second literal for that label would be a mirror inside one function, and the frame it
+  // captions is published as evidence.
+  const tabs = [
+    {
+      id: 'ledger',
+      label: 'Test Companion — Ledger',
+      accessibleName: 'Open the downtime ledger',
+      // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
+      // a long multi-word label, on the same tab, or the widest case is one the layout
+      // assertions do not look at.
+      badge: { count: 1284, accessibleName: '1,284 downtime claims waiting for review' },
+      tooltip: 'Every character’s downtime, in one ledger',
+      icon: 'fas fa-scroll',
+      title: 'Downtime ledger',
+      subtitle: 'Downtime Studio · Every character’s work, in one place.',
+      breadcrumb: 'Ledger',
+    },
+    {
+      id: 'crew',
+      label: 'Test Companion — Crew',
+      accessibleName: 'Open the downtime crew roster',
+      tooltip: 'Who is working on what',
+      icon: 'fas fa-users-gear',
+    },
+    {
+      id: 'writs',
+      label: 'Test Companion — Writs',
+      accessibleName: 'Open downtime writs',
+      tooltip: 'Standing orders and commissions',
+      icon: 'fas fa-file-signature',
+    },
+  ];
+  // The tab this screen's cross-navigation control points at: the next of the stand-in's own
+  // three, wrapping. Derived rather than mapped, so adding a tab above needs nothing here.
+  const nextTab = (tabId) => tabs[(tabs.findIndex((tab) => tab.id === tabId) + 1) % tabs.length];
+
   return {
     apiVersion: 1,
     id: 'downtime',
-    tabs: [
-      {
-        id: 'ledger',
-        label: 'Test Companion — Ledger',
-        accessibleName: 'Open the downtime ledger',
-        // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
-        // a long multi-word label, on the same tab, or the widest case is one the layout
-        // assertions do not look at.
-        badge: { count: 1284, accessibleName: '1,284 downtime claims waiting for review' },
-        tooltip: 'Every character’s downtime, in one ledger',
-        icon: 'fas fa-scroll',
-        title: 'Downtime ledger',
-        subtitle: 'Downtime Studio · Every character’s work, in one place.',
-        breadcrumb: 'Ledger',
-      },
-      {
-        id: 'crew',
-        label: 'Test Companion — Crew',
-        accessibleName: 'Open the downtime crew roster',
-        tooltip: 'Who is working on what',
-        icon: 'fas fa-users-gear',
-      },
-      {
-        id: 'writs',
-        label: 'Test Companion — Writs',
-        accessibleName: 'Open downtime writs',
-        tooltip: 'Standing orders and commissions',
-        icon: 'fas fa-file-signature',
-      },
-    ],
+    tabs,
     // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
     // about and the frame has to be able to show it. The old stand-in mounted a short padded
     // div, which renders identically in a 689px target and a 528px one — so the frame could
@@ -492,6 +501,27 @@ function labDowntimeProvider() {
         context?.onRouteReselect?.(closeEditor);
       });
 
+      // Item 2 (issue 1332): A COMPANION SENDING THE GM TO ANOTHER OF ITS OWN TABS, which is
+      // the control the seam was widened for — a setting shown where the GM feels its effect,
+      // with a way to reach the screen where it is changed. Until Core published
+      // `navigateToTab` a companion could NAME another of its screens and not reach it, so this
+      // button was either absent or dead, and no frame could tell those two apart from a
+      // working one. Pressing it moves the panel AND the rail's current sub-item with no rail
+      // click, which is a claim about behaviour a photograph can carry.
+      const destination = nextTab(tabId);
+      const crossLink = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        `Go to ${destination.label}`
+      );
+      crossLink.type = 'button';
+      // The literal hook, for the reason the drill-down states above it: the case registry's
+      // selector guard greps this file for the hook a selector names, and a `dataset` write
+      // would leave that literal nowhere in it.
+      crossLink.setAttribute('data-lab-companion-tab-link', '');
+      crossLink.addEventListener('click', () => context?.navigateToTab?.(destination.id));
+
       const panel = element(
         'div',
         'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
@@ -522,6 +552,7 @@ function labDowntimeProvider() {
         element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Test companion — ${tabId}`)
       );
       panel.append(openEditor);
+      panel.append(crossLink);
       const scroller = element(
         'div',
         'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'

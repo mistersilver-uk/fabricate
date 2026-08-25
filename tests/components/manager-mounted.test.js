@@ -16155,6 +16155,204 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(managerRoute(), 'world', 'the GM is not stranded by a companion’s bug');
   });
 
+  /**
+   * ISSUE 1332 — a companion sending the GM to another of its OWN tabs.
+   *
+   * These cases sit beside the navigation-guard block above because they are the same
+   * navigation seen from the other end: the guard is a companion refusing a move, and this is a
+   * companion asking for one. The rail sub-item they are asserted against is the same control
+   * the guard cases click, on purpose — the whole claim is that a programmatic request and a
+   * GM's click are ONE navigation rather than two that agree today.
+   */
+  const downtimeSubitem = (tabId) => target.querySelector(`#manager-downtime-nav-${tabId}`);
+
+  it('takes the GM to another of the companion’s own tabs, on the companion’s own request', async () => {
+    const mounts = await mountGuardedCompanion();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    const moved = mounts[0].navigateToTab('crew');
+    assert.equal(
+      moved,
+      true,
+      'a request nobody has to be asked about is answered without asynchrony, as a click is'
+    );
+    await settleRouteExit();
+
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'THE POINT: the companion drew a control that names another of its screens, and reached it'
+    );
+    assert.equal(mounts.length, 2, 'the destination mounts exactly as a rail click mounts it');
+    assert.equal(mounts[1].tabId, 'crew', 'and is told which of its own tabs it is showing');
+    assert.equal(managerRoute(), 'world-downtime');
+    // The RAIL follows, which is what makes this a navigation rather than a panel swap: the
+    // sub-item the GM did not press is now the current one.
+    assert.equal(downtimeSubitem('crew').getAttribute('aria-current'), 'true');
+    assert.equal(downtimeSubitem('ledger').getAttribute('aria-current'), null);
+    assert.ok(downtimeSubitem('crew').classList.contains('is-active'));
+  });
+
+  it('offers the companion’s own guard the navigation the companion asked for', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    const moved = mounts[0].navigateToTab('crew');
+    await settleRouteExit();
+    assert.deepEqual(
+      asked,
+      ['tab'],
+      'a companion holding unsaved work is asked about its OWN request, with the same reason'
+    );
+    assert.equal(moved, false, 'and is told plainly that nobody moved');
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'the GM stays on the screen holding the unsaved work'
+    );
+    assert.equal(mounts.length, 1, 'and the mount that owns it is never torn down');
+    assert.equal(downtimeSubitem('ledger').getAttribute('aria-current'), 'true');
+  });
+
+  it('answers with a promise while the companion’s own dialog is still open', async () => {
+    const mounts = await mountGuardedCompanion();
+    let answer;
+    mounts[0].onBeforeNavigate(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        })
+    );
+
+    const moved = mounts[0].navigateToTab('crew');
+    // A BOOLEAN HERE WOULD BE A LIE. The veto is a dialog the GM has not answered, so the only
+    // honest synchronous answer is "not yet" — a `true` would have the companion tearing down
+    // the screen its own prompt is still asking about.
+    assert.equal(typeof moved?.then, 'function');
+    await settleRouteExit();
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'and nothing moves while the GM is being asked'
+    );
+
+    answer(false);
+    assert.equal(await moved, false, 'the promise resolves to the answer the GM actually gave');
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1);
+  });
+
+  it('re-activates the tab already on screen rather than remounting it', async () => {
+    const mounts = await mountGuardedCompanion();
+    const events = [];
+    mounts[0].onRouteReselect(() => events.push('pop'));
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    assert.equal(mounts[0].navigateToTab('ledger'), true);
+    await settleRouteExit();
+
+    assert.deepEqual(events, ['pop'], 'the companion is offered its own re-activation');
+    assert.equal(
+      mounts.length,
+      1,
+      'THE POINT: no remount, so the drill-down the companion is popping out of still exists'
+    );
+    // The veto above is a POSITIVE CONTROL for the routing claim, not decoration: a guard that
+    // refuses everything did not stop this, which is only possible if the request never went
+    // through the route-exit confirmation at all — exactly as the rail click does not.
+    assert.deepEqual(asked, [], 'and no guard is asked about a navigation that goes nowhere');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+  });
+
+  it('cannot reach Core’s own tabs once its provider has unregistered', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    const unregister = registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+
+    // WHY THIS CASE EXISTS, and why a made-up tab id could not replace it. Between the
+    // unregistration and Core's re-render the mount is still the live one, and the tab list
+    // Core is ABOUT to render is its own preview's — `tracking`, `activities`, `factions`,
+    // `settings`. Resolving membership from what Core renders rather than from the registered
+    // provider would therefore hand a companion that no longer exists a working route onto
+    // Core's own screens, which is the one destination this seam most clearly refuses.
+    unregister();
+    assert.equal(mounts[0].navigateToTab('tracking'), false, 'a Core preview tab is not its own');
+    assert.equal(mounts[0].navigateToTab('ledger'), false, 'and neither is a tab it just lost');
+    await settleRouteExit();
+    assert.equal(mounts.length, 1, 'and nothing it asked for remounted it');
+  });
+
+  it('refuses a call from a mount that has already ended, and moves nobody', async () => {
+    const mounts = await mountGuardedCompanion();
+    downtimeSubitem('crew').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 2, 'the GM went somewhere, and the first mount ended');
+
+    // The retired context, exactly as a companion would still be holding it: a pending promise
+    // that resolved late, a data listener nobody unsubscribed.
+    assert.equal(mounts[0].navigateToTab('ledger'), false);
+    await settleRouteExit();
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'a stale context cannot drag the GM off the screen they chose'
+    );
+    assert.equal(mounts.length, 2, 'and nothing remounted');
+
+    // POSITIVE CONTROL. Without it the `false` above passes just as well for a member that
+    // never navigates anybody, which is the failure this suite has been bitten by before.
+    assert.equal(mounts[1].navigateToTab('ledger'), true);
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 3);
+  });
+
+  it('reaches the tabs this provider registered, and nothing else', async () => {
+    const mounts = await mountGuardedCompanion();
+
+    // `tracking` and `settings` are CORE'S OWN preview tab ids — real Downtime tabs, and not
+    // ones this provider declared. They are the case that separates "resolved from the
+    // registered provider" from "resolved from whatever Core would render", which a made-up id
+    // could not tell apart.
+    assert.equal(mounts[0].navigateToTab('tracking'), false);
+    assert.equal(mounts[0].navigateToTab('settings'), false);
+    assert.equal(mounts[0].navigateToTab('ledger-2'), false, 'and an id that exists nowhere');
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(managerRoute(), 'world-downtime', 'no Core route is reachable through the seam');
+    assert.equal(mounts.length, 1, 'and nothing remounted on the way to refusing');
+
+    // MALFORMED INPUT IS THE OTHER RULING, and it throws rather than answering: an empty or
+    // non-string id can never be a runtime question the way a conditional tab can.
+    for (const malformed of [undefined, null, '', '   ', 7, ['crew']]) {
+      assert.throws(
+        () => mounts[0].navigateToTab(malformed),
+        /navigateToTab requires a non-empty tab id/,
+        `expected ${String(malformed)} to throw rather than answer`
+      );
+    }
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    assert.equal(
+      mounts[0].navigateToTab('crew'),
+      true,
+      'positive control: the tabs this provider DID register are still reachable'
+    );
+  });
+
   it('re-points the route when a provider re-registers with a different tab set', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -16266,6 +16464,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable
         // fields: the context stays frozen and its identity — which is what the host keys a
         // remount on — never moves when a companion restates its chrome.
+        // Issue 1332 — the fourth runtime channel, and the only one that MOVES the GM rather
+        // than restating what is on screen around them.
+        'navigateToTab',
         'onBeforeNavigate',
         'onRouteReselect',
         'requestRemount',
@@ -16280,6 +16481,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(typeof context.setRouteChrome, 'function');
       assert.equal(typeof context.onRouteReselect, 'function');
       assert.equal(typeof context.onBeforeNavigate, 'function');
+      assert.equal(typeof context.navigateToTab, 'function');
       assert.equal(context.schemaVersion, 1);
       assert.equal(context.surface, 'manager');
       assert.equal(context.surfaceId, 'downtime');
