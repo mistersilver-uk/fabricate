@@ -142,6 +142,71 @@ describe('handleFabricateSettingChange', () => {
     ]);
   });
 
+  // The WORLD character libraries leg (issue 1308). It departs from the currency leg above in two
+  // ways, and both are silent when got wrong — which is why they are pinned here rather than left
+  // to the fact that the leg "looks like" its siblings.
+  it('reloads the character-libraries store and announces the UNION of all three domains', () => {
+    const emitted = [];
+    const order = [];
+    const handled = handleFabricateSettingChange('fabricate.characterLibraries', {
+      characterLibrariesStore: {
+        load: () => order.push('load'),
+      },
+      craftingSystemManager: {
+        getSystems: () => [{ id: 'alpha' }, { id: 'beta' }],
+      },
+      callAll: (hook, payload) => {
+        order.push(hook);
+        emitted.push([hook, payload]);
+      },
+    });
+
+    assert.equal(handled, true);
+    // ORDERING IS A MUST, not an accident. Every consumer of the announcements reads the
+    // libraries back through this store, so announcing first hands them the pre-edit libraries
+    // and caches that as the new truth.
+    assert.equal(order[0], 'load', 'the store is re-read BEFORE anything is announced');
+
+    const [republish, change] = emitted;
+    assert.equal(republish[0], 'fabricate.craftingSystemsChanged');
+    assert.equal(change[0], 'fabricate.craftingDataChanged');
+    assert.deepEqual(
+      change[1].scopes,
+      [
+        // EVERY system, not just participants: there is no participation flag here by design, so
+        // any system may reference any entry by id.
+        //
+        // And all THREE domains. Before the move the two libraries lived on the crafting system
+        // and were classified separately — `modifiers: [resolution-config]` and
+        // `characterPrerequisites: [labelling, access-and-knowledge]` — so an edit to either
+        // announced its own domains through the `craftingSystems` write. One setting cannot say
+        // WHICH library moved, so narrowing this to `resolution-config` alone (which is exactly
+        // what copying the currency leg produces) silently stops announcing the other two.
+        { systemId: 'alpha', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
+        { systemId: 'beta', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
+      ],
+      'every system, carrying the union of the three domains the two libraries used to carry'
+    );
+  });
+
+  it('character libraries: emits NOTHING in a world with no crafting systems', () => {
+    // Same reasoning as the currency leg's zero-participant case: an empty scope list poisons
+    // `craftingDataChange` into a broad invalidation of every shell in the world.
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.characterLibraries', {
+      characterLibrariesStore: { load: () => {} },
+      craftingSystemManager: { getSystems: () => [] },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+
+    assert.equal(handled, true);
+    assert.deepEqual(
+      emitted.map(([hook]) => hook),
+      ['fabricate.craftingSystemsChanged'],
+      'the manager republish still fires; the scoped change does not'
+    );
+  });
+
   it('emits NOTHING when no system participates, rather than an unattributable payload', () => {
     // `craftingDataChange` treats an empty domain set as poisoning the whole payload into a
     // broad invalidation, so emitting an empty-scope change here would invalidate every shell
