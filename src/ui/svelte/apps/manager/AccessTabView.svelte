@@ -18,6 +18,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -173,15 +174,14 @@
         .replace('{total}', (recipes || []).length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="access"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </section>
 
@@ -210,8 +210,8 @@
           'Clear search and filters to show every recipe in this system.'
         )}
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
         >
       </EmptyState>
     {:else}

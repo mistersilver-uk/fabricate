@@ -634,9 +634,14 @@
                       )}</span
                     >
                   </div>
-                  <button
-                    type="button"
-                    class="manager-button manager-system-edit-blocker-link"
+                  <!-- Ghost (issue 1118, row 8). `ui-integration/spec.md` defines the role
+                       as the quiet NAVIGATIONAL verb — "Back, Open, View" — which moves the
+                       GM and changes no record, and this control is literally an Open. It
+                       sits inside a blocker callout that already carries the alarm, so at
+                       the base weight it competed with the copy explaining it. -->
+                  <ManagerButton
+                    role="ghost"
+                    class="manager-system-edit-blocker-link"
                     data-system-edit-blocker-link
                     onclick={() => {
                       activeTab = 'validation';
@@ -644,7 +649,7 @@
                     }}
                   >
                     {text('FABRICATE.Admin.Manager.SystemEdit.BlockerLink', 'Open system overview')}
-                  </button>
+                  </ManagerButton>
                 </div>
               {/if}
               <section class="manager-edit-card">
@@ -663,7 +668,7 @@
                         >{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</Chip
                       >
                     {/if}
-                    <button type="submit" class="manager-button is-primary">
+                    <ManagerButton role="primary" type="submit" data-system-details-save>
                       <i class="fas fa-save" aria-hidden="true"></i>
                       <span
                         >{text(
@@ -671,7 +676,7 @@
                           'Save details'
                         )}</span
                       >
-                    </button>
+                    </ManagerButton>
                   </div>
                 </div>
                 <div class="manager-edit-grid">

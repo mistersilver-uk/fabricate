@@ -28,6 +28,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -212,45 +213,42 @@
       linkage and keeps the component; delete removes the component from the system.
     -->
     <div class="manager-component-browser-inspector-actions">
-      <button
-        type="button"
-        class="manager-button manager-component-browser-inspector-edit"
+      <ManagerButton
+        class="manager-component-browser-inspector-edit"
         data-component-action="edit"
         onclick={() => onEdit()}
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component')}</span>
-      </button>
+      </ManagerButton>
       {#if hasRegisteredItemUuid}
-        <button
-          type="button"
-          class="manager-button manager-component-browser-inspector-copy"
+        <ManagerButton
+          class="manager-component-browser-inspector-copy"
           data-component-action="copy-source"
           title={registeredItemUuid}
           onclick={() => onCopySourceUuid(registeredItemUuid)}
         >
           <i class="fas fa-copy" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button manager-component-browser-inspector-unlink"
+        </ManagerButton>
+        <ManagerButton
+          class="manager-component-browser-inspector-unlink"
           data-component-action="unlink"
           onclick={() => onUnlink(selectedComponent.id)}
         >
           <i class="fas fa-link-slash" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Component.UnlinkAction', 'Unlink component')}</span>
-        </button>
+        </ManagerButton>
       {/if}
-      <button
-        type="button"
-        class="manager-button manager-component-browser-inspector-delete"
+      <ManagerButton
+        role="danger"
+        class="manager-component-browser-inspector-delete"
         data-component-action="delete"
         onclick={() => onDelete(selectedComponent.id)}
       >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Component.Delete', 'Delete component')}</span>
-      </button>
+      </ManagerButton>
     </div>
   </section>
 {/if}

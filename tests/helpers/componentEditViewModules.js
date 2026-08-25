@@ -91,6 +91,9 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // block. A `.svelte` the tree renders but this list omits HANGS the suite.
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // The manager's ONE labelled push-button (issue 1096); every salvage add control and
+  // the Manage presets link render through it since issue 1118 task 9.
+  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   // The complications section and its two shared rows (issue 1286). `ComponentEditView`
   // imports the section STATICALLY, so all four are in this tree's module closure whether

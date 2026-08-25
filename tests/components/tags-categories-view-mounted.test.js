@@ -41,6 +41,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
+    // THE manager's labelled push-button (issue 1118). VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',

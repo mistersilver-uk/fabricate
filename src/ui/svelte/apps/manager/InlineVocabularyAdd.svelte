@@ -19,6 +19,7 @@
 -->
 <script>
   import IconPicker from '../../components/IconPicker.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
 
   let {
     inputId = '',
@@ -123,14 +124,15 @@
         />
       </div>
     {/if}
-    <button
+    <ManagerButton
+      role="primary"
       type="submit"
-      class="manager-button is-primary"
+      data-vocabulary-add
       disabled={!inputValue.trim() || liveHint.blocked || submitting}
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{addLabel}</span>
-    </button>
+    </ManagerButton>
   </div>
 
   {#if feedback}

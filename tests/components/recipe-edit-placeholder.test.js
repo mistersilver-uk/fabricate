@@ -53,7 +53,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
   it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {
     const block = inspectorActionBlock();
-    const buttonCount = (block.match(/<button/g) || []).length;
+    // `<ManagerButton`, not `<button` (issue 1118). The three actions render through the
+    // shared primitive now, and a count of the raw element would read 0 while the group is
+    // intact — a guard going VACUOUS, which is worse than one going red.
+    const buttonCount = (block.match(/<ManagerButton[\s/>]/g) || []).length;
     assert.equal(buttonCount, 3, 'inspector action group should contain exactly three buttons');
     const copyIdx = block.indexOf('fa-copy');
     const penIdx = block.indexOf('fa-pen');
@@ -68,24 +71,53 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   // danger button (issue 643).
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
+    // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
+    // primitive emits `manager-button fab-manager-button` from its own `.join(' ')`, and each
+    // site passes only its BESPOKE class through the appending `class` prop. So the three are
+    // counted by the class each one still contributes — the class the rules below are keyed
+    // on — rather than by a string the component no longer writes.
+    assert.equal((block.match(/<ManagerButton[\s/>]/g) || []).length, 3, 'three controls');
+    for (const bespoke of [
+      'manager-recipe-browser-inspector-duplicate',
+      'manager-recipe-browser-inspector-edit',
+      'manager-recipe-browser-inspector-delete',
+    ]) {
+      assert.ok(
+        block.includes(`class="${bespoke}"`),
+        `${bespoke} should travel through the primitive's appending class prop`
+      );
+    }
     assert.equal(
-      (block.match(/class="manager-button /g) || []).length,
-      3,
-      'all three inspector actions are manager-button controls'
+      block.includes('class="manager-button'),
+      false,
+      'and no site in this group writes the convention class by hand any more'
     );
-    // The selectors chain `.manager-button` (0,3,0) so they beat the base
-    // `.manager-button` rule declared later in the sheet — issue 643. Each rule is now
-    // SHARED with the component browser inspector's matching action (issue 676), so the
-    // recipe selector heads a list rather than standing alone: match it either way.
+    // Each of the three is full width, and that is a CASCADE question: which rule wins
+    // `width` for this button. It used to be asked as `css.indexOf(<literal selector>)`,
+    // which is a question about spelling — and the spelling moved. The selectors chained
+    // `.manager-button` (0,3,0) to beat the base rule declared later in the sheet (issue
+    // 643); issue 1118 chained `.fab-manager-button` in beside it, because at (0,3,0) they
+    // only TIED the primitive's own control and held their geometry by source order. The
+    // literal lookup then returned -1 and the assertion failed on `start >= 0`, before
+    // `width` was ever read — a lookup breaking, reported as a stylesheet regressing.
+    //
+    // So this reads the rule by its SELECTOR, tolerant of the chain: the compound may carry
+    // the primitive marker, and a prelude long enough to wrap may be spread over lines.
     for (const selector of [
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
-      const start = css.indexOf(selector);
-      assert.ok(start >= 0, `${selector} should own a rule`);
-      const cssBlock = css.slice(start, css.indexOf('}', start));
-      assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);
+      const pattern = selector
+        .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+        .replaceAll(/\s+/g, String.raw`\s+`)
+        .replaceAll(
+          String.raw`\.manager-button`,
+          String.raw`\.manager-button(?:\.fab-manager-button)?`
+        );
+      const rule = css.match(new RegExp(String.raw`${pattern}[^{}]*\{[^}]*\}`));
+      assert.ok(rule, `${selector} should own a rule`);
+      assert.ok(rule[0].includes('width: 100%;'), `${selector} should be full width`);
     }
   });
 

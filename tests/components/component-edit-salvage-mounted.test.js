@@ -721,6 +721,58 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
+  // ── The three salvage adds are `dashed`, and the sweep found them painted neutral ──────
+  //
+  // Audit rows 22-24 (issue 1118). Each of the three sits at the FOOT of the list it appends
+  // to — a result at the foot of a group, a group at the foot of the group list — which is
+  // the whole meaning of the `dashed` role: a dashed outline reads as an empty slot waiting
+  // to be filled, and a solid button does not. They shipped as bare `manager-button`s, so the
+  // salvage editor showed solid secondary buttons where the recipe studio's identical verbs
+  // show dashed ones.
+  //
+  // `fullWidth` is the delta's per-row ruling for these three specifically, and it is a
+  // statement about the CONTAINER rather than the verb: each is the last child of a
+  // full-width list. `dashed` deliberately no longer implies it — six of the sweep's ten
+  // dashed sites are in wrapping flex rows where a pinned `width: 100%` stacked a four-up row
+  // into four rows.
+  //
+  // Bound to the controls' own hooks, and the negative half names what must NOT have the
+  // role: `[data-salvage-manage-presets]` is a neutral link in the same editor, and it is the
+  // control a "does is-dashed appear in this card" assertion would have accepted.
+  it('paints the salvage adds as full-width dashed appends, and nothing else in the editor', async () => {
+    const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
+    const adds = Array.from(
+      target.querySelectorAll('[data-add-salvage-result], [data-add-salvage-group]')
+    );
+    assert.ok(adds.length >= 2, `the routed editor renders its add controls, found ${adds.length}`);
+    for (const add of adds) {
+      const named = add.hasAttribute('data-add-salvage-group')
+        ? 'data-add-salvage-group'
+        : 'data-add-salvage-result';
+      assert.ok(
+        add.classList.contains('fab-manager-button'),
+        `${named} renders through the ManagerButton primitive, got ${add.className}`
+      );
+      assert.ok(
+        add.classList.contains('is-dashed'),
+        `${named} takes the dashed append role, got ${add.className}`
+      );
+      assert.ok(
+        add.classList.contains('is-full-width'),
+        `${named} spans its full-width list row, got ${add.className}`
+      );
+    }
+    for (const other of target.querySelectorAll(
+      'button:not([data-add-salvage-result]):not([data-add-salvage-group])'
+    )) {
+      assert.ok(
+        !other.classList.contains('is-dashed'),
+        `only the append verbs are dashed, not ${other.getAttribute('data-salvage-manage-presets') === '' ? 'the Manage presets link' : other.className}`
+      );
+    }
+    harness.remount();
+  });
+
   it('Routed mode keeps the multi-group Add group control and no Simple hint', async () => {
     const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
     assert.ok(

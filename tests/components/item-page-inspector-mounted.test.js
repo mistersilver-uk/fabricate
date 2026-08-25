@@ -13,6 +13,9 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // THE manager's labelled push-button (issue 1118). The inspector renders its Edit
+    // recipe item action through the primitive, so a `.svelte` omission HANGS this suite.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte'

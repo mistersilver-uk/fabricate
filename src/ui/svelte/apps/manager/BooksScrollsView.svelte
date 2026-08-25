@@ -42,6 +42,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
 
   let {
@@ -351,15 +352,14 @@
         .replace('{total}', (recipeItems || []).length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="books-scrolls"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </section>
 
@@ -390,8 +390,8 @@
         )}
         dataAttr="data-books-scrolls-empty-filtered"
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

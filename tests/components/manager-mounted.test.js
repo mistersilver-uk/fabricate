@@ -272,7 +272,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   // The library inspector, extracted out of the root (issue 643). It lives under
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
@@ -1177,6 +1176,37 @@ function vocabularyCounters(tab, fact) {
 function headerSaveButton(target) {
   return Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(
     (button) => button.textContent.includes('Save')
+  );
+}
+
+/**
+ * The manager's Back verb, asserted on the route that renders it (issue 1118).
+ *
+ * `.manager-header-actions` paints Back as the SECONDARY treatment beside a Save that
+ * outranks it — `ToolEditView`, the maintainer's authority for what a manager button looks
+ * like, and `ComponentEditorHeader`, which renders its own Back into this very container.
+ * Five routes in the manager root forgot it, all five spelled the same bare
+ * `class="manager-button"`, and the omission was unassertable because four of them carried no
+ * `data-*` handle at all: the only way to name one was "the first button in the header", which
+ * is a statement about DOM order rather than about the control.
+ *
+ * So the hooks landed with the repair, and this addresses one control by name. It is scoped to
+ * `.manager-header-actions` deliberately — several of these routes render a second Back in the
+ * breadcrumb rail, which is a link and not this verb.
+ *
+ * @param {string} hook the control's own `data-*` attribute selector
+ * @param {string} route the `currentView` it renders on, named in the failure message
+ */
+function assertHeaderBackIsGhost(hook, route) {
+  const back = target.querySelector(`.manager-header-actions ${hook}`);
+  assert.ok(Boolean(back), `${route} should render its header Back control at ${hook}`);
+  assert.ok(
+    back.classList.contains('fab-manager-button'),
+    `${route}'s Back should render through the ManagerButton primitive, not a hand-written class`
+  );
+  assert.ok(
+    back.classList.contains('is-ghost'),
+    `${route}'s Back should carry the ghost role, as every other Back in this container does`
   );
 }
 
@@ -6928,6 +6958,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.querySelector('.manager-system-edit-form'));
+    // The lone header action on this route, and the weakest of the five ghost repairs for
+    // exactly that reason: there is no Save here for Back to be secondary TO. It is ghost on
+    // the verb, and this is what holds it there.
+    assertHeaderBackIsGhost('[data-system-edit-back]', 'system-edit');
 
     // The rail's crafting-system card SELECTS (issue 643): a real `<select>` naming the
     // current system and listing every other, so the GM can switch system without a
@@ -8692,6 +8726,47 @@ describe('CraftingSystemManager mounted behavior', () => {
   // impact reaches the panel, that the two clicks reach the store, and above all that the
   // armed token does not survive a change to the set it was armed for.
 
+  // ── Row 68: the component inspector's Delete, the same repair one column over ──────
+  //
+  // Same shape as the recipe inspector's, and deliberately asserted the same way: this
+  // column has FOUR controls, and Unlink is the one that makes the sibling check worth
+  // running. Unlink breaks the item linkage and keeps the component — it destroys nothing —
+  // so it is precisely the neighbour a `danger` role picked by feel would land on.
+  it('paints the component inspector Delete as danger, and not Unlink beside it', async () => {
+    await openComponentsBrowser();
+
+    const inspector = target.querySelector('[data-component-inspector]');
+    assert.ok(Boolean(inspector), 'the components route opens on the single-component inspector');
+
+    const remove = inspector.querySelector('[data-component-action="delete"]');
+    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    assert.ok(
+      remove.classList.contains('fab-manager-button'),
+      'Delete renders through the ManagerButton primitive, not a hand-written class'
+    );
+    assert.ok(
+      remove.classList.contains('is-danger'),
+      'Delete carries the danger role — the verb removes the component from the system'
+    );
+    assert.ok(
+      remove.classList.contains('manager-component-browser-inspector-delete'),
+      'and keeps the bespoke class the panel geometry is keyed on'
+    );
+
+    for (const action of ['edit', 'copy-source', 'unlink']) {
+      const sibling = inspector.querySelector(`[data-component-action="${action}"]`);
+      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+      assert.ok(
+        sibling.classList.contains('fab-manager-button'),
+        `${action} renders through the primitive too`
+      );
+      assert.ok(
+        !sibling.classList.contains('is-danger'),
+        `${action} destroys no record, so the danger role must not have landed on it`
+      );
+    }
+  });
+
   function componentDeleteButton() {
     return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
   }
@@ -9176,6 +9251,55 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector(`[data-recipe-select="${id}"]`).click();
     flushSync();
   }
+
+  // ── Row 29: the recipe inspector's Delete is the DESTRUCTIVE verb (issue 1118) ─────
+  //
+  // It shipped role-less and got its danger-red ink and border from a BESPOKE rule that
+  // restated `.manager-button.is-danger`'s two tokens by hand. Two copies of one decision is
+  // the failure this conversion exists to end, so the copy went and the role arrived; the
+  // rule keeps only the panel SURFACE, which `is-danger` does not declare.
+  //
+  // Asserted on the RENDERED node, addressed by the hook the control already carried, and
+  // asserted against its two SIBLINGS in the same stacked column rather than on its own. A
+  // check that only reads Delete cannot tell "Delete is danger" from "this whole column is
+  // danger", and the column is exactly where a misplaced role would land: Duplicate and Edit
+  // are neighbours in the same `<div>`, one tag apart in the source.
+  it('paints the recipe inspector Delete as danger, and only Delete', async () => {
+    await openRecipesBrowser();
+
+    const inspector = target.querySelector('.manager-recipe-browser-inspector');
+    assert.ok(Boolean(inspector), 'the recipes route opens on the single-recipe inspector');
+
+    const remove = inspector.querySelector('[data-recipe-action="delete"]');
+    assert.ok(Boolean(remove), 'the inspector renders its Delete');
+    assert.ok(
+      remove.classList.contains('fab-manager-button'),
+      'Delete renders through the ManagerButton primitive, not a hand-written class'
+    );
+    assert.ok(
+      remove.classList.contains('is-danger'),
+      'Delete carries the danger role — the verb removes a record'
+    );
+    // The pass-through class survives the conversion, because the sheet keys the panel's own
+    // surface and full-width geometry on it and `manager-contract.test.js` names it too.
+    assert.ok(
+      remove.classList.contains('manager-recipe-browser-inspector-delete'),
+      'and keeps the bespoke class the panel geometry is keyed on'
+    );
+
+    for (const action of ['duplicate', 'edit']) {
+      const sibling = inspector.querySelector(`[data-recipe-action="${action}"]`);
+      assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
+      assert.ok(
+        sibling.classList.contains('fab-manager-button'),
+        `${action} renders through the primitive too`
+      );
+      assert.ok(
+        !sibling.classList.contains('is-danger'),
+        `${action} destroys nothing, so the danger role must not have landed on it`
+      );
+    }
+  });
 
   function recipeDeleteButton() {
     return target.querySelector('[data-recipe-bulk-delete-card] .manager-button.is-danger');
@@ -9797,6 +9921,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
     assert.ok(saveButton, 'header save submit should target the edit form');
     assert.equal(saveButton.disabled, false, 'save should be enabled when the draft is dirty');
+
+    // `ComponentEditorHeader`'s conversion, asserted where it RENDERS (issue 1118). Nothing
+    // measured this pair before: the header's three `data-*` hooks are PROPS spread through a
+    // computed key (`dirtyAttr` / `backAttr` / `saveAttr`, so a second studio can wear its own),
+    // which means no literal `data-*` string sits on either tag and no source scan could ever
+    // have named one of them. Its own docblock is the AUTHORITY for the ghost-Back ruling the
+    // other five Backs in this sweep were repaired against, so the pair it describes should be
+    // the one pair a regression cannot reach — and it was the only one with no assertion at all.
+    //
+    // Both halves matter and each is the other's mutation proof: swapping the two roles reds
+    // this, and so does dropping either.
+    assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
+    assert.ok(
+      saveButton.classList.contains('fab-manager-button'),
+      `the header Save renders through the ManagerButton primitive, got ${saveButton.className}`
+    );
+    assert.ok(
+      saveButton.classList.contains('is-primary') && !saveButton.classList.contains('is-ghost'),
+      `and stays the primary beside a ghost Back, got ${saveButton.className}`
+    );
+    assert.equal(
+      saveButton.getAttribute('type'),
+      'submit',
+      'and keeps the submit type that pairs with `form="manager-component-edit-form"` — the ' +
+        'primitive emits `type` only on a <button>, and dropping it silently stops Save working'
+    );
     saveButton.click();
     flushSync();
     await tick();
@@ -12322,7 +12472,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the recipe-item editor body renders'
     );
     // The router owns the header + footer actions.
-    assert.ok(target.querySelector('[data-recipe-item-back]'), 'Back action renders');
+    assertHeaderBackIsGhost('[data-recipe-item-back]', 'recipe-item-edit');
     assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
     const save = target.querySelector('[data-recipe-item-save]');
     assert.ok(save, 'Save action renders');
@@ -12988,6 +13138,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
+    assertHeaderBackIsGhost('[data-gathering-task-back]', 'gathering-task-edit');
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
     assert.ok(coreEditor);
     assert.equal(coreEditor.querySelector('.manager-link-button'), null);
@@ -13712,6 +13863,37 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       true
     );
+    // The three inline `Add` submits carry the PRIMARY role (issue 1118). Each is the create
+    // verb of its own little form — the same shape `InlineVocabularyAdd` already paints
+    // `manager-button is-primary` — and all three shipped role-less, so they read as the
+    // neutral secondary beside the field they complete.
+    //
+    // Addressed by its OWN hook rather than by position. The two condition adds shared one
+    // i18n key and none of the three carried a `data-*` handle, so "the third control in the
+    // row" was the only way to name one, and that is a statement about DOM order rather than
+    // about the control: moving the role onto a neighbouring add would satisfy a positional
+    // assertion and fail this one.
+    for (const hook of [
+      '[data-gathering-condition-add="timeOfDay"]',
+      '[data-gathering-condition-add="weather"]',
+      '[data-gathering-vocabulary-add="biomes"]',
+    ]) {
+      const add = target.querySelector(hook);
+      assert.ok(Boolean(add), `the gathering settings tab should render an add control at ${hook}`);
+      assert.ok(
+        add.classList.contains('fab-manager-button'),
+        `${hook} should render through the ManagerButton primitive, not a hand-written class`
+      );
+      assert.ok(
+        add.classList.contains('is-primary'),
+        `${hook} should carry the primary role, as the same inline-add shape does elsewhere`
+      );
+      assert.equal(
+        add.getAttribute('type'),
+        'submit',
+        `${hook} completes its own form, so it must stay a submit rather than a plain button`
+      );
+    }
     assert.equal(target.textContent.includes('Add time of day'), false);
     assert.equal(target.textContent.includes('Add weather'), false);
     assert.equal(target.textContent.includes('Add region'), false);
@@ -18815,6 +18997,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'environment-edit'
     );
     assert.ok(calls.some((call) => call[0] === 'createEnvironmentDraft'));
+    assertHeaderBackIsGhost('[data-environment-edit-back]', 'environment-edit');
   });
 
   it('shows create guidance when the gathering task library is empty', async () => {
@@ -19783,9 +19966,30 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
-      .find((button) => button.textContent.includes('View event'))
-      .click();
+    // Selected by the control's OWN hook rather than by its label text (issue 1118). The
+    // bespoke `manager-environment-issue-action` class it used to be found by styled nothing
+    // in any theme — it was a test selector wearing a style class's clothes — and matching on
+    // `textContent` could not tell the two deep links apart except by the words on them.
+    //
+    // Audit row 44's forgotten role, asserted on BOTH deep links by name. Same reasoning as
+    // the system overview's: a "go and look at that" link repeated down an issue list, beside
+    // a severity chip that is meant to be the loud thing. Addressing each by its record kind
+    // is what makes the mutation proof real — moving `role="ghost"` onto a neighbouring
+    // control reds this, where "the validation tab contains a ghost" would not.
+    for (const kind of ['event', 'task']) {
+      const action = target.querySelector(`[data-environment-issue-action="${kind}"]`);
+      assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
+      assert.ok(
+        action.classList.contains('fab-manager-button'),
+        `the View ${kind} link renders through the ManagerButton primitive, got ${action.className}`
+      );
+      assert.ok(
+        action.classList.contains('is-ghost'),
+        `the View ${kind} link takes the ghost role, got ${action.className}`
+      );
+    }
+
+    target.querySelector('[data-environment-issue-action="event"]').click();
     await tick();
     flushSync();
 
@@ -19806,9 +20010,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
-      .find((button) => button.textContent.includes('View task'))
-      .click();
+    target.querySelector('[data-environment-issue-action="task"]').click();
     await tick();
     flushSync();
 
@@ -20657,6 +20859,33 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const blockerLink = target.querySelector('[data-system-edit-blocker-link]');
     assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
+    // Audit row 8's forgotten role (issue 1118). This is a "go and look at that" link inside a
+    // callout that already carries the alarm — the triangle, the title and the body copy — and
+    // at the base `.manager-button` weight it competed with the sentence explaining it. Ghost
+    // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
+    // secondary verb beside something that outranks it.
+    //
+    // Named by its own hook, and paired with the Save beside it in the same editor, which is
+    // the control a "the settings tab renders a ghost" assertion would have accepted.
+    assert.ok(
+      blockerLink.classList.contains('fab-manager-button'),
+      `the blocker link renders through the ManagerButton primitive, got ${blockerLink.className}`
+    );
+    assert.ok(
+      blockerLink.classList.contains('is-ghost'),
+      `the blocker link takes the ghost role, got ${blockerLink.className}`
+    );
+    const detailsSave = target.querySelector('[data-system-details-save]');
+    assert.ok(Boolean(detailsSave), 'the Identity card renders its Save details submit');
+    assert.ok(
+      detailsSave.classList.contains('is-primary') && !detailsSave.classList.contains('is-ghost'),
+      `and the Save beside it stays the primary, got ${detailsSave.className}`
+    );
+    assert.equal(
+      detailsSave.getAttribute('type'),
+      'submit',
+      'Save details submits its own form, so the conversion must keep it a submit'
+    );
     blockerLink.click();
     await tick();
     flushSync();
@@ -22133,6 +22362,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventResult: false };
     await openDirtyGatheringEventEditor(calls, storeOptions);
+    assertHeaderBackIsGhost('[data-gathering-event-back]', 'gathering-event-edit');
 
     assertSaveErrorAbsent(
       '[data-gathering-event-save-error]',

@@ -97,7 +97,14 @@ const FIXTURE = `
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label">Sort by</span>
               <select data-m="sort-select"><option>Name</option></select>
-              <button class="manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+              <!-- Carries fab-manager-button because the shipped control does (issue 1118):
+                   ComponentsBrowserView renders this toggle through ManagerButton, and the
+                   .manager-button.manager-component-sort-direction rule was chained onto the
+                   primitive class so its 9px radius and compact scale stop depending on source
+                   order. Note this fixture still measured 11.52px WITHOUT the marker, because
+                   the components view has a toolbar rule of its own that supplies it — so it
+                   would have gone on passing while measuring a rule it does not name. -->
+              <button class="manager-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
             </div>
           </div>
           <div class="manager-component-filter-row is-chips">
@@ -221,7 +228,14 @@ const FIXTURE = `
                shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
                child of the panel would go on measuring a box the product no longer renders. -->
           <div class="fab-bulk-edit-dock">
-            <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <!-- Carrying fab-manager-button since issue 1118 converted BulkEditPanelShell.
+                 The marking and the re-chain landed in ONE commit, and had to: while
+                 .fab-bulk-edit-apply was a SCOPED rule at (0,2,0), the primitive's (0,3,0)
+                 control would have taken its 38px/0.78rem down to 34px/0.72rem and broken the
+                 bottom-slot equality below against a shipped control that has not moved.
+                 That rule now names .manager-button.fab-manager-button and compiles to
+                 (0,4,0), so the box this fixture measures is the same box it always was. -->
+            <button type="button" class="manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
@@ -239,7 +253,12 @@ const FIXTURE = `
             cannot see a cascade change that moves one RENDERED value while both sources sit
             unchanged, which is the drift that desynchronises the slot.
           -->
-          <button type="button" class="manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
+          <!-- Carries fab-manager-button because the shipped control does (issue 1118). The
+               inspector's stacked action column was chained onto the primitive class: at
+               (0,3,0) it only TIED the primitive's own control and held its 38px and 0.78rem
+               by source order alone. Unmarked, this fixture matched no rule at all and fell to
+               Foundry's 14px app base — which is how it failed, loudly, rather than drifting. -->
+          <button type="button" class="manager-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 

@@ -27,6 +27,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'

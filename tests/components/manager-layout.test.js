@@ -94,9 +94,45 @@ function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
+// A caller here names the RULE it wants to read, and a rule's identity is not the exact
+// characters the sheet spells its prelude with. Three things rewrite that prelude without
+// changing which rule it is, all of them from issue 1118: `ManagerButton` chains a second
+// marker class into the same compound wherever a rule had to be lifted above the primitive
+// (`.manager-button` becomes `.manager-button.fab-manager-button`); every rule that states a
+// RESTING PAINT gained a `:not(:disabled)` qualifier, so that a switched-off button paints
+// from the disabled rule rather than from its role; and a prelude that grows past the print
+// width is re-wrapped onto continuation lines.
+//
+// A literal substring lookup cannot see through any of them, and it fails SILENTLY: it
+// returns '', every `.includes(...)` below reads false, and the assertion fails naming a
+// property that is in fact declared. That is a lookup breaking, not a stylesheet regressing,
+// and the two must not be indistinguishable — both of the tests that broke here reported
+// "should use a light green outline treatment" and "should have an amber warning-action
+// button style" about rules that still say exactly that.
+//
+// So this matches a PATTERN of the selector: whitespace flexible, the primitive marker
+// optional at each `.manager-button`, and the enabled-state qualifier optional at the end of
+// each selector in the list. The list is split on a comma-NEWLINE, which is how both this
+// sheet and these callers write one; the comma inside `:is(select, input…)` is left alone.
+const CHAINED_MANAGER_BUTTON = String.raw`\.manager-button(?:\.fab-manager-button)?`;
+const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
+
+function selectorPattern(selector) {
+  return selector
+    .split(',\n')
+    .map(
+      (one) =>
+        one
+          .trim()
+          .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+          .replaceAll(/\s+/g, String.raw`\s+`)
+          .replaceAll(String.raw`\.manager-button`, CHAINED_MANAGER_BUTTON) + OPTIONAL_ENABLED_STATE
+    )
+    .join(String.raw`,\s+`);
+}
+
 function blockIn(source, selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = source.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
+  const match = source.match(new RegExp(`${selectorPattern(selector)}\\s*\\{[\\s\\S]*?\\}`));
   return match?.[0] || '';
 }
 
@@ -136,7 +172,7 @@ async function readRenderedToolGeometry(width, view) {
     const editor =
       view === 'tool-edit'
         ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
-          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button">Back</button><button class="manager-button">Delete</button><button class="manager-button" data-tool-editor-save>Save Tool</button></div></div></header>
+          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button fab-manager-button is-ghost">Back</button><button class="manager-button fab-manager-button is-danger">Delete</button><button class="manager-button fab-manager-button is-primary" data-tool-editor-save>Save Tool</button></div></div></header>
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
@@ -313,10 +349,10 @@ test('manager root defines a scoped responsive app container', () => {
 
 test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
   const managerFocusBlock = blockFor(
-    '.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus'
+    '.fabricate-manager a:focus,\n.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus'
   );
   const managerFocusVisibleBlock = blockFor(
-    '.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
+    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
   );
   const shellFocusBlock = blockFor(
     '.fabricate-app button:focus,\n.fabricate-app input:focus,\n.fabricate-app select:focus,\n.fabricate-app textarea:focus,\n.fabricate-app [tabindex]:focus'
@@ -341,13 +377,39 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     shellFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'unified shell keyboard focus should remain visible'
   );
+
+  // THE TWO HALVES ARE A PAIR AND MUST NAME THE SAME ELEMENTS (issue 1118). The suppressing
+  // half strips whatever ring Foundry's core or the browser draws; the supplying half puts the
+  // manager's own back on keyboard focus. An element in the first list and not the second gets
+  // NO ring at all, which is what a focused manager `textarea` did, and an element in neither
+  // keeps the host's, which is what the twelve anchor manager buttons did. Both were live and
+  // both were invisible to the two blocks read above, because each of those only asks whether
+  // its own block declares an outline.
+  const elementsIn = (prelude) => [
+    ...new Set(
+      [...prelude.matchAll(/\.fabricate-\w+\s+([a-z]+|\[tabindex])(?=:)/g)].map(([, one]) => one)
+    ),
+  ];
+  for (const [area, suppressing, supplying] of [
+    ['manager', managerFocusBlock, managerFocusVisibleBlock],
+    ['app shell', shellFocusBlock, shellFocusVisibleBlock],
+  ]) {
+    assert.deepEqual(
+      elementsIn(supplying).sort(),
+      elementsIn(suppressing).sort(),
+      `the ${area}'s focus-visible list must name exactly the elements its :focus list ` +
+        'suppresses, or one element type is stripped of a ring and given none'
+    );
+  }
 });
 
 test('Fabricate app shell suppresses the host outline on the selected-tab state class', () => {
   // Core's `button.active` carries the same orange outline + glow as `button:focus`,
   // so the selected nav-rail button keeps a Foundry ring once focus leaves it. The
   // :focus reset above only masks it while the button is focused.
-  const shellActiveBlock = blockFor('.fabricate-app button.active,\n.fabricate-app a.button.active');
+  const shellActiveBlock = blockFor(
+    '.fabricate-app button.active,\n.fabricate-app a.button.active'
+  );
 
   assert.ok(
     shellActiveBlock.includes('outline: none;') && shellActiveBlock.includes('box-shadow: none;'),
@@ -735,7 +797,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
   );
   const focusBlock = blockFor(
-    '.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
+    '.fabricate-manager a:focus-visible,\n.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager textarea:focus-visible,\n.fabricate-manager [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -1547,7 +1609,6 @@ test('manager gathering settings condition panels use a two-column responsive gr
   const settingsBlock = blockFor('.fabricate-manager .manager-gathering-settings');
   const panelBlock = blockFor('.fabricate-manager .manager-condition-panel');
   const addBlock = blockFor('.fabricate-manager .manager-condition-add');
-  const regionAddBlock = blockFor('.fabricate-manager .manager-region-add');
   const biomeAddBlock = blockFor('.fabricate-manager .manager-biome-add');
   const pillBlock = blockFor('.fabricate-manager .manager-condition-pill');
   const regionPillBlock = blockFor('.fabricate-manager .manager-vocabulary-pill.is-region');
@@ -1584,17 +1645,34 @@ test('manager gathering settings condition panels use a two-column responsive gr
     panelBlock.includes('height: 100%;'),
     'condition panel backgrounds should fill the stretched grid row'
   );
+  // The trailing track is `max-content`, not 48px (issue 1118). A number here sized the
+  // column to the two words the Add button happens to hold today; converted, that button
+  // takes the primary role's `0 var(--fab-space-4)` — 32px of padding in a 48px box — and
+  // clips its own label whatever it says. `.manager-region-add` re-templated this same grid
+  // for a region row and was retired in the same edit: no component carries the class.
   assert.ok(
-    addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 48px;'),
-    'condition add controls should reserve icon picker, label input, and Add button columns'
+    addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) max-content;'),
+    'condition add controls should reserve icon picker, label input, and a content-sized Add column'
+  );
+  assert.equal(
+    blockFor('.fabricate-manager .manager-region-add'),
+    '',
+    'the dead region-add grid override must not come back'
   );
   assert.ok(
-    regionAddBlock.includes('grid-template-columns: minmax(0, 1fr) 48px;'),
-    'region add controls should be text input plus Add button'
+    biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) max-content;'),
+    'biome add controls should align icon, colour, input, and a content-sized Add column'
   );
+  // The one declaration `.manager-add-button` keeps: the height that lines it up with the
+  // input beside it. Its width, padding and font-size are the primitive's now.
   assert.ok(
-    biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) 48px;'),
-    'biome add controls should align icon, colour, input, and Add columns'
+    blockFor('.fabricate-manager .manager-add-button').includes('height: 36px;'),
+    'the Add button still matches the sibling input height'
+  );
+  assert.equal(
+    blockFor('.fabricate-manager .manager-add-button').includes('width: 48px;'),
+    false,
+    'and no longer pins itself to the retired 48px box'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-condition-pill-list {\n  display: grid;'),
@@ -2290,12 +2368,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-tools-component-browser-card'
   );
   const toolInspectorActionsBlock = blockFor('.fabricate-manager .manager-tool-inspector-actions');
-  const toolInspectorActionButtonsBlock = blockFor(
-    '.fabricate-manager .manager-tool-inspector-actions .manager-button'
-  );
-  const toolInspectorActionButtonLabelBlock = blockFor(
-    '.fabricate-manager .manager-tool-inspector-actions .manager-button span'
-  );
   const toolsComponentBrowserHeaderBlock = blockFor(
     '.fabricate-manager .manager-tools-component-browser-header'
   );
@@ -2805,15 +2877,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       toolInspectorActionsBlock.includes('gap: var(--fab-space-2);'),
     'selected tool inspector actions should sit in a stable two-column action row inside the header card'
   );
-  assert.ok(
-    toolInspectorActionButtonsBlock.includes('width: 100%;') &&
-      toolInspectorActionButtonsBlock.includes('padding: 0 var(--fab-space-2);'),
-    'selected tool inspector action buttons should fill their grid columns without overflowing the right rail'
-  );
-  assert.ok(
-    toolInspectorActionButtonLabelBlock.includes('overflow-wrap: anywhere;'),
-    'selected tool inspector action labels should be allowed to wrap in narrow localized layouts'
-  );
+  // The two rules that typed this container's BUTTONS were retired in issue 1118, on the
+  // cascade inventory's `DEAD` evidence: `.manager-tool-inspector-actions` appears in no
+  // component's markup at all, so neither could ever have matched an element. The grid above
+  // is asserted rather than retired with them because that task reconciled the manager-button
+  // cascade, not the sheet at large — the orphaned container family is named in its handoff
+  // for a separate dead-CSS sweep. There is no button here left to assert a treatment for.
   assert.ok(
     toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;') &&
       toolsComponentBrowserBlock.includes('gap: 0;') &&
@@ -3619,11 +3688,22 @@ test('manager components browser defines drop target and compact responsive list
     ).includes('height: 34px;'),
     'every studio filter bar dresses its own selects rather than inheriting Foundry core chrome'
   );
+  // The ESSENCE browser's toggle is the third selector in that group (issue 1118). It is
+  // addressed by its `data-*` hook because the class it used to carry styled nothing at all —
+  // the sheet declared `.manager-essence-sort-direction` NOWHERE — so the third instance of
+  // this control rendered at the base 6px/700 scale beside two siblings at 9px/600. Naming all
+  // three here is what makes `blockFor` read the whole group: it anchors on `{`, so a selector
+  // appended to the list leaves a two-selector lookup matching nothing and failing silently.
+  const sortDirectionBlock = blockFor(
+    '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction,\n.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction]'
+  );
   assert.ok(
-    blockFor(
-      '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction'
-    ).includes('border-radius: 9px;'),
+    sortDirectionBlock.includes('border-radius: 9px;'),
     'the component sort-direction button escapes the boxy base .manager-button scale'
+  );
+  assert.ok(
+    sortDirectionBlock.includes('font-weight: 600;'),
+    'and all three sort-direction toggles are typed by one rule rather than three scales'
   );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);') ||
@@ -5751,10 +5831,10 @@ async function readRenderedKnowledgeGeometry(width) {
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
-    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button fab-manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button fab-manager-button is-danger">Reset this system</button><button class="manager-button fab-manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
       )
     );
     return await page.evaluate(() => {
@@ -6819,7 +6899,10 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       };
     });
 
-    assert.ok(report.scrollRange > 100, `cards must overflow the pane (got ${report.scrollRange}px)`);
+    assert.ok(
+      report.scrollRange > 100,
+      `cards must overflow the pane (got ${report.scrollRange}px)`
+    );
     assert.equal(report.scrollerOverflowY, 'auto', 'the card content remains the scroll node');
     assert.ok(report.scrolledBy > 0, 'the card scroller accepts an independent scroll');
     assert.equal(report.footerIsSibling, true, 'the pager is a sibling outside the scroll node');
@@ -7645,9 +7728,9 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
 // The reported defect was that the Modifiers card's buttons did not look like the Tool
 // Studio's: a bare `manager-button` for a destructive verb, and a visibly different label
 // scale. The cause is structural rather than a typo. The Tool Studio's refined treatment
-// comes from an ANCESTOR-CONTEXT rule — `.manager-header-actions .manager-button`, 38px and
-// `0.72rem` — so a card that is not inside a `.manager-header-actions` could never match it
-// however carefully its class string was written.
+// comes from ANCESTOR-CONTEXT rules — `.manager-header-actions .manager-button` and
+// `.manager-tool-edit-actions .manager-button` — so a card that is inside neither could
+// never match them however carefully its class string was written.
 //
 // A shared component that merely emits the same class names would not have caught this and
 // will not catch the next one: the drift lives in the SHEET, not in the markup. So the
@@ -7658,7 +7741,21 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
 const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
 const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
 
-function managerButtonClassesFor(role) {
+// The role modifier is read from the component's NAMED mapping rather than rebuilt here as
+// `is-${role}`. `warning` emits `is-warning-action` — the sheet declares no
+// `.manager-button.is-warning` at all — so a template would hand this harness a class string
+// the product never renders, and the probe would measure a selector that matches nothing
+// while reporting green (issue 1118).
+const managerButtonRoleClasses = (() => {
+  const mapping = managerButtonSource.match(/const ROLE_CLASSES = \{([\s\S]*?)\};/);
+  assert.ok(mapping, 'ManagerButton declares its role-to-class mapping as one named object');
+  return Object.fromEntries(
+    [...mapping[1].matchAll(/(\w+):\s*'([\w-]+)'/g)].map(([, role, className]) => [role, className])
+  );
+})();
+
+// The two unconditional classes, likewise read out of the component rather than restated.
+const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
@@ -7666,12 +7763,20 @@ function managerButtonClassesFor(role) {
     base.includes('manager-button') && base.includes('fab-manager-button'),
     `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
   );
-  assert.match(
-    literal[1],
-    /is-\$\{role\}/,
-    'ManagerButton must derive its role modifier from the prop, not hard-code one'
+  return base;
+})();
+
+function managerButtonClassesFor(role) {
+  // `neutral` is the EMPTY modifier — the primitive emits the two base classes and nothing
+  // more — so it is the one role that cannot be probed by looking a class name up, and the
+  // one role a mutation cannot flip by deleting a prop.
+  if (role === 'neutral') return managerButtonBaseClasses.join(' ');
+  const modifier = managerButtonRoleClasses[role];
+  assert.ok(
+    modifier,
+    `ManagerButton must declare a class for the '${role}' role, got ${Object.keys(managerButtonRoleClasses).join(' ')}`
   );
-  return `${base.join(' ')} is-${role}`;
+  return `${managerButtonBaseClasses.join(' ')} ${modifier}`;
 }
 
 const AUTHORITY_PROBES = ['primary', 'danger'];
@@ -7751,8 +7856,9 @@ test('a Modifiers card button renders exactly like the tool studio button of the
     // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
     // UA default on both sides and matches trivially. These pin that the authority's own
     // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
-    // .manager-button` renders — NOT the 38px `.manager-header-actions` declares, which that
-    // later, more specific block overrides.
+    // .manager-button` renders, and 34px is now the whole header cluster's height too: the
+    // 38px `.manager-header-actions` used to declare was RETIRED in issue 1118 rather than
+    // arbitrated, because it tied the primitive at (0,3,0) and won on source order alone.
     assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
     assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
 
@@ -7774,6 +7880,565 @@ test('a Modifiers card button renders exactly like the tool studio button of the
           `${role}: the Modifiers card's ${property} (${card[property]}) must match the tool studio's (${authority[property]})`
         );
       }
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+// ── A SWITCHED-OFF manager button looks switched off, in every role AND every container ───
+//
+// The reported state of the sheet was that it did not. `.manager-button:disabled` is (0,3,0);
+// `.manager-button.is-primary`, `.is-danger` and `.is-warning-action` are (0,3,0) too and
+// stand LATER in the file, and the primitive's `is-ghost` and `is-dashed` companions are
+// (0,4,0) and beat it outright. Every one of those declares border-color, colour and
+// background with no `:disabled` requirement, so a disabled button kept its enabled paint in
+// every role. `opacity: 0.62` and `cursor: default` still applied — which is why it read as a
+// dimmed LIVE control rather than a dead one, and why three rounds of plan review walked past
+// it. It was already shipping on the screen this conversion designates as the authority:
+// `ToolEditView` renders `role="ghost"` with `disabled={saving}`, so the Back button looked
+// available for the whole of a tool save.
+//
+// The repair qualifies every resting-paint rule with `:not(:disabled)` rather than chaining
+// the disabled rule above them, because that selector also serves `.manager-icon-button` and
+// every hand-written button the sweep does not convert; chaining it would have taken the
+// disabled paint from exactly the controls with no other. So this measures the INVARIANT the
+// repair states — the disabled paint is role-independent — rather than re-deriving the
+// arithmetic that made it false.
+//
+// ── WHY IT PROBES EVERY CONTAINER, AND WHY THE CONTAINER LIST IS DERIVED ─────────────────
+// The first version of this gate mounted its six probes inside `.manager-edit-card` and
+// nothing else, so it measured the invariant against the ROLE rules alone. It was green while
+// `.fabricate-manager .manager-tool-edit-actions .manager-button.is-ghost` — (0,4,0),
+// unqualified, three colour declarations — still beat the disabled rule outright in the one
+// container the Tool Studio's Back button actually sits in. The defect this whole section is
+// named for was live, in the exact control the issue cites, underneath a passing test.
+//
+// A hand-written container list would have repeated that failure one container later, so the
+// list is DERIVED from the sheet: every rule whose key compound is a `.manager-button` and
+// which names an ancestor between `.fabricate-manager` and that compound contributes its
+// ancestor chain, materialized as real elements. Add an ancestor-context rule to the sheet
+// and the probe follows it there on the next run, with no edit here. `ANCESTOR_CONTEXT_FLOOR`
+// and the named-context assertion below are what stop a parse break from emptying the list
+// and reporting green over nothing.
+//
+// Ancestors are materialized as nested elements, so a `>` combinator is honoured and a `+`
+// or `~` one is not: a sibling context is collected as UNMATERIALIZABLE and reds the gate
+// rather than being silently dropped. The sheet has none today.
+const DISABLED_ROLE_PROBES = ['neutral', 'primary', 'ghost', 'danger', 'dashed', 'warning'];
+
+/**
+ * Every rule prelude in a stylesheet, with comments blanked and at-rule preludes dropped.
+ *
+ * Rules nested inside an `@media`/`@container` block are included: a container is a container
+ * whatever guards it, and a probe that skipped them would be blind to exactly the responsive
+ * overrides this sheet uses to re-type a header cluster at narrow widths.
+ *
+ * @param {string} sheet stylesheet text
+ * @returns {Array<string>} one prelude per rule
+ */
+function rulePreludes(sheet) {
+  const text = sheet.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
+  const preludes = [];
+  let depth = 0;
+  let start = 0;
+  for (let cursor = 0; cursor < text.length; cursor += 1) {
+    const char = text[cursor];
+    if (char !== '{' && char !== '}' && !(char === ';' && depth <= 1)) continue;
+    if (char === '{' && depth <= 1) preludes.push(text.slice(start, cursor).trim());
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+    start = cursor + 1;
+  }
+  return preludes.filter((prelude) => prelude !== '' && !prelude.startsWith('@'));
+}
+
+const CLASS_TOKEN = /\.([\w-]+)/g;
+const ATTRIBUTE_TOKEN = /\[([\w-]+)="([^"]*)"]/g;
+
+/**
+ * A compound selector as a renderable element, or `null` when it cannot be one.
+ *
+ * Classes and quoted attribute selectors are materialized; anything else left in the compound
+ * — a pseudo-class, a type selector, a universal — means the caller must not pretend it can
+ * render this context, so it says so instead of rendering an approximation.
+ *
+ * @param {string} compound one compound selector, e.g. `.fabricate-manager[data-x="y"]`
+ * @returns {{classes: Array<string>, attributes: string}|null} the element, or null
+ */
+function elementForCompound(compound) {
+  const classes = [...compound.matchAll(CLASS_TOKEN)].map(([, name]) => name);
+  const attributes = [...compound.matchAll(ATTRIBUTE_TOKEN)]
+    .map(([, name, value]) => ` ${name}="${value}"`)
+    .join('');
+  const residue = compound.replaceAll(CLASS_TOKEN, '').replaceAll(ATTRIBUTE_TOKEN, '');
+  if (residue !== '' || classes.length === 0) return null;
+  return { classes, attributes };
+}
+
+/**
+ * The ancestor chain a manager-button selector names, or `null` when it names none.
+ *
+ * @param {string} selector one selector from a rule's prelude
+ * @returns {{id: string, root: object, chain: Array<object>}|null|'unmaterializable'}
+ */
+function ancestorContextIn(selector) {
+  const one = selector.trim().replaceAll(/\s+/g, ' ');
+  if (!one.includes('.manager-button')) return null;
+  // A comma inside `:is(…)`/`:not(…)` would have been split by the caller, leaving a fragment
+  // with unbalanced parentheses. Such a fragment is not a selector and is not reasoned about.
+  if ((one.match(/\(/g) || []).length !== (one.match(/\)/g) || []).length) return null;
+  const compounds = one.split(/\s*>\s*|\s+/).filter(Boolean);
+  if (!compounds.at(-1).includes('.manager-button')) return null;
+  const ancestors = compounds.slice(1, -1);
+  if (ancestors.length === 0) return null;
+  if (/[+~]/.test(one)) return 'unmaterializable';
+  const root = elementForCompound(compounds[0]);
+  const chain = ancestors.map((compound) => elementForCompound(compound));
+  if (!root || !root.classes.includes('fabricate-manager') || chain.includes(null)) {
+    return 'unmaterializable';
+  }
+  return { id: [compounds[0], ...ancestors].join(' '), root, chain };
+}
+
+// The Modifiers card, kept as the first context because it is the one the reported defect was
+// first measured in and the only one that is NOT an ancestor-context rule of its own — a
+// manager button with no container opinion at all is the base case the roles are ruled for.
+const BASE_DISABLED_CONTEXT = {
+  id: '.fabricate-manager .manager-edit-card',
+  root: { classes: ['fabricate-manager'], attributes: '' },
+  chain: [{ classes: ['manager-edit-card'], attributes: '' }],
+};
+
+// A floor, not a count: the exact number moves whenever the sheet gains or retires a container
+// rule, and pinning it would turn every such edit into a failure here. What must never happen
+// is the list going empty or near-empty through a parse break, which is the failure mode that
+// would make this whole gate vacuous while reporting green.
+const ANCESTOR_CONTEXT_FLOOR = 10;
+
+// Named because each is a container the issue's own findings turn on: the Tool Studio's Back
+// button cluster, the 27-site editor header, the knowledge rows, the drop inspector's stack
+// and the Checks Studio preset row, whose `background` was the SECOND rule found beating the
+// disabled invariant from a container.
+const REQUIRED_DISABLED_CONTEXTS = [
+  '.manager-tool-edit-actions',
+  '.manager-header-actions',
+  '.manager-knowledge-row-actions',
+  '.manager-drop-inspector-stack',
+  '.manager-checks-trigger-presets',
+];
+
+const { contexts: DISABLED_CONTEXTS, unmaterializable: UNMATERIALIZABLE_CONTEXTS } = (() => {
+  const found = new Map([[BASE_DISABLED_CONTEXT.id, BASE_DISABLED_CONTEXT]]);
+  const rejected = new Set();
+  for (const prelude of rulePreludes(css)) {
+    for (const selector of prelude.split(',')) {
+      const context = ancestorContextIn(selector);
+      if (context === null) continue;
+      if (context === 'unmaterializable') rejected.add(selector.trim());
+      else if (!found.has(context.id)) found.set(context.id, context);
+    }
+  }
+  return { contexts: [...found.values()], unmaterializable: [...rejected] };
+})();
+
+function disabledProbeMarkup(context, index) {
+  const probes = DISABLED_ROLE_PROBES.map(
+    (role) =>
+      `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="on-${index}-${role}"><span>Save</span></button>` +
+      `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="off-${index}-${role}" disabled><span>Save</span></button>`
+  ).join('');
+  const open = context.chain
+    .map((element) => `<div class="${element.classes.join(' ')}"${element.attributes}>`)
+    .join('');
+  const close = context.chain.map(() => '</div>').join('');
+  return `<main class="${context.root.classes.join(' ')}"${context.root.attributes}>${open}${probes}${close}</main>`;
+}
+
+test('a disabled manager button paints from the disabled rule in every role and container', async () => {
+  assert.deepEqual(
+    UNMATERIALIZABLE_CONTEXTS,
+    [],
+    'every ancestor-context rule for a manager button must be renderable by this probe — ' +
+      'teach `elementForCompound` the new shape rather than letting a container go unprobed'
+  );
+  assert.ok(
+    DISABLED_CONTEXTS.length >= ANCESTOR_CONTEXT_FLOOR,
+    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} manager-button containers, got ` +
+      `${DISABLED_CONTEXTS.length} — a shorter list means the prelude scan broke, not that the ` +
+      'sheet stopped styling containers'
+  );
+  for (const required of REQUIRED_DISABLED_CONTEXTS) {
+    assert.ok(
+      DISABLED_CONTEXTS.some((context) => context.id.includes(required)),
+      `${required} must be among the derived containers, got ${DISABLED_CONTEXTS.map((context) => context.id).join(' | ')}`
+    );
+  }
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const roots = DISABLED_CONTEXTS.map((entry, index) => disabledProbeMarkup(entry, index)).join(
+      ''
+    );
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          ${roots}
+          <main class="fabricate-manager">
+            <!-- The tokens the disabled rule NAMES, resolved by the browser in this theme, so
+                 the assertions below pin the paint to that rule rather than to whatever the
+                 six probes happen to agree on. -->
+            <span data-token="border" style="color: var(--fab-overlay-light-12)"></span>
+            <span data-token="ink" style="color: var(--fab-mv2-text-muted)"></span>
+            <span data-token="surface" style="color: var(--fab-overlay-light-04)"></span>
+            <span data-token="ghost-border" style="color: var(--fab-mv2-border)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(
+      ({ roles, count }) => {
+        const paintOf = (element) => {
+          const style = getComputedStyle(element);
+          return {
+            borderColor: style.borderTopColor,
+            color: style.color,
+            background: style.backgroundColor,
+            opacity: style.opacity,
+            borderStyle: style.borderTopStyle,
+            height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          };
+        };
+        const read = (probe) => {
+          const element = document.querySelector(`[data-probe="${probe}"]`);
+          return element ? paintOf(element) : null;
+        };
+        const perContext = (state) =>
+          Array.from({ length: count }, (unused, index) =>
+            Object.fromEntries(roles.map((role) => [role, read(`${state}-${index}-${role}`)]))
+          );
+        const token = (name) =>
+          getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+        return {
+          on: perContext('on'),
+          off: perContext('off'),
+          tokens: {
+            border: token('border'),
+            ink: token('ink'),
+            surface: token('surface'),
+            ghostBorder: token('ghost-border'),
+          },
+        };
+      },
+      { roles: DISABLED_ROLE_PROBES, count: DISABLED_CONTEXTS.length }
+    );
+
+    // Collected rather than thrown one at a time. `assert` stops at the first failure, and
+    // the first container in sheet order is not the interesting one — the run that proved
+    // this widening reds before the repair reported only `.manager-checks-trigger-presets`
+    // and said nothing at all about `.manager-tool-edit-actions`, which is the container the
+    // issue names. A gate over a matrix has to report the matrix.
+    const violations = [];
+    const record = (condition, message) => {
+      if (!condition) violations.push(message);
+    };
+    const samePaint = (left, right) =>
+      left.borderColor === right.borderColor &&
+      left.color === right.color &&
+      left.background === right.background;
+
+    for (const [index, entry] of DISABLED_CONTEXTS.entries()) {
+      const on = measured.on[index];
+      const off = measured.off[index];
+
+      for (const role of DISABLED_ROLE_PROBES) {
+        record(on[role], `${entry.id}: the enabled ${role} probe did not render`);
+        record(off[role], `${entry.id}: the disabled ${role} probe did not render`);
+      }
+      if (DISABLED_ROLE_PROBES.some((role) => !on[role] || !off[role])) continue;
+
+      // NON-VACUITY, and the one that would have caught the defect on its own: the sheet must
+      // actually reach these probes. If it did not, every role would report the UA default and
+      // the equality below would hold over nothing.
+      record(
+        on.ghost.borderColor === measured.tokens.ghostBorder,
+        `${entry.id}: the enabled ghost must take the primitive's resting border ` +
+          `${measured.tokens.ghostBorder}, got ${on.ghost.borderColor} — this fixture is unstyled`
+      );
+
+      const disabledPaint = {
+        borderColor: measured.tokens.border,
+        color: measured.tokens.ink,
+        background: measured.tokens.surface,
+      };
+
+      for (const role of DISABLED_ROLE_PROBES) {
+        record(
+          samePaint(off[role], disabledPaint),
+          `${entry.id}: a disabled ${role} button must paint from .manager-button:disabled, ` +
+            `not from its role or its container — got border ${off[role].borderColor}, ink ` +
+            `${off[role].color}, fill ${off[role].background}; expected border ` +
+            `${disabledPaint.borderColor}, ink ${disabledPaint.color}, fill ${disabledPaint.background}`
+        );
+        record(
+          off[role].opacity === '0.62',
+          `${entry.id}: a disabled ${role} button must keep the disabled rule's opacity, got ${off[role].opacity}`
+        );
+        record(
+          !samePaint(off[role], on[role]),
+          `${entry.id}: the ${role} role must PAINT differently when enabled, or its probe proves nothing`
+        );
+      }
+
+      // The dashed role is why the reconciliation splits paint from geometry rather than
+      // qualifying one rule: switching a control off must take its colours, never its shape.
+      // A `border` shorthand under `:not(:disabled)` would have taken the dashed edge with it.
+      record(
+        off.dashed.borderStyle === 'dashed',
+        `${entry.id}: a disabled dashed button must keep its dashed edge, got ${off.dashed.borderStyle}`
+      );
+      record(
+        off.dashed.height === on.dashed.height,
+        `${entry.id}: a disabled dashed button must keep the control height it had when ` +
+          `enabled, got ${off.dashed.height} against ${on.dashed.height}`
+      );
+    }
+
+    assert.deepEqual(
+      violations,
+      [],
+      `the disabled paint must be role-independent AND container-independent:\n- ${violations.join('\n- ')}`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The `warning` role paints, and the spelling it replaces never did (issue 1118) ────────
+//
+// This is the defect that put a sixth role in the primitive's vocabulary, measured from both
+// sides. `environment/CompositionList.svelte` renders ONE verb — the same `onForceInclude`,
+// the same `data-action="force-include"`, the same localization key — from two places, and one
+// of them wrote `class="manager-button is-warning"`. The sheet declares
+// `.manager-button.is-warning-action` and declares `.manager-button.is-warning` NOWHERE, so
+// that Force add shipped with no warning treatment at all while the amber treatment shipped
+// with no call site: a defect and a dead rule, from one typo, on a pair of buttons that are the
+// same verb.
+//
+// The role is what makes the typo unrepeatable — `role="warning"` names a vocabulary entry and
+// the primitive owns which class it emits — so the assertion is on the emitted class rather
+// than on a class string anyone has to remember. The MISSPELT probe is kept beside it as the
+// negative control, and it is not decoration: it is the only thing that distinguishes "the
+// warning role paints" from "these two probes both landed on the base control and agree".
+test('the warning role paints amber, and the is-warning spelling it replaces paints nothing', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const neutral = managerButtonClassesFor('neutral');
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <section class="manager-edit-card">
+              <button type="button" class="${managerButtonClassesFor('warning')}" data-probe="warning"><span>Force add</span></button>
+              <button type="button" class="${neutral} is-warning" data-probe="misspelt"><span>Force add</span></button>
+              <button type="button" class="${neutral}" data-probe="neutral"><span>Force add</span></button>
+              <span class="manager-icon-button is-warning-action" data-probe="icon"></span>
+            </section>
+            <span data-token="border" style="color: var(--fab-warning-border)"></span>
+            <span data-token="ink" style="color: var(--fab-warning-text)"></span>
+            <span data-token="surface" style="color: var(--fab-warning-soft)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const paintOf = (probe) => {
+        const style = getComputedStyle(document.querySelector(`[data-probe="${probe}"]`));
+        return {
+          borderColor: style.borderTopColor,
+          color: style.color,
+          background: style.backgroundColor,
+        };
+      };
+      const token = (name) =>
+        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+      return {
+        warning: paintOf('warning'),
+        misspelt: paintOf('misspelt'),
+        neutral: paintOf('neutral'),
+        icon: paintOf('icon'),
+        tokens: { border: token('border'), ink: token('ink'), surface: token('surface') },
+      };
+    });
+
+    assert.deepEqual(
+      measured.warning,
+      {
+        borderColor: measured.tokens.border,
+        color: measured.tokens.ink,
+        background: measured.tokens.surface,
+      },
+      'a warning manager button computes the three amber tokens the sheet names for it'
+    );
+    // The defect itself, still measurable: `is-warning` selects nothing, so a button wearing
+    // it is indistinguishable from a bare neutral one.
+    assert.deepEqual(
+      measured.misspelt,
+      measured.neutral,
+      'the `is-warning` spelling this role replaces still matches NO rule, which is why the ' +
+        'site that used it shipped with no warning treatment at all'
+    );
+    assert.notDeepEqual(
+      measured.warning,
+      measured.neutral,
+      'and the role must differ from neutral, or the amber assertion above proves nothing'
+    );
+    // The pair this repair exists to reunite: the icon button beside it in the same list
+    // already spelt the class correctly, and the two must now agree on the paint.
+    assert.deepEqual(
+      { color: measured.icon.color, background: measured.icon.background },
+      { color: measured.warning.color, background: measured.warning.background },
+      'the icon Force add and the labelled Force add are one verb and paint alike'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── One toolbar control, three browsers, one scale (issue 1118) ───────────────────────────
+//
+// Asc/Desc beside a sort select is the same control in the recipe, component and essence
+// browsers, and the essence one has never rendered like the other two. It carried
+// `manager-essence-sort-direction`, a class this sheet declares NOWHERE — so it matched no
+// rule of its own and painted from the base control: a 6px corner at weight 700 beside two
+// siblings at 9px and 600, in a toolbar whose selects and segmented toggles are all at the
+// compact scale.
+//
+// That divergence PRE-DATES the conversion sweep, which is why it is measured rather than
+// asserted from the sheet. A source pin cannot tell "this rule reaches the control" from
+// "this rule exists and reaches nothing", and the whole defect was the second of those: the
+// class was written, looked deliberate, and styled nothing for as long as it shipped.
+//
+// The essence probe is addressed by the `data-*` hook rather than a class because the dead
+// class went with the conversion — the primitive emits the two base classes and the site
+// keeps the hook it always had.
+const SORT_DIRECTION_PROBES = Object.freeze([
+  Object.freeze({ probe: 'recipe', attributes: 'class="manager-recipe-sort-direction"' }),
+  Object.freeze({ probe: 'component', attributes: 'class="manager-component-sort-direction"' }),
+  Object.freeze({ probe: 'essence', attributes: 'data-essence-sort-direction="asc"' }),
+]);
+
+test('all three browser sort-direction toggles render as one control', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const base = managerButtonClassesFor('neutral');
+    const toggles = SORT_DIRECTION_PROBES.map(({ probe, attributes }) => {
+      // The bespoke class travels through the primitive's APPENDING `class` prop, so the
+      // rendered element carries both — build the string the way the component joins it
+      // rather than restating one of the two spellings.
+      const extra = /class="([^"]*)"/.exec(attributes)?.[1] ?? '';
+      const hook = extra ? '' : ` ${attributes}`;
+      return `<button type="button" class="${[base, extra].filter(Boolean).join(' ')}"${hook} data-probe="${probe}"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    }).join('');
+    // NEGATIVE CONTROL: the same primitive with neither the class nor the hook. It is what
+    // the essence toggle measured before this rule, so if it matched the three below, the
+    // rule would be reaching nothing and every equality here would hold trivially.
+    const bare = `<button type="button" class="${base}" data-probe="bare"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+            .fas::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="manager-toolbar">${toggles}${bare}</div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          gap: style.gap,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          borderRadius: style.borderRadius,
+        };
+      };
+      return Object.fromEntries(
+        ['recipe', 'component', 'essence', 'bare'].map((probe) => [probe, read(probe)])
+      );
+    });
+
+    for (const probe of ['recipe', 'component', 'essence', 'bare']) {
+      assert.ok(measured[probe], `the ${probe} probe rendered`);
+    }
+
+    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares, and
+    // the base control declares 6px and 700, so agreeing on these two is what "the rule
+    // matched" means here.
+    assert.equal(measured.recipe.borderRadius, '9px', 'the toolbar rule reached the fixture');
+    assert.equal(measured.bare.borderRadius, '6px', 'and the bare primitive is still at 6px');
+    assert.equal(measured.bare.fontWeight, '700', 'and at the base weight');
+
+    for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+      assert.equal(
+        measured.essence[property],
+        measured.recipe[property],
+        `the essence toggle's ${property} (${measured.essence[property]}) must match the recipe browser's (${measured.recipe[property]})`
+      );
+      assert.equal(
+        measured.component[property],
+        measured.recipe[property],
+        `the component toggle's ${property} (${measured.component[property]}) must match the recipe browser's (${measured.recipe[property]})`
+      );
     }
   } finally {
     await context.close();
@@ -8503,11 +9168,10 @@ test('the Downtime rail children sit on the same indent and gap as every other r
         return {
           // The visible indent is what a GM compares, so measure where the GLYPH lands
           // relative to the group that holds it, not the declared padding.
-          glyphOffset:
-            +(
-              button.querySelector('i').getBoundingClientRect().left -
-              document.getElementById(submenuId).getBoundingClientRect().left
-            ).toFixed(2),
+          glyphOffset: +(
+            button.querySelector('i').getBoundingClientRect().left -
+            document.getElementById(submenuId).getBoundingClientRect().left
+          ).toFixed(2),
           gap: computed.columnGap,
           paddingLeft: computed.paddingLeft,
           minHeight: computed.minHeight,
@@ -9187,7 +9851,10 @@ test('Core keeps the Downtime panel scroller for a visibly overflowing companion
   // and the only variable is how the root treats its own content. That is the whole point:
   // "a full-height companion kills Core's scroller" and "a definite height kills Core's
   // scroller" are both false, and each was believed once.
-  const visible = await readCompanionPanelChain(1400, companionRoot('display:block', companionRows));
+  const visible = await readCompanionPanelChain(
+    1400,
+    companionRoot('display:block', companionRows)
+  );
   assert.equal(
     visible.panelsOverflowY,
     'auto',

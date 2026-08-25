@@ -1775,12 +1775,31 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('FABRICATE.Admin.Manager.QuickActions'),
       'inspector should not duplicate row actions'
     );
+    // The legacy system-library header rendered an admin launch button beside Import, wired
+    // to `openCurrentAdmin`. This guarded that by the pair's LITERAL MARKUP, which made an
+    // absence check hostage to formatting rather than to the thing it guards: the literal
+    // stopped matching the day Import gained `data-manager-import-system` and prettier
+    // reflowed the tag across five lines, and it can never match again now that Import is a
+    // `<ManagerButton>` (issue 1118). An absence assertion that cannot match does not go RED
+    // when its subject returns — it goes quietly meaningless, which is the more dangerous of
+    // the two failure modes.
+    //
+    // So: anchor on the HANDLER NAME, which is what the legacy control actually called and
+    // which no reformatting or primitive conversion can spell away, and put a floor under it
+    // that proves the branch still exists. Without the floor, deleting the whole
+    // system-library header would satisfy the absence check perfectly.
+    // The floor reads the Import control's OPEN TAG, not the bare hook name: the hook is also
+    // spelled out in the comment above the control, so a `rootSource.includes(...)` floor
+    // would survive deleting the button it is meant to prove exists.
     assert.ok(
-      !rootSource
-        .replace(/\r\n/g, '\n')
-        .includes(
-          '{:else}\n        <button type="button" class="manager-button" onclick={importSystem}>\n          <i class="fas fa-file-import" aria-hidden="true"></i>\n          <span>{text(\'FABRICATE.Admin.Manager.Import\', \'Import\')}</span>\n        </button>\n        <button type="button" class="manager-button" onclick={openCurrentAdmin}>'
-        ),
+      /<ManagerButton[^<>]*\bdata-manager-import-system\b[^<>]*onclick=\{importSystem\}[^<>]*>/.test(
+        rootSource
+      ),
+      'the system library header should still render Import — the absence check below is ' +
+        'vacuous against a header that no longer exists'
+    );
+    assert.ok(
+      !rootSource.includes('openCurrentAdmin'),
       'system library header should not render the legacy admin launch button'
     );
     assert.equal(
@@ -3054,9 +3073,35 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('onclick={deleteGatheringTaskDraft}'),
       'gathering task editor toolbar should wire the delete button to deleteGatheringTaskDraft'
     );
+    // The destructive role, read off ONE element rather than off two strings that happen to
+    // sit within 200 characters of each other. `/manager-button is-danger[\s\S]{0,200}
+    // deleteGatheringTaskDraft/` matched a class string in one control and a handler in
+    // another as readily as both in the same one, and the class literal it keyed on left the
+    // file entirely when this toolbar moved onto `ManagerButton` (issue 1118).
+    //
+    // `data-gathering-task-delete` is the hook that makes the element addressable — it was
+    // added for exactly this, since the control carried no `data-*` handle of its own. The
+    // open tag is bounded by `[^<>]`, so the match cannot run past this element's own `>`
+    // into the next control's attributes; if it ever does stop resolving, `deleteTag` is
+    // null and the first assertion fails by name instead of the check going quiet.
+    //
+    // What this pins is that the SOURCE asks for the destructive role. That `role="danger"`
+    // renders `is-danger` is the primitive's own contract and is pinned where it belongs, in
+    // `tests/components/manager-button-mounted.test.js`.
+    const deleteTag = /<ManagerButton[^<>]*\bdata-gathering-task-delete\b[^<>]*>/.exec(rootSource);
     assert.ok(
-      /manager-button is-danger[\s\S]{0,200}deleteGatheringTaskDraft/.test(rootSource),
-      'gathering task editor delete button should use the is-danger destructive style'
+      deleteTag,
+      'gathering task editor should render its delete control as a ManagerButton carrying ' +
+        'data-gathering-task-delete'
+    );
+    assert.ok(
+      deleteTag[0].includes('role="danger"'),
+      'gathering task editor delete button should use the danger destructive role'
+    );
+    assert.ok(
+      deleteTag[0].includes('onclick={deleteGatheringTaskDraft}'),
+      'the element carrying data-gathering-task-delete should be the one wired to ' +
+        'deleteGatheringTaskDraft — otherwise the role above is asserted on some other control'
     );
   });
 

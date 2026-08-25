@@ -35,6 +35,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The manager's ONE labelled push-button (issue 1118). This tree renders it from
+    // EnvironmentsBrowserView and from the two gathering browsers it embeds; omitting it
+    // reds `mounted-harness-primitive-allowlist.test.js` and HANGS this suite.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',

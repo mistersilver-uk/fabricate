@@ -29,6 +29,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    // THE manager's labelled push-button (issue 1118). The footer Close renders it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportReportModal.svelte',

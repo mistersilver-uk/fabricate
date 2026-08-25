@@ -11,6 +11,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -268,14 +269,19 @@
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}
-                <button
-                  type="button"
-                  class="manager-button manager-system-overview-link"
+                <!-- Ghost (issue 1118, row 21). The quiet NAVIGATIONAL verb of
+                     `ui-integration/spec.md` — it moves the GM to the record and changes
+                     nothing. One per issue row, in a list whose SEVERITY CHIP is the loud
+                     thing: a solid control repeated down every row out-shouts the ranking
+                     the list exists to present. -->
+                <ManagerButton
+                  role="ghost"
+                  class="manager-system-overview-link"
                   data-overview-link={issue.kind}
                   onclick={() => onSelectIssue(issue)}
                 >
                   {kindLinkLabel(issue.kind)}
-                </button>
+                </ManagerButton>
               {/if}
             </li>
           {/each}

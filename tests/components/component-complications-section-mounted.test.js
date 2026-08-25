@@ -88,6 +88,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     // The roll condition's comparand is the shared signed-integer stepper (issue 1286).
@@ -494,15 +495,43 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     }
   });
 
-  it('lets the panel GRID own the spacing around the Add control', async () => {
+  it('lets the panel GRID own the spacing around the list', async () => {
     // The section root is `.manager-component-panel`, which is `display: grid` with a 12px
-    // gap. A grid gap and an item margin ADD, so a 9px margin on each of these rendered as
+    // gap. A grid gap and an item margin ADD, so a 9px margin on the list rendered as
     // 12 + 9 + 9 = 30px when populated against 12 + 9 = 21px when empty: one section
     // disagreeing with itself, and both far past the prototype's own 9px. Nothing else
     // catches it — the visual-parity harness records no `margin` property.
-    for (const selector of ['.fab-complications-list', '.fab-complications-add']) {
+    assert.doesNotMatch(
+      blockIn(sectionSource, '.fab-complications-list'),
+      /margin/,
+      ".fab-complications-list must not add to the panel's grid gap"
+    );
+  });
+
+  it('has no scoped rule left to check for the Add control, and the primitive states none', async () => {
+    // The Add control converted to `<ManagerButton>` (issue 1118). Its own
+    // `.fab-complications-add` scoped rule declared nothing the role and `fullWidth` did not
+    // already state, so it was retired rather than re-chained under `:global(...)` — the
+    // previous test in this file asserted its ABSENCE of a `margin` from source; now there is
+    // no rule at all to read. `ManagerButton.svelte` itself deliberately carries no scoped
+    // `<style>` — a second source of truth for the control is the failure the primitive
+    // exists to end — so this checks the two GLOBAL rules that give the control its geometry
+    // instead: `is-dashed` and `is-full-width` neither one adds a `margin`, which is what
+    // lets the panel's grid gap alone set the space above it.
+    // Matches the CSS rule and the markup usage, not the docblock prose explaining the
+    // retirement, which still names the class for a future reader.
+    assert.doesNotMatch(
+      sectionSource,
+      /\.fab-complications-add\s*\{|class="[^"]*\bfab-complications-add\b/,
+      'the retired class is gone from CSS and markup'
+    );
+    const globalCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    for (const selector of [
+      '.fabricate-manager .manager-button.fab-manager-button.is-dashed',
+      '.fabricate-manager .manager-button.fab-manager-button.is-full-width',
+    ]) {
       assert.doesNotMatch(
-        blockIn(sectionSource, selector),
+        blockIn(globalCss, selector),
         /margin/,
         `${selector} must not add to the panel's grid gap`
       );
@@ -809,6 +838,23 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     );
     assert.equal(added.when.stageMissed, true, 'and starts on the condition a GM usually wants');
     assert.equal(added.when.checkTrigger, null, 'the trigger clause is an ID, never a boolean');
+  });
+
+  it('renders the Add control as a dashed, full-width ManagerButton (issue 1118)', async () => {
+    // Bound to the `data-complications-add` hook rather than any positional or class
+    // selector, so a future markup reshuffle cannot silently retarget this at a neighbour.
+    // `dashed` is the append-a-row verb at the foot of `.fab-complications-list`, and
+    // `fullWidth` is warranted because that list is the sole column of the panel's grid —
+    // the same shape as `RecipeStepsCard`'s "Add a step" and `ComponentEditView`'s "Add
+    // result"/"Add group" sites.
+    const { target } = await mountSection({ complications: [] });
+    const add = target.querySelector('[data-complications-add]');
+    assert.ok(add, 'the hook resolves to an element');
+    assert.equal(add.tagName, 'BUTTON', 'ManagerButton renders a real <button> by default');
+    assert.ok(add.classList.contains('manager-button'), 'the manager control contract');
+    assert.ok(add.classList.contains('fab-manager-button'), 'the primitive`s own class');
+    assert.ok(add.classList.contains('is-dashed'), 'the append-a-row role');
+    assert.ok(add.classList.contains('is-full-width'), 'it spans the panel`s single-column grid');
   });
 
   it('removes the complication the delete control names', async () => {

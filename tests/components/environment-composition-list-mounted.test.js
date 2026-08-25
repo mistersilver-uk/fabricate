@@ -119,6 +119,9 @@ describe('CompositionList mounted layout', () => {
       // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
       // the harness omits HANGS the suite (# cancelled) rather than failing it.
       'src/ui/svelte/apps/manager/EmptyState.svelte',
+      // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
+      // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
+      'src/ui/svelte/components/ManagerButton.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
@@ -284,6 +287,40 @@ describe('CompositionList mounted layout', () => {
     assert.ok(forceIncludeQuick, 'non-matching available event rows render a quick force-add action');
     forceIncludeQuick.click();
     assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
+
+    // THE `warning` REPAIR's reachable half (issue 1118). Force add is ONE verb — one
+    // `onForceInclude`, one `data-action`, one localization key — rendered from two places in
+    // this component, and the two spelt their amber modifier differently: this icon control
+    // wrote `is-warning-action`, which the sheet declares, and the labelled control wrote
+    // `is-warning`, which it declares nowhere. That is the defect that put a sixth role in the
+    // primitive's vocabulary.
+    //
+    // Only this half can be asserted from a mount, and the reason is a SECOND defect on the
+    // same pair: the labelled control sits in the standalone Non-matching section, which the
+    // markup gates on `mode !== 'manual'`, while its own guard demands `mode === 'manual'`. It
+    // renders in no state at all, which is also why the misspelling survived — nobody ever saw
+    // it. Its role is pinned from source in `tests/manager-button-source-contract.test.js`,
+    // with the reachability defect reported rather than repaired here.
+    assert.ok(
+      forceIncludeQuick.classList.contains('is-warning-action'),
+      `the icon Force add carries the amber class the sheet declares, got ${forceIncludeQuick.className}`
+    );
+    assert.ok(
+      !forceIncludeQuick.classList.contains('is-warning'),
+      'and not the spelling that matches no rule at all'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-force-include'),
+      'in MANUAL mode the standalone Non-matching section is not rendered at all, so the ' +
+        'labelled Force add is absent here for a STRUCTURAL reason and this assertion is ' +
+        'scoped to that. It is a defect in its own right that no other mode renders it ' +
+        'either: the section is gated `mode !== \'manual\'` and the control is gated ' +
+        '`mode === \'manual\'`. WHOEVER REPAIRS THAT CONTRADICTION — by moving the control ' +
+        'into Available-to-add, which reds this line and wants it inverted here; or by ' +
+        're-gating the branch to `mode !== \'manual\'`, which leaves this line correct and ' +
+        'wants its presence asserted in the automatic-mode test above — should not delete ' +
+        'this assertion. See the source contract for the role it carries.'
+    );
 
     assert.equal(
       target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),

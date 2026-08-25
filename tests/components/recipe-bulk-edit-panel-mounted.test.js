@@ -57,6 +57,10 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The shared bulk-edit chrome: this panel renders its header, hero, section headings,
     // staged selects and Apply through these three, exactly as the Component Studio's does.
+    // THE manager's labelled push-button (issue 1118). `BulkEditPanelShell` renders its
+    // Apply through the primitive, so it is a STATIC import of this tree; omitting it HANGS
+    // this suite as `# cancelled` rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',

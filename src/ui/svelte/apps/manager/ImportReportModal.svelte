@@ -21,6 +21,7 @@
 <script>
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerModal from './ManagerModal.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -101,14 +102,9 @@
   {/snippet}
 
   {#snippet footer()}
-    <button
-      type="button"
-      class="manager-button is-primary"
-      data-import-report-close
-      onclick={() => onClose()}
-    >
+    <ManagerButton role="primary" data-import-report-close onclick={() => onClose()}>
       {text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-    </button>
+    </ManagerButton>
   {/snippet}
 </ManagerModal>
 

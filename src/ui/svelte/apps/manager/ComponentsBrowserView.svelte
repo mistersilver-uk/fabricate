@@ -5,6 +5,7 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
@@ -631,9 +632,8 @@
             <option value={option.key}>{option.label}</option>
           {/each}
         </select>
-        <button
-          type="button"
-          class="manager-button manager-component-sort-direction"
+        <ManagerButton
+          class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Component.SortDirection',
@@ -652,7 +652,7 @@
               ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
               : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span
           >
-        </button>
+        </ManagerButton>
       </div>
     </div>
 
@@ -741,12 +741,8 @@
           'No components match your filters.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button"
-          data-clear-filters="components"
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton data-clear-filters="components" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

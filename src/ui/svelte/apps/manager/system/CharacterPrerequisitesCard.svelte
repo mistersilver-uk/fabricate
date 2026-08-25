@@ -10,6 +10,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
@@ -112,18 +113,12 @@
       </p>
     </div>
     <div class="manager-character-modifier-card-header-actions">
-      <button
-        type="button"
-        class="manager-button is-primary"
-        data-add-prerequisite
-        onclick={handleAdd}
-      >
+      <ManagerButton role="primary" data-add-prerequisite onclick={handleAdd}>
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Add', 'Add prerequisite')}
-      </button>
-      <button
-        type="button"
-        class="manager-button"
+      </ManagerButton>
+      <ManagerButton
+        data-seed-prerequisite-presets
         disabled={!presetsSupported}
         data-tooltip={!presetsSupported
           ? text(
@@ -135,7 +130,7 @@
       >
         <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.SeedPresets', 'Seed presets')}
-      </button>
+      </ManagerButton>
     </div>
   </header>
 

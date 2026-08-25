@@ -31,6 +31,7 @@
   import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import {
@@ -349,9 +350,7 @@
             <option value={key}>{sortLabel(key)}</option>
           {/each}
         </select>
-        <button
-          type="button"
-          class="manager-button manager-essence-sort-direction"
+        <ManagerButton
           data-essence-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Essence.ToggleSortDirection',
@@ -370,7 +369,7 @@
               ? text('FABRICATE.Admin.Manager.Essence.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Essence.SortDescending', 'Desc')}</span
           >
-        </button>
+        </ManagerButton>
       </div>
 
       <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
@@ -495,13 +494,11 @@
           'No essences match these filters.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button"
+        <ManagerButton
           data-clear-filters="essences"
           disabled={!filtersActive}
           onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {/snippet}
