@@ -3332,12 +3332,12 @@ export function createAdminStore(services) {
     return confirmed === true;
   }
 
-  function _systemCharacterPrerequisites() {
+  function _characterPrerequisites() {
     const store = _characterLibrariesStore();
     return normalizeCharacterPrerequisiteList(store?.listCharacterPrerequisites?.(), _randomID);
   }
 
-  async function _persistSystemCharacterPrerequisites(prerequisites) {
+  async function _persistCharacterPrerequisites(prerequisites) {
     const store = _characterLibrariesStore();
     if (!store?.saveCharacterPrerequisites) return null;
     const normalized = normalizeCharacterPrerequisiteList(prerequisites, _randomID);
@@ -3348,8 +3348,8 @@ export function createAdminStore(services) {
   async function addCharacterPrerequisite(partial = {}) {
     const entry = normalizeCharacterPrerequisite({ id: _randomID(), ...partial }, _randomID);
     if (!entry) return null;
-    const persisted = await _persistSystemCharacterPrerequisites([
-      ..._systemCharacterPrerequisites(),
+    const persisted = await _persistCharacterPrerequisites([
+      ..._characterPrerequisites(),
       entry,
     ]);
     if (persisted === null) return null;
@@ -3360,13 +3360,13 @@ export function createAdminStore(services) {
   async function updateCharacterPrerequisite(prerequisiteId, updates = {}) {
     if (!prerequisiteId) return false;
     let changed = false;
-    const next = _systemCharacterPrerequisites().map((entry) => {
+    const next = _characterPrerequisites().map((entry) => {
       if (entry.id !== prerequisiteId) return entry;
       changed = true;
       return normalizeCharacterPrerequisite({ ...entry, ...updates, id: entry.id }, _randomID);
     });
     if (!changed) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(next);
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
@@ -3374,7 +3374,7 @@ export function createAdminStore(services) {
 
   async function deleteCharacterPrerequisite(prerequisiteId) {
     if (!prerequisiteId) return false;
-    const current = _systemCharacterPrerequisites();
+    const current = _characterPrerequisites();
     const next = current.filter((entry) => entry.id !== prerequisiteId);
     if (next.length === current.length) return false; // unknown id — nothing removed
     const confirmedPrerequisite = await _confirmLibraryEntryDelete(
@@ -3384,7 +3384,7 @@ export function createAdminStore(services) {
       'FABRICATE.Admin.Manager.CharacterPrerequisites.DeleteContent'
     );
     if (!confirmedPrerequisite) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(next);
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
@@ -3401,15 +3401,15 @@ export function createAdminStore(services) {
    * @returns {Promise<boolean>}
    */
   async function reorderCharacterPrerequisite(fromIndex, toIndex) {
-    const next = _reorderListByIndex(_systemCharacterPrerequisites(), fromIndex, toIndex);
+    const next = _reorderListByIndex(_characterPrerequisites(), fromIndex, toIndex);
     if (!next) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(next);
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
   }
 
-  async function seedCharacterPrerequisitePresetsForSystem() {
+  async function seedPrerequisitePresets() {
     const foundrySystemId = String(services.getFoundrySystemId?.() || '');
     const presets = getCharacterPrerequisitePresetsForFoundrySystem(foundrySystemId);
     if (presets.length === 0) {
@@ -3417,10 +3417,10 @@ export function createAdminStore(services) {
     }
     const { added, skipped, next } = seedCharacterPrerequisitePresets({
       presets,
-      currentLibrary: _systemCharacterPrerequisites(),
+      currentLibrary: _characterPrerequisites(),
     });
     if (added.length > 0) {
-      const persisted = await _persistSystemCharacterPrerequisites(next);
+      const persisted = await _persistCharacterPrerequisites(next);
       if (persisted === null) {
         return { added: 0, skipped: skipped.length, unsupported: false, foundrySystemId };
       }
@@ -7400,7 +7400,7 @@ export function createAdminStore(services) {
    *
    * @returns {{ store: object, library: Array<object> }|null}
    */
-  function _systemModifierContext() {
+  function _modifierContext() {
     const store = _characterLibrariesStore();
     if (!store) return null;
     return { store, library: store.listModifiers?.() ?? [] };
@@ -7413,7 +7413,7 @@ export function createAdminStore(services) {
    * @param {Array<object>} next The replacement library.
    * @returns {Promise<void>}
    */
-  async function _saveSystemModifierLibrary(store, next) {
+  async function _saveModifierLibrary(store, next) {
     await store.saveModifiers(next);
     await refresh();
   }
@@ -7427,8 +7427,8 @@ export function createAdminStore(services) {
    * @param {object} [partial] Partial entry (id, label, icon, expression, min, max).
    * @returns {Promise<object|null>}
    */
-  async function addSystemModifier(partial = {}) {
-    const context = _systemModifierContext();
+  async function addModifier(partial = {}) {
+    const context = _modifierContext();
     if (!context) return null;
     const id = String(partial?.id || _randomID());
     if (context.library.some((entry) => entry.id === id)) return null;
@@ -7443,7 +7443,7 @@ export function createAdminStore(services) {
       expression: partial?.expression || '',
     });
     if (!entry) return null;
-    await _saveSystemModifierLibrary(context.store, [...context.library, entry]);
+    await _saveModifierLibrary(context.store, [...context.library, entry]);
     return entry;
   }
 
@@ -7455,14 +7455,14 @@ export function createAdminStore(services) {
    * @param {object} [updates] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateSystemModifier(modifierId, updates = {}) {
-    const context = _systemModifierContext();
+  async function updateModifier(modifierId, updates = {}) {
+    const context = _modifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.map((entry) =>
       entry.id === modifierId ? _normalizeSystemModifier({ ...entry, ...updates }) || entry : entry
     );
     if (next.every((entry, index) => entry === context.library[index])) return false;
-    await _saveSystemModifierLibrary(context.store, next);
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7475,8 +7475,8 @@ export function createAdminStore(services) {
    * @param {string} modifierId Library entry id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteSystemModifier(modifierId) {
-    const context = _systemModifierContext();
+  async function deleteModifier(modifierId) {
+    const context = _modifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.filter((entry) => entry.id !== modifierId);
     if (next.length === context.library.length) return false;
@@ -7487,7 +7487,7 @@ export function createAdminStore(services) {
       'FABRICATE.Admin.Manager.Modifiers.DeleteContent'
     );
     if (!confirmedModifier) return false;
-    await _saveSystemModifierLibrary(context.store, next);
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7499,12 +7499,12 @@ export function createAdminStore(services) {
    * @param {number} toIndex Destination position.
    * @returns {Promise<boolean>}
    */
-  async function reorderSystemModifier(fromIndex, toIndex) {
-    const context = _systemModifierContext();
+  async function reorderModifier(fromIndex, toIndex) {
+    const context = _modifierContext();
     if (!context) return false;
     const next = _reorderListByIndex(context.library, fromIndex, toIndex);
     if (!next) return false;
-    await _saveSystemModifierLibrary(context.store, next);
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7515,8 +7515,8 @@ export function createAdminStore(services) {
    *
    * @returns {Promise<{added: Array, skipped: Array, unsupported: boolean, foundrySystemId?: string}>}
    */
-  async function seedSystemModifierPresets() {
-    const context = _systemModifierContext();
+  async function seedModifierPresets() {
+    const context = _modifierContext();
     if (!context) return { added: [], skipped: [], unsupported: true };
     const foundrySystemId =
       typeof services.getFoundrySystemId === 'function'
@@ -7530,7 +7530,7 @@ export function createAdminStore(services) {
       presets,
       currentLibrary: context.library,
     });
-    await _saveSystemModifierLibrary(
+    await _saveModifierLibrary(
       context.store,
       result.next.map((entry) => _normalizeSystemModifier(entry)).filter(Boolean)
     );
@@ -7541,7 +7541,7 @@ export function createAdminStore(services) {
   // which since issue 1308 is world scope, so it consults neither the gathering config nor a
   // crafting system.
   function _firstCharacterModifierId() {
-    return _systemModifierContext()?.library?.[0]?.id || '';
+    return _modifierContext()?.library?.[0]?.id || '';
   }
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
@@ -8059,7 +8059,7 @@ export function createAdminStore(services) {
   // IT NO LONGER CARRIES THE LIBRARY. Until issue 1117 this also accepted a system-level
   // `checkModifiers` array, because the Checks card authored the entries; the library now
   // has ONE authoring surface (System settings > Modifiers, through
-  // `_saveSystemModifierLibrary` above) and the Checks card is selection-only. Keeping a
+  // `_saveModifierLibrary` above) and the Checks card is selection-only. Keeping a
   // second write path for the same array is exactly how two screens come to disagree about
   // which wrote last, so the half was removed rather than left dormant.
   //
@@ -9651,16 +9651,16 @@ export function createAdminStore(services) {
     updateGatheringLibraryEvent,
     deleteGatheringLibraryEvent,
     duplicateGatheringLibraryEvent,
-    addSystemModifier,
-    updateSystemModifier,
-    deleteSystemModifier,
-    reorderSystemModifier,
-    seedSystemModifierPresets,
+    addModifier,
+    updateModifier,
+    deleteModifier,
+    reorderModifier,
+    seedModifierPresets,
     addCharacterPrerequisite,
     updateCharacterPrerequisite,
     deleteCharacterPrerequisite,
     reorderCharacterPrerequisite,
-    seedCharacterPrerequisitePresetsForSystem,
+    seedPrerequisitePresets,
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
     deleteGatheringDropRowCharacterModifier,

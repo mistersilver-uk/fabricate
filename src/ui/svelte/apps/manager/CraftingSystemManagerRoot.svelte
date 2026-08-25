@@ -1801,20 +1801,20 @@
   // selected would click Add and watch nothing happen. Currency's handlers below dropped the same
   // guard for the same reason.
   async function onAddCharacterModifier(partial) {
-    return await store.addSystemModifier(partial);
+    return await store.addModifier(partial);
   }
   async function onSeedCharacterModifierPresets() {
     if (!characterModifierPresetsSupported) return;
-    await store.seedSystemModifierPresets();
+    await store.seedModifierPresets();
   }
   async function onUpdateCharacterModifier(modifierId, patch) {
-    await store.updateSystemModifier(modifierId, patch);
+    await store.updateModifier(modifierId, patch);
   }
   async function onDeleteCharacterModifier(modifierId) {
-    await store.deleteSystemModifier(modifierId);
+    await store.deleteModifier(modifierId);
   }
   async function onReorderCharacterModifier(fromIndex, toIndex) {
-    await store.reorderSystemModifier(fromIndex, toIndex);
+    await store.reorderModifier(fromIndex, toIndex);
   }
 
   // Character prerequisites (issue 544) — pass/fail learning gates, WORLD scope since issue
@@ -1841,7 +1841,7 @@
   }
   async function onSeedCharacterPrerequisitePresets() {
     if (!characterPrerequisitePresetsSupported) return;
-    await store.seedCharacterPrerequisitePresetsForSystem();
+    await store.seedPrerequisitePresets();
   }
 
   // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them
@@ -7080,7 +7080,7 @@
   }
 
   async function copyPrerequisiteToModifier(entry) {
-    const created = await store.addSystemModifier(mapPrerequisiteToModifier(entry));
+    const created = await store.addModifier(mapPrerequisiteToModifier(entry));
     if (!created?.id) return;
     worldRulesRequestOpenId = created.id;
     worldRulesRequestOpenNonce += 1;

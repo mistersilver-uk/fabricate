@@ -357,15 +357,14 @@ export class GatheringRichStateService {
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
-    // Modifiers are now system-owned (issue 1117), exactly as tools are below: the ONE
-    // authored library is `system.modifiers`, populated by
-    // `CraftingSystemManager._normalizeSystem`, and it serves the check modifiers on all
-    // three activities AND these d100 drop/event/stamina references. The gathering
-    // config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
-    // merges it up and retires the key), and no read-alias is kept for it — a silent
-    // fallback would make the relocation unobservable.
+    // Modifiers are WORLD-owned since issue 1308 (they were system-owned from issue 1117): the
+    // ONE authored library lives in the `characterLibraries` world setting, and it serves the
+    // check modifiers on all three activities AND these d100 drop/event/stamina references. The
+    // gathering config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
+    // merges it up and retires the key), and no read-alias is kept for it — a silent fallback
+    // would make the relocation unobservable.
     const libraryCharacterModifiers = new Map();
-    for (const entry of normalizeList(this._systemModifierLibrary(system, systemId))) {
+    for (const entry of normalizeList(this._worldModifierLibrary(system))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
@@ -1708,25 +1707,26 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve the character-modifier library for an attempt: prefer the
-   * per-environment map populated at composition time, falling back to the
-   * crafting system's library (needed for stamina regen, which has no
-   * environment context).
+   * Resolve the character-modifier library for an attempt: prefer the per-environment map
+   * populated at composition time, falling back to the WORLD library (needed for stamina regen,
+   * which has no environment context).
+   *
+   * Takes no system id since issue 1318. It carried one while the library belonged to a crafting
+   * system and a caller without the system in hand had to look it up; at world scope there is
+   * nothing system-specific left to resolve, and a retained-but-discarded parameter reads as
+   * though there still were.
    *
    * @param {object} payload
    * @returns {Map<string, object>}
    */
-  _modifierLibrary({ environment = null, system = null, systemId = null } = {}) {
+  _modifierLibrary({ environment = null, system = null } = {}) {
     if (
       environment?.__libraryCharacterModifiers instanceof Map &&
       environment.__libraryCharacterModifiers.size > 0
     ) {
       return environment.__libraryCharacterModifiers;
     }
-    const entries = this._systemModifierLibrary(
-      system,
-      systemId || environment?.craftingSystemId || ''
-    );
+    const entries = this._worldModifierLibrary(system);
     return new Map(entries.map((entry) => [String(entry.id), entry]));
   }
 
@@ -1743,13 +1743,12 @@ export class GatheringRichStateService {
    * @param {string} systemId Its id, used for the registry fallback.
    * @returns {Array<object>} The library entries, possibly empty.
    */
-  _systemModifierLibrary(system, systemId) {
+  _worldModifierLibrary(system) {
     // Issue 1308: ONE read of the world library, replacing the registry round-trip this used to
     // fall back on. That fallback existed only because the library lived on the crafting system,
     // so a caller without the system in hand had to go and fetch it; the library is world scope
-    // now, so there is nothing system-specific left to look up. `systemId` is retained for the
-    // signature's callers and no longer resolves anything.
-    void systemId;
+    // now, so there is nothing system-specific left to look up — which is why this takes no
+    // system id (issue 1318 dropped the one it had been carrying and discarding).
     return resolveModifierLibrary(system);
   }
 
@@ -1768,11 +1767,7 @@ export class GatheringRichStateService {
     if (base <= 0) return 0;
     const references = normalizeList(task?.staminaCostModifiers);
     if (references.length === 0) return Math.max(0, Math.round(base));
-    const library = this._modifierLibrary({
-      environment,
-      system,
-      systemId: system?.id || environment?.craftingSystemId,
-    });
+    const library = this._modifierLibrary({ environment, system });
     let total = base;
     for (const reference of references) {
       const entry = library.get(String(reference.modifierId)) || null;

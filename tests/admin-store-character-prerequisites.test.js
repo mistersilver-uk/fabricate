@@ -161,21 +161,21 @@ describe('adminStore character prerequisites (system-owned)', () => {
     assert.equal(await store.deleteCharacterPrerequisite('ghost'), false);
   });
 
-  it('seedCharacterPrerequisitePresetsForSystem seeds on dnd5e and is idempotent', async () => {
+  it('seedCharacterPrerequisitePresets seeds on dnd5e and is idempotent', async () => {
     const { store, services } = await storeFor({ foundrySystemId: 'dnd5e' });
-    const first = await store.seedCharacterPrerequisitePresetsForSystem();
+    const first = await store.seedPrerequisitePresets();
     assert.equal(first.unsupported, false);
     assert.ok(first.added > 0);
     const seededCount = services._worldSetting.characterPrerequisites.length;
 
-    const second = await store.seedCharacterPrerequisitePresetsForSystem();
+    const second = await store.seedPrerequisitePresets();
     assert.equal(second.added, 0);
     assert.equal(services._worldSetting.characterPrerequisites.length, seededCount);
   });
 
-  it('seedCharacterPrerequisitePresetsForSystem reports unsupported for a non-5e/pf2e world', async () => {
+  it('seedCharacterPrerequisitePresets reports unsupported for a non-5e/pf2e world', async () => {
     const { store, services } = await storeFor({ foundrySystemId: 'cyberpunk' });
-    const result = await store.seedCharacterPrerequisitePresetsForSystem();
+    const result = await store.seedPrerequisitePresets();
     assert.equal(result.unsupported, true);
     assert.equal(result.added, 0);
     assert.equal(services._worldSetting.characterPrerequisites.length, 0);
