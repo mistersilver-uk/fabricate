@@ -116,7 +116,7 @@ function appendMissingIds(existing, forced) {
  * @param {*} environment
  * @returns {*} The same reference when nothing changed, otherwise a shallow copy.
  */
-function migrateEnvironment(environment) {
+function migrateEnvironment(environment, clearAutomaticForces) {
   if (!isPlainObject(environment)) return environment;
 
   const pending = COMPOSITION_ID_KEYS.filter(
@@ -132,6 +132,13 @@ function migrateEnvironment(environment) {
   const next = { ...environment };
 
   for (const { forced, enabled } of pending) {
+    // An AUTOMATIC force list is only residue in a world that predates this change; after it,
+    // force add lives in automatic mode and such a list is a GM's authored intent. The world
+    // migration runs once, version-gated, so clearing there repairs residue and can meet nothing
+    // else. The IMPORT upcast has no version to gate on — every field-level upcast here runs on
+    // every payload forever — so clearing there would silently destroy a legitimate force list on
+    // every export/import round-trip, permanently, for the very feature this change adds.
+    if (!isManual && !clearAutomaticForces) continue;
     if (isManual) {
       const merged = appendMissingIds(environment[enabled], idEntries(environment[forced]));
       // Never CREATE an empty list. A force list holding nothing but `null` folds to no ids
@@ -159,12 +166,13 @@ function migrateEnvironment(environment) {
  * @returns {{ environments: *, migratedCount: number }} `environments` is the input itself
  *   when nothing changed; `migratedCount` counts the environments actually rewritten.
  */
-export function applyManualCompositionForceFold(environments) {
+export function applyManualCompositionForceFold(environments, options = {}) {
+  const { clearAutomaticForces = true } = options;
   if (!Array.isArray(environments)) return { environments, migratedCount: 0 };
 
   let migratedCount = 0;
   const next = environments.map((environment) => {
-    const migrated = migrateEnvironment(environment);
+    const migrated = migrateEnvironment(environment, clearAutomaticForces);
     if (migrated !== environment) migratedCount += 1;
     return migrated;
   });

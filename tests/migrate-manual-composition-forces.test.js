@@ -22,6 +22,7 @@ import {
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { environmentComposesRecord } from '../src/systems/gatheringComposition.js';
 
 /** The schema version `migrateExportPayload` upcasts to, read off the module under test. */
 const CURRENT_EXPORT_SCHEMA = migrateExportPayload({}).schemaVersion;
@@ -428,6 +429,58 @@ test('the export upcast applies the SAME fold, on a current-schema bundle', () =
 
   assert.deepEqual(upcast.gatheringEnvironments[0].enabledTaskIds, ['task-picked', 'task-forced']);
   assert.ok(!('forcedTaskIds' in upcast.gatheringEnvironments[0]));
+});
+
+test('an automatic force list composed NOTHING before the upgrade, so clearing it drops no record', () => {
+  // The migration's label promises a GM that no environment loses or gains a composed record, and
+  // the automatic half of that promise rests on a claim about the ENGINE, not about the editor:
+  // "force add never rendered in automatic mode" is a statement about the control, and a reader
+  // could reasonably wonder whether the engine honoured a force list anyway. It did not.
+  //
+  // Captured from the rule as it stood at be04f069, the commit this branch is based on:
+  //   automatic: matches && !disabled          — `forced*Ids` is not consulted at all
+  //   manual:    forced || (matches && enabled)
+  const composedBefore = (environment, record, mode, matches) => {
+    const id = String(record.id);
+    const list = (key) => (Array.isArray(environment[key]) ? environment[key].map(String) : []);
+    if (mode === 'manual') {
+      if (list('forcedTaskIds').includes(id)) return true;
+      return Boolean(matches) && list('enabledTaskIds').includes(id);
+    }
+    return Boolean(matches) && !list('disabledTaskIds').includes(id);
+  };
+
+  const residue = {
+    id: 'env-auto-residue',
+    compositionMode: 'automatic',
+    enabledTaskIds: [],
+    forcedTaskIds: ['task-forced'],
+  };
+  const record = { id: 'task-forced', enabled: true };
+
+  // Before: the force entry composed nothing, because automatic mode never read the list.
+  assert.equal(
+    composedBefore(residue, record, 'automatic', false),
+    false,
+    'an automatic force entry composed nothing before the upgrade'
+  );
+
+  // After the RULE change but before the migration, the same entry WOULD compose — which is
+  // precisely why the migration clears it rather than leaving it to activate silently.
+  assert.equal(
+    environmentComposesRecord(residue, record, 'task', 'automatic', false),
+    true,
+    'the new rule would honour it, which is what the clear exists to prevent'
+  );
+
+  // After the migration: no list, so nothing composes. Net across both, no record is gained.
+  const { environments } = applyManualCompositionForceFold([structuredClone(residue)]);
+  assert.ok(!('forcedTaskIds' in environments[0]), 'the residue is cleared');
+  assert.equal(
+    environmentComposesRecord(environments[0], record, 'task', 'automatic', false),
+    false,
+    'and the environment composes exactly what it composed before the upgrade: nothing'
+  );
 });
 
 test('the export upcast applies the SAME fold, on a legacy bundle', () => {

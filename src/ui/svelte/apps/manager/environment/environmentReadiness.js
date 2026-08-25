@@ -39,7 +39,10 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   // (manual mode has no match filter), so this is "how many picked records do not match" —
   // a note, not a fault, which is why the issue it raises is `info` rather than `critical`.
   const includedNotMatching = Number(counts.includedNotMatchingTasks || 0) + Number(counts.includedNotMatchingEvents || 0);
-  const noStaleIncluded = includedNotMatching === 0;
+  // Deliberately NOT a readiness check. The state is only ever assigned in manual mode, so a
+  // checklist item would tick vacuously in automatic and sit permanently unticked in manual for
+  // any GM using the feature as designed — telling them a correct environment falls short of
+  // something. The `info` issue below states the fact without grading it.
 
   const checks = [
     { id: 'hasName', satisfied: hasName },
@@ -47,8 +50,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     { id: 'hasBiome', satisfied: hasBiome },
     { id: 'hasDanger', satisfied: hasDanger },
     { id: 'hasCompositionMode', satisfied: hasCompositionMode },
-    { id: 'hasAvailableTask', satisfied: hasAvailableTask },
-    { id: 'noStaleIncluded', satisfied: noStaleIncluded }
+    { id: 'hasAvailableTask', satisfied: hasAvailableTask }
   ];
 
   const issues = [];

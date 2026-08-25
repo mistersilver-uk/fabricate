@@ -89,7 +89,7 @@
     ],
     staleIncluded: [
       'IssueStaleIncluded',
-      'The environment includes a record that does not match it.',
+      'The environment includes a record that does not match it, and composes it anyway.',
     ],
     noScene: ['IssueNoScene', 'The environment has no linked scene.'],
     noEventsAtDanger: [

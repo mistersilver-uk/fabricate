@@ -172,7 +172,9 @@ An automatic environment does not need a placeholder task when matching library 
 In automatic mode, Excluded and Non-matching are separate sections.
 Non-matching lists the records this environment's biome and danger filter rejected, and each enabled row offers **Force add** to compose it in spite of the filter; library-disabled rows offer an "enable in library first" note instead, because a record disabled in the library composes nowhere and no force can override that.
 A record you both force-add and exclude stays out: excluding wins.
-Switching from manual to automatic does not silently make force-added non-matching records available, because manual mode has no force add and so leaves no force list behind to carry across — and the upgrade that moved Force add into automatic mode cleared any force list an older version had left on an environment.
+Manual mode cannot create a force list — it has no Force add — and the upgrade that moved Force add into automatic mode cleared any force list an older version had left behind, so switching a manual environment to automatic does not conjure force-added records out of nothing.
+One case is worth knowing: if you force-add in automatic mode, switch that environment to manual, and later switch it back, the force list is still there and those records become available again.
+Switching modes does not clear your lists — that is what lets you switch back and forth without losing your work — so check the Non-matching list after switching if you are not sure what an environment carries.
 Automatic mode still honors records you explicitly excluded.
 
 **Weather and time-of-day are runtime gates, not matching criteria.**

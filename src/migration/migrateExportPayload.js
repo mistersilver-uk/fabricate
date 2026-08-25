@@ -330,10 +330,21 @@ function liftCharacterLibrariesToWorldScope(migrated) {
  * no force list.
  * @private
  */
-function foldManualCompositionForces(migrated) {
+function foldManualCompositionForces(migrated, { clearAutomaticForces }) {
   const environments = migrated?.gatheringEnvironments;
   if (!Array.isArray(environments)) return;
-  migrated.gatheringEnvironments = applyManualCompositionForceFold(environments).environments;
+  // The manual fold is unconditional: after issue 1315 no manual environment can carry a force
+  // list at all, so a manual one is pre-1315 by construction and folding it is always right.
+  //
+  // Clearing an AUTOMATIC force list is not, and the caller decides. On the LEGACY branch the
+  // bundle predates the schema marker, so its automatic force entries are residue and clearing
+  // them is the same one-time repair the world migration performs. On the CURRENT-SCHEMA branch
+  // there is no version left to gate on — that branch runs on every payload forever, including
+  // bundles exported long after 1315 — so clearing there would silently destroy a legitimate
+  // automatic-mode force list on every export/import round-trip, for the very feature 1315 adds.
+  migrated.gatheringEnvironments = applyManualCompositionForceFold(environments, {
+    clearAutomaticForces,
+  }).environments;
 }
 
 function seedFailureResultPolicy(migrated) {
@@ -366,7 +377,7 @@ export function migrateExportPayload(payload) {
     liftCurrencyToWorldScope(current);
     liftTravelToWorldScope(current);
     liftCharacterLibrariesToWorldScope(current);
-    foldManualCompositionForces(current);
+    foldManualCompositionForces(current, { clearAutomaticForces: false });
     return current;
   }
 
@@ -405,7 +416,7 @@ export function migrateExportPayload(payload) {
   liftCurrencyToWorldScope(migrated);
   liftTravelToWorldScope(migrated);
   liftCharacterLibrariesToWorldScope(migrated);
-  foldManualCompositionForces(migrated);
+  foldManualCompositionForces(migrated, { clearAutomaticForces: true });
 
   return migrated;
 }

@@ -81,9 +81,10 @@
       : entry?.runtimeState;
   }
 
-  // The four-state INCLUDED vocabulary, from its one home (issue 1321). It is not the
-  // three-state COMPOSED set: `includedNotMatching` belongs in this list because a manual
-  // pick composes whether or not it matches, and the GM still needs to see which is which.
+  // The INCLUDED vocabulary, from its one home (issue 1321). It answers "does the Included
+  // list show this", which is a different question from "does it compose" even though issue 1315
+  // leaves the two sets with the same four members: `includedNotMatching` belongs here because a
+  // manual pick composes whether or not it matches, and the GM still needs to see which is which.
   const included = $derived(
     records.filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
   );

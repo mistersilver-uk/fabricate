@@ -662,7 +662,11 @@ describe('evaluateEnvironmentReadiness', () => {
     assert.equal(stale.severity, 'info');
     assert.equal(stale.recordId, 'stale');
     assert.equal(stale.recordName, 'Picked Task');
-    assert.equal(checks.find(check => check.id === 'noStaleIncluded').satisfied, false);
+    assert.equal(
+      checks.find(check => check.id === 'noStaleIncluded'),
+      undefined,
+      'a deliberate non-matching pick is a note, not an unmet readiness check'
+    );
   });
 
   it('reports informational issues for locally excluded records', () => {

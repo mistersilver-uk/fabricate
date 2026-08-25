@@ -79,17 +79,17 @@ function validateEnvironmentForFakeCreate(environment) {
   // Mirrors GatheringEnvironmentStore#_environmentHasTaskSource (the ENABLE gate — "may this
   // environment be turned on" — not the composition rule in src/systems/gatheringComposition.js,
   // which answers a different question, "does this record compose"). enabledTaskIds counts as a
-  // task source in ANY mode (a stale allow-list still counts as authored intent); forcedTaskIds
-  // only counts in manual mode. That second guard is now BACKWARDS — issue #1315 moved force add
-  // to automatic mode, so a manual force list composes nothing — and it is mirrored here as the
-  // real gate still behaves, not as it should; see the divergence named in
-  // `tests/systems/gatheringComposition.test.js`'s site-4 arm. The real gate's
-  // remaining branch, "no ids but an automatic environment matches a library task", needs a
-  // gathering-library fixture this suite does not wire up, so it is intentionally not replicated
-  // here.
+  // task source in MANUAL mode only, because manual composition IS that list. Automatic mode
+  // ignores it and asks the composition predicate instead; that branch needs a gathering-library
+  // fixture this suite does not wire up, so it is intentionally not replicated here and the
+  // `.tasks` stand-in below covers those fixtures. A force list is not a task source in either
+  // mode: issue 1315 moved force add into automatic, where the predicate honours it, and manual
+  // never consults it.
   const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
-  const hasIdTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0)
-    || (compositionMode === 'manual' && Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0);
+  const hasIdTaskSource =
+    compositionMode === 'manual' &&
+    Array.isArray(environment.enabledTaskIds) &&
+    environment.enabledTaskIds.length > 0;
   // Real environments never carry an embedded `tasks` array as a task source — the production gate
   // above does not read `.tasks` at all, and an automatic-mode environment with no ids populated
   // instead falls to matching against the system's gathering library. This fixture predates that:

@@ -564,9 +564,10 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
   }
 
   it('classifies each record into a vocabulary state the rule would compose', async () => {
-    // Claim one of two: the STATE is right. `includedButUnavailable` is shown to the GM as an
-    // included row and is NOT composed, so the set this test re-projects through is the
-    // three-state `ENVIRONMENT_COMPOSED_COMPOSITION_STATES`, never the four-state included one.
+    // Claim one of two: the STATE is right. The set this test re-projects through is
+    // `ENVIRONMENT_COMPOSED_COMPOSITION_STATES` — the question is "does this row compose",
+    // which is not the same question as "does the Included list show it", even while issue 1315
+    // leaves the two sets with the same four members.
     //
     // Re-projecting HERE is what this test can prove and also exactly what it cannot: the
     // projection happens in the test, so the store could pick either set and this assertion would
@@ -596,10 +597,25 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
     // dimensions as `any`. If that ever stops being true this fails loudly here instead of
     // silently narrowing the assertion below to a subset nobody notices.
     //
-    // Swapping the store's projection to `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` is a real
-    // disagreement with the rule — the two sets differ exactly on `includedButUnavailable`, which
-    // is `manual && explicitlyIncluded && !matches` and does not compose — and it is invisible to
-    // the test above.
+    // What this second claim can and cannot prove, stated honestly. It reads the store's OWN
+    // projection (`runtimeState`) rather than re-deriving one, which is the shape that caught a
+    // real defect on issue 1321. But since 1315 the composed and included sets have the SAME four
+    // members — `includedNotMatching` joined the composed set when manual mode stopped filtering
+    // by match — so swapping the store to the included set changes no answer and neither claim
+    // would notice. The membership equality is asserted separately, and the symbol the store
+    // reads is pinned as source text below, which is what actually discriminates while the two
+    // sets coincide. If a later change parts them, this arm becomes discriminating on its own
+    // again with no edit.
+    const storeSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js'),
+      'utf8'
+    );
+    assert.ok(
+      storeSource.includes(
+        'const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);'
+      ),
+      'the store projects `composed` through the COMPOSED set, not the included one'
+    );
     for (const mode of MODES) {
       const rowsById = await classifiedRowsFor(mode);
       const conditionGated = [...rowsById.values()]
@@ -667,10 +683,9 @@ describe('site 3 — adminStore._environmentComposesGatheringRecord, through the
 });
 
 // ---------------------------------------------------------------------------
-// Site 4 — the enable gate. Only ONE of `_environmentHasTaskSource`'s three branches consumes the
-// predicate, and the arm is scoped to that branch on purpose: the two id-list guards ahead of it
-// answer a deliberately coarser question ("is there an explicit id parked here"), and converting
-// them would change the gate's behaviour twice over.
+// Site 4 — the enable gate. Since issue 1315 it has two branches and no mode-blind guard: manual
+// asks its own picked list, which is exactly what manual composes, and automatic delegates to the
+// predicate. The arm covers the automatic branch, where the predicate governs.
 // ---------------------------------------------------------------------------
 
 function makeEnvironmentStore(getConfig) {
@@ -694,9 +709,9 @@ const DECOY_TASK_ID = 'decoy-task-in-no-library';
  * One environment carrying exactly one record's listings — so a gate that answers "does ANY
  * library task compose here" answers the per-record question this matrix asks.
  *
- * `decoys` is off for the guard tests below on purpose: guard 1 fires on ANY non-empty
- * `enabledTaskIds` and guard 2 on any manual-mode `forcedTaskIds`, so a decoy in either would stop
- * the fallback ever being reached and quietly empty the delegation test.
+ * `decoys` is off for the gate tests below on purpose: the manual branch answers on any non-empty
+ * `enabledTaskIds`, so a decoy there would stop the automatic delegation ever being reached and
+ * quietly empty the delegation test.
  */
 function soleRecordEnvironment(entry, { decoys = false } = {}) {
   const base = decoys ? [DECOY_TASK_ID] : [];
@@ -733,10 +748,10 @@ describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
     );
   });
 
-  it('_environmentHasTaskSource delegates to it wherever the two coarse guards do not fire', () => {
-    // Guard 1 is `enabledTaskIds.length > 0` in ANY mode and guard 2 is a manual-mode
-    // `forcedTaskIds`; the fallback governs everything else. This pins the delegation, so a
-    // conversion that reached the predicate but never got called still fails.
+  it('_environmentHasTaskSource delegates to it in automatic mode', () => {
+    // Manual answers from its own picked list; automatic has no list to consult and delegates.
+    // This pins the delegation, so a conversion that imported the predicate but never called it
+    // still fails.
     let config = {};
     const store = makeEnvironmentStore(() => config);
     const delegating = CASES.filter(
@@ -883,9 +898,13 @@ describe('site 6 — the admin-store-environments fake enable gate', () => {
     const collapsed = suite.replaceAll(/\s+/g, ' ');
     assert.ok(
       collapsed.includes(
-        "const hasIdTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0) || (compositionMode === 'manual' && Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0);"
+        "const hasIdTaskSource = compositionMode === 'manual' && Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0;"
       ),
-      'the fake still computes the enable gate as the two id-list guards, unchanged'
+      'the fake computes the enable gate as the real one does: manual asks its own picked list'
+    );
+    assert.ok(
+      !collapsed.includes('environment.forcedTaskIds.length > 0)'),
+      'and the fake no longer treats a force list as a task source in either mode'
     );
     assert.ok(
       collapsed.includes(
@@ -1251,8 +1270,8 @@ describe('the seam — activeEnvironmentsForRecord against the real lab world', 
 describe('the seam — the conditions axis', () => {
   // Two kinds of case, because the conditions arguments are the part that decides the number and
   // each of the two is wrong in a way that fails SILENTLY. Sites 1, 3, 4, 6 and 7 consume the
-  // condition-BLIND predicate and site 2's arm projects onto the three-state `composed` set rather
-  // than the condition-aware `runtimeState`, so the axis belongs here and nowhere else.
+  // condition-BLIND predicate, and site 2's arm projects onto the `composed` set rather than the
+  // condition-aware `runtimeState`, so the axis belongs here and nowhere else.
   const environments = [
     { id: 'env-a', compositionMode: 'automatic', biomes: ['forest'], dangerTags: ['safe'] },
   ];

@@ -162,10 +162,10 @@ Runtime tasks are composed exclusively from the system task library (via `enable
 It may only be **enabled** when it has at least one composed task source (in automatic mode, a library task that matches or is listed in `forcedTaskIds`, and is not listed in `disabledTaskIds`; in manual mode, an `enabledTaskIds` entry), in either `targeted` or `blind` selection mode.
 A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists.
 This gates enable, not save.
-3a. **Known gap (restated by #1315, still open):** the enable gate's first two guards in `GatheringEnvironmentStore._environmentHasTaskSource` do not go through `environmentComposesRecord`, and both now admit an id list the mode they fire in ignores.
-The first accepts a non-empty `enabledTaskIds` in **any** composition mode, although automatic mode ignores that list; the second accepts a non-empty `forcedTaskIds` in **manual** mode, although manual mode ignores that list as of #1315, which is the mirror image of the same divergence rather than a new one.
-Both are intentionally preserved as a coarser check ("is there an explicit id parked here") distinct from the compose predicate ("does this record actually compose"), and both fail in the permissive direction only: they let a GM enable an environment that composes nothing, never refuse one that composes something.
-The gate's automatic branch is not affected, because it calls `environmentComposesRecord` and therefore already accepts a forced non-matching task as a task source.
+3a. **Closed by #1315** (recorded here because #1321 deferred it to that issue): the enable gate no longer carries a mode-blind guard.
+It asks each mode its own question — manual for a non-empty `enabledTaskIds`, which is exactly what manual composes, and automatic through `environmentComposesRecord`, which is exactly what automatic composes.
+The two guards it retired both failed permissively: one accepted a non-empty `enabledTaskIds` in automatic mode, which ignores that list, and the other accepted a non-empty `forcedTaskIds` in manual mode, which ignores that list as of #1315.
+Closing them means the gate now refuses some environments it used to accept — an automatic environment whose only matching task is excluded no longer reports a task source — which is the point: it composes nothing.
 4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`); there is no inline task definition.
 Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.

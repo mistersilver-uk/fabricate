@@ -35,7 +35,6 @@
     hasDanger: ['CheckDanger', 'Has a danger level'],
     hasCompositionMode: ['CheckCompositionMode', 'Has a composition mode'],
     hasAvailableTask: ['CheckAvailableTask', 'Has at least one available task'],
-    noStaleIncluded: ['CheckNoStale', 'All included tasks and events match this environment'],
   };
   const ISSUE_LABELS = {
     noAvailableTasks: ['IssueNoAvailableTasks', 'No tasks are available to players.'],
