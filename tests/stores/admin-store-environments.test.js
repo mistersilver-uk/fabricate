@@ -76,11 +76,26 @@ function makeEnvironment(overrides = {}) {
 function validateEnvironmentForFakeCreate(environment) {
   const errors = [];
   const reservedResultGroups = new Set(['f', 'fail', 'failed', 'failure', 'miss', 'missed', 'm', 'none', 'nothing', 'whiff', 'whiffed', 'hazard', 'danger', 'complication', 'trap', 'oops']);
-  // An environment is a valid task source via its enabled/forced library-task ids
-  // (tasks are matched in from the system library, not authored on the environment).
-  const hasTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0)
-    || (Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0)
-    || (Array.isArray(environment.tasks) && environment.tasks.length > 0);
+  // Mirrors GatheringEnvironmentStore#_environmentHasTaskSource (the ENABLE gate — "may this
+  // environment be turned on" — not the composition rule in src/systems/gatheringComposition.js,
+  // which answers a different question, "does this record compose"). enabledTaskIds counts as a
+  // task source in ANY mode (a stale allow-list still counts as authored intent); forcedTaskIds
+  // only counts in manual mode — an automatic environment's forcedTaskIds, if ever populated, is
+  // not consulted by the real gate, since forces are a manual-mode affordance. The real gate's
+  // remaining branch, "no ids but an automatic environment matches a library task", needs a
+  // gathering-library fixture this suite does not wire up, so it is intentionally not replicated
+  // here.
+  const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
+  const hasIdTaskSource = (Array.isArray(environment.enabledTaskIds) && environment.enabledTaskIds.length > 0)
+    || (compositionMode === 'manual' && Array.isArray(environment.forcedTaskIds) && environment.forcedTaskIds.length > 0);
+  // Real environments never carry an embedded `tasks` array as a task source — the production gate
+  // above does not read `.tasks` at all, and an automatic-mode environment with no ids populated
+  // instead falls to matching against the system's gathering library. This fixture predates that:
+  // most environments here are still built with `makeEnvironment()`'s embedded `tasks` default and
+  // no gathering-library fixture, so a non-empty `.tasks` array is accepted here as a TEST-ONLY
+  // stand-in for "this environment has a real task source" — a shape production never produces or
+  // recognizes for this purpose.
+  const hasTaskSource = hasIdTaskSource || (Array.isArray(environment.tasks) && environment.tasks.length > 0);
   // A task source is only required to ENABLE an environment; a disabled draft may
   // be saved without one (issue #298).
   if (environment.enabled !== false && !hasTaskSource) {

@@ -26,6 +26,10 @@
  * pre-roll, so without it no frame and no parity region could show a complication that has fired.
  */
 
+import {
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from '../../../src/systems/gatheringComposition.js';
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
@@ -125,20 +129,46 @@ function resolveBlindDraw(environments) {
 /**
  * The first environment matching `predicate`, and one task it composes.
  *
+ * This module has no gathering task library to test biome/danger matches against — `buildLabRunStates`
+ * is called with `environments` only, not the system's task records — so it cannot resolve automatic
+ * mode's actual composed set: `matches − disabled`, bounded by NO id list at all (see
+ * `gatheringComposition.js`). The only candidates available here are the environment's own declared
+ * `enabledTaskIds` and `forcedTaskIds`, so the pool this function draws from is their union, which the
+ * lab world's authoring convention keeps a superset of what really composes — it is a stand-in for a
+ * real task library, not a claim that either list bounds automatic composition.
+ *
+ * `environmentComposesRecord` is still the arbiter of which pool candidate survives, called with
+ * `matches: true` for every candidate (pool membership is the only evidence this function has, so it
+ * is asserted rather than computed). That makes the predicate's real job here the mode split: a manual
+ * environment keeps every pool candidate (`enabled ∪ forced` IS manual composition), while an
+ * automatic one additionally drops anything the environment explicitly excludes via `disabledTaskIds`
+ * — the exclusion the raw union alone did not know to apply.
+ *
+ * Exported so a drift test can import and mutate it directly against a task-id-only fixture, the same
+ * way it is used here.
+ *
  * @param {object[]} environments Persisted environment records from `labContent`.
  * @param {Function} predicate Which environment to take.
  * @param {string} description What was being looked for, for the failure message.
  * @param {string|null} [avoid] A task id to pass over when the environment composes another.
  * @returns {{environment: object, taskId: string}} The environment and a task composed in it.
  */
-function resolveDraw(environments, predicate, description, avoid = null) {
+export function resolveDraw(environments, predicate, description, avoid = null) {
   const environment = (environments ?? []).find((entry) => predicate(entry));
   if (!environment) {
     throw new Error(`labRunStates: the lab world declares no ${description} gathering environment`);
   }
-  // `compositionMode: 'manual'` puts the composed set in `forcedTaskIds`; an automatic environment
-  // lists them in `enabledTaskIds`. Either is the real set of tasks that environment can yield.
-  const composed = environment.forcedTaskIds ?? environment.enabledTaskIds ?? [];
+  const declaredTaskIds = (key) => {
+    const value = environment?.[key];
+    return Array.isArray(value) ? value : [];
+  };
+  const pool = [
+    ...new Set([...declaredTaskIds('enabledTaskIds'), ...declaredTaskIds('forcedTaskIds')]),
+  ];
+  const mode = resolveGatheringCompositionMode(environment);
+  const composed = pool.filter((id) =>
+    environmentComposesRecord(environment, { id, enabled: true }, 'task', mode, true)
+  );
   // `avoid` keeps the completed run off the blind run's drawn task. Not cosmetic: the GM frame is
   // read by comparing the secret preview against the rows around it, and a history row carrying the
   // same task name makes "the GM sees the drawn task" indistinguishable from a coincidence.
