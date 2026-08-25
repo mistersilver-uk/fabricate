@@ -44,6 +44,16 @@ const overviewSource = read('EnvironmentOverviewTab.svelte');
 const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
 const rightInspectorSource = read('EnvironmentRightInspector.svelte');
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+// The four-state "included" composition vocabulary has ONE home (issue #1321):
+// `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` in `src/systems/gatheringComposition.js`. The editor
+// shell and the composition list both import it instead of re-listing its members, so the
+// assertions that used to mirror those four state literals pin the IMPORT instead. Written as a
+// whitespace-tolerant regex because Prettier prints an import list on one line or several
+// depending on the importing file's path depth, and a needle that only matched one of those
+// spellings would go quietly green the day the other one was printed.
+const SHARED_INCLUDED_STATES_IMPORT =
+  /import\s*\{[^}]*\bENVIRONMENT_INCLUDED_COMPOSITION_STATES\b[^}]*\}\s*from\s*'[^']*systems\/gatheringComposition\.js'/;
+
 const editorLocalizationSources = [
   ['EnvironmentEditView.svelte', shellSource],
   ...readdirSync(envDir)
@@ -398,8 +408,12 @@ describe('environment composition editor structure', () => {
   it('manual mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
     // The included section must never surface addable/non-matching records; those
     // belong to the Available-to-add list in manual mode.
-    assert.ok(listSource.includes("entry.compositionState === 'includedByMatch'"), 'included section keys off includedByMatch');
-    assert.ok(listSource.includes("entry.compositionState === 'forceIncluded'"), 'included section also surfaces force-included records');
+    // Was two literal-state needles (`includedByMatch`, `forceIncluded`). The list no longer
+    // spells its four states out, so what is pinned here is that it reads the shared set —
+    // and MEMBERSHIP of that set, including force-included records, is asserted exactly in
+    // `tests/systems/gatheringComposition.test.js`.
+    assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(listSource), 'included section keys off the shared four-state included vocabulary');
+    assert.ok(listSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)'), 'included section filters records through that shared set');
     assert.ok(listSource.includes("availableToAddMatching"), 'manual mode has a matching available-to-add group');
     assert.ok(listSource.includes("availableToAddNonMatching"), 'manual mode has a non-matching available-to-add group');
     assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual mode has a library-disabled available-to-add group');
@@ -489,15 +503,26 @@ describe('environment composition editor structure', () => {
   it('tab badges count composition membership and split validation severities', () => {
     assert.ok(!shellSource.includes('tasks: counts.availableTasks || 0'), 'Tasks badge should not use runtime availableTasks');
     assert.ok(!shellSource.includes('events: counts.availableEvents || 0'), 'Events badge should not use runtime availableEvents');
-    assert.ok(shellSource.includes('countComposedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
-    assert.ok(shellSource.includes('countComposedRecords(composition?.events)'), 'Events badge should derive from event composition records');
-    for (const state of ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable']) {
-      assert.ok(shellSource.includes(`'${state}'`), `composition badge count should include ${state}`);
-    }
-    const includedStateSet = shellSource.match(/const INCLUDED_COMPOSITION_STATES = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
-    for (const state of ['excluded', 'candidate', 'notMatching', 'libraryDisabled']) {
-      assert.ok(!includedStateSet.includes(`'${state}'`), `composition badge count should not include ${state}`);
-    }
+    // RENAMED from `countComposedRecords` (issue #1321). It filters the four-state INCLUDED
+    // set and always did; `includedButUnavailable` is shown as an included row and is NOT
+    // composed. With both sets now exported one declaration apart from
+    // `src/systems/gatheringComposition.js`, the old name was an instruction to swap the
+    // import and silently drop a row from both badges. The negative carries a trailing `(`
+    // so it forbids the CALL and the DECLARATION while leaving the source comment that
+    // records the rename free to name it.
+    assert.ok(shellSource.includes('countIncludedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
+    assert.ok(shellSource.includes('countIncludedRecords(composition?.events)'), 'Events badge should derive from event composition records');
+    assert.ok(!shellSource.includes('countComposedRecords('), 'the badge count no longer carries a name that says "composed" while counting "included"');
+    // These three replace a `shellSource.match(/const INCLUDED_COMPOSITION_STATES = .../)?.[0] || ''`
+    // capture that fed four NEGATIVE assertions. The moment the shell stopped declaring that Set,
+    // the capture would have been `''` and all four would have passed VACUOUSLY — green while
+    // proving nothing. A POSITIVE assertion on the shared import cannot fail that way. What the
+    // negatives guarded — `excluded` / `candidate` / `notMatching` / `libraryDisabled` absent from
+    // the included set — is restored and strengthened to exact membership of all three exported
+    // sets in `tests/systems/gatheringComposition.test.js`, which imports them.
+    assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(shellSource), 'badge count imports the shared four-state included vocabulary');
+    assert.ok(shellSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)'), 'badge count filters composition records through that shared set');
+    assert.ok(!shellSource.includes('const INCLUDED_COMPOSITION_STATES'), 'the shell no longer keeps a second copy of the included vocabulary');
     assert.ok(shellSource.includes("issue.severity === 'critical'"), 'validation error badge should count critical issues');
     assert.ok(shellSource.includes("issue.severity === 'warning'"), 'validation warning badge should count warning issues');
     assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');

@@ -3967,6 +3967,7 @@
             "IncludedButUnavailable": "Included but unavailable",
             "NotMatching": "Not matching",
             "LibraryDisabled": "Library disabled",
+            "UnknownState": "Unrecognised state",
             "Unnamed": "Unnamed",
             "NoDescription": "No description",
             "IncludedInEnvironment": "Included in this environment",

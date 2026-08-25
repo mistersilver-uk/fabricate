@@ -57,6 +57,16 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (active && !hasAvailableTask) {
     issues.push({ id: 'activeNoComposition', severity: 'critical', blocks: 'enable' });
   }
+  // This literal STAYS a literal (issue #1321). Its neighbours in the editor now import
+  // `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` from `src/systems/gatheringComposition.js`;
+  // this one deliberately does not, for two reasons. It tests a SINGLE state rather than
+  // membership of a set, so there is no set to share — and this module's contract, stated
+  // at the top of the file, is that it has no Svelte, Foundry or store dependencies and
+  // therefore no import graph to grow. More importantly it is the one home in this
+  // vocabulary where a state nobody registered does not render wrongly: it silently stops
+  // raising `staleIncluded`, and an environment that should be blocked ships enabled. The
+  // guard is `tests/systems/gatheringComposition.test.js`, which calls the exported
+  // predicate once per state in the vocabulary rather than trusting this line to notice.
   for (const entry of [...tasks, ...events]) {
     if (entry.compositionState === 'includedButUnavailable') {
       issues.push({ id: 'staleIncluded', severity: 'critical', recordKind: entry.kind, recordId: entry.id, recordName: entry.record?.name || entry.id });

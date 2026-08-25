@@ -14,6 +14,7 @@
   import Pagination from '../../../components/Pagination.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../../systems/gatheringComposition.js';
 
   let {
     kind = 'task',
@@ -80,14 +81,11 @@
       : entry?.runtimeState;
   }
 
+  // The four-state INCLUDED vocabulary, from its one home (issue #1321). It is not the
+  // three-state COMPOSED set: `includedButUnavailable` belongs in this list precisely
+  // because it does not compose, so the GM can see the stale entry and fix it.
   const included = $derived(
-    records.filter(
-      (entry) =>
-        entry.compositionState === 'includedByMatch' ||
-        entry.compositionState === 'explicitlyIncluded' ||
-        entry.compositionState === 'forceIncluded' ||
-        entry.compositionState === 'includedButUnavailable'
-    )
+    records.filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
   );
   const includedWeightTotal = $derived(
     included.reduce((total, entry) => total + weightFor(entry.id), 0)

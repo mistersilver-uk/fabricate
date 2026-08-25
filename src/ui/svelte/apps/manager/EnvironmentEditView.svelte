@@ -19,13 +19,7 @@
   import EnvironmentValidationTab from './environment/EnvironmentValidationTab.svelte';
   import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
   import { evaluateEnvironmentReadiness } from './environment/environmentReadiness.js';
-
-  const INCLUDED_COMPOSITION_STATES = new Set([
-    'includedByMatch',
-    'explicitlyIncluded',
-    'forceIncluded',
-    'includedButUnavailable',
-  ]);
+  import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../systems/gatheringComposition.js';
 
   let {
     environmentDraft = null,
@@ -68,9 +62,18 @@
     activeTab = kind === 'event' ? 'events' : 'tasks';
   }
 
-  function countComposedRecords(records = []) {
+  // INCLUDED, not COMPOSED — the tab badges count what the Included list SHOWS, which is
+  // the four-state set: `includedButUnavailable` is displayed as an included row (so the
+  // GM can see and fix the stale entry) but is NOT composed at runtime. This was named
+  // `countComposedRecords` while filtering the included set, and now that
+  // `src/systems/gatheringComposition.js` exports both sets one line apart, that name was
+  // an invitation to "correct" the import to the three-state composed set and silently
+  // drop a row from every badge (issue #1321).
+  function countIncludedRecords(records = []) {
     return Array.isArray(records)
-      ? records.filter((entry) => INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)).length
+      ? records.filter((entry) =>
+          ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)
+        ).length
       : 0;
   }
 
@@ -96,8 +99,8 @@
   const readiness = $derived(
     evaluateEnvironmentReadiness(environmentDraft || {}, composition || {})
   );
-  const taskCompositionCount = $derived(countComposedRecords(composition?.tasks));
-  const eventCompositionCount = $derived(countComposedRecords(composition?.events));
+  const taskCompositionCount = $derived(countIncludedRecords(composition?.tasks));
+  const eventCompositionCount = $derived(countIncludedRecords(composition?.events));
   const errorCount = $derived(
     readiness.issues.filter((issue) => issue.severity === 'critical').length
   );
