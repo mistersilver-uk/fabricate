@@ -35,10 +35,9 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     || Boolean(trimmed(environment?.risk));
   const hasCompositionMode = environment?.compositionMode === 'manual' || environment?.compositionMode === 'automatic' || environment?.compositionMode === undefined;
   const hasAvailableTask = Number(counts.availableTasks || 0) > 0;
-  // `counts.unavailable*` is the admin store's tally of `includedNotMatching` rows. Since
-  // issue #1315 those rows COMPOSE (manual mode has no match filter), so the producer's
-  // field name outlives its meaning; renaming it is the store's to do, not this consumer's.
-  // Read here purely as "how many picked records do not match", which is a note, not a fault.
+  // The store's tally of `includedNotMatching` rows. Since issue 1315 those rows COMPOSE
+  // (manual mode has no match filter), so this is "how many picked records do not match" —
+  // a note, not a fault, which is why the issue it raises is `info` rather than `critical`.
   const includedNotMatching = Number(counts.includedNotMatchingTasks || 0) + Number(counts.includedNotMatchingEvents || 0);
   const noStaleIncluded = includedNotMatching === 0;
 
@@ -61,7 +60,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (active && !hasAvailableTask) {
     issues.push({ id: 'activeNoComposition', severity: 'critical', blocks: 'enable' });
   }
-  // `info`, NOT `critical` (issue #1315). Manual mode composes exactly the GM's picked
+  // `info`, NOT `critical` (issue 1315). Manual mode composes exactly the GM's picked
   // list with no match filter, so a picked record that does not match still runs — it is a
   // deliberate choice, not stale state. Raising a critical error here told the GM to undo
   // the thing the product's own contract invites, which is worse than not checking at all.

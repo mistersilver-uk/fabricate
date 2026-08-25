@@ -59,7 +59,7 @@ export const COMPOSITION_STATE_META = Object.freeze({
     fallback: 'Matching candidate',
   },
   excluded: { tone: 'danger', icon: 'fas fa-ban', key: 'Excluded', fallback: 'Excluded' },
-  // Manual mode has no match filter (issue #1315), so a picked record that does not
+  // Manual mode has no match filter (issue 1315), so a picked record that does not
   // match its environment COMPOSES. The chip therefore states a fact, not a fault: the
   // `info` tone and `fas fa-circle-info` glyph read as a note rather than the amber
   // `warning` + `fas fa-triangle-exclamation` this entry carried while the state meant

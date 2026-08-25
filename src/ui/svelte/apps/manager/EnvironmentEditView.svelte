@@ -63,7 +63,7 @@
   }
 
   // INCLUDED, not COMPOSED — the tab badges count what the Included list SHOWS. The two
-  // sets hold the same four members today (issue #1315 made `includedNotMatching` compose),
+  // sets hold the same four members today (issue 1315 made `includedNotMatching` compose),
   // but they answer different questions — "shown in the Included list" versus "composes at
   // runtime" — and the next change to the vocabulary can part them again. This was named
   // `countComposedRecords` while filtering the included set, and now that

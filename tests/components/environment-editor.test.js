@@ -326,7 +326,7 @@ describe('environment composition editor structure', () => {
   });
 
   it('the runtime preview inspector carries the full runtime counts', () => {
-    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-events', 'excluded-events', 'unavailable-included']) {
+    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-events', 'excluded-events', 'included-not-matching']) {
       assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
     }
     assert.ok(summaryInspectorSource.includes('manager-fact-grid manager-environment-runtime-grid'), 'runtime preview uses the shared inspector fact grid');
@@ -635,7 +635,7 @@ describe('evaluateEnvironmentReadiness', () => {
 
   it('does not block enabling when only advisory issues are present', () => {
     const composition = {
-      counts: { availableTasks: 1, unavailableTasks: 1 },
+      counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
       tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
       events: []
     };
@@ -652,7 +652,7 @@ describe('evaluateEnvironmentReadiness', () => {
     // a critical error told the GM to undo what the product's own contract invites. The note
     // survives because the Included list would otherwise show it identically to a matching pick.
     const composition = {
-      counts: { availableTasks: 1, unavailableTasks: 1 },
+      counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
       tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
       events: []
     };

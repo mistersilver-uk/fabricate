@@ -20661,7 +20661,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         },
         composition: {
           compositionMode: 'automatic',
-          counts: { availableTasks: 1, unavailableEvents: 1, availableEvents: 0 },
+          counts: { availableTasks: 1, includedNotMatchingEvents: 1, availableEvents: 0 },
           tasks: [
             {
               id: 'task-moon-herbs',
@@ -20785,7 +20785,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         },
         composition: {
           compositionMode: 'automatic',
-          counts: { availableTasks: 0, availableEvents: 0, unavailableEvents: 1 },
+          counts: { availableTasks: 0, availableEvents: 0, includedNotMatchingEvents: 1 },
           tasks: [
             {
               id: 'task-rain-herbs',

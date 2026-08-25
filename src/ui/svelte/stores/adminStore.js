@@ -3647,7 +3647,7 @@ export function createAdminStore(services) {
         { includeDanger, conditionSettings }
       );
       // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
-      // issue #1315); manual mode has no filter to override, so it has neither.
+      // issue 1315); manual mode has no filter to override, so it has neither.
       const excluded = compositionMode !== 'manual' && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
       const forceIncluded = compositionMode !== 'manual' && forced.includes(id);

@@ -197,7 +197,7 @@ export function conditionSettingsToCurrent(settings) {
  * reproducing `GatheringRichStateService.composeEnvironment`'s filter chain.
  *
  * Force add and exclude belong to **automatic** mode only (maintainer ruling,
- * issue #1315); manual mode has no filter to override, so it has neither.
+ * issue 1315); manual mode has no filter to override, so it has neither.
  *
  * - **automatic**: `(matches ∪ forced*Ids) − disabled*Ids`. Force and exclude are
  *   its two overrides of its own match filter, and they can collide on the same
