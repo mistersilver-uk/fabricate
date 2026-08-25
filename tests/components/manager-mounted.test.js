@@ -495,7 +495,21 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);
   }
-  for (const environmentModule of ['environmentReadiness.js']) {
+  for (const environmentModule of [
+    'environmentReadiness.js',
+    // The per-state tone / glyph / copy map (issue 1321), extracted out of
+    // `CompositionStatePill.svelte` so the composition-state vocabulary can be asserted
+    // against it — a plain `<script>` local in a compiled component is not reachable from a
+    // test. The pill is compiled into this tree, so this is a STATIC import of the mounted
+    // graph, and the map is import-free by design, so this single entry closes that edge.
+    // This suite hand-rolls its temp tree with NO dependency validator, so omitting it does
+    // not fail one test: every mounted manager test is reported as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND in the hook. `tests/components/record-inspector-node-max.test.js`
+    // registers the same module through `createMountedComponentHarness`, whose closure
+    // validator names the missing file instead — the asymmetry is the reason an omission
+    // here is more dangerous than a normal test break.
+    'compositionStateMeta.js',
+  ]) {
     const moduleDestination = join(
       tempRoot,
       `src/ui/svelte/apps/manager/environment/${environmentModule}`
@@ -735,6 +749,16 @@ function compileManagerRoot() {
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js',
+    // The ONE answer to "does this record compose into this environment?" (issue 1321) and
+    // the match evaluator it delegates to. THREE importers put the first in this root's
+    // static graph — the root itself, which reads both "Active environments" facts through
+    // `activeEnvironmentsForRecord`, plus `EnvironmentEditView` and `CompositionList` — and
+    // it statically imports the second, which is import-free, so these two entries close
+    // that subgraph. Same rule as the rest of this list: no dependency validator, so
+    // omitting either reports every mounted manager test as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND rather than failing one.
+    'src/systems/gatheringComposition.js',
+    'src/systems/gatheringMatch.js',
     // adminStore imports classifyModeChange from this pure migration module to
     // dry-run migrate/delete counts before a resolution-mode change; copy it so the
     // mounted import resolves.
@@ -1694,9 +1718,13 @@ function createStore(calls = [], options = {}) {
       },
     ],
   };
+  // `gatheringEventFactEnvironments` is opt-in only: every other test keeps reading the
+  // fixed two-environment fixture below, and only the site-10 discrimination test (issue
+  // 1321) supplies its own set to make the "Active environments" event fact distinguish
+  // `kind: 'event'` from `'task'` and a correct `conditionSettings` shape from a wrong one.
   const environments = options.emptyEnvironments
     ? []
-    : [
+    : options.gatheringEventFactEnvironments || [
         environmentDraft,
         {
           id: 'env-cavern',
@@ -1980,7 +2008,13 @@ function createStore(calls = [], options = {}) {
           conditions: {
             weather: {
               enabled: true,
-              current: 'clear',
+              // Opt-in override (issue 1321): the site-10 discrimination test moves this off
+              // its default so a `conditionSettings`-shape bug (passing the converted
+              // `{weather, timeOfDay}` current shape instead of the settings shape) is
+              // observable — the wrong shape falls back to `conditionSettingsToCurrent`'s
+              // hard-coded default, which is this same default value, so leaving every other
+              // test on it would make that failure mode silent everywhere.
+              current: options.gatheringEventFactWeather || 'clear',
               values: [
                 { id: 'clear', label: 'Clear Sky', icon: 'fas fa-sun' },
                 { id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' },
@@ -14386,6 +14420,131 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-environment-editor-shell .manager-environment-edit-view')
     );
     assert.ok(target.textContent.includes('Quiet Cavern'));
+  });
+
+  // Site 10 (issue 1321): the gathering EVENT browser's "Active environments" fact, the task
+  // fact's twin one nav item over. Both now read `activeEnvironmentsForRecord(record, kind,
+  // scopedEnvironments)` through the root's `activeGatheringEventEnvironmentCount`, and this
+  // fixture is built to make three silent regressions loud rather than merely rendering SOME
+  // number:
+  //
+  //   1. `kind: 'event'` swapped for `'task'` — `includeDanger` goes false, so a `deadly`
+  //      event stops being excluded by a `safe` environment.
+  //   2. `conditionSettings` handed the converted `{weather, timeOfDay}` CURRENT shape
+  //      instead of the settings shape — `conditionSettingsToCurrent` reads `.current` off a
+  //      string, gets `undefined`, and falls back to its own hard-coded default. The fixture
+  //      moves the system's current weather off that default (`gatheringEventFactWeather`)
+  //      so the fallback is a wrong answer, not an accidental match.
+  //   3. The `environment.enabled !== false` scoping filter regressing (covered by the
+  //      `env-thorn-disabled` environment below, which composes on every other axis and must
+  //      still read zero).
+  //
+  // Four composing candidates plus one disabled one, correct answer 2 — neither "all" nor
+  // "one" — so an off-by-everything mutation is visible in the rendered integer alone.
+  it('computes the gathering event browser\'s "Active environments" fact through the shared seam', async () => {
+    const calls = [];
+    const gatheringEventFactEnvironments = [
+      {
+        id: 'env-thorn-a',
+        craftingSystemId: 'alchemy',
+        name: 'Stormlit Thicket',
+        enabled: true,
+        biomes: ['forest'],
+        dangerLevel: 'deadly',
+      },
+      {
+        id: 'env-thorn-b',
+        craftingSystemId: 'alchemy',
+        name: 'Ashen Hollow',
+        enabled: true,
+        biomes: ['forest'],
+        dangerLevel: 'extreme',
+      },
+      // Composes on biome but NOT danger under the real `kind: 'event'` rule (a `deadly`-tagged
+      // event needs an environment ranked `deadly` or above). If `'event'` regresses to
+      // `'task'`, `includeDanger` goes false, danger stops mismatching, and this environment
+      // wrongly joins the count — the failure mode 1 mutation below proves it does.
+      {
+        id: 'env-thorn-safe',
+        craftingSystemId: 'alchemy',
+        name: 'Quiet Meadow',
+        enabled: true,
+        biomes: ['forest'],
+        dangerLevel: 'safe',
+      },
+      // Wrong biome: excluded on every axis, a control against an accidental all-inclusive
+      // seam.
+      {
+        id: 'env-thorn-cavern',
+        craftingSystemId: 'alchemy',
+        name: 'Silent Cavern',
+        enabled: true,
+        biomes: ['cavern'],
+        dangerLevel: 'deadly',
+      },
+      // Matches biome, danger AND conditions, but is disabled: proves the component's own
+      // `environment.enabled !== false` scoping filter (not the shared seam) still applies.
+      {
+        id: 'env-thorn-disabled',
+        craftingSystemId: 'alchemy',
+        name: 'Fogbound Hollow (disabled)',
+        enabled: false,
+        biomes: ['forest'],
+        dangerLevel: 'deadly',
+      },
+    ];
+    const gatheringEventFactEvent = {
+      id: 'event-storm-omen',
+      name: 'Storm Omen',
+      description: 'A deadly squall drives dangerous game to shelter.',
+      img: 'icons/svg/hazard.svg',
+      enabled: true,
+      dropRate: 15,
+      biomes: ['forest'],
+      // Non-empty and satisfied only by the overridden current weather below: a
+      // `conditionSettings`-shape bug collapses `conditionsMet` to false for every
+      // environment, so this is what turns failure mode 2 into a visible `0`.
+      weather: ['heavy-rain'],
+      timeOfDay: [],
+      dangerTags: ['deadly'],
+    };
+
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringLibraryEvents: [gatheringEventFactEvent],
+          gatheringEventFactEnvironments,
+          gatheringEventFactWeather: 'heavy-rain',
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Events').click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      target.querySelector('[data-gathering-events-browser]'),
+      'Events tab should mount the event library browser'
+    );
+    assert.ok(
+      target.textContent.includes('Storm Omen'),
+      'the single library event should be auto-selected into the inspector'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-event-fact="environments"] strong').textContent.trim(),
+      '2',
+      'the event fact should count only the environments the shared seam composes: matching ' +
+        'biome AND danger AND current conditions, scoped to enabled environments in this system'
+    );
   });
 
   it('renders permanent World Parties, Travel and Currency entries', async () => {

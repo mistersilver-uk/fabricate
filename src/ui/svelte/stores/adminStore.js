@@ -88,6 +88,13 @@ import {
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import {
+  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
+  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
+  conditionSettingsToCurrent,
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from '../../../systems/gatheringComposition.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
@@ -248,12 +255,8 @@ const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
-const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
-  'includedByMatch',
-  'explicitlyIncluded',
-  'forceIncluded',
-  'includedButUnavailable',
-]);
+// ENVIRONMENT_INCLUDED_COMPOSITION_STATES is imported from gatheringComposition.js — the
+// module that now owns the full composition-state vocabulary — rather than defined here.
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -3448,19 +3451,6 @@ export function createAdminStore(services) {
     }).matches;
   }
 
-  function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    if (disabled.includes(String(recordId))) return false;
-    return enabled.length === 0 || enabled.includes(String(recordId));
-  }
-
   /**
    * Classify every library task/event for the given environment into a
    * `CompositionState` + `RuntimeState` plus match evidence, honoring
@@ -3489,7 +3479,7 @@ export function createAdminStore(services) {
       ])
     );
     const conditionSettings = system.conditions || null;
-    const conditions = _gatheringCurrentConditions(conditionSettings);
+    const conditions = conditionSettingsToCurrent(conditionSettings);
     const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
 
     const tasks = _classifyCompositionRecords({
@@ -3678,11 +3668,12 @@ export function createAdminStore(services) {
       else compositionState = 'includedByMatch';
 
       // A record is runtime-available only when its composition state would compose it AND
-      // the current weather/time satisfy the record's required conditions.
-      const composed =
-        compositionState === 'includedByMatch' ||
-        compositionState === 'explicitlyIncluded' ||
-        compositionState === 'forceIncluded';
+      // the current weather/time satisfy the record's required conditions. `composed` is the
+      // projection of `environmentComposesRecord` onto the vocabulary — the shared three-state
+      // set, deliberately narrower than the four-state `ENVIRONMENT_INCLUDED_COMPOSITION_STATES`
+      // used to build the "Included" list, since a stale `includedButUnavailable` row is shown
+      // but not composed.
+      const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
       const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
       const dropRateAdjustment = _dropRateAdjustmentSummary({
@@ -3828,7 +3819,31 @@ export function createAdminStore(services) {
       unavailableEvents: 0,
       diagnosticTasks: 0,
       diagnosticEvents: 0,
+      requiredTools: 0,
     };
+  }
+
+  /**
+   * Distinct tool ids required by the tasks that are actually available right now — the same
+   * `runtimeState === 'available'` population `availableTasks` counts, so the "required tools"
+   * fact on the environment inspector card shares one population and one freshness with its two
+   * neighbors instead of being a separately-derived, structurally match-blind number. This means
+   * the count is weather- and time-of-day dependent, exactly like its neighbors (see task 3 of
+   * issue 1321's delta for the deliberate trade).
+   */
+  function _requiredToolCount(tasks) {
+    const toolIds = new Set();
+    for (const row of tasks) {
+      if (row.runtimeState !== 'available') continue;
+      for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
+        // Trim before counting, matching the helper this replaced: an untrimmed pair would
+        // count ' pick ' and 'pick' as two distinct required tools, and a whitespace-only
+        // entry as one. Not reachable with generated ids, but the old code guarded it.
+        const trimmed = String(toolId ?? '').trim();
+        if (trimmed) toolIds.add(trimmed);
+      }
+    }
+    return toolIds.size;
   }
 
   function _compositionCounts(tasks, events) {
@@ -3857,55 +3872,32 @@ export function createAdminStore(services) {
       candidateEvents: h.candidate,
       unavailableEvents: h.unavailable,
       diagnosticEvents: h.diagnostic,
+      requiredTools: _requiredToolCount(tasks),
     };
   }
 
   /**
-   * Whether `environment` currently composes the library task/event `record`, mirroring the
-   * runtime `GatheringRichStateService.composeEnvironment` filter chain exactly:
-   *   library-enabled  AND  (matches OR force-included)  AND  the composition-mode include gate.
-   * In manual mode a record is composed only when force-added, or when it both matches and is on
-   * the enabled allow-list; a stale enabled entry for a non-matching record is NOT composed.
+   * Whether `environment` currently composes the library task/event `record`. Consumes the
+   * shared `environmentComposesRecord` predicate directly, so this mirrors the runtime
+   * `GatheringRichStateService.composeEnvironment` filter chain exactly by construction rather
+   * than by a separately maintained copy of it.
    */
   function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
-    if (!record?.id || record.enabled === false) return false;
-    const recordId = String(record.id);
+    if (!record?.id) return false;
     const includeDanger = kind === 'event';
-    const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    const forced = Array.isArray(environment?.[forcedKey])
-      ? environment[forcedKey].map(String)
-      : [];
-    if (mode === 'manual') {
-      if (forced.includes(recordId)) return true;
-      return (
-        enabled.includes(recordId) &&
-        _gatheringLibraryRecordMatchesEnvironment(
-          record,
-          environment,
-          {},
-          includeDanger,
-          conditionSettings
-        )
-      );
-    }
-    return (
-      !disabled.includes(recordId) &&
-      _gatheringLibraryRecordMatchesEnvironment(
-        record,
-        environment,
-        {},
-        includeDanger,
-        conditionSettings
-      )
+    const matches = _gatheringLibraryRecordMatchesEnvironment(
+      record,
+      environment,
+      {},
+      includeDanger,
+      conditionSettings
+    );
+    return environmentComposesRecord(
+      environment,
+      record,
+      kind,
+      resolveGatheringCompositionMode(environment),
+      matches
     );
   }
 
@@ -3937,13 +3929,6 @@ export function createAdminStore(services) {
     // them (the previous `enabledTaskIds` lookup could only ever match on an id collision).
     if (kind !== 'task' && kind !== 'event') return [];
     return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
-  }
-
-  function _gatheringCurrentConditions(conditionSettings) {
-    return {
-      weather: conditionSettings?.weather?.current || DEFAULT_GATHERING_CONDITIONS.weather,
-      timeOfDay: conditionSettings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay,
-    };
   }
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
@@ -4364,6 +4349,7 @@ export function createAdminStore(services) {
         environmentTaskCounts[String(environment.id)] = {
           availableTaskCount: counts.availableTasks || 0,
           availableEventCount: counts.availableEvents || 0,
+          requiredToolCount: counts.requiredTools || 0,
         };
       }
       let environmentId = get(selectedEnvironmentId);
@@ -5620,13 +5606,20 @@ export function createAdminStore(services) {
     if (!current) return false;
     const viewModel = _buildEnvironmentCompositionViewModel(current);
     const records = kind === 'event' ? viewModel.events : viewModel.tasks;
+    // Both kinds filter on the shared four-state included set, not `runtimeState`. The prior
+    // task-kind branch (`runtimeState === 'available' || compositionState ===
+    // 'includedButUnavailable'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
+    // included record whose current weather/time did not match would drop out of `ids`, and this
+    // function writes `ids` as the entire new order array — an ambient runtime condition would
+    // silently discard that record's saved rank. Using the same predicate-derived set as the
+    // "Included" list `CompositionList.svelte` renders keeps the filter and the UI's index into
+    // it in agreement, which matters here because a drag supplies an index into that same list.
+    // Reachability: `reorderEnvironmentRecord('task', …)` has no UI caller today —
+    // `CompositionList.svelte`'s drag handlers are all gated on `showEventRankControls`
+    // (`kind === 'event' && eventSelectionMode === 'highestRankedDrop'`) — so this branch is
+    // exercised only by tests and future task-kind reorder UI, and both get the correct rule.
     const ids = records
-      .filter((entry) =>
-        kind === 'event'
-          ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
-          : entry.runtimeState === 'available' ||
-            entry.compositionState === 'includedButUnavailable'
-      )
+      .filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
       .map((entry) => entry.id);
     const from = Number(fromIndex);
     const to = Number(toIndex);
@@ -6820,7 +6813,7 @@ export function createAdminStore(services) {
       if (nextConditions.timeOfDay.values.some((option) => option.id === timeOfDay))
         nextConditions.timeOfDay.current = timeOfDay;
     }
-    config.conditions = _gatheringCurrentConditions(nextConditions);
+    config.conditions = conditionSettingsToCurrent(nextConditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -6870,7 +6863,7 @@ export function createAdminStore(services) {
     if (setting.values.every((existing) => !(existing.id === option.id)))
       setting.values = [...setting.values, option];
     if (!setting.current) setting.current = option.id;
-    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
+    config.conditions = conditionSettingsToCurrent(systemConfig.conditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -6940,7 +6933,7 @@ export function createAdminStore(services) {
         (existing) => existing !== tag
       ),
     }));
-    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
+    config.conditions = conditionSettingsToCurrent(systemConfig.conditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;

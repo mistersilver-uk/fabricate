@@ -2,6 +2,11 @@ import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
+import {
+  conditionSettingsToCurrent,
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from './gatheringComposition.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
@@ -325,34 +330,38 @@ export class GatheringRichStateService {
           eventLimit: environment.eventLimit,
           eventPolicy: environment.eventPolicy,
         });
-    const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
+    const compositionMode = resolveGatheringCompositionMode(environment);
     const tasks = sortRecordsByOrder(
       normalizeList(libraries.tasks)
         .filter((task) => task?.enabled !== false)
-        .filter(
-          (task) =>
+        .filter((task) =>
+          environmentComposesRecord(
+            environment,
+            task,
+            'task',
+            compositionMode,
             this._recordMatchesEnvironment(task, environment, currentConditions, {
               includeDanger: false,
               conditionSettings: systemConditions,
-            }) || this._recordIsForced(environment, task.id, 'task', compositionMode)
-        )
-        .filter((task) =>
-          this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)
+            })
+          )
         ),
       environment?.taskOrder
     ).map((task) => this._libraryTaskToRuntimeTask(task, environment));
     const events = sortRecordsByOrder(
       normalizeList(libraries.events)
         .filter((event) => event?.enabled !== false)
-        .filter(
-          (event) =>
+        .filter((event) =>
+          environmentComposesRecord(
+            environment,
+            event,
+            'event',
+            compositionMode,
             this._recordMatchesEnvironment(event, environment, currentConditions, {
               includeDanger: true,
               conditionSettings: systemConditions,
-            }) || this._recordIsForced(environment, event.id, 'event', compositionMode)
-        )
-        .filter((event) =>
-          this._environmentIncludesLibraryRecord(environment, event.id, 'event', compositionMode)
+            })
+          )
         ),
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
@@ -1451,52 +1460,6 @@ export class GatheringRichStateService {
     }).matches;
   }
 
-  _environmentAllowsLibraryRecord(environment, id, kind) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = normalizeList(environment?.[enabledKey]).map(String);
-    const disabled = normalizeList(environment?.[disabledKey]).map(String);
-    if (disabled.includes(String(id))) return false;
-    return enabled.length === 0 || enabled.includes(String(id));
-  }
-
-  /**
-   * Whether a record is force-included into the environment. Forces are honored
-   * only in manual mode (automatic ignores them, like the enabled allow-list);
-   * a force-included record is composed even when it does not match the
-   * environment context.
-   */
-  _recordIsForced(environment, id, kind, compositionMode = 'automatic') {
-    if (compositionMode !== 'manual') return false;
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    return normalizeList(environment?.[forcedKey]).map(String).includes(String(id));
-  }
-
-  /**
-   * Whether a matching, library-enabled record is composed into the
-   * environment, honoring `compositionMode`:
-   * - `automatic`: include every matching record unless explicitly excluded
-   *   (`disabled*Ids`). Any `enabled*Ids` allow-list is ignored — automatic
-   *   means "all matching available unless excluded", so a stale list left
-   *   over from manual mode never suppresses matching records.
-   * - `manual`: include only when explicitly listed (`enabled*Ids`) or
-   *   force-added (`forced*Ids`); stale disabled lists are ignored.
-   */
-  _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = normalizeList(environment?.[enabledKey]).map(String);
-    const disabled = normalizeList(environment?.[disabledKey]).map(String);
-    if (compositionMode !== 'manual' && disabled.includes(String(id))) return false;
-    if (compositionMode === 'manual') {
-      const forced = normalizeList(
-        environment?.[kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds']
-      ).map(String);
-      return enabled.includes(String(id)) || forced.includes(String(id));
-    }
-    return true;
-  }
-
   _libraryTaskToRuntimeTask(task, environment = null) {
     const normalized = normalizeLibraryTask(task);
     const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
@@ -2010,13 +1973,6 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
     };
   }
   return normalized;
-}
-
-function conditionSettingsToCurrent(settings) {
-  return {
-    weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
-    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay,
-  };
 }
 
 function normalizeLibraryTask(task = {}) {

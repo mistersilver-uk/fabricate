@@ -133,6 +133,20 @@ describe('CompositionList mounted layout', () => {
       writeCompiledSvelte(component);
     }
     for (const modulePath of [
+      // The ONE answer to "does this record compose into this environment?" (issue 1321),
+      // which this component imports for the four-state included set, plus the match
+      // evaluator it delegates to; the second is import-free, so the pair closes that
+      // subgraph. `CompositionStatePill` reaches the third — the per-state tone / glyph /
+      // copy map extracted out of its own `<script>` so the vocabulary can be asserted
+      // against it — and that one is import-free too. This suite hand-rolls its compile
+      // loop with NO dependency validator, so omitting any of the three does not fail a
+      // test: the whole file is reported as `# cancelled` behind one ERR_MODULE_NOT_FOUND
+      // in the hook. `tests/components/record-inspector-node-max.test.js` registers the
+      // same map through `createMountedComponentHarness`, whose closure validator names
+      // the missing file instead.
+      'src/systems/gatheringComposition.js',
+      'src/systems/gatheringMatch.js',
+      'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
       'src/ui/svelte/util/foundryBridge.js',
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',

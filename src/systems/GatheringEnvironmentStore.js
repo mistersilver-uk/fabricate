@@ -4,6 +4,10 @@ import {
   SETTING_KEYS,
 } from '../config/settings.js';
 
+import {
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from './gatheringComposition.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
 import {
   DANGER_LEVELS,
@@ -455,10 +459,15 @@ export class GatheringEnvironmentStore {
   }
 
   _hasMatchingLibraryTask(environment) {
-    return this._getGatheringLibraryTasks(environment.craftingSystemId).some(
-      (task) =>
-        task?.enabled !== false &&
+    const compositionMode = resolveGatheringCompositionMode(environment);
+    return this._getGatheringLibraryTasks(environment.craftingSystemId).some((task) =>
+      environmentComposesRecord(
+        environment,
+        task,
+        'task',
+        compositionMode,
         evaluateEnvironmentMatch(task, environment, {}, { includeDanger: false }).matches
+      )
     );
   }
 

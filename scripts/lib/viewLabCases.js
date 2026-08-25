@@ -3423,6 +3423,32 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-gathering-tasks-browse-normal',
+    label: 'Manager — Gathering tasks browse normal',
+    // BEYOND the smoke: `screenshotCaptureMap.js` carries the two task-EDITOR labels and nothing
+    // for the library that lists them, so there is no smoke routine to name. An events-browse
+    // case existed and a tasks-browse one did not, which left the task inspector's facts
+    // unphotographed — including `data-gathering-task-fact="environments"`, the number issue
+    // #1321 corrects.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // The tasks library is a SECTION of the environments route, exactly as the events library is
+    // (`EnvironmentsBrowserView.svelte:1111` renders `GatheringTasksBrowserView`), so the route
+    // key stays `environments` and the second step moves the section rather than the route.
+    steps: ['Gathering', { selector: '#manager-gathering-nav-tasks' }],
+    expectView: 'environments',
+    // The inspector fact, which needs no click to populate: `selectedGatheringTaskId` falls back
+    // to `gatheringTaskDefinitions[0]?.id` over the declaration-ordered library, so the browse
+    // opens on `hb-task-forage`. Asserted on the fact itself because an empty inspector renders
+    // the surrounding card without it.
+    expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTasksBrowserView)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-gathering-task-editor-normal',
     label: 'Manager — Gathering task editor normal',
     smokeLabels: ['manager-gathering-task-editor-normal'],
@@ -3511,10 +3537,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The events library is a SECTION of the environments route, so the route key is unchanged;
     // the section is what the second step moves.
     expectView: 'environments',
+    // The inspector fact, pinned because it is the only evidence that the event browser calls
+    // `activeEnvironmentsForRecord` correctly (issue 1321): the seam's own suite proves the return
+    // value, and the caller is an unexported component local no unit test can reach. Without this
+    // the frame would publish the surrounding card with the fact missing and say nothing.
+    expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      // The facts this case exists to show are computed and rendered here.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
     ],
   }),
   managerCase({

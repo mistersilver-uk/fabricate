@@ -12,6 +12,17 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/gatheringImageDefaults.js',
+    // The per-state tone / glyph / copy map (issue 1321), extracted out of
+    // `CompositionStatePill.svelte`'s own `<script>` so the composition-state vocabulary can
+    // be asserted against it. The pill is in `compiledModules` below, so this is a STATIC
+    // import of the mounted graph; the map is import-free by design, which is why this chip
+    // does not grow a `src/systems/` dependency and this single entry closes the edge.
+    // Unlike its three sibling mount suites, this file goes through
+    // `createMountedComponentHarness`, whose dependency-closure validator throws a named
+    // "add it to rawModules" error for an omission. The other three hand-roll their compile
+    // loops and report `# cancelled` behind one ERR_MODULE_NOT_FOUND instead, which is why
+    // an omission there is far more dangerous than one here.
+    'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
