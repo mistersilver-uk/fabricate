@@ -383,7 +383,7 @@ function labDowntimeProvider() {
     tabs: [
       {
         id: 'ledger',
-        label: 'Ledger Administration',
+        label: 'Test Companion — Ledger',
         accessibleName: 'Open the downtime ledger',
         // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
         // a long multi-word label, on the same tab, or the widest case is one the layout
@@ -397,14 +397,14 @@ function labDowntimeProvider() {
       },
       {
         id: 'crew',
-        label: 'Crew',
+        label: 'Test Companion — Crew',
         accessibleName: 'Open the downtime crew roster',
         tooltip: 'Who is working on what',
         icon: 'fas fa-users-gear',
       },
       {
         id: 'writs',
-        label: 'Writs',
+        label: 'Test Companion — Writs',
         accessibleName: 'Open downtime writs',
         tooltip: 'Standing orders and commissions',
         icon: 'fas fa-file-signature',
@@ -450,7 +450,7 @@ function labDowntimeProvider() {
       openEditor.addEventListener('click', () => {
         context?.setRouteChrome?.({
           title: 'Marn the Quartermaster',
-          subtitle: 'Crew member · two projects in flight',
+          subtitle: 'Test companion record · not a Fabricate surface',
           breadcrumb: 'Marn',
           actionsLabel: 'Crew member actions',
           // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
@@ -498,8 +498,28 @@ function labDowntimeProvider() {
           'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
           'background:var(--fab-bg-2)'
       );
+      // THE BANNER, AND IT IS FOR THE PHOTOGRAPH RATHER THAN FOR THE TEST (issue 1324). Every
+      // frame that registers this provider is published to a PR body on a PUBLIC repository, and
+      // a reader has nothing but the picture. A stand-in whose tabs look like a product's reads
+      // as a feature -- and to a reader who KNOWS those tabs are in neither the free module nor
+      // Premium it reads as a feature that leaked, which is the question this banner exists to
+      // answer before it is asked.
+      //
+      // In the PANEL rather than only in the rail, because the panel is the largest thing in the
+      // frame and the one a reader looks at. The rail's labels say it too; this says it where
+      // the eye already is.
+      const banner = element(
+        'div',
+        'flex:0 0 auto;padding:8px 12px;border:1px solid var(--fab-warning);border-radius:8px;' +
+          'background:var(--fab-warning-soft, var(--fab-bg-3));color:var(--fab-warning);' +
+          'font-size:11px;font-weight:700;letter-spacing:0.04em',
+        'TEST-ONLY COMPANION — registered by tests/view-lab/mount.js so Core can photograph its ' +
+          'own companion seam. Not a Fabricate feature; in neither the free module nor Premium.'
+      );
+      banner.setAttribute('data-lab-companion-banner', '');
+      panel.append(banner);
       panel.append(
-        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Test companion — ${tabId}`)
       );
       panel.append(openEditor);
       const scroller = element(

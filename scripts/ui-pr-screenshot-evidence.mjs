@@ -24,7 +24,7 @@ import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 // `labelForCaseId` has always documented itself as wired into this path and never was: the
 // lookup fell through `VIEW_RECIPES` — a table keyed on SMOKE recipe ids, which a View Lab case
 // id is not — and landed on the bare id. Every lab frame in every PR body has therefore been
-// captioned `manager-world-downtime-premium-installed` rather than with the sentence the
+// captioned `manager-world-downtime-test-companion-installed` rather than with the sentence the
 // registry already held.
 import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
 
