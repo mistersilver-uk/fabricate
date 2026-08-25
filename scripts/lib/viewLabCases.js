@@ -3537,10 +3537,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The events library is a SECTION of the environments route, so the route key is unchanged;
     // the section is what the second step moves.
     expectView: 'environments',
+    // The inspector fact, pinned because it is the only evidence that the event browser calls
+    // `activeEnvironmentsForRecord` correctly (issue 1321): the seam's own suite proves the return
+    // value, and the caller is an unexported component local no unit test can reach. Without this
+    // the frame would publish the surrounding card with the fact missing and say nothing.
+    expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      // The facts this case exists to show are computed and rendered here.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
     ],
   }),
   managerCase({
