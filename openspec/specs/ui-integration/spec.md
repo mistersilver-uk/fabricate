@@ -625,8 +625,12 @@ Selected-system navigation:
   Every selected-system direct leaf, expandable parent, and submenu child receives the corresponding type scale, icon/count geometry, row sizing, neutral/hover/focus-visible/active/disabled treatment.
   World Travel uses one child level with the same full-width row geometry and content inset as Gathering; its expanded group uses Gathering's border, background, radius, and gap.
   The shared styling changes no route, disclosure, or ARIA semantics.
+- **The trail has two roots, and neither is nested under the other.**
+  A World route — Parties, Rules & Resources, Travel, Downtime — is rooted at `World`; every other route is rooted at `Crafting Systems`.
+  World routes are `every system`, as the rail's own micro-label says, and Parties, Currency and Travel are each reachable before any crafting system has opted into anything, so a trail reading `Crafting Systems > World > …` states something false about the shape of the app.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
+  The `World` crumb opens the World route wherever it is not the trail's last crumb, and is inert on the World route itself — which is the rule every crumb in this trail follows, stated once: an intermediate crumb navigates and the leaf does not.
 - The selected-system rail scope uses the shared selector card described above.
   Activating `All crafting systems` returns to the systems browser without clearing the real selected-system store state.
 
@@ -3824,7 +3828,7 @@ Core validates tab SHAPE — a non-empty id, unique within the set, plus a local
 A tab may also carry an optional `badge`.
 The tab contract is a **closed key set**: Core refuses a key it does not name, with a deterministic message, exactly as a runtime chrome update does.
 - A tab may carry its own **registered** route chrome: `title`, `subtitle`, `breadcrumb`, and `actionsLabel`, each an optional non-empty localized string.
-Core renders the active tab's chrome as the page title, page subtitle, leaf breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
+Core renders the active tab's chrome as the page title, page subtitle, **tab** breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
 - A tab may carry `actions`, falling back to the provider's own `actions`; each action is `{ id, label, icon?, tooltip?, tone?, primary?, disabled? }` plus exactly one of an `onSelect` function or an absolute `http(s)` `href`.
 Core renders an `href` action as an external anchor with `target="_blank"` and `rel="noopener noreferrer"`, invokes `onSelect` with the mount context plus `actionId`, and contains a throwing handler.
 - **`tone` selects one of Core's own Manager header button treatments** — `primary`, `ghost`, `danger`, or `neutral` — so a companion's Back, Delete and Save render through the same classes as the recipe editor's rather than as a companion-only lookalike.
@@ -3848,6 +3852,12 @@ Every field is optional.
 Each call states the whole runtime chrome, a field is unset by omitting it, and the whole runtime layer is unset with `null` or `{}`, which mean the same thing.
 - **Unsetting falls back rather than clearing.**
 Core resolves each field through the live mount's runtime chrome, then the active tab's registered chrome, then Core's own string, so a companion that never calls `setRouteChrome` renders exactly as it did before the channel existed and one that unsets lands back on its registered chrome.
+- **`breadcrumb` is the one field where the runtime layer EXTENDS the registered layer rather than shadowing it**, and Core SHALL render both as two crumbs.
+A trail is a PATH, so a drill-down belongs BELOW the tab it was reached through rather than in place of it: resolving this field runtime-first left a GM inside a companion's detail reading `World > Downtime > <detail>`, with the tab absent from its own trail and nothing between the route and the leaf.
+The runtime crumb SHALL be suppressed when it equals the tab crumb, so a screen that restates its registered chrome draws one crumb rather than the same word twice.
+Every other field shadows as stated above, and `title` and `subtitle` deliberately so — a detail screen owns what the header calls it.
+- **The tab crumb SHALL return the GM to that tab's own root**, through the same re-activation the rail offers for a click on the sub-item of the tab already on screen, and for the same reason: Core neither knows the level nor could restore it, because the drill-down is inside the companion's own target.
+Core SHALL render that crumb as inert rather than as a control that does nothing when the live mount registered no re-activation handler, or when there is no runtime crumb beneath it — in the second case the tab crumb names the screen the GM is already on.
 An **empty** `actions` array is a statement that this screen has no actions and does not fall back.
 - **Runtime chrome is scoped to one mount and never survives it.**
 A tab **badge** is deliberately the exception on this seam: it is scoped to the REGISTRATION, not to a mount, because its job is to be true while the companion is not mounted.

@@ -176,9 +176,16 @@
   // derivation would silently turn every chrome update into a remount, which is precisely the
   // failure the runtime channel exists to avoid — so keep chrome out of the context.
   let downtimeRouteChrome = $state(null);
+  // Whether the live mount can be asked to pop one level, which the breadcrumb's tab crumb
+  // reads. Its own signal rather than a field on the chrome above, because it is a separate
+  // fact: chrome is what the header SAYS and this is what one of its controls can DO.
+  let downtimeCanReselect = $state(false);
   const downtimeChromeChannel = createRouteChromeChannel({
     onChange: (chrome) => {
       downtimeRouteChrome = chrome;
+    },
+    onReselectAvailable: (available) => {
+      downtimeCanReselect = available;
     },
   });
   // Every surface a companion currently claims, not just Core's Downtime one. The title bar
@@ -278,6 +285,39 @@
     if (!value) return tab?.id ?? '';
     return downtimeCoreFallback ? text(value, tab.id) : value;
   }
+
+  // THE DOWNTIME TRAIL'S LAST TWO CRUMBS (issue 1322), and they are two rather than one.
+  //
+  // `downtimeChrome` reads the runtime layer FIRST, which is right for the page title and the
+  // subtitle — a companion's detail screen should own those outright. It is wrong for the
+  // breadcrumb, because a trail is a PATH: the detail belongs BELOW the tab it was reached
+  // through rather than in place of it. Shadowing it there left a GM inside a faction reading
+  // `World > Downtime > Emberwatch`, with the Factions tab absent from its own trail.
+  //
+  // So the tab crumb deliberately does NOT go through `downtimeChrome`: it reads the two lower
+  // layers only, in the same order, and the runtime value becomes a crumb of its own beneath.
+  const downtimeTabCrumb = $derived.by(() => {
+    const value = activeDowntimeTab?.breadcrumb;
+    if (downtimeCoreFallback) return value ? text(value, worldDowntimeTabId) : worldDowntimeTabId;
+    return value || downtimeTabText(activeDowntimeTab, 'label');
+  });
+
+  // The companion's own leaf, or the empty string when there is nothing further to say.
+  //
+  // EMPTY WHEN IT MATCHES THE TAB CRUMB, which is not a tidy-up: the Tracking tab's board
+  // screen restates its registered chrome at runtime, so a leaf drawn unconditionally would
+  // read `... > Tracking > Tracking` on the screen a GM lands on.
+  const downtimeLeafCrumb = $derived.by(() => {
+    const runtime = downtimeRuntimeChrome?.breadcrumb;
+    if (!runtime || runtime === downtimeTabCrumb) return '';
+    return runtime;
+  });
+
+  // Whether the tab crumb is worth pressing. `reselect` is offered to the live mount and Core
+  // has nothing of its own to do, so a companion that registered no handler would get a button
+  // that visibly does nothing — and there is nothing to go back UP to when the leaf is absent,
+  // because the tab crumb is then the screen the GM is already on.
+  const downtimeTabCrumbNavigable = $derived(downtimeLeafCrumb !== '' && downtimeCanReselect);
 
   // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
   // companion target is still connected. `onDestroy` remains the safety net for
@@ -8159,26 +8199,38 @@
           class="manager-breadcrumbs"
           aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
         >
-          <button type="button" onclick={() => selectSystemAndShowBrowser()}
-            >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-          >
-          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute && !isWorldRulesRoute && !isWorldTravelRoute}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => editSystem(selectedSystem.id)}
-              >{selectedSystem.name}</button
-            >
-          {/if}
+          <!--
+            TWO ROOTS, NOT ONE (issue 1322). `Crafting Systems` used to lead every trail in the
+            Manager, including the World ones, so a GM configuring their world's parties or
+            downtime read `Crafting Systems > World > ...` — which says World is a page inside a
+            crafting system. It is not: World routes are `every system`, as the rail's own
+            micro-label says, and several of them (Parties, Currency, Travel) are reachable
+            before any crafting system has opted into anything.
+
+            So the trail has two possible roots and this is the fork between them. A World route
+            is rooted at `World`; everything else is rooted at `Crafting Systems`. Neither is
+            nested under the other.
+          -->
           {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <!--
               `World.Heading` is the RAIL's micro-label and is authored in caps for the
               letter-spaced treatment there. A breadcrumb carries no `text-transform`, so
               reusing it printed a literal "WORLD" mid-trail; this crumb has its own
               Title Case key and the rail keeps its shout.
+
+              A BUTTON WHEREVER IT IS NOT THE LEAF, which is the same rule every other crumb in
+              this trail follows: an intermediate crumb navigates and the last one does not. On
+              World > Parties it IS the leaf and stays a span.
             -->
-            <span data-breadcrumb-world
-              >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
-            >
+            {#if isWorldRoute}
+              <span data-breadcrumb-world
+                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
+              >
+            {:else}
+              <button type="button" data-breadcrumb-world onclick={() => openWorldParties()}
+                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</button
+              >
+            {/if}
             {#if isWorldRulesRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}</span>
@@ -8200,15 +8252,53 @@
               <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               <!--
-                The LEAF crumb names the tab, so it belongs to whoever owns the tab. The
-                crumb above it names the Downtime ROUTE, which Core owns in the rail too.
+                THE TAB CRUMB NAMES THE TAB, so it belongs to whoever owns the tab. The crumb
+                above it names the Downtime ROUTE, which Core owns in the rail too.
+
+                IT IS THE TAB'S REGISTERED BREADCRUMB AND NEVER THE RUNTIME ONE (issue 1322).
+                A companion whose tab is a list drilling into a detail publishes the detail's
+                name at runtime, and that used to REPLACE this crumb rather than extend it: a
+                GM inside a faction read `World > Downtime > Emberwatch`, with the tab they
+                were in missing from its own trail and nothing between Downtime and the leaf.
+                So this crumb reads past the runtime layer to the registration underneath,
+                which is what makes the trail grow by one instead of changing its last word.
+
+                AND IT IS A BUTTON, because a crumb that names a screen the GM can go back to
+                should take them there. Core cannot do that itself — the drill-down is inside
+                the companion's own target, and Core neither knows the level nor could restore
+                it — so this is the same re-activation the rail already offers when the GM
+                clicks the sub-item for the tab they are on, through the same channel. A
+                companion that registered no handler gets Core's own behaviour, which is
+                nothing, and the crumb is a span for that case rather than a button that does
+                nothing when pressed.
               -->
-              <span data-breadcrumb-downtime-tab={worldDowntimeTabId}
-                >{downtimeChrome(
-                  'breadcrumb',
-                  worldDowntimeTabId,
-                  downtimeTabText(activeDowntimeTab, 'label')
-                )}</span
+              {#if downtimeTabCrumbNavigable}
+                <button
+                  type="button"
+                  data-breadcrumb-downtime-tab={worldDowntimeTabId}
+                  onclick={() => downtimeChromeChannel.reselect()}>{downtimeTabCrumb}</button
+                >
+              {:else}
+                <span data-breadcrumb-downtime-tab={worldDowntimeTabId}>{downtimeTabCrumb}</span>
+              {/if}
+              <!--
+                AND THE COMPANION'S OWN LEAF UNDER IT, when there is one and it says something
+                the tab crumb does not. A screen that restates the tab's own breadcrumb — which
+                is what the Tracking board does — must not draw the same word twice.
+              -->
+              {#if downtimeLeafCrumb}
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                <span data-breadcrumb-downtime-leaf>{downtimeLeafCrumb}</span>
+              {/if}
+            {/if}
+          {:else}
+            <button type="button" onclick={() => selectSystemAndShowBrowser()}
+              >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
+            >
+            {#if selectedSystem && currentView !== 'systems'}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <button type="button" onclick={() => editSystem(selectedSystem.id)}
+                >{selectedSystem.name}</button
               >
             {/if}
           {/if}

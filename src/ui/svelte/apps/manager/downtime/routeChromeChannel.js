@@ -50,6 +50,7 @@ import { normalizeRouteChrome } from '../../../../managerExtensions.js';
  * @property {(caller: object, handler: () => void) => (() => void)} onReselect Register
  *   `caller`'s re-activation handler and return an idempotent unsubscribe.
  * @property {() => boolean} reselect Invoke the live handler, contained.
+ * @property {boolean} canReselect Whether a live handler is registered right now.
  * @property {(caller: object, handler: Function) => (() => void)} onBeforeNavigate Register
  *   `caller`'s navigation guard and return an idempotent unsubscribe.
  * @property {(reason: string) => (undefined|boolean|Promise<boolean>)} confirmNavigation Ask
@@ -73,11 +74,20 @@ const GUARD_FAILURE = 'Fabricate | Downtime navigation guard failed:';
  * @param {object} [options] Injectable edges.
  * @param {(chrome: object|null) => void} [options.onChange] Called with the chrome Core must
  *   render whenever it changes, and only when it changes.
+ * @param {(available: boolean) => void} [options.onReselectAvailable] Called whether a live
+ *   re-activation handler exists whenever that changes, and only when it changes.
+ *
+ *   SEPARATE FROM `onChange` because they are separate facts. Chrome is what the header SAYS
+ *   and this is what one of its controls can DO, and a companion may publish either without
+ *   the other. Core needs it because its breadcrumb offers the tab crumb as a way back up
+ *   into the companion's own list — and a crumb rendered as a button over a mount that
+ *   registered no handler is a control that visibly does nothing when pressed.
  * @param {(...args: unknown[]) => void} [options.reportError] Sink for a throwing handler.
  * @returns {RouteChromeChannel} Frozen channel.
  */
 export function createRouteChromeChannel({
   onChange = () => {},
+  onReselectAvailable = () => {},
   // Read through `console` at CALL time rather than defaulting to the bare `console.error`
   // reference. A channel is created once, when the Manager root initialises, so a captured
   // reference would pin whatever `console.error` was at that instant — which is what makes a
@@ -94,6 +104,16 @@ export function createRouteChromeChannel({
   // See `confirmNavigation` for why it is shared rather than refused or re-asked.
   let pendingNavigation = null;
 
+  // Every assignment to `reselectHandler` goes through here, so no path can move it without
+  // telling Core. Guarded on change for the same reason `publish` is: a mount that registers
+  // no handler must never wake the header's readers.
+  function setReselectHandler(next) {
+    if (reselectHandler === next) return;
+    const was = reselectHandler !== null;
+    reselectHandler = next;
+    if (was !== (next !== null)) onReselectAvailable(next !== null);
+  }
+
   function publish(next) {
     // Guarded so a mount that sets no chrome — the common case, and every shipped companion
     // today — never republishes `null` over `null` and never wakes the header's readers.
@@ -108,7 +128,7 @@ export function createRouteChromeChannel({
 
   function release() {
     liveContext = null;
-    reselectHandler = null;
+    setReselectHandler(null);
     navigateHandler = null;
     // A navigation still waiting on the old mount's dialog keeps the promise it was already
     // handed; what must not survive is the VARIABLE, or the next mount's first navigation
@@ -127,7 +147,7 @@ export function createRouteChromeChannel({
       // mount's chrome across would mean a GM who left a companion's editor open, switched
       // tab and came back would arrive on a list screen still wearing the editor's title,
       // artwork, Unsaved chip and Save button — describing state the remount just discarded.
-      reselectHandler = null;
+      setReselectHandler(null);
       navigateHandler = null;
       pendingNavigation = null;
       liveContext = context ?? null;
@@ -155,14 +175,14 @@ export function createRouteChromeChannel({
         throw new TypeError('Fabricate World navigation onRouteReselect requires a function');
       }
       if (!isLive(caller)) return () => {};
-      reselectHandler = handler;
+      setReselectHandler(handler);
       let subscribed = true;
       return () => {
         if (!subscribed) return;
         subscribed = false;
         // Only clear a handler that is still this one: a later `onRouteReselect` replaced it,
         // and an unsubscribe held over that replacement must not evict the newer handler.
-        if (reselectHandler === handler) reselectHandler = null;
+        if (reselectHandler === handler) setReselectHandler(null);
       };
     },
 
@@ -243,6 +263,10 @@ export function createRouteChromeChannel({
 
     get chrome() {
       return chrome;
+    },
+
+    get canReselect() {
+      return reselectHandler !== null;
     },
   });
 }
