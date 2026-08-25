@@ -532,41 +532,83 @@ function makeAdminStoreFor(mode) {
 }
 
 describe('site 2 — adminStore._classifyCompositionRecords, through viewState', () => {
-  it('projects onto the three-state composed set exactly where the rule composes', async () => {
-    // The projection is `ENVIRONMENT_COMPOSED_COMPOSITION_STATES`, NOT the four-state included
-    // set: `includedButUnavailable` is shown to the GM as an included row and is not composed,
-    // and conflating the two is a silent one-record error in either direction.
+  /** Every classified row for one mode's environment, keyed by record id. */
+  async function classifiedRowsFor(mode) {
+    const { store } = makeAdminStoreFor(mode);
+    await store.selectSystem(SYSTEM_ID);
+    const composition = get(store.viewState).environmentComposition;
+    const rows = [...composition.tasks, ...composition.events];
+    assert.equal(
+      rows.length,
+      casesOf(mode, 'task').length + casesOf(mode, 'event').length,
+      `${mode}: every library record is classified`
+    );
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  it('classifies each record into a vocabulary state the rule would compose', async () => {
+    // Claim one of two: the STATE is right. `includedButUnavailable` is shown to the GM as an
+    // included row and is NOT composed, so the set this test re-projects through is the
+    // three-state `ENVIRONMENT_COMPOSED_COMPOSITION_STATES`, never the four-state included one.
+    //
+    // Re-projecting HERE is what this test can prove and also exactly what it cannot: the
+    // projection happens in the test, so the store could pick either set and this assertion would
+    // not move. That hole is closed by the next test, and the two are kept apart because the
+    // vocabulary state and the projection of it are two different claims.
     for (const mode of MODES) {
-      const { store } = makeAdminStoreFor(mode);
-      await store.selectSystem(SYSTEM_ID);
-      const composition = get(store.viewState).environmentComposition;
-      const stateById = new Map(
-        [...composition.tasks, ...composition.events].map((row) => [row.id, row.compositionState])
-      );
-      assert.equal(
-        stateById.size,
-        casesOf(mode, 'task').length + casesOf(mode, 'event').length,
-        `${mode}: every library record is classified`
-      );
+      const rowsById = await classifiedRowsFor(mode);
       assertMatrixArm(
         CASES.filter((entry) => entry.mode === mode),
-        (entry) => ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(stateById.get(entry.id)),
-        `_classifyCompositionRecords (${mode})`
+        (entry) =>
+          ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(rowsById.get(entry.id).compositionState),
+        `_classifyCompositionRecords compositionState (${mode})`
       );
     }
   });
 
-  it('reaches every state in the vocabulary, so the projection is not asserted over a stub', async () => {
-    // The ratchet on the arm above. A classifier that had collapsed to two states would still
+  it("projects through the store's OWN set, which re-deriving the projection here cannot see", async () => {
+    // Claim two: the store projects the state through the same set this suite does. The store
+    // writes `composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState)` and then
+    // `runtimeState = composed && conditionsMet ? 'available' : 'unavailable'` (`adminStore.js`),
+    // and `composed` itself is not published — `runtimeState` is the only read of it available
+    // through `viewState`.
+    //
+    // So the PRECONDITION is that `conditionsMet` holds, and it is measured off the store's own
+    // published field for every row rather than assumed from the fixtures: no matrix record
+    // declares a `weather` or `timeOfDay` list, so `evaluateEnvironmentMatch` reports both
+    // dimensions as `any`. If that ever stops being true this fails loudly here instead of
+    // silently narrowing the assertion below to a subset nobody notices.
+    //
+    // Swapping the store's projection to `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` is a real
+    // disagreement with the rule — the two sets differ exactly on `includedButUnavailable`, which
+    // is `manual && explicitlyIncluded && !matches` and does not compose — and it is invisible to
+    // the test above.
+    for (const mode of MODES) {
+      const rowsById = await classifiedRowsFor(mode);
+      const conditionGated = [...rowsById.values()]
+        .filter((row) => row.conditionsMet !== true)
+        .map((row) => row.id);
+      assert.deepEqual(
+        conditionGated,
+        [],
+        `${mode}: every matrix record must satisfy the current conditions for runtimeState to be a faithful read of the store's \`composed\`; these do not:\n- ${conditionGated.join('\n- ')}`
+      );
+      assertMatrixArm(
+        CASES.filter((entry) => entry.mode === mode),
+        (entry) => rowsById.get(entry.id).runtimeState === 'available',
+        `_classifyCompositionRecords runtimeState, i.e. the store's own composed projection (${mode})`
+      );
+    }
+  });
+
+  it('reaches every state in the vocabulary, so neither projection is asserted over a stub', async () => {
+    // The ratchet on both arms above. A classifier that had collapsed to two states would still
     // project correctly on every case while having lost six distinctions, so the states the
     // matrix actually produces are enumerated and compared against the whole vocabulary.
     const observed = new Set();
     for (const mode of MODES) {
-      const { store } = makeAdminStoreFor(mode);
-      await store.selectSystem(SYSTEM_ID);
-      const composition = get(store.viewState).environmentComposition;
-      for (const row of [...composition.tasks, ...composition.events])
-        observed.add(row.compositionState);
+      const rowsById = await classifiedRowsFor(mode);
+      for (const row of rowsById.values()) observed.add(row.compositionState);
     }
     assert.deepEqual(
       [...observed].sort(byCodeUnit),
