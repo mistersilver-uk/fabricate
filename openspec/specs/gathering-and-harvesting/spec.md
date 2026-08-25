@@ -152,20 +152,21 @@ GatheringEnvironment = {
 ```
 
 The environment carries no persisted inline `tasks` field: the store normalizer emits none, and a legacy inline `tasks` list on an imported/older record is dropped on the next save without conversion.
-Runtime tasks are composed exclusively from the system task library (via `enabledTaskIds` / `forcedTaskIds`).
+Runtime tasks are composed exclusively from the system task library (via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`).
 
 ### Requirements
 
 1. `craftingSystemId` must reference an existing `CraftingSystem`.
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
 3. A gathering environment may be **saved** without any task source so a GM can persist a partially-authored place and return to it later.
-It may only be **enabled** when it has at least one composed task source (a matching library task not listed in `disabledTaskIds` in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode.
+It may only be **enabled** when it has at least one composed task source (in automatic mode, a library task that matches or is listed in `forcedTaskIds`, and is not listed in `disabledTaskIds`; in manual mode, an `enabledTaskIds` entry), in either `targeted` or `blind` selection mode.
 A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists.
 This gates enable, not save.
-3a. **Known gap (deferred to #1315):** The id-list arm of requirement 3 scopes to manual mode, but the enable gate's first guard in `GatheringEnvironmentStore._environmentHasTaskSource` checks for a non-empty `enabledTaskIds` in **any** composition mode.
-That divergence misdescribes the code and is intentionally preserved here as a coarser check ("is there an explicit id parked here") distinct from the compose predicate ("does this record actually compose").
-Resolving this asymmetry alongside the broader mode contract is deferred to #1315.
-4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` / `forcedTaskIds`); there is no inline task definition.
+3a. **Known gap (restated by #1315, still open):** the enable gate's first two guards in `GatheringEnvironmentStore._environmentHasTaskSource` do not go through `environmentComposesRecord`, and both now admit an id list the mode they fire in ignores.
+The first accepts a non-empty `enabledTaskIds` in **any** composition mode, although automatic mode ignores that list; the second accepts a non-empty `forcedTaskIds` in **manual** mode, although manual mode ignores that list as of #1315, which is the mirror image of the same divergence rather than a new one.
+Both are intentionally preserved as a coarser check ("is there an explicit id parked here") distinct from the compose predicate ("does this record actually compose"), and both fail in the permissive direction only: they let a GM enable an environment that composes nothing, never refuse one that composes something.
+The gate's automatic branch is not affected, because it calls `environmentComposesRecord` and therefore already accepts a forced non-matching task as a task source.
+4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`); there is no inline task definition.
 Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.
 When absent, surfaces fall back to the shared default `'icons/environment/wilderness/terrain-forest-gray.webp'`.
@@ -185,15 +186,20 @@ Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs 
 They are global gathering conditions used as **runtime gates** — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection.
 Matching itself is decided by biome (and, for events, danger) only — geography (`GatheringRealm`) is not a composition axis.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledEventIds`, and `disabledEventIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
-12a. `compositionMode` controls reusable task/event composition.
-In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledEventIds`; stale `enabled*Ids` and `forced*Ids` are ignored.
-In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledEventIds` are ignored.
-12b. `forcedTaskIds` / `forcedEventIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`).
+12a. `compositionMode` controls reusable task/event composition, and each of the three id lists belongs to exactly one mode.
+In **automatic** mode, the environment composes every library-enabled record matching its biome (and, for events, danger) context, minus the records listed in `disabledTaskIds` / `disabledEventIds`, plus the records listed in `forcedTaskIds` / `forcedEventIds`; stale `enabled*Ids` entries are ignored.
+In **manual** mode, the environment composes exactly the library-enabled records listed in `enabled*Ids`, with no match filter at all, so a listed record composes whether or not it still matches; stale `disabled*Ids` and `forced*Ids` entries are ignored.
+The library-enabled gate precedes **both** modes: a record with `enabled === false` composes in no environment in either mode, so "exactly `enabled*Ids`, and nothing else" over-claims — it is exactly the library-enabled members of `enabled*Ids`.
+`environmentComposesRecord` in `src/systems/gatheringComposition.js` is the one implementation of this rule, and every layer that answers "does this environment compose this record" reads it from there.
+12b. `forcedTaskIds` / `forcedEventIds` are GM "force-add" overrides of **automatic** mode's match filter, and are honored in that mode alone: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`).
+Manual mode has no match filter and therefore nothing for a force to override, so it ignores the lists entirely and offers no force-add control.
+Force add and exclude are automatic mode's two overrides of its own filter and can name the same record; **exclude wins**, so a record listed in both `forced*Ids` and `disabled*Ids` does not compose.
+A force cannot revive a library-disabled record either, because the library-enabled gate in §12a precedes both overrides.
 A forced record remains force-included until removed even if later environment edits make it match normally.
 Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime.
-Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode.
-Removing a forced task or event in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
-12c. `taskOrder` and `eventOrder` provide deterministic ordering for composed reusable records. `eventOrder` applies to every composed/included event, including manual `forcedEventIds`.
+Removing a forced task or event in automatic mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
+The `1.29.0` migration folded every **manual** environment's force lists into its `enabled*Ids` and then cleared `forced*Ids` on **every** environment, manual and automatic alike, so an upgraded world's force lists are empty by construction and a non-empty one is a force add the GM made in automatic mode after the upgrade.
+12c. `taskOrder` and `eventOrder` provide deterministic ordering for composed reusable records. `eventOrder` applies to every composed/included event, including automatic mode's `forcedEventIds`.
 Records absent from the order list retain library order after ordered records.
 12c.1.
 GM authoring UI exposes event reorder controls only when the selected system's event selection mode is `highestRankedDrop`.
@@ -202,8 +208,9 @@ Other event selection modes do not expose reorder handles or move actions.
 12d.
 GM authoring UI for manual task and event composition shows only two record groups: **Included in this environment** and **Available to add**.
 Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section.
+Matching and non-matching rows alike present a plain **Add**, because manual mode composes what the GM picks without filtering it, and library-disabled rows present an "enable in library first" note instead of an action.
 Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded.
-Automatic composition retains its Excluded and Non-matching sections.
+Automatic composition retains its Excluded and Non-matching sections, and its Non-matching section is the only place a **Force add** is offered.
 12e. `taskDropRateAdjustments` and `eventDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and events.
 Task adjustments are keyed first by task id and then by drop-row id.
 Event adjustments are keyed by event id.
@@ -802,7 +809,7 @@ The two surfaces are evaluated independently.
 
 ### Purpose
 
-Represent one attemptable gathering activity — a **library-task** record (`GatheringTask`) authored once in the system task library and composed into environments at runtime (via `enabledTaskIds` / `forcedTaskIds`), not an inline-within-environment record.
+Represent one attemptable gathering activity — a **library-task** record (`GatheringTask`) authored once in the system task library and composed into environments at runtime (via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`), not an inline-within-environment record.
 
 ### Properties
 
@@ -862,7 +869,7 @@ Older aliases remain accepted for compatibility but are not the preferred author
 9. Required-but-reusable, breakable prerequisites for a gathering task are expressed solely through **Tools** referenced by `task.toolIds` (resolved against the **system-owned** Tools library `system.tools`, composed onto the environment as `__libraryTools` by `GatheringRichStateService.composeEnvironment`).
 There is no gathering-side catalyst concept and no gathering-scoped tools store.
 10. `defaultEnvironmentId` is a **new optional field** (`string | null`) and a **placement hint only**.
-Tasks previously carried no environment reference (they are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`).
+Tasks previously carried no environment reference (they are composed into environments many-to-many via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`).
 It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._normalizeGatheringTask` and is preserved by `GatheringEnvironmentStore`.
 It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing.
 It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
@@ -1848,7 +1855,7 @@ Timed backend completion/resolution, timed result creation, timed tool side effe
 Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation.
 The raw engine instance is not public.
 The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible.
-Creating an environment persists a disabled draft shell; task content is composed from the system task library — the environments editor authors the environment's library-task composition (`enabledTaskIds` / `forcedTaskIds`) rather than any inline task list, and inline Environment Tasks no longer exist (task authoring lives in the system Task Library editor).
+Creating an environment persists a disabled draft shell; task content is composed from the system task library — the environments editor authors the environment's library-task composition (`enabledTaskIds` in manual mode, `forcedTaskIds` in automatic mode) rather than any inline task list, and inline Environment Tasks no longer exist (task authoring lives in the system Task Library editor).
 Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs.
 The editor's per-environment overrides (drop-rate adjustments, event ordering, blind-selection weights) are wired from the root into the tab, and the tab delegates those mutations to the admin store; base task fields, result groups, tool references, visibility gates, progressive/check config, time requirements, and failure outcomes are authored on the library task in the Task Library editor, not inline on the environment.
 Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups.

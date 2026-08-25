@@ -4587,6 +4587,58 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-environment-edit-automatic-force-add',
+    label: 'Manager — Environment edit automatic Force add',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Issue 1315 moved Force add to AUTOMATIC mode, where a filter exists for it to override, and
+    // nothing in the lab photographed the result: the automatic Non-matching section is the
+    // section this control lives in, and no case reached it. `manager-environment-edit-placeholder`
+    // opens this same environment and stops on Overview; `manager-environment-edit-blind-weights`
+    // reaches a Tasks tab, but Shadow Thicket is MANUAL, so it renders Available-to-add and no
+    // Non-matching section at all. Before 1315 the control could not have been photographed
+    // anywhere, in either mode: its four branches demanded `mode === 'manual'` inside a section
+    // gated on `mode !== 'manual'`, so they were unreachable by construction.
+    //
+    // Sunlit Grove is `compositionMode: 'automatic'` with `biomes: ['forest']`, and the herbalism
+    // library carries exactly three `biomes: ['mountain']` tasks — Tend the Slow Bloom, the icecap
+    // and the ridgemoss — which fail its match and land in Non-matching. That is fixture the world
+    // already has: no lab content changes for this frame, which matters because a change under
+    // `tests/view-lab/world/` selects the whole corpus.
+    //
+    // The last step OPENS THE ROW MENU, and the frame is published for what that menu contains.
+    // The Non-matching row's actions are split by kind — an event row renders the labelled amber
+    // `warning`-role button inline, a task row renders this menu item — so a task frame that
+    // stopped at the section would show a closed ellipsis and prove only that the section exists.
+    // The herbalism events carry no biome or danger tags, so every event matches every environment
+    // and the world has no non-matching EVENT to photograph the labelled twin with; that gap is a
+    // fixture matter and is recorded rather than papered over here.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+      {
+        selector:
+          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="More actions"]',
+      },
+    ],
+    expectView: 'environment-edit',
+    // The open menu's Force add itself, not the section that holds it. The section renders for any
+    // automatic environment with a rejected record and would be satisfied by the very state this
+    // case exists to prove is over: a Non-matching list offering nothing to do about it.
+    expectSelector:
+      '.fabricate-manager [data-section-row="non-matching"] .manager-environment-comp-menu [data-action="force-include"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-tool-parity-01-library-1280x720',
     label: 'Manager — Tool parity 01 library 1280x720',
     smokeLabels: ['manager-tool-parity-01-library-1280x720'],

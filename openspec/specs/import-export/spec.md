@@ -95,6 +95,11 @@ This hoist MUST also run branch-independently, for the reason every other field-
 Keying on the lists is safe here precisely because this slice has NO scalars — unlike currency and travel, there is no configured-but-empty state an emptiness check could mistake for absence.
 The guard MUST be a TWO-LIST DISJUNCTION for the reason the world migration's is: either populated library proves the lift already ran, so an export from a world that authored only modifiers does not get its prerequisite half rebuilt from a system block already stripped.
 
+A payload whose gathering environments carry `forcedTaskIds` / `forcedEventIds` MUST have the world-side `1.29.0` transform applied to `gatheringEnvironments`, using the SAME function that migration applies (`applyManualCompositionForceFold`), not a second implementation of it.
+Import is a second ingress for exactly the records that migration rescues: `importReferenceResolver` carries the force lists through untouched, so a bundle exported before the upgrade and imported after it would arrive with a manual environment's composed records sitting in a list the engine no longer honours in that mode (see *gathering-and-harvesting* §12a/§12b).
+This transform is NOT keyed on `schemaVersion` and MUST run branch-independently: the force lists are an old ARRANGEMENT of current fields, so every bundle the shipping build writes carries the current schema and would skip a legacy-branch-only transform.
+It is idempotent, because a second pass finds no force list to fold or clear.
+
 ### Currency configuration merge on import
 
 Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.
