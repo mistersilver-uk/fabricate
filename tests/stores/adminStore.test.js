@@ -6086,6 +6086,90 @@ describe('createAdminStore', () => {
         'derived counts should not pollute the persisted environment object'
       );
       assert.equal(get(store.viewState).environmentTaskCounts['env-cave'].availableTaskCount, 1);
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-cave'].requiredToolCount,
+        0,
+        'neither composed task carries a toolId'
+      );
+    });
+
+    it('environmentTaskCounts.requiredToolCount counts distinct tool ids over the composed-and-available task population, not per-task occurrences or non-composed tasks', async () => {
+      // hb-env-ridge (tests/view-lab/world/labContent.js) is the acceptance's 0-to-1 fixture for
+      // this fact, but it lives in the view-lab world module and this suite's fixtures come from
+      // createMockServices()/services._store.gatheringConfig instead, so it is not reachable from
+      // here. This is an equivalent case built on the same rule this task adds: an automatic
+      // environment composing a mountain-biome task that carries a tool moves requiredToolCount
+      // from 0 (no composed task carries a tool) to a non-zero count once one does, the count is
+      // DISTINCT tool ids rather than a sum of per-task toolIds arrays, and a tool-bearing task
+      // that does not compose (wrong biome here) contributes nothing.
+      const environments = [
+        {
+          id: 'env-ridge',
+          craftingSystemId: 'sys1',
+          name: 'Ridge',
+          biomes: ['mountain'],
+          compositionMode: 'automatic',
+        },
+      ];
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => environments,
+          listBySystem: async () => environments,
+        }),
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [
+              // Composed (matches 'mountain'), no tools: contributes to availableTaskCount but
+              // not to requiredToolCount — this is the "0" half of the 0-to-1 case.
+              { id: 't-ridge-plain', name: 'Ridge Plain', biomes: ['mountain'], dropRows: [] },
+              // Composed, carries one tool: this is the "1" half of the 0-to-1 case.
+              {
+                id: 't-ridge-tool',
+                name: 'Ridge Tool',
+                biomes: ['mountain'],
+                toolIds: ['pick'],
+                dropRows: [],
+              },
+              // Also composed, re-uses 'pick' and adds 'rope': proves distinct-id counting
+              // rather than 2 (per-task occurrences of 'pick') or 3 (every mention).
+              {
+                id: 't-ridge-tool-2',
+                name: 'Ridge Tool 2',
+                biomes: ['mountain'],
+                toolIds: ['pick', 'rope'],
+                dropRows: [],
+              },
+              // Wrong biome, does not compose into env-ridge: 'shovel' must be excluded.
+              {
+                id: 't-desert-tool',
+                name: 'Desert Tool',
+                biomes: ['desert'],
+                toolIds: ['shovel'],
+                dropRows: [],
+              },
+            ],
+            events: [],
+          },
+        },
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-ridge'].availableTaskCount,
+        3,
+        'the three mountain-biome tasks all compose; the desert task does not'
+      );
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-ridge'].requiredToolCount,
+        2,
+        'distinct tool ids across the composed-and-available tasks (pick, rope), excluding the ' +
+          'non-composed desert task and not double-counting the shared pick id'
+      );
     });
 
     it('exposes a composition view-model classifying each library record and counts', async () => {
