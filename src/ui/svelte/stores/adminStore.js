@@ -3836,7 +3836,11 @@ export function createAdminStore(services) {
     for (const row of tasks) {
       if (row.runtimeState !== 'available') continue;
       for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
-        if (toolId) toolIds.add(String(toolId));
+        // Trim before counting, matching the helper this replaced: an untrimmed pair would
+        // count ' pick ' and 'pick' as two distinct required tools, and a whitespace-only
+        // entry as one. Not reachable with generated ids, but the old code guarded it.
+        const trimmed = String(toolId ?? '').trim();
+        if (trimmed) toolIds.add(trimmed);
       }
     }
     return toolIds.size;
