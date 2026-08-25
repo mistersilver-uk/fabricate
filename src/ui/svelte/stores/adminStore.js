@@ -3853,11 +3853,12 @@ export function createAdminStore(services) {
       const available = records.filter((r) => r.runtimeState === 'available').length;
       const excluded = records.filter((r) => r.compositionState === 'excluded').length;
       const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-      // NOTE: `includedNotMatching` now composes (ruling 2), so this "unavailable" tally counts
-      // records that ARE runtime-available whenever conditions are met — a naming/semantics
-      // mismatch this rename surfaces but does not resolve; the validation-surfaces lane (issue
-      // #1315 task 4) owns the field name and its consumers.
-      const unavailable = records.filter(
+      // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime
+      // available whenever conditions are met. The field was called `unavailable*` and fed a
+      // GM-facing fact labelled "Included but unavailable" — a number that had inverted against
+      // its own label — so producer, consumers, `data-runtime-fact` and label key were renamed
+      // with it.
+      const includedNotMatching = records.filter(
         (r) => r.compositionState === 'includedNotMatching'
       ).length;
       const diagnostic = records.filter(

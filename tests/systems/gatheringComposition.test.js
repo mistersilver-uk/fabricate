@@ -40,7 +40,7 @@
  * | 1 | `GatheringRichStateService.composeEnvironment` (the authoritative runtime chain) |
  * | 2 | `createAdminStore(...).viewState.environmentComposition` → `_classifyCompositionRecords` |
  * | 3 | `createAdminStore(...).deleteGatheringLibrary{Task,Event}` → `_environmentComposesGatheringRecord` |
- * | 4 | `GatheringEnvironmentStore._hasMatchingLibraryTask` (the enable gate's fallback ONLY) |
+ * | 4 | `GatheringEnvironmentStore._composesAnyLibraryTask` (the enable gate's fallback ONLY) |
  * | 6 | `tests/stores/admin-store-environments.test.js`'s fake — see the arm; NOT invocable |
  * | 7 | `resolveDraw` (`tests/view-lab/world/labRunStates.js`) |
  * | seam | `activeEnvironmentsForRecord`, which sites 9 and 10 both call |
@@ -719,7 +719,7 @@ function soleRecordEnvironment(entry, { decoys = false } = {}) {
   };
 }
 
-describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
+describe('site 4 — GatheringEnvironmentStore._composesAnyLibraryTask', () => {
   it('agrees with the rule on every task case', () => {
     let config = {};
     const store = makeEnvironmentStore(() => config);
@@ -727,9 +727,9 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
       CASES.filter((entry) => entry.kind === 'task'),
       (entry) => {
         config = { systems: { [SYSTEM_ID]: { tasks: [entry.record] } } };
-        return store._hasMatchingLibraryTask(soleRecordEnvironment(entry, { decoys: true }));
+        return store._composesAnyLibraryTask(soleRecordEnvironment(entry, { decoys: true }));
       },
-      '_hasMatchingLibraryTask'
+      '_composesAnyLibraryTask'
     );
   });
 
@@ -756,7 +756,7 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
     );
   });
 
-  it('keeps its two id-list guards coarser than the predicate, and they are named divergences', () => {
+  it('asks each mode its own gate question, with no mode-blind guard left', () => {
     // Reported, not absorbed. Each of these is a case where the gate says "this environment has a
     // task source" and the predicate says "this record does not compose". The FIRST is deliberate
     // — an authored id is authored intent even when nothing composes from it today. The SECOND is
@@ -776,14 +776,16 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
           entry.membership === membership
       );
 
-    // Guard 1 fires in AUTOMATIC mode, where `enabledTaskIds` is ignored by composition.
+    // Guard 1 used to fire in AUTOMATIC mode, where `enabledTaskIds` is ignored by composition.
+    // Issue 1321 recorded that as a known gap and deferred it here; 1315 closed it, so automatic
+    // now asks the predicate and a stale allow-list is no longer a task source.
     const staleAllowList = nonComposing('automatic', 'E');
     config = { systems: { [SYSTEM_ID]: { tasks: [staleAllowList.record] } } };
     assert.equal(EXPECTED.get(staleAllowList.id), false, 'the record does not compose');
     assert.equal(
       store._environmentHasTaskSource(soleRecordEnvironment(staleAllowList)),
-      true,
-      'guard 1 accepts a stale automatic-mode allow-list as a task source'
+      false,
+      'and the gate agrees: a stale automatic-mode allow-list is not a task source'
     );
 
     // Guard 1 in MANUAL mode is no longer a divergence at all, and that is a consequence of the
@@ -802,10 +804,11 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
       'and the gate agrees, so guard 1 in manual mode is coarse about nothing'
     );
 
-    // Guard 2 is the divergence issue #1315 CREATED and has not yet closed: it fires on a
-    // manual-mode `forcedTaskIds`, and a manual-mode force composes nothing whatsoever now. The
-    // result is an environment that may be enabled while composing no task at all — the failure
-    // the gate exists to prevent, in its own words. Asserted as it behaves, not as it should.
+    // Guard 2 was the divergence issue #1315 CREATED, and closed in the same change: it fired on
+    // a manual-mode `forcedTaskIds`, and a manual-mode force composes nothing whatsoever now, so
+    // it would have let an environment be enabled while composing no task at all — the failure
+    // the gate exists to prevent, in its own words. Both guards are gone; manual asks its own
+    // id list and automatic asks the predicate.
     const manualForce = CASES.find(
       (entry) =>
         entry.kind === 'task' &&
@@ -817,8 +820,8 @@ describe('site 4 — GatheringEnvironmentStore._hasMatchingLibraryTask', () => {
     assert.equal(EXPECTED.get(manualForce.id), false, 'a manual-mode force composes nothing');
     assert.equal(
       store._environmentHasTaskSource(soleRecordEnvironment(manualForce)),
-      true,
-      'guard 2 still accepts a manual-mode force list as a task source (issue #1315, enable gate)'
+      false,
+      'and the gate refuses it: a manual-mode force list is not a task source'
     );
 
     // The other direction is already correct, and is asserted so the report above is precise
@@ -913,21 +916,25 @@ describe('site 6 — the admin-store-environments fake enable gate', () => {
         biomes: [ENV_BIOME],
         ...overrides,
       });
-    assert.equal(gate({ enabledTaskIds: ['t'] }), true, 'enabledTaskIds counts in automatic mode');
+    assert.equal(
+      gate({ enabledTaskIds: ['t'] }),
+      false,
+      'enabledTaskIds does NOT count in automatic mode, which ignores that list'
+    );
     assert.equal(
       gate({ compositionMode: 'manual', enabledTaskIds: ['t'] }),
       true,
-      'enabledTaskIds counts in manual mode'
+      'enabledTaskIds counts in manual mode, which composes exactly that list'
     );
     assert.equal(
       gate({ compositionMode: 'manual', forcedTaskIds: ['t'] }),
-      true,
-      'forcedTaskIds counts in manual mode'
+      false,
+      'forcedTaskIds does NOT count in manual mode, which never consults it'
     );
     assert.equal(
       gate({ forcedTaskIds: ['t'] }),
       false,
-      'forcedTaskIds does NOT count in automatic mode'
+      'and a forced id alone is no source in automatic either, with an empty library to force from'
     );
     assert.equal(gate({}), false, 'no ids and an empty library is no task source');
   });
