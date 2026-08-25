@@ -3646,22 +3646,25 @@ export function createAdminStore(services) {
         conditions,
         { includeDanger, conditionSettings }
       );
+      // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
+      // issue #1315); manual mode has no filter to override, so it has neither.
       const excluded = compositionMode !== 'manual' && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
-      // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
-      const forceIncluded = compositionMode === 'manual' && forced.includes(id);
+      const forceIncluded = compositionMode !== 'manual' && forced.includes(id);
 
       let compositionState;
       if (!libraryEnabled) compositionState = 'libraryDisabled';
+      // Exclude is checked before force so the two can collide on the same record without a
+      // branch order bug deciding it silently: exclude wins.
       else if (excluded) compositionState = 'excluded';
       else if (forceIncluded) compositionState = 'forceIncluded';
-      // In automatic mode the enabled allow-list is ignored (matching the runtime composition
-      // service), so a non-matching record is always "not matching" — never a stale
-      // "included but unavailable". Only manual mode honors the explicit inclusion.
+      // Manual mode composes exactly `enabled*Ids`, with no match filter (maintainer ruling), so
+      // a picked non-matching record still composes — it is `includedNotMatching`, not a stale
+      // unreachable state, and stays distinct from `notMatching` so the Included list can flag it.
       else if (!matches)
         compositionState =
           compositionMode === 'manual' && explicitlyIncluded
-            ? 'includedButUnavailable'
+            ? 'includedNotMatching'
             : 'notMatching';
       else if (compositionMode === 'manual')
         compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
@@ -3669,10 +3672,9 @@ export function createAdminStore(services) {
 
       // A record is runtime-available only when its composition state would compose it AND
       // the current weather/time satisfy the record's required conditions. `composed` is the
-      // projection of `environmentComposesRecord` onto the vocabulary — the shared three-state
-      // set, deliberately narrower than the four-state `ENVIRONMENT_INCLUDED_COMPOSITION_STATES`
-      // used to build the "Included" list, since a stale `includedButUnavailable` row is shown
-      // but not composed.
+      // projection of `environmentComposesRecord` onto the vocabulary — the shared four-state
+      // set (see `gatheringComposition.js`), which now includes `includedNotMatching` because a
+      // manual pick composes whether or not it currently matches.
       const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
       const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
@@ -3851,8 +3853,12 @@ export function createAdminStore(services) {
       const available = records.filter((r) => r.runtimeState === 'available').length;
       const excluded = records.filter((r) => r.compositionState === 'excluded').length;
       const candidate = records.filter((r) => r.compositionState === 'candidate').length;
+      // NOTE: `includedNotMatching` now composes (ruling 2), so this "unavailable" tally counts
+      // records that ARE runtime-available whenever conditions are met — a naming/semantics
+      // mismatch this rename surfaces but does not resolve; the validation-surfaces lane (issue
+      // #1315 task 4) owns the field name and its consumers.
       const unavailable = records.filter(
-        (r) => r.compositionState === 'includedButUnavailable'
+        (r) => r.compositionState === 'includedNotMatching'
       ).length;
       const diagnostic = records.filter(
         (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'

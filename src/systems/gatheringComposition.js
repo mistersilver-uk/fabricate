@@ -65,10 +65,14 @@ const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' })
  * silent-drift failure this module exists to prevent.
  *
  * - `libraryDisabled` — the record is disabled in the library, so no environment composes it.
- * - `excluded` — automatic mode, explicitly excluded via `disabled*Ids`.
- * - `forceIncluded` — manual mode, force-added via `forced*Ids`; composes without matching.
- * - `includedButUnavailable` — manual mode, on `enabled*Ids` but no longer matching; NOT composed.
- * - `notMatching` — does not match the environment and is not force-added.
+ * - `excluded` — automatic mode, explicitly excluded via `disabled*Ids`; wins over a force.
+ * - `forceIncluded` — automatic mode, force-added via `forced*Ids`; composes without matching,
+ *   unless also excluded.
+ * - `includedNotMatching` — manual mode, on `enabled*Ids` but does not currently match; composes
+ *   anyway (manual has no match filter — see {@link environmentComposesRecord}), and this state
+ *   exists to keep that fact visible to the GM rather than indistinguishable from a matching pick.
+ * - `notMatching` — does not match the environment and is not picked (manual) or force-added
+ *   (automatic).
  * - `explicitlyIncluded` — manual mode, matching and on `enabled*Ids`.
  * - `candidate` — manual mode, matching but not listed; composable if the GM adds it.
  * - `includedByMatch` — automatic mode, matching and not excluded.
@@ -79,7 +83,7 @@ export const ENVIRONMENT_COMPOSITION_STATES = new Set([
   'libraryDisabled',
   'excluded',
   'forceIncluded',
-  'includedButUnavailable',
+  'includedNotMatching',
   'notMatching',
   'explicitlyIncluded',
   'candidate',
@@ -89,11 +93,16 @@ export const ENVIRONMENT_COMPOSITION_STATES = new Set([
 /**
  * The states the environment editor shows in its "Included" list and counts in
  * its tab badges. Note that this is a **four**-state set and includes
- * `includedButUnavailable`, which is shown to the GM as an included row (so the
- * stale entry is visible and fixable) but is NOT composed at runtime.
+ * `includedNotMatching`, which is shown to the GM as an included row precisely
+ * so a picked record that no longer matches stays visible as such — it composes
+ * (see {@link ENVIRONMENT_COMPOSED_COMPOSITION_STATES}), but a GM reading the
+ * Included list still needs to know it is not matching.
  *
- * Distinct from {@link ENVIRONMENT_COMPOSED_COMPOSITION_STATES}; conflating the
- * two is a silent one-record error in either direction.
+ * Distinct from {@link ENVIRONMENT_COMPOSED_COMPOSITION_STATES} as a *concept*
+ * — "shown in the Included list" and "composes at runtime" are different
+ * questions — even though the two sets currently hold the same four members;
+ * conflating the two is a silent one-record error in either direction the next
+ * time the vocabulary changes shape.
  *
  * @type {Set<string>}
  */
@@ -101,15 +110,17 @@ export const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
   'forceIncluded',
-  'includedButUnavailable',
+  'includedNotMatching',
 ]);
 
 /**
  * The states that actually compose into the environment at runtime — the
  * projection of {@link environmentComposesRecord} onto the vocabulary, and the
- * population `runtimeState` is derived from. This is a **three**-state set:
- * `includedButUnavailable` is deliberately absent, because a stale `enabled*Ids`
- * entry for a record that no longer matches is displayed but not composed.
+ * population `runtimeState` is derived from. This is a **four**-state set:
+ * `includedNotMatching` composes (manual mode has no match filter — a picked
+ * record composes whether or not it currently matches), and the state exists
+ * only so the Included list can still flag it as not matching rather than
+ * looking identical to a matching pick.
  *
  * @type {Set<string>}
  */
@@ -117,6 +128,7 @@ export const ENVIRONMENT_COMPOSED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
   'forceIncluded',
+  'includedNotMatching',
 ]);
 
 const TASK_ID_KEYS = Object.freeze({
@@ -184,15 +196,24 @@ export function conditionSettingsToCurrent(settings) {
  * Whether `environment` composes the library `record` — the one definition,
  * reproducing `GatheringRichStateService.composeEnvironment`'s filter chain.
  *
- * - **automatic**: `matches − disabled*Ids`. Bounded by no id list at all: it
- *   consults neither `enabled*Ids` (a stale allow-list left over from manual
- *   mode must never suppress matching records) nor `forced*Ids` (forces are a
- *   manual-mode affordance). Automatic means "everything matching unless
- *   explicitly excluded".
- * - **manual**: `enabled*Ids ∪ forced*Ids`. A force-add composes whether or not
- *   the record matches; an `enabled*Ids` entry composes only while the record
- *   still matches (otherwise it is `includedButUnavailable` — shown, not
- *   composed). `disabled*Ids` is stale in this mode and is ignored.
+ * Force add and exclude belong to **automatic** mode only (maintainer ruling,
+ * issue #1315); manual mode has no filter to override, so it has neither.
+ *
+ * - **automatic**: `(matches ∪ forced*Ids) − disabled*Ids`. Force and exclude are
+ *   its two overrides of its own match filter, and they can collide on the same
+ *   record — **exclude wins**: a record on both `forced*Ids` and `disabled*Ids`
+ *   does not compose. Neither override can act until the record clears the
+ *   library-enabled gate below, so a force can never revive a library-disabled
+ *   record. `enabled*Ids` is never consulted (a stale manual-mode allow-list
+ *   must never suppress or admit a record here).
+ * - **manual**: exactly `enabled*Ids`, full stop. No match filter, therefore
+ *   nothing to override: `disabled*Ids` and `forced*Ids` are both ignored. A
+ *   listed record composes whether or not it currently matches — see
+ *   `includedNotMatching` in the module docstring for how that stays visible
+ *   to a GM instead of looking identical to a matching pick.
+ *
+ * Both modes are gated by library-enabled first: `record.enabled === false`
+ * composes nowhere, in either mode, before either branch runs.
  *
  * Conditions are NOT consulted (see the module docstring); a composed record
  * whose weather or time-of-day does not currently apply is composed and
@@ -210,10 +231,10 @@ export function environmentComposesRecord(environment, record, kind, composition
   const id = String(record.id ?? '');
   const keys = idKeysFor(kind);
   if (compositionMode === 'manual') {
-    if (idList(environment, keys.forced).includes(id)) return true;
-    return Boolean(matches) && idList(environment, keys.enabled).includes(id);
+    return idList(environment, keys.enabled).includes(id);
   }
-  return Boolean(matches) && !idList(environment, keys.disabled).includes(id);
+  if (idList(environment, keys.disabled).includes(id)) return false;
+  return Boolean(matches) || idList(environment, keys.forced).includes(id);
 }
 
 /**
