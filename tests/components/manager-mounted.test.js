@@ -495,7 +495,21 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);
   }
-  for (const environmentModule of ['environmentReadiness.js']) {
+  for (const environmentModule of [
+    'environmentReadiness.js',
+    // The per-state tone / glyph / copy map (issue 1321), extracted out of
+    // `CompositionStatePill.svelte` so the composition-state vocabulary can be asserted
+    // against it — a plain `<script>` local in a compiled component is not reachable from a
+    // test. The pill is compiled into this tree, so this is a STATIC import of the mounted
+    // graph, and the map is import-free by design, so this single entry closes that edge.
+    // This suite hand-rolls its temp tree with NO dependency validator, so omitting it does
+    // not fail one test: every mounted manager test is reported as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND in the hook. `tests/components/record-inspector-node-max.test.js`
+    // registers the same module through `createMountedComponentHarness`, whose closure
+    // validator names the missing file instead — the asymmetry is the reason an omission
+    // here is more dangerous than a normal test break.
+    'compositionStateMeta.js',
+  ]) {
     const moduleDestination = join(
       tempRoot,
       `src/ui/svelte/apps/manager/environment/${environmentModule}`
@@ -735,6 +749,16 @@ function compileManagerRoot() {
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js',
+    // The ONE answer to "does this record compose into this environment?" (issue 1321) and
+    // the match evaluator it delegates to. THREE importers put the first in this root's
+    // static graph — the root itself, which reads both "Active environments" facts through
+    // `activeEnvironmentsForRecord`, plus `EnvironmentEditView` and `CompositionList` — and
+    // it statically imports the second, which is import-free, so these two entries close
+    // that subgraph. Same rule as the rest of this list: no dependency validator, so
+    // omitting either reports every mounted manager test as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND rather than failing one.
+    'src/systems/gatheringComposition.js',
+    'src/systems/gatheringMatch.js',
     // adminStore imports classifyModeChange from this pure migration module to
     // dry-run migrate/delete counts before a resolution-mode change; copy it so the
     // mounted import resolves.
