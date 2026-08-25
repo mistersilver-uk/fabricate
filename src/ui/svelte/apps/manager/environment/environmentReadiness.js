@@ -39,7 +39,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   // issue #1315 those rows COMPOSE (manual mode has no match filter), so the producer's
   // field name outlives its meaning; renaming it is the store's to do, not this consumer's.
   // Read here purely as "how many picked records do not match", which is a note, not a fault.
-  const includedNotMatching = Number(counts.unavailableTasks || 0) + Number(counts.unavailableEvents || 0);
+  const includedNotMatching = Number(counts.includedNotMatchingTasks || 0) + Number(counts.includedNotMatchingEvents || 0);
   const noStaleIncluded = includedNotMatching === 0;
 
   const checks = [

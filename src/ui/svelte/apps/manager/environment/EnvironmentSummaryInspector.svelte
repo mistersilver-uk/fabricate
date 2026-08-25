@@ -244,13 +244,16 @@
         ></span
       >
     </div>
-    <div class="manager-fact" data-runtime-fact="unavailable-included">
+    <div class="manager-fact" data-runtime-fact="included-not-matching">
       <span class="manager-fact-line"
-        ><strong>{(counts.unavailableTasks || 0) + (counts.unavailableEvents || 0)}</strong>
+        ><strong
+          >{(counts.includedNotMatchingTasks || 0) +
+            (counts.includedNotMatchingEvents || 0)}</strong
+        >
         <span class="manager-fact-label"
           >{text(
-            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnavailableIncluded',
-            'Included but unavailable'
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.IncludedNotMatching',
+            'Included, not matching'
           )}</span
         ></span
       >

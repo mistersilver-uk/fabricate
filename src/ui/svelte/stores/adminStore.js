@@ -3814,11 +3814,11 @@ export function createAdminStore(services) {
       availableTasks: 0,
       excludedTasks: 0,
       candidateTasks: 0,
-      unavailableTasks: 0,
+      includedNotMatchingTasks: 0,
       availableEvents: 0,
       excludedEvents: 0,
       candidateEvents: 0,
-      unavailableEvents: 0,
+      includedNotMatchingEvents: 0,
       diagnosticTasks: 0,
       diagnosticEvents: 0,
       requiredTools: 0,
@@ -3863,7 +3863,7 @@ export function createAdminStore(services) {
       const diagnostic = records.filter(
         (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
       ).length;
-      return { available, excluded, candidate, unavailable, diagnostic };
+      return { available, excluded, candidate, includedNotMatching, diagnostic };
     };
     const t = tally(tasks);
     const h = tally(events);
@@ -3871,12 +3871,12 @@ export function createAdminStore(services) {
       availableTasks: t.available,
       excludedTasks: t.excluded,
       candidateTasks: t.candidate,
-      unavailableTasks: t.unavailable,
+      includedNotMatchingTasks: t.includedNotMatching,
       diagnosticTasks: t.diagnostic,
       availableEvents: h.available,
       excludedEvents: h.excluded,
       candidateEvents: h.candidate,
-      unavailableEvents: h.unavailable,
+      includedNotMatchingEvents: h.includedNotMatching,
       diagnosticEvents: h.diagnostic,
       requiredTools: _requiredToolCount(tasks),
     };
@@ -5614,7 +5614,7 @@ export function createAdminStore(services) {
     const records = kind === 'event' ? viewModel.events : viewModel.tasks;
     // Both kinds filter on the shared four-state included set, not `runtimeState`. The prior
     // task-kind branch (`runtimeState === 'available' || compositionState ===
-    // 'includedButUnavailable'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
+    // 'includedNotMatching'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
     // included record whose current weather/time did not match would drop out of `ids`, and this
     // function writes `ids` as the entire new order array — an ambient runtime condition would
     // silently discard that record's saved rank. Using the same predicate-derived set as the
