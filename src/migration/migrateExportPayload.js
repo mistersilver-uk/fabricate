@@ -12,8 +12,8 @@
  * A payload ALREADY at the current schema is not a no-op: it still runs every field-level upcast,
  * because an export stamped with the current version can predate a field-level change. Any
  * derivation added here must therefore be written branch-independently — reachable from the
- * early return as well as from the main path — which is why `liftCurrencyToWorldScope` and
- * `liftTravelToWorldScope` are called from both.
+ * early return as well as from the main path — which is why `liftCurrencyToWorldScope`,
+ * `liftTravelToWorldScope` and `foldManualCompositionForces` are called from both.
  *
  * Foundry-free (no globals) so it runs before validation/import and in tests.
  */
@@ -28,6 +28,7 @@ import {
   buildWorldCurrencyConfig,
   stripSystemCurrencyConfig,
 } from './migrateCurrencyToWorldScope.js';
+import { applyManualCompositionForceFold } from './migrateManualCompositionForces.js';
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
@@ -308,6 +309,33 @@ function liftCharacterLibrariesToWorldScope(migrated) {
   migrated.system = stripSystemCharacterLibraries([system])[0];
 }
 
+/**
+ * Fold a pre-1315 bundle's manual force lists into its picked lists and clear every force
+ * list (issue 1315), mirroring the world-side 1.29.0 migration so an imported environment
+ * composes exactly what it composed in the world it was exported from.
+ *
+ * THIS IS THE WORLD MIGRATION'S OWN FUNCTION, not a mirror of it, which is what
+ * `import-export/spec.md` requires of the payload upcast — and it matters more here than it
+ * reads, because `importReferenceResolver` carries `forcedTaskIds` and `forcedEventIds`
+ * through import untouched. A bundle exported before the upgrade and imported after it would
+ * otherwise arrive with its manual environments' composed records sitting in a list the
+ * engine no longer honours in that mode: the same silent loss the world migration exists to
+ * prevent, through the one door the world migration cannot reach.
+ *
+ * BRANCH-INDEPENDENT for the reason every sibling above is: `migrateExportPayload` returns
+ * early once `schemaVersion` is already current, and every bundle written by the shipping
+ * build carries the current schema, so a transform reachable only from the legacy branch
+ * would never run on a real bundle. The force lists are an OLD arrangement of CURRENT fields,
+ * so their presence is orthogonal to the envelope version. Idempotent — a second pass finds
+ * no force list.
+ * @private
+ */
+function foldManualCompositionForces(migrated) {
+  const environments = migrated?.gatheringEnvironments;
+  if (!Array.isArray(environments)) return;
+  migrated.gatheringEnvironments = applyManualCompositionForceFold(environments).environments;
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -338,6 +366,7 @@ export function migrateExportPayload(payload) {
     liftCurrencyToWorldScope(current);
     liftTravelToWorldScope(current);
     liftCharacterLibrariesToWorldScope(current);
+    foldManualCompositionForces(current);
     return current;
   }
 
@@ -376,6 +405,7 @@ export function migrateExportPayload(payload) {
   liftCurrencyToWorldScope(migrated);
   liftTravelToWorldScope(migrated);
   liftCharacterLibrariesToWorldScope(migrated);
+  foldManualCompositionForces(migrated);
 
   return migrated;
 }
