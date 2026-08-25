@@ -3812,9 +3812,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   const inspectorSourceActionsBlock = blockFor(
     '.fabricate-manager .manager-essence-inspector-source-actions'
   );
-  const warningActionBlock = blockFor(
-    '.fabricate-manager .manager-button.is-warning-action,\n.fabricate-manager .manager-icon-button.is-warning-action'
-  );
+  // Issue 1315 retired the `.manager-icon-button` half of this pair with the manual-mode icon
+  // Force add that was its only consumer, so the rule is now the labelled button alone.
+  const warningActionBlock = blockFor('.fabricate-manager .manager-button.is-warning-action');
   const sourceDropBlock = blockFor(
     '.fabricate-manager .manager-essence-source-drop-zone .essence-source-trigger'
   );
@@ -8322,13 +8322,13 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
       measured.neutral,
       'and the role must differ from neutral, or the amber assertion above proves nothing'
     );
-    // The pair this repair exists to reunite: the icon button beside it in the same list
-    // already spelt the class correctly, and the two must now agree on the paint.
-    assert.deepEqual(
-      { color: measured.icon.color, background: measured.icon.background },
-      { color: measured.warning.color, background: measured.warning.background },
-      'the icon Force add and the labelled Force add are one verb and paint alike'
-    );
+    // The pair this repair originally reunited no longer exists. Issue 1315 moved Force add to
+    // automatic composition mode, where it renders as the labelled button alone; the icon twin
+    // lived in the manual-mode Available-to-add list, which is now plain add/remove, and it was
+    // deleted along with `.manager-icon-button.is-warning-action`. Asserting the two paint alike
+    // would compare the live control against a class nothing writes — green, and about nothing.
+    // What still matters is the half that survived, already asserted above: the role paints amber
+    // and the `is-warning` spelling it replaces paints nothing.
   } finally {
     await context.close();
   }
