@@ -131,6 +131,10 @@ const essenceStudioSources = readdirSync(essenceStudioDir)
 const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const worldModifiersSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte'),
+  'utf8'
+);
 const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
 const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
@@ -769,24 +773,27 @@ describe('CraftingSystemManager source contract', () => {
     // `RollDataExpressionInput` — the control the retired Checks-tab editor used, adopted
     // here because this is now the ONE surface that authors an expression — so the binding
     // pinned is its `onChange`, not a raw `event.currentTarget.value` read.
+    //
+    // Read from `WorldModifiersTab.svelte` since issue 1311 moved the editor onto its own World
+    // page. The contract is unchanged; only the file that has to honour it moved.
     assert.ok(
-      !systemEditSource.includes('ProviderExpressionInput'),
+      !worldModifiersSource.includes('ProviderExpressionInput'),
       'modifier editor should not import the deleted provider/expression component'
     );
     assert.ok(
-      !systemEditSource.includes('characterModifierProviderLabel'),
+      !worldModifiersSource.includes('characterModifierProviderLabel'),
       'modifier editor should not render a provider label'
     );
     assert.ok(
-      !systemEditSource.includes('manager-character-modifier-provider'),
+      !worldModifiersSource.includes('manager-character-modifier-provider'),
       'modifier summary should not render a provider chip'
     );
     assert.ok(
-      /onUpdateModifier\(entry\.id, \{ expression \}\)/.test(systemEditSource),
+      /onUpdate\(entry\.id, \{ expression \}\)/.test(worldModifiersSource),
       'modifier editor should bind the expression field through RollDataExpressionInput'
     );
     assert.ok(
-      systemEditSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
+      worldModifiersSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
       'modifier editor should keep the localized Expression label'
     );
     // --- World > Currency (issue 1278) --------------------------------------------------

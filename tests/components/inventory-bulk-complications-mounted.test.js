@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/RowDisclosure.svelte',

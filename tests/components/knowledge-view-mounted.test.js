@@ -26,6 +26,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-knowledge-view-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     // knowledgeStudio resolves a learned recipe's image through the shared chokepoint

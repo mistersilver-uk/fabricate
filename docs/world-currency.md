@@ -8,12 +8,13 @@ nav_order: 3.4
 
 Currency is a world setting, not a per-system one.
 A world runs a single game system, so there is exactly one way its actors store coins, and every crafting system that opts in shares the same coin ladder.
-GMs author it in **World > Currency**, a tab in the manager rail directly under **World > Parties**.
+GMs author it in **World > Rules & Resources > Currency**, in the manager rail.
+Rules & Resources groups the three libraries that belong to the world rather than to any one crafting system: the coin ladder, the character prerequisites and the modifiers.
 
 {: .gm }
-> Only GMs can see and manage World > Currency.
+> Only GMs can see and manage World > Rules & Resources.
 
-World > Currency is always available, even before any crafting system enables currency.
+Currency is always available, even before any crafting system enables currency.
 This lets you set up the coins first and switch systems on afterward.
 The page subtitle tells you how many coins you have defined, and how many of your crafting systems currently use them.
 

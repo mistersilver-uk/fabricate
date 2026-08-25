@@ -11,6 +11,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-books-scrolls-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
     // wires the drop listeners through the dragDrop action. Omitting either raw
     // module from the allowlist does not fail the mount — it HANGS (# cancelled).

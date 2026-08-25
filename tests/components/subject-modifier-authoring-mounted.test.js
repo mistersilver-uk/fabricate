@@ -270,6 +270,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',

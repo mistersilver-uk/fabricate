@@ -2451,7 +2451,9 @@
    renders a single child straight into `.manager-main`, so without this it lands in the shared
    shell's auto-sized first row and a tall ladder grows the Manager instead of scrolling inside
    `.manager-world-currency`'s own overflow. */
-.fabricate-manager[data-manager-view="world-currency"] .manager-main {
+.fabricate-manager[data-manager-view="world-currency"] .manager-main,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-main,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -3726,7 +3728,7 @@
    specific the layered selector is. So a rule HERE restating a property `Chip.svelte`'s own
    scoped block declares cannot win, at any specificity — this exact pair was written here
    first, at (0,4,0), and the parity run reported the chip still at the shared primitive's
-   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `<style>` is not
+   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `\3c style>` is not
    bound by that: it is unlayered too, so a `:global(...)` block there CAN out-specify
    `Chip.svelte`'s base rule and render correctly, and one did. That is still a second
    implementation of the one chip's geometry — exactly what issue 883 retired regardless of
@@ -5246,7 +5248,13 @@
    The currency editor moved out of the System Settings form, where the surrounding form
    supplied its padding and scrolling. Standing alone in `manager-main` it has to supply both
    itself, so the page scrolls in its own right rather than growing the window. */
-.fabricate-manager .manager-world-currency {
+
+/* The two Rules & Resources siblings share the currency page's block (issue 1311): one authored
+   library, scrolling in its own right, with the same padding and rhythm. Listed rather than
+   renamed to a shared class, because a rename would touch every currency rule below it. */
+.fabricate-manager .manager-world-currency,
+.fabricate-manager .manager-world-prerequisites,
+.fabricate-manager .manager-world-modifiers {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
@@ -6744,7 +6752,7 @@
    input` and `.manager-toolbar .manager-button`, but not `select`.
 
    The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
-   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
+   same reason. It had re-derived the bar in its own scoped `\3c style>`, which looked
    equivalent and was not, in two ways a source read cannot show:
 
     - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
@@ -9475,6 +9483,13 @@
    `!isChecksRoute` guard, so the studio rendered against a ~300px dead strip — the
    exact regression the comment above says this pairing exists to prevent, arriving
    from the other direction. */
+
+/* The three Rules & Resources routes join this list in issue 1311. `world-currency` belonged here
+   and always did: its aside has been suppressed in the root since issue 1278, but the column was
+   never released, so the page has been rendering against the ~300px dead strip the comment above
+   warns about — the Checks regression, arriving from the other direction a second time. The two
+   new routes join it because they are the same kind of surface: one authored library, with
+   nothing to put in a third column. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view^="checks"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
@@ -9482,6 +9497,12 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="world-currency"] .manager-body,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-body,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -9496,6 +9517,12 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="world-currency"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
@@ -10480,7 +10507,7 @@
    reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
-   (48px wide, 22px tall, transparent) from its component-scoped <style>. This rule is
+   (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
    `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
@@ -11030,7 +11057,7 @@
 
 /* ── The Validation tab's aggregate header (issue 676) ────────────────────────────
    Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
-   open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
+   open. It lives in the GLOBAL sheet, not a scoped Svelte \3c style>, for two reasons: the
    rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
    `.manager-recipe-val-*`), and a component-scoped
    block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
@@ -21968,7 +21995,7 @@
 
 /* World > Parties (issue 1182).
 
-   The pane is a CARD LIST whose appearance lives in the scoped `<style>` blocks of
+   The pane is a CARD LIST whose appearance lives in the scoped `\3c style>` blocks of
    `GatheringPartiesTab`, `PartyExpandedBody`, `PartyMemberRow`, `PartyAddMemberPanel`
    and `PartyTravelActorPanel`. Only four kinds of rule are left here, each because a
    scoped block cannot express it:
@@ -23198,7 +23225,7 @@
    so the body drops the formula and the DC — a batch has no single subject — and
    replaces them with a subject strip and a note saying the answer lands on every roll.
 
-   These rules live HERE rather than in a scoped `<style>` block because the dialog body
+   These rules live HERE rather than in a scoped `\3c style>` block because the dialog body
    is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
    scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
    dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the

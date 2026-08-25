@@ -202,6 +202,7 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
 // the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js'

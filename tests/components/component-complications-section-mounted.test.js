@@ -67,6 +67,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-complications-section-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/actions/dragDrop.js',

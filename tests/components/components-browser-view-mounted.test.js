@@ -27,6 +27,7 @@ const browser = createMountedComponentHarness({
   tmpPrefix: 'fabricate-components-browser-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/utils/componentCategories.js',
     'src/utils/componentBrowserModel.js',

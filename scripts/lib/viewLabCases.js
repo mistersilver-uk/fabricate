@@ -675,29 +675,29 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-system-edit-lists',
-    label: 'Manager — System edit lists',
+    label: 'Manager — World Modifiers list ergonomics',
     smokeLabels: ['manager-system-edit-lists'],
-    // The three settings-list cards together — Modifiers, Character prerequisites and
-    // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
-    // section collapsed to show whole-section collapse. Herbalism carries all three and is
-    // the system whose Modifiers library the checks screens select over. (The card is no
-    // longer gated on `gathering`, per issue 1117 — it now holds every CHECK modifier too —
-    // but herbalism remains the fixture with a populated library.)
+    // The settings-list ergonomics card, with one modifier open and its IconPicker down.
+    //
+    // It framed all THREE lists together while they shared the System Settings page. Issue 1278
+    // took Currency Units to its own World route and issue 1311 took these two, so the three are
+    // now three frames — this one, `currency-actor-property`, and `world-prerequisites` — and
+    // this case keeps the ergonomics half. It also no longer needs a selected system: the library
+    // is world scope since issue 1308, so the `system` query is gone with it.
     reaches: 'exact',
-    query: { system: 'lab-herbalism' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-modifier] [data-toggle-modifier]' },
-      { selector: '[data-system-modifier] .essence-icon-picker-trigger' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+      { selector: '[data-world-modifier] [data-toggle-modifier]' },
+      { selector: '[data-world-modifier] .essence-icon-picker-trigger' },
       // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
       // over-tall element's BOTTOM edge, and issue 1117 made this section taller (a bounds
       // row and its hint per open entry), which pushed the renamed "Modifiers" heading off
       // the top of the frame. The title anchors it from the top instead — the same fix the
       // checks-entries case records for the same cause.
-      { selector: '[data-system-modifiers] .manager-card-title', scroll: true },
+      { selector: '[data-world-modifiers] .manager-card-title', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-modifiers',
     // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
     // Checks-tab editor rather than only on the section it already had: the open row's `min`
     // Stepper is what proves the check-only bounds pair reached this card, and it is the only
@@ -705,12 +705,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `hb-mod-medicine` is the world's only BOUNDED entry, so this frame carries real values
     // rather than two `Unbounded` placeholders.
     expectSelector:
-      '.fabricate-manager [data-system-modifiers]' +
-      ':has([data-system-modifier-bounds] [data-system-modifier-field="min"])',
+      '.fabricate-manager [data-world-modifiers]' +
+      ':has([data-world-modifier-bounds] [data-world-modifier-field="min"])',
     position: { width: 1280, height: 980 },
-    kinds: ['manager', 'system-edit'],
+    kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
       // itself is a BROAD SIGNAL and reaches this case through
       // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
@@ -719,7 +719,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-system-edit-modifier-rolls',
-    label: 'Manager — System edit rolling modifier',
+    label: 'Manager — World Modifiers rolling entry',
     // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
     // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
     reaches: 'beyond',
@@ -734,22 +734,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
     // what this frame exists for, and `manager-system-edit-lists` already frames the card from
     // its heading.
-    query: { system: 'lab-herbalism' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-modifier="hb-mod-luck"] [data-toggle-modifier]' },
-      { selector: '[data-system-modifier="hb-mod-luck"]', scroll: true },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+      { selector: '[data-world-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+      { selector: '[data-world-modifier="hb-mod-luck"]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-modifiers',
     // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
     // rule's copy occupied and the only one that cannot render if the note is dropped.
     expectSelector:
-      '.fabricate-manager [data-system-modifiers]' +
-      ':has([data-system-modifier-roll-note="hb-mod-luck"])',
+      '.fabricate-manager [data-world-modifiers]' +
+      ':has([data-world-modifier-roll-note="hb-mod-luck"])',
     position: { width: 1280, height: 980 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-actor-property',
@@ -763,7 +762,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // nested overflow containers, so without it every assertion passes and the units are simply
     // absent from the PNG.
     steps: [
-      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
@@ -778,7 +778,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
     steps: [
-      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
       { selector: '[data-world-currency-strategy-select]', select: 'macro' },
       { selector: '[data-world-currency-units]', scroll: true },
     ],
@@ -796,7 +797,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no-provider callout steering the GM to macro mode — which is the state the smoke's
     // counterpart photographs too, for the same reason.
     steps: [
-      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
       { selector: '[data-world-currency-strategy-select]', select: 'actorInventory' },
       { selector: '[data-world-currency-units]', scroll: true },
     ],
@@ -804,6 +806,43 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-prerequisites',
+    label: 'Manager — World Character prerequisites',
+    smokeLabels: ['world-prerequisites'],
+    reaches: 'exact',
+    // World > Rules & Resources > Character prerequisites (issue 1311). The library is WORLD
+    // scope since issue 1308, so this route needs no selected system and is ungated. Both steps
+    // are needed: the parent lands on Currency, and the sub-item is what moves to this page.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
+      { selector: '[data-world-prerequisites-page]', scroll: true },
+    ],
+    expectView: 'world-prerequisites',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-modifiers',
+    label: 'Manager — World Modifiers',
+    smokeLabels: ['world-modifiers'],
+    reaches: 'exact',
+    // World > Rules & Resources > Modifiers (issue 1311). `scroll` is load-bearing for the reason
+    // the currency cases give: the list runs below the page's own fold and `frame.screenshot()`
+    // does not scroll nested overflow containers, so without it the entries are simply absent
+    // from the PNG while every assertion still passes.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
+      { selector: '[data-world-modifiers-page]', scroll: true },
+    ],
+    expectView: 'world-modifiers',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
   }),
   managerCase({
     id: 'manager-recipes-normal',

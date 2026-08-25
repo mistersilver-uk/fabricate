@@ -12,6 +12,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-grant-access-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js'
   ],

@@ -531,7 +531,7 @@ test('every interaction step names text that exists in the manager UI', () => {
 test('every expectSelector names UI that still exists', () => {
   // The step sweep above never looked at `expectSelector`, so a hook named only there — which
   // is the normal shape for a case whose whole job is to assert a state — was guarded by
-  // nothing. `data-system-modifier-roll-note` was exactly that: mutated to nonsense, every
+  // nothing. `data-world-modifier-roll-note` was exactly that: mutated to nonsense, every
   // guard passed and only a 20-minute capture run would have found it.
   const sources = renderSources();
   const haystack = [...sources.values()].join('\n');

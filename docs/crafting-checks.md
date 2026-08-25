@@ -130,7 +130,7 @@ Check modifiers are **not** a crafting-only feature.
 Crafting, Salvage and Gathering select over the same library, each with its own rule, its own default set and its own pick cap.
 See [One library, three activities](#one-library-three-activities).
 **No Checks page edits an entry**, Crafting included.
-Each shows the library read-only and links to System settings › Modifiers.
+Each shows the library read-only and links to World › Rules & Resources › Modifiers.
 
 Because an eligible modifier never appears in the formula you type, **The roll** section restates it for you.
 Under the formula field, **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
@@ -180,9 +180,14 @@ Downgrading back to 1.20.0 loses no data — your formulas and libraries are int
 
 The library used to belong to the crafting check, which made it crafting's alone.
 Upgrading moves it up to the crafting system, so salvage and gathering can select over the same entries.
-Upgrading again merges it with the gathering character-modifier library, so a system now carries one **Modifiers** library serving checks, drop rows, events and stamina costs alike.
-Both moves are automatic and need nothing from you.
+Upgrading again merges it with the gathering character-modifier library, so one **Modifiers** library serves checks, drop rows, events and stamina costs alike.
+Upgrading once more moves that library out of the crafting system entirely, to **World > Rules & Resources > Modifiers**, because a modifier resolves against a character rather than against a crafting system.
+Every move is automatic and needs nothing from you.
+
 Where a gathering modifier shared an id with a check modifier, Fabricate keeps both, renames the gathering one, repoints every reference to it, and tells you which systems were affected so you can review the names.
+
+Where two crafting systems had modifiers that shared an id but were **defined differently**, only one definition survives the move to the world library, and Fabricate names them so you can check.
+Nothing breaks visibly in that case — the reference still resolves — but it now resolves to the other system's version of the rule.
 
 **Downgrading past either move loses the library**, and this one is worth reading twice.
 An older version does not know where the library now lives, so it drops it on first read.
@@ -226,7 +231,7 @@ Neither a recipe nor a player can change it, and neither can pick modifiers unde
 Choosing the by-record rule or **Player picks** hands out the *selection*, never the rule.
 
 Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared library**.
-The library is authored once, in System settings › Modifiers.
+The library is authored once, in World › Rules & Resources › Modifiers.
 All three **Modifiers** sections show the same entries read-only and let you decide which of them apply there and how they combine.
 The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering task** on Gathering, because the record doing the picking is different on each.
 
@@ -245,7 +250,7 @@ A sentence above the entries states which reading is in force, and it changes th
 
 ### Least and most a modifier may add
 
-Each library entry may carry a **Minimum** and a **Maximum**, in System settings › Modifiers where the library is authored.
+Each library entry may carry a **Minimum** and a **Maximum**, in World › Rules & Resources › Modifiers where the library is authored.
 They clamp what **that one modifier** contributes, after its expression is worked out and before the modifiers are combined — so a maximum of `+5` caps that entry at `+5` whether the rule sums the eligible set or takes the largest of it.
 
 **Leave either field empty for no bound on that side.**
@@ -260,7 +265,7 @@ Only that entry is refused; the other modifiers on the roll are unaffected.
 ### One library, three activities
 
 Crafting, Salvage and Gathering all select over the same library.
-Each **Named modifiers** card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to System settings › Modifiers to edit them.
+Each **Named modifiers** card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to World › Rules & Resources › Modifiers to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
 **Gathering is not switched on yet.**

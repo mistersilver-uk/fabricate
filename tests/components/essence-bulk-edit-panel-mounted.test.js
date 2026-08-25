@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-bulk-panel-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/util/managerColorTokens.js',

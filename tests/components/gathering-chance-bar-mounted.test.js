@@ -13,6 +13,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-chance-bar-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringFormat.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive

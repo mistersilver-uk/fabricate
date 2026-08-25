@@ -12,6 +12,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-validation-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // recipeReadiness dispatches through the match-type registry, which reads
     // item flags — copy both so the harness module graph resolves.
     'src/config/flags.js',
