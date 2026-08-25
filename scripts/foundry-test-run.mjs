@@ -8137,9 +8137,11 @@ async function main() {
         // Seed a gathering library task that will NOT match the environment's
         // conditions/biome, then create a MANUAL environment that explicitly
         // includes it. A manually-included-but-non-matching task is classified
-        // `includedButUnavailable`, which surfaces a `staleIncluded` TASK-kind
-        // issue in the overview — exercising the task/event deep-link (which must
-        // resolve to the OWNING environment id, not the task record id).
+        // `includedNotMatching` (issue 1315: manual mode composes the picked list
+        // whether or not it matches, so this is information rather than a fault),
+        // which surfaces a `staleIncluded` TASK-kind issue in the overview —
+        // exercising the task/event deep-link (which must resolve to the OWNING
+        // environment id, not the task record id).
         const blockedConfig = game.settings.get('fabricate', 'gatheringConfig') || {};
         await game.settings.set('fabricate', 'gatheringConfig', {
           ...blockedConfig,
