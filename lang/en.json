@@ -3957,9 +3957,9 @@
           "Composition": {
             "ModeLabel": "Composition mode",
             "Automatic": "Automatic",
-            "AutomaticHint": "All matching enabled tasks and events are available unless locally excluded.",
+            "AutomaticHint": "All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.",
             "Manual": "Manual",
-            "ManualHint": "Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.",
+            "ManualHint": "Only the tasks and events you add are available, whether or not they match this environment.",
             "IncludedByMatch": "Included by match",
             "Included": "Included",
             "Candidate": "Not included",
@@ -4152,13 +4152,13 @@
           },
           "Tasks": {
             "Title": "Tasks",
-            "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
-            "ManualIntro": "Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks."
+            "AutomaticIntro": "All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.",
+            "ManualIntro": "Only tasks you add are available to players, whether or not they match this environment."
           },
           "Events": {
             "Title": "Events",
-            "AutomaticIntro": "All matching enabled library events apply unless you exclude them here.",
-            "ManualIntro": "Only events you explicitly include apply here. You can add matching events or force add non-matching events.",
+            "AutomaticIntro": "All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.",
+            "ManualIntro": "Only events you add apply here, whether or not they match this environment.",
             "EventChance": "Event chance",
             "DangerTag": {
               "safe": "Safe",
