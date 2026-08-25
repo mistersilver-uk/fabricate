@@ -763,7 +763,7 @@ describe('createAdminStore', () => {
     // persists with no `-=` deletion — and writes NOTHING through `updateSystem`, so it cannot
     // re-default an activity rule it was never asked about. That second half is asserted by the
     // crafting system receiving no write at all.
-    it('addSystemModifier and deleteSystemModifier write the WORLD library, alone', async () => {
+    it('addModifier and deleteModifier write the WORLD library, alone', async () => {
       const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -782,7 +782,7 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const added = await store.addSystemModifier({ id: 'alch', label: 'Alchemy' });
+      const added = await store.addModifier({ id: 'alch', label: 'Alchemy' });
       assert.equal(added.id, 'alch');
       assert.deepEqual(
         services._characterLibraries.modifiers.map((entry) => entry.id),
@@ -791,7 +791,7 @@ describe('createAdminStore', () => {
       );
       assert.deepEqual(calls, [], 'a library write touches no crafting system at all');
 
-      assert.equal(await store.deleteSystemModifier('med'), true);
+      assert.equal(await store.deleteModifier('med'), true);
       assert.deepEqual(
         services._characterLibraries.modifiers.map((entry) => entry.id),
         ['alch'],
@@ -810,8 +810,8 @@ describe('createAdminStore', () => {
       );
     });
 
-    // A no-op op writes NOTHING. `addSystemModifier` refuses a duplicate id and
-    // `deleteSystemModifier` refuses an id the library does not carry; without those
+    // A no-op op writes NOTHING. `addModifier` refuses a duplicate id and
+    // `deleteModifier` refuses an id the library does not carry; without those
     // guards each would re-persist and re-project the whole system for a request that
     // changes nothing.
     it('refuses a duplicate add and an unknown delete without writing', async () => {
@@ -830,12 +830,12 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.addSystemModifier({ id: 'med' }), null);
+      assert.equal(await store.addModifier({ id: 'med' }), null);
       // The id goes in the FIRST argument since issue 1308 dropped the system id. Passing the old
       // two-argument shape made this assert that `'sys1'` is not a modifier id, which is true and
       // proves nothing — `'ghost'` was never tested at all.
-      assert.equal(await store.deleteSystemModifier('ghost'), false);
-      assert.equal(await store.updateSystemModifier('ghost', { label: 'X' }), false);
+      assert.equal(await store.deleteModifier('ghost'), false);
+      assert.equal(await store.updateModifier('ghost', { label: 'X' }), false);
       assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 

@@ -2363,8 +2363,8 @@ function createStore(calls = [], options = {}) {
       calls.push(['addCharacterPrerequisite', partial]);
       return { id: 'created-prereq', ...partial };
     },
-    addSystemModifier: async (partial) => {
-      calls.push(['addSystemModifier', partial]);
+    addModifier: async (partial) => {
+      calls.push(['addModifier', partial]);
       return { id: 'created-modifier', ...partial };
     },
     // No system id on any of these: currency is world scope since issue 1278, so the store's

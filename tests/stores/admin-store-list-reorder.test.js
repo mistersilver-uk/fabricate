@@ -131,11 +131,11 @@ const CURRENCY_UNITS = [
 ];
 
 describe('adminStore settings-list reorder (issue 768)', () => {
-  it('reorderSystemModifier moves an entry and persists the new order', async () => {
+  it('reorderModifier moves an entry and persists the new order', async () => {
     const { store, services } = await storeFor({ modifiers: MODIFIERS });
     assert.deepEqual(modifierIds(store), ['mod-a', 'mod-b', 'mod-c']);
 
-    const ok = await store.reorderSystemModifier(0, 2);
+    const ok = await store.reorderModifier(0, 2);
     assert.equal(ok, true);
     assert.deepEqual(modifierIds(store), ['mod-b', 'mod-c', 'mod-a'], 're-projected order');
     assert.deepEqual(
@@ -180,7 +180,7 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    await store.reorderSystemModifier(0, 2);
+    await store.reorderModifier(0, 2);
     await store.reorderCharacterPrerequisite(0, 2);
     await store.reorderCurrencyUnit(0, 2);
 
@@ -200,9 +200,9 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    assert.equal(await store.reorderSystemModifier(0, 0), false, 'no-op');
-    assert.equal(await store.reorderSystemModifier(1, 9), false, 'to out of range');
-    assert.equal(await store.reorderSystemModifier(-1, 1), false, 'from out of range');
+    assert.equal(await store.reorderModifier(0, 0), false, 'no-op');
+    assert.equal(await store.reorderModifier(1, 9), false, 'to out of range');
+    assert.equal(await store.reorderModifier(-1, 1), false, 'from out of range');
     assert.equal(await store.reorderCharacterPrerequisite(2, 2), false, 'no-op');
     assert.equal(await store.reorderCharacterPrerequisite(0, 5), false, 'out of range');
     assert.equal(await store.reorderCurrencyUnit(1, 1), false, 'no-op');
