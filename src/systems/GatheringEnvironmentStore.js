@@ -447,18 +447,31 @@ export class GatheringEnvironmentStore {
     return systems.find((system) => system?.id === systemId) || null;
   }
 
+  /**
+   * Whether this environment composes at least one task, which is what gates enabling it.
+   *
+   * Each mode is asked its own question, because after issue 1315 the two modes compose by
+   * different rules. Two mode-blind guards used to precede this and both are retired:
+   *
+   *  - a non-empty `enabledTaskIds` returned true in ANY mode, including automatic, where that
+   *    list is ignored entirely. Issue 1321 recorded this as a known gap and deferred it here.
+   *  - a non-empty `forcedTaskIds` returned true in MANUAL mode, which this issue's ruling makes
+   *    wrong: manual composes exactly `enabledTaskIds`, so a manual environment whose only entry
+   *    is a force list composes nothing and must not be enableable.
+   *
+   * Manual keeps the coarser id-presence test deliberately. "Is there an explicit pick parked
+   * here" is a different question from "does this record compose", and a manual pick naming an
+   * id the library no longer holds is a dangling reference to report, not a reason to refuse
+   * enabling. Automatic has no such list to consult, so it must ask the predicate.
+   */
   _environmentHasTaskSource(environment) {
-    if (environment.enabledTaskIds.length > 0) return true;
-    if (
-      environment.compositionMode === 'manual' &&
-      normalizeIdList(environment.forcedTaskIds).length > 0
-    )
-      return true;
-    if (environment.compositionMode !== 'automatic') return false;
-    return this._hasMatchingLibraryTask(environment);
+    if (resolveGatheringCompositionMode(environment) === 'manual') {
+      return normalizeIdList(environment.enabledTaskIds).length > 0;
+    }
+    return this._composesAnyLibraryTask(environment);
   }
 
-  _hasMatchingLibraryTask(environment) {
+  _composesAnyLibraryTask(environment) {
     const compositionMode = resolveGatheringCompositionMode(environment);
     return this._getGatheringLibraryTasks(environment.craftingSystemId).some((task) =>
       environmentComposesRecord(
