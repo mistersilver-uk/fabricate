@@ -159,9 +159,12 @@ Runtime tasks are composed exclusively from the system task library (via `enable
 1. `craftingSystemId` must reference an existing `CraftingSystem`.
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
 3. A gathering environment may be **saved** without any task source so a GM can persist a partially-authored place and return to it later.
-It may only be **enabled** when it has at least one composed task source (a matching library task in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode.
+It may only be **enabled** when it has at least one composed task source (a matching library task not listed in `disabledTaskIds` in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode.
 A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists.
 This gates enable, not save.
+3a. **Known gap (deferred to #1315):** The id-list arm of requirement 3 scopes to manual mode, but the enable gate's first guard in `GatheringEnvironmentStore._environmentHasTaskSource` checks for a non-empty `enabledTaskIds` in **any** composition mode.
+That divergence misdescribes the code and is intentionally preserved here as a coarser check ("is there an explicit id parked here") distinct from the compose predicate ("does this record actually compose").
+Resolving this asymmetry alongside the broader mode contract is deferred to #1315.
 4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` / `forcedTaskIds`); there is no inline task definition.
 Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.
@@ -2095,7 +2098,7 @@ If a linked scene is deleted:
 ## Testing Requirements
 
 - Unit tests for environment validation:
-  - an environment (`targeted` or `blind`) requires a composed task source to be enabled, but may be saved without one while disabled; automatic library composition can satisfy the source via matching Gathering Tasks
+  - an environment (`targeted` or `blind`) requires a composed task source to be enabled, but may be saved without one while disabled; automatic library composition can satisfy the source via matching Gathering Tasks not listed in `disabledTaskIds`
   - `blind` allows multiple tasks and validates blind-selection/redaction configuration
 - Unit tests for default tag seeding and preservation of GM-customized tags
 - Unit tests for task/event composition matching by biome and danger (geography — `GatheringRealm` — is not a composition axis), plus runtime condition gating by global weather and global time of day
