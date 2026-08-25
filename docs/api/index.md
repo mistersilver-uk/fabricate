@@ -1109,11 +1109,12 @@ That rollup is Core's arithmetic over your numbers, it replaces the rail's muted
 | `setRouteChrome(chrome)` | Restate this mount's route chrome at any time, with no remount. See [Runtime Route Chrome](#runtime-route-chrome). |
 | `onRouteReselect(handler)` | Register a handler for the GM re-activating the rail sub-item this mount is already showing. See [Runtime Route Chrome](#runtime-route-chrome). |
 | `onBeforeNavigate(handler)` | Register a veto over the navigations that would end this mount. See [Guarding Unsaved Work](#guarding-unsaved-work). |
+| `navigateToTab(tabId)` | Take the GM to another of **your own** registered tabs. See [Navigating To Your Own Tabs](#navigating-to-your-own-tabs). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
-`setRouteChrome`, `onRouteReselect` and `onBeforeNavigate` are the exceptions: they are functions carried on that same frozen context, and calling them never changes the context's own identity, so none of them triggers the remount a new context would.
+`setRouteChrome`, `onRouteReselect`, `onBeforeNavigate` and `navigateToTab` are the exceptions: they are functions carried on that same frozen context, and calling them never changes the context's own identity, so none of them triggers the remount a new context would.
 
 ### Runtime Route Chrome
 
@@ -1286,6 +1287,45 @@ No prompt, no added await, no changed timing: Fabricate takes the same code path
 **Your guard dies with your mount.**
 The call returns an idempotent unsubscribe, and Fabricate drops the handler itself when the mount ends, so an unstopped subscription is not a leak.
 A context you kept from an ended mount registers nothing.
+
+### Navigating To Your Own Tabs
+
+A companion can draw a control that names another of its screens — "change this in Settings" on the card where the GM feels the setting's effect — and, until this call existed, could not reach it.
+The active tab is Fabricate's own state and nothing published a way into it, so such a control was either absent or dead.
+
+`context.navigateToTab(tabId)` takes the GM to another of the tabs **your provider registered**:
+
+```javascript
+autoAdvanceCard.onEditSettings(() => {
+  // The same navigation the GM's own click on your Settings rail sub-item performs.
+  context.navigateToTab('settings');
+});
+```
+
+**It is your rail sub-item's own click.**
+Asking for the tab already on screen re-activates it through `onRouteReselect` rather than remounting; any other tab is offered to your own `onBeforeNavigate` guard with `reason: 'tab'`, so unsaved work can still stop it; and an allowed move expands the rail group and activates the view exactly as a click does.
+Your programmatic request and the GM's click are one navigation, not two that agree today.
+
+**It returns `true` when the request was honoured and `false` when it was refused**, and a promise of either whenever your guard answers asynchronously — a veto may be a dialog, and a synchronous `true` would be a claim about a question still on screen.
+A re-activation counts as honoured: nothing moved because nothing had to.
+
+**You can reach your own tabs and nothing else.**
+Another provider's surface, a Fabricate route, and an id your provider never declared are all refused.
+Membership is resolved from what you have **registered**, not from what Fabricate happens to be rendering, so an id you have just unregistered is refused rather than resolving against Fabricate's own fallback tabs.
+
+**A well-formed id you did not register returns `false`; a malformed one throws.**
+Your tab set is a runtime fact — you may re-register with a different one, and a conditional tab may not exist yet — so asking for an id that is not currently yours is a question rather than a coding error.
+A non-string or empty id never is: it raises a `TypeError` and changes nothing, exactly as a malformed `setRouteChrome` update does.
+A call from a context whose mount has ended returns `false` and moves nobody.
+
+**Do not call it from inside your own `onBeforeNavigate` handler.**
+"Veto this move, and send the GM to Settings instead" is the tempting shape, and it returns `false` from there: the request is not the question your guard is being asked, so Fabricate refuses it rather than nesting one navigation inside the answer to another.
+Redirect *after* you have answered — from the continuation of your own dialog, say — because a redirect is a consequence of the decision rather than part of making it.
+The same refusal covers the window in which a promise your guard returned is still pending.
+
+**Two things that are not refusals.**
+Your context is already live for the duration of `mount()` itself, so a call from inside `mount` re-enters Fabricate's routing mid-mount; redirect from your first data callback instead.
+And asking for the tab already on screen runs your `onRouteReselect` handler **synchronously**, before the call returns — so if that handler tears down what you are standing in, it has already done so by your next line.
 
 ### The Panel's Layout Contract
 

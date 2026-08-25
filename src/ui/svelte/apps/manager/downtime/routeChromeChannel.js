@@ -58,7 +58,8 @@ import { normalizeRouteChrome } from '../../../../managerExtensions.js';
  *   the live mount's guard whether one navigation may proceed. `undefined` means there is
  *   nothing to ask.
  * @property {(caller: object, tabId: string) => (boolean|Promise<boolean>)} navigate Move the
- *   GM to one of the live mount's own tabs on `caller`'s behalf.
+ *   GM to one of the live mount's own tabs on `caller`'s behalf. Refused, as `false`, from a
+ *   retired mount and from inside a guard answer this channel is still waiting on.
  * @property {object|null} chrome The chrome Core should render, or `null` for the tab's own.
  */
 
@@ -121,6 +122,11 @@ export function createRouteChromeChannel({
   // The in-flight guard answer, shared by every navigation that arrives while it is pending.
   // See `confirmNavigation` for why it is shared rather than refused or re-asked.
   let pendingNavigation = null;
+  // Whether a guard is being asked RIGHT NOW, inside its own synchronous body. `pendingNavigation`
+  // cannot answer that: it is assigned only after the handler has returned, and only when the
+  // handler returned a promise, so throughout the one window in which a companion's guard can
+  // call back into this channel it is still `null`. See `navigate` for what that window means.
+  let askingGuard = false;
 
   // Every assignment to `reselectHandler` goes through here, so no path can move it without
   // telling Core. Guarded on change for the same reason `publish` is: a mount that registers
@@ -249,6 +255,10 @@ export function createRouteChromeChannel({
       // `confirmDiscardDirtyToolsDraft` already applies to Core's own concurrent prompt.
       if (pendingNavigation) return pendingNavigation;
       let result;
+      // `finally`, not a pair of assignments: a guard that THROWS must release this as surely as
+      // one that returns, or the first companion defect would leave `navigateToTab` refusing for
+      // the rest of the mount — a second, quieter failure caused by the containment of the first.
+      askingGuard = true;
       try {
         result = navigateHandler(Object.freeze({ reason }));
       } catch (error) {
@@ -259,6 +269,8 @@ export function createRouteChromeChannel({
         // seam existed, where a screen exit neither wrote nor discarded a companion's draft.
         reportGuardFailure(error);
         return undefined;
+      } finally {
+        askingGuard = false;
       }
       // Only an explicit `false` vetoes. An omitted return, `undefined`, `true` or anything
       // else allows, so a handler written to OBSERVE a navigation cannot accidentally trap the
@@ -292,6 +304,24 @@ export function createRouteChromeChannel({
       // higher here: repainting a header the GM has left is a cosmetic wrong, and dragging them
       // off the screen they chose is not.
       if (!isLive(caller)) return false;
+      // AND NEITHER DOES A MOUNT WHOSE OWN GUARD IS STILL BEING ASKED. `onBeforeNavigate`'s
+      // pending-answer rule DE-DUPLICATES two navigations Core raises concurrently, because one
+      // GM decision genuinely answers both. This is not that. Here the companion is BOTH the
+      // party being asked and the party asking, and its second question has a different
+      // destination — so the outstanding answer is not an answer to it, and there is nothing to
+      // share.
+      //
+      // The shape this refuses is the tempting one: "veto this move, and send the GM to Settings
+      // instead", written as a `navigateToTab` inside the guard body. Nesting it is unsound in
+      // both directions. A guard that always redirects re-enters its own handler without bound,
+      // because the inner navigation asks the same guard again. A guard that redirects
+      // conditionally is worse than a hang: the inner navigation COMMITS the route before the
+      // outer veto has been applied, so a GM is moved by a decision that then comes back `false`.
+      //
+      // So the answer is `false` — the seam's own word for "nobody moved" — and a companion that
+      // wants to redirect asks AFTER its answer is given, where a redirect belongs: it is a
+      // consequence of the decision, not part of making it.
+      if (askingGuard || pendingNavigation) return false;
       return onNavigate(tabId);
     },
 

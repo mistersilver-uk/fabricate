@@ -326,6 +326,23 @@ const DEFAULT_STATUS_TONE = 'warning';
  *   the same reason: a companion holding a stale context must not be able to move a GM who has
  *   already gone elsewhere.
  *
+ *   IT REFUSES TO RUN INSIDE AN ANSWER IT IS STILL WAITING FOR. Calling it from within a
+ *   `onBeforeNavigate` handler's own body — the tempting "veto this move, and send the GM to
+ *   Settings instead" — returns `false` and moves nobody, because that request is not the
+ *   question the guard is currently answering. Nesting it would re-enter the same guard without
+ *   bound when a companion always redirects, and would commit the inner route before the outer
+ *   veto had been applied when it redirects conditionally. Ask AFTER answering instead: a
+ *   redirect is a consequence of the decision, not part of making it. The same refusal covers
+ *   the window in which a guard's returned promise is still pending.
+ *
+ *   TWO THINGS THAT ARE NOT REFUSALS, and are stated because a companion author meets both.
+ *   The mount context is LIVE for the duration of `mount()` itself, so calling this from inside
+ *   `mount` re-enters Core's routing mid-mount rather than being refused; a companion that must
+ *   redirect on arrival should do it from its own first data callback, not from `mount`. And
+ *   asking for the tab already on screen invokes this mount's `onRouteReselect` handler
+ *   SYNCHRONOUSLY, before this call returns — so a handler that tears down what the caller is
+ *   standing in has already done so by the next line.
+ *
  *   AN UNKNOWN-BUT-WELL-FORMED TAB ID ANSWERS `false` RATHER THAN THROWING, deliberately, and
  *   it is the one refusal here that had a real alternative. Membership is a RUNTIME fact that
  *   moves under the companion's feet: a provider may re-register with a different tab set at

@@ -488,3 +488,98 @@ test('a channel created without a host refuses to navigate rather than pretendin
   channel.beginMount(ledger);
   assert.equal(channel.navigate(ledger, 'crew'), false);
 });
+
+/**
+ * RE-ENTRANCY FROM INSIDE THE GUARD'S OWN BODY (issue 1332 review).
+ *
+ * The pending-answer sharing above cannot cover this window: `pendingNavigation` is assigned
+ * only AFTER the handler returns, and only when it returned a promise, so throughout the
+ * synchronous body of a guard it is still `null`. A `navigateToTab` issued there — the natural
+ * shape of "veto this move, and send the GM to Settings instead" — used to re-invoke the very
+ * handler it was called from.
+ */
+test('a navigation asked for from inside the guard’s own body is refused, never nested', () => {
+  const reached = [];
+  const channel = createRouteChromeChannel({
+    onNavigate: (tabId) => {
+      reached.push(tabId);
+      return true;
+    },
+  });
+  const ledger = contextFor('ledger');
+  channel.beginMount(ledger);
+
+  const asked = [];
+  const redirects = [];
+  channel.onBeforeNavigate(ledger, (event) => {
+    asked.push(event.reason);
+    redirects.push(channel.navigate(ledger, 'writs'));
+    return false;
+  });
+
+  assert.equal(channel.confirmNavigation('tab'), false);
+  assert.deepEqual(asked, ['tab'], 'the handler is asked ONCE — the recursion is what this fixes');
+  assert.deepEqual(redirects, [false], 'and its own request is answered, not queued or shared');
+  assert.deepEqual(reached, [], 'nothing reached the host, so no route could commit ahead of it');
+
+  // AND THE REFUSAL IS SCOPED TO THAT WINDOW, which is the half a `false` alone would not
+  // prove: a member that simply stopped working after the first guard call would pass above.
+  assert.equal(channel.navigate(ledger, 'writs'), true);
+  assert.deepEqual(reached, ['writs']);
+});
+
+test('a guard that throws still releases the navigation it was holding', () => {
+  const reported = [];
+  const channel = createRouteChromeChannel({
+    onNavigate: () => true,
+    reportError: (...args) => reported.push(args),
+  });
+  const ledger = contextFor('ledger');
+  channel.beginMount(ledger);
+  channel.onBeforeNavigate(ledger, () => {
+    throw new Error('companion exploded');
+  });
+
+  assert.equal(channel.confirmNavigation('tab'), undefined, 'a thrown guard allows, as it did');
+  assert.equal(reported.length, 1);
+  // Without the `finally` this is where the SECOND failure lands: one contained companion defect
+  // would leave `navigateToTab` refusing for the rest of the mount, with nothing to explain it.
+  assert.equal(channel.navigate(ledger, 'crew'), true);
+});
+
+test('a navigation asked for while the GM’s dialog is open is refused rather than shared', async () => {
+  const reached = [];
+  const channel = createRouteChromeChannel({
+    onNavigate: (tabId) => {
+      reached.push(tabId);
+      return true;
+    },
+  });
+  const ledger = contextFor('ledger');
+  channel.beginMount(ledger);
+
+  let answer;
+  channel.onBeforeNavigate(
+    ledger,
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+  );
+
+  const outer = channel.confirmNavigation('tab');
+  assert.equal(typeof outer.then, 'function');
+  // CORE'S OWN second navigation still shares the pending answer — that rule is untouched, and
+  // asserting it here is what stops this case from being read as a change to it.
+  assert.equal(channel.confirmNavigation('close'), outer, 'two Core navigations, one decision');
+  // The COMPANION's own request does not join that share: it is a different question, asked by
+  // the very party the outstanding one is waiting on.
+  assert.equal(channel.navigate(ledger, 'crew'), false);
+  assert.deepEqual(reached, []);
+
+  answer(true);
+  assert.equal(await outer, true);
+  await Promise.resolve();
+  assert.equal(channel.navigate(ledger, 'crew'), true, 'and the refusal ends with the answer');
+  assert.deepEqual(reached, ['crew']);
+});

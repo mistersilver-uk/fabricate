@@ -16273,6 +16273,86 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
   });
 
+  /**
+   * THE GUARD CALLING BACK INTO THE SEAM IT IS ANSWERING (issue 1332 review).
+   *
+   * "Veto this move, and send the GM to Settings instead" is the shape a companion author will
+   * reach for, and it is the shape the pending-answer rule above cannot cover: that rule shares
+   * an answer between two navigations CORE raised, and this is the companion asking a DIFFERENT
+   * question from inside the answer to the first one. Both cases below drive it through the rail
+   * click a GM actually makes, because the outer navigation has to be a real one for the inner
+   * request to be nested inside anything.
+   */
+  async function mountThreeTabCompanion() {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        prefix: 'Guild',
+        ids: ['ledger', 'crew', 'writs'],
+        mount: ({ context }) => {
+          mounts.push(context);
+        },
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    return mounts;
+  }
+
+  it('refuses a redirect a guard asks for from inside its own body', async () => {
+    const mounts = await mountThreeTabCompanion();
+    const asked = [];
+    const redirects = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      redirects.push(mounts[0].navigateToTab('writs'));
+      return false;
+    });
+
+    // Before the refusal existed this recursed without bound: the redirect asked the same guard,
+    // which redirected again. The test would not have failed an assertion — it would have blown
+    // the stack, which is the sort of defect a companion meets as a frozen Manager.
+    downtimeSubitem('crew').click();
+    await settleRouteExit();
+
+    assert.deepEqual(asked, ['tab'], 'the guard is asked once for the one navigation the GM made');
+    assert.deepEqual(redirects, [false], 'and its own request is answered plainly, not nested');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1, 'nobody moved: not to the GM’s tab, and not to the redirect');
+  });
+
+  it('never commits a redirect ahead of the veto that is still pending', async () => {
+    const mounts = await mountThreeTabCompanion();
+    let calls = 0;
+    let redirect;
+    mounts[0].onBeforeNavigate(() => {
+      calls += 1;
+      // The CONDITIONAL redirect, which is worse than the unbounded one: it terminates, so it
+      // ships. Nested, the second call would allow the inner navigation and commit `writs`
+      // before this first call had returned its veto — leaving the GM moved by a decision that
+      // then came back `false`, and moved somewhere neither they nor the guard asked for.
+      if (calls > 1) return true;
+      redirect = mounts[0].navigateToTab('writs');
+      return false;
+    });
+
+    downtimeSubitem('crew').click();
+    await settleRouteExit();
+
+    assert.equal(calls, 1, 'the guard is never re-entered, so its second arm is never reached');
+    assert.equal(redirect, false);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'THE POINT: the veto is what stands, and no route was committed while it was pending'
+    );
+    assert.equal(mounts.length, 1);
+    assert.equal(downtimeSubitem('ledger').getAttribute('aria-current'), 'true');
+  });
+
   it('cannot reach Core’s own tabs once its provider has unregistered', async () => {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
@@ -17291,6 +17371,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(mounts, [], 'what it observes is an ABSENCE: mount is simply never called');
     assert.ok(!target.querySelector('[data-world-downtime-host]'), 'no host is rendered');
     assertDowntimeRailAbsent();
+  });
+
+  it('refuses a companion’s tab navigation once the gate shuts under a standing GM', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+
+    // The gate does not evict a standing GM, which is what makes this state reachable at all:
+    // a LIVE mount asking for a route Core will no longer open. Neither of the seam's other
+    // refusals can answer it — the context is live, the provider is still registered, and
+    // `crew` is still one of its own tabs — so the availability refusal is the only thing
+    // between a companion and a `true` reporting a move that never happened.
+    await setExperimentalFeatures(false);
+    assert.equal(managerRoute(), 'world-downtime', 'the GM is left exactly where they were');
+    assert.equal(mounts.length, 1);
+    assertDowntimeRailAbsent();
+
+    assert.equal(mounts[0].navigateToTab('crew'), false);
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime', 'and the request moved nobody');
+    assert.equal(mounts.length, 1, 'no second mount, so nothing was silently torn down');
+    assert.deepEqual(cleanups, [], 'nor was the standing companion disposed by a refusal');
   });
 
   it('cannot be resurrected by requestRemount from a context retained across the gate', async () => {
