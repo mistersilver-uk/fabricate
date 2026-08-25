@@ -7678,7 +7678,7 @@
    * - Where it did run it was **wrong.** It worked only from the three id lists on the
    *   environment object: structurally match-blind (no biome, danger, or condition evaluation)
    *   and mode-blind (it unioned `enabled*Ids` with `forced*Ids` in both composition modes). It
-   *   was one of the disagreeing copies of the composition rule that issue #1321 collapses, and
+   *   was one of the disagreeing copies of the composition rule that issue 1321 collapses, and
    *   this component cannot host the correct rule — it imports no gathering library data.
    *
    * Fixing it here would have meant new data wiring for an arm nothing reaches; the honest
@@ -7966,7 +7966,7 @@
    * disagreed twice over: the task fact hand-rolled biome, weather and time inline over a
    * `gatheringTaskAllowedInEnvironment` helper that applied `enabledTaskIds` as an allow-list in
    * every mode and never read `forcedTaskIds`, and the event fact was `enabledEventIds.includes`
-   * and nothing else. Both are deleted; see issue #1321.
+   * and nothing else. Both are deleted; see issue 1321.
    *
    * Only the two SCOPING filters stay here, because they answer "which environments is this GM
    * looking at" rather than "does this record compose": the disabled-environment filter and the

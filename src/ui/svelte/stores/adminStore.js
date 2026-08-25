@@ -3829,7 +3829,7 @@ export function createAdminStore(services) {
    * fact on the environment inspector card shares one population and one freshness with its two
    * neighbors instead of being a separately-derived, structurally match-blind number. This means
    * the count is weather- and time-of-day dependent, exactly like its neighbors (see task 3 of
-   * issue #1321's delta for the deliberate trade).
+   * issue 1321's delta for the deliberate trade).
    */
   function _requiredToolCount(tasks) {
     const toolIds = new Set();

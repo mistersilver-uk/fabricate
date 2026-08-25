@@ -81,7 +81,7 @@
       : entry?.runtimeState;
   }
 
-  // The four-state INCLUDED vocabulary, from its one home (issue #1321). It is not the
+  // The four-state INCLUDED vocabulary, from its one home (issue 1321). It is not the
   // three-state COMPOSED set: `includedButUnavailable` belongs in this list precisely
   // because it does not compose, so the GM can see the stale entry and fix it.
   const included = $derived(

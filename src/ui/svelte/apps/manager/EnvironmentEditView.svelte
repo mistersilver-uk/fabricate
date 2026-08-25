@@ -68,7 +68,7 @@
   // `countComposedRecords` while filtering the included set, and now that
   // `src/systems/gatheringComposition.js` exports both sets one line apart, that name was
   // an invitation to "correct" the import to the three-state composed set and silently
-  // drop a row from every badge (issue #1321).
+  // drop a row from every badge (issue 1321).
   function countIncludedRecords(records = []) {
     return Array.isArray(records)
       ? records.filter((entry) =>

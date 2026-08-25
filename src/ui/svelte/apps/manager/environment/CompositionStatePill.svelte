@@ -5,7 +5,7 @@
   The per-state tone/glyph/copy map lives in `./compositionStateMeta.js` rather than
   here: a compiled Svelte component exposes only `<script module>` exports, so a
   `<script>` local could not be asserted key-for-key against the vocabulary in
-  `src/systems/gatheringComposition.js` that it mirrors (issue #1321). This component
+  `src/systems/gatheringComposition.js` that it mirrors (issue 1321). This component
   renders that map; it does not own it.
 -->
 <script>

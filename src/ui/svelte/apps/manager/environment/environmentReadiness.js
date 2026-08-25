@@ -57,7 +57,7 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   if (active && !hasAvailableTask) {
     issues.push({ id: 'activeNoComposition', severity: 'critical', blocks: 'enable' });
   }
-  // This literal STAYS a literal (issue #1321). Its neighbours in the editor now import
+  // This literal STAYS a literal (issue 1321). Its neighbours in the editor now import
   // `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` from `src/systems/gatheringComposition.js`;
   // this one deliberately does not, for two reasons. It tests a SINGLE state rather than
   // membership of a set, so there is no set to share — and this module's contract, stated
