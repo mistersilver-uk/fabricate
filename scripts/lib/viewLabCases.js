@@ -3423,6 +3423,32 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-gathering-tasks-browse-normal',
+    label: 'Manager — Gathering tasks browse normal',
+    // BEYOND the smoke: `screenshotCaptureMap.js` carries the two task-EDITOR labels and nothing
+    // for the library that lists them, so there is no smoke routine to name. An events-browse
+    // case existed and a tasks-browse one did not, which left the task inspector's facts
+    // unphotographed — including `data-gathering-task-fact="environments"`, the number issue
+    // #1321 corrects.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // The tasks library is a SECTION of the environments route, exactly as the events library is
+    // (`EnvironmentsBrowserView.svelte:1111` renders `GatheringTasksBrowserView`), so the route
+    // key stays `environments` and the second step moves the section rather than the route.
+    steps: ['Gathering', { selector: '#manager-gathering-nav-tasks' }],
+    expectView: 'environments',
+    // The inspector fact, which needs no click to populate: `selectedGatheringTaskId` falls back
+    // to `gatheringTaskDefinitions[0]?.id` over the declaration-ordered library, so the browse
+    // opens on `hb-task-forage`. Asserted on the fact itself because an empty inspector renders
+    // the surrounding card without it.
+    expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTasksBrowserView)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-gathering-task-editor-normal',
     label: 'Manager — Gathering task editor normal',
     smokeLabels: ['manager-gathering-task-editor-normal'],

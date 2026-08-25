@@ -44,6 +44,7 @@
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
+  import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import {
@@ -7662,45 +7663,42 @@
     };
   }
 
-  function environmentComposedIds(environment, kind) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey] : [];
-    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey] : [];
-    const disabled = new Set(
-      Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []
-    );
-    return Array.from(new Set([...enabled, ...forced])).filter((id) => !disabled.has(id));
+  /**
+   * One of the three environment inspector counts, as the store computed it.
+   *
+   * All three now read a stored number with a zero fallback — the pattern
+   * `EnvironmentsBrowserView.svelte:340-345` already uses for the same fact. The
+   * `environmentComposedIds` fallback these three used to share is deleted, not moved:
+   *
+   * - It was **unreachable in practice.** `adminStore.js`'s `_buildEnvironmentState` writes a
+   *   finite entry into `environmentTaskCounts` for every environment in the same `listBySystem`
+   *   result this component iterates as `environmentList`, so the fallback arm could only be
+   *   taken for an environment absent from that map — never true for one the UI is rendering a
+   *   row for. No test exercises `data-environment-fact` at all.
+   * - Where it did run it was **wrong.** It worked only from the three id lists on the
+   *   environment object: structurally match-blind (no biome, danger, or condition evaluation)
+   *   and mode-blind (it unioned `enabled*Ids` with `forced*Ids` in both composition modes). It
+   *   was one of the disagreeing copies of the composition rule that issue #1321 collapses, and
+   *   this component cannot host the correct rule — it imports no gathering library data.
+   *
+   * Fixing it here would have meant new data wiring for an arm nothing reaches; the honest
+   * outcome is that the store is the single answer and this is a read of it.
+   */
+  function environmentStoredCount(environment, key) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.[key];
+    return Number.isFinite(stored) ? stored : 0;
   }
 
   function environmentComposedTaskCount(environment) {
-    const stored =
-      $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableTaskCount;
-    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'task').length;
+    return environmentStoredCount(environment, 'availableTaskCount');
   }
 
   function environmentComposedEventCount(environment) {
-    const stored =
-      $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableEventCount;
-    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'event').length;
+    return environmentStoredCount(environment, 'availableEventCount');
   }
 
   function environmentRequiredToolCount(environment) {
-    const taskIds = new Set(environmentComposedIds(environment, 'task'));
-    if (taskIds.size === 0) return 0;
-    // Function-local counting scratch, discarded when the function returns.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const toolIds = new Set();
-    for (const task of gatheringTaskDefinitions) {
-      if (!taskIds.has(task?.id)) continue;
-      const refs = Array.isArray(task?.toolIds) ? task.toolIds : [];
-      for (const ref of refs) {
-        const str = String(ref || '').trim();
-        if (str) toolIds.add(str);
-      }
-    }
-    return toolIds.size;
+    return environmentStoredCount(environment, 'requiredToolCount');
   }
 
   function gatheringTaskName(task) {
@@ -7919,18 +7917,6 @@
     return `${times}, ${weather}`;
   }
 
-  function gatheringTaskAllowedInEnvironment(task, environment) {
-    const enabledIds = Array.isArray(environment?.enabledTaskIds)
-      ? environment.enabledTaskIds.map(String)
-      : [];
-    const disabledIds = Array.isArray(environment?.disabledTaskIds)
-      ? environment.disabledTaskIds.map(String)
-      : [];
-    if (disabledIds.includes(String(task?.id))) return false;
-    if (enabledIds.length > 0 && !enabledIds.includes(String(task?.id))) return false;
-    return true;
-  }
-
   const DANGER_LEVEL_ORDER = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
 
   function sortedDangerTags(tags) {
@@ -7971,41 +7957,68 @@
     });
   }
 
+  /**
+   * The environments a library gathering record is active in right now — the shared
+   * `activeEnvironmentsForRecord` seam, which owns composition (mode, match, forces,
+   * exclusions) AND the runtime weather/time-of-day gate.
+   *
+   * This is the single answer behind BOTH "Active environments" facts. They previously
+   * disagreed twice over: the task fact hand-rolled biome, weather and time inline over a
+   * `gatheringTaskAllowedInEnvironment` helper that applied `enabledTaskIds` as an allow-list in
+   * every mode and never read `forcedTaskIds`, and the event fact was `enabledEventIds.includes`
+   * and nothing else. Both are deleted; see issue #1321.
+   *
+   * Only the two SCOPING filters stay here, because they answer "which environments is this GM
+   * looking at" rather than "does this record compose": the disabled-environment filter and the
+   * system filter. The seam deliberately applies neither.
+   *
+   * `conditionSettings` is handed the raw SETTINGS object (`{weather: {enabled, current}, …}`),
+   * not a current-conditions shape — the module owns that conversion and needs the `enabled`
+   * flags the current shape does not carry.
+   *
+   * @param {object} record Library task or event.
+   * @param {'task' | 'event'} kind
+   * @param {object[]} scopedEnvironments Caller-scoped; see above.
+   */
+  function activeEnvironmentsForGatheringRecord(record, kind, scopedEnvironments) {
+    return activeEnvironmentsForRecord(record, scopedEnvironments, kind, {
+      conditionSettings: selectedGatheringSystemConfig.conditions,
+    });
+  }
+
+  // The `task.enabled === false` early return this used to open with is gone rather than kept as
+  // a second gate: `activeEnvironmentsForRecord` returns `[]` for a library-disabled record
+  // without inspecting an environment.
+  //
+  // The `|| selectedSystemId` in the system filter is PRESERVED from the shipped code, and is a
+  // deliberate asymmetry with the event fact below, which has no such fallback: a legacy
+  // environment with no `craftingSystemId` counts for tasks and not for events. Unifying the two
+  // would be a third behaviour change on top of this fact's two, and it is not this change's.
   function activeGatheringTaskEnvironmentCount(task) {
-    if (!task || task.enabled === false) return 0;
-    const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
-    const timeSetting = selectedGatheringSystemConfig.conditions?.timeOfDay || {};
-    const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
-    const taskWeather = Array.isArray(task.weather) ? task.weather : [];
-    const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
-    return environmentList.filter((environment) => {
-      if (environment?.enabled === false) return false;
-      if (
-        String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')
+    return activeEnvironmentsForGatheringRecord(
+      task,
+      'task',
+      environmentList.filter(
+        (environment) =>
+          environment?.enabled !== false &&
+          String(environment?.craftingSystemId || selectedSystemId) ===
+            String(selectedSystemId || '')
       )
-        return false;
-      if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
-      const environmentBiomes = Array.isArray(environment?.biomes)
-        ? environment.biomes
-        : environment?.biome
-          ? [environment.biome]
-          : [];
-      if (taskBiomes.length > 0 && !taskBiomes.some((biome) => environmentBiomes.includes(biome)))
-        return false;
-      if (
-        weatherSetting.enabled !== false &&
-        taskWeather.length > 0 &&
-        !taskWeather.includes(weatherSetting.current)
+    ).length;
+  }
+
+  // Site 10's fact. Extracted from an inline IIFE in the markup so it sits beside the task fact
+  // it now shares a definition with, and so the two are read together when either changes.
+  function activeGatheringEventEnvironmentCount(event) {
+    return activeEnvironmentsForGatheringRecord(
+      event,
+      'event',
+      environmentList.filter(
+        (environment) =>
+          environment?.enabled !== false &&
+          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
       )
-        return false;
-      if (
-        timeSetting.enabled !== false &&
-        taskTime.length > 0 &&
-        !taskTime.includes(timeSetting.current)
-      )
-        return false;
-      return true;
-    }).length;
+    ).length;
   }
 
   function environmentFacts(environment) {
@@ -12102,20 +12115,7 @@
                   <div class="manager-fact" data-gathering-event-fact="environments">
                     <span class="manager-fact-line"
                       ><strong
-                        >{(() => {
-                          if (!selectedGatheringEvent?.id) return 0;
-                          const eventId = String(selectedGatheringEvent.id);
-                          return environmentList.filter((env) => {
-                            if (
-                              String(env?.craftingSystemId || '') !== String(selectedSystemId || '')
-                            )
-                              return false;
-                            const ids = Array.isArray(env?.enabledEventIds)
-                              ? env.enabledEventIds.map(String)
-                              : [];
-                            return ids.includes(eventId);
-                          }).length;
-                        })()}</strong
+                        >{activeGatheringEventEnvironmentCount(selectedGatheringEvent)}</strong
                       >
                       <span class="manager-fact-label"
                         >{text(
