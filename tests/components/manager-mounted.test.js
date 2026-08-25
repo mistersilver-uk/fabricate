@@ -12569,6 +12569,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-recipe-item-editor]'),
       'the recipe-item editor body renders'
     );
+    // AND THE TRAIL NAMES THE ITEM (issue 1328), not the kind of screen. A recipe item has no
+    // name of its own — it is a world item plus the recipes it contains — so the leaf is the
+    // LINKED item's name, resolved through the same derivation the editor's own Overview preview
+    // uses rather than a second answer to "what is this thing called".
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
+        .filter((node) => node.tagName.toLowerCase() !== 'i')
+        .map((node) => node.textContent.trim()),
+      ['Crafting Systems', 'Alchemy', 'Crafting', 'Books & Scrolls', 'Alchemist Cook Book']
+    );
     // The router owns the header + footer actions.
     assertHeaderBackIsGhost('[data-recipe-item-back]', 'recipe-item-edit');
     assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
@@ -18630,9 +18640,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       '.fabricate-manager > .manager-header[data-tool-library-context]'
     );
     assert.ok(contextHeader, 'the Tool library owns one full-shell context header');
-    assert.match(
-      contextHeader.querySelector('.manager-breadcrumbs').textContent,
-      /Alchemy.*Crafting.*Tools/
+    // THE WHOLE TRAIL, ROOT INCLUDED (issue 1328). This used to be a substring match, which is
+    // why the missing root survived it: `/Alchemy.*Crafting.*Tools/` is satisfied by a trail that
+    // begins anywhere. The Tool library has its own header rather than sharing the root nav, and
+    // it began at the system name — so of the two Tool screens, the EDITOR carried
+    // `Crafting Systems` and the library did not.
+    assert.deepEqual(
+      Array.from(contextHeader.querySelectorAll('.manager-breadcrumbs > *'))
+        .filter((node) => node.tagName.toLowerCase() !== 'i')
+        .map((node) => node.textContent.trim()),
+      ['Crafting Systems', 'Alchemy', 'Crafting', 'Tools']
     );
     assert.equal(contextHeader.querySelector('.manager-title').textContent, 'Tool Studio');
     assert.match(
@@ -19375,6 +19392,57 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
   });
 
+  it('names the Gathering sub-tab in the trail, and the group above it navigates', async () => {
+    // FOUR SCREENS UNDER ONE NAME (issue 1328). Gathering is Environments, Tasks, Events and
+    // Settings, and its trail named only the group — so all four read `<system> > Gathering` and
+    // the trail could not tell a GM which one they were on. Checks already names its own sub-tab;
+    // this is that rule applied to the other group that has one.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([]),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    const crumbs = () =>
+      Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
+        .filter((node) => node.tagName.toLowerCase() !== 'i')
+        .map((node) => node.textContent.trim());
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(crumbs(), ['Crafting Systems', 'Alchemy', 'Gathering', 'Environments']);
+
+    // A SECOND TAB IS A DIFFERENT TRAIL, which is the whole claim: a crumb that named the group
+    // alone would be identical here, and a crumb hard-coded to `Environments` would too.
+    target.querySelector('#manager-gathering-nav-tasks').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(crumbs(), ['Crafting Systems', 'Alchemy', 'Gathering', 'Tasks']);
+    assert.equal(
+      target.querySelector('[data-breadcrumb-gathering-tab]').dataset.breadcrumbGatheringTab,
+      'tasks'
+    );
+
+    // AND THE GROUP CRUMB IS A LABEL HERE, not a control. One rule decides it, the same one the
+    // Downtime tab crumb follows: a crumb is a control when pressing it goes somewhere the GM is
+    // not. From the library, `Gathering` names the route already on the screen — returning to it
+    // leaves the active tab where it is — so a button would sit there doing nothing. From an
+    // editor it really does leave, and the editor trails below draw it as a button.
+    assert.equal(
+      Array.from(target.querySelectorAll('.manager-breadcrumbs button')).some(
+        (button) => button.textContent.trim() === 'Gathering'
+      ),
+      false,
+      'the Gathering crumb offers a press that would go nowhere'
+    );
+  });
+
   it('creates a new environment draft with draft-backed title and inspector context', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -19399,15 +19467,37 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'environment-edit'
     );
-    // The environment editor matches the task/event convention: a STATIC title,
-    // breadcrumb crumb, and concise help-text subtitle — the environment NAME and
-    // DESCRIPTION are no longer injected into the chrome. Pills render under the title.
+    // THE TITLE STAYS STATIC and the BREADCRUMB LEAF NAMES THE SUBJECT (issue 1328). These were
+    // one rule and are now two, deliberately. The chrome ruling this case was written for is
+    // about the TITLE and SUBTITLE: an environment's name and description are not injected
+    // there, and the pills render under a fixed heading. That still holds.
+    //
+    // A breadcrumb is a different instrument. It is the only thing on the screen that says WHICH
+    // environment is open — the title says what kind of screen it is, which a GM can already see
+    // — so a trail ending `Edit environment` withholds the one fact only it can carry, and four
+    // environments opened in turn produce four identical trails. The recipe, component and tool
+    // editors have always named their subject; this is the same rule reaching the three editors
+    // that did not.
     assert.equal(target.querySelector('.manager-title').textContent.trim(), 'Edit environment');
     const envEditCrumbs = Array.from(target.querySelectorAll('.manager-breadcrumbs span'));
     assert.equal(
       envEditCrumbs[envEditCrumbs.length - 1].textContent.trim(),
-      'Edit environment',
-      'final breadcrumb crumb should be the static label, not the environment name'
+      'New Gathering Environment',
+      'final breadcrumb crumb should name the environment, not the kind of screen'
+    );
+    // AND THE TRAIL ABOVE IT IS THE PATH THAT WAS WALKED, group and sub-tab included, rather
+    // than a jump from the system straight to the editor.
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
+        .filter((node) => node.tagName.toLowerCase() !== 'i')
+        .map((node) => node.textContent.trim()),
+      [
+        'Crafting Systems',
+        'Alchemy',
+        'Gathering',
+        'Environments',
+        'New Gathering Environment',
+      ]
     );
     assert.equal(
       target.querySelector('.manager-subtitle').textContent.trim(),

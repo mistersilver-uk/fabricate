@@ -628,9 +628,19 @@ Selected-system navigation:
 - **The trail has two roots, and neither is nested under the other.**
   A World route — Parties, Rules & Resources, Travel, Downtime — is rooted at `World`; every other route is rooted at `Crafting Systems`.
   World routes are `every system`, as the rail's own micro-label says, and Parties, Currency and Travel are each reachable before any crafting system has opted into anything, so a trail reading `Crafting Systems > World > …` states something false about the shape of the app.
+- **Every trail is rooted, and every trail describes the path that was walked.**
+  A trail SHALL begin at its root on every route, including a route whose header is drawn by a view of its own rather than by the shared one.
+  A trail SHALL name each level between the root and the screen, so that a group with sub-screens names the sub-screen too — a trail that stops at the group reads identically on every screen the group contains, and a trail that skips the group describes a path the GM cannot walk.
+- **A crumb that names a subject SHALL name that subject, not the kind of screen it opens.**
+  Where a screen edits a named thing, its leaf is that thing's name, falling back to the type name only while the thing has no name yet.
+  The title says what kind of screen it is, which the GM can already see; the trail is the only place that says WHICH one is open, so a leaf reading `Edit <type>` withholds the one fact only it can carry and renders every subject of that type identically.
+  This governs the BREADCRUMB alone and does not disturb any ruling about what a page title or subtitle may carry.
+- **A crumb is a control exactly when pressing it goes somewhere the GM is not.**
+  An intermediate crumb that names a reachable screen navigates to it; the leaf does not, and neither does a crumb naming the screen already displayed.
+  A crumb rendered as a control that cannot move the GM is worse than a label, because it invites a press that does nothing.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
-  The `World` crumb opens the World route wherever it is not the trail's last crumb, and is inert on the World route itself — which is the rule every crumb in this trail follows, stated once: an intermediate crumb navigates and the leaf does not.
+  The `World` crumb opens the World route wherever it is not the trail's last crumb, and is inert on the World route itself.
 - The selected-system rail scope uses the shared selector card described above.
   Activating `All crafting systems` returns to the systems browser without clearing the real selected-system store state.
 
