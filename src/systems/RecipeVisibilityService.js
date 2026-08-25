@@ -8,6 +8,7 @@ import { indexedMembershipLookups, readDefinitionRevision } from '../utils/defin
 import { recipeItemDefinitionsContaining } from '../utils/recipeItemMembership.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
+import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
@@ -551,7 +552,7 @@ export class RecipeVisibilityService {
     }
     const ids = this._getRecipeItemCharacterPrerequisiteIds(recipe, definition);
     if (ids.length === 0) return { met: true, reason: '' };
-    const definitions = this._getCraftingSystem(recipe)?.characterPrerequisites;
+    const definitions = resolveCharacterPrerequisiteLibrary(this._getCraftingSystem(recipe));
     const byId = new Map(
       (Array.isArray(definitions) ? definitions : []).map((def) => [def.id, def])
     );

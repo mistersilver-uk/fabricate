@@ -73,6 +73,7 @@ const RAW_MODULES = [
   // the same module. This harness DOES validate its dependency graph, so omitting it
   // throws a named "add it to rawModules" error rather than hanging — unlike the manager
   // harness, whose inline list has no validator.
+  'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
   // …and issue 1094 gave that resolver its first two imports: it appends the resolved
   // scalar through `toolCheckBonus.js` and reads the retirement shim from

@@ -416,7 +416,7 @@ test('buildExportPayload: writes the explicit schemaVersion + runtimeStateInclud
   const payload = buildExportPayload(makeSystem(), [], '1.0.0');
   // 4 since issue 1282 added the world `travelConfig` slice to the envelope (3 was #1278's
   // `currencyConfig`).
-  assert.equal(payload.schemaVersion, 4);
+  assert.equal(payload.schemaVersion, 5);
   assert.ok(payload.currencyConfig && typeof payload.currencyConfig === 'object');
   assert.ok(payload.travelConfig && typeof payload.travelConfig === 'object');
   assert.ok(Array.isArray(payload.travelConfig.realms));

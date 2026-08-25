@@ -262,6 +262,7 @@ const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
   rawModules: [
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
@@ -384,15 +385,16 @@ describe('CraftingSystemManagerRoot threads each host its OWN activity’s selec
     'utf8'
   );
 
-  it('hands both hosts the SYSTEM library', () => {
+  it('hands both hosts the WORLD library', () => {
     const wirings = [...source.matchAll(/checkModifierOptions=\{([^}]+)\}/g)].map((m) => m[1]);
     assert.equal(wirings.length, 2, 'one wiring per host — salvage and gathering');
     for (const wiring of wirings) {
       assert.match(
         wiring,
-        /selectedSystem\?\.modifiers/,
-        'the library is SYSTEM-level since issue 1095 and is named `modifiers` since issue ' +
-          '1117; an empty literal here renders a picker with nothing in it'
+        /selectedSystemModifiers/,
+        'the library is ONE list since issue 1117 and WORLD scope since issue 1308, read off the ' +
+          'view state rather than the selection; an empty literal here renders a picker with ' +
+          'nothing in it'
       );
     }
   });

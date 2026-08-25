@@ -7,7 +7,8 @@ An ingredient set contributes its own Tool ids only when the Crafting System use
 Recipe-wide Tools apply to every step, active step Tools apply to that step, and active ingredient-set Tools apply only when that set is selected.
 Legacy recipe `toolBonusModes` data is ignored and omitted from canonical Recipe writes; Recipe data never owns Tool behavior.
 
-An enabled Tool shared-prerequisite gate resolves every selected id against `system.characterPrerequisites` and evaluates the resolved definitions with AND semantics.
+An enabled Tool shared-prerequisite gate resolves every selected id against the WORLD character-prerequisite library (issue 1308) and evaluates the resolved definitions with AND semantics.
+Unlike the learning gate, it fails CLOSED: an id that resolves to nothing leaves the gate unpassed, so under `gateMode: "usability"` the tool is unusable and the attempt is blocked.
 An unresolved selected id fails closed.
 For an owned Tool, presence matching, prerequisite evaluation, and bonus-expression evaluation bind to the same matched Item's owning actor, so multiple actors cannot collectively satisfy one Tool.
 A virtual-present Tool binds those evaluations to the primary acting or check actor.

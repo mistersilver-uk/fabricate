@@ -56,6 +56,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+  'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',

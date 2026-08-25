@@ -12,8 +12,10 @@
  *     authoring `enabled`/`values` overrides).
  */
 
+import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { normalizeTravelConfig } from './gatheringRealms.js';
+import { normalizeModifierLibrary } from './modifierLibrary.js';
 
 /**
  * Integer schema-version marker written onto every export envelope. Distinct
@@ -21,7 +23,7 @@ import { normalizeTravelConfig } from './gatheringRealms.js';
  * exports carry no `schemaVersion` and are treated as schema `1` by the
  * migration layer.
  */
-export const FABRICATE_EXPORT_SCHEMA_VERSION = 4;
+export const FABRICATE_EXPORT_SCHEMA_VERSION = 5;
 
 /**
  * Default current-condition selection used when resetting runtime condition
@@ -114,6 +116,33 @@ export function assembleTravelAuthoringBundle(travelConfig) {
   return normalizeTravelConfig(
     travelConfig && typeof travelConfig === 'object' ? travelConfig : {}
   );
+}
+
+/**
+ * The WORLD character libraries slice of an export (issue 1308): the character-prerequisite
+ * library and the modifier library.
+ *
+ * TWO LIBRARIES, NORMALIZED SEPARATELY, and that separation carries all the way through import.
+ * They share a setting key for persistence economy only; they share no invariant, so a merge that
+ * treated the slice as one aggregate would let a destination holding only prerequisites discard
+ * every incoming modifier.
+ *
+ * Nothing here is runtime state, so nothing is stripped.
+ *
+ * @param {object} characterLibraries - The FULL `characterLibraries` world setting
+ * @returns {{ characterPrerequisites: object[], modifiers: object[] }}
+ */
+export function assembleCharacterLibrariesAuthoringBundle(characterLibraries) {
+  const source =
+    characterLibraries &&
+    typeof characterLibraries === 'object' &&
+    !Array.isArray(characterLibraries)
+      ? characterLibraries
+      : {};
+  return {
+    characterPrerequisites: normalizeCharacterPrerequisiteList(source.characterPrerequisites),
+    modifiers: normalizeModifierLibrary(source.modifiers),
+  };
 }
 
 /**

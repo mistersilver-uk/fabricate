@@ -271,9 +271,19 @@ test('export -> import round-trips the authored cap, the bySubject rule and ever
 
   const created = [];
   const createdRecipes = [];
+  // The library is WORLD scope since issue 1308, so it round-trips through the envelope's
+  // `characterLibraries` slice and lands in a SETTING rather than on the created system. The
+  // importer therefore needs the two settings seams to have anywhere to put it.
+  const worldSettings = {};
   const importer = new CompendiumImporter(
     makeSystemManager({ created }),
-    makeRecipeManager({ created: createdRecipes })
+    makeRecipeManager({ created: createdRecipes }),
+    {
+      getSetting: (key) => worldSettings[key],
+      setSetting: async (key, value) => {
+        worldSettings[key] = value;
+      },
+    }
   );
   // Round-trip through JSON, which is what a real import reads.
   await importer.importFromPackData(prepareForImport(JSON.parse(JSON.stringify(payload))));
@@ -284,8 +294,9 @@ test('export -> import round-trips the authored cap, the bySubject rule and ever
     'an authored cap survives the round trip — it is not re-derived as 1'
   );
   assert.equal(created[0].craftingCheck.defaultModifierPolicy, 'bySubject');
-  // The library and its ABSENCE-PRESERVING bounds survive at the system level.
-  assert.deepEqual(created[0].modifiers, [
+  // The library and its ABSENCE-PRESERVING bounds survive, in the world setting.
+  assert.equal(created[0].modifiers, undefined, 'no per-system copy is created');
+  assert.deepEqual(worldSettings.characterLibraries.modifiers, [
     { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
     { id: 'alch', label: 'Alchemy', expression: '@alch' },
   ]);

@@ -36,6 +36,7 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/systems/CraftingListingBuilder.js',
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',

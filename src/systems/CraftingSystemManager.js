@@ -65,11 +65,9 @@ import {
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
-  isRollExpression,
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
-  resolveModifierBounds,
 } from './checkModifierResolver.js';
 import {
   craftingDataChange,
@@ -80,6 +78,7 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -113,6 +112,50 @@ const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
 const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
 // `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
+
+/**
+ * Collect the trimmed ids of every entry across the given lists into one Set.
+ *
+ * @param {...Array<{id?: unknown}>} lists
+ * @returns {Set<string>}
+ */
+/**
+ * The Valid Id Basis for ONE library: the union of the world list and the system's surviving
+ * legacy copy, or `null` when neither can vouch for an id.
+ *
+ * PER LIBRARY, because the two are independent. A setting payload carrying only `modifiers` says
+ * nothing about whether a prerequisite has ever been authored, so an aggregate seeded flag would
+ * hand this a real, empty, PRUNABLE basis derived from a key that is simply absent.
+ *
+ * A legacy copy counts only when it is NON-EMPTY. An empty array is a legacy key, not a legacy
+ * library: it vouches for nothing while licensing a full prune, and every pre-1308 save emitted
+ * one, so treating its presence as a basis would arm the exact failure this whole mechanism
+ * exists to prevent.
+ *
+ * @param {object|null} store
+ * @param {'characterPrerequisites'|'modifiers'} key
+ * @param {() => Array<object>} readWorld
+ * @param {unknown} legacy
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
+function _libraryBasis(store, key, readWorld, legacy) {
+  const seeded = store?.isSeeded?.(key) === true;
+  const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
+  if (!seeded && !legacyList) return null;
+  return _idSet(seeded ? readWorld() : [], legacyList ?? []);
+}
+
+function _idSet(...lists) {
+  const ids = new Set();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+      if (id) ids.add(id);
+    }
+  }
+  return ids;
+}
 
 export class CraftingSystemManager {
   /**
@@ -165,6 +208,79 @@ export class CraftingSystemManager {
     this._isActiveGM =
       seams.isActiveGM ??
       (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
+    // Issue 1308: the WORLD character libraries, which since the move are the source of the two
+    // id sets this manager prunes references against. Optional by design — a fixture that
+    // injects none gets an UNKNOWN basis and prunes nothing, which is the safe direction. See
+    // `_characterLibraryBasis`.
+    this._characterLibrariesStore =
+      seams.characterLibrariesStore ??
+      (() => globalThis.game?.fabricate?.getCharacterLibrariesStore?.() ?? null);
+  }
+
+  /**
+   * Resolve the injected character-libraries store, whether it was supplied as the store itself
+   * or as a lazy getter. Lazy is the production shape: `game.fabricate` is not populated when
+   * this manager is constructed.
+   *
+   * @returns {object|null}
+   * @private
+   */
+  _resolveCharacterLibrariesStore() {
+    const seam = this._characterLibrariesStore;
+    if (!seam) return null;
+    try {
+      return typeof seam === 'function' ? (seam() ?? null) : seam;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Build the VALID ID BASIS for one system's reference pruning — the id sets
+   * `_normalizeSystem` and `upsertTool` check `prerequisites.ids` and `defaultModifierIds`
+   * against before dropping anything.
+   *
+   * RETURNS `null` FOR EACH SET IT CANNOT KNOW TO BE COMPLETE, and `null` means prune nothing.
+   * `DOMAIN.md`'s Valid Id Basis rule is that a destructive pass runs only when its basis is
+   * known-complete, and it names this exact failure — a pass handed an empty set for an entity
+   * class prunes every key scoped to that class on every run, reached by an omitted ARGUMENT
+   * rather than by an incomplete corpus.
+   *
+   * THE BASIS IS A UNION of the world library and the system's own surviving legacy copy, and
+   * the union is what makes it known-complete rather than merely non-empty. Before the 1.28.0
+   * migration lifts them, the legacy in-system entries ARE the live corpus, so including them is
+   * derivation-from-corpus. It is emphatically NOT a `migrationVersion` check, which
+   * `DOMAIN.md` forbids outright: "this client did not run the migration" is true on every
+   * non-primary client on every boot. One formulation covers every dangerous state at once —
+   * the unmigrated player or assistant GM, the deferred or aborted migration pass, a
+   * copy-mode import whose incoming system still carries its own libraries, and `upsertTool`.
+   *
+   * WHY AN EMPTY WORLD LIBRARY IS NOT ENOUGH TO PRUNE ON. Foundry returns the registered
+   * default for a world setting that was never written, so an unmigrated world reads as two
+   * empty arrays — indistinguishable, after normalizing, from a GM who deliberately emptied
+   * both. The store keeps the raw key presence for exactly this decision, so "never written"
+   * yields an unknown basis while "written empty" yields a real, empty, prunable one.
+   *
+   * @param {object} system The system being normalized, still carrying any legacy copy.
+   * @returns {{prerequisiteIds: Set<string>|null, modifierIds: Set<string>|null}}
+   * @private
+   */
+  _characterLibraryBasis(system) {
+    const store = this._resolveCharacterLibrariesStore();
+    return {
+      prerequisiteIds: _libraryBasis(
+        store,
+        'characterPrerequisites',
+        () => store.listCharacterPrerequisites(),
+        system?.characterPrerequisites
+      ),
+      modifierIds: _libraryBasis(
+        store,
+        'modifiers',
+        () => store.listModifiers(),
+        system?.modifiers
+      ),
+    };
   }
 
   /**
@@ -269,11 +385,18 @@ export class CraftingSystemManager {
     );
     // Normalize the shared prerequisite library before Tools so every payload path
     // (settings, import, copy, or direct registration) applies the same ID invariant.
-    const characterPrerequisites = normalizeCharacterPrerequisiteList(
+    // Issue 1308: both libraries are WORLD scope now, so the basis this pass prunes references
+    // against comes from `_characterLibraryBasis` — a union of the world library and any legacy
+    // in-system copy — and either half may be `null`, meaning "not known to be complete, prune
+    // nothing". Deriving it from `system.characterPrerequisites` alone, as this did before the
+    // move, would silently strip every tool prerequisite in any world that has not migrated.
+    const { prerequisiteIds: validToolPrerequisiteIds, modifierIds: validCatalogueIds } =
+      this._characterLibraryBasis(system);
+    const _legacyModifiers = normalizeModifierLibrary(system.modifiers);
+    const _legacyCharacterPrerequisites = normalizeCharacterPrerequisiteList(
       system.characterPrerequisites,
       () => foundry.utils.randomID()
     );
-    const validToolPrerequisiteIds = new Set(characterPrerequisites.map((entry) => entry.id));
     const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
     // Salvage-normalization context (issue 764), HOISTED above the component map so the
     // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
@@ -288,8 +411,7 @@ export class CraftingSystemManager {
     // `1.22.0` and `1.23.0` — and is NOT read from either old location here. The
     // migrations and the export-payload upcast are the paths a legacy payload arrives
     // through, and a silent read-alias would make the relocation unobservable.
-    const modifiers = this._normalizeModifierLibrary(system.modifiers);
-    const validCatalogueIds = new Set(modifiers.map((entry) => entry.id));
+
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
@@ -397,11 +519,24 @@ export class CraftingSystemManager {
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      // The one named modifier library for the WHOLE system (issue 1117). Crafting,
-      // salvage and gathering checks each select over it through their own
-      // `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple below,
-      // and the gathering d100 drop rows, events and stamina costs REFERENCE it too.
-      modifiers,
+      // A SURVIVING LEGACY COPY IS CARRIED THROUGH; THE MIGRATION IS THE ONLY THING THAT REMOVES
+      // IT (issue 1308).
+      //
+      // The library is WORLD scope — authored once, with every crafting system's check triple
+      // selecting over the same list — so on a migrated world there is nothing here to carry and
+      // this emits nothing.
+      //
+      // The tempting alternative was to let the allowlist rebuild shed the key, which is how the
+      // 1.22.0 and 1.23.0 relocations retired theirs. It is wrong here, twice over. Migrations run
+      // on the ACTIVE GM alone, so every player and every assistant GM hydrates through this
+      // normalizer while the world setting is still unwritten; `hydrate` runs it on load, and the
+      // legacy copy is the only place those entries exist on that client, so any later save makes
+      // the loss durable. And `upsertTool` derives its own Valid Id Basis from the NORMALIZED
+      // record, so a shed here silently narrows a basis that pass depends on.
+      //
+      // Carrying it forward is not a read-alias keeping a retired location alive. The 1.28.0
+      // migration strips it exactly once, from the one client entitled to, and it is gone.
+      ...(_legacyModifiers.length > 0 && { modifiers: _legacyModifiers }),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
@@ -467,13 +602,11 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: normalizedTools,
-      // System-owned character prerequisite library (issue 544). Reusable
-      // pass/fail conditions (`{ id, name, icon, path, op, value }`) the GM
-      // authors in System Settings and attaches to gate learning a recipe from a
-      // book/scroll (referenced by id from a recipe item's `caps.learn`).
-      // Normalized wholesale from the incoming array; settings replace (not
-      // deep-merge), so a removed entry does not resurrect.
-      characterPrerequisites,
+      // Carried through on the same rule as the modifier library above, and removed by the same
+      // migration.
+      ...(_legacyCharacterPrerequisites.length > 0 && {
+        characterPrerequisites: _legacyCharacterPrerequisites,
+      }),
       // PARTICIPATION ONLY (issue 1282). The realm library itself is world scope — realms are
       // geography, and the same valley is the same valley whichever crafting system a
       // character is there to serve — so it lives in the `travelConfig` world setting and
@@ -697,7 +830,7 @@ export class CraftingSystemManager {
     return normalizeFailureResultPolicy(value);
   }
 
-  _normalizeCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeCraftingCheck(check = {}, validCatalogueIds = null) {
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
       .map((o) =>
@@ -743,85 +876,6 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the SYSTEM-LEVEL modifier library (issue 1117): the ONE named library of
-   * `{id, label, icon?, expression, isRollExpression, min?, max?}` entries that every
-   * activity's check selects over AND that every gathering drop row, event and stamina
-   * cost references. Malformed entries are dropped, ids are trimmed and de-duplicated,
-   * and a bad expression coerces to an empty string.
-   *
-   * IT IS ONE LIBRARY, not two. Until issue 1117 a system authored modifiers twice, in
-   * two near-identical shapes: the check-modifier catalogue at `system.checkModifiers`
-   * and the gathering character-modifier library at
-   * `gatheringConfig.systems[systemId].characterModifiers`. The `1.23.0` migration merges
-   * them here, and the `checkModifiers`/`characterModifiers` keys are both retired — this
-   * normalizer is an ALLOWLIST REBUILD, so an unemitted key is dropped on the next save,
-   * which is exactly why the migration must run first (`_runMigrations` in `src/main.js`
-   * precedes every manager load).
-   *
-   * THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-   * `min`/`max` clamp the resolved value of a CHECK modifier, and gathering's own
-   * per-reference `min`/`max` clamp a drop contribution independently of them.
-   *
-   * `icon`, `min` and `max` are all ABSENCE-PRESERVING: each is attached only when
-   * authored, so `null`, `undefined`, `''` and junk all normalize to the same shape (key
-   * absent) and absence means unbounded. `0` is a real bound and survives, which is why
-   * the guard is `Number.isFinite` and not truthiness. An inverted pair (`min > max`) is
-   * PRESERVED VERBATIM rather than repaired: it is a blocking readiness issue
-   * (`modifierBoundsInverted`) that the GM must fix, and silently swapping the pair would
-   * roll a number nobody authored. `clampModifierValue` makes such an entry contribute 0
-   * meanwhile — the refuse posture gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS`
-   * already takes.
-   *
-   * `isRollExpression` is DERIVED here and never read off the input, so a persisted or
-   * imported flag can never contradict the expression beside it. It is emitted rather
-   * than left to each reader because the two readers that need it — the authoring
-   * surface's Roll chip and the check-readiness rule that BLOCKS on a roll-shaped
-   * expression reaching a check — must classify one entry identically.
-   *
-   * AN ENTRY WITH NO EXPRESSION IS KEPT, which is a deliberate change from the gathering
-   * normalizer this replaces (it dropped one). The library now has an "Add modifier"
-   * button, and an entry that vanished on save the moment it was created would make that
-   * button appear broken. An unresolvable expression is still a runtime misconfiguration
-   * — gathering reports `CHARACTER_MODIFIER_NON_FINITE` for it instead of
-   * `MISSING_CHARACTER_MODIFIER` — so nothing silently succeeds.
-   *
-   * @param {unknown} library Raw `system.modifiers`.
-   * @returns {Array<{id: string, label: string, expression: string, isRollExpression: boolean,
-   *   icon?: string, min?: number, max?: number}>}
-   * @private
-   */
-  _normalizeModifierLibrary(library) {
-    const raw = Array.isArray(library) ? library : [];
-    const seenIds = new Set();
-    const modifiers = [];
-    for (const entry of raw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      const expression = typeof entry.expression === 'string' ? entry.expression.trim() : '';
-      const normalized = {
-        id,
-        label: typeof entry.label === 'string' ? entry.label : '',
-        expression,
-        isRollExpression: isRollExpression(expression),
-      };
-      if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
-      // Asked of the RESOLVER rather than re-derived here, so the persisted shape and the
-      // clamp the engine applies cannot disagree about what an unbounded form is. That
-      // matters more than it looks: `Number(null)`, `Number('')` and `Number([])` are all
-      // `0`, and `0` is a REAL bound on this field — so a hand-written `Number.isFinite`
-      // guard here would MINT a bound of 0 every time the editor cleared one (it patches
-      // `null`), exactly the trap `_normalizeSalvage`'s `dcOverride` guard calls out.
-      const { min, max } = resolveModifierBounds(entry);
-      if (min !== null) normalized.min = min;
-      if (max !== null) normalized.max = max;
-      modifiers.push(normalized);
-    }
-    return modifiers;
-  }
-
-  /**
    * Normalize ONE activity check's selection over the system catalogue (issue 1095):
    * `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }`.
    *
@@ -859,7 +913,13 @@ export class CraftingSystemManager {
     const defaultModifierIds = (
       Array.isArray(check?.defaultModifierIds) ? check.defaultModifierIds : []
     ).filter((id) => {
-      if (typeof id !== 'string' || !validIds.has(id) || seenDefaults.has(id)) return false;
+      // `!(validIds instanceof Set)` is the UNKNOWN-basis sentinel, matching
+      // `_normalizeToolPrerequisites` (issue 1308). A caller that cannot vouch for the modifier
+      // library passes `null` and nothing is pruned; the three activity-check normalizers above
+      // DEFAULT to that, because their old `new Set()` default was itself the omitted-argument
+      // form of the Valid Id Basis failure — an empty basis prunes every id on every run.
+      if (typeof id !== 'string' || seenDefaults.has(id)) return false;
+      if (validIds instanceof Set && !validIds.has(id)) return false;
       seenDefaults.add(id);
       return true;
     });
@@ -1333,7 +1393,7 @@ export class CraftingSystemManager {
     return null;
   }
 
-  _normalizeSalvageCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeSalvageCraftingCheck(check = {}, validCatalogueIds = null) {
     const normalizedCheck = !check || typeof check !== 'object' ? {} : check;
     const outcomes = Array.isArray(normalizedCheck.outcomes) ? normalizedCheck.outcomes : [];
     const normalizedOutcomes = outcomes
@@ -1380,7 +1440,7 @@ export class CraftingSystemManager {
   // routed). d100 needs no editable config (the fixed d100 roll), so only the
   // progressive and routed sub-objects are authored, reusing the crafting shapes.
   // A per-task DC override lives on the gathering task (`task.dcOverride`).
-  _normalizeGatheringCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeGatheringCraftingCheck(check = {}, validCatalogueIds = null) {
     const source = !check || typeof check !== 'object' ? {} : check;
     return {
       enabled: source.enabled === true,
@@ -3171,11 +3231,14 @@ export class CraftingSystemManager {
     const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
     const tools = Array.isArray(system.tools) ? system.tools : [];
     const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
-    const validPrerequisiteIds = new Set(
-      (Array.isArray(system.characterPrerequisites) ? system.characterPrerequisites : []).map(
-        (entry) => entry.id
-      )
-    );
+    // Issue 1308: the SAME Valid Id Basis `_normalizeSystem` uses, and derived through the same
+    // helper rather than rebuilt here. This site is easy to miss and expensive to get wrong: it
+    // does not go through `_normalizeSystem`, so before the fix it read the world-scoped library
+    // off `system.characterPrerequisites`, found nothing, and handed `_normalizeToolPrerequisites`
+    // a real-but-empty Set — which its own unknown-basis sentinel cannot refuse. Every Tool save
+    // would then strip that tool's prerequisite ids and flip its gate off, in a fully migrated,
+    // otherwise healthy world.
+    const { prerequisiteIds: validPrerequisiteIds } = this._characterLibraryBasis(system);
     const staged = this._normalizeTool(
       {
         ...existing,

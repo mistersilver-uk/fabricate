@@ -138,11 +138,10 @@ function realmIds(travelConfig) {
 }
 
 describe('the export envelope carries the world travel configuration', () => {
-  it('stamps schema 4 and puts the realm library beside the currency ladder', () => {
+  it('stamps the current schema and puts the realm library beside the currency ladder', () => {
     const envelope = exportedEnvelope();
 
     assert.equal(envelope.schemaVersion, FABRICATE_EXPORT_SCHEMA_VERSION);
-    assert.equal(FABRICATE_EXPORT_SCHEMA_VERSION, 4, 'the travel slice is what bumped 3 → 4');
     assert.deepEqual(realmIds(envelope.travelConfig), [VALE_ID, QUARRY_ID]);
     assert.equal(envelope.travelConfig.revealMode, 'onPartyTokenEntry');
     assert.equal(envelope.travelConfig.modifierVisibility, 'gmOnly');

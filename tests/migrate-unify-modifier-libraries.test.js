@@ -27,6 +27,7 @@ import {
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { normalizeModifierLibrary } from '../src/systems/modifierLibrary.js';
 
 const CHECK_LIBRARY = [
   { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
@@ -250,10 +251,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   // FIVE, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
   // the routed DC-source downgrade boundary, issue 1098's 1.25.0 seeds the failure-result
-  // policy, issue 1278's 1.26.0 lifts currency to world scope, and issue 1282's 1.27.0 lifts
-  // travel; the runner counts every entry it applies.
-  assert.equal(summary.ran, 5);
-  assert.equal(store.get('migrationVersion'), '1.27.0');
+  // policy, issue 1278's 1.26.0 lifts currency to world scope, issue 1282's 1.27.0 lifts travel,
+  // and issue 1308's 1.28.0 lifts both character libraries; the runner counts every entry it
+  // applies.
+  assert.equal(summary.ran, 6);
+  assert.equal(store.get('migrationVersion'), '1.28.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(
@@ -261,8 +263,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
       `the transient report is never persisted into ${key}`
     );
   }
+  // The re-keyed entry is asserted where it now LIVES: 1.28.0 runs in the same pass and lifts the
+  // unified library into the `characterLibraries` world setting, shedding the per-system copy.
+  assert.equal(store.get('craftingSystems')[0].modifiers, undefined);
   assert.ok(
-    store.get('craftingSystems')[0].modifiers.some((entry) => entry.id === 'nature-gathering')
+    store.get('characterLibraries').modifiers.some((entry) => entry.id === 'nature-gathering')
   );
 });
 
@@ -320,10 +325,13 @@ test('the export upcast merges an imported bundle’s two libraries', () => {
   };
   const migrated = migrateExportPayload(bundle);
 
+  // The merged library lands in the envelope's world slice, because 1.28.0's lift runs at the end
+  // of the same chain and takes it off the system.
   assert.deepEqual(
-    migrated.system.modifiers.map((modifier) => modifier.id),
+    migrated.characterLibraries.modifiers.map((modifier) => modifier.id),
     ['med', 'nature', 'nature-gathering', 'survival']
   );
+  assert.equal(migrated.system.modifiers, undefined);
   assert.equal(Object.hasOwn(migrated.system, 'checkModifiers'), false);
   assert.equal(Object.hasOwn(migrated.gatheringConfig.system, 'characterModifiers'), false);
   assert.deepEqual(
@@ -349,29 +357,40 @@ test('the export upcast composes with 1.22.0: a PRE-1.22.0 bundle keeps its cata
     },
   });
   assert.deepEqual(
-    migrated.system.modifiers.map((entry) => entry.id),
+    migrated.characterLibraries.modifiers.map((entry) => entry.id),
     ['med', 'nature'],
-    'the 1.22.0 lift runs first, so the merge finds the catalogue where it now lives'
+    'the 1.22.0 lift runs first so the merge finds the catalogue, and 1.28.0 then lifts the ' +
+      'merged library off the system into the envelope slice'
   );
 });
 
-// The whole point of the move: ONE library, read by the normalizer that owns it.
-test('the merged library normalizes as the system library, bounds and all', () => {
+// The whole point of the 1.23.0 move: ONE library, read by the normalizer that owns it.
+//
+// Since issue 1308 that normalizer is `normalizeModifierLibrary`, not `_normalizeSystem` — the
+// library became a WORLD setting and the crafting system stopped carrying a copy. What this still
+// pins is that 1.23.0's OUTPUT is well-formed for whoever owns it next, which for an upgrade path
+// running both migrations in one pass is the 1.28.0 lift.
+test('the merged library normalizes as the modifier library, bounds and all', () => {
   const merged = systemOf(migrateUnifyModifierLibraries(world()));
-  const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  const normalized = manager._normalizeSystem(merged);
+  const normalized = normalizeModifierLibrary(merged.modifiers);
   assert.deepEqual(
-    normalized.modifiers.map((entry) => entry.id),
+    normalized.map((entry) => entry.id),
     ['med', 'nature', 'nature-gathering', 'survival']
   );
-  assert.equal(normalized.modifiers[0].min, -1);
-  assert.equal(normalized.modifiers[0].max, 5);
-  assert.equal(normalized.modifiers[0].isRollExpression, false);
-  assert.deepEqual(
-    normalized.craftingCheck.defaultModifierIds,
-    ['med', 'nature'],
-    'and the crafting selection still resolves against it'
-  );
+  assert.equal(normalized[0].min, -1);
+  assert.equal(normalized[0].max, 5);
+  assert.equal(normalized[0].isRollExpression, false);
+  // And the crafting selection still resolves against it, once the world library carries it.
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  manager._characterLibrariesStore = {
+    isSeeded: () => true,
+    listCharacterPrerequisites: () => [],
+    listModifiers: () => normalized,
+  };
+  assert.deepEqual(manager._normalizeSystem(merged).craftingCheck.defaultModifierIds, [
+    'med',
+    'nature',
+  ]);
 });
 
 // The shared per-system transform is what lets the world migration and the export upcast

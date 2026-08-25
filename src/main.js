@@ -20,6 +20,7 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
+import { CharacterLibrariesStore } from './systems/CharacterLibrariesStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
@@ -1045,6 +1046,20 @@ class Fabricate {
       randomID: () => foundry.utils.randomID()
     });
     this.currencyConfigStore.load();
+    // Issue 1308: the world character libraries — the character-prerequisite library and the
+    // modifier library. Constructed and loaded HERE, before both managers, because
+    // `CraftingSystemManager` derives its Valid Id Basis from this store on every normalize; a
+    // manager built ahead of it would prune every reference against an empty basis.
+    //
+    // Note this is NOT where the travel store sits (it is constructed well after the manager).
+    // Copying that placement would be wrong: realms are read on demand, whereas these libraries
+    // are read during normalization itself.
+    this.characterLibrariesStore = new CharacterLibrariesStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.characterLibrariesStore.load();
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
@@ -1578,6 +1593,23 @@ class Fabricate {
       }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
       ui.notifications?.warn?.(message, { permanent: true });
     }
+
+    // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about
+    // what an id MEANS. Identical copies are filtered out upstream, so everything here changed a
+    // real rule — and the change is INVISIBLE without this notice, because the reference still
+    // resolves. It resolves to the other system's definition, so a book that gated learning at
+    // rank 2 now gates at rank 1 with nothing on screen to say so. The migration's own label
+    // promises the GM this report by name; permanent, for the reason the sibling above is.
+    const characterLibraryCollisions = Array.isArray(summary?.characterLibraryCollisions)
+      ? summary.characterLibraryCollisions : [];
+    if (characterLibraryCollisions.length > 0 && game.user?.isGM) {
+      const names = [...new Set(characterLibraryCollisions.map((entry) => entry.entryId))].join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.CharacterLibraries.CollisionNotice', {
+        count: characterLibraryCollisions.length,
+        entries: names,
+      }) || `Fabricate merged every crafting system's character prerequisites and modifiers into one world library. ${characterLibraryCollisions.length} entr(ies) shared an id across systems but were defined differently, so only one definition survived: ${names}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources.`;
+      ui.notifications?.warn?.(message, { permanent: true });
+    }
   }
 
   /**
@@ -1711,6 +1743,25 @@ class Fabricate {
    */
   getCurrencyConfigStore() {
     return this.currencyConfigStore ?? null;
+  }
+
+  /**
+   * Get the world character libraries store (issue 1308): the character-prerequisite library and
+   * the modifier library.
+   *
+   * World scope, not per crafting system, because both resolve against the acting CHARACTER.
+   * Nothing stays per system — there is no participation flag to consult.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, for the reason `getCurrencyConfigStore` above is
+   * not: these libraries gate craftability, learning and tool usability, and every call site
+   * guards with optional chaining, which catches an absent accessor but NOT a throw. A readiness
+   * throw here would surface as a crash on the craftability path rather than the unknown basis
+   * those callers are written to tolerate.
+   *
+   * @returns {CharacterLibrariesStore|null}
+   */
+  getCharacterLibrariesStore() {
+    return this.characterLibrariesStore ?? null;
   }
 
   /**
@@ -4305,6 +4356,10 @@ function bindFabricateGlobal() {
     // every realm-gated environment in the payload lands in the destination world citing realm
     // ids that name nothing.
     const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
+    // And the world character libraries (issue 1308), for the same reason and with the same
+    // consequence: omit them and the export carries empty libraries, so every learning gate,
+    // tool requirement and check modifier in the payload lands unresolvable.
+    const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
@@ -4312,7 +4367,8 @@ function bindFabricateGlobal() {
       gatheringEnvironments,
       gatheringConfig,
       currencyConfig,
-      travelConfig
+      travelConfig,
+      characterLibraries
     );
   };
 
@@ -4625,6 +4681,7 @@ Hooks.once('ready', async () => {
     gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
     currencyConfigStore: fabricate.currencyConfigStore,
     travelStore: fabricate.gatheringRealmStore,
+    characterLibrariesStore: fabricate.characterLibrariesStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {

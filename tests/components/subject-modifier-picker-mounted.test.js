@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-subject-modifier-picker-',
   rawModules: [
     // `resolveMaxModifierPicks` decides what an ABSENT cap means, and these close its graph.
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',

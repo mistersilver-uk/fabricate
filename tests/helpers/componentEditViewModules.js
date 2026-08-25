@@ -21,6 +21,7 @@
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
+  'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',

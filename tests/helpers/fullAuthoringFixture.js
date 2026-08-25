@@ -19,7 +19,7 @@ export const FIXTURE_REALM_ID = 'realm-verdant';
 /**
  * Build a full authoring fixture.
  *
- * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig: object }}
+ * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig: object, characterLibraries: object }}
  */
 export function buildFullAuthoringFixture() {
   const system = {
@@ -89,17 +89,8 @@ export function buildFullAuthoringFixture() {
     // Realms left the crafting system in issue 1282: the library is WORLD scope and lives in
     // `travelConfig` (below), so all a system carries now is whether it PARTICIPATES.
     gatheringRealmSettings: { enabled: true },
-    // The ONE system-level modifier library (issues 1095, 1117). THREE entries on purpose:
-    // one carrying BOTH bounds and one carrying NEITHER, because `min`/`max` are
-    // absence-preserving and a fixture where every entry is bounded cannot tell a
-    // round-trip that DROPS the keys from one that writes them everywhere — plus the entry
-    // a gathering drop row references, which used to live in a second library in the
-    // gathering config and now lives here with the rest.
-    modifiers: [
-      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
-      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
-      { id: FIXTURE_MODIFIER_ID, label: 'Skilled', expression: '@abilities.str.mod' },
-    ],
+    // The modifier library is NOT here: issue 1308 moved it to WORLD scope, so it lives in
+    // `characterLibraries` below alongside the character prerequisites.
     // A NON-DEFAULT selection triple on EACH of the three activity checks. A
     // default-valued fixture is not an oracle for an allowlist rebuild: `addAll` with an
     // empty id set and no cap is exactly what a normalizer that emitted NOTHING produces,
@@ -361,7 +352,34 @@ export function buildFullAuthoringFixture() {
     ],
   };
 
-  return { system, recipes, environments, gatheringConfig, travelConfig };
+  // The WORLD character libraries (issue 1308).
+  //
+  // THREE modifier entries on purpose: one carrying BOTH bounds and one carrying NEITHER, because
+  // `min`/`max` are absence-preserving and a fixture where every entry is bounded cannot tell a
+  // round-trip that DROPS the keys from one that writes them everywhere — plus the entry a
+  // gathering drop row references, which used to live in a second library in the gathering config.
+  //
+  // The prerequisite carries a NON-NULL `value`, because the valueless operators normalize `value`
+  // to null and a fixture using one could not tell a round trip that drops the field.
+  const characterLibraries = {
+    characterPrerequisites: [
+      {
+        id: 'prereq-smith',
+        name: "Smith's Tools",
+        icon: 'fa-solid fa-hammer',
+        path: 'tools.smith.value',
+        op: 'gte',
+        value: 1,
+      },
+    ],
+    modifiers: [
+      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
+      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+      { id: FIXTURE_MODIFIER_ID, label: 'Skilled', expression: '@abilities.str.mod' },
+    ],
+  };
+
+  return { system, recipes, environments, gatheringConfig, travelConfig, characterLibraries };
 }
 
 /**
@@ -438,9 +456,9 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   ],
   // ── issues 1095/1117: the ONE system-level library and its three selections ───────
   [
-    'system carries a modifier library with one BOUNDED and one UNBOUNDED entry',
+    'the world carries a modifier library with one BOUNDED and one UNBOUNDED entry',
     (f) => {
-      const library = f.system.modifiers ?? [];
+      const library = f.characterLibraries.modifiers ?? [];
       return (
         library.some((entry) => Number.isFinite(entry.min) && Number.isFinite(entry.max)) &&
         library.some((entry) => !Object.hasOwn(entry, 'min') && !Object.hasOwn(entry, 'max'))
@@ -450,7 +468,7 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   [
     'the ONE library also carries the entry a gathering drop row references',
     (f) =>
-      (f.system.modifiers ?? []).some((entry) => entry.id === FIXTURE_MODIFIER_ID) &&
+      (f.characterLibraries.modifiers ?? []).some((entry) => entry.id === FIXTURE_MODIFIER_ID) &&
       !Object.hasOwn(f.gatheringConfig.systems[f.system.id] ?? {}, 'characterModifiers'),
   ],
   [

@@ -1014,15 +1014,21 @@ The identity sub-form (Name + Description only) SHALL participate in the Manager
 A navigation that re-enters the System Overview page on the same system (the validation-blocker link, or re-selecting the already-selected system) SHALL NOT prompt, because the form stays mounted and its pending edit survives.
 The optional-features toggles (the Currency participation toggle included) and the character-modifier / prerequisite cards on the same tab live-apply through the store and stage no draft, so they do not participate in this guard.
 
-The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — a system-owned library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes (behaviour in `recipe-visibility`).
+The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — the WORLD library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes and to a Tool to gate who may wield it (behaviour in `recipe-visibility` and `data-models` -> Tool).
+Since issue 1308 it edits a world record on a page framed as settings for the SELECTED crafting system, which is the one place in the Manager where those two scopes meet.
+That is a deliberate interim state, and it is made honest in place rather than left implicit: the card header SHALL carry a neutral scope chip reading "every system" — the World rail's own wording, so the two surfaces say one thing — the hint SHALL state that the library is shared by every crafting system, and delete SHALL confirm, naming the cross-system reach, because an unconfirmed one-click delete whose blast radius is every system is not a recoverable mistake.
+The **Modifiers** card on the same tab SHALL carry the identical treatment, for the identical reason.
+Both chips go away when the follow-up change relocates the two editors to their own World route.
 It is an accordion list (one entry expanded at a time): each collapsed row shows the entry name and a live `@path op value` preview, and the expanded body edits the name, then the property `path` (rendered with a leading `@` affordance), an operator dropdown (the nine `CharacterPrerequisite.op` tokens), and a `value` field that is hidden for the valueless operators (`is true` / `is false` / `exists`).
 Add, delete, and an opt-in **Seed presets** action (enabled only for `dnd5e` / `pf2e` worlds, disabled with an explanatory tooltip otherwise) mirror the gathering character-modifier card's affordances.
 Each control live-applies through the admin store (`addCharacterPrerequisite` / `updateCharacterPrerequisite` / `deleteCharacterPrerequisite` / `seedCharacterPrerequisitePresetsForSystem`), staging no dirty draft.
+Since issue 1308 none of those actions takes a crafting-system id and none may early-return on an unselected system: the library they write is world scope, so a system-scoped guard would silently drop the edit.
 
 #### Settings-List Ergonomics
 
 Three Manager library lists — **Character modifiers** and **Character prerequisites** on System Settings, and **Currency units** on the World > Currency route — share a set of ergonomic affordances (issue 768).
 The Currency-units list moved out of System Settings with the rest of the currency editor (issue 1278), and the shared contract follows it: the ergonomics are a property of the list, not of the page it sits on.
+All three now edit WORLD records (issue 1308 moved the other two's data, though not yet their editors), so the shared contract additionally covers SCOPE DISCLOSURE: a list editing a world record from a system-framed page SHALL say so on its header and in its delete confirmation, and one editing it from a World route needs neither, because the route already said it.
 
 The Character-modifiers list SHALL render as a compact summary-row accordion mirroring the Character-prerequisites card: each collapsed row is one line — a chevron, the modifier's icon, its label, and its expression shown inline with the leading `@` sigil stripped for a cleaner read — with the row actions (copy, delete) to the right; activating the summary expands the row to the editor (Icon, Label, Expression).
 The Character-modifier editor SHALL edit its `icon` with the shared pop-over `IconPicker` (the same control the Currency-unit and Character-prerequisite editors use), not a raw icon-class text input; a modifier with no explicit icon falls back to `fa-solid fa-user`.
@@ -1235,7 +1241,8 @@ When `checkBreakable` is false under check-driven authority, on-break controls a
 `flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
 `replaceWith` authors exactly one managed Component target through a full-width shared searchable popover card.
 The Tool Studio does not create or edit direct Item targets; legacy direct Item discriminators remain readable and executable at runtime until the GM deliberately replaces them with a managed Component target.
-Requirements selects shared `system.characterPrerequisites` ids, the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Requirements selects ids from the WORLD character-prerequisite library (issue 1308), the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Its empty state SHALL say the library is empty for the WORLD rather than for this system, and a Tool save SHALL preserve the selected ids: `upsertTool` derives the same Valid Id Basis `_normalizeSystem` does, so a save on a world whose library cannot be vouched for prunes nothing rather than silently clearing the gate.
 The bonus expression input visually supplies a leading `@` for roll-data paths, stores that sigil exactly once, provides explanatory hint text, and does not offer game-system-specific preset values.
 Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
 
@@ -1700,7 +1707,8 @@ Current GM editor behavior:
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
-- The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
+- The selected-system inspector exposes the WORLD character modifier library for gathering (issue 1308; per-system until then), with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
+  The inspector projection is an explicit allowlist, so neither library may be projected off the crafting system any more: a field omitted there is invisible to the UI, and one projected from the system would show a stale copy the corpus no longer carries.
 - D100 drop row and event editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
 - The settings/tag area can edit gathering vocabularies for biomes and danger.
   The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records under World > Travel > Realms.
@@ -2027,7 +2035,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.modifiers` library.
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
 Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 

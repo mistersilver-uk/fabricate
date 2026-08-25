@@ -167,6 +167,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
       getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
       getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,
+      getCharacterLibrariesStore: () =>
+        game?.fabricate?.getCharacterLibrariesStore?.() ?? null,
       getGatheringRealmStore: () => game?.fabricate?.getGatheringRealmStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getCurrentSceneRegions: () =>

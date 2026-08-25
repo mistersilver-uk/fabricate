@@ -67,13 +67,11 @@ CraftingSystem = {
   recipeItemDefinitions: RecipeItemDefinition[],
   membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
 
-  // System-owned character-prerequisite library (issue 544). Reusable pass/fail
-  // conditions the GM authors in System Settings and attaches, by id, to a book/
-  // scroll's caps.learn to gate WHO may learn its recipes against the acting
-  // actor's roll data. Normalized wholesale (settings replace, not deep-merge) by
-  // normalizeCharacterPrerequisiteList, so a removed entry does not resurrect.
-  // Shape defined under ## CharacterPrerequisite below.
-  characterPrerequisites: CharacterPrerequisite[], // default []
+  // NO `characterPrerequisites` KEY, and no `modifiers` key (issue 1308). Both libraries
+  // moved to the `characterLibraries` WORLD setting, so `_normalizeSystem` emits neither
+  // and its allowlist rebuild sheds any surviving legacy copy on the next save. See
+  // ## CharacterLibraries, ## CharacterPrerequisite and ## ModifierLibrary below; unlike
+  // currency and travel, NO participation flag stays behind on the crafting system.
 
   // Present only when features.salvage is true.
   salvageResolutionMode: "simple" | "routed" | "progressive",
@@ -107,7 +105,7 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
-    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // The SELECTION TRIPLE over the WORLD modifier library (issues 1095, 1117, 1308), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
     // every activity rather than left implicit: the library is shared, the SELECTION is
@@ -132,7 +130,7 @@ CraftingSystem = {
     },
     routed: RoutedCheck,
 
-    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // The SELECTION TRIPLE over the WORLD modifier library (issues 1095, 1117, 1308), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
     // every activity rather than left implicit: the library is shared, the SELECTION is
@@ -143,53 +141,6 @@ CraftingSystem = {
     defaultModifierIds?: string[],  // default []
     maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
-
-  // THE ONE named modifier library for the WHOLE system (issue 1117). It has moved twice:
-  // out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select
-  // over the same entries so it can belong to no one activity; and then, in `1.23.0`, it
-  // ABSORBED the gathering character-modifier library
-  // (`gatheringConfig.systems[systemId].characterModifiers`), because a named actor-driven
-  // expression is ONE concept and authoring it twice let a GM define "Medicine" as two
-  // unrelated records that could disagree. Both migrations delete the old key.
-  //
-  // THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-  // `min`/`max` clamp a CHECK modifier's contribution — the resolved number for a flat
-  // entry, and the ROLLED result for a rolling one — while a gathering drop-row
-  // reference carries its OWN `min`/`max` that clamp its contribution independently.
-  // `isRollExpression` is DERIVED from the expression on every normalize and never read
-  // from the input, so a persisted or imported flag cannot contradict the expression
-  // beside it.
-  //
-  // Each `expression` is a roll-data fragment evaluated against the acting character
-  // (missing/failed → 0). `icon`, `min` and `max` are attached ONLY when authored, so
-  // absence round-trips as key-absent and means unbounded — a bound of `0` is a real
-  // bound, which is why the guard is `Number.isFinite` on an explicitly-guarded value
-  // rather than truthiness. An authored `min > max` is preserved VERBATIM and is a
-  // BLOCKING readiness issue (`modifierBoundsInverted`): that entry contributes 0 until
-  // it is repaired, matching gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS` posture.
-  // A finite bound that no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the
-  // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
-  // contains the entry to 0. Two issue ids rather than one cause with two readings: the
-  // repairs differ and `1e21` is not an inversion.
-  // A ROLL-SHAPED expression is legal here and legal in a CHECK (issue 1118). A gathering
-  // drop row evaluates the expression and applies the result as a percentage-point delta;
-  // a check appends the DICE to its roll formula, so the authored variance survives to the
-  // roll and shows on the card. The bounds above clamp the ROLLED result for such an entry,
-  // in the formula. `isRollExpression` is therefore a DISPLAY classification and never a
-  // gate: the blocking `modifierRollExpression` readiness issue issue 1117 raised is
-  // RETIRED.
-  //
-  // An entry with an EMPTY expression is KEPT rather than dropped: the library has an "Add
-  // modifier" button, and an entry that vanished on save the moment it was created would
-  // make that button appear broken. It is still a runtime misconfiguration wherever it is
-  // referenced.
-  //
-  // Absent = empty library, so every activity's contribution is nothing and no term is
-  // appended.
-  modifiers?: {
-    id: string, label: string, expression: string, isRollExpression: boolean,
-    icon?: string, min?: number, max?: number
-  }[],  // default []
 
   craftingCheck: {
     // `enabled` is ONLY the on/off toggle for optional checks (simple/alchemy
@@ -235,10 +186,13 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // THE SELECTION TRIPLE, and only it (issues 1095, 1117). The LIBRARY moved UP to
-    // `CraftingSystem.modifiers` — see the system shape above — because salvage and
-    // gathering now select over the same entries; the `1.22.0` migration relocates it and
-    // DELETES this level's `checkModifiers` key. The identical triple appears on
+    // THE SELECTION TRIPLE, and only it (issues 1095, 1117, 1308). The LIBRARY moved UP to
+    // `CraftingSystem.modifiers` in `1.22.0` — because salvage and gathering select over the
+    // same entries, so it can belong to no one activity — and then OUT of the crafting system
+    // altogether in `1.28.0`, to the `characterLibraries` world setting (## ModifierLibrary).
+    // Each relocation DELETES the key it moved from, this level's `checkModifiers` included.
+    // The SELECTION stayed here through both moves: the library is shared, the selection is
+    // not. The identical triple appears on
     // `salvageCraftingCheck` and `gatheringCraftingCheck`, emitted by ONE shared
     // derivation so the three whitelist rebuilds cannot drift.
     //
@@ -590,7 +544,7 @@ CraftingSystem = {
     The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
     This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
-    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117): the library is `CraftingSystem.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` and `1.23.0` migrations' before-any-load ordering is load-bearing rather than incidental.
+    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117, 1308): the library is the world `characterLibraries.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the before-any-load ordering of the `1.22.0`, `1.23.0` and `1.28.0` migrations is load-bearing rather than incidental.
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
@@ -622,11 +576,13 @@ CraftingSystem = {
     Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
     It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
 
-33. **System-level modifier library.** `CraftingSystem.modifiers` is the ONE named modifier library for the whole system: an ordered array of `{ id, label, expression, isRollExpression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, `icon` / `min` / `max` attached only when authored, and `isRollExpression` DERIVED from the expression on every normalize.
-    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers).
-    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`).
+33. **World modifier library.** The ONE named modifier library is a WORLD record since issue 1308 and is defined in full under ## ModifierLibrary; `CraftingSystem` carries no `modifiers` key at all, and this requirement states only what the crafting system's own checks do with it.
+    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers, relocating to a World route in the follow-up change).
+    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`), and `CraftingSystem.modifiers` itself (lifted to world scope and deleted by `1.28.0`).
     An entry with an empty expression is kept, not dropped, because the authoring surface can create one.
-    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
+    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift.
+    **A default id naming nothing in the library is dropped ONLY when the Valid Id Basis for the modifier library is known-complete**, preserving order and de-duplication; when it is not, every id passes through untouched.
+    That condition is not a caveat but the requirement's operative half since the library left the crafting system: the basis is now derived from a world setting a client may not have migrated, and a pass that read it as an empty library would prune every authored default on the next save (see ### Valid Id Basis and ## CharacterLibraries).
     `min` / `max` clamp that entry's CONTRIBUTION, so a bound means the same thing under every combination rule: the resolved value for a flat expression, and the ROLLED result for a rolling one, the latter expressed in the formula as `min(max((1d8), -1), 6)`.
     Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
     An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
@@ -634,6 +590,8 @@ CraftingSystem = {
     The expressibility test is the same `isDecimalSafeTermValue` the term emit asks, so the clamp and the emit cannot disagree about which numbers a formula can carry.
 
 34. **Subject-level modifier picks.** Under the `bySubject` combination rule the pick lives on the record being resolved: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds`, `GatheringTask.checkModifierIds`.
+    All three name entries in the WORLD modifier library (issue 1308), so the pick outlives any one crafting system's authoring and a system copied between worlds keeps resolving whatever ids the destination library carries.
+    None of the three is pruned against the library at all: `normalizeCheckModifierIds` filters SHAPE and not catalogue membership, so a subject pick is never a Valid Id Basis consumer and the move changed nothing about it.
     All three preserve an AUTHORED EMPTY array as a real pick of zero, distinct from absent, keyed on `Array.isArray` at entry so a malformed member cannot flip an authored empty set back to inherit.
     All three are truncated to `maxModifierPicks` at the resolver rather than only at the picker, so lowering the cap never leaves a record rolling more modifiers than the system permits and never destroys its stored picks.
     **The id COERCION is one rule for all three subjects** (`normalizeCheckModifierIds`, `src/utils/checkModifierPicks.js`): ids are TRIMMED, non-string members are dropped rather than coerced, duplicates are dropped and authored order is preserved.
@@ -811,6 +769,7 @@ type TravelConfig = {
 3. Normalization is total and non-throwing, always emitting all three keys.
 4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
    Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+   Realm ids are `randomID()`, so reporting EVERY collision is informative here; the `1.28.0` character-library migration refines that to CONTENT-DIFFERING collisions only, because its preset ids are stable semantic slugs that collide by design (## CharacterLibraries requirement 8).
 5. The store publishes its cache BEFORE awaiting the write.
    Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
    The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.
@@ -819,6 +778,104 @@ type TravelConfig = {
    A read-modify-write loop over the realm list would lose every iteration but the last.
 7. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported environment's realm gating names a realm id that is unusable unless the realm arrives with it, whereas no exported record references a party.
+
+## CharacterLibraries
+
+### Purpose
+
+Define the WORLD character libraries: the character-prerequisite library and the modifier library, which issue 1308 lifted off every crafting system.
+
+Both are world scope because both resolve against the acting CHARACTER rather than against any one crafting system.
+"Smith's Tools proficiency at least 1" is a fact about a character and `@abilities.med.mod` is a number read off a character sheet; neither becomes a different rule because the GM switched from the blacksmithing system to the alchemy system, yet the per-system model made a world running three systems maintain three copies of each and let the copies drift apart.
+
+**Unlike `CurrencyConfig` and `TravelConfig`, NOTHING stays on the crafting system.**
+There is no `enabled` key here and no participation flag there, because an unreferenced entry already costs nothing, so there is no meaningful "off" state to model.
+A reader looking for a per-system half of this concept is looking for something that does not exist.
+
+It is persisted as the `fabricate.characterLibraries` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `CharacterLibrariesStore` is the persistence shell, `normalizeCharacterPrerequisiteList` and `normalizeModifierLibrary` are the two normalizers, and `src/systems/characterLibraries.js` is the shared read-side resolver.
+
+```ts
+type CharacterLibraries = {
+  characterPrerequisites: CharacterPrerequisite[]; // default []
+  modifiers: ModifierLibraryEntry[]; // default []
+};
+```
+
+### Requirements
+
+1. **This is ONE setting key carrying TWO independent libraries, and that is a persistence decision rather than a modelling one.**
+   The two share no key, no reference, no invariant and no reader: nothing in the corpus reads both.
+   The key is shared only so that a fourth near-identical persistence shell is not written beside `CurrencyConfigStore` and `GatheringRealmStore`.
+   Splitting it into two keys later would therefore be a pure persistence change with no domain consequence, and every rule below that says "per library" is what keeps that true.
+2. **Every operation over this setting is PER LIBRARY, never over the object as a whole.**
+   Normalization, the world migration's union, the export slice and the import merge each treat `characterPrerequisites` and `modifiers` separately.
+   A single object-level destination-wins merge on import would let a destination world that has prerequisites but no modifiers win the whole slice and silently discard every incoming modifier, which is the concrete harm requirement 1's independence exists to prevent.
+3. **The shared key WIDENS the lost-update window across both libraries, and the cost is accepted knowingly.**
+   A write to either library rewrites the whole setting, so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
+   The store therefore publishes its cache BEFORE awaiting the write, exactly as `CurrencyConfigStore` does and for the same read-modify-write reason, and with more at stake: a stale read taken during a modifier keystroke writes back a stale `characterPrerequisites` beside it, losing an edit in a list the GM was not even touching.
+4. **The store exposes RAW KEY PRESENCE as `isSeeded()`, captured from the raw read before normalizing, and that predicate is what makes a destructive prune decidable.**
+   `game.settings.get` on a world setting that has never been written returns the registered default, so an unmigrated world reads `{}`, normalizes to two empty arrays and reports itself loaded — byte-identical, at this store's API, to a GM who deliberately emptied both libraries.
+   `{}` means never written, so the Valid Id Basis is UNKNOWN and nothing may be pruned; `{ characterPrerequisites: [], modifiers: [] }` means the GM emptied it, so the basis is real, empty and prunable.
+   A write seeds the setting from that point on, so a GM's deliberate deletion starts pruning immediately rather than waiting for a reload.
+5. `load()` is GUARDED and never throws, unlike `CurrencyConfigStore.load()`.
+   A throw would propagate through `CraftingSystemManager._normalizeSystem` into `hydrate` and out of `initialize()`, which is the issue-970 failure mode where the manager never initializes at all.
+   An unreadable setting degrades to an UNKNOWN basis; it never takes the module down.
+6. **Persistence is NOT gated on validity**, exactly as `CurrencyConfig` requirement 4 states and for the same reason: a GM authors a library incrementally, so an entry is transiently incomplete between being added and being filled in, and refusing those writes would make the editor unusable.
+7. **Entry `id`s are stable and are never rewritten**, because books and scrolls (`caps.learn.characterPrerequisiteIds`), tool requirement gates (`Tool.prerequisites.ids`), the three activity checks' `defaultModifierIds`, every subject pick, and every gathering drop row, event and stamina cost all store ids.
+   Every reconciliation of two libraries is therefore keyed by `id` and reference-preserving, per library: the `1.28.0` migration UNIONS entries by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+8. **Collision reporting is narrowed to CONTENT-DIFFERING collisions, which is a refinement on the `1.27.0` rule rather than a copy of it.**
+   Realm ids are `randomID()`, so a travel collision is already rare enough that reporting all of them is informative; preset ids on BOTH of these libraries are stable semantic slugs (`smithsTools`, `proficientArcana`, `expertCrafter`; `strength`, `perception`, `survival`) and presets are editable once seeded, so a GM who seeded presets into two systems collides on every seeded entry.
+   Sameness is judged on the NORMALIZED entry, so a difference in key order or in an absent-versus-undefined bound is not mistaken for a disagreement, and the one collision that changed a rule is not buried under dozens that changed nothing.
+9. **The runtime READ is the UNION of the world library and the crafting system's own surviving legacy copy, world first on an id collision** (`resolveModifierLibrary` / `resolveCharacterPrerequisiteLibrary`).
+   Before the `1.28.0` migration lifts them, the legacy in-system entries ARE the live corpus, and migrations run on the ACTIVE GM only, so every player and every assistant GM spends at least one session reading a world setting that has not been written yet; without the union their tools, books and checks would resolve nothing at all in that window.
+   This is deliberately NOT the silent read-alias the `1.22.0` and `1.23.0` relocations refused: an alias hides a relocation by making the old location keep working forever, whereas this is bounded by the migration, which strips the legacy copy the first time an active GM loads the world.
+10. The libraries are world data and are therefore NOT part of the `CraftingSystem` record, but they DO ride along with crafting-system import/export as their own envelope slice, on the terms `CurrencyConfig` requirement 9 and `TravelConfig` requirement 7 state.
+    An exported book's learning gate, an exported tool's requirement gate and an exported check's `defaultModifierIds` all name entries by `id` and are unusable in the destination world unless those entries arrive with them.
+11. **Both libraries are read DURING crafting-system normalization, which currency and travel are not, and that difference is load-bearing at three sites.**
+    `CraftingSystemManager` derives its Valid Id Basis from this store on every `_normalizeSystem` and on every `upsertTool`, so the store must be constructed and loaded BEFORE the manager at startup, a copy-mode import must merge this slice BEFORE the system is created, and that merge must go through (or invalidate) the store rather than writing the setting behind its cache.
+    Copying the currency and travel placements — both constructed or persisted late, because nothing reads them during normalization — would prune every incoming reference against a basis that cannot yet see it.
+
+## ModifierLibrary
+
+### Purpose
+
+Define the ONE named modifier library: the ordered list of reusable actor-driven expressions that every activity's check selects over and that every gathering drop row, event and stamina cost references.
+
+It lives in the `characterLibraries` world setting as `modifiers[]` (see ## CharacterLibraries).
+It has moved THREE times, and each move deleted the key it left: out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select over the same entries so it can belong to no one activity; into a merge with the gathering character-modifier library (`gatheringConfig.systems[systemId].characterModifiers`) in `1.23.0`, because a named actor-driven expression is ONE concept and authoring it twice let a GM define "Medicine" as two unrelated records that could disagree; and out of `CraftingSystem.modifiers` to world scope in `1.28.0`, because an expression evaluated against a character is not a fact about a crafting system.
+
+### Properties
+
+```js
+ModifierLibraryEntry = {
+  id: string,               // stable reference; trimmed, unique within the library
+  label: string,            // GM label; '' when unauthored
+  expression: string,       // roll-data fragment evaluated against the acting character
+  isRollExpression: boolean,// DERIVED from the expression, never read from input
+  icon?: string,            // attached only when authored
+  min?: number,             // attached only when authored; absence means unbounded
+  max?: number,             // attached only when authored; absence means unbounded
+}
+```
+
+### Requirements
+
+1. **ABSENT IS NOT AN EMPTY LIBRARY**, and this inverts the rule that stood while the library lived on the crafting system.
+   The pre-1308 shape read an absent `modifiers` key as an empty library, so every activity's contribution was nothing and no term was appended; that reading is exactly the Valid Id Basis anti-pattern, and once the library moved to a world setting whose unwritten form reads back as the registered default it would have made every unmigrated client prune every authored default id.
+   An unwritten setting is therefore UNKNOWN rather than empty (## CharacterLibraries requirement 4): reading still resolves the union with any surviving legacy in-system copy, and pruning is skipped entirely.
+   A library the GM has WRITTEN and emptied is a real empty library, and it does contribute nothing.
+2. `normalizeModifierLibrary` is total and non-throwing: ids are trimmed and de-duplicated, an entry with no assignable id or a non-object entry is dropped rather than repaired, a bad expression coerces to `''`, and `isRollExpression` is DERIVED on every normalize so a persisted or imported flag can never contradict the expression beside it.
+   It lives in `src/systems/modifierLibrary.js` rather than on `CraftingSystemManager` because since issue 1308 it has THREE callers that must agree byte for byte — the world store, the `1.28.0` migration and the export-payload upcast — and a second implementation of a normalizer is how a persisted shape and its migration drift apart.
+3. **THE SHAPE IS A SUPERSET**, and each field is honoured by whichever consumer needs it: `min` / `max` clamp the resolved value of a CHECK modifier, while a gathering drop-row reference carries its OWN `min` / `max` that clamp its contribution independently.
+4. `icon`, `min` and `max` are ABSENCE-PRESERVING: each is attached only when authored, so `null`, `undefined`, `''` and junk all normalize to the same shape with the key absent, and absence means unbounded.
+   `0` is a real bound and survives, which is why the guard is `Number.isFinite` on an explicitly-guarded value rather than truthiness.
+   The bounds are asked of the shared resolver rather than re-derived, so the persisted shape and the clamp the engine applies cannot disagree about what an unbounded form is.
+5. An authored `min > max` is PRESERVED VERBATIM rather than repaired: it is the blocking `modifierBoundsInverted` readiness issue that the GM must fix, and silently swapping the pair would roll a number nobody authored.
+   A finite bound no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the second blocking bounds fault, `modifierBoundsUnsafe`, and contains the entry to 0 in the same way.
+6. **AN ENTRY WITH NO EXPRESSION IS KEPT.** The library has an "Add modifier" button, and an entry that vanished on save the moment it was created would make that button appear broken.
+   It is still a runtime misconfiguration wherever it is referenced.
+7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, and a check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+   `isRollExpression` is therefore a DISPLAY classification and never a gate; the blocking `modifierRollExpression` readiness issue is RETIRED.
 
 ## CurrencyUnit
 
@@ -995,7 +1052,7 @@ RecipeItemDefinition = {
                                      // first (AND — "Required Knowledge"; prior-knowledge gate). Folds
                                      // a legacy single `prerequisite` string on normalize (issue 544).
                                      // Only enforced when limitLearning is true.
-      characterPrerequisiteIds: string[], // default []; ids into CraftingSystem.characterPrerequisites
+      characterPrerequisiteIds: string[], // default []; ids into the WORLD characterLibraries.characterPrerequisites
                                      // that a reader must ALL pass (AND) to learn this book's recipes,
                                      // evaluated against actor roll data (issue 544). A per-book
                                      // actor-stat gate, distinct from `prerequisiteIds` (prior knowledge).
@@ -1028,7 +1085,7 @@ RecipeItemDefinition = {
 6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
    6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
    `prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
-   `characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
+   `characterPrerequisiteIds` references into the world `characterLibraries.characterPrerequisites[].id` (issue 1308): a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
    The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
    An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
 7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
@@ -1038,8 +1095,10 @@ RecipeItemDefinition = {
 
 ### Purpose
 
-Define one system-owned, reusable pass/fail condition (issue 544) evaluated against the acting actor's prepared roll data.
-The GM authors a library of them on the System Settings page; a book/scroll references a subset by id from `RecipeItemDefinition.caps.learn.characterPrerequisiteIds` to gate who may learn its recipes (behaviour in `recipe-visibility`).
+Define one WORLD-scoped, reusable pass/fail condition (issue 544, moved to world scope by issue 1308) evaluated against the acting actor's prepared roll data.
+The library lives in the `characterLibraries` world setting as `characterPrerequisites[]` (see ## CharacterLibraries); a crafting system carries no copy of it and no participation flag over it.
+The GM authors it on the System Settings page THIS change, which is the one surface in the Manager where a world record is edited on a page framed as settings for the selected crafting system; the interim honesty package (a scope chip on the card header, hints reading "shared by every crafting system", and a delete confirmation naming the cross-system reach) is what makes that state honest, and the follow-up change relocates the editor to its own World route.
+A book/scroll references a subset by id from `RecipeItemDefinition.caps.learn.characterPrerequisiteIds` to gate who may learn its recipes (behaviour in `recipe-visibility`); a Tool references a subset from `Tool.prerequisites.ids` to gate who may wield it (behaviour under ## Tool).
 
 ### Properties
 
@@ -1058,6 +1117,7 @@ CharacterPrerequisite = {
 
 1. `characterPrerequisites` normalizes wholesale from the incoming array (`normalizeCharacterPrerequisiteList`); settings replace rather than deep-merge, so a removed entry does not resurrect.
    An entry with no assignable `id` is dropped.
+   Since issue 1308 the ONE array being normalized is the world library's, and the same normalizer is shared by the world store, the `1.28.0` migration and the export-payload upcast so the three cannot drift.
 2. `op` is one of the nine word tokens above; an unknown or missing token normalizes to `"gte"`.
    The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
 3. `path` is stored WITHOUT a leading `@` (the `@` is a display/authoring affordance only); a leading `@` on input is stripped on normalization.
@@ -1065,7 +1125,11 @@ CharacterPrerequisite = {
 4. Evaluation is pure and Foundry-free (`evaluatePrerequisite` / `evaluatePrerequisites`).
    An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
    `evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
-5. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
+5. **AN UNRESOLVABLE ID HAS TWO OPPOSITE POLARITIES, one per gate, and neither is a bug.**
+   The LEARNING gate fails OPEN: a `caps.learn.characterPrerequisiteIds` entry that resolves to no definition is SKIPPED, so a book with one broken reference still gates on the rest and stays learnable.
+   The TOOL gate fails CLOSED: `toolCheckBonus` passes only when `resolved.length > 0 && unresolvedIds.length === 0`, so a single unresolvable id makes the tool fail its gate — and under `gateMode: "usability"` that makes the tool unusable, which blocks every craft, salvage and gathering attempt that requires it.
+   The asymmetry is deliberate in each direction — knowledge that cannot be checked is granted, a tool whose gate cannot be checked is withheld — but it is what makes an id-losing prune far more destructive on the tool side than on the learning side, and it is the reason ## Tool requirement 6's prune is now conditional on a known-complete Valid Id Basis.
+6. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
    The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
    The word-token table has a THIRD consumer since issue 1286: a component complication's `rollCondition` gate.
    All three read ONE table through the exported `compareNumbersByOperatorId(actual, op, expected)`, so a retuned operator cannot mean two things on two surfaces.
@@ -1416,7 +1480,7 @@ Recipe = {
     See resolution-modes/spec.md §Check Source.
     An unrecognized `defaultModifierPolicy` falls back to `addAll` at the activity-check level (`CraftingSystemManager._normalizeCheckModifierSelection`), which is the only level a rule exists at.
     Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `bySubject` reuses this same `modifierIds` list.
-    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.modifiers`.
+    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live WORLD modifier library.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
     A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
@@ -1857,7 +1921,7 @@ Tool = {
   },
   prerequisites: {
     enabled: boolean,
-    ids: string[],                 // shared CraftingSystem.characterPrerequisites ids
+    ids: string[],                 // ids into the WORLD characterLibraries.characterPrerequisites
     gateMode: "bonus" | "usability",
   },
   bonus: {
@@ -1910,7 +1974,11 @@ Tool = {
      The tool breaks when the numeric result is `< threshold`.
      Legacy `breakage.mode: "immune"` reads forward in both `Tool` construction and `_normalizeSystem` as `{ mode: "limitedUses", maxUses: null }` plus `checkBreakable: false`, and the next canonical write never emits `immune`.
 6. `prerequisites` always persists `{ enabled, ids, gateMode }`, and `bonus` always persists `{ enabled, expression }` even while either setting is inactive.
-   The system normalizer processes `characterPrerequisites` before Tools, prunes unknown Tool prerequisite ids in every state, retains valid ids while disabled, and changes an enabled gate to disabled when pruning leaves no ids.
+   **The prune of unknown Tool prerequisite ids is CONDITIONAL on a known-complete Valid Id Basis, and is NOT performed "in every state"** — that unqualified rule stood only while the library lived on the crafting system beside the Tools, and issue 1308 falsified it by moving the library to a world setting a given client may not have migrated.
+   The normalizer resolves the basis for the prerequisite library BEFORE Tools (`CraftingSystemManager._characterLibraryBasis`, the union of the world library and any surviving legacy in-system copy) and passes it in; when that basis is UNKNOWN the pass still runs and still rebuilds the record, but every id passes through untouched.
+   When the basis IS known-complete the prune is unchanged: an unknown id is dropped, valid ids are retained while the gate is disabled, and an enabled gate is changed to disabled when pruning leaves no ids.
+   The same basis MUST reach `upsertTool`, which does not go through `_normalizeSystem` and would otherwise derive an empty one of its own and clear a healthy world's gate on every Tool save.
+   An UNKNOWN basis is carried as a sentinel value that is not a `Set`, and every prune site tests for that rather than for emptiness, because an empty `Set` is a real, prunable basis and is exactly what the omitted-argument form of this failure looks like.
 7. Exactly one `onBreak.mode` is configured per Tool.
    `replaceWith` carries exactly one discriminator in `replacementTarget`: a managed Component id or a direct Item UUID; malformed, empty, or dual targets are invalid, and a Component target must differ from the Tool's own `componentId` when present.
    New Manager authoring is Component-only: the Tool Studio never creates or edits the direct Item discriminator.
@@ -1964,7 +2032,7 @@ Tool = {
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                          | non-integer, out of range       |
 | `breakage.diceExpression.formula`        | non-empty string                                          | empty                           |
 | `breakage.diceExpression.threshold`      | finite number                                             | non-finite                      |
-| `prerequisites.ids`                      | known shared ids; at least one when enabled               | unknown or enabled-empty        |
+| `prerequisites.ids`                      | world-library ids; at least one when enabled              | enabled-empty; unknown only against a known-complete basis |
 | `bonus.expression`                       | non-empty when enabled                                    | enabled-empty                   |
 | `checkBreakable`                         | boolean                                                   | non-boolean canonical input     |
 | `onBreak.replaceWith.replacementTarget`  | exactly one valid Component id or Item UUID discriminator | absent, malformed, or dual      |
@@ -2995,6 +3063,27 @@ The pass list MUST therefore be constructed by a pure, exported builder that the
 A pass that declares no basis MUST be omitted, so that a destructive pass cannot ship ungated by omitting its declaration.
 **Both doors MUST share that one builder.**
 Two independently written gates on the same collaborators drift, and the half that drifts is the half nobody is looking at; the mutation-time composition site therefore supplies its own pass-to-entity-kind declarations to the same builder rather than restating the partition.
+
+**THERE ARE TWO ENFORCEMENT SHAPES, and the second is not a footnote on the first.**
+The rule above — omit the pass — is the shape available when the pass exists only to prune, so that not running it is a complete and honest outcome; that is true of every startup and mutation-time cleanup pass, and it stays the DEFAULT shape because an omitted pass is directly assertable from a pure builder.
+It is unavailable when the prune is one step inside a pass that MUST still run for another reason.
+`CraftingSystemManager._normalizeSystem` is the case that established the second shape (issue 1308): it is a whitelist rebuild that produces the persisted crafting-system record, so omitting it does not decline to prune — it declines to emit the record at all, and the caller writes nothing or writes a shape the corpus cannot carry.
+The same is true of `upsertTool`, whose job is to save a Tool.
+
+**In that shape the UNKNOWN basis MUST be carried to the prune site as a SENTINEL, and ONLY the prune is skipped.**
+The pass runs, every non-destructive derivation it performs still happens, and the reference lists it would have filtered pass through unchanged.
+Three rules make that safe, and all three are consequences of the first shape rather than new licence:
+
+- **The sentinel MUST be distinguishable from an EMPTY basis by its TYPE, never by its size.**
+  An empty basis is a real, prunable answer — the GM deleted every entry — and it is also precisely what an omitted argument produces, so a site testing `size === 0` cannot tell "prune everything" from "prune nothing" and would silently pick one of them.
+  The reference implementation passes `null` and every prune site tests `instanceof Set`, so a caller that supplies nothing gets the safe direction.
+- **Every prune site that can receive the sentinel MUST test for it**, including sites reached only through an argument default.
+  An argument default of an EMPTY set is this requirement's own failure mode reached by an omitted argument, so those defaults become the sentinel too.
+- **The basis MUST be threaded as an argument rather than read from a collaborator inside the pass**, so the pass stays a function of its arguments and a caller that cannot vouch for the ids can say so.
+  A pass that digs the basis out of ambient state cannot be handed an UNKNOWN one, and cannot be tested for what it does with one.
+
+**The sentinel shape does NOT relax what makes a basis known-complete**, and it is not a licence to skip pruning where the first shape applies.
+It is the same gate with a different lever, chosen because the pass cannot be omitted, and it reports nothing because the pass itself still ran; what the first shape reports as an omission, this shape leaves visible as unpruned references that the next known-complete normalize resolves.
 
 **An omission MUST be reported.**
 Neither door's caller reads what its runner returns — the startup runner returns only FAILED labels and its caller discards them, and the mutation-time callers discard the outcome entirely — so a gate that omitted every pass is otherwise indistinguishable from a run that found nothing to prune.

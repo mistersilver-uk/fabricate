@@ -665,15 +665,17 @@ There is **no** gathering-scoped tools store; the 0.7.0 migration (`migrateTools
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
 3. Crafting systems without a `tools` array normalize to `tools: []` on load.
 4. The Manager authors tools into the system-owned library; the same library backs the recipe/step/ingredient-set/salvage tool gate, the canvas interactable browser, and gathering.
-5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which is sourced the same way, from `system.modifiers` (issue 1117), with a live registry lookup by id as the fallback for a caller that holds no system.
+5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which since issue 1308 is sourced from the WORLD modifier library through `resolveModifierLibrary`, unioned with any surviving legacy in-system copy.
+The live registry lookup by crafting-system id that used to serve a caller holding no system is RETIRED: it existed only because the library was per system, and there is nothing system-specific left to look up.
 Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 6. The library is per crafting system.
 Tools are not shared across crafting systems.
 
 ## One Library, Two Arithmetics
 
-A system authors modifiers in exactly ONE place (issue 1117): `CraftingSystem.modifiers`, edited in System settings › Modifiers.
-Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; the shapes are now one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
+A WORLD authors modifiers in exactly ONE place (issues 1117 and 1308): the `characterLibraries` world setting's `modifiers[]`, edited in System settings › Modifiers and relocating to a World route in the follow-up change.
+Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; issue 1117 made the shapes one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
+Issue 1308 then made the LIBRARY one per world rather than one per crafting system, for the same reason at the next scope up: an expression evaluated against the acting character is not a fact about a crafting system, so three systems meant three copies of Medicine that could drift apart.
 
 **What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
 A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
@@ -697,11 +699,11 @@ The capability activates when 683 lands; no separate follow-up issue is opened.
 
 ### Purpose
 
-Represent a d100 drop row's or event's REFERENCE into the system's one modifier library, with its own operator and bounds.
+Represent a d100 drop row's or event's REFERENCE into the world's one modifier library, with its own operator and bounds.
 
 ### Properties
 
-The library entry itself is `CraftingSystem.modifiers[]` (§data-models); this section owns only the reference shape and the arithmetic it drives.
+The library entry itself is the world `characterLibraries.modifiers[]` (§data-models → ModifierLibrary); this section owns only the reference shape and the arithmetic it drives.
 
 Character modifier row references use this shape:
 
@@ -718,9 +720,9 @@ GatheringCharacterModifierReference = {
 
 ### Requirements
 
-1. References resolve against the ONE system-level library `CraftingSystem.modifiers` (issue 1117).
-The gathering config carries no library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired, the `1.23.0` migration merges it up, and the gathering config normalizer — an allowlist rebuild — no longer emits the key.
-2. A new system's library is empty.
+1. References resolve against the ONE WORLD library, `characterLibraries.modifiers` (issues 1117 and 1308), read through `resolveModifierLibrary` — which unions the world library with any surviving legacy in-system copy, so an unmigrated client still resolves every `modifierId`.
+Neither the gathering config nor the crafting system carries a library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired by the `1.23.0` migration and `CraftingSystem.modifiers` by the `1.28.0` migration, and both normalizers — allowlist rebuilds — no longer emit their key.
+2. A new WORLD's library is empty, and creating a crafting system does not create one.
 Presets are never seeded automatically.
 3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
 It seeds into the one system library, from the one authoring surface.

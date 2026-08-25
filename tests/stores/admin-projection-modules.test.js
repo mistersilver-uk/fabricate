@@ -44,7 +44,6 @@ const SELECTED_SYSTEM_FIELDS = [
   'availableScriptMacros',
   'categories',
   'categoryIcons',
-  'characterPrerequisites',
   'componentCategories',
   'componentCategoryIcons',
   'componentTagOptions',
@@ -62,7 +61,10 @@ const SELECTED_SYSTEM_FIELDS = [
   'id',
   'itemTags',
   'managedItemOptions',
-  'modifiers',
+  // NO `modifiers` and NO `characterPrerequisites` (issue 1308): both libraries are world scope,
+  // so projecting either here would be a second and always-empty source of truth, exactly as the
+  // realm and currency notes above describe. Their readers take them from the top-level world
+  // slices instead.
   'name',
   'recipeItemDefinitions',
   'recipeVisibility',
@@ -256,7 +258,6 @@ function makeSystem(overrides = {}) {
       progressive: { rollFormula: '1d20', checkBreakage: { enabled: true } },
       consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
     },
-    modifiers: [{ id: 'mod-1', label: 'Guild', icon: 'fa-solid fa-user', expression: '2' }],
     toolBreakage: { authority: 'checkDriven' },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20' } },

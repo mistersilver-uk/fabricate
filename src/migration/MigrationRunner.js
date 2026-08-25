@@ -12,6 +12,7 @@ import { SETTING_KEYS } from '../config/settings.js';
 import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
+import { migrateCharacterLibrariesToWorldScope } from './migrateCharacterLibrariesToWorldScope.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
 import { migrateCurrencyToWorldScope } from './migrateCurrencyToWorldScope.js';
 import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
@@ -118,6 +119,26 @@ function _normalizeRetiredCraftingModEntry(entry) {
     normalized[key] = Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
   }
   return normalized;
+}
+
+/**
+ * Normalize one entry of the transient `_characterLibraryCollisions` report (1.28.0) into a fixed
+ * `{ library, entryId, keptFrom, discardedFrom }` shape, so the GM notice can format it without
+ * re-guarding each field and a hand-written entry cannot put an object into a notification string.
+ *
+ * @param {*} entry
+ * @returns {{ library: string, entryId: string, keptFrom: string, discardedFrom: string }|null}
+ */
+function _normalizeCharacterLibraryCollisionEntry(entry) {
+  if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const entryId = String(entry.entryId ?? '').trim();
+  if (!entryId) return null;
+  return {
+    library: String(entry.library ?? ''),
+    entryId,
+    keptFrom: String(entry.keptFrom ?? ''),
+    discardedFrom: String(entry.discardedFrom ?? ''),
+  };
 }
 
 /**
@@ -550,6 +571,32 @@ const MIGRATIONS = [
     downgradeLosesData: true,
     migrate: (data) => migrateTravelToWorldScope(data),
   },
+  {
+    version: '1.28.0',
+    label:
+      'Move the character prerequisite library and the modifier library from each crafting ' +
+      'system to WORLD scope. Both describe the acting CHARACTER rather than the crafting ' +
+      'system — a proficiency requirement is a fact about a character, and an ability modifier ' +
+      'is a number read off a character sheet — so a world running three systems was ' +
+      'maintaining three copies of every rule. Unlike currency and travel, NOTHING stays on the ' +
+      'crafting system: there is no participation flag, because an unreferenced entry costs ' +
+      'nothing. Entries from every system are UNIONED by id, per library, with the first system ' +
+      'winning a collision, because books, tools, complications, recipes, components, gathering ' +
+      'tasks, drop rows and events all reference entries by id and dropping one would orphan ' +
+      'them. COLLISIONS ARE COMMON HERE, unlike the earlier moves: preset ids are stable slugs ' +
+      'such as "smithsTools" and "perception", so seeding presets in two systems collides on ' +
+      'every seeded entry, and presets are editable afterwards. Where two systems disagreed ' +
+      'about what an id MEANS only one survives, so the reference still resolves but to a ' +
+      'different rule — every such case is reported by name, and identical copies are not, so ' +
+      'the list you see is the list that actually changed something. Check World > Character ' +
+      'prerequisites and World > Modifiers afterwards. DOWNGRADING IS NOT LOSSLESS: 1.27.0 ' +
+      'reads both libraries only from the crafting system, so it would find none, every ' +
+      'learning gate and tool requirement would stop resolving and every check modifier would ' +
+      'contribute nothing until you re-authored them per system',
+    downgradeTo: '1.27.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateCharacterLibrariesToWorldScope(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -615,6 +662,7 @@ function emptyPassSummary(overrides = {}) {
     essenceCollisionDisabledRecipes: [],
     retiredCraftingModCounts: [],
     unifiedModifierCollisions: [],
+    characterLibraryCollisions: [],
     ...overrides,
   };
 }
@@ -729,6 +777,7 @@ export class MigrationRunner {
     const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
     const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
     const rawTravelConfig = this._getSetting(SETTING_KEYS.TRAVEL_CONFIG) ?? {};
+    const rawCharacterLibraries = this._getSetting(SETTING_KEYS.CHARACTER_LIBRARIES) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
@@ -737,6 +786,7 @@ export class MigrationRunner {
     const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
     const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
     const originalTravelConfigJson = JSON.stringify(rawTravelConfig);
+    const originalCharacterLibrariesJson = JSON.stringify(rawCharacterLibraries);
 
     let data = {
       recipes: rawRecipes,
@@ -746,6 +796,7 @@ export class MigrationRunner {
       gatheringParties: rawGatheringParties,
       currencyConfig: rawCurrencyConfig,
       travelConfig: rawTravelConfig,
+      characterLibraries: rawCharacterLibraries,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -873,6 +924,19 @@ export class MigrationRunner {
     }
     delete data._unifiedModifierCollisions;
 
+    // 1.28.0 reports the character-library id collisions where two systems disagreed about what
+    // an id MEANS (issue 1308). Identical copies are not reported, so anything here changed a
+    // real rule: the reference still resolves, but to the other system's definition, which is
+    // invisible on screen and is exactly why the GM has to be told. Captured for the notice and
+    // stripped so the transient field is never persisted.
+    let characterLibraryCollisions = [];
+    if (Array.isArray(data._characterLibraryCollisions)) {
+      characterLibraryCollisions = data._characterLibraryCollisions
+        .map((entry) => _normalizeCharacterLibraryCollisionEntry(entry))
+        .filter(Boolean);
+    }
+    delete data._characterLibraryCollisions;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -883,6 +947,8 @@ export class MigrationRunner {
     const currencyConfigChanged =
       JSON.stringify(data.currencyConfig) !== originalCurrencyConfigJson;
     const travelConfigChanged = JSON.stringify(data.travelConfig) !== originalTravelConfigJson;
+    const characterLibrariesChanged =
+      JSON.stringify(data.characterLibraries) !== originalCharacterLibrariesJson;
 
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
@@ -929,6 +995,15 @@ export class MigrationRunner {
       if (travelConfigChanged) {
         await this._setSetting(SETTING_KEYS.TRAVEL_CONFIG, data.travelConfig);
       }
+      // `characterLibraries` is the THIRD destination written before its source (issue 1308),
+      // for the identical reason: 1.28.0 lifts both libraries out of the systems and then strips
+      // them, so a tear after the systems write would leave every system shrunk and the world
+      // setting empty, the re-run would lift nothing, and the idempotence guard would correctly
+      // decline to write. Every prerequisite and every modifier in the world would be gone with
+      // no error and no recoverable copy.
+      if (characterLibrariesChanged) {
+        await this._setSetting(SETTING_KEYS.CHARACTER_LIBRARIES, data.characterLibraries);
+      }
       if (systemsChanged) {
         await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
@@ -961,6 +1036,7 @@ export class MigrationRunner {
       essenceCollisionDisabledRecipes,
       retiredCraftingModCounts,
       unifiedModifierCollisions,
+      characterLibraryCollisions,
     };
   }
 

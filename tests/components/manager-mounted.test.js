@@ -747,6 +747,7 @@ function compileManagerRoot() {
     // `maxModifierPicks` means. This list has NO dependency validator, so
     // omitting it does not fail the suite: every mounted manager test is reported as
     // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     // …and issue 1118 gave it another: the deterministic average a rolling modifier is
     // ranked by, which is also what tells the resolver that a modifier rolls at all.
@@ -1386,12 +1387,11 @@ function createStore(calls = [], options = {}) {
       // every assertion below is about. The persisted default is still `=== true` — this is
       // a fixture choice, not a change to the normalizer.
       craftingCheck: { enabled: true, ...(options.craftingCheck || {}) },
-      // The ONE system-level modifier library (issues 1095, 1117). It moved out of
-      // `craftingCheck` so salvage and gathering can select over the same entries, absorbed
-      // the gathering character-modifier library, and the store's projection is an
-      // ALLOWLIST — an unforwarded key here renders an empty library on every activity,
-      // which is exactly the silent state this fixture exists to make reachable.
-      modifiers: options.modifiers,
+      // The ONE modifier library (issues 1095, 1117) is NOT here any more: issue 1308 moved it to
+      // WORLD scope, so it rides the view state's `worldModifiers` slice below. The warning the
+      // old comment carried still holds there — the projection is an ALLOWLIST, and an
+      // unforwarded key renders an empty library on every activity, which is exactly the silent
+      // state this fixture exists to make reachable.
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
       gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
@@ -2104,6 +2104,12 @@ function createStore(calls = [], options = {}) {
     // read it. A double that omitted it was looser than the helper it stands for, which is
     // exactly how a subtitle that always counted zero assigned characters would pass green.
     worldCurrency: worldCurrencyFrom(options.selectedCurrency),
+    // The two character libraries are WORLD scope since issue 1308, so they ride the view state
+    // beside the currency ladder rather than the selected system. `options.modifiers` and
+    // `options.characterPrerequisites` keep their fixture names — the surfaces that read them
+    // have not moved yet, only where the data comes from.
+    worldModifiers: options.modifiers || [],
+    worldCharacterPrerequisites: options.characterPrerequisites || [],
     travelParties: options.travelParties || [
       {
         id: 'party-one',

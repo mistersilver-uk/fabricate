@@ -960,11 +960,20 @@
                     <h3 class="manager-card-title">
                       <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
                       {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+                      <!-- The scope chip (issue 1308). This library is WORLD scope now, but it is
+                           still authored on a page framed as "settings for the selected crafting
+                           system", so the shared scope has to be visible where the editing
+                           happens. It reuses the World rail's own wording — the same "every
+                           system" the rail heading carries — so the two surfaces say one thing.
+                           It goes away when this editor moves to its own World page. -->
+                      <Chip tone="neutral" class="manager-library-scope-chip"
+                        >{text('FABRICATE.Admin.Manager.World.Scope', 'every system')}</Chip
+                      >
                     </h3>
                     <p class="manager-muted">
                       {text(
                         'FABRICATE.Admin.Manager.Modifiers.Hint',
-                        'Reusable actor-driven modifiers for this system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.'
+                        'Reusable actor-driven modifiers, shared by every crafting system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.'
                       )}
                     </p>
                   </div>

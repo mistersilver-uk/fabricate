@@ -219,7 +219,8 @@ The action's stated purpose and its confirmation prompt must name description re
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives a six-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, and `CURRENCY_CONFIG` settings) and returns the transformed payload **or a subset of its keys**.
+- Each migration receives an eight-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, and `CHARACTER_LIBRARIES` settings) and returns the transformed payload **or a subset of its keys**.
+- The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, and `1.28.0` from seven to eight.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
@@ -242,7 +243,7 @@ On module initialization (on the primary-GM client):
 2. Filter the migration registry for entries where `migration.version > migrationVersion` using numeric semver comparison.
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
-5. Read all six current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, and `fabricate.currencyConfig`.
+5. Read all eight current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, and `fabricate.characterLibraries`.
 6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
 8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
@@ -253,8 +254,9 @@ On module initialization (on the primary-GM client):
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist each of the six settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`).
-13. Each of the six write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+12. Persist each of the eight settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`).
+13. Each of the eight write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+    Every DESTINATION of a world-scope lift is written BEFORE the `craftingSystems` SOURCE it was lifted from, so a tear between the two legs is recoverable rather than destructive; `currencyConfig`, `travelConfig` and `characterLibraries` are all written ahead of it.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
@@ -307,7 +309,7 @@ The layout reaches both surfaces from the value the pass already resolved, never
 
 ### Write-on-Change Persistence
 
-- Each of the six migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
+- Each of the eight migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`, `travelConfig`, `characterLibraries`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
 - On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
 - On aborted migration passes, `migrationVersion` is unchanged.
@@ -751,6 +753,52 @@ The `1.27.0` settings-data migration (`src/migration/migrateTravelToWorldScope.j
     `1.26.0` reads realms only from the crafting system, so a downgraded world would find no library at all, every environment's realm gating would stop resolving, and every Scene Region link would need re-authoring per system.
     A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.27.0`, so the pass does not re-run, and the allowlist rebuild discards the re-authored library on that system's next save.
     The re-upgrade path is therefore re-authoring at World > Travel, not re-authoring per system.
+
+### Character Libraries World-Scope Migration (`1.28.0`, `downgradeTo: '1.27.0'`, pure, non-mutating, idempotent)
+
+Issue 1308 moves BOTH character libraries — the character-prerequisite library (`characterPrerequisites`) and the modifier library (`modifiers`) — off every crafting system and into the `characterLibraries` WORLD setting.
+Unlike `1.26.0` and `1.27.0`, NOTHING stays on the crafting system: there is no participation flag, because an unreferenced entry already costs nothing and there is no meaningful "off" state to model.
+The `1.28.0` settings-data migration (`src/migration/migrateCharacterLibrariesToWorldScope.js`) reads the `craftingSystems` and `characterLibraries` payloads and returns both; it mutates neither input, and it throws no `FatalMigrationError` — every level is guarded, and a malformed system or entry is SKIPPED rather than repaired, because repair is the normalizer's job.
+
+1. **Without it the move is incomplete rather than broken, which is what distinguishes this pass from `1.26.0` and `1.27.0`.**
+   The runtime readers resolve the UNION of the world library and a system's own surviving legacy copy (`data-models` -> CharacterLibraries requirement 9), so an unmigrated world still resolves every reference.
+   What it does NOT have is one library: the GM would be editing a world pool no crafting system had contributed to, so the migration is what actually completes the move.
+2. **Entries are UNION-MERGED across every system, keyed by entry `id`, first system wins a collision — and the union is PER LIBRARY, never across both.**
+   Books and scrolls, tool requirement gates, complications, recipes, components, gathering tasks, drop rows, events and stamina costs all store ids, so a dropped entry orphans every reference to it and taking the union preserves the most references.
+   Keying by `id` rather than by label is what makes the merge reference-preserving at all.
+3. **COLLISIONS ARE THE NORMAL CASE HERE, and that changes what the harm IS.**
+   Preset ids are stable semantic slugs on both libraries — `smithsTools`, `proficientArcana`, `expertCrafter`; `strength`, `perception`, `survival` — and presets are explicitly editable once seeded, so a GM who seeded presets into two systems collides on every seeded entry.
+   Elsewhere a bad merge orphans a reference, which is visible; here the reference still RESOLVES, to a different rule.
+   If system B edited its `smithsTools` to require rank 2 and system A's copy wins, system B's books silently start gating at the easier threshold, with no error and nothing on screen to notice.
+4. **A collision is REPORTED, never re-keyed, and only a CONTENT-DIFFERING collision is reported.**
+   Re-keying the loser would orphan every reference to it, which is the precise harm requirement 2 exists to prevent.
+   Two systems seeded from the same preset bundle collide on every entry while agreeing exactly about what each one means, and reporting those would bury the one collision that changed a rule under dozens that changed nothing.
+   Sameness is judged on the NORMALIZED entry, through each library's own normalizer, so a difference in key order or in an absent-versus-undefined bound is not mistaken for a disagreement.
+   The report rides the payload as a transient `_characterLibraryCollisions` key, is normalized to a fixed `{ library, entryId, keptFrom, discardedFrom }` shape by the runner, and is STRIPPED before persistence so the diagnostic never reaches the setting.
+5. **The idempotence guard is a TWO-LIST DISJUNCTION, and so is the lifted-anything predicate.**
+   Either populated library proves the lift already ran, so a world whose GM authored only modifiers is not re-merged on every boot and a second pass never re-imposes stale system blocks over a library the GM has since edited — they may have deliberately deleted an entry.
+   Symmetrically, the pass returns the ORIGINAL stored object when there was nothing to lift, because a freshly-built `{ characterPrerequisites: [], modifiers: [] }` over a stored `{}` registers as a change under the runner's JSON comparison and would write the setting in every world on upgrade, matching the no-storage-churn decisions `1.22.0`, `1.25.0`, `1.26.0` and `1.27.0` already record.
+6. **Every system's copy is stripped unconditionally, and an ALREADY-STRIPPED system is returned BY REFERENCE.**
+   The strip needs no guard of its own because it is already idempotent, but the reference identity is load-bearing: the runner detects change by JSON comparison over the whole corpus, so rebuilding every system into an equal copy would report the crafting systems as changed in every upgraded world and rewrite the entire corpus for nothing.
+7. **The runner's before-any-load ordering is load-bearing**, in the same way requirement 8 of `1.26.0` and requirement 10 of `1.27.0` are.
+   `_normalizeSystem` is an ALLOWLIST REBUILD that no longer emits either key, so a system save running before the pass would DELETE both libraries rather than lift them.
+   This is why the normalizer change and the migration cannot be separated by even one release.
+8. **The transforms are SHARED with the export-payload upcast** (`buildWorldCharacterLibraries` and `stripSystemCharacterLibraries`), not reimplemented; `migrateExportPayload` applies them branch-independently.
+   An export carries one system, so the union across systems degenerates there to that system's own libraries — but it is the same function, so a world upgrade and an imported bundle cannot drift on how an entry is carried across.
+   One system cannot collide with itself, so the export path discards the diagnostic rather than persisting it into an envelope no reader would consult.
+9. **Mutated setting keys:** `characterLibraries` (created) and `craftingSystems` (shrunk).
+   This is the migration that took the runner's payload from seven settings to eight; `characterLibraries` is read, snapshotted, passed, change-detected and written back exactly like the seven that preceded it, and omitting any one of those four threading points is silent — omit the read and the idempotence guard never sees the GM's edits, omit the snapshot and the setting is written on every boot.
+10. **The `characterLibraries` writeback MUST precede the `craftingSystems` writeback**, and the ordering is load-bearing in the same way requirement 11 of `1.26.0` and requirement 14 of `1.27.0` are.
+    Systems are the SOURCE of the lift and `characterLibraries` is the DESTINATION, and the writeback legs share one `try` whose `catch` abandons every leg after the one that rejected.
+    Write the source first and a tear between the two destroys both libraries irrecoverably: `migrationVersion` stays behind, the re-run finds systems already stripped, the build lifts nothing, and requirement 5's no-churn guard correctly declines to write — so every prerequisite and every modifier in the world is gone with no error and no recoverable copy.
+    Writing the destination first makes the identical tear fully recoverable, because the re-run finds a populated world library, requirement 5's guard keeps it, and the strip it re-applies is idempotent by construction.
+11. **The pass is NOT what protects an unmigrated client**, and reading it as such is the mistake this requirement exists to foreclose.
+    Migrations are primary-GM-gated, and a pass may DEFER or a preceding pass may ABORT while startup continues normally, so a player, an assistant GM holding `SETTINGS_MODIFY`, or the primary GM on a deferred pass all boot against an unmigrated setting.
+    What protects them is the Valid Id Basis on the read and prune paths (`data-models` -> CharacterLibraries requirements 4 and 9), which is derived from the CORPUS and never from `migrationVersion` — gating on the migration version is forbidden outright by ### Valid Id Basis.
+12. **The downgrade is NOT lossless**, and is declared `downgradeLosesData: true` with the loss named in the `label` string beside the very Downgrade button it is about.
+    `1.27.0` reads both libraries only from the crafting system, so a downgraded world would find neither: every learning gate and every tool requirement would stop resolving, and every check modifier would contribute nothing until the GM re-authored them per system.
+    A GM who downgrades, re-authors per system, and then upgrades AGAIN does not get a second lift: `migrationVersion` is already `1.28.0`, so the pass does not re-run, and the allowlist rebuild discards the re-authored libraries on that system's next save.
+13. **The `label` string is the one string a GM ever reads about this migration**, so it names the collision outcome, tells them to check the two library editors afterwards, and says what the downgrade costs.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 

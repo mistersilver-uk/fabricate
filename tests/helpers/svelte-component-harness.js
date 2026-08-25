@@ -234,6 +234,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
+  'src/systems/characterLibraries.js',
   'src/systems/CraftingListingBuilder.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out
   // of the builder into an import-free leaf so #1091's summary projection can share them

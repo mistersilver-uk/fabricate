@@ -75,7 +75,7 @@ export function createGatheringToolAvailability({ craftingSystemManager, evaluat
         const gate = await evaluateToolPrerequisiteGate({
           tool,
           actor: boundActor,
-          prerequisiteDefinitions: system?.characterPrerequisites,
+          prerequisiteDefinitions: resolveCharacterPrerequisiteLibrary(system),
           evaluatePrerequisite: ({ actor: gateActor, prerequisite }) =>
             evaluatePrerequisite(gateActor?.getRollData?.() ?? gateActor?.system ?? {}, prerequisite),
         });
@@ -300,5 +300,6 @@ function normalizeFoundryCollection(collection) {
   return [];
 }
 import { getItemSourceReferences } from './utils/sourceUuid.js';
+import { resolveCharacterPrerequisiteLibrary } from './systems/characterLibraries.js';
 import { evaluatePrerequisite } from './systems/characterPrerequisites.js';
 import { evaluateToolPrerequisiteGate } from './systems/toolCheckBonus.js';

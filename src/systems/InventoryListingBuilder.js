@@ -77,6 +77,7 @@ import { attachStageComplications } from '../utils/progressiveStageComplications
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { matchRecipeItemDefinition, resolveToolForItem } from '../utils/sourceUuid.js';
 
+import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 // The ONE salvage `(mode, checkUsable)` derivation, shared with `CraftingEngine` so the
@@ -1312,9 +1313,7 @@ export class InventoryListingBuilder {
     // its recipes with a `learnBlocked` flag the Learn affordance disables on.
     const rollData = craftingActor?.getRollData?.() ?? {};
     const prerequisiteById = new Map(
-      (Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : []).map(
-        (def) => [def.id, def]
-      )
+      resolveCharacterPrerequisiteLibrary(system).map((def) => [def.id, def])
     );
     const rows = [];
     for (const [defId, { def, sources: sourceMap, item }] of owned) {

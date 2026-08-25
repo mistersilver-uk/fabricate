@@ -184,12 +184,32 @@ function createMockServices(overrides = {}) {
     exportRecipes: () => recipes.map((r) => r.toJSON()),
   };
 
+  // The world character libraries (issue 1308). Kept as a plain in-memory fake rather than the
+  // real store, because this suite drives adminStore's projection and write paths and needs to
+  // read the persisted value straight back.
+  const characterLibraries = { characterPrerequisites: [], modifiers: [] };
+  const mockCharacterLibrariesStore = {
+    isSeeded: () => true,
+    get: () => characterLibraries,
+    listCharacterPrerequisites: () => characterLibraries.characterPrerequisites,
+    listModifiers: () => characterLibraries.modifiers,
+    saveCharacterPrerequisites: async (next) => {
+      characterLibraries.characterPrerequisites = next;
+      return characterLibraries;
+    },
+    saveModifiers: async (next) => {
+      characterLibraries.modifiers = next;
+      return characterLibraries;
+    },
+  };
+
   const base = {
     getSetting: (key) => store[key] ?? '',
     setSetting: async (key, value) => {
       store[key] = value;
     },
     getCraftingSystemManager: () => mockSystemManager,
+    getCharacterLibrariesStore: () => mockCharacterLibrariesStore,
     getRecipeManager: () => mockRecipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
@@ -209,6 +229,7 @@ function createMockServices(overrides = {}) {
   // Expose internal state for assertions
   merged._store = store;
   merged._getSystemsMutable = () => systems;
+  merged._characterLibraries = characterLibraries;
   merged._getRecipesMutable = () => recipes;
 
   return merged;
@@ -424,7 +445,7 @@ describe('createAdminStore', () => {
       // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.modifiers = [
+      services._characterLibraries.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
         { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
       ];
@@ -448,24 +469,22 @@ describe('createAdminStore', () => {
       const selected = get(store.viewState).selectedSystem;
       const check = selected.craftingCheck;
 
-      // The library is a SYSTEM-level key since issue 1095 and is named `modifiers` since
-      // issue 1117; it is projected there and nowhere else.
+      // The library is WORLD scope since issue 1308, so it is projected as a top-level slice and
+      // NOT off the selection — hanging it there would make the same library appear to change
+      // when the GM merely clicks a different crafting system.
+      const worldModifiers = get(store.viewState).worldModifiers;
+      assert.equal(selected.modifiers, undefined, 'never projected off the selected system');
       assert.deepEqual(
-        selected.modifiers.map((modifier) => modifier.id),
+        worldModifiers.map((modifier) => modifier.id),
         ['med', 'alch'],
-        'the library surfaces through the projection allowlist, at the system level'
-      );
-      assert.notEqual(
-        selected.modifiers[0],
-        sys.modifiers[0],
-        'library entries are cloned, not shared with the live system'
+        'the library surfaces through the world projection'
       );
       // The BOUNDS survive the projection too. Without them the read-only chip on salvage
       // and gathering renders nothing and the crafting steppers read blank — an
       // absence-preserving field is exactly the kind an allowlist drops unnoticed.
-      assert.equal(selected.modifiers[0].min, -1);
-      assert.equal(selected.modifiers[0].max, 5);
-      assert.equal(Object.hasOwn(selected.modifiers[1], 'min'), false);
+      assert.equal(worldModifiers[0].min, -1);
+      assert.equal(worldModifiers[0].max, 5);
+      assert.equal(Object.hasOwn(worldModifiers[1], 'min'), false);
 
       assert.equal(check.defaultModifierPolicy, 'highest');
       assert.deepEqual(check.defaultModifierIds, ['med']);
@@ -635,7 +654,7 @@ describe('createAdminStore', () => {
         defaultModifierPolicy: 'addAll',
         defaultModifierIds: ['med', 'alch'],
       };
-      sys.modifiers = [
+      services._characterLibraries.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@med' },
         { id: 'alch', label: 'Alchemy', expression: '@alch' },
       ];
@@ -683,7 +702,7 @@ describe('createAdminStore', () => {
       );
       await store.refresh();
       assert.deepEqual(
-        get(store.viewState).selectedSystem.modifiers.map((entry) => entry.id),
+        get(store.viewState).worldModifiers.map((entry) => entry.id),
         ['med', 'alch'],
         'and the authored library is intact'
       );
@@ -702,7 +721,9 @@ describe('createAdminStore', () => {
         let updates = null;
         const services = createMockServices();
         const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-        sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+        services._characterLibraries.modifiers = [
+          { id: 'med', label: 'Medicine', expression: '@med' },
+        ];
         sys[key] = {
           enabled: true,
           routed: { type: 'relative', rollFormula: '1d20 + 3' },
@@ -737,16 +758,19 @@ describe('createAdminStore', () => {
       });
     }
 
-    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117). Every library op goes through
-    // `updateSystem({ modifiers })` — a TOP-LEVEL key, so the array is replaced wholesale and
-    // removing an entry persists with no `-=` deletion — and touches no activity selection,
-    // so it cannot re-default a rule it was never asked about.
-    it('addSystemModifier and deleteSystemModifier write the library at the SYSTEM level, alone', async () => {
+    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117), now at WORLD scope (issue 1308).
+    // Every library op replaces the whole array in the world setting — so removing an entry
+    // persists with no `-=` deletion — and writes NOTHING through `updateSystem`, so it cannot
+    // re-default an activity rule it was never asked about. That second half is asserted by the
+    // crafting system receiving no write at all.
+    it('addSystemModifier and deleteSystemModifier write the WORLD library, alone', async () => {
       const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy: 'highest' };
-      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 }];
+      services._characterLibraries.modifiers = [
+        { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
+      ];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -758,31 +782,29 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const added = await store.addSystemModifier('sys1', { id: 'alch', label: 'Alchemy' });
+      const added = await store.addSystemModifier({ id: 'alch', label: 'Alchemy' });
       assert.equal(added.id, 'alch');
       assert.deepEqual(
-        calls.at(-1).modifiers.map((entry) => entry.id),
+        services._characterLibraries.modifiers.map((entry) => entry.id),
         ['med', 'alch'],
         'the whole array is written, appended in order'
       );
-      assert.equal(
-        Object.hasOwn(calls.at(-1), 'craftingCheck'),
-        false,
-        'a library write touches no activity selection'
-      );
+      assert.deepEqual(calls, [], 'a library write touches no crafting system at all');
 
-      assert.equal(await store.deleteSystemModifier('sys1', 'med'), true);
+      assert.equal(await store.deleteSystemModifier('med'), true);
       assert.deepEqual(
-        calls.at(-1).modifiers.map((entry) => entry.id),
+        services._characterLibraries.modifiers.map((entry) => entry.id),
         ['alch'],
         'the removal persists as a whole-array replace'
       );
 
       await store.refresh();
-      const selected = get(store.viewState).selectedSystem;
-      assert.deepEqual(selected.modifiers.map((entry) => entry.id), ['alch']);
+      assert.deepEqual(
+        get(store.viewState).worldModifiers.map((entry) => entry.id),
+        ['alch']
+      );
       assert.equal(
-        selected.craftingCheck.defaultModifierPolicy,
+        get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy,
         'highest',
         'and the crafting rule survives the round trip rather than being re-defaulted'
       );
@@ -796,7 +818,7 @@ describe('createAdminStore', () => {
       const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+      services._characterLibraries.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -808,9 +830,12 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.addSystemModifier('sys1', { id: 'med' }), null);
-      assert.equal(await store.deleteSystemModifier('sys1', 'ghost'), false);
-      assert.equal(await store.updateSystemModifier('sys1', 'ghost', { label: 'X' }), false);
+      assert.equal(await store.addSystemModifier({ id: 'med' }), null);
+      // The id goes in the FIRST argument since issue 1308 dropped the system id. Passing the old
+      // two-argument shape made this assert that `'sys1'` is not a modifier id, which is true and
+      // proves nothing — `'ghost'` was never tested at all.
+      assert.equal(await store.deleteSystemModifier('ghost'), false);
+      assert.equal(await store.updateSystemModifier('ghost', { label: 'X' }), false);
       assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 
@@ -6624,9 +6649,9 @@ describe('createAdminStore', () => {
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
-      // The library a drop-row reference points INTO is SYSTEM-owned (issue 1117); the
-      // gathering config carries only the tasks and events that reference it.
-      sys.modifiers = [
+      // The library a drop-row reference points INTO is the ONE library (issue 1117), WORLD scope
+      // since issue 1308; the gathering config carries only the tasks and events referencing it.
+      services._characterLibraries.modifiers = [
         {
           id: 'strength',
           label: 'Strength',

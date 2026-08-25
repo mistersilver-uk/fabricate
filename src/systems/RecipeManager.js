@@ -17,6 +17,7 @@ import {
   itemIsToolByDurableIdentity,
 } from '../utils/sourceUuid.js';
 
+import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import {
   craftingDataChange,
@@ -176,8 +177,13 @@ export class RecipeManager {
     // manager seam is: when absent the shared affordance resolver falls back to the
     // `game.fabricate` global, so no existing construction site changes.
     currencyConfigStore = null,
+    characterLibrariesStore = null,
   } = {}) {
     this.currencyConfigStore = currencyConfigStore;
+    // Issue 1308: the world character libraries. Optional — `resolveCharacterPrerequisiteLibrary`
+    // falls back to the module registry when nothing is injected, exactly as the currency
+    // resolver does, so only tests need to supply it.
+    this._characterLibrariesStore = characterLibrariesStore;
     this.recipes = new Map();
     this.initialized = false;
     // The revision-token registry this manager mints from (issue 1076). Per manager, never
@@ -1846,7 +1852,7 @@ export class RecipeManager {
     const systemId = recipe?.craftingSystemId;
     if (!systemId || !this.getCraftingSystem) return [];
     const system = this.getCraftingSystem(systemId);
-    return Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : [];
+    return resolveCharacterPrerequisiteLibrary(system, this._characterLibrariesStore);
   }
 
   _resolveCraftingSystem(systemId) {
