@@ -1518,6 +1518,12 @@ export function gateCompanionCallSite(request, seams) {
  * It is logged rather than swallowed, because a resolver that throws on a WELL-FORMED address is
  * a defect and a silent `null` would report it as an empty party.
  *
+ * The throw is REAL and not defensive: `fromUuidSync` raises on a pack-sourced EMBEDDED address
+ * (`Compendium.<pack>.Actor.<id>.Item.<id>`), because its `strict` parameter defaults to `true`
+ * on both v13.350 and v14.365 and such an address cannot be resolved synchronously. A companion
+ * assembling addresses from its own data can hold one, and it must become a refusal here rather
+ * than an exception out of a member that publishes "never throws".
+ *
  * @param {string} uuid one caller address, already known to be a non-empty string
  * @param {{resolveActor: (uuid: string) => object|null}} seams
  * @returns {object|null}
@@ -1548,22 +1554,41 @@ function resolveOnePooledActor(uuid, seams) {
  * - `noActor` when NOT ONE of the supplied addresses answers — the same word every other
  *   actor-targeted member answers, said about a set;
  * - `invalidActorUuids` when the REQUEST itself is wrong: absent, empty, longer than
- *   {@link POOLED_ACTORS_MAX}, carrying anything that is not a non-empty string, or only PARTLY
- *   resolved.
+ *   {@link POOLED_ACTORS_MAX}, carrying anything that is not a non-empty string, only PARTLY
+ *   resolved, or resolving to the SAME DOCUMENT TWICE.
  *
  * A partly resolved list is the request being wrong rather than the world being empty, and that
  * placement is the whole point: pooling over fewer actors than the caller believes is the harm
  * both members refuse, because a consume would then draw from a different set than the read
  * reported.
  *
+ * ## A repeated document is the SAME harm, from the other direction
+ *
+ * A pool is a SET, and every consumer downstream sums per entry: the read flat-maps each entry's
+ * items into the candidate order and sums its coin, and the consume drains that same order. So a
+ * document that appears twice is counted twice — a party holding one stack of five reads as
+ * holding ten, and a take of eight then plans five from the stack AND three from the same stack,
+ * writes the reduction, deletes the emptied document and publishes `consumed: 8` for five units
+ * that left a sheet. Nothing fails, so nothing rolls back. That is the permissive direction, on
+ * the member that DELETES.
+ *
+ * It is not a hypothetical caller error either. `fromUuidSync` resolves a LINKED token's actor
+ * address and its world actor address to the IDENTICAL document (`Token#actor` returns
+ * `this.baseActor` when `isLinked`), so two well-formed, visibly different addresses legitimately
+ * name one pool — and the ordering rule this API publishes ("the caller's order IS the allocation
+ * policy") actively invites prepending the acting character to a party list.
+ *
+ * Distinctness is by object IDENTITY and never by `id`, and that distinction is load-bearing in
+ * the opposite direction: an UNLINKED token's synthetic actor is a DIFFERENT document carrying
+ * the SAME `id` as its base actor (`ActorDelta#applyDelta` builds it from `baseActor.toObject()`
+ * with `_id` deleted), and those two are genuinely different pools. An `id`-keyed test would
+ * collapse them and refuse a legitimate party.
+ *
  * @param {*} actorUuids the caller's own list of addresses
- * @param {{noActorKey: string, invalidActorUuidsKey: string}} keys the CALLING member's own
- *   refusal strings, so a refused consume is never reported in the read's words
  * @param {{resolveActor: (uuid: string) => object|null}} seams
- * @returns {{actors: Array<object>|null, outcome: string|null, message: string|null,
- *   messageData: object|null}}
+ * @returns {{actors: Array<object>|null, outcome: string|null, messageData: object|null}}
  */
-export function gatePooledActorUuids(actorUuids, keys, seams) {
+export function gatePooledActorUuids(actorUuids, seams) {
   const wanted = Array.isArray(actorUuids) ? actorUuids : [];
   const addressable =
     wanted.length > 0 &&
@@ -1572,21 +1597,16 @@ export function gatePooledActorUuids(actorUuids, keys, seams) {
   const actors = addressable
     ? wanted.map((uuid) => resolveOnePooledActor(uuid, seams)).filter(Boolean)
     : [];
-  if (addressable && actors.length === wanted.length) {
-    return { actors, outcome: null, message: null, messageData: null };
+  const distinct = new Set(actors).size === actors.length;
+  if (addressable && distinct && actors.length === wanted.length) {
+    return { actors, outcome: null, messageData: null };
   }
   if (addressable && actors.length === 0) {
-    return {
-      actors: null,
-      outcome: COMPANION_OUTCOMES.noActor,
-      message: keys.noActorKey,
-      messageData: null,
-    };
+    return { actors: null, outcome: COMPANION_OUTCOMES.noActor, messageData: null };
   }
   return {
     actors: null,
     outcome: COMPANION_OUTCOMES.invalidActorUuids,
-    message: keys.invalidActorUuidsKey,
     messageData: { max: POOLED_ACTORS_MAX },
   };
 }

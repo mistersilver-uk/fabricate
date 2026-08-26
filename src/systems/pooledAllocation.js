@@ -28,6 +28,10 @@
  * issues per-document `delete`/`update` calls, while the pooled consume batches per
  * actor.
  *
+ * A candidate list that repeats one document pays from it ONCE. It plans nothing, so a
+ * repeat would be read against the same unwritten `available` twice and reported as
+ * `satisfied` for a quantity nothing holds — see {@link planFirstFitDrain}.
+ *
  * ### Why the plan is parent-grouped
  *
  * {@link DrainPlan#groups} carries the same takes as {@link DrainPlan#takes}, bucketed by
@@ -119,6 +123,20 @@ export function pooledItemOrder(actors) {
  * coercing it, so a caller that passes a non-number gets the same arithmetic it got when
  * this loop lived inside the engine.
  *
+ * **One document pays at most once.** A candidate list that names the same document twice
+ * is planned as though it were two stacks: the first take reads `available` and exhausts
+ * it, the second re-reads the SAME `available` off the same unwritten document and takes
+ * again — so the plan reports `satisfied` for a quantity the pool does not hold, and a
+ * caller that writes it reduces the stack and then deletes it while publishing the larger
+ * figure. The repeat is skipped by object IDENTITY rather than by `id`, because two actors'
+ * items are not guaranteed to have distinct ids and an id-keyed test would drop a second
+ * actor's genuine stack.
+ *
+ * This is defence in depth and not the rule's home: the pooled members refuse a repeated
+ * ACTOR up front, which is where a repeated document comes from. It is here because a
+ * planner that answers `satisfied` for an unsatisfiable request is a lie no caller can
+ * detect, and because this module is the one place both callers' drains meet.
+ *
  * @param {Iterable<object>} items The candidate items, already in the order they should
  *   be drained (see {@link pooledItemOrder} for the pooled case).
  * @param {number} quantity How much to take in total.
@@ -126,11 +144,14 @@ export function pooledItemOrder(actors) {
  */
 export function planFirstFitDrain(items, quantity) {
   const takes = [];
+  const drained = new Set();
   let remaining = quantity;
   let allocated = 0;
 
   for (const item of items ?? []) {
     if (remaining <= 0) break;
+    if (drained.has(item)) continue;
+    drained.add(item);
     const available = readStackQuantity(item);
     const takeQuantity = Math.min(available, remaining);
     takes.push({

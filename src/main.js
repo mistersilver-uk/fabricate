@@ -124,8 +124,6 @@ import {
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
-  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
-  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
@@ -188,27 +186,18 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
 });
 
 /**
- * The two pooled members' OWN refusal strings, hoisted for the reason the pairs above are
+ * The two pooled members carry NO hoisted refusal-string trio, and that absence is deliberate
  * (issue 1342).
  *
- * THREE keys each and not two, because the SET-valued preamble splits an actor refusal in a way
- * the singular one cannot: `noActor` when not one supplied UUID addresses an actor, and
- * `invalidActorUuids` when the request itself is wrong. A pair shared between the read and the
- * consume would be the cross-member vocabulary leak the parameter exists to prevent, and it
- * would bite hardest between exactly these two — the pair is designed to be called one after
- * the other, so a GM reading the second answer in the first's words could not tell them apart.
+ * Every member above hands its preamble its own keys because the SINGULAR preamble's `message`
+ * is read: `resetActorKnowledge` answers `{ success: false, message: gate.message }` verbatim.
+ * The SET-valued preamble's is not. Both pooled delegators branch on `gate.outcome` alone and
+ * answer through their own result builder, which resolves the member's own message table by
+ * outcome — so a key threaded through the gate could only ever restate, in a second place, the
+ * string the builder is about to derive. Three parameters, two frozen constants and a mirror
+ * copy of both bought exactly one failure mode: someone editing a string. The builder is the one
+ * home of a member's words, and the gate now answers `{ actors, outcome, messageData }`.
  */
-const READ_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
-  gmOnlyKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
-  invalidActorUuidsKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids]
-});
-
-const CONSUME_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
-  gmOnlyKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
-  invalidActorUuidsKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids]
-});
 import { checkWorldCurrencyAffordability, creditWorldCurrency } from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
@@ -2520,31 +2509,47 @@ class Fabricate {
    * keeps its items. So these two take addresses, and the read takes the same addresses the
    * consume will, so the two can never disagree about which documents the answer was about.
    *
-   * The resolved document must BE an actor. `fromUuidSync` answers whatever the address names,
-   * and an Item or a Scene handed to the pooled leaves would be scanned for components and then
-   * written to; a `documentName` test is what makes a mistyped address a refusal rather than a
-   * write against the wrong document.
+   * The resolved document must BE an actor, and must be a WORLD actor. `fromUuidSync` answers
+   * whatever the address names, and an Item or a Scene handed to the pooled leaves would be
+   * scanned for components and then written to; a `documentName` test is what makes a mistyped
+   * address a refusal rather than a write against the wrong document.
+   *
+   * The compendium test beside it is the same rule about a different mistake, and it guards the
+   * member that DELETES. `fromUuidSync` resolves a pack address as
+   * `collection.get(id) ?? collection.index.get(id)`, so the answer depends on whether anything
+   * has loaded that pack: an index entry is a plain object with no `documentName` and is refused,
+   * while the SAME address answers a real `Actor` once the pack is loaded — and the consume would
+   * then issue `deleteEmbeddedDocuments` against a compendium TEMPLATE. The pack's `locked` flag
+   * does not save it; that is a client-side guard on the collection's own management methods and
+   * the server backend never consults it. `Document#inCompendium` is `!!this.pack` and is
+   * documented from v13, which is this module's declared minimum.
    *
    * `globalThis.fromUuidSync` rather than the bare global this file uses elsewhere, for the
    * reason recorded on {@link Fabricate#_postBulkSalvageChatMessage}: optional chaining does not
    * rescue an UNDECLARED identifier, so a bare `fromUuidSync?.()` still throws a ReferenceError
-   * where the global has not been installed — and a `stable` member may not throw.
+   * where the global has not been installed — and a `stable` member may not throw. The throw that
+   * a shipped world actually reaches is a different one and is handled a layer down, by
+   * `resolveOnePooledActor`'s `try`: `fromUuidSync` RAISES on a pack-sourced embedded address
+   * such as `Compendium.<pack>.Actor.<id>.Item.<id>`, because its `strict` parameter defaults to
+   * `true` on both v13.350 and v14.365.
+   *
+   * It takes NO refusal strings. See the comment where the pooled trios used to be hoisted: this
+   * preamble's `message` was read by nobody, because each pooled delegator answers through its
+   * own result builder and that builder is the one home of the member's words.
    *
    * @param {*} actorUuids The target actors, by UUID (never by id).
-   * @param {{gmOnlyKey: string, noActorKey: string, invalidActorUuidsKey: string}} keys This
-   *   member's own refusal strings.
-   * @returns {{actors: Array<Actor>|null, outcome: string|null, message: string|null,
-   *   messageData: object|null}}
+   * @returns {{actors: Array<Actor>|null, outcome: string|null, messageData: object|null}}
    * @private
    */
-  _requireGmActors(actorUuids, keys) {
+  _requireGmActors(actorUuids) {
     if (game.user?.isGM !== true) {
-      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, message: keys.gmOnlyKey, messageData: null };
+      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, messageData: null };
     }
-    return gatePooledActorUuids(actorUuids, keys, {
+    return gatePooledActorUuids(actorUuids, {
       resolveActor: (uuid) => {
         const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
-        return addressed?.documentName === 'Actor' ? addressed : null;
+        if (addressed?.documentName !== 'Actor') return null;
+        return addressed.inCompendium === true ? null : addressed;
       }
     });
   }
@@ -2788,7 +2793,7 @@ class Fabricate {
    * @returns {Promise<Readonly<object>>}
    */
   async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids, READ_POOLED_HOLDINGS_GATE_KEYS);
+    const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
       return pooledHoldingsReadResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
     }
@@ -2982,7 +2987,8 @@ class Fabricate {
    * on {@link Fabricate#readPooledHoldings} and first measured for {@link Fabricate#creditCurrency}.
    *
    * It owns preconditions 1-3 only — GM, actors, readiness, in that order, through the same
-   * set-valued preamble the read uses with its OWN refusal strings — and hands the RESOLVED
+   * set-valued preamble the read uses, answering in its OWN words through its OWN result builder
+   * rather than through a refusal string threaded into that preamble — and hands the RESOLVED
    * actor documents plus the seam bag to the leaf, which owns the call-site gate, the election,
    * the `costs` validation, the components-first ordering and the rollback.
    *
@@ -2997,7 +3003,7 @@ class Fabricate {
    * @returns {Promise<Readonly<object>>}
    */
   async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids, CONSUME_POOLED_HOLDINGS_GATE_KEYS);
+    const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
       return pooledHoldingsConsumeResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
     }

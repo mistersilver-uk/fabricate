@@ -155,8 +155,18 @@ function validatePooledCosts(costs) {
  * A FLOOR, not the member's actor gate: the facade resolves the caller's UUIDs and owns the
  * `noActor`/`invalidActorUuids` split, because only it holds the raw list and can tell "not one
  * resolved" from "some resolved". What this can still see is a set that is absent, empty,
- * over-bound, or carrying something that is not an addressable document — and each of those is
- * the request being wrong rather than the world being empty.
+ * over-bound, carrying something that is not an addressable document, or NOT A SET AT ALL — and
+ * each of those is the request being wrong rather than the world being empty.
+ *
+ * The distinctness half is the one with teeth here, because this member's error would be a
+ * PERMISSIVE one. Every reading sums per entry — components flat-map each actor's items, coin is
+ * summed per actor — so one document appearing twice reports a party holding one stack of ten as
+ * holding twenty, and the consume the caller is about to make on the strength of that answer
+ * cannot cover it. Erring permissive is the direction {@link readCurrencyCost} already refuses to
+ * err in a paragraph below; this is the same rule about the pool rather than the denomination.
+ *
+ * By object IDENTITY and never by `id`: an unlinked token's synthetic actor and its base actor
+ * are two genuinely different pools that share one `id`.
  *
  * @param {*} actors
  * @returns {Array<object>|null}
@@ -164,6 +174,7 @@ function validatePooledCosts(costs) {
 function validatePooledActors(actors) {
   if (!Array.isArray(actors)) return null;
   if (actors.length === 0 || actors.length > POOLED_ACTORS_MAX) return null;
+  if (new Set(actors).size !== actors.length) return null;
   return actors.every((actor) => typeof actor?.uuid === 'string' && actor.uuid !== '')
     ? actors
     : null;

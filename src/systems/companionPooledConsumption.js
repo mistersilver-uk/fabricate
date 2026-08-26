@@ -26,10 +26,25 @@
  *   `if (!(operation.keepId && data._id)) data._id = await sublevel.createNewId()`, so the
  *   supplied `_id` is retained verbatim — and therefore the item's UUID — while
  *   `_generateEmbeddedDocumentIds(keepEmbeddedIds)` skips every embedded document that already
- *   carries an `_id`, so active effects keep theirs too. `_stats.createdTime` survives as well;
- *   only `modifiedTime` and `lastModifiedBy` are refreshed. `awardComponents` is lossy ONLY
- *   because it rebuilds from the component TEMPLATE, which is a different operation, and it is
- *   deliberately not reached for here.
+ *   carries an `_id`, so active effects keep theirs too. Flags, `system` data, `name`, `img`,
+ *   `compendiumSource` and `duplicateSource` all survive, because none of them is a managed
+ *   stat. `awardComponents` is lossy ONLY because it rebuilds from the component TEMPLATE, which
+ *   is a different operation, and it is deliberately not reached for here.
+ *
+ *   **`_stats` is the accepted residue, and `createdTime` is part of it.** An earlier version of
+ *   this comment claimed `createdTime` survived; it does not, and the two mechanisms that decide
+ *   it agree. `DocumentStatsField.managedFields` lists `createdTime` as "ignored if they appear
+ *   in creation or update data", and `_sanitizeType` strips it on the create the server performs
+ *   with `sanitize: {deleteStats: true, user}`. `ServerDocumentMixin#_tagStats` then sets
+ *   `createdTime` to now whenever the write IS a creation — which a `keepId` restore is. So
+ *   `createdTime`, `modifiedTime` and `lastModifiedBy` are all refreshed. That is source-proven
+ *   on v14.365 and strong inference on v13.350. It is residue rather than a defect: no companion
+ *   answer, no uuid and no player-visible field depends on it.
+ *
+ *   One further residue on an UNLINKED token: a restore promotes an INHERITED item to a
+ *   delta-managed record. The uuid, `_id`, effect ids, flags and system data are identical, so
+ *   nothing a companion can observe changes, but the item stops tracking later edits to the base
+ *   actor — only core's own `EmbeddedCollectionDelta#restoreDocuments` re-links it.
  * - **Currency is the unreliable half.** Under `spendStrategy: 'macro'` the `increment` macro is
  *   explicitly OPTIONAL, so a world can be perfectly valid and have published no way to hand
  *   coin back at all; under `pf2e` a give-back creates treasure Items; under `actorProperty` it
@@ -153,10 +168,21 @@ function normalizeCostQuantity(value) {
 /**
  * The resolved actor set, or `null` when the whole call must refuse `invalidActorUuids`.
  *
- * The facade's set-valued preamble has already refused an unresolvable or partly resolved UUID
- * list; this is the BOUND and the shape, tested again at the boundary that issues the writes. A
- * member that DELETES does not delegate the question "is this a usable set of actors?" to its
- * caller, and the bound is what makes the work finite: every cost is scanned across every actor.
+ * The facade's set-valued preamble has already refused an unresolvable, partly resolved or
+ * repeated UUID list; this is the BOUND, the shape and the SET-ness, tested again at the boundary
+ * that issues the writes. A member that DELETES does not delegate the question "is this a usable
+ * set of actors?" to its caller, and the bound is what makes the work finite: every cost is
+ * scanned across every actor.
+ *
+ * A `uuid` is required and not merely nice to have, on the READ floor's rule: `publish` echoes
+ * the pool as `actor?.uuid` and the contract's `frozenActorUuids` FILTERS OUT anything that is
+ * not a string, so an entry without one is silently dropped from the echo — leaving a caller
+ * pooled over a set it cannot see, which is the exact harm the `noActor`/`invalidActorUuids`
+ * split exists to prevent, on the member that deletes.
+ *
+ * Distinctness is by object IDENTITY and never by `id`, for the reason `gatePooledActorUuids`
+ * records: a repeated document is counted twice by every consumer downstream, while an unlinked
+ * token actor and its base actor are two different documents that legitimately share one `id`.
  *
  * @param {*} actors the already-resolved actor documents, in payment order
  * @returns {Array<object>|null}
@@ -165,7 +191,10 @@ function validateActorPool(actors) {
   if (!Array.isArray(actors) || actors.length === 0 || actors.length > POOLED_ACTORS_MAX) {
     return null;
   }
-  return actors.every((actor) => actor && typeof actor === 'object') ? actors : null;
+  if (new Set(actors).size !== actors.length) return null;
+  return actors.every((actor) => typeof actor?.uuid === 'string' && actor.uuid !== '')
+    ? actors
+    : null;
 }
 
 /**
@@ -405,15 +434,20 @@ function planComponentCosts(actors, rows, seams) {
  * `insufficient`, and that is the one this ignores. Every other answer was decided before the
  * pool was consulted and is honoured verbatim.
  *
+ * `baseUnitId` comes back with it because it is the key the rows are grouped by, and the empty
+ * pool is exactly where it can be learned for free: `planned` carries it onto the `insufficient`
+ * answer this ignores, so the group key costs no extra ladder resolution and — like
+ * `requiredBase` — is the CURRENCY MODULE's own answer rather than a second derivation here.
+ *
  * @param {object} row
  * @param {object} seams
- * @returns {Promise<{outcome: string|null, requiredBase: number|null}>}
+ * @returns {Promise<{outcome: string|null, requiredBase: number|null, baseUnitId: string}>}
  */
 async function probeCurrencyRequest(row, seams) {
   const request = { unitId: row.unitId, amount: row.raw };
   const probe = await consumePooledCurrency([], request, seams);
   const outcome = probe.outcome === COMPANION_OUTCOMES.insufficient ? null : probe.outcome;
-  return { outcome, requiredBase: probe.requiredBase };
+  return { outcome, requiredBase: probe.requiredBase, baseUnitId: probe.baseUnitId };
 }
 
 /**
@@ -438,30 +472,78 @@ function refuseCurrencyRow(row, outcome) {
 }
 
 /**
- * Price one currency cost against the pool, refusing before anything is written.
+ * Bucket one currency row onto the plan for its TERMINAL BASE UNIT, or answer its refusal.
+ *
+ * The currency analogue of {@link bucketComponentRow}, and it exists for that function's exact
+ * reason: two costs that draw on ONE balance must not each be priced against the whole of it.
+ * The component arm has always summed two costs naming one component before deciding; the
+ * currency arm used to read the balance once per row and compare each row's own `requiredBase`
+ * against the full total, so a pool of 3 gp answered "yes" twice to two 2 gp costs. The pre-check
+ * then passed a call the pool could not cover, the first cost DEBITED, the second answered
+ * `insufficient`, and the unwind credited the coin back — publishing `insufficient`, which the
+ * contract declares a ZERO-MUTATION outcome and whose shipped string says "so nothing was taken",
+ * after a real debit-and-credit round trip through the leg this module's own header calls the
+ * unreliable half.
+ *
+ * The key is the TERMINAL BASE UNIT and not the caller's `unitId`, because two costs in different
+ * denominations on one ladder branch — 2 gp and 30 sp — are two claims on the SAME coin. Grouping
+ * by the caller's spelling would leave that case exactly as broken as the identical-unit one.
  *
  * `requiredBase` comes from the currency module's own answer rather than from an
  * `amount × baseValue` computed here, so this module performs NO denomination arithmetic and
  * cannot disagree with the leg that will do the spending.
+ *
+ * @param {object} row
+ * @param {Map<string, object>} groups
+ * @param {object} seams
+ * @returns {Promise<string|null>} the CALL-level refusal, or `null`
+ */
+async function bucketCurrencyRow(row, groups, seams) {
+  const probe = await probeCurrencyRequest(row, seams);
+  if (probe.outcome) return refuseCurrencyRow(row, probe.outcome);
+  if (!Number.isFinite(probe.requiredBase)) {
+    row.outcome = COMPANION_OUTCOMES.insufficient;
+    return COMPANION_OUTCOMES.insufficient;
+  }
+
+  const key = String(probe.baseUnitId ?? '');
+  let group = groups.get(key);
+  if (!group) {
+    group = { unitId: row.unitId, rows: [], total: 0 };
+    groups.set(key, group);
+  }
+  group.rows.push(row);
+  group.total += probe.requiredBase;
+  return null;
+}
+
+/**
+ * Price one group of currency costs against the pool ONCE, refusing before anything is written.
  *
  * An UNREADABLE pool refuses rather than pricing itself at zero, and it refuses at CALL level as
  * `consumeFailed`: `balanceNotConfigured` is a token the READ member declares and this one does
  * not, because a read can report one unreadable cost and answer every other, where a take that
  * cannot see what a party is carrying must not take from them at all.
  *
+ * A shortfall marks EVERY row in the group `insufficient`, on the component bucket's rule: the
+ * costs are jointly unaffordable, and singling one out would name a cost that is individually
+ * payable as the one the pool could not cover.
+ *
+ * The group's summed total is re-tested for safe-integer exactness. Beyond that bound the
+ * arithmetic a coin count depends on stops being exact, and a total no pool could hold is a
+ * shortfall rather than a validation error — the per-row amounts were each admitted by the
+ * currency module's own rule.
+ *
  * @param {Array<object>} actors
- * @param {object} row
+ * @param {object} group
  * @param {object} seams
  * @returns {Promise<string|null>} the CALL-level refusal, or `null`
  */
-async function priceCurrencyRow(actors, row, seams) {
-  const probe = await probeCurrencyRequest(row, seams);
-  if (probe.outcome) return refuseCurrencyRow(row, probe.outcome);
-
-  const pool = await readPooledCurrencyBalance(actors, { unitId: row.unitId }, seams);
+async function priceCurrencyGroup(actors, group, seams) {
+  const pool = await readPooledCurrencyBalance(actors, { unitId: group.unitId }, seams);
   if (pool.outcome || pool.available === null) return COMPANION_OUTCOMES.consumeFailed;
-  if (!Number.isFinite(probe.requiredBase) || pool.available < probe.requiredBase) {
-    row.outcome = COMPANION_OUTCOMES.insufficient;
+  if (!Number.isSafeInteger(group.total) || pool.available < group.total) {
+    for (const row of group.rows) row.outcome = COMPANION_OUTCOMES.insufficient;
     return COMPANION_OUTCOMES.insufficient;
   }
   return null;
@@ -470,15 +552,24 @@ async function priceCurrencyRow(actors, row, seams) {
 /**
  * Price every currency cost, stopping at the first refusal.
  *
+ * Two passes, because a group cannot be priced until every row that joins it is known. The first
+ * pass writes nothing and reads no pool — {@link probeCurrencyRequest} asks with an EMPTY actor
+ * set — so a request refused there still fires no GM `balance` macro.
+ *
  * @param {Array<object>} actors
  * @param {Array<object>} rows
  * @param {object} seams
  * @returns {Promise<string|null>} the CALL-level refusal, or `null`
  */
 async function priceCurrencyCosts(actors, rows, seams) {
+  const groups = new Map();
   for (const row of rows) {
     if (row.type !== CURRENCY || row.outcome) continue;
-    const refusal = await priceCurrencyRow(actors, row, seams);
+    const refusal = await bucketCurrencyRow(row, groups, seams);
+    if (refusal) return refusal;
+  }
+  for (const group of groups.values()) {
+    const refusal = await priceCurrencyGroup(actors, group, seams);
     if (refusal) return refusal;
   }
   return null;
@@ -512,10 +603,18 @@ function precheckRefusal(rows) {
  * write and a rejection into the same empty answer.
  *
  * A write is judged by its RETURN VALUE and never by whether it threw, exactly as
- * `awardComponents` judges its own: `deleteEmbeddedDocuments` resolves fewer documents than it
- * was given ids for when a `preDelete` hook refuses one, and `updateEmbeddedDocuments` DROPS an
- * update whose diff is empty — which is precisely what a GM-authored stack-quantity path that is
- * not in the item's data model produces.
+ * `awardComponents` judges its own. `deleteEmbeddedDocuments` resolves fewer documents than it
+ * was given ids for when a `preDelete` hook refuses one, and `updateEmbeddedDocuments` answers
+ * short for FOUR distinct reasons, not one: a `_preUpdate` refusal, a `preUpdate<Type>` hook
+ * refusal, a throwing `updateSource`, and the empty-diff DROP — which is precisely what a
+ * GM-authored stack-quantity path that is not in the item's data model produces. The caller
+ * collapses all four into one answer deliberately: it compares answered ids against requested
+ * ids and unwinds, so it never has to tell them apart.
+ *
+ * The `catch` is not defensive either. `collection.get(id, {strict: true})` THROWS for an id that
+ * vanished between the plan and the write, and it rejects the WHOLE batch rather than shortening
+ * it — a concurrently deleted stack is the ordinary way to reach this, and a rejection escaping
+ * here would escape a member that publishes "never throws".
  *
  * @param {object} actor
  * @param {string} method
@@ -687,6 +786,19 @@ function allocationTakes(row) {
 }
 
 /**
+ * The token one component bucket's rows publish — the component arm's
+ * {@link currencyFailureRowOutcome}, and it is here for that function's stated reason.
+ *
+ * @param {boolean} ok whether the bucket's whole plan was taken
+ * @param {boolean} moved whether ANY write in the bucket actually moved something
+ * @returns {string}
+ */
+function componentRowOutcome(ok, moved) {
+  if (ok) return COMPANION_OUTCOMES.consumed;
+  return moved ? COMPANION_OUTCOMES.consumeFailed : COMPANION_OUTCOMES.notAttempted;
+}
+
+/**
  * Settle every component cost, stopping at the first bucket that fails.
  *
  * @param {Map<string, object>} buckets
@@ -704,7 +816,14 @@ async function takeComponentCosts(buckets, undo) {
     for (const row of bucket.rows) {
       row.taken = allocationTakes(row);
       row.outstanding = moved;
-      row.outcome = ok ? COMPANION_OUTCOMES.consumed : COMPANION_OUTCOMES.consumeFailed;
+      // The SAME fact decides the row's token, because the contract DERIVES `attempted` from it
+      // and `consumeFailed` means A WRITE WAS ISSUED. A bucket refused before its first write —
+      // an object-valued stack-quantity path, or a take with no owning document — issued none, so
+      // `consumeFailed` there would publish `attempted: true` beside `consumed: 0` and an empty
+      // `takes`, which the four-way discrimination table reads as "writes went out and every one
+      // was given back". `notAttempted` is the row word for what actually happened. The CALL
+      // still answers `consumeFailed`: `callOutcome` needs only that no row says `consumed`.
+      row.outcome = componentRowOutcome(ok, moved);
     }
     if (!ok) return false;
   }
@@ -970,16 +1089,33 @@ export async function consumePooledHoldings(
   }
 
   const rows = entries.map((cost) => startRow(cost));
-  const buckets = planComponentCosts(pool, rows, seams);
-  const precheck = precheckRefusal(rows) ?? (await priceCurrencyCosts(pool, rows, seams));
-  if (precheck) return publish(precheck, pool, rows);
-
   // The undo stack is the call's own and never module-scoped: a leaked one would hand a later
   // call the authority to put back documents it never took, on actors it was never given.
   const undo = [];
-  const took =
-    (await takeComponentCosts(buckets, undo)) &&
-    (await takeCurrencyCosts(pool, rows, callSite, seams, undo));
-  if (!took) await unwind(undo);
-  return publish(callOutcome(rows), pool, rows);
+  try {
+    const buckets = planComponentCosts(pool, rows, seams);
+    const precheck = precheckRefusal(rows) ?? (await priceCurrencyCosts(pool, rows, seams));
+    if (precheck) return publish(precheck, pool, rows);
+
+    const took =
+      (await takeComponentCosts(buckets, undo)) &&
+      (await takeCurrencyCosts(pool, rows, callSite, seams, undo));
+    if (!took) await unwind(undo);
+    return publish(callOutcome(rows), pool, rows);
+  } catch (error) {
+    // The floor a `stable` member needs, and the asymmetry `readPooledHoldings` had already
+    // closed for itself. `callActorWrite` and `unwind` carry the only other `try`s here, so every
+    // OTHER seam is bare — `resolveSystem`, `resolveComponent`, `findComponentItems`,
+    // `consumePooledCurrency`, `readPooledCurrencyBalance` — and optional chaining guards an
+    // ABSENT method, never a throwing one. The shipped `findComponentItems` opens with
+    // `const items = [...actor.items];`, which is a TypeError for any resolved document whose
+    // `items` is not iterable; the crafting engine guards that same call with its own
+    // `itemsIterable` test elsewhere, which is what says the case is real rather than defensive.
+    //
+    // It UNWINDS before publishing. A throw between two writes is exactly the state the undo
+    // stack exists for, and a member that has already taken must not answer without giving back.
+    console.error('Fabricate | Could not take pooled holdings from a set of actors', error);
+    await unwind(undo);
+    return publish(COMPANION_OUTCOMES.consumeFailed, pool, rows);
+  }
 }
