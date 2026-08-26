@@ -691,15 +691,16 @@ An approximate case that does not declare itself approximate is worse than no ca
 A new or replaced screenshot on the documentation site MUST be generated from a named view case rather than curated by hand.
 A screenshot committed before this requirement's generator existed remains valid documentation evidence without migration, because retiring evidence that is still accurate buys nothing and a rule that silently indicts shipped work is a rule nobody can act on.
 
-#### Scenario: a doc page declares a case slot
+#### Scenario: a doc page declares an image slot
 
 - **WHEN** a documentation page needs a visual reference for a view the canonical view-case registry covers
 - **THEN** the page declares an image slot naming that case id, and the committed asset is generated from that case
 - **AND** a slot whose asset is absent fails a gate rather than rendering a hole
+- **AND** the published frame carries a description of what it shows, recorded alongside the case id rather than at each call site, so one frame is described once however many pages use it, and a gate refuses an empty description
 
 #### Scenario: only exact and beyond cases feed documentation
 
-- **WHEN** a case is selected to feed a documentation slot
+- **WHEN** a case is selected to feed a documentation image slot
 - **THEN** only a case declaring `reaches: exact` or `reaches: beyond` may be used
 - **AND** a case that reaches the right application window but not the specific condition its live-smoke counterpart shows is refused, under the View-case reach declaration requirement, because publishing it as a documentation reference would present a shortfall as the condition the page describes
 
@@ -714,6 +715,7 @@ A screenshot committed before this requirement's generator existed remains valid
 
 - **WHEN** the renderer reports a per-case failure while an earlier run's output for that case is still on disk
 - **THEN** that frame is not consumed, because the renderer accumulates output and a surviving stale frame would otherwise be republished as current documentation
+- **AND** a render that produced no fresh record of what it rendered is refused wholesale rather than read from whatever record was already on disk, because a record left by an earlier run is internally consistent and would otherwise certify every frame in it
 
 #### Scenario: only changed frames are rewritten
 
@@ -721,13 +723,15 @@ A screenshot committed before this requirement's generator existed remains valid
 - **THEN** it rewrites only those frames whose fresh render differs from the committed one by more than the renderer's own measured noise
 - **AND** it reports which images changed and which were left alone, so a reviewer can tell a real visual change from re-encoding noise
 - **AND** both sides of the comparison pass through identical encoding, so that the encoder's own treatment is not mistaken for a render difference
-- **AND** the provenance digest is taken over the renderer's output rather than the published asset, so that changing the encoder cannot present itself as a visual change
+- **AND** the provenance digest is taken over the renderer's output rather than the published asset, and records WHICH render produced the committed asset rather than deciding whether it changed, since a renderer that is not byte-stable cannot have its digest re-derived
 
 #### Scenario: the renderer's own noise is not a documentation change
 
 - **WHEN** two renders of the same case differ only by antialiasing jitter, which this renderer produces and which moves between runs rather than settling
 - **THEN** the frame counts as unchanged and is not rewritten, because rewriting a tenth of the set on every run destroys the reviewable diff the selective rewrite exists to protect
-- **AND** the tolerance that decides this is derived from measured noise and is required to be narrower than the smallest change a reader would notice, demonstrated in both directions, so that it cannot widen into a blindfold
+- **AND** the tolerance that decides this is derived from measured noise and is required to sit below the smallest reader-visible change the measurement established, a single changed character of on-screen text, demonstrated in both directions, so that it cannot widen into a blindfold
+- **AND** the tolerance bounds AREA as well as amplitude, because the measured noise is local to control edges while a colour or theme change is not, and an amplitude-only rule would call a whole recoloured panel unchanged
+- **AND** the margins between the tolerance and each measured population are themselves asserted, so the tolerance cannot be widened later without the gate that justifies it going red
 
 #### Scenario: the toolchain that produced the frames changes
 
@@ -746,6 +750,8 @@ A screenshot committed before this requirement's generator existed remains valid
 - **WHEN** a screenshot was committed to the documentation site before this requirement's generator existed
 - **THEN** it remains valid documentation evidence and is not required to be re-authored through an image slot
 - **AND** only a new or replaced screenshot must use the generated slot mechanism
+- **AND** the carve-out is decided by which namespace a frame occupies rather than by when it was committed, so a reader can tell the two populations apart without consulting history
+- **AND** the hand-curated population is closed and may only shrink, because a replacement for one of its frames is a new screenshot and must be generated
 
 ### Requirement: Provider-specific skill metadata
 

@@ -170,6 +170,19 @@ test('every declared image slot names a mapped case', () => {
   );
 });
 
+test('every mapped case describes what its frame shows', () => {
+  const undescribed = map.screenshots
+    .filter((entry) => typeof entry.alt !== 'string' || entry.alt.trim() === '')
+    .map((entry) => entry.case);
+  assert.deepEqual(
+    undescribed,
+    [],
+    'these mapped cases record no description, so every page showing them presents the frame to a' +
+      ' screen reader as nothing at all. The description lives beside the case id so one frame is' +
+      ' described once however many pages use it — write one there rather than at each slot'
+  );
+});
+
 test('every recorded digest is a distinct lowercase SHA-256', () => {
   const malformed = map.screenshots
     .filter((entry) => !SOURCE_DIGEST_PATTERN.test(entry.sha256 ?? ''))
