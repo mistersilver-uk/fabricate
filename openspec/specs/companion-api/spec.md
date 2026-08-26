@@ -71,9 +71,11 @@ This pair **deletes**, and deleting from a prototype corrupts every other token 
 An address a member may not be wrong about is therefore an unambiguous one, and `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")` is Foundry's own handle for exactly that.
 The rule is a widening rather than a contradiction: an `actorId` remains correct for a member that acts on one actor, and the uuid form is required only where the set or the destruction makes it so.
 
-**The set-valued preamble is an EXTENSION of the once-only authorization rule, not a second copy of it.**
-`_requireGmActors` resolves a list of UUIDs and delegates per actor to the shared single-actor preamble, so the GM gate, the resolver and the readiness ordering all still exist exactly once.
-It adds only what a set adds: the bound, the shape, and the split between "not one of these resolved" and "the list itself was wrong".
+**The set-valued preamble is an EXTENSION of the once-only authorization rule, and it SHARES that rule's GM text rather than routing through it.**
+`_requireGmActors` cannot call `_requireGmActor` for its actor half: the singular preamble resolves its target by id, through `_resolveCraftingActor`, and an id is exactly what the uuid form exists to avoid, because a synthetic token actor's id IS its base actor's.
+So the GM check is DUPLICATED rather than shared through the singular preamble: `_requireGmActors` opens with its own literal `if (game.user?.isGM !== true)`, in the same words as the singular preamble's, and only what follows it is delegated — the bound, the address-based lookup, and the split between "not one of these resolved" and "the list itself was wrong" — to `gatePooledActorUuids`, the ONE place that resolution logic exists.
+There are therefore now TWO GM-gate texts and TWO actor resolvers rather than one of each: the singular preamble's id-keyed `_resolveCraftingActor`, and the plural preamble's address-keyed `globalThis.fromUuidSync` plus a `documentName === 'Actor'` test.
+Both duplications are deliberate, and both are pinned as literal source strings by tests, on the production text and on its harness mirror, so neither can drift from the other without the suite failing red.
 Both members **fail closed** on a set that does not fully resolve, and the answer echoes the resolved set back so a caller can see the exact set an answer was computed over.
 Silently dropping an unresolvable UUID — as `_resolveCraftingSources` does for its own, different purpose — would compute a pool over fewer actors than the caller believes, and a consume would then draw from a different set than the read reported.
 `noActor` is answered when **not one** supplied UUID addresses an actor, which is the same word every other actor-targeted member answers.
@@ -330,7 +332,7 @@ So `0` means *provably zero* and `null` means *Fabricate cannot say*, exactly as
 Reporting `0` for `creditFailed` would state a third party's word as Fabricate's own proof.
 
 `creditNotConfigured` names a world whose currency configuration cannot express the credit and where **nothing was written**, and it is the GM's to fix.
-Its producers are: no spender for the configured spend strategy, a spender with no refund method, no `increment` macro configured — which is a documented-normal state, because `increment` alone among the three macro keys is optional — an `increment` uuid naming nothing runnable, a configured actor path Foundry discarded, a configured actor path holding a value that is not a number, and a pre-write balance read that failed or threw before any mechanism was invoked.
+Its producers are: no spender for the configured spend strategy, a spender with no refund method, no `increment` macro configured — which is a documented-normal state, because `increment` is one of two optional keys among the (now four) macro keys, `balance` being the other, while `canAfford` and `decrement` are required by validation — an `increment` uuid naming nothing runnable, a configured actor path Foundry discarded, a configured actor path holding a value that is not a number, and a pre-write balance read that failed or threw before any mechanism was invoked.
 Collapsing it into `creditFailed` would report a misconfiguration as a domain answer; collapsing it into `creditUnavailable` would tell a log that something may have landed when nothing possibly could.
 
 **`creditCurrency` resolves its denomination through the same resolution as `checkAffordability`.**
@@ -417,9 +419,12 @@ Currency is the leg whose inverse may be ABSENT or LOSSY: under `macro` the `inc
 So the recoverable leg is taken first, the unrecoverable leg last, and **a currency cost is REFUSED UP FRONT** — `creditNotConfigured`, before the pool is read and before any component is written — in a world that has published no way to give coin back at all.
 That refusal reads world configuration alone, so taking it before the pool is read is required and not merely tidy: an intended zero-effect refusal must not first fire a GM's `balance` macro once per actor.
 
-**Two residues of the restore are ACCEPTED and are declared rather than hidden.**
+**Three residues of the restore are ACCEPTED and are declared rather than hidden.**
 A restore fires `createItem` per document, because `noHook` gates only the pre-hook, so Fabricate's own fragment-discovery and recipe-learning hooks can fire on an undo.
-And the restored document is a NEW JS object, so a third-party module holding an `Item` reference across the take holds a stale one even though the UUID resolves; `_stats.modifiedTime` and `lastModifiedBy` are refreshed while `createdTime` is preserved.
+The restored document is also a NEW JS object, so a third-party module holding an `Item` reference across the take holds a stale one even though the UUID resolves.
+`_stats.modifiedTime` and `lastModifiedBy` are refreshed, and `createdTime` is NOT preserved: Foundry's server-side stats tagging (`ServerDocumentMixin#_tagStats`, reached from `_initializeSource` on a creation) sets `createdTime` to that write's own timestamp whenever the write is a creation, and a `keepId` restore IS a creation, so the original document's age does not survive it (verified on 14.365; 13.350 carries the identical doc-string on `DocumentStatsField.managedFields` but its server source was not read, so this is strong inference rather than proof on that version).
+And on an UNLINKED TOKEN ACTOR, the restore promotes an inherited item to a delta-managed one: before the take, an unmodified item on the token is INHERITED from the base actor, the delete writes a tombstone, and the `keepId` re-create lands as a managed record on the token's own delta.
+The uuid, `_id`, effect ids, flags and system data are all identical, so nothing a companion can observe changes, but the item no longer tracks later edits to the base actor — and only core's own `EmbeddedCollectionDelta#restoreDocuments` re-links it, which is not a route a module can reasonably use here.
 
 ### All-Or-Nothing, And The Zero-Mutation Set
 

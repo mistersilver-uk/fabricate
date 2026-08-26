@@ -801,8 +801,10 @@ So `0` means *Fabricate can prove nothing moved* and `null` means *Fabricate can
 {: .warning }
 > **In a `macro` currency world, a credit runs the GM's `increment` macro.**
 > That macro has until now run only on a player-cancelled craft, so a credit hands it `recipe: null` and `craftingSystem: null`, and an `increment` macro that reads `context.recipe.name` without checking throws on every credit.
-> Tell the GM to branch on `context.caller`: the **pair** `(macro key, caller)` separates all four occasions — `canAfford` with `"craft"` is the craft-time gate, `canAfford` with `"award"` is `checkAffordability`, `increment` with `"craft"` is the cancel refund, and `increment` with `"award"` is `creditCurrency`.
+> Tell the GM to branch on `context.caller`: the **pair** `(macro key, caller)` now separates **eight** occasions, not four — `canAfford` with `"craft"` is the craft-time gate, `canAfford` with `"award"` is `checkAffordability`, `decrement` with `"craft"` is the craft-time spend, `decrement` with `"consume"` is the pooled holdings debit (see *Reading And Taking Pooled Holdings* below), `balance` with `"consume"` is the pooled holdings read (below), `increment` with `"craft"` is the cancel refund, `increment` with `"consume"` is the pooled debit's own intra-call give-back (below), and `increment` with `"award"` is `creditCurrency`.
+> **That last cell is not unique**: a pooled consume that has to unwind a currency cost it already settled gives it back THROUGH `creditCurrency`'s own mechanism, so a GM's `increment` macro sees `"award"` for that unwind exactly as it does for a credit a companion asked for outright, and it does not need to tell the two apart — both are Fabricate returning coin it is entitled to return.
 > A world with no `increment` macro configured is a normal state rather than a broken one, and answers `creditNotConfigured` — the GM's to fix, and never reported as the spender declining.
+> `balance` is optional in the same way; a `macro` world with neither `increment` nor `balance` authored keeps every craft-time behaviour unchanged and simply cannot refund a cancel or answer a pooled read.
 
 ### Reading And Taking Pooled Holdings
 
@@ -886,9 +888,12 @@ A deleted component has an exact inverse: Fabricate snapshots `item.toObject()` 
 Currency is the leg whose inverse may be absent or lossy: under `macro` the `increment` macro is explicitly optional, under pf2e a give-back creates treasure Items, and under `actorProperty` it lands in the unit's own denomination rather than the base unit that was debited.
 So the recoverable leg goes first, and **a currency cost is refused up front** — `creditNotConfigured`, having written nothing — in a world that has published no way to give coin back at all.
 
-Two costs of that restore are accepted rather than hidden.
+Three costs of that restore are accepted rather than hidden.
 A restore fires `createItem` per document, because `noHook` gates only the pre-hook, so Fabricate's own fragment-discovery and recipe-learning hooks can chatter on an undo.
-And the restored document is a **new JS object**, so a third-party module holding an `Item` reference across the take holds a stale one even though the UUID still resolves; `_stats.modifiedTime` and `lastModifiedBy` are refreshed while `createdTime` is preserved.
+The restored document is also a **new JS object**, so a third-party module holding an `Item` reference across the take holds a stale one even though the UUID still resolves.
+`_stats.modifiedTime` and `lastModifiedBy` are refreshed, but `createdTime` is **not** preserved: Foundry tags a creation's own `createdTime` with that write's own timestamp regardless of what the payload supplies, and a `keepId` restore is a creation, so the restored item reads as freshly created rather than carrying its original age.
+And on an **unlinked token actor**, the restore promotes an inherited item to a delta-managed one: an unmodified item on the token was inherited from the base actor before the take, the delete writes a tombstone, and the `keepId` re-create lands as a managed record on the token's own delta instead.
+The uuid, `_id`, effect ids, flags and system data are all identical, so nothing your integration can observe changes — but the item no longer tracks later edits to the base actor, and only core's own `EmbeddedCollectionDelta#restoreDocuments` re-links it, which is not a route this API exposes.
 
 **A shortfall anywhere refuses everywhere.**
 One cost the pool cannot cover refuses the whole call as `insufficient` before anything is written, with every ledger row reporting `attempted: false`.
