@@ -20,6 +20,10 @@
  *   - **`balanceNotConfigured` blocks nothing.** A `macro` world with no `balance` macro answers
  *     `null` for its currency cost while every component and tool cost in the same request is
  *     answered normally. This is the placement the contract declares as data, proved as behaviour.
+ *   - **A cost's `name` means the same thing on every axis.** A currency cost resolves its coin
+ *     by id, abbreviation or label, folded exactly as the component axis folds a definition
+ *     name, and reports a collision as `ambiguous` rather than picking one — while an exact id
+ *     still wins outright, so a label typed onto another coin cannot redirect a working caller.
  *   - **The issue-540 name-only telemetry is not fired by resolving a cost's NAME**, with a
  *     negative control proving the probe can see a warning at all — a silent probe that could
  *     never fire would pass the first assertion vacuously.
@@ -557,5 +561,148 @@ describe('readPooledHoldings — the deprecated name tier’s telemetry', () => 
 
     assert.equal(result.readings[0].available, 3);
     assert.equal(nameOnly().length, 1, 'the item-side compare is a name-only match and says so');
+  });
+});
+
+describe('readPooledHoldings — a cost names its coin the way it names its component', () => {
+  /** 1 gp + 50 sp + 30 cp is 630 copper on the fixture ladder, and 6 whole gold pieces. */
+  const party = () => [
+    makeActor('Idrin', { currency: { gp: 1 } }),
+    makeActor('Sera', { currency: { sp: 50 } }),
+    makeActor('Bram', { currency: { cp: 30 } }),
+  ];
+
+  it('resolves a coin by its label, its abbreviation or a differently-cased id', async () => {
+    // THE ASYMMETRY THIS CLOSES. A component cost's name folds case-insensitively against
+    // definition names; a currency cost's name used to be passed through as an internal unit id
+    // and matched exactly, so a caller authoring requirements the way a person writes them got
+    // two axes that resolved and a third that answered `unitNotFound` forever.
+    const names = ['gp', 'GP', 'Gold', 'gold', '  GOLD  '];
+
+    for (const name of names) {
+      const result = await read(party(), [cost('currency', name, 6)]);
+      assert.deepEqual(
+        summarize(result),
+        [[COMPANION_OUTCOMES.read, 6, true]],
+        `"${name}" must name the same coin as every other spelling of it`
+      );
+      // The CANONICAL id is echoed back whatever the caller typed, because the caller is liable
+      // to consume by it afterwards and the consume takes ids.
+      assert.equal(result.readings[0].unitId, 'gp', `"${name}" resolves to the ladder's own id`);
+      assert.equal(result.readings[0].ambiguous, false);
+    }
+  });
+
+  it('answers all three axes from human-written names in ONE request', async () => {
+    const holder = makeActor('Idrin', {
+      currency: { gp: 4 },
+      items: [
+        new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 }),
+        new HeldItem("Smith's Hammer"),
+      ],
+    });
+
+    const result = await read([holder], [
+      cost('component', 'iron ingot', 2),
+      cost('tool', "smith's hammer"),
+      cost('currency', 'Gold', 4),
+    ]);
+
+    assert.deepEqual(summarize(result), [
+      [COMPANION_OUTCOMES.read, 2, true],
+      [COMPANION_OUTCOMES.read, null, true],
+      [COMPANION_OUTCOMES.read, 4, true],
+    ]);
+    assert.equal(result.readings[2].unitId, 'gp');
+  });
+
+  it('keeps unitNotFound for a name no coin on the ladder answers to', async () => {
+    const result = await read(party(), [cost('currency', 'zorkmid', 1)]);
+
+    assert.deepEqual(summarize(result), [[COMPANION_OUTCOMES.unitNotFound, null, null]]);
+    assert.equal(result.readings[0].ambiguous, false, 'nothing matched, so nothing collided');
+    assert.equal(result.readings[0].unitId, 'zorkmid', 'and the caller’s own string comes back');
+  });
+
+  it('reports a coin name two coins answer to as ambiguous, and still reads the first', async () => {
+    // `Crown` is one coin's LABEL and another's ABBREVIATION. The two are alternatives for the
+    // same slot in the display chain, so a caller holding a string Fabricate printed cannot know
+    // which field it came from — ranking them would settle a real collision by a coin flip that
+    // looks authoritative. The reading's own `ambiguous` field is where that goes, exactly as it
+    // does for a component name matching in two crafting systems.
+    const colliding = [
+      {
+        id: 'u1',
+        label: 'Crown',
+        abbreviation: 'cr',
+        actorPath: 'system.currency.gp',
+        contains: [{ unitId: 'u2', amount: 10 }],
+      },
+      {
+        id: 'u2',
+        label: 'Shilling',
+        abbreviation: 'crown',
+        actorPath: 'system.currency.sp',
+        contains: [],
+      },
+    ];
+    const holder = makeActor('Idrin', { currency: { gp: 3 } });
+
+    const result = await read([holder], [cost('currency', 'Crown', 3)], {
+      getCurrencyConfig: () => ({
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: {},
+        units: colliding,
+      }),
+    });
+
+    const [reading] = result.readings;
+    assert.equal(reading.ambiguous, true, 'the caller is told the name was not decisive');
+    assert.equal(reading.outcome, COMPANION_OUTCOMES.read, 'and it is still answered, not refused');
+    assert.equal(reading.unitId, 'u1', 'the first coin in LADDER order');
+    assert.equal(reading.available, 3, '30 base units, read back in the coin that was named');
+    assert.equal(reading.sufficient, true);
+  });
+
+  it('lets an exact unit id win outright, so a rename elsewhere cannot redirect it', async () => {
+    // The precedence claim as BEHAVIOUR: `gold` is one coin's id and another's label. A caller
+    // that has always asked for `gold` keeps getting the coin it asked for, and the GM who typed
+    // that label onto a second coin has not silently changed what an existing request means.
+    const words = [
+      {
+        id: 'gold',
+        label: 'Royal',
+        abbreviation: 'ry',
+        actorPath: 'system.currency.gp',
+        contains: [{ unitId: 'bit', amount: 10 }],
+      },
+      {
+        id: 'bit',
+        label: 'gold',
+        abbreviation: 'bt',
+        actorPath: 'system.currency.sp',
+        contains: [],
+      },
+    ];
+    const seams = {
+      getCurrencyConfig: () => ({
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: {},
+        units: words,
+      }),
+    };
+    const holder = () => makeActor('Idrin', { currency: { gp: 2 } });
+
+    const exact = (await read([holder()], [cost('currency', 'gold', 1)], seams)).readings[0];
+    assert.equal(exact.unitId, 'gold');
+    assert.equal(exact.ambiguous, false);
+    assert.equal(exact.available, 2, 'two of the coin whose ID is `gold`, not twenty of the other');
+
+    // One case off, the exact tier misses and the folded tier sees BOTH — which is the honest
+    // answer rather than a silent pick.
+    const folded = (await read([holder()], [cost('currency', 'GOLD', 1)], seams)).readings[0];
+    assert.equal(folded.ambiguous, true);
   });
 });

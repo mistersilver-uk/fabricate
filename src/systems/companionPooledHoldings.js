@@ -75,7 +75,7 @@ import {
   POOLED_UNSERVED_COST_TYPES,
   pooledHoldingsReadResult,
 } from './companionContract.js';
-import { readPooledCurrencyBalance } from './currencyAffordance.js';
+import { readPooledCurrencyBalance, resolveWorldCurrencyUnitByName } from './currencyAffordance.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { pooledItemOrder } from './pooledAllocation.js';
 
@@ -307,12 +307,36 @@ function readToolCost({ name }, { systems, actors, craftingSystemManager, classi
 /**
  * Read a CURRENCY cost across the pool.
  *
- * Delegated whole to {@link readPooledCurrencyBalance}, so nothing here re-derives what a
- * denomination means. Its refusals are folded into two readings, because a caller can do nothing
- * different about most of them: a unit the ladder does not name is `unitNotFound`, while an empty
- * ladder, an invalid one, and a pool one actor could not be read from are all
- * `balanceNotConfigured` — Fabricate cannot see, so the reading answers `available: null` and
- * BLOCKS NOTHING ELSE IN THE REQUEST.
+ * ## A cost's `name` means the same thing on all three axes
+ *
+ * The component and tool axes resolve a name against DEFINITION names, folded case-insensitively.
+ * Currency used to be the odd one out: its `name` went straight through as a unit ID, and
+ * `findCurrencyUnit` matches `unit.id` exactly and case-sensitively — so a caller authoring
+ * requirements the way a person writes them ("gold", "gp", "Gold Pieces") got two axes that
+ * resolved and a third that answered `unitNotFound` forever. Nothing about that was unsafe; the
+ * refusal degrades to `available: null` and blocks nothing. It simply made the axis unusable by
+ * any caller that did not already hold Fabricate's internal unit ids, which is every caller
+ * outside Fabricate.
+ *
+ * {@link resolveWorldCurrencyUnitByName} closes it, and it lives in the currency module rather
+ * than here because the coin ladder is that module's subject: this leaf must not grow a second
+ * opinion about what names a coin. Resolution is ADDITIVE — an exact id still wins outright and
+ * still behaves exactly as it did — and the RESOLVED id is what goes down to the balance read, so
+ * a caller can consume by the `unitId` this reading hands back. An unresolved name is passed
+ * through verbatim, so this hop can only ever add an answer, never take one away.
+ *
+ * A name that answers to two coins sets `ambiguous` and still reads the first in ladder order:
+ * the component axis's rule, for the component axis's reason: a caller is liable to consume by the
+ * id a read handed back, and a quietly chosen coin is a quietly chosen debit.
+ *
+ * ## The refusals, and the denomination
+ *
+ * The balance itself is delegated whole to {@link readPooledCurrencyBalance}, so nothing here
+ * re-derives what a denomination means. Its refusals fold into two readings, because a caller can
+ * do nothing different about most of them: a name the ladder answers to nowhere is
+ * `unitNotFound`, while an empty ladder, an invalid one, and a pool one actor could not be read
+ * from are all `balanceNotConfigured` — Fabricate cannot see, so the reading answers
+ * `available: null` and BLOCKS NOTHING ELSE IN THE REQUEST.
  *
  * The balance arrives denominated in the ladder's TERMINAL BASE UNIT while the caller asked in
  * its own; `available` is converted back and FLOORED, because a pool holding three and a half
@@ -320,18 +344,24 @@ function readToolCost({ name }, { systems, actors, craftingSystemManager, classi
  * in gold would let the contract derive `sufficient` from two different denominations, and it
  * errs PERMISSIVE — the direction a gate must never err in.
  */
-async function readCurrencyCost({ name }, { actors, seams, readCurrencyBalance }) {
-  const balance = await readCurrencyBalance(actors, { unitId: name }, seams);
+async function readCurrencyCost(
+  { name },
+  { actors, seams, readCurrencyBalance, resolveUnitByName }
+) {
+  const named = resolveUnitByName(name, seams);
+  const ambiguous = named.ambiguous;
+  const balance = await readCurrencyBalance(actors, { unitId: named.unit?.id ?? name }, seams);
   if (balance?.outcome === COMPANION_OUTCOMES.unitNotFound) {
-    return { unitId: name || null, outcome: COMPANION_OUTCOMES.unitNotFound };
+    return { unitId: name || null, ambiguous, outcome: COMPANION_OUTCOMES.unitNotFound };
   }
   const unitId = balance?.unit?.id ?? (name || null);
   const baseValue = Number(balance?.baseValue) || 0;
   if (balance?.outcome || balance?.available === null || baseValue <= 0) {
-    return { unitId, outcome: COMPANION_OUTCOMES.balanceNotConfigured };
+    return { unitId, ambiguous, outcome: COMPANION_OUTCOMES.balanceNotConfigured };
   }
   return {
     unitId,
+    ambiguous,
     available: Math.floor(balance.available / baseValue),
     outcome: COMPANION_OUTCOMES.read,
   };
@@ -418,6 +448,9 @@ async function readPooledCost(entry, context) {
  *   display-state classifier
  * @param {(actors: Array<object>, request: object, seams: object) => Promise<object>}
  *   [seams.readCurrencyBalance] defaulted to the shipped pooled coin reader
+ * @param {(name: string, seams: object) => {unit: object|null, ambiguous: boolean}}
+ *   [seams.resolveUnitByName] defaulted to the shipped world coin-name resolver, so a currency
+ *   cost names its coin the way a component cost names its component
  * @returns {Promise<Readonly<{success: boolean, actorUuids: ReadonlyArray<string>,
  *   readings: ReadonlyArray<object>, outcome: string, message: string, messageData?: object}>>}
  */
@@ -427,6 +460,7 @@ export async function readPooledHoldings(
   {
     classifyToolStates = classifyGatheringToolStates,
     readCurrencyBalance = readPooledCurrencyBalance,
+    resolveUnitByName = resolveWorldCurrencyUnitByName,
     ...seams
   } = {}
 ) {
@@ -454,6 +488,7 @@ export async function readPooledHoldings(
       craftingSystemManager: seams.craftingSystemManager,
       classifyToolStates,
       readCurrencyBalance,
+      resolveUnitByName,
     };
     const readings = [];
     for (const entry of entries) readings.push(await readPooledCost(entry, context));

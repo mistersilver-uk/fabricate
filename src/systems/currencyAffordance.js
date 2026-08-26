@@ -38,8 +38,10 @@ import {
   gateCompanionCallSite,
 } from './companionContract.js';
 import {
+  currencyUnitDisplayName,
   findCurrencyUnit,
   formatCurrencyRequirement,
+  resolveCurrencyUnitByName,
   validateCurrencyProfile,
 } from './currencyProfile.js';
 
@@ -704,13 +706,16 @@ function resolveCreditAmount(amount) {
 }
 
 /**
- * The human name of a resolved unit, through the same `abbreviation` → `label` → `id` chain
- * {@link formatCurrencyRequirement} uses, so the contract's message and a craft-time shortfall
- * message name the same coin the same way. Split out because the localization keys interpolate the
- * amount and the unit into SEPARATE placeholders, which a preformatted `"1 gp"` cannot fill.
+ * The human name of a resolved unit. A DELEGATE to {@link currencyUnitDisplayName}, which is now
+ * the one home of the `abbreviation` → `label` → `id` chain this used to respell — so the
+ * contract's message and a craft-time shortfall message cannot name the same coin two ways.
+ *
+ * Kept as a local alias rather than inlined at its three call sites because the reason it was split
+ * out has not changed: the localization keys interpolate the amount and the unit into SEPARATE
+ * placeholders, which a preformatted `"1 gp"` cannot fill.
  */
 function unitDisplayName(unit) {
-  return unit?.abbreviation || unit?.label || unit?.id || '';
+  return currencyUnitDisplayName(unit);
 }
 
 /**
@@ -1165,6 +1170,31 @@ export async function creditWorldCurrency(actor, { unitId, amount, callSite } = 
 // three beside the pooled members that answer them, so the forward reference is retired and this
 // module reads them from `COMPANION_OUTCOMES` like every other outcome it answers — one
 // vocabulary, one home. Each token's rationale lives with its declaration (issue 1342).
+
+/**
+ * Resolve a coin from a string a HUMAN wrote, against the WORLD ladder (issue 1342).
+ *
+ * A two-line composition, and it is exported for the reason the pooled pair above is: what the
+ * caller needs is `resolveWorldCurrencySettings`, which is private and stays private —
+ * "exporting privates would widen a heavily-shared module's surface for no gain". So the FUNCTION
+ * is what this module exports and the private it needs does not move.
+ *
+ * It exists because the pooled holdings READ takes a NAME on every axis: its component and tool
+ * costs resolve case-insensitively against definition names, so its currency cost must resolve the
+ * same way rather than demanding an internal unit id nobody outside Fabricate holds. Routing it
+ * through the same world-settings resolver the balance read uses is what stops the two disagreeing
+ * about which ladder is being asked about — including on the `globalThis.game` fallback, which a
+ * caller reading `getCurrencyConfig` for itself would silently miss.
+ *
+ * Reading only: it resolves an identity and touches no actor.
+ *
+ * @param {string} name The caller's string — a unit id, abbreviation or label.
+ * @param {{ getCurrencyConfig?: () => object }} [seams]
+ * @returns {{ unit: object|null, ambiguous: boolean }} See {@link resolveCurrencyUnitByName}.
+ */
+export function resolveWorldCurrencyUnitByName(name, seams = {}) {
+  return resolveCurrencyUnitByName(resolveWorldCurrencySettings(seams).units, name);
+}
 
 /**
  * Resolve the TERMINAL BASE UNIT of a unit's ladder branch — the coin whose own `baseValue` is
