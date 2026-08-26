@@ -931,6 +931,11 @@ Record your claim in front of the irreversible act rather than guarding inside i
 **Both members fail closed on an actor set that does not fully resolve, and the two refusals split on what resolved.**
 `noActor` means **not one** of the supplied UUIDs addressed an actor — the same word every other actor-targeted member answers.
 `invalidActorUuids` covers the request itself: an absent, empty or over-bound list, a non-string entry, or a list where **some** resolved and some did not.
+It also covers a list naming the **same actor twice**, which is easier to do than it sounds: a linked token's actor is its base actor, so `Actor.x` and `Scene.s.Token.t.Actor.x` are two addresses for one document.
+Build the set from a party plus the acting character and you can send that pair without noticing.
+Distinctness is judged by document identity rather than by id, because an unlinked token's actor shares its base actor's id and is a genuinely different pool.
+
+An address inside a compendium is refused, not read: a compendium actor is a template, and neither member will read from or take from one.
 Silently dropping one would compute a pool over fewer actors than you believe, and the consume would then draw from a different set than the read reported, so the resolved set is echoed back on `actorUuids` for you to check.
 
 **Both lists are bounded at 32.**

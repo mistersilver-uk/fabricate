@@ -80,6 +80,14 @@ Both members **fail closed** on a set that does not fully resolve, and the answe
 Silently dropping an unresolvable UUID — as `_resolveCraftingSources` does for its own, different purpose — would compute a pool over fewer actors than the caller believes, and a consume would then draw from a different set than the read reported.
 `noActor` is answered when **not one** supplied UUID addresses an actor, which is the same word every other actor-targeted member answers.
 `invalidActorUuids` covers the request itself: absent, empty, over the bound, carrying a non-string entry, or a list where **some** resolved and some did not.
+It also covers a list that resolves to the **same document twice**, and that arm is not a guard against a careless caller.
+Two well-formed, unrelated-looking addresses can name one document: a LINKED token's actor IS its base actor, so `Actor.x` and `Scene.s.Token.t.Actor.x` resolve to the identical object, and a companion assembling a party from controlled tokens beside a named party actor produces the pair without doing anything wrong.
+A pool that counted such a document twice would report a party as holding twice what it holds, and a take against it would plan the same stack twice and report units that never left a sheet.
+Distinctness is therefore decided by **document identity**, never by `id`: an UNLINKED token's synthetic actor is a different document that carries the same id as its base actor, and those two are genuinely different pools.
+
+**An address inside a compendium is refused rather than resolved**, so a `Compendium.<pack>.Actor.<id>` address answers `noActor` or `invalidActorUuids` exactly as an unresolvable one does.
+A compendium actor is a template rather than a character at the table, and the refusal is deliberate on the member that DELETES: whether such an address resolves at all otherwise depends on whether anything has loaded that pack yet, and a write gate whose answer depends on load state is worse than one that refuses outright.
+A pack's `locked` flag is not the protection here — it is enforced on the collection's own management methods and not at the database layer.
 
 Every `stable` member is **GM-gated on `isGM`**, refusing `gmOnly` otherwise, and refuses `notReady` before the module is ready rather than throwing.
 A member reachable from a handler that fires on **every connected client** additionally requires the caller to declare its **call site**, and for a broadcast call site refuses `notElected` unless this client is the elected executor (`game.users.activeGM?.id === game.user?.id`).
