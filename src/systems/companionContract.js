@@ -1480,7 +1480,7 @@ export function pooledHoldingsConsumeResult(outcome, messageData = null, record 
  * `invalidQuantity`).
  *
  * It lives HERE, in the Foundry-free leaf that already owns {@link COMPANION_CALL_SITES},
- * rather than in any one member's module: four members now gate on it, and the canonical
+ * rather than in any one member's module: five members now gate on it, and the canonical
  * requirement is that the rule exists once. It is pure — the election arrives as a seam — so
  * this module stays a leaf, and a member that lifted its own copy would be free to drift on
  * exactly the question a write may not be wrong about (issue 1301, D13).
