@@ -953,20 +953,37 @@ Those pre-existing seventeen frames stay exactly as they are.
 They remain valid documentation evidence and are not migrated, because retiring evidence that is still accurate buys nothing.
 The rule applies to a new or replaced screenshot.
 
-`npm run docs:screenshots` rewrites only the frames whose rendered source actually moved, and reports which ones it left alone.
+`npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.
 Run it after any change that alters one of the mapped views, and read what it reports before committing.
-Then run `npm run docs:screenshots:check` to confirm every committed digest still matches a fresh render.
-That check is the reason the digests are worth carrying at all, so do not skip it on a change that touched a mapped view.
+Then run `npm run docs:screenshots:check` to confirm every committed frame still matches a fresh render.
+Both verbs decide with the same comparison, so a `check` failure means the same thing a `generate` rewrite would have.
 
-One limitation is known and measured rather than assumed.
-The renderer's output is not byte-stable from one run to the next for every case.
-Across two consecutive runs of the forty-six mapped cases, eight to nine frames reported as changed while being visually identical, and the set was not the same both times.
-Measured on one of them, five pixels out of 1,049,600 differed, none by more than four levels on any channel, all inside a five-by-fourteen-pixel box on the antialiased edge of a single radio button.
-So a run that reports a small changed list with nothing visibly different is renderer noise rather than a view change, and re-running does not settle it.
-Read the changed list rather than trusting it, and do not read a check failure of that shape as a documentation defect.
+That comparison is perceptual rather than byte-equal, and the reason is measured rather than assumed.
+This renderer is not byte-deterministic: two clean renders of the identical forty-six cases differ in a handful of frames, and the differing set moves between runs rather than settling, so it is per-run timing and not a property of any case.
+Byte equality would therefore report roughly a tenth of the set as changed on every run forever, which is the churn the selective rewrite exists to prevent.
+
+So a frame is compared like this.
+The fresh render is encoded with the same `cwebp` settings the committed asset uses, and the two WebP files are compared byte for byte.
+Identical means unchanged, and that is the fast path.
+Only on a mismatch are both decoded with `dwebp -ppm` and compared pixel by pixel.
+Comparing WebP against WebP keeps both sides under identical encoder treatment, so nothing but a genuine render difference survives; comparing a fresh PNG against the committed WebP would fold the encoder's own preprocessing into every measurement.
+
+The tolerance is eight pixels differing by twenty-four levels or more on any channel, and it was derived from the measurement below rather than chosen.
+Across four full renders of the forty-six mapped cases — six pairings, 276 frame comparisons — nineteen frame pairs differed at all.
+The worst carried 2116 differing pixels, and the largest per-channel difference any pair reached anywhere was sixteen levels, on three pixels.
+Not one noise pixel reached twenty-four.
+
+The other side was measured the same way.
+Changing one character of one recipe name in the View Lab world fixture, between two letters of equal advance width so nothing reflowed, put forty-seven pixels past twenty-four levels in the smallest of the three places that name appears on screen, reaching sixty levels.
+So the threshold sits eight pixels above a noise population that never reaches it at all, and at roughly a sixth of the weakest real signal.
+`tests/docs-screenshot-frames.test.js` holds both directions against committed fixtures, and its header records where they came from.
+
+Do not widen either number without repeating that measurement.
+A tolerance that cannot separate renderer jitter from a changed character is not a tolerance, it is a blindfold.
 
 Generation fails closed.
-Without the harvested Foundry chrome it aborts naming the harvest command, and without `cwebp` on `PATH` it aborts naming libwebp.
+Without the harvested Foundry chrome it aborts naming the harvest command, and without `cwebp` and `dwebp` on `PATH` it aborts naming libwebp.
+The decoder is required even by a run that encodes nothing, because without it the only available comparison is byte equality — which this renderer's own jitter fails.
 A case the renderer failed on this run is refused even when an earlier run left a frame for it on disk, because the renderer accumulates output and republishing that frame would ship an older commit's picture as current documentation.
 
 There is no CI job that regenerates any of this.

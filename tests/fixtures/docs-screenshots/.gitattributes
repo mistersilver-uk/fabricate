@@ -1,0 +1,4 @@
+# A PPM is raw pixel data. Without this, `* text=auto eol=lf` in the repository root can
+# classify one as text on its content and silently rewrite CRLF byte pairs inside the pixels,
+# corrupting a fixture in a way that shows up as a comparison result nobody can explain.
+*.ppm binary

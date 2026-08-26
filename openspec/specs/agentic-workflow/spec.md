@@ -705,7 +705,7 @@ A screenshot committed before this requirement's generator existed remains valid
 
 #### Scenario: generation fails closed
 
-- **WHEN** the harvested Foundry window chrome or the image encoder is absent at generation time
+- **WHEN** the harvested Foundry window chrome, the image encoder, or the decoder the frame comparison needs is absent at generation time
 - **THEN** generation aborts naming what is missing and how to obtain it, and writes no image
 - **AND** no approximated frame is emitted, because a reader cannot tell a wrong documentation screenshot from a right one, which makes it worse than a stale one
 - **AND** the restriction on harvested material is the one already stated in the Harvested Foundry window chrome requirement, and nothing here widens or narrows it
@@ -718,9 +718,16 @@ A screenshot committed before this requirement's generator existed remains valid
 #### Scenario: only changed frames are rewritten
 
 - **WHEN** the generator runs against an already-populated documentation image set
-- **THEN** it rewrites only those frames whose rendered source differs by content digest
+- **THEN** it rewrites only those frames whose fresh render differs from the committed one by more than the renderer's own measured noise
 - **AND** it reports which images changed and which were left alone, so a reviewer can tell a real visual change from re-encoding noise
-- **AND** the digest is taken over the renderer's own output rather than the published asset, so that changing the encoder cannot present itself as a visual change
+- **AND** both sides of the comparison pass through identical encoding, so that the encoder's own treatment is not mistaken for a render difference
+- **AND** the provenance digest is taken over the renderer's output rather than the published asset, so that changing the encoder cannot present itself as a visual change
+
+#### Scenario: the renderer's own noise is not a documentation change
+
+- **WHEN** two renders of the same case differ only by antialiasing jitter, which this renderer produces and which moves between runs rather than settling
+- **THEN** the frame counts as unchanged and is not rewritten, because rewriting a tenth of the set on every run destroys the reviewable diff the selective rewrite exists to protect
+- **AND** the tolerance that decides this is derived from measured noise and is required to be narrower than the smallest change a reader would notice, demonstrated in both directions, so that it cannot widen into a blindfold
 
 #### Scenario: the toolchain that produced the frames changes
 

@@ -7,27 +7,37 @@
  *
  *   node scripts/docs-screenshots.mjs plan       what a run would do, without rendering anything
  *   node scripts/docs-screenshots.mjs generate   render, encode what changed, update the map
- *   node scripts/docs-screenshots.mjs check      render and verify the committed digests
+ *   node scripts/docs-screenshots.mjs check      render and verify the committed frames
  *
  * WHY ONLY WHAT CHANGED
  * ---------------------
  * A generator that rewrites every image on every run produces a diff nobody can review, and a
  * reviewer looking at fifty changed binaries cannot tell a real visual change from re-encoding
- * noise. So the decision is made against a content digest, and the run says out loud which frames
- * it touched and which it left alone.
+ * noise. So the run says out loud which frames it touched and which it left alone.
  *
- * WHY THE DIGEST IS TAKEN OVER THE SOURCE FRAME
- * ---------------------------------------------
- * The digest recorded in the map is of the renderer's own output, not of the published image. That
- * keeps "did this view change" independent of the encoder: an encoder upgrade re-encodes nothing,
- * because nothing the renderer produced moved. Digesting the published image instead would let a
- * libwebp release present itself as fifty visual changes.
+ * WHY THE DECISION IS PERCEPTUAL RATHER THAN A DIGEST COMPARISON
+ * --------------------------------------------------------------
+ * The obvious mechanism is a content digest of the renderer's output, and it was implemented,
+ * measured, and found to be wrong: this renderer is not byte-deterministic. Repeated clean renders
+ * of the same case set differ in a handful of frames by a few antialiased pixels, and the
+ * differing set moves between runs rather than settling. A digest comparison therefore reports
+ * roughly a tenth of the set as changed on every run forever, which is exactly the churn this
+ * generator exists to prevent. The comparison lives in `scripts/lib/webpFrames.js`, which carries
+ * the measurements the tolerance was derived from.
+ *
+ * WHAT THE RECORDED DIGEST IS FOR, THEN
+ * -------------------------------------
+ * `sha256` in the map is the provenance of the render that produced the committed asset — which
+ * frame this image came from — and it is deliberately taken over the renderer's PNG rather than
+ * over the published WebP, so that a libwebp release cannot present itself as fifty visual
+ * changes. It moves only when a frame is actually rewritten. It is not, and after the measurement
+ * above cannot be, the mechanism that decides whether to rewrite.
  *
  * WHY THIS FAILS CLOSED, THREE WAYS
  * ---------------------------------
  * A wrong documentation screenshot is worse than a stale one, because a reader has no way to tell.
- * So absent harvested Foundry chrome aborts, an absent encoder aborts, and — the subtle one — a
- * frame is consumed only when THIS run produced it. The renderer accumulates into its output
+ * So absent harvested Foundry chrome aborts, an absent encoder or decoder aborts, and — the subtle
+ * one — a frame is consumed only when THIS run produced it. The renderer accumulates into its output
  * directory and collects per-case failures rather than throwing, so a case that failed today can
  * still have yesterday's PNG sitting on disk. Publishing that would ship a frame from an older
  * commit as current documentation, silently. Every mapped case must appear in the manifest this
@@ -41,12 +51,13 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
   DOCS_SCREENSHOT_MAP_PATH,
+  LAB_ASSET_EXTENSION,
   LAB_SCREENSHOT_DIRECTORY,
   expectedProvenance,
   labAssetPath,
@@ -55,22 +66,20 @@ import {
 } from './lib/docsScreenshotMap.js';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { resolveExecutable } from './lib/resolveExecutable.js';
+import { DECODER, ENCODER, compareEncodedFrames, encodeFrame } from './lib/webpFrames.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RENDERER = 'scripts/view-lab-screenshots.mjs';
 const RENDER_OUTPUT_DIRECTORY = 'ui-screenshot-artifact/apps';
 
 /**
- * The encoder, and the settings it was chosen with.
+ * Where this run's freshly encoded frames go before anything decides to publish them.
  *
- * Measured on a representative frame rather than assumed. Against a 191958-byte source PNG:
- * `-lossless` gives 162794 bytes, a 15% saving that does not pay for the conversion; `-q 95` gives
- * 104454 bytes at 36.74 dB, which is what the quality ladder collapses to on UI text; and
- * `-near_lossless 60` gives 115468 bytes at 57.89 dB. Near-lossless is barely heavier than the
- * lossy setting and visually intact, so it wins on both counts.
+ * Beside the renderer's own output, which is already gitignored and already the place a human
+ * looks when a run surprises them. A frame lands here whether or not it turns out to differ, so
+ * "what did this run actually produce" is answerable after the fact.
  */
-const ENCODER = 'cwebp';
-const ENCODER_SETTINGS = ['-near_lossless', '60', '-quiet'];
+const ENCODE_OUTPUT_DIRECTORY = 'ui-screenshot-artifact/docs-frames';
 
 /** Thrown for a condition a user can act on, so the CLI can print it without a stack trace. */
 class DocsScreenshotError extends Error {}
@@ -90,20 +99,29 @@ function requireChrome() {
 }
 
 /**
- * The image encoder, or an abort naming it.
+ * The libwebp tools, or an abort naming what is missing.
  *
- * @returns {string} Absolute path to the encoder.
+ * Both are required, and `dwebp` is required even by a run that ends up encoding nothing: it is
+ * what turns "these two WebPs differ" into "this view changed", so without it the only comparison
+ * available is byte equality — which this renderer's own jitter fails on roughly a tenth of the
+ * set. A run that quietly fell back to byte equality would rewrite those frames and report them as
+ * visual changes, so this fails closed instead.
+ *
+ * @returns {{encoder: string, decoder: string}} Absolute paths to both tools.
  */
-function requireEncoder() {
-  const executable = resolveExecutable(ENCODER);
-  if (!executable) {
+function requireImageTools() {
+  const encoder = resolveExecutable(ENCODER);
+  const decoder = resolveExecutable(DECODER);
+  const missing = [!encoder && ENCODER, !decoder && DECODER].filter(Boolean);
+  if (missing.length > 0) {
     throw new DocsScreenshotError(
-      `${ENCODER} is not on PATH, so no documentation frame can be encoded. Install libwebp` +
-        ` (winget install Google.Libwebp, brew install webp, or apt install webp) and try again.` +
-        ' Nothing was written.'
+      `${missing.join(' and ')} ${missing.length === 1 ? 'is' : 'are'} not on PATH, so a` +
+        ' documentation frame can neither be encoded nor compared against the committed one.' +
+        ' Install libwebp (winget install Google.Libwebp, brew install webp, or apt install webp)' +
+        ' and try again. Nothing was written.'
     );
   }
-  return executable;
+  return { encoder, decoder };
 }
 
 /**
@@ -186,23 +204,6 @@ async function digestOf(path) {
     .digest('hex');
 }
 
-/**
- * Encode one source frame into its committed asset.
- *
- * @param {string} encoder Absolute encoder path.
- * @param {string} source Absolute source PNG path.
- * @param {string} target Absolute asset path.
- * @returns {void}
- */
-function encodeFrame(encoder, source, target) {
-  const result = spawnSync(encoder, [...ENCODER_SETTINGS, '-o', target, source], {
-    stdio: ['ignore', 'inherit', 'inherit'],
-  });
-  if (result.status !== 0) {
-    throw new DocsScreenshotError(`${ENCODER} failed on ${source} (exit ${result.status})`);
-  }
-}
-
 /** Print a heading and its lines, or nothing at all when there are none. */
 function report(heading, lines) {
   if (lines.length === 0) return;
@@ -234,7 +235,9 @@ async function commandPlan() {
   console.log(
     `\nharvested Foundry chrome: ${chrome ? `${chrome.version}, ready` : 'ABSENT, so a run aborts'}`
   );
-  console.log(`${ENCODER}: ${resolveExecutable(ENCODER) ? 'ready' : 'ABSENT, so a run aborts'}`);
+  for (const tool of [ENCODER, DECODER]) {
+    console.log(`${tool}: ${resolveExecutable(tool) ? 'ready' : 'ABSENT, so a run aborts'}`);
+  }
   if (drifted.length === 0 && absent.length === 0) {
     console.log('\nnothing is known to need rewriting, but only a run can tell you that for sure');
   }
@@ -242,48 +245,89 @@ async function commandPlan() {
 }
 
 /**
- * Render every mapped case and hand back this run's digests.
+ * Render every mapped case, encode what this run produced, and judge each frame against the
+ * committed one.
  *
+ * Shared by `generate` and `check` deliberately: the two verbs must agree about what "changed"
+ * means, and a `check` that judged frames differently from the `generate` that wrote them would be
+ * a gate reporting on a rule nothing implements.
+ *
+ * @param {{encoder: string, decoder: string}} tools Absolute libwebp tool paths.
  * @param {object[]} screenshots Map entries.
- * @returns {Promise<{digests: Map<string, string>, refused: string[]}>} Digest per usable case id,
- *   and a line per case this run could not produce.
+ * @returns {Promise<{verdicts: object[], refused: string[]}>} One verdict per frame this run
+ *   produced, and a line per case it did not.
  */
-async function renderAndDigest(screenshots) {
+async function renderAndCompare(tools, screenshots) {
   const caseIds = screenshots.map((entry) => entry.case);
   const manifest = await renderCases(caseIds);
   const { usable, refused } = consumableFrames(manifest, caseIds);
-  const digests = new Map();
-  for (const [caseId, source] of usable) digests.set(caseId, await digestOf(source));
-  return { digests, refused };
+  await mkdir(join(ROOT, ENCODE_OUTPUT_DIRECTORY), { recursive: true });
+
+  const verdicts = [];
+  for (const entry of screenshots) {
+    const source = usable.get(entry.case);
+    if (!source) continue;
+    const fresh = join(ROOT, ENCODE_OUTPUT_DIRECTORY, `${entry.case}${LAB_ASSET_EXTENSION}`);
+    encodeFrame(tools.encoder, source, fresh);
+    const committed = join(ROOT, labAssetPath(entry.case));
+    if (!existsSync(committed)) {
+      verdicts.push({ entry, source, fresh, state: 'absent', reason: 'no image is committed yet' });
+      continue;
+    }
+    const comparison = compareEncodedFrames(
+      tools.decoder,
+      await readFile(committed),
+      committed,
+      await readFile(fresh),
+      fresh
+    );
+    verdicts.push({
+      entry,
+      source,
+      fresh,
+      state: comparison.changed ? 'changed' : 'unchanged',
+      reason: comparison.reason,
+    });
+  }
+  return { verdicts, refused };
+}
+
+/** The verdicts of one state, as report lines naming the case and why. */
+function linesFor(verdicts, state) {
+  return verdicts
+    .filter((verdict) => verdict.state === state)
+    .map((verdict) => `${verdict.entry.case}: ${verdict.reason}`);
+}
+
+/** How far the recorded provenance is from this toolchain, as report lines. */
+async function provenanceDrift(map) {
+  const expected = await expectedProvenance(ROOT);
+  return Object.entries(expected)
+    .filter(([key, value]) => map.provenance[key] !== value)
+    .map(([key, value]) => `${key}: recorded ${map.provenance[key] ?? 'nothing'}, now ${value}`);
 }
 
 /**
  * Render, rewrite what moved, and leave the rest alone.
  *
+ * A frame is republished by copying THIS run's encode over the committed one, rather than by
+ * re-encoding the source a second time. One encode per frame per run means the bytes that were
+ * compared are the bytes that get committed, so a rewrite cannot disagree with the comparison that
+ * asked for it.
+ *
  * @returns {Promise<number>} Exit code.
  */
 async function commandGenerate() {
   requireChrome();
-  const encoder = requireEncoder();
+  const tools = requireImageTools();
   const map = await readDocsScreenshotMap(ROOT);
-  const { digests, refused } = await renderAndDigest(map.screenshots);
+  const { verdicts, refused } = await renderAndCompare(tools, map.screenshots);
   await mkdir(join(ROOT, LAB_SCREENSHOT_DIRECTORY), { recursive: true });
 
-  const changed = [];
-  const written = [];
-  const untouched = [];
-  for (const entry of map.screenshots) {
-    const digest = digests.get(entry.case);
-    if (!digest) continue;
-    const target = join(ROOT, labAssetPath(entry.case));
-    const moved = digest !== entry.sha256;
-    if (!moved && existsSync(target)) {
-      untouched.push(entry.case);
-      continue;
-    }
-    encodeFrame(encoder, join(ROOT, RENDER_OUTPUT_DIRECTORY, `${entry.case}.png`), target);
-    entry.sha256 = digest;
-    (moved ? changed : written).push(entry.case);
+  for (const verdict of verdicts) {
+    if (verdict.state === 'unchanged') continue;
+    await copyFile(verdict.fresh, join(ROOT, labAssetPath(verdict.entry.case)));
+    verdict.entry.sha256 = await digestOf(verdict.source);
   }
 
   map.provenance = await expectedProvenance(ROOT);
@@ -291,45 +335,37 @@ async function commandGenerate() {
   const mapPath = join(ROOT, DOCS_SCREENSHOT_MAP_PATH);
   if ((await readFile(mapPath, 'utf8')) !== serialized) await writeFile(mapPath, serialized);
 
-  report('rewritten because the view changed', changed);
-  report('written because no image was committed yet', written);
-  console.log(`\n${untouched.length} frame(s) left alone — their view is unchanged`);
+  report('rewritten because the view changed', linesFor(verdicts, 'changed'));
+  report('written because no image was committed yet', linesFor(verdicts, 'absent'));
+  const untouched = verdicts.filter((verdict) => verdict.state === 'unchanged').length;
+  console.log(`\n${untouched} frame(s) left alone — their view is unchanged`);
   report('NOT consumed, because this run did not produce them', refused);
   return refused.length === 0 ? 0 : 1;
 }
 
 /**
- * Re-verify the committed digests against a fresh render, writing nothing.
+ * Re-verify the committed frames against a fresh render, writing nothing.
  *
  * @returns {Promise<number>} Exit code.
  */
 async function commandCheck() {
   requireChrome();
-  requireEncoder();
+  const tools = requireImageTools();
   const map = await readDocsScreenshotMap(ROOT);
-  const { digests, refused } = await renderAndDigest(map.screenshots);
+  const { verdicts, refused } = await renderAndCompare(tools, map.screenshots);
 
-  const stale = [];
-  const absent = [];
-  for (const entry of map.screenshots) {
-    const digest = digests.get(entry.case);
-    if (digest && digest !== entry.sha256) {
-      stale.push(`${entry.case}: recorded ${entry.sha256}, rendered ${digest}`);
-    }
-    if (!existsSync(join(ROOT, labAssetPath(entry.case)))) absent.push(entry.case);
-  }
-
-  const expected = await expectedProvenance(ROOT);
-  const drifted = Object.entries(expected)
-    .filter(([key, value]) => map.provenance[key] !== value)
-    .map(([key, value]) => `${key}: recorded ${map.provenance[key] ?? 'nothing'}, now ${value}`);
+  const stale = linesFor(verdicts, 'changed');
+  const absent = linesFor(verdicts, 'absent');
+  const drifted = await provenanceDrift(map);
 
   report('the view has changed since this image was committed', stale);
   report('mapped but no image is committed', absent);
   report('the recorded provenance no longer matches this toolchain', drifted);
   report('NOT verified, because this run did not produce them', refused);
   const problems = stale.length + absent.length + drifted.length + refused.length;
-  if (problems === 0) console.log(`\nall ${digests.size} committed frame(s) match a fresh render`);
+  if (problems === 0) {
+    console.log(`\nall ${verdicts.length} committed frame(s) match a fresh render`);
+  }
   return problems === 0 ? 0 : 1;
 }
 
