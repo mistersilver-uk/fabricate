@@ -124,12 +124,17 @@ import {
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
   componentAwardResult,
   currencyCreditResult,
-  knowledgeGrantResult
+  gatePooledActorUuids,
+  knowledgeGrantResult,
+  pooledHoldingsConsumeResult,
+  pooledHoldingsReadResult
 } from './systems/companionContract.js';
 // Aliased on import because the facade delegator below carries the SAME name. A class
 // method is not a bare identifier in its own body, so the unaliased import would resolve
@@ -143,6 +148,10 @@ import {
   resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
   rollActorCheck as rollStandaloneActorCheck
 } from './systems/companionCheckRoll.js';
+// Aliased for the same reason again (issue 1342): both facade delegators carry the SAME names
+// as the leaves they delegate to, and the alias says which side of the boundary is which.
+import { readPooledHoldings as readPooledHoldingsAcrossActors } from './systems/companionPooledHoldings.js';
+import { consumePooledHoldings as consumePooledHoldingsFromActors } from './systems/companionPooledConsumption.js';
 
 /**
  * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble.
@@ -176,6 +185,29 @@ const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
 const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
   gmOnlyKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
   noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+
+/**
+ * The two pooled members' OWN refusal strings, hoisted for the reason the pairs above are
+ * (issue 1342).
+ *
+ * THREE keys each and not two, because the SET-valued preamble splits an actor refusal in a way
+ * the singular one cannot: `noActor` when not one supplied UUID addresses an actor, and
+ * `invalidActorUuids` when the request itself is wrong. A pair shared between the read and the
+ * consume would be the cross-member vocabulary leak the parameter exists to prevent, and it
+ * would bite hardest between exactly these two — the pair is designed to be called one after
+ * the other, so a GM reading the second answer in the first's words could not tell them apart.
+ */
+const READ_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+  invalidActorUuidsKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids]
+});
+
+const CONSUME_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+  invalidActorUuidsKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids]
 });
 import { checkWorldCurrencyAffordability, creditWorldCurrency } from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
@@ -2471,6 +2503,53 @@ class Fabricate {
   }
 
   /**
+   * The SET-VALUED extension of {@link Fabricate#_requireGmActor}, for the two pooled members
+   * (issue 1342).
+   *
+   * An extension rather than a parallel gate: the GM half is the same rule in the same words and
+   * runs first, and everything below it — the bound, the shape, the split between "not one
+   * resolved" and "the request was wrong" — is DELEGATED to the one place that rule exists,
+   * {@link gatePooledActorUuids} in the Foundry-free contract leaf. This method owns exactly the
+   * two things a leaf may not touch: `game.user`, and the Foundry resolver.
+   *
+   * **Addressed by UUID, and never by id.** Every member above resolves an `actorId` through
+   * `game.actors.get`, which CANNOT distinguish an unlinked token actor from its world
+   * prototype — a synthetic token actor's `id` IS the base actor's. That is a tolerable ambiguity
+   * for a member that GIVES and a corrupting one for a member that DELETES: deleting from the
+   * prototype damages every other token derived from it while the token that should have paid
+   * keeps its items. So these two take addresses, and the read takes the same addresses the
+   * consume will, so the two can never disagree about which documents the answer was about.
+   *
+   * The resolved document must BE an actor. `fromUuidSync` answers whatever the address names,
+   * and an Item or a Scene handed to the pooled leaves would be scanned for components and then
+   * written to; a `documentName` test is what makes a mistyped address a refusal rather than a
+   * write against the wrong document.
+   *
+   * `globalThis.fromUuidSync` rather than the bare global this file uses elsewhere, for the
+   * reason recorded on {@link Fabricate#_postBulkSalvageChatMessage}: optional chaining does not
+   * rescue an UNDECLARED identifier, so a bare `fromUuidSync?.()` still throws a ReferenceError
+   * where the global has not been installed — and a `stable` member may not throw.
+   *
+   * @param {*} actorUuids The target actors, by UUID (never by id).
+   * @param {{gmOnlyKey: string, noActorKey: string, invalidActorUuidsKey: string}} keys This
+   *   member's own refusal strings.
+   * @returns {{actors: Array<Actor>|null, outcome: string|null, message: string|null,
+   *   messageData: object|null}}
+   * @private
+   */
+  _requireGmActors(actorUuids, keys) {
+    if (game.user?.isGM !== true) {
+      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, message: keys.gmOnlyKey, messageData: null };
+    }
+    return gatePooledActorUuids(actorUuids, keys, {
+      resolveActor: (uuid) => {
+        const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
+        return addressed?.documentName === 'Actor' ? addressed : null;
+      }
+    });
+  }
+
+  /**
    * GM-only crafting-knowledge reset (issue 773). This is the GM API that the
    * Knowledge surface's per-character reset control routes through (issue 785, both
    * the "This system" and "All systems" grains), and it remains available to macros
@@ -2651,6 +2730,72 @@ class Fabricate {
   }
 
   /**
+   * The seam bag {@link Fabricate#readPooledHoldings} injects (issue 1342).
+   *
+   * It SPREADS {@link Fabricate#_worldCurrencySeams} rather than restating the coin bindings,
+   * because the read's currency axis is the same WORLD ladder `checkAffordability` reads and a
+   * second spelling of that resolution is how the two come to disagree about what `50 gp` means.
+   *
+   * `findComponentItems` is the PUBLISHED matcher a companion can already reach for itself,
+   * which is what keeps what this read COUNTS and what the consume TAKES from disagreeing. The
+   * `?? []` floor mirrors the award bag's: the engine is `null` before readiness, and the
+   * member's own readiness refusal runs first.
+   *
+   * `craftingSystemManager` is the raw collaborator rather than a function, because the tool
+   * classifier this read drives takes the manager itself.
+   *
+   * Three seams the leaf declares are deliberately ABSENT — `classifyToolStates`,
+   * `readCurrencyBalance` and `resolveUnitByName` — for the reason `createOrStack` is absent
+   * from the award bag: the leaf defaults each to the shipped collaborator, so binding them here
+   * would give a shipped primitive two spellings. They stay injectable for tests.
+   *
+   * @returns {object}
+   * @private
+   */
+  _pooledHoldingsSeams() {
+    return {
+      ...this._worldCurrencySeams(),
+      listSystems: () => this.craftingSystemManager?.getSystems?.() ?? [],
+      craftingSystemManager: this.craftingSystemManager,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
+    };
+  }
+
+  /**
+   * `COMPANION.readPooledHoldings` — what a SET of characters holds between them (issue 1342).
+   *
+   * Sited HERE, beside the world-currency members whose bag it spreads, rather than beside the
+   * consume it pairs with. That siting is measured rather than aesthetic, and it is the same
+   * decision recorded on {@link Fabricate#creditCurrency}: adjacent, near-identical delegators
+   * concatenate into ONE duplicated run across this file and its harness mirror, and the pair
+   * measures over the bar where each member alone measures under it.
+   *
+   * The first member that answers over a set of actors, and the first addressed by actor UUID —
+   * see {@link Fabricate#_requireGmActors} for why the address rather than the id. It owns
+   * preconditions 1-3 only — GM, actors, readiness, in that order — and hands the RESOLVED actor
+   * documents plus the seam bag to the leaf, which owns the `costs` validation, the per-axis
+   * resolution and every per-cost refusal, because those are request validation and sit where
+   * every other member's request validation sits.
+   *
+   * **It writes nothing, takes no `callSite`, and is NOT a reservation.** The election gate
+   * exists to stop N clients each applying a consequence Fabricate cannot reconcile, and N
+   * clients answering the same question is harmless; nothing stops an item moving between this
+   * answer and a consume, so a caller that must not overdraw reads the CONSUME's refusal.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {Array<string>|null} [options.actorUuids] The party, by actor UUID (never by id).
+   * @param {Array<object>|null} [options.costs] `{ type, name, quantity }` entries, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids, READ_POOLED_HOLDINGS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsReadResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
+    }
+    return await readPooledHoldingsAcrossActors(gate.actors, { costs }, this._pooledHoldingsSeams());
+  }
+
+  /**
    * The ONE seam bag both Standalone Check Roll members inject.
    *
    * Hoisted to a single private so neither delegator restates it, and so the harness mirror
@@ -2798,6 +2943,65 @@ class Fabricate {
       return componentAwardResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
     }
     return await awardComponentsToActor(gate.actor, { systemId, awards, callSite }, this._componentAwardSeams());
+  }
+
+  /**
+   * The seam bag {@link Fabricate#consumePooledHoldings} injects (issue 1342).
+   *
+   * It spreads {@link Fabricate#_worldCurrencySeams} for the reason the read's bag does — the
+   * coin the take debits and the coin it gives back are the same WORLD ladder every other
+   * currency member reads — and adds the election, exactly as {@link Fabricate#creditCurrency}
+   * does, because this member WRITES and a broadcast handler fires on every connected client.
+   *
+   * The component trio is bound identically to the award's, and that identity is the point
+   * rather than a copy: what an award STACKS ONTO, what salvage consumes and what this TAKES
+   * must resolve through one matcher, or a read predicts a write against a different set of
+   * documents. `resolveSourceItem` is absent because nothing here creates from a template.
+   *
+   * @returns {object}
+   * @private
+   */
+  _pooledConsumptionSeams() {
+    return {
+      ...this._worldCurrencySeams(),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
+      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
+    };
+  }
+
+  /**
+   * `COMPANION.consumePooledHoldings` — take a set of costs from what a SET of characters holds
+   * between them (issue 1342).
+   *
+   * The first published member that REMOVES value rather than placing it. Every companion writer
+   * before it gives: the grant teaches, the award places, the credit pays.
+   *
+   * Sited HERE rather than beside the read it pairs with, for the duplicated-run reason recorded
+   * on {@link Fabricate#readPooledHoldings} and first measured for {@link Fabricate#creditCurrency}.
+   *
+   * It owns preconditions 1-3 only — GM, actors, readiness, in that order, through the same
+   * set-valued preamble the read uses with its OWN refusal strings — and hands the RESOLVED
+   * actor documents plus the seam bag to the leaf, which owns the call-site gate, the election,
+   * the `costs` validation, the components-first ordering and the rollback.
+   *
+   * **Costs arrive as RESOLVED IDS**, which is what the read hands back, and the pair is designed
+   * to be called in that order. **NOT IDEMPOTENT**: calling it twice takes twice, and there is no
+   * natural key to absorb a repeat, so not double-consuming is the caller's own obligation.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {Array<string>|null} [options.actorUuids] The party, by actor UUID (never by id).
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {Array<object>|null} [options.costs] The costs to take, by resolved id, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids, CONSUME_POOLED_HOLDINGS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsConsumeResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
+    }
+    return await consumePooledHoldingsFromActors(gate.actors, { callSite, costs }, this._pooledConsumptionSeams());
   }
 
 
@@ -4310,9 +4514,10 @@ function bindFabricateGlobal() {
     // any collaborator exists — that is the whole affordance, and it is what lets a
     // companion version-check before it calls.
     //
-    // The six `stable` behavioural members it declares — `grantRecipeKnowledge` and
+    // The `stable` behavioural members it declares — `grantRecipeKnowledge` and
     // `checkAffordability` from issue 1289, `rollActorCheck` and `resolveBulkCheckDecision`
-    // from issue 1293, `awardComponents` and `creditCurrency` from issue 1301 — are METHODS ON
+    // from issue 1293, `awardComponents` and `creditCurrency` from issue 1301, and
+    // `readPooledHoldings` and `consumePooledHoldings` from issue 1342 — are METHODS ON
     // THE FACADE, not entries in this class bag, and
     // deliberately so: everything above is a constructor a caller instantiates, while
     // `grantRecipeKnowledge` is an unbounded, GM-gated write whose only authorised route is

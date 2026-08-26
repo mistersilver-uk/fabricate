@@ -45,6 +45,9 @@ import {
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  POOLED_ACTORS_MAX,
+  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
@@ -52,6 +55,7 @@ import {
   assertContractResult,
   assertLocalizationKey,
   assertMessageDataCovers,
+  assertMessageIsFromTable,
 } from './helpers/companionContractOutcomes.js';
 import {
   CurrencyCraftingActorFake,
@@ -64,6 +68,7 @@ import {
   MAIN_SOURCE,
   installFacadeGame,
   mainMethodSource,
+  makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
 const GM = { id: 'user-gm', isGM: true };
@@ -720,6 +725,254 @@ describe('criterion 13 — every stable answer keeps its key set, its types, and
 });
 
 // ---------------------------------------------------------------------------
+// Criterion 6 (pooled half) — the SET-valued preamble, as an ORDER and a SPLIT
+// ---------------------------------------------------------------------------
+
+const POOLED_COMPONENT = { id: 'component-iron', name: 'Iron Ore' };
+const POOLED_SYSTEM = { id: 'system-1', components: [POOLED_COMPONENT], tools: [] };
+
+/**
+ * The two pooled members, each with its own refusal strings, its own answer shape and the
+ * request it makes.
+ *
+ * Table-driven for the reason `STABLE_MEMBERS` above is: the claim is that ONE set-valued rule
+ * serves both members while each answers in its OWN words and its OWN shape, and a per-member
+ * copy of these cases could not fail on the second half of that claim.
+ *
+ * `extra` is each member's derived fields as a REFUSAL answers them — the read's empty readings,
+ * the consume's vacuous `null` total beside its empty ledger — so every case below asserts the
+ * WHOLE answer rather than a token.
+ */
+const POOLED_MEMBERS = [
+  {
+    name: 'readPooledHoldings',
+    keys: POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+    extra: { actorUuids: [], readings: [] },
+    call: (facade, actorUuids) =>
+      facade.readPooledHoldings({
+        actorUuids,
+        costs: [{ type: 'component', name: POOLED_COMPONENT.name, quantity: 1 }],
+      }),
+  },
+  {
+    name: 'consumePooledHoldings',
+    keys: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+    extra: { actorUuids: [], consumed: null, ledger: [] },
+    call: (facade, actorUuids) =>
+      facade.consumePooledHoldings({
+        actorUuids,
+        callSite: 'gmAction',
+        costs: [
+          {
+            type: 'component',
+            systemId: POOLED_SYSTEM.id,
+            componentId: POOLED_COMPONENT.id,
+            quantity: 1,
+          },
+        ],
+      }),
+  },
+];
+
+/** One member's refusal, WHOLE, so a field that appeared or moved fails here. */
+function pooledRefusal(member, outcome, messageData = null) {
+  const expected = { success: false, ...member.extra, outcome, message: member.keys[outcome] };
+  if (messageData) expected.messageData = messageData;
+  return expected;
+}
+
+/**
+ * The two pooled seam bags, recording WHICH actor documents the leaves were handed.
+ *
+ * The record is the point: a delegator that resolved its own actors, or forwarded the caller's
+ * raw addresses, would pass every outcome assertion while handing the leaf something other than
+ * what the gate resolved. `findComponentItems` is shared by both bags exactly as production's
+ * two bags bind the same published matcher.
+ */
+function makePooledSeams() {
+  const seen = { actorUuids: [] };
+  const findComponentItems = (actor, component) => {
+    seen.actorUuids.push(actor?.uuid ?? null);
+    return (actor?.items ?? []).filter((item) => item.name === component?.name);
+  };
+  const getSystem = (id) => (id === POOLED_SYSTEM.id ? POOLED_SYSTEM : null);
+  return {
+    seen,
+    pooledHoldingsSeams: {
+      getCurrencyConfig: () => null,
+      listSystems: () => [POOLED_SYSTEM],
+      craftingSystemManager: { getSystem },
+      findComponentItems,
+    },
+    pooledConsumptionSeams: {
+      getCurrencyConfig: () => null,
+      isElectedExecutor: () => true,
+      resolveSystem: (systemId) => getSystem(systemId),
+      resolveComponent: (system, componentId) =>
+        (system?.components ?? []).find((component) => component.id === componentId) ?? null,
+      findComponentItems,
+    },
+  };
+}
+
+function standUpPooledFacade({ user = GM, ready = true, actors = [], documents = [] } = {}) {
+  installFacadeGame({ user, actors, documents });
+  const seams = makePooledSeams();
+  const facade = new FabricateFacadeUnderTest({
+    ready,
+    pooledHoldingsSeams: seams.pooledHoldingsSeams,
+    pooledConsumptionSeams: seams.pooledConsumptionSeams,
+  });
+  return { facade, seen: seams.seen };
+}
+
+/** An addressable actor carrying `Iron Ore`, at whatever address the caller names. */
+function makePooledActor(id, uuid, quantity = 3) {
+  const actor = makeFacadeActor(id, { owned: { [POOLED_COMPONENT.name]: quantity } });
+  actor.uuid = uuid ?? actor.uuid;
+  return actor;
+}
+
+describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split on WHAT resolved', () => {
+  for (const member of POOLED_MEMBERS) {
+    describe(member.name, () => {
+      it('refuses a non-GM with gmOnly, in its OWN words, before any address is even read', async () => {
+        // `ready: false` throughout, exactly as the singular half of this criterion runs: if
+        // readiness were tested first this would answer `notReady`, and a `_requireReady()`
+        // preamble would have thrown besides.
+        const actor = makePooledActor('actor-1', 'Actor.actor-1');
+        const { facade, seen } = standUpPooledFacade({
+          user: PLAYER,
+          ready: false,
+          actors: [actor],
+        });
+        const result = await member.call(facade, [actor.uuid]);
+        assertContractResult(result, pooledRefusal(member, COMPANION_OUTCOMES.gmOnly));
+        assert.deepEqual(seen.actorUuids, [], 'a refused call reaches no leaf at all');
+      });
+
+      it('answers noActor when NOT ONE supplied address resolves, still before readiness', async () => {
+        const { facade, seen } = standUpPooledFacade({ ready: false, actors: [] });
+        const result = await member.call(facade, ['Actor.nobody', 'Actor.also-nobody']);
+        assertContractResult(result, pooledRefusal(member, COMPANION_OUTCOMES.noActor));
+        assert.deepEqual(seen.actorUuids, []);
+      });
+
+      it('answers invalidActorUuids for a request that is wrong, carrying its own bound', async () => {
+        const actor = makePooledActor('actor-1', 'Actor.actor-1');
+        const overBound = Array.from({ length: POOLED_ACTORS_MAX + 1 }, () => actor.uuid);
+        const REQUESTS = [
+          ['absent', null],
+          ['empty', []],
+          ['over the bound', overBound],
+          ['carrying a non-string', [actor.uuid, 42]],
+          ['carrying an empty string', [actor.uuid, '   ']],
+          // The one an outcome-blind gate gets wrong, and the reason the split exists: SOME of
+          // these resolve. Pooling over fewer actors than the caller believes is the harm both
+          // members refuse, because a consume would then draw from a different set than the
+          // read reported.
+          ['only PARTLY resolved', [actor.uuid, 'Actor.nobody']],
+          // An address that resolves to something that is not an actor. `fromUuidSync` answers
+          // whatever the address names, so without the `documentName` test this Item would be
+          // scanned for components and — on the consume — written to.
+          ['addressing a document that is not an actor', [actor.uuid, 'Item.iron-ore']],
+        ];
+        for (const [label, actorUuids] of REQUESTS) {
+          const { facade, seen } = standUpPooledFacade({
+            actors: [actor],
+            documents: [{ uuid: 'Item.iron-ore', documentName: 'Item', name: 'Iron Ore' }],
+          });
+          const result = await member.call(facade, actorUuids);
+          assertContractResult(
+            result,
+            pooledRefusal(member, COMPANION_OUTCOMES.invalidActorUuids, {
+              max: POOLED_ACTORS_MAX,
+            })
+          );
+          assert.deepEqual(seen.actorUuids, [], `${label}: nothing was read or written`);
+        }
+      });
+
+      it('refuses notReady only once BOTH earlier gates have passed, and does not throw', async () => {
+        const actor = makePooledActor('actor-1', 'Actor.actor-1');
+        const { facade, seen } = standUpPooledFacade({ ready: false, actors: [actor] });
+        const result = await member.call(facade, [actor.uuid]);
+        assertContractResult(result, pooledRefusal(member, COMPANION_OUTCOMES.notReady));
+        assert.deepEqual(seen.actorUuids, []);
+      });
+
+      it('is ORDERED, not merely a set: flipping one fact at a time moves the answer', async () => {
+        const actor = makePooledActor('actor-1', 'Actor.actor-1');
+        const cases = [
+          [{ user: PLAYER, ready: false }, [actor.uuid], COMPANION_OUTCOMES.gmOnly],
+          [{ user: GM, ready: false }, ['Actor.nobody'], COMPANION_OUTCOMES.noActor],
+          [{ user: GM, ready: false }, [], COMPANION_OUTCOMES.invalidActorUuids],
+          [{ user: GM, ready: false }, [actor.uuid], COMPANION_OUTCOMES.notReady],
+        ];
+        for (const [options, actorUuids, outcome] of cases) {
+          const { facade } = standUpPooledFacade({ ...options, actors: [actor] });
+          const result = await member.call(facade, actorUuids);
+          assert.equal(result.outcome, outcome, `${JSON.stringify(options)} -> ${outcome}`);
+        }
+      });
+    });
+  }
+
+  it('hands the leaf the RESOLVED documents, in the caller order, once every gate has passed', async () => {
+    const first = makePooledActor('actor-1', 'Actor.actor-1', 2);
+    const second = makePooledActor('actor-2', 'Actor.actor-2', 3);
+    const { facade, seen } = standUpPooledFacade({ actors: [first, second] });
+    const result = await facade.readPooledHoldings({
+      actorUuids: [second.uuid, first.uuid],
+      costs: [{ type: 'component', name: POOLED_COMPONENT.name, quantity: 4 }],
+    });
+    assert.equal(result.outcome, COMPANION_OUTCOMES.read);
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      [...result.actorUuids],
+      [second.uuid, first.uuid],
+      'the answer echoes the resolved set in the order the caller asked for it'
+    );
+    assert.deepEqual(seen.actorUuids, [second.uuid, first.uuid], 'and the leaf saw those two');
+    const [reading] = result.readings;
+    assert.equal(reading.available, 5, 'the pool is summed across both sheets');
+    assert.equal(reading.sufficient, true);
+    assert.equal(reading.systemId, POOLED_SYSTEM.id);
+    assert.equal(reading.componentId, POOLED_COMPONENT.id);
+  });
+
+  it('addresses the TOKEN actor its address names, never the world prototype sharing its id', async () => {
+    // The whole reason these two members take a UUID. A synthetic token actor's `id` IS its
+    // base actor's, so an id-keyed resolution silently answers about the wrong document — a
+    // tolerable ambiguity for a member that gives, and a corrupting one for one that deletes.
+    const prototype = makePooledActor('actor-1', 'Actor.actor-1', 9);
+    const token = makePooledActor('actor-1', 'Scene.scene-1.Token.token-1.Actor.actor-1', 1);
+    const { facade, seen } = standUpPooledFacade({ actors: [prototype], documents: [token] });
+    const result = await facade.readPooledHoldings({
+      actorUuids: [token.uuid],
+      costs: [{ type: 'component', name: POOLED_COMPONENT.name, quantity: 1 }],
+    });
+    assert.deepEqual([...result.actorUuids], [token.uuid]);
+    assert.deepEqual(seen.actorUuids, [token.uuid]);
+    assert.equal(result.readings[0].available, 1, 'the token paid attention to its own sheet');
+  });
+
+  it('reaches the consume leaf once the gate passes, and the leaf owns the rest', async () => {
+    // The consume's own leaf-level refusal, reached only because the preamble admitted the set:
+    // an empty `costs` list is `invalidCosts`, a token no facade gate can produce.
+    const actor = makePooledActor('actor-1', 'Actor.actor-1');
+    const { facade } = standUpPooledFacade({ actors: [actor] });
+    const result = await facade.consumePooledHoldings({
+      actorUuids: [actor.uuid],
+      callSite: 'gmAction',
+      costs: [],
+    });
+    assert.equal(result.outcome, COMPANION_OUTCOMES.invalidCosts);
+    assertMessageIsFromTable(result, POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS, 'the consume');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Criterion 14 — every member resolves through its declared host and path
 // ---------------------------------------------------------------------------
 
@@ -873,6 +1126,19 @@ const AWARD =
   'async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {';
 const CREDIT =
   'async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {';
+/**
+ * The pooled members' own signatures, and the SET-valued preamble they sit on (issue 1342).
+ *
+ * These need a SECOND fidelity block rather than a row in the loop below, and the reason is
+ * mechanical: that loop asserts the literal `this._requireGmActor(actorId,`, which a plural
+ * preamble taking `actorUuids` cannot satisfy. Loosening the existing assertion to match both
+ * would stop it proving that the SINGULAR members delegate to the singular rule — so the claims
+ * are stated separately, each about the preamble its members actually use.
+ */
+const PLURAL_PREAMBLE = '_requireGmActors(actorUuids, keys) {';
+const READ_POOLED = 'async readPooledHoldings({ actorUuids = null, costs = null } = {}) {';
+const CONSUME_POOLED =
+  'async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {';
 
 /**
  * Every claim below is asserted over BOTH texts.
@@ -1289,6 +1555,260 @@ describe('the harness copies are faithful to src/main.js', () => {
           code.includes('game.actors'),
           false,
           `${label} ${signature} reads the actor collection directly, dropping the ownership predicate`
+        );
+      }
+    }
+  });
+
+  it('AC-31 — reproduces the SET-valued preamble, its GM half and the delegated split', () => {
+    for (const [label, body] of bothTexts(PLURAL_PREAMBLE)) {
+      assert.ok(body.length > 250, `non-vacuity: ${label} sliced to ${body.length} characters`);
+      const gmAt = body.indexOf('if (game.user?.isGM !== true) {');
+      const gateAt = body.indexOf('return gatePooledActorUuids(actorUuids, keys, {');
+      assert.ok(gmAt >= 0, `${label} lost the GM gate the singular preamble states in the same words`);
+      assert.ok(gateAt >= 0, `${label} stopped delegating the address rule to the ONE place it exists`);
+      assert.ok(gmAt < gateAt, `${label} reads addresses before it has established a GM`);
+      assert.ok(
+        body.includes('message: keys.gmOnlyKey'),
+        `${label} stopped answering with the CALLING member's own refusal string`
+      );
+      // Addressed by UUID, never by id. `game.actors.get` cannot tell an unlinked token actor
+      // from its world prototype — the synthetic actor's `id` IS the base actor's — so an
+      // id-keyed resolution here would let a member that DELETES take from the wrong document.
+      assert.ok(
+        body.includes('globalThis.fromUuidSync?.(uuid) ?? null'),
+        `${label} no longer resolves its actors by ADDRESS`
+      );
+      assert.equal(
+        codeOnly(body).includes('game.actors'),
+        false,
+        `${label} reads the actor collection, which cannot address a token actor at all`
+      );
+      // `fromUuidSync` answers whatever the address names. Without this test an Item address
+      // would be scanned for components and, on the consume, written to.
+      assert.ok(
+        body.includes("addressed?.documentName === 'Actor' ? addressed : null"),
+        `${label} accepts an address that resolves to a document which is not an actor`
+      );
+      assert.equal(
+        codeOnly(body).includes('_requireReady()'),
+        false,
+        `${label} must REFUSE notReady, never throw it — a stable member may not throw`
+      );
+    }
+  });
+
+  /**
+   * Each pooled member with the three things only IT may name: its own hoisted key trio, its own
+   * answer builder, and its own leaf.
+   *
+   * Named per member rather than asserted as a shape, because every one of the three is a single
+   * substitution away from a cross-member leak that the behavioural cases cannot see — the two
+   * members are gated identically, so swapping the trio changes no answer today, and swapping the
+   * builder or the leaf in PRODUCTION is invisible to a suite that runs the mirror.
+   */
+  const POOLED_DELEGATORS = [
+    [READ_POOLED, 'READ_POOLED_HOLDINGS_GATE_KEYS', 'pooledHoldingsReadResult', 'readPooledHoldingsAcrossActors'],
+    [
+      CONSUME_POOLED,
+      'CONSUME_POOLED_HOLDINGS_GATE_KEYS',
+      'pooledHoldingsConsumeResult',
+      'consumePooledHoldingsFromActors',
+    ],
+  ];
+
+  it('AC-31 — reproduces one guard per POOLED member, ordered preamble-then-readiness', () => {
+    for (const [signature, gateKeys, builder, leaf] of POOLED_DELEGATORS) {
+      for (const [label, body] of bothTexts(signature)) {
+        assert.ok(body.length > 200, `non-vacuity: ${label} sliced to ${body.length} characters`);
+        assert.ok(
+          body.includes(`const gate = this._requireGmActors(actorUuids, ${gateKeys});`),
+          `${label} ${signature} must delegate to the SET-valued preamble with its OWN hoisted trio`
+        );
+        assert.ok(
+          body.includes(`return ${builder}(`),
+          `${label} ${signature} must answer its OWN refusal shape; the other pooled member's ` +
+            'builder answers in the other member’s words AND its other key set'
+        );
+        assert.ok(
+          body.includes(`await ${leaf}(`),
+          `${label} ${signature} no longer delegates to its own leaf`
+        );
+        assert.ok(
+          body.includes('if (gate.outcome || this.ready !== true) {'),
+          `${label} ${signature} lost the single guard that keeps the preamble ahead of readiness`
+        );
+        // The bound rides on the refusal. `InvalidActorUuids` interpolates `{max}`, so dropping
+        // `gate.messageData` puts literal braces in front of a GM — and no outcome assertion
+        // anywhere would notice.
+        assert.ok(
+          body.includes('gate.messageData'),
+          `${label} ${signature} drops the gate's own interpolation data from its refusal`
+        );
+        // The RESOLVED documents, as the leaf's FIRST argument — which is what makes a
+        // caller-supplied `actors` in the request structurally unable to reach a seam.
+        assert.ok(
+          body.includes('gate.actors'),
+          `${label} ${signature} must pass the RESOLVED actor documents into the leaf`
+        );
+        const code = codeOnly(body);
+        assert.equal(
+          code.includes('_requireReady()'),
+          false,
+          `${label} ${signature} must REFUSE notReady, never throw it`
+        );
+        assert.equal(
+          code.includes('...'),
+          false,
+          `${label} ${signature} spreads something into the leaf; it must name every key`
+        );
+        assert.equal(
+          code.includes('game.actors'),
+          false,
+          `${label} ${signature} reads the actor collection directly, which cannot address a token`
+        );
+      }
+    }
+  });
+
+  it('AC-31 — each pooled delegator keeps its OWN refusal strings, all three of them', () => {
+    // THREE keys and not two, because the set-valued preamble splits an actor refusal in a way
+    // the singular one cannot. Unlike the pairs above, `noActorKey` and `invalidActorUuidsKey`
+    // are NOT inert: `gatePooledActorUuids` puts them on the gate's `message`. Both delegators
+    // still branch on `gate.outcome` alone, so a swap changes no answer TODAY — which is
+    // precisely why it is pinned at the source rather than left to a behavioural case.
+    const PAIRS = [
+      ['readPooledHoldings', 'POOLED_HOLDINGS_READ_MESSAGE_KEYS', POOLED_HOLDINGS_READ_MESSAGE_KEYS],
+      [
+        'consumePooledHoldings',
+        'POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS',
+        POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+      ],
+    ];
+    for (const [label, source] of [
+      ['production', MAIN_SOURCE],
+      ['the harness mirror', HARNESS_SOURCE],
+    ]) {
+      for (const [member, table, keys] of PAIRS) {
+        for (const [key, outcome] of [
+          ['gmOnlyKey', COMPANION_OUTCOMES.gmOnly],
+          ['noActorKey', COMPANION_OUTCOMES.noActor],
+          ['invalidActorUuidsKey', COMPANION_OUTCOMES.invalidActorUuids],
+        ]) {
+          assert.ok(
+            source.includes(`${key}: ${table}[COMPANION_OUTCOMES.${outcome}]`),
+            `${label}: ${member}'s hoisted trio must read ${table}, never the other pooled member's`
+          );
+          assert.ok(
+            keys[outcome].startsWith('FABRICATE.'),
+            `${member}'s table resolves a real key for ${outcome}`
+          );
+        }
+      }
+    }
+  });
+
+  it('AC-31 — the two pooled delegators are NOT adjacent, in either text', () => {
+    // A MEASURED siting rather than an aesthetic one, and the acceptance criterion this change
+    // carries. Adjacent, near-identical delegators concatenate into ONE duplicated run across
+    // `src/main.js` and this mirror, and the pair measures over SonarJS's 100-token floor where
+    // each member alone measures under it — the effect first recorded for `creditCurrency`.
+    // Asserting a whole OTHER member sits between them is what makes the siting checkable; a
+    // character-distance threshold would only measure how much prose was written.
+    for (const [label, source] of [
+      ['production', MAIN_SOURCE],
+      ['the harness mirror', HARNESS_SOURCE],
+    ]) {
+      const readAt = source.indexOf(READ_POOLED);
+      const consumeAt = source.indexOf(CONSUME_POOLED);
+      assert.ok(readAt >= 0, `${label} no longer declares readPooledHoldings as authored`);
+      assert.ok(consumeAt > readAt, `${label} no longer declares consumePooledHoldings after it`);
+      assert.ok(
+        source.slice(readAt, consumeAt).includes(AWARD),
+        `${label} sites the two pooled delegators together, which is what makes their run measure`
+      );
+    }
+  });
+
+  it('AC-31 — binds every seam the two pooled members inject, as production ships them', () => {
+    // PRODUCTION-SIDE ONLY, for the reason the award bag's pin states: the mirror INJECTS both
+    // bags — production reaches the live crafting-system manager, the real engine and
+    // `game.users`, none of which exist under `node --test` — so every facade-level case for
+    // these two members runs against a bag the suite supplied, and nothing else looks at the
+    // one production builds.
+    const POOLED_BAGS = [
+      [
+        '_pooledHoldingsSeams() {',
+        ['listSystems', 'craftingSystemManager', 'findComponentItems'],
+        [
+          [
+            'listSystems',
+            'listSystems: () => this.craftingSystemManager?.getSystems?.() ?? []',
+            'no crafting system is offered to resolve a cost name in, so every component and ' +
+              'tool cost answers componentNotFound/toolNotFound forever',
+          ],
+          [
+            'craftingSystemManager',
+            'craftingSystemManager: this.craftingSystemManager',
+            'the tool classifier reads no manager and every tool cost reads `missing`',
+          ],
+          [
+            'findComponentItems',
+            'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
+            'the read stops counting through the PUBLISHED matcher the consume takes through, ' +
+              'which is exactly the gate that lies',
+          ],
+        ],
+      ],
+      [
+        '_pooledConsumptionSeams() {',
+        ['isElectedExecutor', 'resolveSystem', 'resolveComponent', 'findComponentItems'],
+        [
+          [
+            'isElectedExecutor',
+            'isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id',
+            'a broadcast take is unelectable, so N connected GM clients each delete N times the ' +
+              'components and take N times the coin, with no natural key to absorb the repeat',
+          ],
+          [
+            'resolveSystem',
+            'resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null',
+            'every component row answers systemNotFound and no take ever lands',
+          ],
+          [
+            'resolveComponent',
+            'resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null',
+            'every component row answers componentNotFound',
+          ],
+          [
+            'findComponentItems',
+            'findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []',
+            'the take drains documents some other matcher chose than the one the read counted',
+          ],
+        ],
+      ],
+    ];
+
+    for (const [signature, keys, bindings] of POOLED_BAGS) {
+      const bag = mainMethodSource(signature);
+      assert.ok(bag.length > 250, `non-vacuity: ${signature} sliced to ${bag.length} characters`);
+      assert.deepEqual(
+        [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key),
+        keys,
+        `${signature} binds exactly these seams — a dropped one leaves the leaf reading undefined`
+      );
+      // The spread is enumerated by nothing above it, and dropping it is the silent mutation
+      // that matters most: the coin bindings vanish, every currency cost degrades to "cannot
+      // see", and every component and tool case in the suite stays green.
+      assert.ok(
+        bag.includes('...this._worldCurrencySeams(),'),
+        `${signature} stopped spreading the ONE world-currency bag, so its coin axis is unbound`
+      );
+      const squashed = bag.replaceAll(/\s+/g, ' ');
+      for (const [key, binding, harm] of bindings) {
+        assert.ok(
+          squashed.includes(binding),
+          `${key} is no longer bound as authored, so in production ${harm}`
         );
       }
     }

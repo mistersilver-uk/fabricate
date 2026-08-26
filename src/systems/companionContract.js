@@ -1510,6 +1510,88 @@ export function gateCompanionCallSite(request, seams) {
 }
 
 /**
+ * Resolve ONE address, treating a resolver that THROWS as an address that answered nothing.
+ *
+ * A `stable` member may not throw, and the resolver is a Foundry global a caller's own world
+ * hands in: an address it cannot parse must become one unresolvable actor — which the rule below
+ * then refuses on — rather than an exception escaping a member that publishes "never throws".
+ * It is logged rather than swallowed, because a resolver that throws on a WELL-FORMED address is
+ * a defect and a silent `null` would report it as an empty party.
+ *
+ * @param {string} uuid one caller address, already known to be a non-empty string
+ * @param {{resolveActor: (uuid: string) => object|null}} seams
+ * @returns {object|null}
+ */
+function resolveOnePooledActor(uuid, seams) {
+  try {
+    return seams.resolveActor(uuid) ?? null;
+  } catch (error) {
+    console.error(`Fabricate | Could not resolve the pooled holdings address "${uuid}"`, error);
+    return null;
+  }
+}
+
+/**
+ * The ACTOR-SET rule BOTH pooled members apply, existing exactly ONCE (issue 1342).
+ *
+ * A sibling of {@link gateCompanionCallSite}, here for that rule's stated reason: the canonical
+ * requirement is that the rule exists once, it is pure — the resolver arrives as a seam — and a
+ * member that lifted its own copy would be free to drift on the one question a member that
+ * DELETES may not be wrong about. It also sits beside the vocabulary comment that already
+ * describes this split, so the rule and its reasoning cannot come to live in two files.
+ *
+ * The GM half is deliberately NOT here. Reading `game.user` is the facade's, and the facade calls
+ * this only once that gate has passed — which is what keeps this module a Foundry-free leaf.
+ *
+ * The split is on WHAT RESOLVED, and both halves fail closed:
+ *
+ * - `noActor` when NOT ONE of the supplied addresses answers — the same word every other
+ *   actor-targeted member answers, said about a set;
+ * - `invalidActorUuids` when the REQUEST itself is wrong: absent, empty, longer than
+ *   {@link POOLED_ACTORS_MAX}, carrying anything that is not a non-empty string, or only PARTLY
+ *   resolved.
+ *
+ * A partly resolved list is the request being wrong rather than the world being empty, and that
+ * placement is the whole point: pooling over fewer actors than the caller believes is the harm
+ * both members refuse, because a consume would then draw from a different set than the read
+ * reported.
+ *
+ * @param {*} actorUuids the caller's own list of addresses
+ * @param {{noActorKey: string, invalidActorUuidsKey: string}} keys the CALLING member's own
+ *   refusal strings, so a refused consume is never reported in the read's words
+ * @param {{resolveActor: (uuid: string) => object|null}} seams
+ * @returns {{actors: Array<object>|null, outcome: string|null, message: string|null,
+ *   messageData: object|null}}
+ */
+export function gatePooledActorUuids(actorUuids, keys, seams) {
+  const wanted = Array.isArray(actorUuids) ? actorUuids : [];
+  const addressable =
+    wanted.length > 0 &&
+    wanted.length <= POOLED_ACTORS_MAX &&
+    wanted.every((uuid) => typeof uuid === 'string' && uuid.trim() !== '');
+  const actors = addressable
+    ? wanted.map((uuid) => resolveOnePooledActor(uuid, seams)).filter(Boolean)
+    : [];
+  if (addressable && actors.length === wanted.length) {
+    return { actors, outcome: null, message: null, messageData: null };
+  }
+  if (addressable && actors.length === 0) {
+    return {
+      actors: null,
+      outcome: COMPANION_OUTCOMES.noActor,
+      message: keys.noActorKey,
+      messageData: null,
+    };
+  }
+  return {
+    actors: null,
+    outcome: COMPANION_OUTCOMES.invalidActorUuids,
+    message: keys.invalidActorUuidsKey,
+    messageData: { max: POOLED_ACTORS_MAX },
+  };
+}
+
+/**
  * Normalize a caller-supplied `grantedBy` label, REFUSING rather than coercing.
  *
  * The field is `grantedBy` and not `source` because `source*` on a learned entry already

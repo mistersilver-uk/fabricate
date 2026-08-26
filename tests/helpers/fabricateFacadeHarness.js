@@ -45,14 +45,21 @@ import {
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
   componentAwardResult,
   currencyCreditResult,
+  gatePooledActorUuids,
   knowledgeGrantResult,
+  pooledHoldingsConsumeResult,
+  pooledHoldingsReadResult,
 } from '../../src/systems/companionContract.js';
 import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/systems/companionKnowledgeGrant.js';
+import { consumePooledHoldings as consumePooledHoldingsFromActors } from '../../src/systems/companionPooledConsumption.js';
+import { readPooledHoldings as readPooledHoldingsAcrossActors } from '../../src/systems/companionPooledHoldings.js';
 import {
   checkWorldCurrencyAffordability,
   creditWorldCurrency,
@@ -127,6 +134,33 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
 });
 
 /**
+ * Faithful copies of `src/main.js`'s hoisted `READ_POOLED_HOLDINGS_GATE_KEYS` and
+ * `CONSUME_POOLED_HOLDINGS_GATE_KEYS` (issue 1342).
+ *
+ * THREE keys each on both sides, because the SET-valued preamble splits an actor refusal in a
+ * way the singular one cannot — `noActor` when not one supplied UUID addresses an actor, against
+ * `invalidActorUuids` for a request that is absent, empty, over-bound, non-string, or only
+ * partly resolved.
+ *
+ * These are LESS inert than the pairs above them: `gatePooledActorUuids` puts `noActorKey` and
+ * `invalidActorUuidsKey` on the gate's `message`, so a swap here is a member reporting itself in
+ * the other pooled member's words on the surface a GM reads. Both delegators still branch on
+ * `gate.outcome` alone, so the behavioural cases would stay green — which is exactly why the
+ * source pin exists.
+ */
+const READ_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+  invalidActorUuidsKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids],
+});
+
+const CONSUME_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
+  invalidActorUuidsKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids],
+});
+
+/**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
  *
  * A thin naming of {@link classMemberSource} for this file's default source, kept because
@@ -158,6 +192,29 @@ function installFoundryShim() {
           .reduce((value, key) => (value == null ? undefined : value[key]), object),
     },
   };
+}
+
+/**
+ * Install the `globalThis.fromUuidSync` the pooled preamble addresses its actors through.
+ *
+ * ADDRESS-keyed and nothing else, because that is the whole reason the pooled members take a
+ * UUID: a synthetic token actor's `id` IS its world prototype's, so a double that resolved by id
+ * would agree with the very confusion the address exists to remove. A caller can therefore hand
+ * in a token-scoped actor and a world one that share an `id` and see them stay apart.
+ *
+ * It answers `null` for an address it does not hold, which is what makes the `noActor` and
+ * partly-resolved refusals reachable: a resolver that answered something for every string would
+ * be a seam that cannot refuse, and the gate above it would be untestable.
+ *
+ * @param {Array<object>} documents Everything addressable, each carrying its own `uuid`.
+ */
+function installUuidResolver(documents) {
+  const byUuid = new Map(
+    documents
+      .filter((document) => typeof document?.uuid === 'string' && document.uuid !== '')
+      .map((document) => [document.uuid, document])
+  );
+  globalThis.fromUuidSync = (uuid) => byUuid.get(uuid) ?? null;
 }
 
 /**
@@ -193,6 +250,11 @@ export function makeFacadeActor(
     // derives the uuid the service receives (the seam itself never takes one) and both
     // report `actorName` on every row.
     uuid: `Actor.${id}`,
+    // Every real Actor carries this, and `_requireGmActors` reads it: `fromUuidSync` answers
+    // whatever the address names, so the pooled preamble refuses an address that resolves to a
+    // document which is not an actor. A double without it would make that gate untestable in
+    // the passing direction — the counterpart to a double that is LOOSER than the real thing.
+    documentName: 'Actor',
     name: `Actor ${id}`,
     items,
     getFlag,
@@ -254,6 +316,8 @@ export function makeDeletableFacadeActor(id, { ownerUserIds = [], documents = []
  * @param {Array<object>} [options.actors] Mock actors (each with an `id`).
  * @param {string|null} [options.selectedCraftingActorId] Persisted `LAST_CRAFTING_ACTOR`.
  * @param {string[]} [options.componentSourceActorIds] Persisted `LAST_COMPONENT_SOURCES`.
+ * @param {Array<object>} [options.documents] Extra documents `fromUuidSync` can address —
+ *   a token-scoped synthetic actor, or a non-Actor document a mistyped address names.
  * @returns {{ game: object, setCurrentUser: (user: object) => void }}
  */
 export function installFacadeGame({
@@ -261,8 +325,10 @@ export function installFacadeGame({
   actors = [],
   selectedCraftingActorId = null,
   componentSourceActorIds = [],
+  documents = [],
 }) {
   installFoundryShim();
+  installUuidResolver([...actors, ...documents]);
   const actorsById = new Map(actors.map((actor) => [actor.id, actor]));
   const settings = new Map([
     ['lastCraftingActor', selectedCraftingActorId ?? ''],
@@ -325,6 +391,13 @@ export class FabricateFacadeUnderTest {
     // crafting-system manager and the real engine, none of which exist here. The DELEGATOR
     // below is a faithful copy and is pinned; the bag it reads is what a test substitutes.
     componentAwardSeams = null,
+    // The two Pooled Holdings seam bags (issue 1342), INJECTED for the same reason and NOT part
+    // of the fidelity claim: production's `_pooledHoldingsSeams()` and
+    // `_pooledConsumptionSeams()` reach the live crafting-system manager, the real engine and
+    // `game.users`, none of which exist here. Both DELEGATORS below are faithful copies and are
+    // pinned; the bags they read are what a test substitutes.
+    pooledHoldingsSeams = null,
+    pooledConsumptionSeams = null,
   } = {}) {
     this._alchemyListingBuilder = alchemyListingBuilder;
     this.craftingEngine = craftingEngine;
@@ -343,6 +416,8 @@ export class FabricateFacadeUnderTest {
     this._bulkDestroyService = bulkDestroyService;
     this._companionCheckSeamBag = companionCheckSeams;
     this._componentAwardSeamBag = componentAwardSeams;
+    this._pooledHoldingsSeamBag = pooledHoldingsSeams;
+    this._pooledConsumptionSeamBag = pooledConsumptionSeams;
   }
 
   get _game() {
@@ -390,6 +465,41 @@ export class FabricateFacadeUnderTest {
       return { actor: null, outcome: COMPANION_OUTCOMES.noActor, message: noActorKey };
     }
     return { actor, outcome: null, message: null };
+  }
+
+  // --- Faithful copy of Fabricate#_requireGmActors (issue 1342) --------------
+  //
+  // The SET-valued extension of the preamble above, for the two pooled members. The GM half is
+  // the same rule in the same words and runs first; everything below it is DELEGATED to the one
+  // place that rule exists, `gatePooledActorUuids` in the contract leaf — which is what keeps
+  // the bound, the shape and the `noActor`/`invalidActorUuids` split out of this copy entirely.
+  //
+  // Addressed by UUID and never by id, because `game.actors.get` cannot tell an unlinked token
+  // actor from its world prototype and this pair feeds a member that DELETES. The
+  // `documentName` test is what stops an address naming an Item being scanned and written to as
+  // if it were an actor.
+  //
+  // One incidental asymmetry, of the class this file already carries: production reads the bare
+  // `game` global where this copy hoists `this._game` first, exactly as `_requireGmActor` above
+  // does. The resolver expression is VERBATIM on both sides, `globalThis.` and all — production
+  // spells it that way because optional chaining does not rescue an undeclared identifier, and
+  // this suite's own resolver is installed on the same global.
+  _requireGmActors(actorUuids, keys) {
+    const game = this._game;
+    if (game.user?.isGM !== true) {
+      return {
+        actors: null,
+        outcome: COMPANION_OUTCOMES.gmOnly,
+        message: keys.gmOnlyKey,
+        messageData: null,
+      };
+    }
+    return gatePooledActorUuids(actorUuids, keys, {
+      resolveActor: (uuid) => {
+        const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
+        return addressed?.documentName === 'Actor' ? addressed : null;
+      },
+    });
   }
 
   // --- Faithful copies of the four `handle` accessors (issue 1289) -----------
@@ -500,6 +610,37 @@ export class FabricateFacadeUnderTest {
         ...this._worldCurrencySeams(),
         isElectedExecutor: () => this._game.users?.activeGM?.id === this._game.user?.id,
       }
+    );
+  }
+
+  // --- The Pooled Holdings read seam bag (INJECTED, see the constructor) ------
+  _pooledHoldingsSeams() {
+    return this._pooledHoldingsSeamBag;
+  }
+
+  // --- Faithful copy of Fabricate#readPooledHoldings (issue 1342) ------------
+  //
+  // The delegator only: the read itself is the REAL leaf, so what this copy reproduces is
+  // exactly the part that lives in `src/main.js` — the SET-valued preamble with this member's
+  // OWN hoisted keys, the single readiness guard, the gate's own `messageData` carried onto the
+  // refusal, and the RESOLVED actor documents passed through as the leaf's FIRST argument.
+  //
+  // Sited HERE, beside `creditCurrency` and the world-currency bag production's own version
+  // spreads, because production sites it here — the mirror follows production's member order as
+  // well as its text, and that order is what keeps the two pooled delegators from concatenating
+  // into one over-the-bar duplicated run across the two files.
+  async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids, READ_POOLED_HOLDINGS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsReadResult(
+        gate.outcome ?? COMPANION_OUTCOMES.notReady,
+        gate.messageData
+      );
+    }
+    return await readPooledHoldingsAcrossActors(
+      gate.actors,
+      { costs },
+      this._pooledHoldingsSeams()
     );
   }
 
@@ -617,6 +758,35 @@ export class FabricateFacadeUnderTest {
       gate.actor,
       { systemId, awards, callSite },
       this._componentAwardSeams()
+    );
+  }
+
+  // --- The Pooled Holdings consume seam bag (INJECTED, see the constructor) ---
+  _pooledConsumptionSeams() {
+    return this._pooledConsumptionSeamBag;
+  }
+
+  // --- Faithful copy of Fabricate#consumePooledHoldings (issue 1342) ---------
+  //
+  // The delegator only: the take itself is the REAL leaf, which owns the call-site gate, the
+  // election, the `costs` validation, the components-first ordering and the rollback.
+  //
+  // Sited HERE, after `awardComponents` and well away from the read above, because production
+  // sites it here for the measured duplicated-run reason recorded on `rollActorCheck` — the two
+  // pooled delegators are near-identical, so adjacency would concatenate them into one run
+  // across this file and `src/main.js` that neither member reaches alone.
+  async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids, CONSUME_POOLED_HOLDINGS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsConsumeResult(
+        gate.outcome ?? COMPANION_OUTCOMES.notReady,
+        gate.messageData
+      );
+    }
+    return await consumePooledHoldingsFromActors(
+      gate.actors,
+      { callSite, costs },
+      this._pooledConsumptionSeams()
     );
   }
 
