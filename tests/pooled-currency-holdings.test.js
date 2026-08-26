@@ -28,7 +28,6 @@ import { ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { COMPANION_OUTCOMES } from '../src/systems/companionContract.js';
 import {
   CURRENCY_SPEND_CALLERS,
-  POOLED_CURRENCY_OUTCOMES,
   consumePooledCurrency,
   readPooledCurrencyBalance,
 } from '../src/systems/currencyAffordance.js';
@@ -195,7 +194,7 @@ describe('consumePooledCurrency', () => {
 
     const result = await consume(party, pooledSeams(), { amount: 2 });
 
-    assert.equal(result.outcome, POOLED_CURRENCY_OUTCOMES.insufficient);
+    assert.equal(result.outcome, COMPANION_OUTCOMES.insufficient);
     assert.equal(result.wroteNothing, true);
     assert.deepEqual(result.ledger, []);
     assert.equal(party[0].updates.length, 0);
@@ -210,7 +209,7 @@ describe('consumePooledCurrency', () => {
 
     const result = await consume([readable, opaque], pooledSeams(), { amount: 2 });
 
-    assert.equal(result.outcome, POOLED_CURRENCY_OUTCOMES.balanceNotConfigured);
+    assert.equal(result.outcome, COMPANION_OUTCOMES.balanceNotConfigured);
     assert.equal(result.wroteNothing, true);
     assert.equal(
       readable.updates.length,
@@ -282,7 +281,7 @@ describe('consumePooledCurrency', () => {
       amount: 3,
     });
 
-    assert.equal(result.outcome, POOLED_CURRENCY_OUTCOMES.consumeFailed);
+    assert.equal(result.outcome, COMPANION_OUTCOMES.consumeFailed);
     assert.equal(idrin.totalCopper(), 100, "the first payer's total is restored exactly");
     assert.equal(sera.totalCopper(), 500);
     assert.deepEqual(
@@ -316,7 +315,7 @@ describe('consumePooledCurrency', () => {
       amount: 3,
     });
 
-    assert.equal(result.outcome, POOLED_CURRENCY_OUTCOMES.consumeFailed);
+    assert.equal(result.outcome, COMPANION_OUTCOMES.consumeFailed);
     assert.equal(idrin.totalCopper(), 0, 'the coin really is gone');
     assert.equal(
       result.wroteNothing,

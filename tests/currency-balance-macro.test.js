@@ -28,7 +28,6 @@ import {
   interpretMacroSpendResult,
 } from '../src/systems/CoinSpenders.js';
 import { COMPANION_OUTCOMES } from '../src/systems/companionContract.js';
-import { POOLED_CURRENCY_OUTCOMES } from '../src/systems/currencyAffordance.js';
 import {
   CURRENCY_MACRO_KEYS,
   normalizeCurrencyConfig,
@@ -258,17 +257,39 @@ describe('the surfaces that do not follow the vocabulary automatically', () => {
   });
 });
 
+/**
+ * The three tokens the pooled currency pair answers that the contract did not declare while it
+ * had no member able to emit them. `currencyAffordance.js` spelled them locally in an explicit
+ * FORWARD REFERENCE, and this guard compared the two spellings so they could not diverge.
+ */
+const POOLED_CURRENCY_TOKENS = Object.freeze([
+  'insufficient',
+  'balanceNotConfigured',
+  'consumeFailed',
+]);
+
 describe('the pooled outcome tokens', () => {
-  it('agree with the companion contract wherever it declares one', async () => {
-    // The tokens are spelled locally because publishing a word before any member can answer it
-    // would put a dead entry in the contract's vocabulary. This guard is what stops that forward
-    // reference becoming two spellings of one fact once the contract does declare them.
-    for (const [key, value] of Object.entries(POOLED_CURRENCY_OUTCOMES)) {
-      assert.equal(key, value, 'a token is its own key, as in COMPANION_OUTCOMES');
-      const published = COMPANION_OUTCOMES[key];
-      if (published !== undefined) {
-        assert.equal(published, value, `the contract spells "${key}" differently`);
-      }
+  it('are answered through the contract, with no second vocabulary beside it', () => {
+    // The forward reference is retired: the contract declares all three beside the pooled members
+    // that answer them (issue 1342). So the guard that once compared two spellings now pins the
+    // single home against the module that answers with it — and reds if a second one reappears,
+    // which is the whole failure the forward reference was written to be safe from.
+    const text = source('../src/systems/currencyAffordance.js');
+    for (const token of POOLED_CURRENCY_TOKENS) {
+      assert.equal(
+        COMPANION_OUTCOMES[token],
+        token,
+        `the contract declares "${token}", and a token is its own key`
+      );
+      assert.ok(
+        text.includes(`COMPANION_OUTCOMES.${token}`),
+        `the pooled currency pair must answer "${token}" through the contract`
+      );
     }
+    assert.equal(
+      text.includes('POOLED_CURRENCY_OUTCOMES = '),
+      false,
+      'a local pooled-outcome block is two vocabularies for one fact'
+    );
   });
 });

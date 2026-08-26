@@ -476,6 +476,18 @@ const SITE_MAPPING = [
     sites: 1,
     anchors: [/updateStackQuantity\(target, before \+ quantity, quantityPath\)/],
   },
+  {
+    // The pooled holdings READ counts what a party is carrying (issue 1342), and it must count
+    // it with the reader the pooled CONSUME's first-fit drain spends: `pooledAllocation.js` uses
+    // `readStackQuantity` and states that the choice is not a parameter. A read on
+    // `readStoredStackQuantity` would honour a stored `0` the drain reads as `1`, so a pool the
+    // read called short would pay in full — a gate that lies in the direction that matters.
+    // One row, so no anchors: there is no second accessor in that file to be swapped with.
+    site: 'companionPooledHoldings pooled component count',
+    file: 'src/systems/companionPooledHoldings.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
 ];
 
 /** The accessor module itself, which DEFINES these names and must not be counted. */

@@ -1157,32 +1157,14 @@ export async function creditWorldCurrency(actor, { unitId, amount, callSite } = 
 // compose these two rather than re-deriving what a denomination means.
 // ---------------------------------------------------------------------------
 
-/**
- * The three outcome tokens the pooled pair answers that {@link COMPANION_OUTCOMES} does not
- * declare yet, spelled EXACTLY as the contract will declare them when the pooled members ship.
- *
- * They are declared here, and not in `companionContract.js`, because a token in that file is part
- * of a PUBLISHED vocabulary: adding one there before any member can answer it would publish a word
- * with no meaning, and the contract runs a dead-vocabulary sweep that would then be lying.
- * Spelling them here lets the currency leg answer the right words today without pre-announcing
- * them. A guard test asserts that the contract, once it does declare any of them, declares it with
- * the same spelling, so the forward reference cannot rot into two vocabularies for one fact.
- */
-export const POOLED_CURRENCY_OUTCOMES = Object.freeze({
-  // The pool is short. A refusal, not a question answered no: `notAffordable` sits in the
-  // contract's successful-outcome list because asking "can they afford it?" and hearing "no" is a
-  // successful answer, whereas asking a member to TAKE what is not there is a refused act.
-  insufficient: 'insufficient',
-  // Fabricate cannot see what the pool holds. Named for the commonest producer — a `macro` world
-  // with no `balance` macro authored — but it is the answer for every unreadable pool, because a
-  // caller can do nothing different about a missing macro and a mis-typed `actorPath`, and both
-  // must fail closed rather than price the pool at zero.
-  balanceNotConfigured: 'balanceNotConfigured',
-  // A spend mechanism RAN and did not succeed. Distinct from `insufficient`, which is decided
-  // before anything is invoked: this one means the money was there and the write did not happen,
-  // so a caller must read `wroteNothing` before deciding whether to retry.
-  consumeFailed: 'consumeFailed',
-});
+// `insufficient`, `balanceNotConfigured` and `consumeFailed` were spelled HERE, in a local
+// `POOLED_CURRENCY_OUTCOMES` block, for as long as the contract had no member that could answer
+// them: publishing a word into `COMPANION_OUTCOMES` before anything emits it would have put a dead
+// entry in a vocabulary that runs a dead-entry sweep. That block was explicitly a FORWARD
+// REFERENCE, guarded by a test asserting the two spellings agreed. The contract now declares all
+// three beside the pooled members that answer them, so the forward reference is retired and this
+// module reads them from `COMPANION_OUTCOMES` like every other outcome it answers — one
+// vocabulary, one home. Each token's rationale lives with its declaration (issue 1342).
 
 /**
  * Resolve the TERMINAL BASE UNIT of a unit's ladder branch — the coin whose own `baseValue` is
@@ -1642,13 +1624,13 @@ export async function consumePooledCurrency(actors, { unitId, amount } = {}, sea
 
   if (available === null) {
     const detail = readings.find((reading) => reading.copperValue === null)?.message || '';
-    return pooledDebitRefusal(POOLED_CURRENCY_OUTCOMES.balanceNotConfigured, { detail }, planned);
+    return pooledDebitRefusal(COMPANION_OUTCOMES.balanceNotConfigured, { detail }, planned);
   }
 
   const { plan, remaining } = planPooledDebit(readings, requiredBase);
   if (available < requiredBase || remaining > 0) {
     return pooledDebitRefusal(
-      POOLED_CURRENCY_OUTCOMES.insufficient,
+      COMPANION_OUTCOMES.insufficient,
       {
         required: String(requiredBase),
         available: String(available),
@@ -1665,7 +1647,7 @@ export async function consumePooledCurrency(actors, { unitId, amount } = {}, sea
     baseUnit,
   });
   return {
-    outcome: failure === null ? null : POOLED_CURRENCY_OUTCOMES.consumeFailed,
+    outcome: failure === null ? null : COMPANION_OUTCOMES.consumeFailed,
     messageData: failure === null ? null : { detail: failure },
     wroteNothing,
     ...planned,
