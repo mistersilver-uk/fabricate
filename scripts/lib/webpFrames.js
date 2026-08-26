@@ -66,20 +66,52 @@ export const DECODER = 'dwebp';
 /**
  * The renderer's own noise, measured, and the tolerance derived from it.
  *
- * `channelDelta` is the per-channel amplitude at which a pixel counts as meaningfully different
- * rather than as jitter; `pixels` is how many such pixels a frame may carry before it counts as
- * changed. A frame differs when either its dimensions moved or its significant-pixel count exceeds
- * `pixels`.
+ * Two independent rules, because a difference can be loud or it can be broad and the renderer's
+ * noise is neither.
  *
- * The two populations these numbers sit between are recorded in `CONTRIBUTING.md`, and
- * `tests/docs-screenshot-frames.test.js` asserts both directions from committed fixtures. Do not
- * widen either number without repeating that measurement: a tolerance that cannot distinguish
- * renderer jitter from a changed character of on-screen text is not a tolerance, it is a blindfold.
+ * - `channelDelta` is the per-channel amplitude at which a pixel counts as meaningfully different
+ *   rather than as jitter, and `pixels` is how many such pixels a frame may carry before it counts
+ *   as changed. Across 276 frame comparisons the renderer's noise reached 16 levels at its very
+ *   worst and put ZERO pixels past 24, so `pixels` is zero: the whole measured margin is in
+ *   amplitude, and a budget above what the measurement found would buy nothing but blindness. One
+ *   pixel at 24 levels is now a change.
+ * - `area` is the fraction of a frame that may differ AT ALL, at any amplitude. The worst noise
+ *   measured touched 2116 pixels of a 1280x860 frame — 0.19% of it — so five percent sits about
+ *   twenty-six times above the measurement.
+ *
+ * WHY THE SECOND RULE EXISTS
+ * --------------------------
+ * The amplitude rule alone cannot see a shallow change that covers a lot of frame, and that is not
+ * a hypothetical shape: lightening every pixel of a real committed frame by 23 levels — a
+ * Fabricate colour-token change across a panel, which is precisely what documentation exists to
+ * show — put not one pixel past 24 and was reported unchanged, under a printed reason claiming a
+ * million differing pixels were "within this renderer's own noise". They were not.
+ *
+ * WHAT IS STILL INVISIBLE, AND WHAT IT COSTS
+ * ------------------------------------------
+ * A difference under 24 levels on every pixel AND under five percent of the frame passes. That is
+ * a subtle recolour of something small, and it is the residual cost of a tolerance wide enough to
+ * absorb this renderer's jitter at all. The cost runs the other way too: a libwebp release that
+ * changes `-near_lossless` preprocessing would move many pixels a little and trip the area rule,
+ * rewriting the set once with no visual change to review. That is the price of being able to see a
+ * broad shallow change, and such a rewrite lands as its own commit.
+ *
+ * The two measured populations are recorded in `CONTRIBUTING.md`, and
+ * `tests/docs-screenshot-frames.test.js` asserts every one of these numbers against committed
+ * fixtures rather than merely using them. Do not widen any of them without repeating that
+ * measurement: a tolerance that cannot distinguish renderer jitter from a changed character of
+ * on-screen text is not a tolerance, it is a blindfold.
  */
 export const RENDER_NOISE = Object.freeze({
   channelDelta: 24,
-  pixels: 8,
+  pixels: 0,
+  area: 0.05,
 });
+
+/** A fraction of a frame, as the reports write it. */
+function asPercentage(share) {
+  return `${(share * 100).toFixed(2)}%`;
+}
 
 /** The raster `dwebp -ppm` writes: binary P6, three channels, 8 bits each. */
 const PPM_HEADER = /^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/;
@@ -194,6 +226,15 @@ export function measureRasterDifference(left, right) {
 /**
  * Turn a measurement into the generator's verdict, with the sentence it should print.
  *
+ * Three ways to be changed and one way not to be. Amplitude and area are asked separately because
+ * either alone is blind to the other's shape, and the sentence says which one fired so a reader can
+ * tell a moved glyph from a recoloured panel without opening either image.
+ *
+ * Nothing here claims a difference is "within this renderer's noise" — the reason lines report what
+ * was measured and what the tolerance allows, and leave those two facts adjacent. The wording they
+ * replaced asserted the noise claim about any difference that happened to pass, which was false the
+ * moment a difference passed for a reason the noise measurement never covered.
+ *
  * @param {ReturnType<typeof measureRasterDifference>} measurement The measurement.
  * @returns {{changed: boolean, reason: string}} The verdict and why.
  */
@@ -204,16 +245,29 @@ export function classifyRasterDifference(measurement) {
       changed: true,
       reason:
         `${measurement.significantPixels} pixel(s) differ by ${RENDER_NOISE.channelDelta} levels` +
-        ` or more, up to ${measurement.maxChannelDelta}, past the ${RENDER_NOISE.pixels} this` +
-        " renderer's own noise reaches",
+        ` or more, up to ${measurement.maxChannelDelta}; measured renderer noise put no pixel` +
+        ` past ${RENDER_NOISE.channelDelta} at all`,
     };
   }
   if (measurement.differingPixels === 0) return { changed: false, reason: 'identical' };
+
+  const share = measurement.differingPixels / measurement.pixels;
+  if (share > RENDER_NOISE.area) {
+    return {
+      changed: true,
+      reason:
+        `${measurement.differingPixels} pixel(s) differ, ${asPercentage(share)} of the frame,` +
+        ` past the ${asPercentage(RENDER_NOISE.area)} this tolerance allows; the difference only` +
+        ` reaches ${measurement.maxChannelDelta} levels, but the worst measured noise touched` +
+        ' 0.19% of a frame, so one this broad is a view change however shallow it is',
+    };
+  }
   return {
     changed: false,
     reason:
-      `${measurement.differingPixels} pixel(s) differ by up to ${measurement.maxChannelDelta}` +
-      " levels, within this renderer's own noise",
+      `${measurement.differingPixels} pixel(s) differ, ${asPercentage(share)} of the frame,` +
+      ` ${measurement.significantPixels} of them by ${RENDER_NOISE.channelDelta} levels or more,` +
+      ` up to ${measurement.maxChannelDelta} — inside both halves of the measured tolerance`,
   };
 }
 
