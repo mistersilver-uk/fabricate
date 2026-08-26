@@ -209,8 +209,9 @@ describe('the three read semantics, over every awkward stored value', () => {
 // a file that GAINS a second row has to anchor both.
 // ---------------------------------------------------------------------------
 
-/** Every accessor the table polices. `stackQuantityUpdate` has no `src` call site, and
- *  is listed so that acquiring one without a row is a red test rather than a silent gap. */
+/** Every accessor the table polices. `stackQuantityUpdate` had no `src` call site until the
+ *  pooled holdings consume needed a BATCHED decrement (issue 1342); it was listed here before
+ *  it had one, so that acquiring a site without a row was a red test rather than a silent gap. */
 const ACCESSORS = Object.freeze([
   'hasStackQuantity',
   'readStackQuantity',
@@ -487,6 +488,22 @@ const SITE_MAPPING = [
     file: 'src/systems/companionPooledHoldings.js',
     accessor: 'readStackQuantity',
     sites: 1,
+  },
+  {
+    // The pooled holdings consume batches its writes per actor, so it needs the update PAYLOAD
+    // rather than the live-document writer every other decrement site uses (issue 1342). Two
+    // sites, and they are each other's inverse: one writes the post-take remainder, the other
+    // writes back the `available` the drain plan read. Anchored even though a single-accessor
+    // file needs none, because a rollback that wrote the wrong one of those two numbers is the
+    // failure that costs a player their inventory and no count could see it.
+    site: 'companionPooledConsumption batched reduction and its rollback',
+    file: 'src/systems/companionPooledConsumption.js',
+    accessor: 'stackQuantityUpdate',
+    sites: 2,
+    anchors: [
+      /stackQuantityUpdate\(take\.item, take\.remainingQuantity\)/,
+      /stackQuantityUpdate\(take\.item, take\.available\)/,
+    ],
   },
 ];
 
