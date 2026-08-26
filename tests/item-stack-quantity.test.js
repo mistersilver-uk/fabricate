@@ -254,22 +254,29 @@ const SITE_MAPPING = [
     anchors: [/updateStackQuantity\(existing, base \+ delta, quantityPath\)/],
   },
   {
-    site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable + _consumeComponentItems',
+    site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStackQuantity',
-    sites: 3,
-    // Only `_consumeComponentItems` is a delete-on-underrun site; the other two are the
-    // selection helper and the salvage availability gate.
-    deleteSites: 1,
+    sites: 2,
+    // Neither is a delete-on-underrun site any more: the salvage consume's capacity read
+    // moved to `pooledAllocation.planFirstFitDrain` (issue 1342) and took its delete site
+    // with it, one row below. These two are the selection helper and the salvage
+    // availability gate.
     // The first anchor is the one that matters most. `selectedQuantityItems` is the
     // hazard-COMPOUNDING site: read it with the stored reader and an item stored at 0
     // stops decrementing `remaining`, so every candidate enters the plan the delete
     // branch then walks.
-    anchors: [
-      /remaining -= readStackQuantity\(item\);/,
-      /sum \+ readStackQuantity\(item\)/,
-      /const available = readStackQuantity\(item\);/,
-    ],
+    anchors: [/remaining -= readStackQuantity\(item\);/, /sum \+ readStackQuantity\(item\)/],
+  },
+  {
+    site: 'pooledAllocation.planFirstFitDrain capacity read (was _consumeComponentItems)',
+    file: 'src/systems/pooledAllocation.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+    // The read that decides delete-versus-decrement for the salvage consume. It is the
+    // coercing reader on purpose: a stored 0 read as 0 would make every take exhaust its
+    // item, so the consume would DELETE where it should decrement.
+    deleteSites: 1,
   },
   {
     site: 'CraftingEngine._consumeAlchemyExtraItems + _consumeSubmittedAlchemyItems + _consumeIngredients',
@@ -307,7 +314,7 @@ const SITE_MAPPING = [
     anchors: [
       /updateStackQuantity\(item, qty - count\)/,
       /updateStackQuantity\(item, itemQuantity - quantity\)/,
-      /updateStackQuantity\(item, available - toConsume\)/,
+      /updateStackQuantity\(take\.item, take\.remainingQuantity\)/,
     ],
   },
   {

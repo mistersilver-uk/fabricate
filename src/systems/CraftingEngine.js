@@ -63,6 +63,7 @@ import {
   setStackQuantity,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -3281,7 +3282,7 @@ export class CraftingEngine {
     optionOverrides = null,
     essenceAllocation = null
   ) {
-    const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
+    const availableItems = pooledItemOrder(componentSourceActors);
     const matcher = (ingredient, item) =>
       this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
     if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
@@ -6387,23 +6388,32 @@ export class CraftingEngine {
    * Consume a specific total quantity from component items on the actor.
    * Deletes items when fully consumed, reduces quantity otherwise.
    * Returns array of { item, quantity: consumed }.
+   *
+   * WHICH items pay and HOW MUCH each pays is the first-fit drain policy, which now
+   * lives in {@link planFirstFitDrain} (issue 1342) so the pooled companion consume
+   * answers the question the same way this path does. Only the WRITES stayed here: this
+   * one issues a `delete`/`update` per document, where the pooled consume batches per
+   * actor, and the plan is parent-grouped so it can.
+   *
+   * The plan preserves this site's reader exactly — `readStackQuantity`, which coerces a
+   * stored `0` to `1`, not the stored reader — and therefore its delete-versus-decrement
+   * branch: `exhausted` is `toConsume >= available` by construction.
+   *
+   * `actor` is UNUSED and stays in the signature. Both callers pass the salvaging actor
+   * and the items are already resolved from it, so the parameter documents whose
+   * inventory is being drained; dropping it would churn every caller and every test for
+   * nothing.
+   *
    * @private
    */
   async _consumeComponentItems(actor, items, quantity) {
     const consumed = [];
-    let remaining = quantity;
 
-    for (const item of items) {
-      if (remaining <= 0) break;
-      // `readStackQuantity` (present => at least one) rather than the stored reader:
-      // this site coerced a stored 0 to 1 before the routing change and still does.
-      const available = readStackQuantity(item);
-      const toConsume = Math.min(available, remaining);
-      consumed.push({ item, quantity: toConsume });
-      remaining -= toConsume;
-      await (toConsume >= available
-        ? item.delete()
-        : updateStackQuantity(item, available - toConsume));
+    for (const take of planFirstFitDrain(items, quantity).takes) {
+      consumed.push({ item: take.item, quantity: take.quantity });
+      await (take.exhausted
+        ? take.item.delete()
+        : updateStackQuantity(take.item, take.remainingQuantity));
     }
 
     return consumed;
