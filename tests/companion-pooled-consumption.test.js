@@ -256,6 +256,27 @@ const allWrites = (actors) => actors.flatMap((actor) => actor.itemWrites);
 /** The stack count an item currently stores at the configured path. */
 const stackOf = (item) => item.system.count.value;
 
+/**
+ * Run one call with `console.error` captured, so a logged throw is provable rather than assumed.
+ *
+ * Every guard this file drives that catches something also REPORTS it, and asserting the report
+ * is what separates "the catch ran" from "the call happened to answer the same way for another
+ * reason" — which is exactly the distinction the parentless-take case below could not make.
+ *
+ * @param {() => Promise<object>} run
+ * @returns {Promise<{result: object, errors: Array<Array<*>>}>}
+ */
+async function withCapturedErrors(run) {
+  const errors = [];
+  const originalError = console.error;
+  console.error = (...args) => errors.push(args);
+  try {
+    return { result: await run(), errors };
+  } finally {
+    console.error = originalError;
+  }
+}
+
 /** Assert an answer is a frozen, table-owned, resolvable contract answer. */
 function assertConsumeAnswer(result, outcome) {
   assert.ok(Object.isFrozen(result), 'a contract answer crosses the boundary frozen');
@@ -963,28 +984,23 @@ describe('the guards between a plan and a write', () => {
     // this is the second, and it is what `collection.get(id, {strict: true})` does for an id
     // that vanished between the plan and the write — it rejects the WHOLE batch. Without a
     // rejecting fake, `callActorWrite`'s `catch` could be deleted with this file still green.
-    const errors = [];
-    const originalError = console.error;
-    console.error = (...args) => errors.push(args);
-    try {
-      const idrin = new ConsumptionActor('Idrin');
-      makeItem(idrin, 'i1', 'hide', 3);
-      makeItem(idrin, 'i2', 'hide', 5);
-      idrin.rejectDelete = true;
+    const idrin = new ConsumptionActor('Idrin');
+    makeItem(idrin, 'i1', 'hide', 3);
+    makeItem(idrin, 'i2', 'hide', 5);
+    idrin.rejectDelete = true;
 
-      const result = await take([idrin], [componentCost('hide', 5)]);
+    const { result, errors } = await withCapturedErrors(() =>
+      take([idrin], [componentCost('hide', 5)])
+    );
 
-      assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
-      assert.equal(result.consumed, 0);
-      assert.equal(idrin.items.length, 2, 'the rejected delete removed nothing');
-      assert.equal(stackOf(idrin.items[1]), 5, 'and the reduction that DID apply was restored');
-      assert.ok(
-        errors.some(([message]) => String(message).includes('could not deleteEmbeddedDocuments')),
-        'the rejection was reported rather than swallowed'
-      );
-    } finally {
-      console.error = originalError;
-    }
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
+    assert.equal(result.consumed, 0);
+    assert.equal(idrin.items.length, 2, 'the rejected delete removed nothing');
+    assert.equal(stackOf(idrin.items[1]), 5, 'and the reduction that DID apply was restored');
+    assert.ok(
+      errors.some(([message]) => String(message).includes('could not deleteEmbeddedDocuments')),
+      'the rejection was reported rather than swallowed'
+    );
   });
 });
 
@@ -1159,18 +1175,6 @@ describe('two currency costs drawing on one balance', () => {
 // ---------------------------------------------------------------------------
 
 describe('a seam that THROWS', () => {
-  /** Run one call with `console.error` captured, so a logged throw is provable. */
-  async function withCapturedErrors(run) {
-    const errors = [];
-    const originalError = console.error;
-    console.error = (...args) => errors.push(args);
-    try {
-      return { result: await run(), errors };
-    } finally {
-      console.error = originalError;
-    }
-  }
-
   it('becomes a refusal, on every bare seam the pre-check reaches', async () => {
     // `callActorWrite` and `unwind` carried the only `try`s in this module, so every other seam
     // was bare — and optional chaining guards an ABSENT method, never a throwing one. The
