@@ -135,7 +135,7 @@ Gathering applies no numeric Tool bonus.
 ## Authoring and Crafting Surfaces
 
 GMs author recipes in the Crafting Admin panel.
-The recipe editor has dedicated tabs for the recipe's overview, ingredients, results, tools, access, and validation.
+The recipe editor has dedicated tabs for the recipe's overview, ingredients, results, tools, and validation, with an access or books and scrolls tab appearing according to the system's recipe visibility mode.
 The Overview tab edits identity (name, description, image, and whether it is on or off) and links a recipe item.
 
 {% include screenshot.html case="manager-recipe-edit-normal" caption="The Overview tab of the recipe editor." %}

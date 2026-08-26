@@ -82,7 +82,7 @@
     },
     {
       "case": "manager-tool-parity-01-library-1280x720",
-      "alt": "The tool library for a crafting system, listing each tool with how it breaks and what happens when it does, above the system-wide breakage mode, with the selected tool summarised on the right.",
+      "alt": "The tool library for a crafting system, listing each tool with how it breaks and what happens when it does, below the system-wide breakage mode, with the selected tool summarised on the right.",
       "sha256": "99d2ec6b07b3229210cd5bc627be037718b8abf2324c19930df89d52abb9223e"
     },
     {
@@ -122,13 +122,8 @@
     },
     {
       "case": "manager-recipe-edit-access-rail",
-      "alt": "The Recipe access page, where individual recipes are granted to specific characters or players; every recipe in this system currently shows No access.",
+      "alt": "The Recipe access page, where individual recipes are granted to specific characters or players. Every recipe in this system currently shows No access.",
       "sha256": "187fe487d75a8fc43b1fb87ae0c64657aa94ca0ced43c6d5a7c75444286e4f3e"
-    },
-    {
-      "case": "coverage-mode-simple-detail",
-      "alt": "A simple recipe selected in the Crafting tab, showing the two ingredient options it can be made from, which of them is selected, and the materials that route consumes.",
-      "sha256": "627377831b69dab09466a852e11327d7fcf48e4c99fa0eefbb2b4fbbc9c2a0b8"
     },
     {
       "case": "player-crafting-simple",
@@ -192,7 +187,7 @@
     },
     {
       "case": "player-alchemy-workbench",
-      "alt": "The Alchemy Workbench with an empty bench, the character’s known recipes on the left — none revealed yet — and the components available to place on it on the right.",
+      "alt": "The Alchemy Workbench with an empty bench, the character’s known recipes on the left with none revealed yet, and the components available to place on it on the right.",
       "sha256": "2a4d1b329da05f1f2caa8984e725c8f0c6958d2332bc13bfef86aff32d0202a0"
     },
     {

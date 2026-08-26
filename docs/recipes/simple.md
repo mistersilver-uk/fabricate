@@ -36,10 +36,6 @@ You author it on the Ingredients and Results tabs of the recipe editor in the Cr
 The public API can create and configure recipes too.
 See the [API reference]({% link api/recipe-manager.md %}) for those methods.
 
-A player sees the whole recipe in one panel: what it needs, what it uses, and what it makes.
-
-{% include screenshot.html case="coverage-mode-simple-detail" %}
-
 ## With an Optional Check
 
 If crafting checks are enabled on the system, simple mode uses pass/fail:

@@ -368,8 +368,6 @@ The check only gates whether the craft succeeds, and it is optional, so with no 
 A routed check's outcome tiers are authored as either **Relative** or **Fixed**, chosen with the **Check type** control at the top of the **Outcomes** section.
 The two types map the roll to an outcome in different ways.
 
-{% include screenshot.html case="manager-checks-crafting-recipe-tiers" caption="Two named difficulty tiers on a crafting check." %}
-
 **Relative** tiers are positioned against a DC.
 Each tier threshold is expressed relative to the recipe's difficulty, for example DC -5 or DC +10.
 The base difficulty comes from the recipe's selected tier, or from a dynamic difficulty macro when you set one up.
@@ -596,6 +594,10 @@ Re-author your award thresholds whenever you move a progressive check onto a cou
 ### Setting the difficulty without a prompt
 
 Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
+You author the tiers themselves on the **Crafting** page of the **Checks** screen, where each one carries a name and the DC it puts in place of the base DC.
+
+{% include screenshot.html case="manager-checks-crafting-recipe-tiers" caption="Two named recipe difficulty tiers on a crafting check, each with the DC a recipe picking it is measured against." %}
+
 Where a dynamic DC macro is also in play, the recipe's chosen tier resolves first, and the macro is handed that value as its starting point.
 If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
 The two features compose rather than compete.

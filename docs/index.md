@@ -22,7 +22,7 @@ Then, they browse recipes, pick a character or characters to source the material
 
 {% include screenshot.html case="fabricate-app-shell" caption="The player window, with the recipe browser, the selected recipe, and the shopping list side by side." %}
 
-GMs author single or multi-step recipes in the Crafting Admin panel across the overview, ingredients, results, tools, access, knowledge, and validation tabs.
+GMs author single or multi-step recipes in the Crafting Admin panel across the overview, ingredients, results, tools, and validation tabs, with an access or books and scrolls tab appearing according to the system's recipe visibility mode.
 
 {% include screenshot.html case="manager-default-selection" caption="The Crafting Admin panel, where a GM manages every crafting system in the world." %}
 
@@ -37,7 +37,7 @@ GMs author single or multi-step recipes in the Crafting Admin panel across the o
 | **System-Agnostic**        | Works with any Foundry game system, with no dependency on a specific ruleset                                                                                 |
 | **Crafting Systems**       | Define independent systems with their own component libraries, essences, and rules                                                                           |
 | **Player Crafting**        | Browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab                                                          |
-| **Recipe Authoring**       | Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, access, knowledge, and validation                                   |
+| **Recipe Authoring**       | Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, and validation, plus an access or books and scrolls tab according to the system's recipe visibility mode                                   |
 | **Resolution Modes**       | Simple, routed by ingredients, routed by check, progressive, and alchemy crafting with optional and mandatory skill checks, depending on the resolution mode |
 | **Multi-Step Recipes**     | Chain steps that must be completed in sequence, with optional time gates                                                                                     |
 | **Tools**                  | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage                                                                |
@@ -68,7 +68,7 @@ Head to [Quickstart]({% link quickstart.md %}) for installation and your first G
 Players craft in the **Crafting** tab of the unified Fabricate window.
 They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
 A built-in **Shopping List** lets players queue several recipes and see one consolidated list of the components, essences, and tools they still need.
-GMs author recipes end to end in the Crafting Admin panel, across dedicated tabs for overview, ingredients, results, tools, access, and validation.
+GMs author recipes end to end in the Crafting Admin panel, across dedicated tabs for overview, ingredients, results, tools, and validation, with an access or books and scrolls tab appearing according to the system's recipe visibility mode.
 Steps are added on the overview tab, and each step's ingredients and results are edited on the ingredients and results tabs.
 See [Recipes]({% link recipes/index.md %}).
 
