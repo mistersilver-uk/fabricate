@@ -47,9 +47,11 @@
      component INSTANCE, not its node, so a caller that must measure or focus the chip
      — `SearchablePopover` positions its popover off the trigger's bounding box and
      restores focus to it on close — has no other way to reach it.
-   - density: 'default' (the manager's one chip scale) or 'row' — the Checks Studio
+   - density: 'default' (the manager's one chip scale), 'row' — the Checks Studio
      modifier row's own scale for an in-line annotation chip (the bounds chip, the
-     "Rolls dice" chip), taken from the prototype (issue 1096). `styles/fabricate.css`
+     "Rolls dice" chip), taken from the prototype (issue 1096) — or 'action', the page
+     header's action cluster, where a chip stands in the same row as the Back / Delete /
+     Save buttons and has to be one of them. `styles/fabricate.css`
      cannot state it: that sheet imports at `layer(modules)` while this component's
      `css: 'injected'` block lands UNLAYERED (svelte.config.js), and an unlayered
      declaration beats a layered one no matter how specific the layered selector is
@@ -139,6 +141,7 @@
       mono ? 'is-mono' : '',
       truncate ? 'is-truncated' : '',
       density === 'row' ? 'is-row' : '',
+      density === 'action' ? 'is-action' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -383,6 +386,37 @@
     background: var(--fab-bg-2);
     font-size: 10px;
     font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ACTION density: a chip standing in the page header's action cluster.
+     
+     THE ROW CENTRES ITS CHILDREN, so a 20px chip beside 34px buttons floated in the middle
+     of the group and read as a stray label rather than as the first member of it — which is
+     where every Core editor and every companion drill-down puts its own `Unsaved`. Measured
+     in Chromium against the composed page, not reasoned: 20px against 34px.
+     
+     34px IS THE BUTTON'S OWN FIGURE, from `.fabricate-manager .manager-button` in
+     `styles/fabricate.css`. It is restated here rather than read, because there is nothing to
+     read it from: a `min-height` in a layered sheet cannot be inherited by an unlayered block,
+     and the two are decided in different places by different layers. What keeps them equal is
+     `manager-header-geometry.test.js`, which measures BOTH in one composed page and fails
+     naming the pair — a duplicated figure with a gate on it, rather than a duplicated figure
+     with a comment on it.
+     
+     THIS IS A VARIANT ON THE PRIMITIVE, not a caller override, for the reason `density`
+     documents above — and here that reason is not theoretical. Two global rules claimed this
+     exact geometry (`min-height: 34px` at three classes, `min-height: 38px` at four) and both
+     were inert, because the sheet is layered and this block is not; issue 1118 retired them
+     rather than arbitrating them. A third attempt written the same way would be inert in the
+     same way.
+     
+     The radius is left at the base rule's 10px. The retired rules asked for 999px and 6px
+     between them, which is two answers to a question the design does not put: the base chip's
+     corner is the chip's corner, and a header chip is a chip. */
+  .manager-chip.is-action {
+    min-height: 34px;
+    padding: 0 var(--fab-space-3);
     white-space: nowrap;
   }
 

@@ -2143,12 +2143,29 @@
   overflow-wrap: anywhere;
 }
 
+/* THE ACTION CLUSTER IS NEVER THE THING THAT GIVES. `.manager-header` is a two-child
+   `space-between` row and both children shrink by default, so a heading with a long title or a
+   wrapped subtitle claimed the width and squeezed this — and because the cluster wraps, it
+   BROKE rather than overflowing: `Save faction` dropped onto a second line under `Delete
+   faction` while the heading beside it ran to two lines of description.
+
+   `flex-wrap: wrap` STAYS. It is the right behaviour when the window is genuinely too narrow
+   for four controls, which is a different situation from a neighbour taking the room; what was
+   wrong was reaching it because a name or a description was long.
+
+   THE HEADING NEEDS NOTHING ADDED FOR THIS. A `flex: 1 1 auto` was written on
+   `.manager-heading` beside this, on the reasoning that one of the two children had to be
+   named as the side that absorbs the slack. Driven mutation says otherwise: with this cluster
+   refusing to shrink, the heading's default `flex: 0 1 auto` and its existing `min-width: 0`
+   are the whole of what it needs, and the rule changed no measurement. Measured in
+   `tests/components/manager-header-geometry.test.js`. */
 .fabricate-manager .manager-header-actions,
 .fabricate-manager .manager-action-group {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--fab-space-2);
+  flex: 0 0 auto;
   flex-wrap: wrap;
 }
 
@@ -19881,6 +19898,28 @@
   /* The recipe editor title sits at the prototype's 20px, a notch under the browser
      list heading's 22px global default (issue 643 audit). */
   font-size: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* THE SUBTITLE IS CLAMPED THE WAY THE TITLE ABOVE IT ALREADY WAS. The global
+   `.manager-subtitle` sets `overflow-wrap: anywhere`, which is right for a route whose subline
+   is a short measure — `Training · 8 days total` — and wrong for one carrying a document's own
+   prose. A faction's description is the GM's paragraph: it wrapped to two lines, grew the
+   heading, and broke the action cluster beside it.
+
+   SCOPED TO THE IDENTITY HEADER, not written on `.manager-subtitle`. That class draws on every
+   route in the Manager, several of which are meant to wrap, and clamping it globally would
+   truncate sublines nobody complained about in order to fix one that somebody did.
+
+   `max-width` AS WELL AS THE CLAMP. One line of a long description would otherwise run the
+   full width of everything the cluster does not take, and an ellipsis at the far right of a
+   1200px header is a sentence a GM has to scan an empty row to find the end of. 62ch is a
+   reading measure; the heading is of course narrower when the window is. */
+.fabricate-manager .manager-recipe-edit-heading-copy .manager-subtitle {
+  max-width: 62ch;
+  overflow: hidden;
+  overflow-wrap: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
