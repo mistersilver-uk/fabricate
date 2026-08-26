@@ -15,7 +15,7 @@ One ingredient set, one result group, optional pass/fail check.
 ## Rules
 
 - Exactly **one** ingredient set
-- Exactly **one** result group
+- **One** result group, and a second **On a failed check** group when the system lets a failed check produce something
 - Crafting check is optional (pass/fail only)
 
 {% include screenshot.html case="player-crafting-simple" caption="A simple recipe ready to craft in the Crafting tab." %}
@@ -41,7 +41,10 @@ See the [API reference]({% link api/recipe-manager.md %}) for those methods.
 If crafting checks are enabled on the system, simple mode uses pass/fail:
 
 - **Pass**: ingredients are consumed and results are created
-- **Fail**: behaviour depends on your consumption-on-failure settings
+- **Fail**: what the attempt costs depends on your consumption-on-failure settings, and what it produces depends on whether the system lets a failed check produce a result
+
+What a failure costs and what it produces are separate settings, so you can have either, both, or neither.
+When failed checks are allowed to produce something, the results tab gains a second **On a failed check** group holding what the failure hands back.
 
 The crafting check decides whether the attempt passes or fails.
 See [Crafting Checks]({% link crafting-checks.md %}) for how checks work.
