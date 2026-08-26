@@ -84,7 +84,8 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
  * - `actorInventory` — a preconfigured provider (filtered by `game.system.id`) owns the
  *   denomination ladder; units located by `denomination`.
  * - `macro` — the GM supplies custom `canAfford`/`decrement` macros (the macro receives the actor
- *   and does whatever it likes), with units keyed by `abbreviation`.
+ *   and does whatever it likes), with units keyed by `abbreviation`. `increment` (refund) and
+ *   `balance` (holdings read) are optional peers of those two.
  *
  * @type {Set<string>}
  */
@@ -93,12 +94,25 @@ const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 /**
  * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
- * the craft, `decrement` performs the spend, and `increment` performs the refund on a player-cancel
- * reversal (issue 848). Used by the normalizer and the macro spender to iterate the macro slots.
+ * the craft, `decrement` performs the spend, `increment` performs the refund on a player-cancel
+ * reversal (issue 848), and `balance` REPORTS holdings rather than acting on them (issue 1342).
+ * Used by the normalizer, the editor and the macro spender to iterate the macro slots.
+ *
+ * ## `balance` needs no migration, and this is where that is recorded
+ *
+ * {@link normalizeCurrencyConfig} iterates THIS array, and `CurrencyConfigStore.load()` normalizes
+ * on EVERY read — it never trusts the stored shape. So a world persisted before `balance` existed
+ * reads back with `macros.balance: ''` the first time anything asks for its config, with no
+ * migration step and no `migrationVersion` advance. Do not add one: a migration here would rewrite
+ * every world's setting to produce the value the normalizer already produces for free.
+ *
+ * The keys are APPENDED rather than inserted, because the array is the render order of the macro
+ * fields in `WorldCurrencyTab.svelte`, and the three shipped fields should not move under a GM who
+ * knows where they are.
  *
  * @type {string[]}
  */
-export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement'];
+export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement', 'balance'];
 
 // The provider/macro settings only carry meaning under their owning strategy (`providerId` for
 // `actorInventory`, `macros` for `macro`), but they are always persisted so flipping the strategy
@@ -144,7 +158,8 @@ function resolveSpendStrategy(currency = {}) {
  * @param {object} [currency]
  * @param {{ randomID?: () => string }} [options]
  * @returns {{ enabled: boolean, spendStrategy: string, providerId: string,
- *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ *   macros: { canAfford: string, increment: string, decrement: string, balance: string },
+ *   units: object[] }}
  */
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const randomID = typeof options.randomID === 'function' ? options.randomID : undefined;
@@ -174,7 +189,8 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
  * @param {object} [config]
  * @param {{ randomID?: () => string }} [options]
  * @returns {{ spendStrategy: string, providerId: string,
- *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ *   macros: { canAfford: string, increment: string, decrement: string, balance: string },
+ *   units: object[] }}
  */
 export function normalizeWorldCurrencyConfig(config = {}, options = {}) {
   // Legacy `provider: 'system'` + `systemAdapter` configs used to be resolved by
@@ -389,6 +405,12 @@ function buildUnitResolver(byId, errors) {
 // (canAfford) and deduct (decrement); both are required. `increment` performs the player-cancel
 // refund (issue 848) and stays OPTIONAL — a system with no increment macro simply cannot refund a
 // macro-mode cancel (the reversal reports the failure rather than aborting).
+//
+// `balance` (issue 1342) stays OPTIONAL on exactly that precedent, and the precedent is what makes
+// the choice safe rather than lenient: requiring it would make every world that already authored a
+// valid macro ladder INVALID at craft time, because `validateCurrencyProfile` is the same gate the
+// engine's afford check and deduction run through. A missing `balance` macro costs a world only the
+// pooled holdings read, which answers "cannot see" and blocks nothing.
 function collectMacroConfigErrors(macros, errors) {
   const safeMacros = macros && typeof macros === 'object' ? macros : {};
   if (!String(safeMacros.canAfford || '').trim()) {
@@ -411,11 +433,13 @@ function collectMacroConfigErrors(macros, errors) {
  * - `actorInventory`: each unit's `denomination` (defaulting to its id) must be a pf2e coin key
  *   (`pp`/`gp`/`sp`/`cp`).
  * - `macro`: each unit must have a non-empty `abbreviation` (macros match coins by abbreviation),
- *   and the config-level `canAfford` and `decrement` macros must be set (`increment` optional).
+ *   and the config-level `canAfford` and `decrement` macros must be set (`increment` and
+ *   `balance` optional).
  *
  * @param {object[]} [units]
  * @param {{ spendStrategy?: string,
- *   macros?: { canAfford?: string, increment?: string, decrement?: string } }} [options]
+ *   macros?: { canAfford?: string, increment?: string, decrement?: string, balance?: string }
+ *   }} [options]
  * @returns {{ valid: boolean, errors: string[], units: object[], metadata: Map }}
  */
 export function validateCurrencyProfile(units = [], options = {}) {

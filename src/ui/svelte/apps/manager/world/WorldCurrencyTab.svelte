@@ -30,7 +30,7 @@
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
     currencyProviderId = '',
-    currencyMacros = { canAfford: '', increment: '', decrement: '' },
+    currencyMacros = { canAfford: '', increment: '', decrement: '', balance: '' },
     currencyProviderOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
@@ -122,6 +122,19 @@
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrementHint',
       hintFallback: 'Runs after a successful craft to spend the currency cost.',
     },
+    // The fourth key (issue 1342), and the only one that ASKS rather than acts. It is what lets a
+    // macro world answer a companion's pooled holdings question at all; without it Fabricate can
+    // spend a macro world's coins but cannot see them, and every holdings read answers "cannot
+    // see" rather than a number. Optional, on the increment precedent — a world that never
+    // authors it loses the read and keeps every craft-time behaviour.
+    {
+      key: 'balance',
+      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalance',
+      labelFallback: 'Balance macro',
+      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalanceHint',
+      hintFallback:
+        'Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as "unknown".',
+    },
   ];
 
   // Resolve each configured macro UUID to a { name, img, missing } display, mirroring the
@@ -174,9 +187,10 @@
     return currencyMacroDocs[key] || null;
   }
 
-  // Each empty macro drop zone needs a field-specific accessible name; otherwise the three zones
-  // (canAfford/increment/decrement) expose an identical "Drag a macro here to link it." label and
-  // are indistinguishable to assistive tech. Compose the visible field label with the drop hint.
+  // Each empty macro drop zone needs a field-specific accessible name; otherwise the zones
+  // (canAfford/increment/decrement/balance) expose an identical "Drag a macro here to link it."
+  // label and are indistinguishable to assistive tech. Compose the visible field label with the
+  // drop hint.
   function currencyMacroDropZoneLabel(field) {
     const fieldLabel = text(field.labelKey, field.labelFallback);
     const composed = localize('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel', {

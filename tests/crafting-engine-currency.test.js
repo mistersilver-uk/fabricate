@@ -9,6 +9,7 @@ import {
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
 import {
+  CURRENCY_MACRO_KEYS,
   buildCurrencySpendUpdates,
   canAddCurrencySubUnit,
   currencySubUnitOptions,
@@ -155,7 +156,18 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   assert.equal('inventoryMode' in defaults, false);
   assert.equal(defaults.spendStrategy, 'actorProperty');
   assert.equal(defaults.providerId, '');
-  assert.deepEqual(defaults.macros, { canAfford: '', increment: '', decrement: '' });
+  // Every DECLARED slot, emitted empty. Adding a key to `CURRENCY_MACRO_KEYS` is what backfills
+  // it into every existing world (there is no migration), so this asserts the whole set rather
+  // than three names: a normalizer that stopped emitting one would still satisfy a literal that
+  // was edited in the same commit.
+  assert.deepEqual(
+    Object.keys(defaults.macros).sort(),
+    [...CURRENCY_MACRO_KEYS].sort()
+  );
+  assert.deepEqual(
+    Object.values(defaults.macros),
+    CURRENCY_MACRO_KEYS.map(() => '')
+  );
 
   const trimmed = normalizeCurrencyConfig({
     enabled: true,
@@ -166,7 +178,12 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   assert.equal(trimmed.spendStrategy, 'macro');
   assert.equal('inventoryMode' in trimmed, false);
   assert.equal(trimmed.providerId, 'pf2e-inventory');
-  assert.deepEqual(trimmed.macros, { canAfford: 'Macro.a', increment: '', decrement: 'Macro.d' });
+  assert.deepEqual(trimmed.macros, {
+    canAfford: 'Macro.a',
+    increment: '',
+    decrement: 'Macro.d',
+    balance: '',
+  });
 
   // Legacy nested actorInventory + inventoryMode: 'macro' maps forward to the peer macro strategy
   // and drops inventoryMode; round-trips stably.

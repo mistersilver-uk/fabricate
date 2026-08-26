@@ -4344,6 +4344,8 @@
           "MacroIncrementHint": "Runs to return currency when a player cancels an in-progress craft, if the system refunds on cancel.",
           "MacroDecrement": "Decrement macro",
           "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
+          "MacroBalance": "Balance macro",
+          "MacroBalanceHint": "Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as \"unknown\".",
           "MacroDropHint": "Drag a macro here to link it.",
           "MacroDropZoneLabel": "{field}: drag a macro here to link it.",
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
