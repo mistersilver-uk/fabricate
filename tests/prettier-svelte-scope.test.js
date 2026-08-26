@@ -179,6 +179,15 @@ const GATE_TARGETS = [
   'scripts/lib/fontAwesomeSmokeExpectations.js',
   'scripts/foundry-icon-bundle-assert.mjs',
   'scripts/generate-icon-catalogue.mjs',
+  // The documentation screenshot generator (issue 958). Another maintainer-only entry point: it
+  // needs the harvested Foundry chrome, which never leaves the maintainer's machine, so CI cannot
+  // run it and nothing else would ever format it. Its three libraries carry the parts that can be
+  // tested — the map reader, the run's refusals and the pixel comparison — while the `.mjs` is the
+  // CLI shell that performs them.
+  'scripts/lib/docsScreenshotMap.js',
+  'scripts/docs-screenshots.mjs',
+  'scripts/lib/webpFrames.js',
+  'scripts/lib/docsScreenshotRun.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

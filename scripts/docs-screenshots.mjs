@@ -33,15 +33,24 @@
  * changes. It moves only when a frame is actually rewritten. It is not, and after the measurement
  * above cannot be, the mechanism that decides whether to rewrite.
  *
- * WHY THIS FAILS CLOSED, THREE WAYS
- * ---------------------------------
+ * WHY THIS FAILS CLOSED, FOUR WAYS
+ * --------------------------------
  * A wrong documentation screenshot is worse than a stale one, because a reader has no way to tell.
- * So absent harvested Foundry chrome aborts, an absent encoder or decoder aborts, and — the subtle
- * one — a frame is consumed only when THIS run produced it. The renderer accumulates into its output
- * directory and collects per-case failures rather than throwing, so a case that failed today can
- * still have yesterday's PNG sitting on disk. Publishing that would ship a frame from an older
- * commit as current documentation, silently. Every mapped case must appear in the manifest this
- * run wrote, stamped with this run's head, and absent from its failures.
+ * So absent harvested Foundry chrome aborts, an absent encoder or decoder aborts, a manifest this
+ * run did not itself write aborts, and — the subtle one — a frame is consumed only when THIS run
+ * produced it. The renderer accumulates into its output directory and collects per-case failures
+ * rather than throwing, so a case that failed today can still have yesterday's PNG sitting on disk.
+ * Publishing that would ship a frame from an older commit as current documentation, silently. Every
+ * mapped case must appear in the manifest this run wrote, stamped with this run's head, and absent
+ * from its failures.
+ *
+ * WHERE THOSE REFUSALS LIVE, AND WHY NOT HERE
+ * -------------------------------------------
+ * This file dispatches its command from `process.argv` at module scope, so importing it runs a
+ * capture and nothing in it can be reached from a test. The refusals above are the part worth
+ * testing — a refusal that silently stopped working looks exactly like one that never fires — so
+ * they live in `scripts/lib/docsScreenshotRun.js`, which decides and returns, and this file
+ * performs. `scripts/lib/webpFrames.js` holds the pixel comparison for the same reason.
  *
  * WHY THERE IS NO CI JOB
  * ----------------------
@@ -50,7 +59,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,6 +73,12 @@ import {
   readDocsScreenshotMap,
   serializeDocsScreenshotMap,
 } from './lib/docsScreenshotMap.js';
+import {
+  consumableFrames,
+  missingImageToolReason,
+  publicationPlan,
+  staleManifestReason,
+} from './lib/docsScreenshotRun.js';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { resolveExecutable } from './lib/resolveExecutable.js';
 import { DECODER, ENCODER, compareEncodedFrames, encodeFrame } from './lib/webpFrames.js';
@@ -112,16 +127,17 @@ function requireChrome() {
 function requireImageTools() {
   const encoder = resolveExecutable(ENCODER);
   const decoder = resolveExecutable(DECODER);
-  const missing = [!encoder && ENCODER, !decoder && DECODER].filter(Boolean);
-  if (missing.length > 0) {
-    throw new DocsScreenshotError(
-      `${missing.join(' and ')} ${missing.length === 1 ? 'is' : 'are'} not on PATH, so a` +
-        ' documentation frame can neither be encoded nor compared against the committed one.' +
-        ' Install libwebp (winget install Google.Libwebp, brew install webp, or apt install webp)' +
-        ' and try again. Nothing was written.'
-    );
-  }
+  const reason = missingImageToolReason([
+    [ENCODER, encoder],
+    [DECODER, decoder],
+  ]);
+  if (reason) throw new DocsScreenshotError(reason);
   return { encoder, decoder };
+}
+
+/** When the renderer's manifest was last written, or undefined when there is none. */
+function manifestWrittenAt(manifestPath) {
+  return statSync(manifestPath, { throwIfNoEntry: false })?.mtimeMs;
 }
 
 /**
@@ -130,11 +146,18 @@ function requireImageTools() {
  * The renderer is spawned rather than imported: it dispatches its own command from `process.argv`
  * at module scope, so importing it would run a capture as a side effect of loading it.
  *
+ * Spawning is also why the manifest is timed rather than trusted. The renderer's exit status cannot
+ * answer "did it produce anything", because a run with per-case failures exits non-zero having
+ * written a perfectly good manifest — so this reads when the file was last written, on both sides
+ * of the spawn, and hands both to {@link staleManifestReason}.
+ *
  * @param {string[]} caseIds Case ids to render.
  * @returns {Promise<object>} The manifest this run wrote.
  */
 async function renderCases(caseIds) {
   console.log(`rendering ${caseIds.length} case(s) — this takes a few minutes\n`);
+  const manifestPath = join(ROOT, RENDER_OUTPUT_DIRECTORY, 'manifest.json');
+  const before = manifestWrittenAt(manifestPath);
   const result = spawnSync(process.execPath, [join(ROOT, RENDERER), 'apps', caseIds.join(',')], {
     cwd: ROOT,
     stdio: 'inherit',
@@ -143,53 +166,19 @@ async function renderCases(caseIds) {
     throw new DocsScreenshotError(`could not run the renderer: ${result.error.message}`);
   }
 
-  const manifestPath = join(ROOT, RENDER_OUTPUT_DIRECTORY, 'manifest.json');
-  if (!existsSync(manifestPath)) {
-    throw new DocsScreenshotError(
-      `the renderer wrote no manifest to ${RENDER_OUTPUT_DIRECTORY}, so nothing this run produced` +
-        ' can be identified. Nothing was written.'
-    );
-  }
+  const stale = staleManifestReason(
+    RENDER_OUTPUT_DIRECTORY,
+    before,
+    manifestWrittenAt(manifestPath)
+  );
+  if (stale) throw new DocsScreenshotError(stale);
   return JSON.parse(await readFile(manifestPath, 'utf8'));
 }
 
-/**
- * Split the mapped cases into the frames this run produced and the ones it did not.
- *
- * The head comparison is the whole point: without it a case that failed today would be served from
- * whatever the renderer left on disk at some earlier commit, and published as current
- * documentation with nothing to show it was stale.
- *
- * @param {object} manifest The manifest this run wrote.
- * @param {string[]} caseIds Case ids the map declares.
- * @returns {{usable: Map<string, string>, refused: string[]}} Usable case ids to source PNG paths,
- *   and a line per refused case saying why.
- */
-function consumableFrames(manifest, caseIds) {
-  if (!manifest.head) {
-    throw new DocsScreenshotError(
-      'the renderer could not record the commit each frame was rendered at, so a frame left over' +
-        ' from an earlier run cannot be told from one this run produced. Nothing was written.'
-    );
-  }
-
-  const rendered = new Map((manifest.frames ?? []).map((frame) => [frame.id, frame]));
-  const failed = new Set((manifest.failures ?? []).map((failure) => failure.id));
-  const usable = new Map();
-  const refused = [];
-
-  for (const caseId of caseIds) {
-    const source = join(ROOT, RENDER_OUTPUT_DIRECTORY, `${caseId}.png`);
-    const frame = rendered.get(caseId);
-    if (failed.has(caseId)) refused.push(`${caseId}: the renderer reported a failure for it`);
-    else if (!frame) refused.push(`${caseId}: this run rendered no frame for it`);
-    else if (frame.head !== manifest.head) {
-      refused.push(`${caseId}: its frame is left over from ${frame.head}, not this run`);
-    } else if (existsSync(source)) usable.set(caseId, source);
-    else refused.push(`${caseId}: the manifest lists it but its frame is not on disk`);
-  }
-
-  return { usable, refused };
+/** The source frame this run left on disk for a case, or null when there is none. */
+function locateRenderedFrame(caseId) {
+  const source = join(ROOT, RENDER_OUTPUT_DIRECTORY, `${caseId}.png`);
+  return existsSync(source) ? source : null;
 }
 
 /**
@@ -260,7 +249,7 @@ async function commandPlan() {
 async function renderAndCompare(tools, screenshots) {
   const caseIds = screenshots.map((entry) => entry.case);
   const manifest = await renderCases(caseIds);
-  const { usable, refused } = consumableFrames(manifest, caseIds);
+  const { usable, refused } = consumableFrames(manifest, caseIds, locateRenderedFrame);
   await mkdir(join(ROOT, ENCODE_OUTPUT_DIRECTORY), { recursive: true });
 
   const verdicts = [];
@@ -322,25 +311,25 @@ async function commandGenerate() {
   const tools = requireImageTools();
   const map = await readDocsScreenshotMap(ROOT);
   const { verdicts, refused } = await renderAndCompare(tools, map.screenshots);
+  const plan = publicationPlan(verdicts, refused);
   await mkdir(join(ROOT, LAB_SCREENSHOT_DIRECTORY), { recursive: true });
 
-  for (const verdict of verdicts) {
-    if (verdict.state === 'unchanged') continue;
+  for (const verdict of plan.rewrite) {
     await copyFile(verdict.fresh, join(ROOT, labAssetPath(verdict.entry.case)));
     verdict.entry.sha256 = await digestOf(verdict.source);
   }
 
-  map.provenance = await expectedProvenance(ROOT);
+  if (plan.stampProvenance) map.provenance = await expectedProvenance(ROOT);
   const serialized = serializeDocsScreenshotMap(map);
   const mapPath = join(ROOT, DOCS_SCREENSHOT_MAP_PATH);
   if ((await readFile(mapPath, 'utf8')) !== serialized) await writeFile(mapPath, serialized);
 
   report('rewritten because the view changed', linesFor(verdicts, 'changed'));
   report('written because no image was committed yet', linesFor(verdicts, 'absent'));
-  const untouched = verdicts.filter((verdict) => verdict.state === 'unchanged').length;
-  console.log(`\n${untouched} frame(s) left alone — their view is unchanged`);
+  console.log(`\n${plan.untouched} frame(s) left alone — their view is unchanged`);
   report('NOT consumed, because this run did not produce them', refused);
-  return refused.length === 0 ? 0 : 1;
+  if (plan.provenanceNote) console.log(`\n${plan.provenanceNote}`);
+  return plan.exitCode;
 }
 
 /**
