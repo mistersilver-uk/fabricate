@@ -34,6 +34,7 @@ import {
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   POOLED_TOOL_STATES,
   POOLED_UNSERVED_COST_TYPES,
+  gatePooledActorUuids,
   pooledHoldingsConsumeResult,
   pooledHoldingsReadResult,
 } from '../src/systems/companionContract.js';
@@ -531,4 +532,148 @@ test('the cost axes are published as symbols, and the unserved ones are not amon
   assert.ok(POOLED_UNSERVED_COST_TYPES.includes('tag'));
   assert.ok(Object.isFrozen(POOLED_TOOL_STATES));
   assert.deepEqual(Object.keys(POOLED_TOOL_STATES), ['present', 'damaged', 'missing']);
+});
+
+// ---------------------------------------------------------------------------
+// The ACTOR-SET gate, driven directly
+// ---------------------------------------------------------------------------
+
+/**
+ * `gatePooledActorUuids` had no unit suite of its own, and the gap was not cosmetic.
+ *
+ * Its only exercise was through the facade harness, whose resolver is a `Map.get(uuid) ?? null`
+ * — it cannot throw, cannot alias two addresses onto one document, and answers instantly. So
+ * `resolveOnePooledActor`'s `try`/`catch` could be deleted with the whole suite still green,
+ * while the production resolver is `fromUuidSync`, which DOES throw: `strict` defaults to `true`
+ * on both v13.350 and v14.365, and a pack-sourced embedded address cannot be resolved
+ * synchronously.
+ *
+ * The function is Foundry-free and takes its resolver as a seam, so every case below is a
+ * literal. `resolveActor` is spelled per case rather than shared, because the seam's BEHAVIOUR is
+ * the subject.
+ */
+
+/** A resolved document stands only for its own identity here, so a bare object is enough. */
+const actorA = { uuid: 'Actor.a', documentName: 'Actor' };
+const actorB = { uuid: 'Actor.b', documentName: 'Actor' };
+
+/** A world in which every listed address answers its mapped document and nothing else does. */
+const worldOf = (entries) => ({ resolveActor: (uuid) => entries[uuid] ?? null });
+
+test('the gate admits a distinct, fully resolved set, in the caller order', () => {
+  const gate = gatePooledActorUuids(
+    ['Actor.b', 'Actor.a'],
+    worldOf({ 'Actor.a': actorA, 'Actor.b': actorB })
+  );
+
+  assert.equal(gate.outcome, null);
+  assert.equal(gate.messageData, null);
+  // The caller's order IS the allocation policy, so the gate may not sort.
+  assert.deepEqual(
+    gate.actors.map((actor) => actor.uuid),
+    ['Actor.b', 'Actor.a']
+  );
+  assert.equal(gate.actors[0], actorB, 'and they are the RESOLVED documents, not copies');
+});
+
+test('the gate answers noActor only when NOT ONE address resolves', () => {
+  const gate = gatePooledActorUuids(['Actor.ghost', 'Actor.also-ghost'], worldOf({}));
+
+  assert.equal(gate.outcome, COMPANION_OUTCOMES.noActor);
+  assert.equal(gate.actors, null);
+  assert.equal(gate.messageData, null, 'noActor names no bound, so it interpolates nothing');
+});
+
+test('the gate refuses a request that is wrong, carrying the bound its string interpolates', () => {
+  const world = worldOf({ 'Actor.a': actorA, 'Actor.b': actorB });
+  const overBound = Array.from({ length: POOLED_ACTORS_MAX + 1 }, (_, index) => `Actor.${index}`);
+  const REQUESTS = [
+    ['absent', null],
+    ['not a list', 'Actor.a'],
+    ['empty', []],
+    ['over the bound', overBound],
+    ['carrying a non-string', ['Actor.a', 42]],
+    ['carrying whitespace', ['Actor.a', '   ']],
+    ['only PARTLY resolved', ['Actor.a', 'Actor.ghost']],
+  ];
+
+  for (const [label, actorUuids] of REQUESTS) {
+    const gate = gatePooledActorUuids(actorUuids, world);
+    assert.equal(gate.outcome, COMPANION_OUTCOMES.invalidActorUuids, label);
+    assert.equal(gate.actors, null, label);
+    assert.deepEqual(gate.messageData, { max: POOLED_ACTORS_MAX }, label);
+  }
+});
+
+test('the gate refuses a pool that names one document twice, by IDENTITY', () => {
+  // Both spellings of the repeat, and the second needs no caller mistake at all: `Token#actor`
+  // returns `this.baseActor` for a LINKED token, so these two well-formed, visibly different
+  // addresses resolve to the identical document. Downstream every consumer sums per entry, so a
+  // repeat reads a party holding one stack of five as holding ten and then takes eight from it.
+  const aliased = {
+    'Actor.a': actorA,
+    'Scene.s.Token.t.Actor.a': actorA,
+    'Actor.b': actorB,
+  };
+  const REQUESTS = [
+    ['the same address twice', ['Actor.a', 'Actor.a']],
+    ['two addresses for one document', ['Actor.a', 'Scene.s.Token.t.Actor.a']],
+    ['a repeat buried in an otherwise valid party', ['Actor.a', 'Actor.b', 'Actor.a']],
+  ];
+
+  for (const [label, actorUuids] of REQUESTS) {
+    const gate = gatePooledActorUuids(actorUuids, worldOf(aliased));
+    assert.equal(gate.outcome, COMPANION_OUTCOMES.invalidActorUuids, label);
+    assert.equal(gate.actors, null, label);
+    assert.deepEqual(gate.messageData, { max: POOLED_ACTORS_MAX }, label);
+  }
+});
+
+test('the gate admits two DIFFERENT documents that share one id', () => {
+  // The counterpart, and the reason distinctness is by identity rather than by `id`. An UNLINKED
+  // token's synthetic actor is built by `ActorDelta#applyDelta` from `baseActor.toObject()` with
+  // `_id` deleted, so it carries the SAME `id` as its base actor while being a different
+  // document with a different inventory. An id-keyed test would refuse this legitimate party.
+  const base = { id: 'shared', uuid: 'Actor.shared', documentName: 'Actor' };
+  const synthetic = { id: 'shared', uuid: 'Scene.s.Token.t.Actor.shared', documentName: 'Actor' };
+
+  const gate = gatePooledActorUuids(
+    [base.uuid, synthetic.uuid],
+    worldOf({ [base.uuid]: base, [synthetic.uuid]: synthetic })
+  );
+
+  assert.equal(gate.outcome, null, 'two different documents are two different pools');
+  assert.equal(gate.actors.length, 2);
+});
+
+test('a resolver that THROWS answers one unresolvable address, never an escaping exception', () => {
+  // The production resolver is `fromUuidSync`, and it raises on a pack-sourced EMBEDDED address
+  // because `strict` defaults to true. A `stable` member may not throw, so the throw has to
+  // become a refusal — and WHICH refusal is the claim: the address answered nothing, so the
+  // partly-resolved rule decides, exactly as an unknown address would.
+  const errors = [];
+  const originalError = console.error;
+  console.error = (...args) => errors.push(args);
+  try {
+    const thrower = {
+      resolveActor: (uuid) => {
+        if (uuid === 'Compendium.pack.Actor.x.Item.y') throw new Error('not synchronous');
+        return uuid === 'Actor.a' ? actorA : null;
+      },
+    };
+
+    const partly = gatePooledActorUuids(['Actor.a', 'Compendium.pack.Actor.x.Item.y'], thrower);
+    assert.equal(partly.outcome, COMPANION_OUTCOMES.invalidActorUuids);
+    assert.equal(partly.actors, null);
+
+    const allThrew = gatePooledActorUuids(['Compendium.pack.Actor.x.Item.y'], thrower);
+    assert.equal(allThrew.outcome, COMPANION_OUTCOMES.noActor, 'nothing resolved, so noActor');
+
+    // Logged rather than swallowed: a resolver that throws on a WELL-FORMED address is a defect,
+    // and a silent `null` would report it as an empty party.
+    assert.equal(errors.length, 2, 'every throw is reported');
+    assert.match(String(errors[0][0]), /Could not resolve the pooled holdings address/);
+  } finally {
+    console.error = originalError;
+  }
 });

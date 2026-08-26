@@ -860,6 +860,13 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
 
       it('answers invalidActorUuids for a request that is wrong, carrying its own bound', async () => {
         const actor = makePooledActor('actor-1', 'Actor.actor-1');
+        // The SAME document at a second address, exactly as a LINKED token answers: `Token#actor`
+        // returns `this.baseActor`, so these two well-formed, visibly different addresses are one
+        // pool. `overBound` below cannot stand in for this case — it is 33 copies of one address
+        // and is refused by the BOUND, so it reads as covering duplication while never reaching
+        // the rule.
+        const linked = makePooledActor('actor-2', 'Actor.actor-2');
+        linked.uuidAliases = ['Scene.scene-1.Token.token-1.Actor.actor-2'];
         const overBound = Array.from({ length: POOLED_ACTORS_MAX + 1 }, () => actor.uuid);
         const REQUESTS = [
           ['absent', null],
@@ -876,11 +883,32 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
           // whatever the address names, so without the `documentName` test this Item would be
           // scanned for components and — on the consume — written to.
           ['addressing a document that is not an actor', [actor.uuid, 'Item.iron-ore']],
+          // A pack address. `fromUuidSync` resolves one as `collection.get(id) ?? index.get(id)`,
+          // so BEFORE anything loads the pack it answers an index entry with no `documentName`
+          // and after it answers a real Actor — load-state-dependent behaviour on the member that
+          // DELETES. The `locked` flag is no defence: it guards the collection's own management
+          // methods client-side and the server backend never reads it.
+          ['addressing a compendium template actor', [actor.uuid, 'Compendium.pack.Actor.tpl']],
+          // The repeat, said the two ways a caller reaches it. The first is a companion
+          // prepending the acting character to a party list, which the published ordering rule
+          // ("the caller's order IS the allocation policy") actively invites; the second needs no
+          // mistake at all, because the two addresses name one document in Foundry's own model.
+          ['repeating one address', [actor.uuid, actor.uuid]],
+          ['naming ONE document at TWO addresses', [linked.uuid, ...linked.uuidAliases]],
         ];
         for (const [label, actorUuids] of REQUESTS) {
           const { facade, seen } = standUpPooledFacade({
-            actors: [actor],
-            documents: [{ uuid: 'Item.iron-ore', documentName: 'Item', name: 'Iron Ore' }],
+            actors: [actor, linked],
+            documents: [
+              { uuid: 'Item.iron-ore', documentName: 'Item', name: 'Iron Ore' },
+              {
+                uuid: 'Compendium.pack.Actor.tpl',
+                documentName: 'Actor',
+                inCompendium: true,
+                name: 'Template',
+                items: [],
+              },
+            ],
           });
           const result = await member.call(facade, actorUuids);
           assertContractResult(
@@ -1135,7 +1163,7 @@ const CREDIT =
  * would stop it proving that the SINGULAR members delegate to the singular rule — so the claims
  * are stated separately, each about the preamble its members actually use.
  */
-const PLURAL_PREAMBLE = '_requireGmActors(actorUuids, keys) {';
+const PLURAL_PREAMBLE = '_requireGmActors(actorUuids) {';
 const READ_POOLED = 'async readPooledHoldings({ actorUuids = null, costs = null } = {}) {';
 const CONSUME_POOLED =
   'async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {';
@@ -1408,14 +1436,14 @@ describe('the harness copies are faithful to src/main.js', () => {
     // Foundry smoke by design. The claim this comment used to make, that the swap makes a
     // refused award report itself in the grant's words, was simply false.
     const PAIRS = [
-      ['awardComponents', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
-      ['creditCurrency', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
+      [AWARD, 'awardComponents', 'AWARD_COMPONENTS_GATE_KEYS', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
+      [CREDIT, 'creditCurrency', 'CREDIT_CURRENCY_GATE_KEYS', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
     ];
     for (const [label, source] of [
       ['production', MAIN_SOURCE],
       ['the harness mirror', HARNESS_SOURCE],
     ]) {
-      for (const [member, table, keys] of PAIRS) {
+      for (const [, member, constant, table, keys] of PAIRS) {
         assert.ok(
           source.includes(`gmOnlyKey: ${table}[COMPANION_OUTCOMES.gmOnly]`) &&
             source.includes(`noActorKey: ${table}[COMPANION_OUTCOMES.noActor]`),
@@ -1426,6 +1454,24 @@ describe('the harness copies are faithful to src/main.js', () => {
         assert.ok(
           keys[COMPANION_OUTCOMES.gmOnly].startsWith('FABRICATE.'),
           `${member}'s table resolves a real key`
+        );
+        assert.ok(
+          constant.startsWith(member === 'awardComponents' ? 'AWARD_' : 'CREDIT_'),
+          `${member}'s constant is named for the member it belongs to`
+        );
+      }
+    }
+    // The half the two assertions above CANNOT make, and the reason the hole was worth closing.
+    // They are file-scoped: they prove both constants are correctly defined, and stay green while
+    // `awardComponents` hands the preamble `CREDIT_CURRENCY_GATE_KEYS`. That mis-wiring is inert
+    // TODAY only because these two discard `gate.message` — and one shipped member,
+    // `resetActorKnowledge`, already answers with it, so the day a sixth does the same the
+    // mis-wiring goes live with nothing red. The claim belongs in the member's own BODY.
+    for (const [signature, member, constant] of PAIRS) {
+      for (const [label, body] of bothTexts(signature)) {
+        assert.ok(
+          body.includes(`this._requireGmActor(actorId, ${constant})`),
+          `${label}: ${member} must gate with ${constant}, never another member's pair`
         );
       }
     }
@@ -1564,13 +1610,18 @@ describe('the harness copies are faithful to src/main.js', () => {
     for (const [label, body] of bothTexts(PLURAL_PREAMBLE)) {
       assert.ok(body.length > 250, `non-vacuity: ${label} sliced to ${body.length} characters`);
       const gmAt = body.indexOf('if (game.user?.isGM !== true) {');
-      const gateAt = body.indexOf('return gatePooledActorUuids(actorUuids, keys, {');
+      const gateAt = body.indexOf('return gatePooledActorUuids(actorUuids, {');
       assert.ok(gmAt >= 0, `${label} lost the GM gate the singular preamble states in the same words`);
       assert.ok(gateAt >= 0, `${label} stopped delegating the address rule to the ONE place it exists`);
       assert.ok(gmAt < gateAt, `${label} reads addresses before it has established a GM`);
-      assert.ok(
-        body.includes('message: keys.gmOnlyKey'),
-        `${label} stopped answering with the CALLING member's own refusal string`
+      // It threads NO refusal string. Both pooled delegators discard `gate.message` and answer
+      // through their own result builder, which derives the member's words from its own table by
+      // outcome — so a key here could only restate that string in a second place. Reintroducing
+      // one would be reintroducing the thing whose only failure mode was someone editing it.
+      assert.equal(
+        codeOnly(body).includes('Key'),
+        false,
+        `${label} threads a refusal string through a preamble whose \`message\` nobody reads`
       );
       // Addressed by UUID, never by id. `game.actors.get` cannot tell an unlinked token actor
       // from its world prototype — the synthetic actor's `id` IS the base actor's — so an
@@ -1587,8 +1638,17 @@ describe('the harness copies are faithful to src/main.js', () => {
       // `fromUuidSync` answers whatever the address names. Without this test an Item address
       // would be scanned for components and, on the consume, written to.
       assert.ok(
-        body.includes("addressed?.documentName === 'Actor' ? addressed : null"),
+        body.includes("if (addressed?.documentName !== 'Actor') return null;"),
         `${label} accepts an address that resolves to a document which is not an actor`
+      );
+      // And the pack test beside it. `fromUuidSync` answers a pack address as
+      // `collection.get(id) ?? index.get(id)`, so the SAME uuid is refused as an index entry
+      // before anything loads the pack and admitted as a real Actor afterwards. Without this the
+      // consume would issue `deleteEmbeddedDocuments` against a compendium TEMPLATE, and whether
+      // it did would depend on what else the world had opened.
+      assert.ok(
+        body.includes('addressed.inCompendium === true ? null : addressed'),
+        `${label} admits a compendium actor, whose embedded documents a consume would delete`
       );
       assert.equal(
         codeOnly(body).includes('_requireReady()'),
@@ -1599,31 +1659,28 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   /**
-   * Each pooled member with the three things only IT may name: its own hoisted key trio, its own
-   * answer builder, and its own leaf.
+   * Each pooled member with the two things only IT may name: its own answer builder and its own
+   * leaf.
    *
-   * Named per member rather than asserted as a shape, because every one of the three is a single
-   * substitution away from a cross-member leak that the behavioural cases cannot see — the two
-   * members are gated identically, so swapping the trio changes no answer today, and swapping the
-   * builder or the leaf in PRODUCTION is invisible to a suite that runs the mirror.
+   * TWO and not three. The hoisted key trio these members used to carry is gone: the SET-valued
+   * preamble's `message` was read by nobody — both delegators branch on `gate.outcome` and answer
+   * through the builder, which derives the member's words from its own table by outcome — so the
+   * trio, its mirror copy and the pin over both bought one failure mode, someone editing a
+   * string. What remains is named per member rather than asserted as a shape, because swapping
+   * the builder or the leaf in PRODUCTION is invisible to a suite that runs the mirror.
    */
   const POOLED_DELEGATORS = [
-    [READ_POOLED, 'READ_POOLED_HOLDINGS_GATE_KEYS', 'pooledHoldingsReadResult', 'readPooledHoldingsAcrossActors'],
-    [
-      CONSUME_POOLED,
-      'CONSUME_POOLED_HOLDINGS_GATE_KEYS',
-      'pooledHoldingsConsumeResult',
-      'consumePooledHoldingsFromActors',
-    ],
+    [READ_POOLED, 'pooledHoldingsReadResult', 'readPooledHoldingsAcrossActors'],
+    [CONSUME_POOLED, 'pooledHoldingsConsumeResult', 'consumePooledHoldingsFromActors'],
   ];
 
   it('AC-31 — reproduces one guard per POOLED member, ordered preamble-then-readiness', () => {
-    for (const [signature, gateKeys, builder, leaf] of POOLED_DELEGATORS) {
+    for (const [signature, builder, leaf] of POOLED_DELEGATORS) {
       for (const [label, body] of bothTexts(signature)) {
         assert.ok(body.length > 200, `non-vacuity: ${label} sliced to ${body.length} characters`);
         assert.ok(
-          body.includes(`const gate = this._requireGmActors(actorUuids, ${gateKeys});`),
-          `${label} ${signature} must delegate to the SET-valued preamble with its OWN hoisted trio`
+          body.includes('const gate = this._requireGmActors(actorUuids);'),
+          `${label} ${signature} must delegate to the SET-valued preamble`
         );
         assert.ok(
           body.includes(`return ${builder}(`),
@@ -1646,10 +1703,17 @@ describe('the harness copies are faithful to src/main.js', () => {
           `${label} ${signature} drops the gate's own interpolation data from its refusal`
         );
         // The RESOLVED documents, as the leaf's FIRST argument — which is what makes a
-        // caller-supplied `actors` in the request structurally unable to reach a seam.
-        assert.ok(
-          body.includes('gate.actors'),
-          `${label} ${signature} must pass the RESOLVED actor documents into the leaf`
+        // caller-supplied `actors` in the request structurally unable to reach a seam. Pinned at
+        // the CALL and not merely somewhere in the body: `body.includes('gate.actors')` alone is
+        // satisfied by transposed arguments, and both leaves take `(actors, request, seams)`, so
+        // a transposition would hand the request where the pool belongs.
+        // Whitespace-tolerant, because the two texts are formatted differently on purpose:
+        // `src/main.js` is outside the `format:check` globs and this mirror is not, so Prettier
+        // wraps the mirror's call and leaves production's on one line.
+        assert.match(
+          body,
+          new RegExp(String.raw`${leaf}\(\s*gate\.actors\s*,`),
+          `${label} ${signature} must pass the RESOLVED actor documents as the leaf's FIRST argument`
         );
         const code = codeOnly(body);
         assert.equal(
@@ -1671,39 +1735,46 @@ describe('the harness copies are faithful to src/main.js', () => {
     }
   });
 
-  it('AC-31 — each pooled delegator keeps its OWN refusal strings, all three of them', () => {
-    // THREE keys and not two, because the set-valued preamble splits an actor refusal in a way
-    // the singular one cannot. Unlike the pairs above, `noActorKey` and `invalidActorUuidsKey`
-    // are NOT inert: `gatePooledActorUuids` puts them on the gate's `message`. Both delegators
-    // still branch on `gate.outcome` alone, so a swap changes no answer TODAY — which is
-    // precisely why it is pinned at the source rather than left to a behavioural case.
-    const PAIRS = [
-      ['readPooledHoldings', 'POOLED_HOLDINGS_READ_MESSAGE_KEYS', POOLED_HOLDINGS_READ_MESSAGE_KEYS],
-      [
-        'consumePooledHoldings',
-        'POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS',
-        POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
-      ],
-    ];
+  it('AC-31 — each pooled member answers in its OWN words WITHOUT a threaded refusal string', () => {
+    // The inverse of the pin this replaces. That one asserted three key strings per member
+    // against the source and admitted, in its own comment, that "a swap changes no answer
+    // TODAY" — so its only failure mode was someone editing a string. The strings were inert
+    // because each pooled delegator discards `gate.message` and answers through its own result
+    // builder, which resolves the member's own table BY OUTCOME. So the claim worth pinning is
+    // that no such constant exists to be mis-wired, and the claim worth TESTING is behavioural:
+    // the words a refusal actually carries. Both are done here.
     for (const [label, source] of [
       ['production', MAIN_SOURCE],
       ['the harness mirror', HARNESS_SOURCE],
     ]) {
-      for (const [member, table, keys] of PAIRS) {
-        for (const [key, outcome] of [
-          ['gmOnlyKey', COMPANION_OUTCOMES.gmOnly],
-          ['noActorKey', COMPANION_OUTCOMES.noActor],
-          ['invalidActorUuidsKey', COMPANION_OUTCOMES.invalidActorUuids],
-        ]) {
-          assert.ok(
-            source.includes(`${key}: ${table}[COMPANION_OUTCOMES.${outcome}]`),
-            `${label}: ${member}'s hoisted trio must read ${table}, never the other pooled member's`
-          );
-          assert.ok(
-            keys[outcome].startsWith('FABRICATE.'),
-            `${member}'s table resolves a real key for ${outcome}`
-          );
-        }
+      for (const removed of ['READ_POOLED_HOLDINGS_GATE_KEYS', 'CONSUME_POOLED_HOLDINGS_GATE_KEYS']) {
+        assert.equal(
+          source.includes(removed),
+          false,
+          `${label}: ${removed} is back — a second home for a string the builder already derives`
+        );
+      }
+      assert.equal(
+        source.includes('invalidActorUuidsKey'),
+        false,
+        `${label}: a refusal string is threaded through the set-valued preamble again`
+      );
+    }
+    // And the behavioural half, on the two outcomes only the SET-valued gate can produce: each
+    // member reports them in its own vocabulary, which is what the deleted trio claimed to buy
+    // and never did. `POOLED_MEMBERS[n].keys` is the member's OWN published table.
+    for (const member of POOLED_MEMBERS) {
+      for (const outcome of [COMPANION_OUTCOMES.noActor, COMPANION_OUTCOMES.invalidActorUuids]) {
+        const other = POOLED_MEMBERS.find((candidate) => candidate !== member);
+        assert.notEqual(
+          member.keys[outcome],
+          other.keys[outcome],
+          `${member.name} and ${other.name} must not share a ${outcome} string`
+        );
+        assert.ok(
+          member.keys[outcome].startsWith('FABRICATE.'),
+          `${member.name}'s table resolves a real key for ${outcome}`
+        );
       }
     }
   });

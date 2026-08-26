@@ -125,6 +125,17 @@ function makeItem(actor, id, componentId, quantity, { snapshotable = true, syste
  * `createEmbeddedDocuments` models the two `keepId` behaviours the restore depends on, verified
  * against the v14.365 server backend: an id is regenerated unless `keepId` AND an `_id` are both
  * supplied, and a create onto an id the collection still holds is REJECTED.
+ *
+ * **A silent refusal and a REJECTION are different failures, and both are modelled.** `deny*`
+ * answers `[]` having written nothing, which is what a refusing `preDelete` hook or an empty
+ * diff produces; `reject*` throws, which is what `collection.get(id, {strict: true})` does for an
+ * id that vanished between the plan and the write, and it rejects the WHOLE batch rather than
+ * shortening it. Telling those apart is the entire claim `callActorWrite` makes, and without a
+ * rejecting fake its `catch` could be deleted with this file still green.
+ *
+ * `answersIds` is the third shape a real write can answer in. `writtenIds` reads
+ * `typeof entry === 'string' ? entry : entry?.id` precisely because a write can answer bare ids,
+ * and no fixture drove that branch either.
  */
 class ConsumptionActor extends PooledActorFake {
   constructor(name, currency = {}) {
@@ -133,6 +144,10 @@ class ConsumptionActor extends PooledActorFake {
     this.denyUpdate = false;
     this.denyDelete = false;
     this.denyCreate = false;
+    this.rejectUpdate = false;
+    this.rejectDelete = false;
+    this.rejectCreate = false;
+    this.answersIds = false;
     this.dropUpdateIds = new Set();
     this.dropDeleteIds = new Set();
     this.created = 0;
@@ -142,8 +157,14 @@ class ConsumptionActor extends PooledActorFake {
     return this.itemWrites.filter((write) => write.method === method);
   }
 
+  /** What a write answers with: the documents themselves, or their bare ids. */
+  answer(documents) {
+    return this.answersIds ? documents.map((document) => document.id) : documents;
+  }
+
   async updateEmbeddedDocuments(type, updates, options) {
     this.itemWrites.push({ method: 'update', type, updates: structuredClone(updates), options });
+    if (this.rejectUpdate) throw new Error('The document [i1] does not exist in the Actor');
     if (this.denyUpdate) return [];
     const applied = [];
     for (const update of updates) {
@@ -153,11 +174,12 @@ class ConsumptionActor extends PooledActorFake {
       applyFlattened(item, update);
       applied.push(item);
     }
-    return applied;
+    return this.answer(applied);
   }
 
   async deleteEmbeddedDocuments(type, ids, options) {
     this.itemWrites.push({ method: 'delete', type, ids: [...ids], options });
+    if (this.rejectDelete) throw new Error('The document [i1] does not exist in the Actor');
     if (this.denyDelete) return [];
     const removed = [];
     for (const id of ids) {
@@ -165,11 +187,12 @@ class ConsumptionActor extends PooledActorFake {
       const index = this.items.findIndex((item) => item.id === id);
       if (index !== -1) removed.push(...this.items.splice(index, 1));
     }
-    return removed;
+    return this.answer(removed);
   }
 
   async createEmbeddedDocuments(type, data, options) {
     this.itemWrites.push({ method: 'create', type, data: structuredClone(data), options });
+    if (this.rejectCreate) throw new Error('The _id [i1] already exists within the parent');
     if (this.denyCreate) return [];
     return data.map((payload) => {
       const keeps = options?.keepId === true && Boolean(payload._id);
@@ -826,6 +849,441 @@ describe('the currency arm', () => {
 
     assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
     assert.equal(result.consumed, 100, 'one payer`s hundred copper is genuinely still gone');
+    assert.deepEqual(result.ledger[0].takes, [
+      { actorUuid: 'Actor.Idrin', documentUuid: null, quantity: 100 },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The guards no fixture used to reach
+// ---------------------------------------------------------------------------
+
+describe('the guards between a plan and a write', () => {
+  it('refuses a pool that is not a SET, and one whose entries cannot be echoed', async () => {
+    // The repeat is the one that costs a player items rather than merely refusing. One actor
+    // holding a stack of five, addressed twice, reads as ten: the drain then plans five from
+    // the stack AND three from the same stack, both writes succeed, and the ledger publishes
+    // `consumed: 8` for five units that left a sheet. Nothing fails, so nothing rolls back.
+    const idrin = new ConsumptionActor('Idrin');
+    makeItem(idrin, 'i1', 'hide', 5);
+    const sera = new ConsumptionActor('Sera');
+
+    for (const [label, pool] of [
+      ['the same document twice', [idrin, idrin]],
+      ['a repeat buried in a larger party', [idrin, sera, idrin]],
+      // The READ's floor has always required a `uuid`; this one only required an object. The
+      // echo is built from `actor?.uuid` and the contract FILTERS OUT anything that is not a
+      // string, so an entry without one is silently dropped from `actorUuids` — leaving a
+      // caller pooled over a set it cannot see, on the member that deletes.
+      ['an entry with no uuid at all', [idrin, { items: [] }]],
+      ['an entry whose uuid is empty', [idrin, { uuid: '', items: [] }]],
+    ]) {
+      const result = await take(pool, [componentCost('hide', 8)]);
+      assertConsumeAnswer(result, COMPANION_OUTCOMES.invalidActorUuids, label);
+      assert.deepEqual(result.messageData, { max: POOLED_ACTORS_MAX }, label);
+      assert.deepEqual(result.ledger, [], label);
+    }
+    assert.deepEqual(allWrites([idrin, sera]), [], 'and not one write was issued');
+    assert.equal(stackOf(idrin.items[0]), 5, 'the stack is untouched');
+  });
+
+  it('refuses a take with no owning document as notAttempted, never as an issued write', async () => {
+    // `planFirstFitDrain` records `parent: null` for an item with no owner. This case pins the
+    // OUTCOME rather than one guard, and the distinction is measured rather than cautious:
+    // `takeComponentBucket`'s `if (!group.parent) return false` is REDUNDANT here. Removing it
+    // alone leaves this suite green, and so does removing it together with `callActorWrite`'s
+    // absent-method floor — only removing those two AND `callActorWrite`'s `catch` reds, because
+    // each in turn normalises a write against `null` into "answered nothing". So no test can
+    // distinguish the guard; what is worth asserting is the behaviour all three defend, and no
+    // comment here should claim otherwise.
+    //
+    // The row's token is the second claim, and that one is NOT redundant: nothing was written,
+    // so `consumeFailed` — from which the contract DERIVES `attempted: true` — would tell a
+    // caller writes went out and were all given back.
+    const idrin = new ConsumptionActor('Idrin');
+    const orphan = makeItem(idrin, 'i1', 'hide', 5);
+    orphan.parent = null;
+
+    const result = await take([idrin], [componentCost('hide', 2)]);
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
+    assert.equal(result.ledger[0].outcome, COMPANION_OUTCOMES.notAttempted);
+    assert.deepEqual(attempts(result), [false]);
+    assert.deepEqual(allWrites([idrin]), [], 'the refusal is taken BEFORE the first write');
+    assert.equal(result.consumed, 0);
+  });
+
+  it('publishes notAttempted for a bucket refused before its first write, and consumeFailed after one', async () => {
+    // The two halves of the same rule, side by side, because only the pair proves the branch is
+    // a branch. `ATTEMPTED_CONSUME_OUTCOMES` derives `attempted` from the token, and its own doc
+    // says the token means A WRITE WAS ISSUED.
+    const refused = new ConsumptionActor('Idrin');
+    const item = makeItem(refused, 'i1', 'hide', 5);
+    // A structured value at the configured path that still coerces to a number: `reduceStacks`
+    // refuses the whole group before writing anything.
+    item.system.count.value = [5];
+
+    const before = await take([refused], [componentCost('hide', 1)]);
+    assert.equal(before.ledger[0].outcome, COMPANION_OUTCOMES.notAttempted);
+    assert.deepEqual(attempts(before), [false]);
+    assert.deepEqual(allWrites([refused]), []);
+
+    const wrote = new ConsumptionActor('Sera');
+    makeItem(wrote, 'i1', 'hide', 5);
+    makeItem(wrote, 'i2', 'hide', 5);
+    wrote.dropDeleteIds.add('i1');
+
+    const after = await take([wrote], [componentCost('hide', 10)]);
+    assert.equal(after.ledger[0].outcome, COMPANION_OUTCOMES.consumeFailed);
+    assert.deepEqual(attempts(after), [true], 'this one really did issue a write');
+    assert.equal(after.consumed, 0, 'and it was given back');
+  });
+
+  it('reads a write that answers bare IDS exactly as one that answers documents', async () => {
+    // `writtenIds` is `typeof entry === 'string' ? entry : entry?.id`, and nothing drove the
+    // first half. A write answering ids that this member read as documents would judge every
+    // successful write a failure and roll back a take that actually happened.
+    const idrin = new ConsumptionActor('Idrin');
+    makeItem(idrin, 'i1', 'hide', 3);
+    makeItem(idrin, 'i2', 'hide', 5);
+    idrin.answersIds = true;
+
+    const result = await take([idrin], [componentCost('hide', 5)]);
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumed);
+    assert.equal(result.consumed, 5);
+    assert.equal(idrin.items.length, 1, 'the exhausted stack is gone');
+    assert.equal(stackOf(idrin.items[0]), 3, 'and the survivor carries the remainder');
+    assert.deepEqual(idrin.writesOfKind('create'), [], 'nothing was rolled back');
+  });
+
+  it('treats a REJECTED write as a failed one, and gives back what the earlier write moved', async () => {
+    // A silent short answer and a rejection are different failures. `deny*` covers the first;
+    // this is the second, and it is what `collection.get(id, {strict: true})` does for an id
+    // that vanished between the plan and the write — it rejects the WHOLE batch. Without a
+    // rejecting fake, `callActorWrite`'s `catch` could be deleted with this file still green.
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      const idrin = new ConsumptionActor('Idrin');
+      makeItem(idrin, 'i1', 'hide', 3);
+      makeItem(idrin, 'i2', 'hide', 5);
+      idrin.rejectDelete = true;
+
+      const result = await take([idrin], [componentCost('hide', 5)]);
+
+      assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
+      assert.equal(result.consumed, 0);
+      assert.equal(idrin.items.length, 2, 'the rejected delete removed nothing');
+      assert.equal(stackOf(idrin.items[1]), 5, 'and the reduction that DID apply was restored');
+      assert.ok(
+        errors.some(([message]) => String(message).includes('could not deleteEmbeddedDocuments')),
+        'the rejection was reported rather than swallowed'
+      );
+    } finally {
+      console.error = originalError;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The candidate list, whose two stated properties no fixture could see
+// ---------------------------------------------------------------------------
+
+describe('the candidate list a component cost drains', () => {
+  it('drops an item the resolver returns that NOBODY in the pool owns', async () => {
+    // Membership is tested by object IDENTITY against the pooled item order, and the property
+    // is invisible to the default seam — `actor.items.filter(...)` is an order-preserving
+    // subsequence, so the filter is the identity function on every other fixture in this file.
+    // A resolver that answers a document outside the pool is not hypothetical: the shipped
+    // matcher is handed a system and a component and reads durable roles off items.
+    const outsider = new ConsumptionActor('Outsider');
+    const stranger = makeItem(outsider, 'x1', 'hide', 3);
+    const idrin = new ConsumptionActor('Idrin');
+    makeItem(idrin, 'i1', 'hide', 3);
+
+    const result = await take(
+      [idrin],
+      [componentCost('hide', 3)],
+      makeSeams({ findComponentItems: (actor) => [stranger, ...actor.items] })
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumed);
+    assert.deepEqual(allWrites([outsider]), [], 'the outsider was never written to');
+    assert.equal(outsider.items.length, 1, 'and still holds their own stack');
+    assert.equal(idrin.items.length, 0, 'the pool paid, in full, from its own documents');
+    assert.deepEqual(
+      result.ledger[0].takes.map((line) => line.actorUuid),
+      ['Actor.Idrin']
+    );
+  });
+
+  it('drains in the POOLED order even when the resolver answers a different one', async () => {
+    // The order is `pooledItemOrder`'s and nothing else's, because first-fit means whoever comes
+    // first pays first — so which DOCUMENT is destroyed depends on it. Re-deriving it from the
+    // resolver's answer would let a read and a consume destroy different documents.
+    const idrin = new ConsumptionActor('Idrin');
+    makeItem(idrin, 'i1', 'hide', 3);
+    makeItem(idrin, 'i2', 'hide', 3);
+
+    const result = await take(
+      [idrin],
+      [componentCost('hide', 4)],
+      makeSeams({ findComponentItems: (actor) => [...actor.items].toReversed() })
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumed);
+    assert.deepEqual(
+      result.ledger[0].takes.map((line) => [line.documentUuid, line.quantity]),
+      [
+        ['Actor.Idrin.Item.i1', 3],
+        ['Actor.Idrin.Item.i2', 1],
+      ],
+      'i1 was exhausted first because it comes first in the ACTOR’s own item order'
+    );
+    assert.deepEqual(
+      idrin.items.map((item) => item.id),
+      ['i2']
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Two currency costs on one balance
+// ---------------------------------------------------------------------------
+
+describe('two currency costs drawing on one balance', () => {
+  /** A spender that fails the test if it is ever asked to move coin. */
+  const refuseToSpend = (available) => ({
+    actorPropertyCoinSpender: {
+      readCoins: () => ({ valid: true, copperValue: available }),
+      spend: async () => assert.fail('a pre-check refusal must be taken before any spend'),
+      refund: async () => assert.fail('and nothing may be given back that was never taken'),
+    },
+  });
+
+  it('sums two costs in ONE unit before deciding, exactly as the component arm does', async () => {
+    // The component arm has always bucketed two costs naming one component and summed them
+    // before planning. The currency arm priced each row against the WHOLE balance, so a pool of
+    // 3 gp answered "yes" twice to two 2 gp costs — and the call then DEBITED the first, refused
+    // the second, credited the first back, and published `insufficient`. That token is in the
+    // documented zero-mutation set and its shipped string says "so nothing was taken".
+    const idrin = new ConsumptionActor('Idrin', { gp: 3 });
+
+    const result = await take(
+      [idrin],
+      [currencyCost(2), currencyCost(2)],
+      makeSeams(refuseToSpend(300))
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.insufficient);
+    assert.deepEqual(
+      result.ledger.map((row) => row.outcome),
+      [COMPANION_OUTCOMES.insufficient, COMPANION_OUTCOMES.insufficient],
+      'the costs are jointly unaffordable, so neither is singled out'
+    );
+    assert.deepEqual(attempts(result), [false, false]);
+    assert.equal(result.consumed, 0);
+    assert.equal(idrin.totalCopper(), 300, 'and the purse is untouched');
+    assert.deepEqual(idrin.updates, [], 'no debit and no matching credit ever happened');
+  });
+
+  it('sums two costs in DIFFERENT units on one ladder branch, keyed by the terminal base', async () => {
+    // Grouping by the caller's own `unitId` would leave this case exactly as broken. 2 gp and
+    // 150 cp are two claims on the same coin: 200 + 150 against a pool of 300.
+    const idrin = new ConsumptionActor('Idrin', { gp: 3 });
+
+    const result = await take(
+      [idrin],
+      [currencyCost(2, 'gp'), currencyCost(150, 'cp')],
+      makeSeams(refuseToSpend(300))
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.insufficient);
+    assert.deepEqual(attempts(result), [false, false]);
+    assert.equal(idrin.totalCopper(), 300);
+  });
+
+  it('still settles two costs the summed balance DOES cover', async () => {
+    // The positive control the refusals above need: the grouping must not refuse an affordable
+    // pair, and each row still reports its own take lines.
+    const idrin = new ConsumptionActor('Idrin', { gp: 3 });
+
+    const result = await take([idrin], [currencyCost(1), currencyCost(2)]);
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumed);
+    assert.deepEqual(
+      result.ledger.map((row) => row.consumed),
+      [100, 200],
+      'each row reports its own share, in the terminal base unit'
+    );
+    assert.equal(result.consumed, 300);
+    assert.equal(idrin.totalCopper(), 0);
+  });
+
+  it('answers insufficient when the pool moves between the pre-check and the settle', async () => {
+    // The one route to a CALL-level `insufficient` that the pre-check cannot take, because the
+    // pre-check already passed. The read is not a lease and the module says so; this is what
+    // that costs, and the answer must still be `insufficient` rather than `consumeFailed` —
+    // the pool was short, which is a different thing from a mechanism that broke.
+    const idrin = new ConsumptionActor('Idrin', { gp: 5 });
+    makeItem(idrin, 'i1', 'hide', 2);
+    let reads = 0;
+    const seams = makeSeams({
+      actorPropertyCoinSpender: {
+        readCoins: () => {
+          reads += 1;
+          return { valid: true, copperValue: reads === 1 ? 500 : 100 };
+        },
+        spend: async () => assert.fail('a pool short at settle time must not be spent from'),
+        refund: async () => ({ valid: true }),
+      },
+    });
+
+    const result = await take([idrin], [componentCost('hide', 2), currencyCost(2)], seams);
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.insufficient);
+    assert.equal(result.ledger[1].outcome, COMPANION_OUTCOMES.insufficient);
+    assert.equal(result.consumed, 0, 'and the component take was given back');
+    assert.ok(
+      idrin.items.some((item) => item.id === 'i1'),
+      'the component is back on the sheet'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A stable member may not throw
+// ---------------------------------------------------------------------------
+
+describe('a seam that THROWS', () => {
+  /** Run one call with `console.error` captured, so a logged throw is provable. */
+  async function withCapturedErrors(run) {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      return { result: await run(), errors };
+    } finally {
+      console.error = originalError;
+    }
+  }
+
+  it('becomes a refusal, on every bare seam the pre-check reaches', async () => {
+    // `callActorWrite` and `unwind` carried the only `try`s in this module, so every other seam
+    // was bare — and optional chaining guards an ABSENT method, never a throwing one. The
+    // reachability is not theoretical: the facade binds `findComponentItems` to the shipped
+    // `CraftingEngine.findComponentItems`, whose first statement is `[...actor.items]`, which is
+    // a TypeError for any resolved document whose `items` is not iterable.
+    const boom = () => {
+      throw new TypeError('actor.items is not iterable');
+    };
+    const CASES = [
+      ['resolveSystem', { resolveSystem: boom }, [componentCost('hide', 1)]],
+      ['resolveComponent', { resolveComponent: boom }, [componentCost('hide', 1)]],
+      ['findComponentItems', { findComponentItems: boom }, [componentCost('hide', 1)]],
+      ['the currency ladder', { getCurrencyConfig: boom }, [currencyCost(1)]],
+    ];
+
+    for (const [label, overrides, costs] of CASES) {
+      const idrin = new ConsumptionActor('Idrin', { gp: 5 });
+      makeItem(idrin, 'i1', 'hide', 5);
+
+      const { result, errors } = await withCapturedErrors(() =>
+        take([idrin], costs, makeSeams(overrides))
+      );
+
+      assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed, label);
+      assert.equal(result.ledger[0].outcome, COMPANION_OUTCOMES.notAttempted, label);
+      assert.deepEqual(attempts(result), [false], label);
+      assert.deepEqual(allWrites([idrin]), [], `${label}: nothing was written`);
+      assert.ok(
+        errors.some(([message]) =>
+          String(message).includes('Could not take pooled holdings from a set of actors')
+        ),
+        `${label}: the throw is reported rather than swallowed`
+      );
+    }
+  });
+
+  it('UNWINDS what it already took before it publishes the refusal', async () => {
+    // A throw between two writes is exactly the state the undo stack exists for. A guard that
+    // merely caught and published would leave a player short of the components this call
+    // deleted while telling its caller nothing was consumed.
+    const idrin = new ConsumptionActor('Idrin', { gp: 5 });
+    makeItem(idrin, 'i1', 'hide', 2);
+    let componentsWritten = false;
+    const deleteItems = idrin.deleteEmbeddedDocuments.bind(idrin);
+    idrin.deleteEmbeddedDocuments = async (...args) => {
+      componentsWritten = true;
+      return deleteItems(...args);
+    };
+    const seams = makeSeams({
+      getCurrencyConfig: () => {
+        if (componentsWritten) throw new TypeError('the ladder vanished mid-call');
+        return { spendStrategy: 'actorProperty', providerId: '', macros: {}, units: POOLED_LADDER };
+      },
+    });
+
+    const { result } = await withCapturedErrors(() =>
+      take([idrin], [componentCost('hide', 2), currencyCost(1)], seams)
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
+    assert.equal(result.consumed, 0, 'nothing is claimed');
+    assert.deepEqual(result.ledger[0].takes, [], 'because the component take was given back');
+    assert.equal(result.ledger[1].outcome, COMPANION_OUTCOMES.notAttempted);
+    assert.ok(
+      idrin.items.some((item) => item.id === 'i1'),
+      'and the document is back on the sheet, under its own id'
+    );
+  });
+
+  it('keeps a row outstanding when the GIVE-BACK itself throws', async () => {
+    // `unwind`'s own `catch`, which nothing reached: every undo step runs through
+    // `callActorWrite`, which catches for itself. The currency give-back does not — it goes
+    // through the published `creditWorldCurrency`, which resolves the world ladder afresh. A
+    // give-back that throws must leave the row's take lines standing, because those lines are
+    // the only record that the coin is genuinely still gone.
+    const idrin = new ConsumptionActor('Idrin', { gp: 3 });
+    let spends = 0;
+    let unwinding = false;
+    const seams = makeSeams({
+      getCurrencyConfig: () => {
+        if (unwinding) throw new TypeError('the ladder vanished during the give-back');
+        return { spendStrategy: 'actorProperty', providerId: '', macros: {}, units: POOLED_LADDER };
+      },
+      actorPropertyCoinSpender: {
+        readCoins: () => ({ valid: true, copperValue: idrin.totalCopper() }),
+        spend: async (actor, requirement) => {
+          spends += 1;
+          if (spends === 2) {
+            unwinding = true;
+            return { valid: false, message: 'The second purse jammed.' };
+          }
+          idrin.system.currency.cp = idrin.totalCopper() - requirement.amount;
+          idrin.system.currency.gp = 0;
+          idrin.system.currency.sp = 0;
+          return { valid: true };
+        },
+        refund: async () => ({ valid: true }),
+      },
+    });
+
+    const { result, errors } = await withCapturedErrors(() =>
+      take([idrin], [currencyCost(1), currencyCost(1)], seams)
+    );
+
+    assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
+    assert.ok(
+      errors.some(([message]) =>
+        String(message).includes('A pooled holdings consume could not be given back')
+      ),
+      'the failed give-back is reported'
+    );
+    assert.equal(result.consumed, 100, 'the coin is genuinely still gone, and the ledger says so');
     assert.deepEqual(result.ledger[0].takes, [
       { actorUuid: 'Actor.Idrin', documentUuid: null, quantity: 100 },
     ]);

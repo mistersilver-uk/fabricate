@@ -45,8 +45,6 @@ import {
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
-  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
-  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
@@ -134,31 +132,14 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
 });
 
 /**
- * Faithful copies of `src/main.js`'s hoisted `READ_POOLED_HOLDINGS_GATE_KEYS` and
- * `CONSUME_POOLED_HOLDINGS_GATE_KEYS` (issue 1342).
+ * The two pooled members carry NO hoisted refusal-string trio, on either side (issue 1342).
  *
- * THREE keys each on both sides, because the SET-valued preamble splits an actor refusal in a
- * way the singular one cannot — `noActor` when not one supplied UUID addresses an actor, against
- * `invalidActorUuids` for a request that is absent, empty, over-bound, non-string, or only
- * partly resolved.
- *
- * These are LESS inert than the pairs above them: `gatePooledActorUuids` puts `noActorKey` and
- * `invalidActorUuidsKey` on the gate's `message`, so a swap here is a member reporting itself in
- * the other pooled member's words on the surface a GM reads. Both delegators still branch on
- * `gate.outcome` alone, so the behavioural cases would stay green — which is exactly why the
- * source pin exists.
+ * The pairs above exist because the SINGULAR preamble's `message` is read — `resetActorKnowledge`
+ * answers it verbatim. The SET-valued preamble's is not: both pooled delegators branch on
+ * `gate.outcome` alone and answer through their own result builder, which resolves the member's
+ * own message table by outcome. A key threaded through the gate could only restate the string
+ * the builder is about to derive, so production carries none and this mirror carries none.
  */
-const READ_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
-  gmOnlyKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
-  invalidActorUuidsKey: POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids],
-});
-
-const CONSUME_POOLED_HOLDINGS_GATE_KEYS = Object.freeze({
-  gmOnlyKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
-  invalidActorUuidsKey: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.invalidActorUuids],
-});
 
 /**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
@@ -209,11 +190,19 @@ function installFoundryShim() {
  * @param {Array<object>} documents Everything addressable, each carrying its own `uuid`.
  */
 function installUuidResolver(documents) {
-  const byUuid = new Map(
-    documents
-      .filter((document) => typeof document?.uuid === 'string' && document.uuid !== '')
-      .map((document) => [document.uuid, document])
-  );
+  const byUuid = new Map();
+  for (const document of documents) {
+    if (typeof document?.uuid !== 'string' || document.uuid === '') continue;
+    byUuid.set(document.uuid, document);
+    // A document may answer to SEVERAL addresses, and it is the IDENTICAL object at each one.
+    // That is not a convenience for tests: `Token#actor` returns `this.baseActor` for a LINKED
+    // token, so `Actor.x` and `Scene.s.Token.t.Actor.x` are two well-formed, visibly different
+    // addresses for one document. A resolver that answered a copy would make the pooled gate's
+    // distinctness rule untestable in the direction that actually bites.
+    for (const alias of Array.isArray(document.uuidAliases) ? document.uuidAliases : []) {
+      if (typeof alias === 'string' && alias !== '') byUuid.set(alias, document);
+    }
+  }
   globalThis.fromUuidSync = (uuid) => byUuid.get(uuid) ?? null;
 }
 
@@ -477,27 +466,28 @@ export class FabricateFacadeUnderTest {
   // Addressed by UUID and never by id, because `game.actors.get` cannot tell an unlinked token
   // actor from its world prototype and this pair feeds a member that DELETES. The
   // `documentName` test is what stops an address naming an Item being scanned and written to as
-  // if it were an actor.
+  // if it were an actor, and the `inCompendium` test beside it is what stops a pack TEMPLATE
+  // being deleted from once anything has loaded that pack — `fromUuidSync` answers an index
+  // entry before the load and a real Actor after it, so without that test the member that
+  // deletes would behave differently depending on what else the world had touched.
+  //
+  // It takes NO refusal strings on either side. See the comment where the trios used to be.
   //
   // One incidental asymmetry, of the class this file already carries: production reads the bare
   // `game` global where this copy hoists `this._game` first, exactly as `_requireGmActor` above
   // does. The resolver expression is VERBATIM on both sides, `globalThis.` and all — production
   // spells it that way because optional chaining does not rescue an undeclared identifier, and
   // this suite's own resolver is installed on the same global.
-  _requireGmActors(actorUuids, keys) {
+  _requireGmActors(actorUuids) {
     const game = this._game;
     if (game.user?.isGM !== true) {
-      return {
-        actors: null,
-        outcome: COMPANION_OUTCOMES.gmOnly,
-        message: keys.gmOnlyKey,
-        messageData: null,
-      };
+      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, messageData: null };
     }
-    return gatePooledActorUuids(actorUuids, keys, {
+    return gatePooledActorUuids(actorUuids, {
       resolveActor: (uuid) => {
         const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
-        return addressed?.documentName === 'Actor' ? addressed : null;
+        if (addressed?.documentName !== 'Actor') return null;
+        return addressed.inCompendium === true ? null : addressed;
       },
     });
   }
@@ -630,7 +620,7 @@ export class FabricateFacadeUnderTest {
   // well as its text, and that order is what keeps the two pooled delegators from concatenating
   // into one over-the-bar duplicated run across the two files.
   async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids, READ_POOLED_HOLDINGS_GATE_KEYS);
+    const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
       return pooledHoldingsReadResult(
         gate.outcome ?? COMPANION_OUTCOMES.notReady,
@@ -776,7 +766,7 @@ export class FabricateFacadeUnderTest {
   // pooled delegators are near-identical, so adjacency would concatenate them into one run
   // across this file and `src/main.js` that neither member reaches alone.
   async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids, CONSUME_POOLED_HOLDINGS_GATE_KEYS);
+    const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
       return pooledHoldingsConsumeResult(
         gate.outcome ?? COMPANION_OUTCOMES.notReady,

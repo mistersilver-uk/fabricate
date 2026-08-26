@@ -294,6 +294,41 @@ describe('readPooledHoldings — tools', () => {
     assert.deepEqual(summarize(result), [[COMPANION_OUTCOMES.toolNotFound, null, null]]);
     assert.equal(result.readings[0].state, null);
   });
+
+  it('names a COMPONENT-LINKED tool by its component, and reports that component back', async () => {
+    // Two claims no other tool case can make, because every other fixture tool carries its own
+    // `name` and a `componentId` of `null`.
+    //
+    // The first is `toolDisplayName`'s fallback: a tool whose snapshot name was never
+    // backfilled is known by its LINKED COMPONENT's name, which is the expression
+    // `RecipeManager.toolMatchesItem` derives its own fallback from — so a tool this read can
+    // find is a tool that matcher can match. With `own` truthy on every other fixture the
+    // fallback was dead code as far as the suite was concerned.
+    //
+    // The second matters more to a caller: `componentId` on a tool reading is the id a
+    // companion would then hand to the CONSUME. Until this case it was only ever observed at
+    // `null`, so a reading that named the wrong component would have looked identical.
+    const systems = [
+      {
+        id: SMITHING,
+        components: [{ id: 'tongs', name: 'Iron Tongs' }],
+        tools: [{ id: 'tongs-tool', name: '', componentId: 'tongs' }],
+      },
+    ];
+    const party = [makeActor('Idrin', { items: [new HeldItem('Iron Tongs')] })];
+
+    const [reading] = (await read(party, [cost('tool', 'Iron Tongs')], {}, systems)).readings;
+
+    assert.equal(reading.state, POOLED_TOOL_STATES.present, 'the linked name found the tool');
+    assert.equal(reading.sufficient, true);
+    assert.equal(reading.systemId, SMITHING);
+    assert.equal(reading.componentId, 'tongs', 'and the reading names the component it links to');
+
+    // The counterpart, so the assertion above is not satisfied by a member that echoes the
+    // cost's own name: a tool with no link reports `null`, not a component id.
+    const unlinked = (await read(party, [cost('tool', "Smith's Hammer")])).readings[0];
+    assert.equal(unlinked.componentId, null);
+  });
 });
 
 describe('readPooledHoldings — currency', () => {
@@ -469,6 +504,35 @@ describe('readPooledHoldings — the request itself', () => {
       assert.deepEqual(result.readings, [], `${label}: nothing is read from a set like this`);
       assert.deepEqual(result.messageData, { max: POOLED_ACTORS_MAX }, label);
     }
+  });
+
+  it('refuses a pool that is not a SET, because summing it twice errs PERMISSIVE', async () => {
+    // The one refusal on this floor whose absence produces a WRONG NUMBER rather than a
+    // crash. Every reading sums per entry, so one document listed twice reads as a party
+    // holding twice what it holds — and the caller consumes on the strength of that answer.
+    // The facade's gate refuses the repeat before this floor ever sees it; the floor exists
+    // because the member below it deletes and a floor that trusts its caller is not one.
+    const idrin = makeActor('Idrin', {
+      currency: { gp: 3 },
+      items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 5 })],
+    });
+    const sera = makeActor('Sera');
+
+    for (const [label, party] of [
+      ['the same document twice', [idrin, idrin]],
+      ['a repeat buried in a larger party', [idrin, sera, idrin]],
+    ]) {
+      const result = await read(party, [cost('component', 'Iron Ingot', 8)]);
+      assert.equal(result.outcome, COMPANION_OUTCOMES.invalidActorUuids, label);
+      assert.deepEqual(result.messageData, { max: POOLED_ACTORS_MAX }, label);
+      assert.deepEqual(result.readings, [], label);
+    }
+
+    // The number the refusal prevents, stated so the case cannot be read as ceremony: Idrin
+    // holds five, and the doubled pool would have answered ten — sufficient for a cost of
+    // eight the party cannot pay.
+    const honest = await read([idrin], [cost('component', 'Iron Ingot', 8)]);
+    assert.deepEqual(summarize(honest), [[COMPANION_OUTCOMES.read, 5, false]]);
   });
 });
 

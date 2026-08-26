@@ -269,6 +269,41 @@ describe('first-fit drain', () => {
     assert.deepEqual(planFirstFitDrain(null, 4).takes, []);
   });
 
+  it('pays from one document ONCE, however many times the candidate list names it', () => {
+    // A repeat is planned as though it were two stacks: the plan writes nothing, so the second
+    // take re-reads the SAME `available` off the same unwritten document. The result is a plan
+    // reporting `satisfied` for a quantity the pool does not hold — and a caller that writes it
+    // reduces the stack, then deletes it, while publishing the larger figure. Nothing fails, so
+    // no rollback runs.
+    const item = itemFake('hide', 5);
+
+    const plan = planFirstFitDrain([item, item], 8);
+
+    assert.equal(plan.satisfied, false, 'five is five, however many times it is listed');
+    assert.equal(plan.allocated, 5);
+    assert.equal(plan.shortfall, 3);
+    assert.equal(plan.takes.length, 1, 'and the repeat produced no second take');
+    assert.equal(plan.groups.length, 1);
+    assert.deepEqual(writeLog([item]), [], 'planning writes nothing, here as everywhere');
+  });
+
+  it('is IDENTITY-keyed, so two documents sharing an id both pay', () => {
+    // The counterpart to the case above, and the reason the skip is by object identity rather
+    // than by `id`: two actors' items are not guaranteed to have distinct ids — an unlinked
+    // token actor is built from its base actor's own data — so an id-keyed skip would drop a
+    // second actor's genuine stack and refuse a request the pool can cover.
+    const mine = itemFake('shared', 3);
+    const theirs = itemFake('shared', 3);
+
+    const plan = planFirstFitDrain([mine, theirs], 5);
+
+    assert.equal(plan.satisfied, true);
+    assert.deepEqual(
+      plan.takes.map((take) => take.quantity),
+      [3, 2]
+    );
+  });
+
   it('reads a stored 0 and an absent field as one, matching readStackQuantity', () => {
     const stored = itemFake('stored-zero', 0);
     const absent = itemFake('no-field', undefined);

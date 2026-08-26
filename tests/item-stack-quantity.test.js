@@ -493,9 +493,16 @@ const SITE_MAPPING = [
     // The pooled holdings consume batches its writes per actor, so it needs the update PAYLOAD
     // rather than the live-document writer every other decrement site uses (issue 1342). Two
     // sites, and they are each other's inverse: one writes the post-take remainder, the other
-    // writes back the `available` the drain plan read. Anchored even though a single-accessor
-    // file needs none, because a rollback that wrote the wrong one of those two numbers is the
-    // failure that costs a player their inventory and no count could see it.
+    // writes back the `available` the drain plan read.
+    //
+    // These anchors PROVE BOTH NUMBERS ARE PRESENT and nothing more. They cannot see the swap
+    // they were written for: exchange the two numbers between `reduceStacks` and `restoreStacks`
+    // and each regex still matches once, so the total is still 2 and this row stays green. The
+    // claim that the anchors close that hole was simply false. Two things do close it — the
+    // behavioural case in `tests/companion-pooled-consumption.test.js` that restores a reduced
+    // stack to the value the plan read, and the FUNCTION-SCOPED pin at the bottom of this file,
+    // which slices each function's body out and asserts it carries its own number and not the
+    // other's.
     site: 'companionPooledConsumption batched reduction and its rollback',
     file: 'src/systems/companionPooledConsumption.js',
     accessor: 'stackQuantityUpdate',
@@ -695,7 +702,13 @@ describe('the per-site accessor mapping', () => {
     // Counted from an explicit field rather than parsed out of the label: a label-substring
     // filter reads as a check while actually depending on prose nobody validates.
     const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
-    assert.equal(total, 4, 'craft, salvage, alchemy-extra, alchemy-no-match');
+    // The failure message names the rows the count is made of rather than restating a list of
+    // site labels in prose: the labels drifted once already, and a stale one in an assertion
+    // message reads as a fact about the codebase while depending on nothing.
+    const contributors = SITE_MAPPING.filter((entry) => (entry.deleteSites ?? 0) > 0).map(
+      (entry) => `${entry.site} (${entry.deleteSites})`
+    );
+    assert.equal(total, 4, `expected four delete-on-underrun sites: ${contributors.join('; ')}`);
     for (const entry of SITE_MAPPING) {
       assert.ok(
         (entry.deleteSites ?? 0) <= entry.sites,
@@ -1371,5 +1384,63 @@ describe('player-write guardrail for the stack-quantity key', () => {
     assert.equal(itemStackQuantityPath(), 'system.qtd');
     assert.deepEqual(seam.writes, [], 'the push is one-way — the accessor never writes back');
     assert.deepEqual(seam.refused, []);
+  });
+});
+
+describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', () => {
+  /**
+   * The hole the two `stackQuantityUpdate` anchors in `SITE_MAPPING` cannot close.
+   *
+   * Those anchors are counted, not placed: exchange `take.remainingQuantity` and
+   * `take.available` between `reduceStacks` and `restoreStacks` and each regex still matches
+   * once, the total is still 2, and the row stays green. The swap is the failure that costs a
+   * player their inventory — a rollback writing the post-take remainder puts the stack back at
+   * the size the take left it, and a reduction writing `available` takes nothing at all.
+   *
+   * So the claim is made per FUNCTION BODY: each carries its own number and NOT the other's.
+   */
+  const CONSUMPTION_MODULE = 'src/systems/companionPooledConsumption.js';
+
+  /**
+   * One top-level function's body, sliced at its own closing brace.
+   *
+   * Prettier formats this file, so a top-level function's closing brace is the first `\n}` at
+   * column zero after its declaration. Slicing rather than lazily matching across the file is
+   * the whole point: a lazy `[^]*?` from one declaration to the other function's number would
+   * MATCH after the swap, which is the failure being closed.
+   *
+   * @param {string} source The module text.
+   * @param {string} name The function to slice.
+   * @returns {string} That function's body.
+   */
+  function functionBody(source, name) {
+    const declaration = `async function ${name}(`;
+    const start = source.indexOf(declaration);
+    assert.ok(start >= 0, `${name} is no longer declared in ${CONSUMPTION_MODULE}`);
+    const end = source.indexOf('\n}', start);
+    assert.ok(end > start, `${name}'s body has no closing brace`);
+    return source.slice(start, end);
+  }
+
+  it('reduces to the remainder and restores to the value the plan read', () => {
+    const source = stripComments(collectSources(join(repoRoot, 'src'))[CONSUMPTION_MODULE] ?? '');
+    assert.ok(source.length > 500, `non-vacuity: read ${source.length} characters`);
+    const PAIRS = [
+      ['reduceStacks', 'take.remainingQuantity', 'take.available'],
+      ['restoreStacks', 'take.available', 'take.remainingQuantity'],
+    ];
+
+    for (const [name, own, other] of PAIRS) {
+      const body = functionBody(source, name);
+      assert.ok(
+        body.includes(`stackQuantityUpdate(take.item, ${own})`),
+        `${name} must write ${own}`
+      );
+      assert.equal(
+        body.includes(`stackQuantityUpdate(take.item, ${other})`),
+        false,
+        `${name} writes ${other}, which is the OTHER half of the pair`
+      );
+    }
   });
 });
