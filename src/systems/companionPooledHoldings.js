@@ -205,20 +205,44 @@ function systemComponents(system) {
  * @param {(system: object) => object|null|undefined} lookup how one system answers the name
  * @returns {{match: {system: object, definition: object}|null, ambiguous: boolean}}
  */
-function resolveNamedDefinition(systems, name, lookup) {
+function resolveNamedDefinition(systems, name, byId, byName) {
   if (!name) return { match: null, ambiguous: false };
-  const matches = [];
-  for (const system of systems) {
-    const definition = lookup(system);
-    if (definition) matches.push({ system, definition });
-  }
+  const gather = (lookup) => {
+    const matches = [];
+    for (const system of systems) {
+      const definition = lookup(system);
+      if (definition) matches.push({ system, definition });
+    }
+    return matches;
+  };
+  const byIdMatches = gather(byId);
+  const matches = byIdMatches.length > 0 ? byIdMatches : gather(byName);
   return { match: matches[0] ?? null, ambiguous: matches.length > 1 };
 }
 
-/** Resolve a component cost's name against every system's component definitions. */
+/**
+ * Resolve a component cost's name against every system's component definitions, ID FIRST.
+ *
+ * The tier order is {@link resolveCurrencyUnitByName}'s, deliberately: an exact definition id
+ * wins outright, and only a name that matched no id falls through to the folded name tier. Two
+ * reasons, and they are the same two the coin axis states.
+ *
+ * A caller that already holds an id gets the answer it asked for whatever a world's display
+ * names happen to say, so a rename cannot silently redirect a working caller. And a READ HANDS
+ * IDS OUT — every reading echoes the `componentId` it resolved, and the consume takes ids only —
+ * so a companion that caches a reading and later refreshes it would otherwise have to go back to
+ * the weaker key it already replaced. A member that publishes an id and then refuses to accept
+ * it is answering a different question on the way back in.
+ *
+ * A name that collides with another definition's id is decided by the id, for the same reason a
+ * coin's is: an id is a durable handle and a name is display text somebody can retype.
+ */
 function resolveNamedComponent(systems, name) {
-  return resolveNamedDefinition(systems, name, (system) =>
-    findByName(getDefinitionIndex(systemComponents(system)), name, false)
+  return resolveNamedDefinition(
+    systems,
+    name,
+    (system) => findById(getDefinitionIndex(systemComponents(system)), name),
+    (system) => findByName(getDefinitionIndex(systemComponents(system)), name, false)
   );
 }
 
@@ -241,10 +265,12 @@ function toolDisplayName(system, tool) {
 /** Resolve a tool cost's name against every system's first-class Tool definitions. */
 function resolveNamedTool(systems, name) {
   const wanted = name.toLowerCase();
-  return resolveNamedDefinition(systems, name, (system) =>
-    (Array.isArray(system?.tools) ? system.tools : []).find(
-      (tool) => toolDisplayName(system, tool).toLowerCase() === wanted
-    )
+  const tools = (system) => (Array.isArray(system?.tools) ? system.tools : []);
+  return resolveNamedDefinition(
+    systems,
+    name,
+    (system) => tools(system).find((tool) => tool?.id === name),
+    (system) => tools(system).find((tool) => toolDisplayName(system, tool).toLowerCase() === wanted)
   );
 }
 

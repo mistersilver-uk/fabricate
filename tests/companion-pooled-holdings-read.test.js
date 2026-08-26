@@ -770,3 +770,70 @@ describe('readPooledHoldings — a cost names its coin the way it names its comp
     assert.equal(folded.ambiguous, true);
   });
 });
+
+describe('readPooledHoldings — a cost may name a definition by the id the read hands back', () => {
+  // THE ROUND TRIP IS THE POINT. Every reading echoes the `componentId` it resolved, and the
+  // consume takes ids ONLY. A read that published an id and then refused to accept it would be
+  // answering a different question on the way back in: a companion caching a reading and later
+  // refreshing it would have to go back to the authored name it had already replaced.
+  //
+  // The tier order is the coin axis's, and so is its reasoning — exact id outright, then the
+  // folded name tier.
+
+  it('resolves a component cost by its definition id', async () => {
+    const party = [
+      makeActor('Idrin', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 4 })] }),
+    ];
+
+    const result = await read(party, [cost('component', 'iron', 1)]);
+
+    assert.equal(result.readings[0].available, 4, 'the id resolved to the same definition');
+    assert.equal(result.readings[0].componentId, 'iron');
+    assert.equal(result.readings[0].systemId, SMITHING);
+    assert.equal(result.readings[0].ambiguous, false);
+  });
+
+  it('resolves a tool cost by its definition id', async () => {
+    const party = [makeActor('Idrin', { items: [new HeldItem("Smith's Hammer")] })];
+
+    const result = await read(party, [cost('tool', 'hammer', 1)]);
+
+    assert.equal(result.readings[0].state, 'present');
+    assert.equal(result.readings[0].sufficient, true);
+  });
+
+  it('lets an id win outright over a name that collides with it', async () => {
+    // A world where one component's ID is another component's NAME. The id tier answers and the
+    // name tier is never consulted, so a rename cannot silently redirect a caller holding an id —
+    // the same durable-handle-beats-display-text rule the coin axis states.
+    const systems = [
+      {
+        id: SMITHING,
+        components: [
+          { id: 'ashes', name: 'Grave Ashes', registeredItemUuid: IRON_SOURCE },
+          { id: 'grave', name: 'ashes' },
+        ],
+        tools: [],
+      },
+    ];
+    const party = [
+      makeActor('Idrin', { items: [new HeldItem('Grave Ashes', { uuid: IRON_SOURCE, quantity: 7 })] }),
+    ];
+
+    const result = await read(party, [cost('component', 'ashes', 1)], {}, systems);
+
+    assert.equal(result.readings[0].componentId, 'ashes', 'the id decided it, not the name');
+    assert.equal(result.readings[0].available, 7);
+    assert.equal(result.readings[0].ambiguous, false, 'one id match is not an ambiguity');
+  });
+
+  it('still reports an ambiguous NAME when no id answers', async () => {
+    // The fall-through is unchanged: `Ember Dust` exists in both fixture systems and neither is
+    // named by an id, so the name tier runs and the collision is reported rather than settled.
+    const party = [makeActor('Idrin', { items: [new HeldItem('Ember Dust', { quantity: 2 })] })];
+
+    const result = await read(party, [cost('component', 'Ember Dust', 1)]);
+
+    assert.equal(result.readings[0].ambiguous, true);
+  });
+});

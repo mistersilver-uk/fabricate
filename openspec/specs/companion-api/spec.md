@@ -398,9 +398,11 @@ That vocabulary is display-only in its own home and never relaxes the start-atte
 
 `balanceNotConfigured` is a **reading-level** outcome and never a call-level one, and that placement IS its behaviour: one axis Fabricate cannot answer MUST NOT cost the caller the axes it can.
 
-### Names In On The Read, Ids In On The Consume
+### Names Or Ids In On The Read, Ids Only In On The Consume
 
 The read accepts a human-written `name` on all three axes and answers the canonical `systemId`, `componentId` and `unitId` that name resolved to.
+**It MUST also accept, in that same `name` field, the ids it hands back**, on every axis and in one tier order: an exact id wins outright, and only a value matching no id falls through to the folded name tier.
+The read publishes ids, so a read that refused to accept one would be answering a different question on the way back in — a companion that caches a reading and later refreshes it would have to return to the authored name it had already replaced.
 The consume accepts those resolved ids and MUST NOT resolve a name at all.
 The reason is the promise tier: Fabricate's owned-item name matcher is case-SENSITIVE and deprecated, and no `stable` promise authorising a **delete** may be built on top of a tier that is scheduled for removal.
 

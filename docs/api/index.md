@@ -818,8 +818,10 @@ For a member that **gives**, the consequence is that value lands on a sheet the 
 For a member that **deletes**, the same ambiguity would destroy items on the prototype every other token is derived from while the token that should have paid keeps its own.
 So the pair takes `actorUuids`, and `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")` addresses the token's own actor exactly.
 
-**Names go in on the read; ids go in on the consume.**
+**Names or ids go in on the read; only ids go in on the consume.**
 The read takes human-written names on all three axes — `"Iron Ingot"`, `"gp"`, `"Smith's Tools"` — and answers the canonical `systemId`, `componentId` and `unitId` those names resolved to.
+It takes those ids too, in the same `name` field: an exact id wins outright and anything else falls through to the folded name tier, on every axis.
+So a companion that reads once, caches what came back and later refreshes it can hand the ids straight back rather than returning to the authored name it already replaced — and a rename between the two calls cannot redirect it.
 The consume takes those resolved ids and refuses to guess from a name, because Fabricate's owned-item name matcher is case-sensitive and deprecated (issue 540) and no `stable` promise that authorises a **delete** is going to be built on top of it.
 
 **A name Fabricate printed is a name Fabricate accepts.**
