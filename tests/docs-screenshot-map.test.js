@@ -24,8 +24,14 @@
  * An unread digest is decoration. It exists so that a hand-captured browser grab dropped into the
  * map cannot pass every other check while claiming to be generated from the product, and so a
  * toolchain rewrite is identifiable — neither of which happens unless something reads it. Shape
- * and uniqueness are what can be checked without rendering; that a digest still matches a fresh
- * render is what `docs:screenshots:check` is for.
+ * and uniqueness are what this file checks.
+ *
+ * Nothing re-derives the digest, here or anywhere, and nothing can. It is the SHA-256 of the source
+ * PNG a render produced, and this renderer is not byte-deterministic: a fresh render of the
+ * identical case yields a different PNG, and so a different digest, while showing the identical
+ * view. The digest is therefore provenance — which render this asset came from — and it moves only
+ * when a frame is actually rewritten. `docs:screenshots:check` re-renders and compares PIXELS,
+ * because that is the only comparison the renderer's own jitter does not defeat.
  */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
