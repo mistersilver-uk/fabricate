@@ -2,8 +2,10 @@
 
 ## Purpose
 
-Define the requirements for Fabricate's **outbound behavioural** contract: the capabilities Fabricate publishes so a companion module can settle work against an actor — grant the knowledge an activity teaches, ask what a cost comes to, read what the actor already holds, roll a check for an actor, settle one roll decision for many, place components on the actor's sheet, or credit currency to it.
-The last two are the first published capabilities that are neither a read nor a roll: they **place value**, and every rule below that separates a question from an act binds harder on them than on anything published before.
+Define the requirements for Fabricate's **outbound behavioural** contract: the capabilities Fabricate publishes so a companion module can settle work against an actor, or against a set of actors — grant the knowledge an activity teaches, ask what a cost comes to, read what the actor already holds, read what a whole party holds between them, roll a check for an actor, settle one roll decision for many, place components on the actor's sheet, credit currency to it, or take a set of costs from the party's combined holdings.
+Three kinds of capability are now published, not one.
+A member that **asks** a question, a member that **places value**, and — since the pooled holdings consume — a member that **removes** it.
+Every rule below that separates a question from an act binds harder on the second kind than on anything published before it, and hardest of all on the third: an award a GM did not want is value to find and reverse, while a take a GM did not want is a player's inventory gone.
 
 This specification governs a companion **consuming Fabricate's behaviour**.
 Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md`.
@@ -22,6 +24,7 @@ Behaviour stays with its domain.
 The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-integration/spec.md`.
 The award members split the same way.
 The currency credit's ladder rules, its spender write-truth rules and its consequences for a GM's `increment` macro are specified in `data-models/spec.md`; the reciprocal statement that the knowledge grant's idempotency has no counterpart on these two members is in `recipe-visibility/spec.md`; and the **gathering** award's own stacking rules, which are not these, stay in `gathering-and-harvesting/spec.md`.
+The pooled members split the same way: the pooled base-value read, the base-unit denomination of a pooled debit and the `balance` macro key are specified in `data-models/spec.md`, and what this spec governs is the contract those rules are published through.
 
 ## The Published Contract
 
@@ -56,9 +59,25 @@ The carve-out remains published because a companion still reads what an actor al
 
 ## Behavioural Member Rules
 
-Every `stable` member **that reads or acts on a specific actor** takes an **`actorId`**, never an actor uuid, and resolves it through `Fabricate#_resolveCraftingActor`.
+Every `stable` member **that reads or acts on one specific actor** takes an **`actorId`**, never an actor uuid, and resolves it through `Fabricate#_resolveCraftingActor`.
 A member that answers a question about the caller's own request rather than about an actor takes none: an ownership gate on an argument the member never reads is ceremony a later reader deletes, and a caller passing one would infer a gate that does not exist.
-The narrowing is bounded by the positive rule — any member that **does** touch an actor is still bound by the sentence above, and by the named resolver rather than by a bare collection read.
+The narrowing is bounded by the positive rule — any member that **does** touch one actor is still bound by the sentence above, and by the named resolver rather than by a bare collection read.
+
+**A member that answers about a SET of actors takes an `actorUuids` list, and a member that writes DESTRUCTIVELY takes UUIDs rather than ids.**
+The two pooled holdings members are both, and the departure is stated here rather than left as an inconsistency.
+`game.actors.get()` cannot distinguish an unlinked token actor from its world prototype, because the synthetic actor's `id` **is** the base actor's id, so a token-scoped id silently resolves to the prototype.
+Every member published before this pair **gives**, and for a give that ambiguity costs a player value landing where they will not see it.
+This pair **deletes**, and deleting from a prototype corrupts every other token derived from it while the token that should have paid keeps its items.
+An address a member may not be wrong about is therefore an unambiguous one, and `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")` is Foundry's own handle for exactly that.
+The rule is a widening rather than a contradiction: an `actorId` remains correct for a member that acts on one actor, and the uuid form is required only where the set or the destruction makes it so.
+
+**The set-valued preamble is an EXTENSION of the once-only authorization rule, not a second copy of it.**
+`_requireGmActors` resolves a list of UUIDs and delegates per actor to the shared single-actor preamble, so the GM gate, the resolver and the readiness ordering all still exist exactly once.
+It adds only what a set adds: the bound, the shape, and the split between "not one of these resolved" and "the list itself was wrong".
+Both members **fail closed** on a set that does not fully resolve, and the answer echoes the resolved set back so a caller can see the exact set an answer was computed over.
+Silently dropping an unresolvable UUID — as `_resolveCraftingSources` does for its own, different purpose — would compute a pool over fewer actors than the caller believes, and a consume would then draw from a different set than the read reported.
+`noActor` is answered when **not one** supplied UUID addresses an actor, which is the same word every other actor-targeted member answers.
+`invalidActorUuids` covers the request itself: absent, empty, over the bound, carrying a non-string entry, or a list where **some** resolved and some did not.
 
 Every `stable` member is **GM-gated on `isGM`**, refusing `gmOnly` otherwise, and refuses `notReady` before the module is ready rather than throwing.
 A member reachable from a handler that fires on **every connected client** additionally requires the caller to declare its **call site**, and for a broadcast call site refuses `notElected` unless this client is the elected executor (`game.users.activeGM?.id === game.user?.id`).
@@ -99,6 +118,12 @@ A member that **writes value** — placing items on a sheet, or crediting coin �
 N clients do not produce N different answers to reconcile; they produce **N copies of the same value** on a player's sheet, with no `alreadyKnown` no-op and no natural key to absorb the repeat.
 The obligation therefore binds hardest exactly where the "a read is harmless" justification is weakest, which is why both award members require a `callSite` and why neither is idempotent.
 The `gmAction`-from-a-synced-hook bypass is correspondingly more consequential for a member that moves inventory than for one that posts chat: a duplicated message is noise a GM deletes, while a duplicated award is items and coin a GM must find and reverse by hand.
+
+**A member that REMOVES value is the sharpest case of all, and the obligation is restated for it rather than inherited by implication.**
+N unelected clients running the pooled holdings consume delete N times the components and take N times the coin, across every actor in the supplied set at once.
+There is no absorbing repeat and no natural key: a second take is indistinguishable from a first, so nothing in the answer or the world tells a GM which one was intended.
+Reversing a duplicated award means finding value that arrived; reversing a duplicated take means reconstructing inventory that left, from a ledger of whichever call happened to be looked at.
+That is why the member requires a `callSite` and refuses `notElected`, and why the declaration being **truthful** is a contract obligation on the caller rather than a hint.
 
 ## The Standalone Check Roll
 
@@ -163,7 +188,7 @@ What this capability restores is a **different** dialog — Fabricate's own roll
 
 A second shared rule exists **once**, beside the authorization preamble and deliberately separate from it, because it answers a different question: the preamble asks WHO is calling, this asks WHERE FROM.
 It is sited **after** readiness, because it is request validation.
-It binds every member that declares a call site — `rollActorCheck`, `resolveBulkCheckDecision`, `awardComponents` and `creditCurrency` — and it exists as **one** implementation, sited in the Foundry-free contract module beside the published `callSites` vocabulary rather than inside any one member's module.
+It binds every member that declares a call site — `rollActorCheck`, `resolveBulkCheckDecision`, `awardComponents`, `creditCurrency` and `consumePooledHoldings` — and it exists as **one** implementation, sited in the Foundry-free contract module beside the published `callSites` vocabulary rather than inside any one member's module.
 A member carrying its own copy would be free to drift on exactly the question a write may not be wrong about.
 
 `callSite` is **required and has no default**.
@@ -199,6 +224,8 @@ Both request key sets are **closed**, including the nested `awards[i]` set, whic
 No caller-supplied bag is spread into any collaborator, seam or item payload: a spread would put caller-controlled arbitrary keys onto a created Foundry document, which is itself a leading cause of a create the client silently drops.
 `awards` holds at most 64 entries, because every entry is a document write and an unbounded list is an unbounded write batch driven by an external caller; the bound starts small because widening what a member accepts is free under the compatibility promise while narrowing it is a version bump.
 `systemId` is declared once per call rather than per entry, and every entry resolves within it, so a mixed-system award is two calls.
+That is a rule about the **award's** request shape and not about every member: the pooled holdings members resolve a system **per cost entry**, because a downtime stage's requirements are mixed-system by construction and splitting one stage into one call per crafting system would make the caller compose the all-or-nothing guarantee itself.
+A component id is not unique across crafting systems, so per-entry resolution has to report an unresolved ambiguity rather than settle it: a name matching in two systems answers `ambiguous` on the read, and a system a cost names that does not exist is a **row-level** `systemNotFound` on the consume where the award answers it at call level.
 
 **Both award members target WORLD actors, and cannot address an unlinked token actor.**
 Every actor-targeted member resolves `actorId` against the world actor collection through the shared resolver named above, never against a token, a token id or a uuid.
@@ -281,6 +308,14 @@ That resolver applies the list-aware different-component veto on its durable-ide
 The fallback is therefore not a legacy edge: a fully stamped component whose actor happens to hold an *unstamped* item of the same name reaches it, which in an unmigrated world is the ordinary case rather than the exception.
 The companion award inherits both branches rather than growing a second matcher, and it differs on that second branch from the **gathering** award, whose rules are specified under "Award Item Stacking" in `gathering-and-harvesting/spec.md` and whose own fallback is shared raw source references rather than a name match at all.
 
+**Both pooled holdings members inherit that same resolver, and therefore that same name fallback and its telemetry.**
+They MUST: a pooled read predicts what a pooled consume will take, and a consume matches what salvage and bulk destroy match, so a read on one matcher and a write on another is precisely the gate that lies.
+A pooled consume can therefore emit issue-540 name-only-match telemetry, and so can a pooled read — the report is deduped per session on `(systemId, definition, item name)`, so a companion polling every stage cannot inflate it.
+**What the read MUST NOT do is resolve the caller's own cost NAME through the reporting tier.**
+A cost's `name` is resolved to a crafting-system **definition** through the definition index's silent primitive, never through `componentNameMatch`'s warn-once reporter.
+The distinction is between an owned item resolving to a definition — the deprecated fallback the telemetry measures — and an authored requirement's spelling resolving to a definition, which is this member's own lookup and no part of what issue 540 is counting.
+Reporting the second would corrupt the very measurement that justifies removing the first, with a signal whose magnitude is a companion's naming convention and its polling interval.
+
 The member calls the resolver **only after** its own component resolution has succeeded, which is what makes the carve-out's two throw conditions unreachable from a member that may not throw.
 **Within one call, two entries naming the same component stack onto one item wherever the world can express a stack count**: the member carries forward what it has already placed rather than depending on the actor's item collection having caught up.
 Where the world cannot express a count the second entry creates a second document instead, so nothing is invented and nothing is refused.
@@ -320,6 +355,159 @@ The split is declared as data a test can read rather than as prose a reviewer re
 A second word for the concept `awarded` already names was rejected at the entry level, because a caller would then have to branch on both.
 
 They also reuse the already-declared `systemNotFound`, `unitNotFound`, `invalidAmount`, `ladderEmpty`, `ladderInvalid`, `invalidCallSite` and `notElected`, and the shared `gmOnly`, `noActor` and `notReady`.
+
+## The Pooled Holdings Members
+
+Fabricate publishes two `stable` members that answer about a **set** of actors' combined holdings.
+`readPooledHoldings({ actorUuids, costs })` answers `{ success, actorUuids, readings, outcome, message }` and **writes nothing**.
+`consumePooledHoldings({ actorUuids, callSite, costs })` takes those costs and answers `{ success, actorUuids, consumed, ledger, outcome, message }`.
+
+**POOLED HOLDINGS** is the bound term for one answer over a combined supply, and it is deliberately not **BULK**, which names many subjects settled serially.
+Bulk salvage salvages N components one after another and reports N results; a pooled read produces ONE number about a party.
+
+### The Read Is Not A Reservation
+
+The read is exact **at read time** and holds nothing.
+Nothing prevents an item being sold, dropped, traded or consumed between a read and a consume, and no lease, claim or reservation is taken by either member.
+A caller that must not overdraw MUST call the consume and read **its** refusal, rather than treating a `sufficient` it read a moment ago as a promise about a later write.
+This is required to be stated rather than left to be inferred, because the pair is designed to be called one after the other and the intervening gap is exactly where a caller assumes a guarantee that was never offered.
+
+Fabricate will not add a reservation to close it.
+A lease over another module's actors is a persisted shape with an expiry policy, a release path and a failure mode in which a crashed companion leaves a party's inventory locked — and a partial guarantee here is more dangerous than a published non-guarantee, on the same reasoning that refused an award idempotency key.
+
+### `null` Means Cannot See, `0` Means Provably None
+
+The shipped `creditCurrency` rule binds here unchanged, and neither member may collapse the two.
+A component nobody in the set is carrying answers `available: 0`, which is a confident answer: the matcher ran on every actor and nothing resolved.
+A currency cost answers `available: null` where the world cannot be read at all — an empty coin ladder, an invalid profile, a `macro` world with no `balance` macro, or a set containing one actor whose purse could not be read.
+A pool containing one unreadable actor is UNREADABLE rather than partial, because a sum over a subset is a number about a different group than the caller asked about and is always too SMALL, so a gate built on it would refuse parties that can pay while looking authoritative.
+
+`sufficient` is DERIVED from `available` against `requested` and is `null` wherever `available` is, so *the pool is short* and *the pool could not be read* never collapse into the same confident `false`.
+A TOOL is the single exception: it answers a `state` from the shipped Required Tool Display State vocabulary and no `available`, and its `sufficient` is `state === 'present'` and nothing else.
+That vocabulary is display-only in its own home and never relaxes the start-attempt tool gate, so a `sufficient` derived from the state token alone would admit a `damaged` tool the shipped gate refuses.
+
+`balanceNotConfigured` is a **reading-level** outcome and never a call-level one, and that placement IS its behaviour: one axis Fabricate cannot answer MUST NOT cost the caller the axes it can.
+
+### Names In On The Read, Ids In On The Consume
+
+The read accepts a human-written `name` on all three axes and answers the canonical `systemId`, `componentId` and `unitId` that name resolved to.
+The consume accepts those resolved ids and MUST NOT resolve a name at all.
+The reason is the promise tier: Fabricate's owned-item name matcher is case-SENSITIVE and deprecated, and no `stable` promise authorising a **delete** may be built on top of a tier that is scheduled for removal.
+
+**A name Fabricate PRINTED is a name Fabricate ACCEPTS.**
+That is a correctness property rather than a convenience, and it is what the currency axis had been failing: a unit resolved by exact `id` only, so a caller authoring requirements the way a person writes them could name a component and a tool but never a coin.
+A coin therefore resolves in two tiers, and the order is load-bearing.
+An exact `id` match wins outright, so a caller already holding Fabricate's internal ids is byte-identically unaffected and an unrelated label edit cannot redirect a working caller — the same durable-identity-beats-display-name precedence the component matcher already applies.
+Otherwise every name folds into ONE case-insensitive tier in which abbreviation and label rank LEVEL, because the display-name derivation renders whichever of the two is present and a caller holding a printed string cannot know which field it came from; ranking them would settle a genuine collision by a coin flip that looks authoritative.
+
+**Ambiguity is REPORTED and never resolved silently, on every axis.**
+A cost name matching a component in more than one crafting system, or a coin name answering to more than one unit, sets `ambiguous: true` on that reading and resolves to the first in order.
+`ambiguous` is a strict boolean rather than a nullable one: `false` is a true statement about every reading that resolved, and about every refusal too.
+It is required because the caller is liable to CONSUME by the id the read handed back, so a quietly chosen system is a quietly chosen set of documents and a quietly chosen coin is a quietly chosen debit.
+
+### The Consume Takes Components First And Coin Last
+
+The order is normative, and it follows from which leg has a reliable inverse rather than from a preference.
+
+A deleted component HAS an exact inverse: the document is snapshotted with `toObject()` before the delete and re-created with `{ keepId: true, keepEmbeddedIds: true }`, so the `_id` — and therefore the UUID — is retained, embedded documents keep their own ids, and flags, system data and active effects return verbatim.
+A partial take needs no snapshot at all, because the inverse of a decrement is restoring the count, and the restore writes the value the plan recorded BEFORE the take rather than an increment a concurrent change could compound.
+The component-award primitive is deliberately NOT reached for, because it rebuilds from the component template and is therefore lossy.
+
+Currency is the leg whose inverse may be ABSENT or LOSSY: under `macro` the `increment` macro is explicitly optional, under the pf2e inventory provider a give-back creates treasure Items, and under `actorProperty` it lands in the unit's own denomination rather than the base unit that was debited.
+So the recoverable leg is taken first, the unrecoverable leg last, and **a currency cost is REFUSED UP FRONT** — `creditNotConfigured`, before the pool is read and before any component is written — in a world that has published no way to give coin back at all.
+That refusal reads world configuration alone, so taking it before the pool is read is required and not merely tidy: an intended zero-effect refusal must not first fire a GM's `balance` macro once per actor.
+
+**Two residues of the restore are ACCEPTED and are declared rather than hidden.**
+A restore fires `createItem` per document, because `noHook` gates only the pre-hook, so Fabricate's own fragment-discovery and recipe-learning hooks can fire on an undo.
+And the restored document is a NEW JS object, so a third-party module holding an `Item` reference across the take holds a stale one even though the UUID resolves; `_stats.modifiedTime` and `lastModifiedBy` are refreshed while `createdTime` is preserved.
+
+### All-Or-Nothing, And The Zero-Mutation Set
+
+A shortfall anywhere refuses everywhere.
+One cost the pool cannot cover refuses the WHOLE call as `insufficient` before anything is written, with every ledger row reporting `attempted: false`, because a partly-paid downtime cost is worse than an unpaid one.
+
+The consume's zero-mutation set is `gmOnly`, `noActor`, `notReady`, `invalidCallSite`, `notElected`, `invalidActorUuids`, `invalidCosts`, `insufficient` and `creditNotConfigured`.
+**`consumeFailed` is deliberately EXCLUDED**, and a give-back that itself failed is the reason.
+Some `consumeFailed` answers wrote nothing — a cost naming a system or component that does not resolve is refused in the pre-check — and some wrote and could not fully un-write, and the outcome token alone cannot carry that distinction.
+
+The **ledger** carries it, and the discrimination is four-way rather than two-way:
+`consumed === null` with an empty `ledger` means the request was refused before any cost was priced;
+`consumed === 0` with every row `attempted: false` means the pool was priced and the call refused, and nothing was written;
+`consumed === 0` with some row `attempted: true` means writes were issued and every one was given back;
+and `consumed > 0` beside `consumeFailed` means the give-back did NOT fully complete, that much is still gone, and each row's `takes` name from whom.
+`attempted` is DERIVED from the row's own outcome and `consumed` is SUMMED from the rows, which are themselves summed from their takes, so no two published figures can disagree.
+A row whose whole component bucket failed before the give-back reports its FULL planned allocation rather than the part that was written, which over-states on the safe side: a caller deciding whether to make a player whole again is better served by a number that cannot be too small.
+
+The published refusal message for `consumeFailed` MUST NOT assert that everything taken was put back.
+It states that a give-back was attempted and directs the reader to the ledger, because the fourth case above is exactly the case in which the reassuring wording would be false.
+
+### An Unreadable Pool Refuses The Consume Outright
+
+`balanceNotConfigured`, `ladderEmpty` and `ladderInvalid` are declared by the READ and have **no token in the consume's key table**, and the asymmetry is deliberate.
+A read can report one unreadable cost and answer every other; a take that cannot see what a party is carrying MUST NOT take from them at all.
+So a consume in that world refuses at CALL level as `consumeFailed` with every row reporting `notAttempted` and nothing written, and a caller that needs the cause calls the read, which names it on the currency reading itself.
+Minting a row token for it would publish a word the contract does not declare, and borrowing `unitNotFound` for a broken ladder would send a GM looking for a unit that is spelled perfectly well.
+
+### Denominations Are Not Reconciled Between `requested` And `consumed`
+
+A currency row's `requested` echoes the CALLER'S OWN unit, because every per-entry answer promises a faithful echo a caller can map back onto the request it wrote.
+Its `takes` — and therefore its `consumed` — are in the ladder's TERMINAL BASE UNIT, because that is the only denomination in which a debit split across several payers is exact.
+So on a `gp → sp → cp` ladder a 2 gp cost answers `requested: 2` beside `consumed: 200`, and the two are NOT reconciled.
+
+Both alternatives were considered and both are refused.
+Expressing a payer's share back in the caller's unit makes it fractional, and a three-way split of one unit does not sum back to one in floating point, so the ledger would stop adding up.
+Collapsing the lines into a single whole-cost take discards the per-actor attribution the ledger exists to provide.
+A coin count is exact; a converted one is not.
+
+The READ does not carry this seam: its `available` is converted back into the caller's own unit and FLOORED, because a pool holding three and a half gold pieces cannot pay four, and because deriving `sufficient` from two different denominations would err PERMISSIVE — the one direction a gate may never err in.
+
+### The Consume Is Not Idempotent
+
+Exactly the award members' position, for exactly their reason.
+There is no natural key for Fabricate to absorb a repeat with: taking three hides twice is legitimately six hides gone, and nothing readable distinguishes a duplicated call from a second, intended one.
+No idempotency key will be added, on the reasoning already recorded for the awards.
+The `callSite` election removes the steady-state multi-client duplication class and is **not a lease**; not double-consuming is the caller's own obligation, discharged by recording a claim in front of the irreversible act rather than by a guard inside it.
+
+### Bounds
+
+`actorUuids` holds at most **32** actors and `costs` at most **32** entries.
+Both are bounded LOWER than the award's 64 because the work these members do is the PRODUCT of the two rather than either one: every cost is scanned across every actor, and the consume then issues one batched write per actor that paid.
+Each refusal string interpolates its own bound as `max` rather than restating the number.
+Widening a published bound is free under the compatibility promise and narrowing one is a `schemaVersion` bump, so the bounds start where the cheap direction stays available.
+
+### Which Axes Each Member Serves
+
+The declared cost axes are `component`, `currency` and `tool`.
+The read serves all three; the consume serves `component` and `currency`, and a `tool` cost on the consume answers `costTypeUnsupported` because tool WEAR is out of scope rather than because `tool` is not an axis.
+`essence` and `tag` are axes this domain names that NO pooled member serves, and they answer `costTypeUnsupported` on both.
+A string naming no axis at all answers `invalidCostType`, and the two refusals MUST stay distinct: the difference is *not yet* against *you mistyped*, and collapsing them sends an author hunting for a spelling mistake that is not there.
+
+## The Outcome Vocabulary Added By The Pooled Members
+
+The pooled members add exactly these outcomes: `read`, `readFailed`, `consumed`, `consumeFailed`, `insufficient`, `notAttempted`, `balanceNotConfigured`, `toolNotFound`, `invalidCostType`, `costTypeUnsupported`, `invalidCosts`, and `invalidActorUuids`.
+Of these, only `read` and `consumed` answer `success: true`.
+
+`insufficient` is deliberately NOT one of them, and that is the line separating it from `notAffordable`, which is.
+A QUESTION answered no is a success; a REFUSED ACT is not.
+`consumeFailed` is absent for the reason `awardFailed` is: an act that did not happen at all answers `false`.
+
+`read`, `readFailed`, `consumed`, `consumeFailed` and `insufficient` are answered at BOTH the call level and the entry level.
+`balanceNotConfigured`, `toolNotFound`, `invalidCostType`, `costTypeUnsupported` and `invalidQuantity` are **reading-level only** on the read.
+`notAttempted`, `componentNotFound`, `unitNotFound`, `systemNotFound`, `invalidCostType`, `costTypeUnsupported` and `invalidQuantity` are **row-level only** on the consume.
+Each split is declared as DATA a test can read rather than as prose a reviewer remembers, on the precedent the award members set, and each member's declared CALL-level set is its key table MINUS that list rather than a second enumeration two places can disagree about.
+A call can never answer `notAttempted`: "nothing was attempted" is the consequence of a reason rather than a reason.
+
+Two tokens were considered and are deliberately NOT minted.
+`costNotFound` would be a third spelling of the shipped `componentNotFound` and `unitNotFound`, so a cost naming nothing answers one of those, or `toolNotFound` for a tool.
+`partiallyConsumed` would name a state this design cannot reach, because the take is all-or-nothing by construction; declaring it would additionally force a key-table entry for a refusal no member can emit, which the contract's dead-vocabulary sweep forbids.
+
+The names were chosen against near-misses, and the near-miss is recorded with each.
+`invalidActorUuids` is not `invalidPool`, because POOL already names a resource reservoir in this domain.
+`balanceNotConfigured` is not `poolingUnsupported`, because nothing about pooling is unsupported — a `macro` world with no `balance` macro cannot answer for ONE actor either.
+`consumePooledHoldings` is not `consumePooledCosts`, because the costs are not pooled; the supply is.
+
+They also reuse the already-declared `componentNotFound`, `unitNotFound`, `systemNotFound`, `invalidQuantity`, `creditNotConfigured`, `invalidCallSite` and `notElected`, and the shared `gmOnly`, `noActor` and `notReady`.
+Each member answers with its OWN message key table, because a failed take must not report itself in the words of a failed read — and that rule bites hardest between exactly this pair, which is designed to be called one after the other.
 
 ## The Compatibility Promise
 
