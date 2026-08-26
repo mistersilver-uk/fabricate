@@ -686,6 +686,60 @@ An approximate case that does not declare itself approximate is worse than no ca
 - **THEN** the case stays declared as falling short and the limitation is recorded in the register
 - **AND** the renderer does not substitute a facsimile of the missing behaviour, because a frame depicting UI the product never draws is evidence of something that does not exist
 
+### Requirement: Documentation screenshot provenance
+
+A new or replaced screenshot on the documentation site MUST be generated from a named view case rather than curated by hand.
+A screenshot committed before this requirement's generator existed remains valid documentation evidence without migration, because retiring evidence that is still accurate buys nothing and a rule that silently indicts shipped work is a rule nobody can act on.
+
+#### Scenario: a doc page declares a case slot
+
+- **WHEN** a documentation page needs a visual reference for a view the canonical view-case registry covers
+- **THEN** the page declares an image slot naming that case id, and the committed asset is generated from that case
+- **AND** a slot whose asset is absent fails a gate rather than rendering a hole
+
+#### Scenario: only exact and beyond cases feed documentation
+
+- **WHEN** a case is selected to feed a documentation slot
+- **THEN** only a case declaring `reaches: exact` or `reaches: beyond` may be used
+- **AND** a case that reaches the right application window but not the specific condition its live-smoke counterpart shows is refused, under the View-case reach declaration requirement, because publishing it as a documentation reference would present a shortfall as the condition the page describes
+
+#### Scenario: generation fails closed
+
+- **WHEN** the harvested Foundry window chrome or the image encoder is absent at generation time
+- **THEN** generation aborts naming what is missing and how to obtain it, and writes no image
+- **AND** no approximated frame is emitted, because a reader cannot tell a wrong documentation screenshot from a right one, which makes it worse than a stale one
+- **AND** the restriction on harvested material is the one already stated in the Harvested Foundry window chrome requirement, and nothing here widens or narrows it
+
+#### Scenario: a frame whose render did not succeed this run
+
+- **WHEN** the renderer reports a per-case failure while an earlier run's output for that case is still on disk
+- **THEN** that frame is not consumed, because the renderer accumulates output and a surviving stale frame would otherwise be republished as current documentation
+
+#### Scenario: only changed frames are rewritten
+
+- **WHEN** the generator runs against an already-populated documentation image set
+- **THEN** it rewrites only those frames whose rendered source differs by content digest
+- **AND** it reports which images changed and which were left alone, so a reviewer can tell a real visual change from re-encoding noise
+- **AND** the digest is taken over the renderer's own output rather than the published asset, so that changing the encoder cannot present itself as a visual change
+
+#### Scenario: the toolchain that produced the frames changes
+
+- **WHEN** the harvested Foundry version or the browser build that rasterises the frames changes
+- **THEN** the whole generated set is expected to be rewritten with no visual change to review
+- **AND** the provenance that produced the set is recorded alongside it and gated, so that such a rewrite is identifiable as a toolchain change rather than mistaken for content changes
+
+#### Scenario: the map is gated in both directions
+
+- **WHEN** either a documentation image or the case id feeding it is renamed, added, or removed
+- **THEN** a gate fails unless both sides move together, so neither can drift out from under the other
+- **AND** the generated images occupy a namespace distinct from hand-curated ones, so that the reverse direction enumerates real files rather than restating the map to itself
+
+#### Scenario: a screenshot predating the generator
+
+- **WHEN** a screenshot was committed to the documentation site before this requirement's generator existed
+- **THEN** it remains valid documentation evidence and is not required to be re-authored through an image slot
+- **AND** only a new or replaced screenshot must use the generated slot mechanism
+
 ### Requirement: Provider-specific skill metadata
 
 Skills SHOULD include provider-specific metadata under the skill directory when that provider benefits from explicit discovery hints.

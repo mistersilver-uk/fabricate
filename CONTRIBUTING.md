@@ -923,15 +923,57 @@ Tee to a path outside `test-results/` if you need a copy.
 
 ### Documentation screenshot source
 
-The docs increasingly use real Foundry screenshots for each stage of gathering setup and play.
-The source of truth is the local `full` smoke profile, not hand-captured one-off browser images.
-Run `npm run test:foundry` locally, then copy only curated frames from `test-results/screenshot-*.png` into `docs/img/screenshots/` with durable names.
-Do not link docs directly to `test-results/`; that directory is transient and is wiped at the start of the next smoke run.
+A new or replaced screenshot on the documentation site is generated from a named View Lab case.
+Nothing on the site is hand-captured from a browser any more, because a curated frame has no producer and goes stale with nothing to say so.
 
-The reduced `rc`/`ci` smoke profiles intentionally do not regenerate this whole docs source set; local `full` runs provide documentation evidence.
-Only copy a frame into `docs/img/screenshots/` when an authored docs page references it.
-`tests/docs-screenshots.test.js` fails on any committed screenshot that is not referenced from a docs page, so a frame that was deliberately dropped from the docs cannot quietly creep back in from a later smoke run.
-If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
+A page declares an image slot by naming a case id.
+The generator fills the slot, and both halves are gated, so neither can move without the other.
+
+```sh
+node scripts/docs-screenshots.mjs plan   # what a run would rewrite, without starting a browser
+npm run docs:screenshots                 # render, encode what changed, update the map
+npm run docs:screenshots:check           # re-verify the committed digests against a fresh render
+```
+
+Three files make up the mechanism.
+
+- `docs/_data/screenshots.json` is the committed map.
+  It carries a provenance header and one entry per case, each with the alternative text the site publishes and the SHA-256 of the source frame the committed image was encoded from.
+  The asset path is derived from the case id and never stored, so there is only ever one name for a frame.
+- `docs/_includes/screenshot.html` is the slot.
+  Write `{% raw %}{% include screenshot.html case="manager-recipe-edit-normal" %}{% endraw %}` on a page, optionally with `alt` to override the map's text or `caption` to add a visible one.
+- `docs/img/screenshots/lab/` holds the generated images, one per mapped case.
+
+The generated set has a directory of its own, and that is load-bearing rather than tidiness.
+`docs/img/screenshots/` still holds seventeen hand-curated frames that predate the generator, five of the case ids share the `fabricate-` prefix with them, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
+That reduces the reverse gate to the map restating itself.
+`tests/docs-screenshots.test.js` owns the flat directory and `tests/docs-screenshot-map.test.js` owns `lab/`, and each says in its own comments which facts keep them apart.
+
+Those pre-existing seventeen frames stay exactly as they are.
+They remain valid documentation evidence and are not migrated, because retiring evidence that is still accurate buys nothing.
+The rule applies to a new or replaced screenshot.
+
+`npm run docs:screenshots` rewrites only the frames whose rendered source actually moved, and reports which ones it left alone.
+Run it after any change that alters one of the mapped views, and read what it reports before committing.
+Then run `npm run docs:screenshots:check` to confirm every committed digest still matches a fresh render.
+That check is the reason the digests are worth carrying at all, so do not skip it on a change that touched a mapped view.
+
+One limitation is known and measured rather than assumed.
+The renderer's output is not byte-stable from one run to the next for every case.
+Across two consecutive runs of the forty-six mapped cases, eight to nine frames reported as changed while being visually identical, and the set was not the same both times.
+Measured on one of them, five pixels out of 1,049,600 differed, none by more than four levels on any channel, all inside a five-by-fourteen-pixel box on the antialiased edge of a single radio button.
+So a run that reports a small changed list with nothing visibly different is renderer noise rather than a view change, and re-running does not settle it.
+Read the changed list rather than trusting it, and do not read a check failure of that shape as a documentation defect.
+
+Generation fails closed.
+Without the harvested Foundry chrome it aborts naming the harvest command, and without `cwebp` on `PATH` it aborts naming libwebp.
+A case the renderer failed on this run is refused even when an earlier run left a frame for it on disk, because the renderer accumulates output and republishing that frame would ship an older commit's picture as current documentation.
+
+There is no CI job that regenerates any of this.
+Generation needs the harvested chrome, which never leaves your machine, so CI builds and deploys what is committed.
+
+A Foundry chrome rotation or a Playwright resolution change rewrites the whole set with no visual change to review.
+The map's provenance header makes that identifiable, and such a rewrite lands as its own commit, separate from any content change.
 
 ## UI PR screenshot evidence
 
