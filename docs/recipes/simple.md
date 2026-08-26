@@ -18,6 +18,8 @@ One ingredient set, one result group, optional pass/fail check.
 - Exactly **one** result group
 - Crafting check is optional (pass/fail only)
 
+{% include screenshot.html case="player-crafting-simple" caption="A simple recipe ready to craft in the Crafting tab." %}
+
 ## Example: Healing Potion
 
 A basic alchemy recipe:
@@ -33,6 +35,10 @@ This recipe has one ingredient set with two groups, a "Herbs" group (2x Moonpeta
 You author it on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
 The public API can create and configure recipes too.
 See the [API reference]({% link api/recipe-manager.md %}) for those methods.
+
+A player sees the whole recipe in one panel: what it needs, what it uses, and what it makes.
+
+{% include screenshot.html case="coverage-mode-simple-detail" %}
 
 ## With an Optional Check
 

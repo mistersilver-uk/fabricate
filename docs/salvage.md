@@ -75,6 +75,8 @@ Setting one up is two steps, in this order:
 The toggle stays unavailable until the component has a result group, because there is nothing to enable yet.
 The panel tells you which of the two states you are in, so you are never left guessing why the toggle will not move.
 
+{% include screenshot.html case="manager-component-edit-salvage" caption="The salvage section of the component editor." %}
+
 Removing a component's last result group turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
@@ -146,6 +148,8 @@ It shows no **System** drop-down and behaves exactly as before.
 ### What the Salvage Tab Shows
 
 The tab opens with a short banner naming the rule the component follows, then lists what the player stands to recover.
+
+{% include screenshot.html case="player-salvage" %}
 What it lists depends on the system's salvage resolution mode, and on whether you have given that mode a salvage check roll formula.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -178,6 +182,8 @@ Availability is judged against the character doing the salvaging, not the party 
 A tool that only another party member is carrying still reads **Unavailable**, because this character cannot reach it during the salvage.
 A tool the salvaging character holds but which is broken also reads **Unavailable**, because a broken tool cannot be used.
 
+{% include screenshot.html case="player-salvage-tools" %}
+
 While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
 The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
 Bringing the tool onto the salvaging character clears the block and makes the button usable.
@@ -192,6 +198,8 @@ Players can select several owned items in the Inventory grid and act on all of t
 Shift-click a card, or press Shift+Enter or Shift+Space with a card focused, to add it to the selection.
 Shift-clicking a selected card removes it again.
 Pressing Escape clears the whole selection.
+
+{% include screenshot.html case="player-inventory-bulk-mixed" caption="Four items selected at once, drawn from more than one crafting system." %}
 
 Once at least one item is selected, the inspector shows the bulk panel instead of a single item's detail.
 The panel sorts the selection into two lists:

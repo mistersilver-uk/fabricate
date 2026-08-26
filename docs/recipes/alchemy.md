@@ -152,6 +152,8 @@ See [Visibility Rules](#visibility-rules) for what "revealed" means and how a di
 
 On a narrow window the three columns stack, with the workbench on top.
 
+{% include screenshot.html case="player-alchemy-workbench" %}
+
 The discipline's name and its **Switch discipline** button sit above the **Known recipes** heading.
 
 ### Pulling components from other characters
@@ -168,6 +170,8 @@ When only one alchemy discipline is set up, the workbench opens straight into it
 When more than one exists, Fabricate first shows a **Choose a discipline** screen with a card for each one.
 Each card shows the discipline's name and how many of its recipes you have discovered out of the total that exist.
 Choose a card and select **Enter** to open that discipline's workbench.
+
+{% include screenshot.html case="player-alchemy-chooser" caption="The discipline chooser, shown when more than one alchemy system is set up." %}
 
 Once you are in a discipline, a **Switch discipline** button lets you return to the chooser and pick another.
 Switching clears the bench and your current selection, and everything on screen then refers to the new discipline.
@@ -277,8 +281,12 @@ See [Journal]({% link journal.md %}) for where a character's runs and attempts a
 ## Setting Up an Alchemy System
 
 To set up an alchemy system, create a crafting system with its resolution mode set to Alchemy, then choose the **Alchemy check** under **Recipe resolution** on the system's **Settings** page.
+
+{% include screenshot.html case="manager-alchemy-settings" %}
 Add the managed components that act as ingredients, then author recipes.
 Each recipe has a single ingredient set that defines the hidden combination players must discover by experiment, and one or more result sets that define what is produced.
+
+{% include screenshot.html case="manager-recipe-edit-results-alchemy" caption="The result sets of an alchemy recipe." %}
 With a Simple check, each recipe has an **On success** result set and a separate **On a failed check** result set.
 Fill the failure set when you want a failed brew to produce something, or leave it empty to have a failed brew produce nothing.
 Enable each recipe, because disabled recipes are never matched.

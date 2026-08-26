@@ -77,6 +77,8 @@ All crafting system editing requires the GM role.
 5. Enable any optional features you want (essences, multi-step recipes, etc.)
 6. Save it
 
+{% include screenshot.html case="manager-system-edit-normal" caption="A saved system, showing its name and description above the optional feature toggles." %}
+
 ## Step 3: Add Components
 
 Fabricate recipes reference *components*.
@@ -88,6 +90,10 @@ So long as you use that same world or compendium item, or copies of it, to creat
 3. Your item is now registered as a Fabricate component
 
 ![Fabricate created component](img/screenshots/fabricate-created-component.webp)
+
+Once you start adding recipes, the **Crafting** page lists every recipe the system holds.
+
+{% include screenshot.html case="manager-recipes-normal" %}
 
 ## Step 4: Create a Gathering Environment
 

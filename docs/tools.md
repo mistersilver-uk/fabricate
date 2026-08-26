@@ -21,6 +21,8 @@ The library shows each Tool's image, display name, enabled state, breakage summa
 Select a row to inspect it.
 Choose **Edit Tool** to open its editor.
 
+{% include screenshot.html case="manager-tool-parity-01-library-1280x720" %}
+
 **Ready** means the Tool passes every validation check.
 **Needs attention** means the Tool has one or more issues.
 The inspector shows the issue count before you open the editor.
@@ -50,6 +52,8 @@ The editor has four tabs:
 - **Requirements** controls shared character prerequisites and the Tool check bonus.
 - **Validation** lists every issue that blocks saving.
 
+{% include screenshot.html case="manager-tool-parity-02-overview-1280x720" caption="The overview tab of the Tool editor." %}
+
 The behavior preview summarizes the draft while you work.
 Its **How Tools work in Fabricate** card remains available on every tab.
 The **Unsaved** state appears after a change.
@@ -68,6 +72,8 @@ The acting actor must own a non-broken matching Item unless a Tool station provi
 Presence matching accepts familiar copies so players can use Items copied from the Tool's source.
 Usage and breakage require a durable identity match because those actions can change or delete an Item.
 A loosely recognized copy can satisfy presence while being spared from usage and breakage.
+
+{% include screenshot.html case="manager-tool-parity-04-requirements-1280x720" caption="Character prerequisites gate who may wield a Tool." %}
 
 {: .note }
 
@@ -123,6 +129,8 @@ See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-trigger
 ## Tool-specific breakage mechanics
 
 Under **Tool-specific**, choose one breakage mechanic:
+
+{% include screenshot.html case="manager-tool-parity-03-breakage-1280x720" %}
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 

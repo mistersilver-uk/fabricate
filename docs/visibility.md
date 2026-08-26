@@ -344,6 +344,8 @@ The surface lists every recipe item in the selected system.
 Each item shows its image and name, and the recipes it teaches under **Linked recipes**.
 An item with no linked recipes yet says so, and the whole surface shows an empty state when the system has no recipe items at all.
 
+{% include screenshot.html case="manager-books-scrolls-normal" caption="Every recipe item in a system, with the recipes each one teaches." %}
+
 Each item also shows its own use and learn caps as chips:
 
 - A **Use cap** chip shows how many times the item grants crafting access, or **Unlimited uses** when use tracking is off.
@@ -386,6 +388,8 @@ The roster lists player characters only.
 A character with nothing tracked shows a dimmed **Nothing tracked** row.
 The detail pane has two tabs, **Recipe items** and **Learned recipes**.
 Knowledge opens on **Recipe items**, unless the selected system has no recipe items registered at all, in which case it opens on **Learned recipes** instead.
+
+{% include screenshot.html case="manager-knowledge-owned-copies" caption="The copies a character is carrying, on the Recipe items tab." %}
 
 At the top of the detail pane, a reset control lets you clear a character's knowledge outright.
 See [Resetting a Character's Knowledge](#resetting-a-characters-knowledge) below.

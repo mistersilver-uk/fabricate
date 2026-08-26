@@ -33,6 +33,10 @@ Every recipe brings together a few things.
 > For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole.
 See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
+The results a recipe produces are chosen on their own tab.
+
+{% include screenshot.html case="manager-recipe-edit-results" %}
+
 ## Enabling and Disabling Recipes
 
 Whether a recipe is enabled controls whether it can be crafted.
@@ -51,6 +55,8 @@ Ingredients are organised in a three-level hierarchy:
 - **Ingredient Sets** (OR, any one set satisfies the recipe)
   - **Ingredient Groups** (AND, all groups in the set must be satisfied)
     - **Options** (OR, any one option satisfies the group)
+
+{% include screenshot.html case="manager-recipe-edit-ingredients" %}
 
 **Example:** A sword recipe might accept either iron or steel:
 
@@ -131,6 +137,8 @@ Gathering applies no numeric Tool bonus.
 GMs author recipes in the Crafting Admin panel.
 The recipe editor has dedicated tabs for the recipe's overview, ingredients, results, tools, access, and validation.
 The Overview tab edits identity (name, description, image, and whether it is on or off) and links a recipe item.
+
+{% include screenshot.html case="manager-recipe-edit-normal" caption="The Overview tab of the recipe editor." %}
 When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
@@ -140,6 +148,14 @@ See [Check modifiers]({% link crafting-checks.md %}#check-modifiers).
 
 Players craft in the **Crafting** tab of the unified Fabricate window.
 They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
+
+The Validation tab lists anything that would stop the recipe being crafted.
+
+{% include screenshot.html case="manager-recipe-edit-validation" %}
+
+In a system that restricts recipes, the **Access** page grants individual recipes to named characters and players.
+
+{% include screenshot.html case="manager-recipe-edit-access-rail" caption="Recipe access, where a GM grants a recipe to specific characters or players." %}
 
 Recipe authoring and runtime crafting are also available through the public API.
 See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
