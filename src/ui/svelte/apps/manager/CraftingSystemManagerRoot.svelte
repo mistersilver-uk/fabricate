@@ -8744,6 +8744,7 @@
                 <Chip
                   tone={downtimeHeaderStatus.tone}
                   truncate
+                  density="action"
                   data-downtime-chrome-status
                   title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
                   >{downtimeHeaderStatus.label}</Chip
@@ -8787,6 +8788,7 @@
               <Chip
                 tone="warning"
                 truncate
+                density="action"
                 title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}
                 >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
               >
@@ -8816,6 +8818,7 @@
               <Chip
                 tone="warning"
                 truncate
+                density="action"
                 data-recipe-item-dirty
                 title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}
                 >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
@@ -8887,7 +8890,9 @@
             <!-- no header actions for the tags view -->
           {:else if isChecksRoute}
             {#if checksDirty}
-              <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
+              <Chip tone="warning" density="action"
+                >{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip
+              >
             {/if}
             <ManagerButton
               role="primary"
@@ -8989,7 +8994,7 @@
             </ManagerButton>
           {:else if currentView === 'environment-edit'}
             {#if $viewState.environmentDraftDirty}
-              <Chip tone="warning"
+              <Chip tone="warning" density="action"
                 >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
               >
             {/if}
@@ -9030,7 +9035,7 @@
             </ManagerButton>
           {:else if currentView === 'gathering-task-edit'}
             {#if gatheringTaskDraftDirty}
-              <Chip tone="warning"
+              <Chip tone="warning" density="action"
                 >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
               >
             {/if}
@@ -9087,7 +9092,7 @@
             {/if}
           {:else if currentView === 'gathering-event-edit'}
             {#if gatheringEventDraftDirty}
-              <Chip tone="warning"
+              <Chip tone="warning" density="action"
                 >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
               >
             {/if}
