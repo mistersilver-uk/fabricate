@@ -113,7 +113,8 @@
       labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrement',
       labelFallback: 'Increment macro',
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrementHint',
-      hintFallback: 'Reserved for a future refund flow — configured now but not yet invoked.',
+      hintFallback:
+        'Runs whenever coin goes back to an actor: a cancelled craft, a companion credit, or a pooled take that could not be completed.',
     },
     {
       key: 'decrement',
