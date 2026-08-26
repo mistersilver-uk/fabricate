@@ -283,10 +283,12 @@ See [Journal]({% link journal.md %}) for where a character's runs and attempts a
 To set up an alchemy system, create a crafting system with its resolution mode set to Alchemy, then choose the **Alchemy check** under **Recipe resolution** on the system's **Settings** page.
 
 {% include screenshot.html case="manager-alchemy-settings" %}
+
 Add the managed components that act as ingredients, then author recipes.
 Each recipe has a single ingredient set that defines the hidden combination players must discover by experiment, and one or more result sets that define what is produced.
 
 {% include screenshot.html case="manager-recipe-edit-results-alchemy" caption="The result sets of an alchemy recipe." %}
+
 With a Simple check, each recipe has an **On success** result set and a separate **On a failed check** result set.
 Fill the failure set when you want a failed brew to produce something, or leave it empty to have a failed brew produce nothing.
 Enable each recipe, because disabled recipes are never matched.

@@ -150,6 +150,7 @@ It shows no **System** drop-down and behaves exactly as before.
 The tab opens with a short banner naming the rule the component follows, then lists what the player stands to recover.
 
 {% include screenshot.html case="player-salvage" %}
+
 What it lists depends on the system's salvage resolution mode, and on whether you have given that mode a salvage check roll formula.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->

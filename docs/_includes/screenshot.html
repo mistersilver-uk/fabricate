@@ -10,6 +10,10 @@ Parameters:
   alt      optional, overrides the alternative text the map records for that case
   caption  optional, a visible caption beneath the frame
 
+Both alt and caption are escaped. Neither is a place for markup: alt is read aloud in place of the
+image, where a tag is noise rather than emphasis, and a caption that wanted a link or a code span
+would be describing something the surrounding prose should be saying instead.
+
 The image source is resolved through relative_url so it works from any depth of the site. The bare
 relative paths used by the older hand-curated frames only resolve because every page carrying one
 happens to sit at the site root, and would break on a page in a subdirectory.
@@ -30,6 +34,6 @@ change.
     style="display: block; width: 100%; height: auto; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.14);"
   >
   {%- if include.caption %}
-  <figcaption style="margin-top: 0.5rem; font-size: 0.75rem; line-height: 1.5; opacity: 0.8;">{{ include.caption }}</figcaption>
+  <figcaption style="margin-top: 0.5rem; font-size: 0.75rem; line-height: 1.5; opacity: 0.8;">{{ include.caption | escape }}</figcaption>
   {%- endif %}
 </figure>

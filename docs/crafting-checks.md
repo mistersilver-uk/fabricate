@@ -154,6 +154,7 @@ There is nothing to add to the roll formula: an entry that is eligible applies a
 This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.
 
 {% include screenshot.html case="manager-checks-crafting-modifiers" %}
+
 The two READ it differently — a drop row works the expression out and shifts the chance by the result, while a check adds it to the roll — but **an expression that rolls dice is welcome in both**.
 A check appends the dice to its own roll formula, so a `1d4` modifier is rolled once together with the check, animates like any other die, and shows on the chat card.
 
@@ -660,11 +661,13 @@ Treat a per-die trigger as unverified on a counting pool, and confirm it with a 
 
 ### What the previews will tell you
 
-For a formula whose outcomes can all be counted, the panel draws the chance of each one for a chosen character.
+Start with what the panel does when it can work the outcomes out.
+The frame below is an ordinary `1d20 + @abilities.int.mod` check on a routed system, and the **Chance per outcome** panel gives each named tier its own percentage for the chosen character.
 
-{% include screenshot.html case="manager-checks-crafting-odds-enumerable" %}
+{% include screenshot.html case="manager-checks-crafting-odds-enumerable" caption="Chance per outcome, on an ordinary formula the panel can enumerate." %}
 
-The odds histogram on the check's panel deliberately abstains from drawing a chart for a counting formula, and it says so.
+A counting formula gets none of that.
+The odds histogram deliberately abstains from drawing a chart for one, and says on the panel that it has.
 That is correct behaviour: the panel refuses rather than showing a chart that would be wrong.
 The average reading, and any ranking built from it, are not trustworthy for a counting formula.
 Do not use them to compare one check against another.

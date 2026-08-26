@@ -58,6 +58,7 @@ How the roll maps to a tier depends on whether the check's tiers are relative or
 {% include screenshot.html case="coverage-mode-routed-check-checks" caption="The outcome tiers a routed check sorts results into." %}
 
 {% include screenshot.html case="player-crafting-routed-by-check" caption="The same recipe as a player sees it, listing the outcomes the roll can land in." %}
+
 See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers) for the difference.
 
 With relative tiers, the base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.

@@ -139,6 +139,7 @@ The recipe editor has dedicated tabs for the recipe's overview, ingredients, res
 The Overview tab edits identity (name, description, image, and whether it is on or off) and links a recipe item.
 
 {% include screenshot.html case="manager-recipe-edit-normal" caption="The Overview tab of the recipe editor." %}
+
 When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
