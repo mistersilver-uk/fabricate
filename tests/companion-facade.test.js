@@ -783,7 +783,7 @@ describe('criterion 14 — the member table resolves, and says where', () => {
 
   it('resolves every member through its OWN declared host and path', () => {
     const facade = makeInitializedFacade();
-    assert.equal(COMPANION_MEMBERS.length, 12, 'the declared set is twelve members');
+    assert.equal(COMPANION_MEMBERS.length, 14, 'the declared set is fourteen members');
     for (const member of COMPANION_MEMBERS) {
       const host = resolveHost(member, facade);
       assert.ok(host, `${member.name}: its declared host resolved to nothing`);
