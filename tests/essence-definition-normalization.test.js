@@ -166,6 +166,34 @@ test('_normalizeSystem - v2 sourceComponentId survives with resolved sourceItemU
 });
 
 test('_normalizeSystem - stale sourceComponentId is preserved but skips legacy sourceItemUuid', () => {
+  // The component array is NON-EMPTY, which is what makes the component Valid Id Basis KNOWN
+  // (issue 1359): the id genuinely names nothing in this system, so the legacy uuid is dropped
+  // exactly as it always was. With an EMPTY array the basis is UNKNOWN and the uuid is retained
+  // instead — see the next case.
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-1',
+    essenceDefinitions: [
+      {
+        name: 'Void',
+        sourceComponentId: 'missing-component',
+        sourceItemUuid: 'Compendium.fabricate.items.old-source'
+      }
+    ],
+    managedItems: [{ id: 'present-component', name: 'Present' }]
+  });
+  const essence = system.essenceDefinitions[0];
+  assert.equal(essence.sourceComponentId, 'missing-component');
+  assert.equal(essence.sourceItemUuid, null);
+  assert.equal(essence.associatedSystemItemId, 'missing-component');
+});
+
+test('_normalizeSystem - an EMPTY component array is an UNKNOWN basis, so the legacy uuid survives', () => {
+  // Issue 1359 (epic 1357). An empty in-system array plus an unwritten world component setting is
+  // not an empty corpus, it is an UNKNOWABLE one — the state every client is in after the
+  // world-scope migration lands on the active GM and before the setting replicates. Nulling the
+  // authored uuid there is a silent, permanent deletion, because this normalizer is a whitelist
+  // rebuild and the next save makes it durable.
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
@@ -180,7 +208,7 @@ test('_normalizeSystem - stale sourceComponentId is preserved but skips legacy s
   });
   const essence = system.essenceDefinitions[0];
   assert.equal(essence.sourceComponentId, 'missing-component');
-  assert.equal(essence.sourceItemUuid, null);
+  assert.equal(essence.sourceItemUuid, 'Compendium.fabricate.items.old-source');
   assert.equal(essence.associatedSystemItemId, 'missing-component');
 });
 

@@ -417,6 +417,93 @@ describe('the SYSTEM-VALIDITY GATE reaches the gathering store', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------
+// publisher 4 — a replicated WORLD SCOPE write (issue 1359, epic 1357)
+// ---------------------------------------------------------------------------------------------
+
+describe('publisher 4 — a replicated world scope write', () => {
+  /**
+   * The domains each key announces, restated here as LITERAL tokens rather than imported from
+   * `domainsForSystemFields`.
+   *
+   * Deliberate: the bridge DERIVES them from `SYSTEM_FIELD_DOMAINS` so it cannot drift, and a test
+   * that derived them the same way would assert `x === x` and would stay green if both moved
+   * together. Writing the tokens out is what makes a reclassification a decision somebody has to
+   * come here and make.
+   */
+  const SCOPE_KEYS = [
+    {
+      key: `fabricate.${SETTING_KEYS.COMPONENT_SCOPE}`,
+      target: 'componentScopeStore',
+      domains: ['labelling', 'narrative', 'component-definitions'],
+    },
+    {
+      key: `fabricate.${SETTING_KEYS.ESSENCE_SCOPE}`,
+      target: 'essenceScopeStore',
+      domains: ['labelling', 'materials-and-yield', 'component-definitions'],
+    },
+    {
+      key: `fabricate.${SETTING_KEYS.TOOL_SCOPE}`,
+      target: 'toolScopeStore',
+      // Taxonomy order, which is what `domainsForSystemFields` answers in.
+      domains: ['labelling', 'narrative', 'resolution-config', 'component-definitions'],
+    },
+  ];
+
+  for (const scope of SCOPE_KEYS) {
+    it(`announces exactly ${scope.target}'s domains, for every system and no others`, () => {
+      const { world, bus } = wiredWorld();
+      tracked(bus);
+
+      const handled = handleFabricateSettingChange(scope.key, {
+        [scope.target]: { load: () => {} },
+        craftingSystemManager: world.systemManager,
+        callAll: (name, payload) => bus.hooks.callAll(name, payload),
+      });
+
+      assert.equal(handled, true);
+      assert.equal(bus.scopedEmissions().length, 1, 'one write, one scoped signal');
+      assert.deepEqual(scopeSummary(bus.scopedEmissions()[0]), [
+        [SYS_A, scope.domains],
+        [SYS_B, scope.domains],
+      ]);
+      assert.equal(
+        bus.fallbackCount(),
+        0,
+        'and it arrived by ROUTING, not by the broad fail-safe — an empty domain list would ' +
+          'poison the payload and reload every store on every client'
+      );
+    });
+  }
+
+  it('scopes EVERY system, because a world entity has no participation flag to filter on', () => {
+    // Unlike currency and travel, which filter to participating systems. Any system may reference
+    // any world entity by id, so any system may be affected.
+    const { world, bus } = wiredWorld();
+    tracked(bus);
+    handleFabricateSettingChange(`fabricate.${SETTING_KEYS.COMPONENT_SCOPE}`, {
+      componentScopeStore: { load: () => {} },
+      craftingSystemManager: world.systemManager,
+      callAll: (name, payload) => bus.hooks.callAll(name, payload),
+    });
+    assert.equal(bus.scopedEmissions()[0].scopes.length, 2);
+  });
+
+  it('emits NOTHING when there is no system to attribute the edit to', () => {
+    // An empty scope list would poison the payload into a broad invalidation, so the leg skips the
+    // emission entirely rather than announcing one.
+    const { bus } = wiredWorld();
+    tracked(bus);
+    handleFabricateSettingChange(`fabricate.${SETTING_KEYS.TOOL_SCOPE}`, {
+      toolScopeStore: { load: () => {} },
+      craftingSystemManager: { getSystems: () => [] },
+      callAll: (name, payload) => bus.hooks.callAll(name, payload),
+    });
+    assert.equal(bus.scopedEmissions().length, 0);
+    assert.equal(bus.fallbackCount(), 0);
+  });
+});
+
 describe('the fail-safe: an unattributable change routes broadly', () => {
   it('runs reload -> delta -> emit -> FALLBACK for a pure corpus reordering', () => {
     // A reordering is the only production-reachable producer of an empty domain set, which
