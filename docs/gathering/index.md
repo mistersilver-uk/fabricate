@@ -35,7 +35,7 @@ See [Checks › Gathering]({% link checks/gathering.md %}).
 
 Gathering is opt-in per crafting system.
 Open the system in the Crafting Admin panel and enable the Gathering feature.
-When this feature is enabled, the **Environments** tab appears for that system.
+When this feature is enabled, the **Gathering** group appears in the rail for that system.
 
 When at least one crafting system has gathering enabled, players also see a dedicated **Gathering** action in the Items Directory header.
 This action opens the player Gathering app.

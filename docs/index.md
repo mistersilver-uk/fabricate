@@ -86,10 +86,10 @@ Tools can be both things you would carry, like a hammer, knife, or satchel or th
 
 ## Gathering
 
-GMs can define material gathering locations in [Gathering Environments]({% link gathering/index.md %}) when a crafting system enables the "Gathering" feature.
+GMs can define material gathering locations in [Gathering]({% link gathering/index.md %}) when a crafting system enables the "Gathering" feature.
 Gathering can also be location-aware!
 GMs can describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
-See [Gathering Realms & Travel]({% link world/travel/index.md %}).
+See [Travel]({% link world/travel/index.md %}).
 
 ## Journal
 

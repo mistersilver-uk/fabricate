@@ -7,6 +7,9 @@ has_children: true
 
 # Components
 
+Components are managed on the **Components** page of the Crafting Admin panel's rail.
+Two more pages sit beneath this one: [Complications]({% link components/complications.md %}), the consequences a component can fire when a progressive result produces it, and [Salvage]({% link components/salvage.md %}), what it yields when it is broken back down.
+
 Components are the building blocks of recipes.
 Instead of pointing at a single specific world item, recipes refer to a component, and any matching item can satisfy it.
 This means:

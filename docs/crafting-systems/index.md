@@ -11,6 +11,19 @@ A **crafting system** is a self-contained configuration that groups together env
 You can have multiple crafting systems in a single world.
 For example, "Alchemy", "Blacksmithing", and "Enchanting" could each be their own system with different recipes and rules.
 
+This page covers creating a system and the settings that live on the system itself.
+Three more pages sit beneath it:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Page | What it holds |
+|:-----|:--------------|
+| [System Overview]({% link crafting-systems/system-overview.md %}) | Every open issue across the system, and what a blocker hides from players. |
+| [Startup & Preferences Cleanup]({% link crafting-systems/startup-cleanup.md %}) | What Fabricate tidies away on load, and why. |
+| [Import & Export]({% link crafting-systems/import-export.md %}) | Moving a whole system between worlds as JSON. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ---
 
 ## Creating a System
@@ -68,7 +81,7 @@ Most optional features are off by default and must be explicitly enabled by a GM
 | Property macros     | Off     | Allow result items to have their properties set by a macro. With essences also enabled, each contributing essence can carry its own property macro too   |
 | Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |
 | Multi-step recipes  | Off     | Allow recipes with multiple sequential steps. Turning it off keeps any multi-step recipes you have authored and collapses each one into a single combined action that produces its final results, until you turn it back on |
-| Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
+| Gathering           | Off     | Show the Gathering group for authoring gathering environments, tasks, and events. Any enabled system also exposes the player Gathering action in the Items Directory |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -176,7 +189,7 @@ Each system uses one of four visibility modes:
 Selecting a mode applies at once and never rewrites your recipes.
 The mode you choose decides which extra surfaces appear in the **Crafting** menu, such as the **Access** section for Restricted mode or **Books & Scrolls** limits for Item and Knowledge modes.
 
-For full details on each mode, recipe items, the learn flow, and configuration examples, see [Visibility & Knowledge]({% link crafting/settings.md %}).
+For full details on each mode, recipe items, the learn flow, and configuration examples, see [Crafting Settings]({% link crafting/settings.md %}#recipe-visibility).
 
 ### Alchemy Mode
 
