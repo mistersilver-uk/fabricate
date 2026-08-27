@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { SETTING_KEYS } from '../src/config/settings.js';
+import { SETTING_KEYS, WORLD_SCOPED_SETTING_KEYS } from '../src/config/settings.js';
 import {
   createComponentScopeStore,
   createEssenceScopeStore,
@@ -275,6 +275,18 @@ describe('the three world scope settings', () => {
     assert.equal(SETTING_KEYS.ESSENCE_SCOPE, 'essenceScope');
     assert.equal(SETTING_KEYS.TOOL_SCOPE, 'toolScope');
     assert.equal(SETTING_KEYS.WORLD_VOCABULARY, undefined);
+  });
+
+  it('are registered at WORLD scope, which the rest of this suite cannot see', () => {
+    // Every other case here injects its own settings seam, so it would pass verbatim against a
+    // typo'd `scope: 'client'` registration - and that typo is not cosmetic. A client-scoped key
+    // is PER USER: the corpus each player read would be their own, `_scopeBasis` would answer
+    // from a roster the GM never wrote, and both bridge legs would stop replicating because there
+    // would be nothing world-level to replicate. Pinned against `WORLD_SCOPED_SETTING_KEYS`,
+    // which is DERIVED from the registration itself, rather than against a restated literal.
+    assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.COMPONENT_SCOPE), true);
+    assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.ESSENCE_SCOPE), true);
+    assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.TOOL_SCOPE), true);
   });
 });
 

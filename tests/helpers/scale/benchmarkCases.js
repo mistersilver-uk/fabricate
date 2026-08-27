@@ -51,14 +51,17 @@ const BULK_ROWS = 5;
 const CORPUS_ROW_SERIES = Object.freeze([25, 50, 100]);
 
 /**
- * How many of the 5,000-component library ALSO exist at world scope (issue 1359, epic 1357).
+ * How many world-scope entities each issue-1359 case seeds (issue 1359, epic 1357).
  *
- * Half, deliberately, so BOTH halves of both unions are non-degenerate: 2,500 world entities with
- * a membership record for the bench system, and 2,500 components that exist only in the system's
- * own array. A fixture where the world corpus were empty would take the union's degenerate branch
- * and measure nothing — which is exactly the gap this case exists to close, since every OTHER case
- * in this registry either runs against a hand-built stub that never calls `_normalizeSystem` or
- * seeds no world setting at all.
+ * Half the 5,000-component library, deliberately, so BOTH halves of both unions are
+ * non-degenerate: 2,500 world entities with a membership record for the bench system beside a
+ * 5,000-entry in-system array. A fixture where the world corpus were empty would take each
+ * union's degenerate branch and measure nothing — which is exactly the gap these cases exist to
+ * close, since every OTHER case in this registry either runs against a hand-built stub that never
+ * calls `_normalizeSystem` or seeds no world setting at all.
+ *
+ * WHETHER THOSE 2,500 IDS OVERLAP THE IN-SYSTEM ARRAY IS PER CASE, and it decides what each
+ * case's counts can distinguish. See `worldComponentScope`.
  */
 const WORLD_SCOPE_ENTITIES = 2500;
 
@@ -73,21 +76,44 @@ const WORLD_SCOPE_ENTITIES = 2500;
 const SCOPED_UNION_READS = 25;
 
 /**
+ * The prefix that turns an in-system component id into one the in-system array does NOT carry.
+ *
+ * See `worldComponentScope`: which of the two rosters a case seeds decides what its counts can
+ * distinguish, so the choice is a per-case argument rather than a single shared fixture.
+ */
+const WORLD_ONLY_ID_PREFIX = 'world-only-';
+
+/**
  * The world component scope payload for one bench world, in the PERSISTED shape.
  *
+ * THE TWO ROSTERS ARE NOT INTERCHANGEABLE, and picking the wrong one makes a case blind to the
+ * failure it exists to catch.
+ *
+ * - `overlap: true` draws the roster from the FIRST `WORLD_SCOPE_ENTITIES` in-system components,
+ *   so every world row COLLIDES with a legacy row. That is what the READ UNION case wants: the
+ *   union's "world wins on an id collision" branch is what decides all 2,500 of them. Its row
+ *   count is 5,000 either way, so the row count alone cannot tell a two-half union from the
+ *   legacy half alone — which is why that case also commits `scopedUnionWorldWins`.
+ * - `overlap: false` mints ids the in-system array does not carry, so the BASIS union is
+ *   strictly WIDER than the legacy array: 5,000 + 2,500. A basis that ignored the world store
+ *   would answer 5,000, and a roster drawn from the in-system ids could not show the difference.
+ *
  * @param {object} world
+ * @param {object} [options]
+ * @param {boolean} [options.overlap] Whether the roster reuses in-system ids. Defaults to `true`.
  * @returns {object}
  */
-function worldComponentScope(world) {
+function worldComponentScope(world, { overlap = true } = {}) {
   const scoped = world.fixture.components.slice(0, WORLD_SCOPE_ENTITIES);
   const entities = [];
   const defaults = {};
   const membership = {};
   for (const component of scoped) {
-    entities.push({ id: component.id, name: component.name, img: component.img });
-    defaults[component.id] = { id: component.id, category: component.category };
-    membership[`${component.id}|${world.system.id}`] = {
-      entityId: component.id,
+    const id = overlap ? component.id : `${WORLD_ONLY_ID_PREFIX}${component.id}`;
+    entities.push({ id, name: component.name, img: component.img });
+    defaults[id] = { id, category: component.category };
+    membership[`${id}|${world.system.id}`] = {
+      entityId: id,
       systemId: world.system.id,
       inherit: {},
     };
@@ -362,7 +388,8 @@ function simpleCorpusCases() {
         'unioned with the 5,000-component in-system library, read ' +
         `${SCOPED_UNION_READS} times through the REAL CraftingSystemManager. ` +
         'identityIndexBuilds must stay at 1: it is the committed proof that the memo is HIT ' +
-        'rather than rebuilt per call.',
+        'rather than rebuilt per call, and scopedUnionWorldWins is the committed proof that the ' +
+        'WORLD half participated at all.',
       setup: (context) => {
         const world = worldFor(context);
         return { world, ...scopedManager(world) };
@@ -377,6 +404,12 @@ function simpleCorpusCases() {
       counts: ({ world }, union) => ({
         scopedUnionReads: SCOPED_UNION_READS,
         scopedUnionRows: union.length,
+        // THE ROW COUNT ALONE IS BLIND. This roster overlaps the in-system array exactly, so
+        // `scopedUnionRows` is 5,000 whether the world half participated or was dropped on the
+        // floor. Only a world row carries `member` — it is stamped by the three-layer resolver
+        // and a legacy row passes through verbatim — so this is the count that moves, from 2,500
+        // to 0, the moment the membership-filtered pass stops contributing.
+        scopedUnionWorldWins: union.filter((entry) => entry.member === true).length,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
         // The join payload cost of the new key, at this scale. World settings are delivered whole
         // to every client and every edit rebroadcasts the whole value, so the BYTES are the fact
@@ -395,12 +428,16 @@ function simpleCorpusCases() {
       profile: 'simple-corpus',
       description:
         'The other half of issue 1359: initialize() runs _normalizeSystem over the whole ' +
-        '5,000-component library while the world component scope is SEEDED, so the Valid Id ' +
-        'Basis really does union a 2,500-id world roster with the in-system array on every ' +
-        'normalize instead of taking its degenerate branch.',
+        '5,000-component library while the world component scope is SEEDED with a roster of ' +
+        '2,500 ids the in-system array does NOT carry, so scopedBasisComponentIds is 7,500 — ' +
+        'the committed proof that the Valid Id Basis really does union the world roster with ' +
+        'the in-system array instead of taking its degenerate branch.',
       setup: (context) => {
         const world = worldFor(context);
-        world.settings.set('componentScope', worldComponentScope(world));
+        // DISJOINT, unlike the read-union case above. A roster drawn from the in-system ids would
+        // make the basis 5,000 whether or not the world half was consulted, so the count could
+        // not distinguish a real union from the legacy array alone. See `worldComponentScope`.
+        world.settings.set('componentScope', worldComponentScope(world, { overlap: false }));
         world.settings.set('craftingSystems', [world.system]);
         const store = world.modules.worldScopeStores.createComponentScopeStore();
         store.load();
@@ -419,6 +456,13 @@ function simpleCorpusCases() {
           (total, system) => total + (system.components?.length ?? 0),
           0
         ),
+        // MANAGER-DERIVED, and the only count here that can move. The other four are identical to
+        // the unscoped `craftingSystemManager.normalizeImport` case plus two facts read off the
+        // settings map, so a basis that ignored the world store outright would leave every one of
+        // them unchanged. This one is the basis the normalize run prunes against, asked of the
+        // manager itself: 5,000 in-system ids plus a disjoint 2,500-id world roster.
+        scopedBasisComponentIds: manager._scopeBasis(manager.getSystem(world.system.id))
+          .componentIds.size,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
         worldScopeBytes: settingBytes(world.settings, 'componentScope'),
       }),

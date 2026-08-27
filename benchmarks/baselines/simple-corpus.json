@@ -113,26 +113,28 @@
       }
     },
     "craftingSystemManager.scopedUnionRead": {
-      "description": "The world-scope READ UNION (issue 1359) over a 2,500-entity world component corpus unioned with the 5,000-component in-system library, read 25 times through the REAL CraftingSystemManager. identityIndexBuilds must stay at 1: it is the committed proof that the memo is HIT rather than rebuilt per call.",
+      "description": "The world-scope READ UNION (issue 1359) over a 2,500-entity world component corpus unioned with the 5,000-component in-system library, read 25 times through the REAL CraftingSystemManager. identityIndexBuilds must stay at 1: it is the committed proof that the memo is HIT rather than rebuilt per call, and scopedUnionWorldWins is the committed proof that the WORLD half participated at all.",
       "counts": {
         "identityCandidatesExamined": 0,
         "identityIndexBuilds": 1,
         "scopedUnionReads": 25,
         "scopedUnionRows": 5000,
+        "scopedUnionWorldWins": 2500,
         "worldScopeEntities": 2500,
         "worldScopeBytes": 656382
       }
     },
     "craftingSystemManager.normalizeImport.worldScoped": {
-      "description": "The other half of issue 1359: initialize() runs _normalizeSystem over the whole 5,000-component library while the world component scope is SEEDED, so the Valid Id Basis really does union a 2,500-id world roster with the in-system array on every normalize instead of taking its degenerate branch.",
+      "description": "The other half of issue 1359: initialize() runs _normalizeSystem over the whole 5,000-component library while the world component scope is SEEDED with a roster of 2,500 ids the in-system array does NOT carry, so scopedBasisComponentIds is 7,500 — the committed proof that the Valid Id Basis really does union the world roster with the in-system array instead of taking its degenerate branch.",
       "counts": {
         "componentCandidatesExamined": 5000,
         "identityCandidatesExamined": 0,
         "identityIndexBuilds": 0,
         "normalizedSystems": 1,
         "normalizedComponents": 5000,
+        "scopedBasisComponentIds": 7500,
         "worldScopeEntities": 2500,
-        "worldScopeBytes": 656382
+        "worldScopeBytes": 793882
       }
     },
     "craftingListing.buildListing.corpusAxis@25": {

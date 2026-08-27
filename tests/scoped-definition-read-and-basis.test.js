@@ -292,6 +292,63 @@ describe('the Valid Id Basis', () => {
     assert.ok(essenceIds instanceof Set);
     assert.equal(essenceIds.size, 0);
   });
+
+  it('answers all THREE entity legs, each from its OWN store and its OWN legacy array', () => {
+    // Every case above drives the ESSENCE leg, because that is the only one epic 1357's consumer
+    // sweep has reached; `componentIds` is pinned once more by the READ-vs-BASIS pair below.
+    // `toolIds` was pinned by NOTHING: it is computed on every call and is what a later PR will
+    // prune tool references against, so replacing it with a bare `null` left all four related
+    // suites green — a half of the basis that could not be wrong is a half nothing holds.
+    //
+    // Three DISJOINT rosters and three DISJOINT legacy arrays, so a leg wired to the wrong store
+    // or reading the wrong in-system array cannot answer correctly by coincidence.
+    const seam = settingsSeam({
+      [SETTING_KEYS.COMPONENT_SCOPE]: { entities: [{ id: 'w-comp' }] },
+      [SETTING_KEYS.ESSENCE_SCOPE]: { entities: [{ id: 'w-ess' }] },
+      [SETTING_KEYS.TOOL_SCOPE]: { entities: [{ id: 'w-tool' }] },
+    });
+    const manager = new CraftingSystemManager(
+      { getRecipes: () => [] },
+      {
+        componentScopeStore: createComponentScopeStore(seam),
+        essenceScopeStore: createEssenceScopeStore(seam),
+        toolScopeStore: createToolScopeStore(seam),
+      }
+    );
+    const basis = manager._scopeBasis({
+      id: 'sys-a',
+      components: [{ id: 'legacy-comp' }],
+      essenceDefinitions: [{ id: 'legacy-ess' }],
+      tools: [{ id: 'legacy-tool' }],
+    });
+
+    assert.deepEqual([...basis.componentIds].sort(), ['legacy-comp', 'w-comp']);
+    assert.deepEqual([...basis.essenceIds].sort(), ['legacy-ess', 'w-ess']);
+    assert.deepEqual([...basis.toolIds].sort(), ['legacy-tool', 'w-tool']);
+  });
+
+  it('gives the TOOL leg the same UNKNOWN gate the essence leg gets', () => {
+    // `null` means prune nothing, and it is the whole safety property. An unseeded tool store
+    // with an empty in-system array must be UNKNOWN rather than a real, empty, prunable set;
+    // a written-empty roster must be the prunable one.
+    const unseeded = new CraftingSystemManager(
+      { getRecipes: () => [] },
+      { toolScopeStore: seededStore(createToolScopeStore, SETTING_KEYS.TOOL_SCOPE, {}) }
+    );
+    assert.equal(unseeded._scopeBasis({ tools: [] }).toolIds, null);
+
+    const emptied = new CraftingSystemManager(
+      { getRecipes: () => [] },
+      {
+        toolScopeStore: seededStore(createToolScopeStore, SETTING_KEYS.TOOL_SCOPE, {
+          entities: [],
+        }),
+      }
+    );
+    const { toolIds } = emptied._scopeBasis({ tools: [] });
+    assert.ok(toolIds instanceof Set);
+    assert.equal(toolIds.size, 0);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
