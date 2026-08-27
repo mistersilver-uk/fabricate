@@ -408,7 +408,7 @@ Hooks.once('fabricate.ready', async () => {
 {: .note }
 > You can also trigger bulk import from the UI by dragging a compendium pack header onto the **Items** tab drop zone in the Crafting Admin panel.
 > The same deduplication logic applies.
-> See [Bulk compendium pack drop]({% link crafting-systems/index.md %}#bulk-compendium-pack-drop) for details.
+> See [Bulk compendium pack drop]({% link components/index.md %}#bulk-compendium-pack-drop) for details.
 
 ### addToolFromUuid(systemId, itemUuid)
 

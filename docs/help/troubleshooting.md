@@ -261,7 +261,7 @@ values, and [Salvage]({% link components/salvage.md %}) for salvage's own On fai
    This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
-[Crafting Checks]({% link checks/crafting.md %}#failure-consumption-policy) covers consumption on failure settings.
+[Crafting Checks]({% link checks/crafting.md %}#what-a-failure-costs) covers consumption on failure settings.
 [Repairing Item Data](#repairing-item-data) covers the maintenance action that gives duplicated copies a durable identity link.
 
 ---
@@ -376,7 +376,7 @@ Note that these lists share one setting.
 Adding an actor type so that a group, vehicle or caravan actor can be chosen as a party's travel actor also makes actors of that type eligible party members.
 If you would rather not widen both, drag the actor onto the travel-actor panel instead: a drop assigns any actor directly and ignores the type list.
 
-**See also:** [Gathering Environments]({% link gathering/index.md %}#actor-selection-bar) covers the character bar from the player's side.
+**See also:** [Gathering Environments]({% link player-app/gathering.md %}#actor-selection-bar) covers the character bar from the player's side.
 
 ---
 

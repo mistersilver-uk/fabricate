@@ -201,7 +201,7 @@ const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not
   // contain it. `manager-systems-empty` is the frame that does, and it is the frame
-  // `docs/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
+  // `docs/help/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
   // reader sees going stale.
   'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze(['manager-systems-empty']),
   // BOTH parties pickers, because between them they are the primitive's two modes and
