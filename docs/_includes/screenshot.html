@@ -18,22 +18,25 @@ The image source is resolved through relative_url so it works from any depth of 
 relative paths used by the older hand-curated frames only resolve because every page carrying one
 happens to sit at the site root, and would break on a page in a subdirectory.
 
-Styled inline rather than through a stylesheet on purpose. A new stylesheet file anywhere in this
-repository arms the screenshot evidence gate, which is a needless gate on a documentation-only
-change.
+Presentation lives in docs/_sass/custom/custom.scss, under `.main-content figure`, so that the
+images a page writes as plain markdown are framed the same way as the frames rendered here.
+
+An earlier revision styled the figure inline to avoid arming the screenshot evidence gate. That
+was over-cautious: scripts/ui-pr-screenshot-evidence.mjs matches a path ending in `.css`, and a
+`.scss` partial does not match. A stylesheet under docs/_sass is free; a `.css` file anywhere in
+this repository is not.
 {%- endcomment -%}
 {%- assign slot_case = include.case -%}
 {%- assign slot_entry = site.data.screenshots.screenshots | where: "case", slot_case | first -%}
 {%- assign slot_alt = include.alt | default: slot_entry.alt -%}
 {%- capture slot_source -%}/img/screenshots/lab/{{ slot_case }}.webp{%- endcapture -%}
-<figure style="margin: 1.5rem 0;">
+<figure>
   <img
     src="{{ slot_source | relative_url }}"
     alt="{{ slot_alt | escape }}"
     loading="lazy"
-    style="display: block; width: 100%; height: auto; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.14);"
   >
   {%- if include.caption %}
-  <figcaption style="margin-top: 0.5rem; font-size: 0.75rem; line-height: 1.5; opacity: 0.8;">{{ include.caption | escape }}</figcaption>
+  <figcaption>{{ include.caption | escape }}</figcaption>
   {%- endif %}
 </figure>
