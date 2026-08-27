@@ -94,7 +94,7 @@ The salvage strip carries its own **Edit** control, named for complications so i
 Either one opens the component the complications belong to, which is the only place they can be changed.
 These read-only strips always show everything you authored, whatever **Tell the player** says, because they are for you.
 
-{% include screenshot.html case="manager-recipe-complications-stage-strip" caption="Two progressive stages in the recipe editor, each carrying its component's complications read-only." %}
+{% include screenshot.html case="manager-recipe-edit-results-progressive" caption="Two progressive stages in the recipe editor, each carrying its component's complications read-only." %}
 
 ## Your Private Report
 

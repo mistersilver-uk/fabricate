@@ -30,7 +30,7 @@ Components you already own in full drop off the list, so only shortfalls remain.
 A recipe you can already make adds nothing to the list.
 Its requirements instead resolve to a plain account of what the craft is about to consume, and the list stays on its empty state.
 
-{% include screenshot.html case="player-crafting-consumption-plan" caption="A recipe with everything to hand, so the shopping list has nothing to ask for." %}
+{% include screenshot.html case="fabricate-app-shell" caption="A recipe with everything to hand, so the shopping list on the right has nothing to ask for." %}
 
 The shopping list is scratch planning.
 It clears when you close the Crafting window.

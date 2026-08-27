@@ -316,11 +316,6 @@
       "sha256": "fcacd5b1f8c1acda64713d0cdff4573278175be31d62859fe349c64b304ad77c"
     },
     {
-      "case": "player-crafting-consumption-plan",
-      "alt": "The player Crafting tab with a craftable recipe, showing which component each requirement resolved to, a card listing exactly what the craft will use and how much the character owns, and the tool it needs marked available.",
-      "sha256": "081554c7e009ebdf93d6479bc73cf1d92130a336d8677456acae5ec44347c1a1"
-    },
-    {
       "case": "currency-actor-property",
       "alt": "The World Currency page with the spend strategy set to reading coins from a field on the actor sheet, above a list of five coins from copper to platinum with reorder, edit and delete controls on each.",
       "sha256": "71d054cff0f27d1529f4ff4d771c019b7541446ab8c7f5933917cfa1163b247f"
@@ -339,11 +334,6 @@
       "case": "manager-component-complications-expanded",
       "alt": "A component's complication expanded in the component editor, showing the conditions it can watch with three ticked and a dice expression filled in, and the effects below with a dice roll turned on and an empty macro drop zone.",
       "sha256": "3ff01e3c8ec85a11077c77e2c98d3391411cd9636bbb05ad8efcceb10a0506c1"
-    },
-    {
-      "case": "manager-recipe-complications-stage-strip",
-      "alt": "The recipe editor's Results tab in progressive mode, with an ordered list of stages each carrying a difficulty, and read-only strips under two of them naming the complications their component carries with severity and player pills.",
-      "sha256": "66a581cde24ddf4c572da027458166c5a1f1302de2de7c4bbe4d2593ea2bcbbf"
     },
     {
       "case": "manager-recipe-edit-books-scrolls",
