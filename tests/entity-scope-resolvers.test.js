@@ -5,6 +5,7 @@
 //
 // Everything that holds identically for all three entities is asserted once, in the parameterized
 // contract helper in `tests/scoped-definitions.test.js`.
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -28,6 +29,8 @@ const {
 const {
   DEFAULT_TOOL_BREAKAGE_AUTHORITY,
   TOOL_BLOCKED,
+  TOOL_SCOPE,
+  TOOL_SEEDED_SECTIONS,
   normalizeToolMemberships,
   normalizeToolWorldDefaults,
   resolveTool,
@@ -71,6 +74,10 @@ test('the component normalizer DROPS an enabled key from adversarial input', () 
 });
 
 test('the component path exposes no enable/disable API', () => {
+  // A NAMING TRIPWIRE, not the enforcement. It scans exported names, so an API spelled
+  // `setComponentAvailability` would sail past it; what actually holds the line is the behavioural
+  // leg above — the resolver OMITS the key and the normalizer DROPS an authored one. This is kept
+  // because the cheap way to reintroduce the ruled-out toggle is to name it after `enabled`.
   const enableApis = Object.keys(componentScope).filter((name) => /enabl/i.test(name));
   assert.deepStrictEqual(enableApis, [], 'component membership is binary: present or absent');
 });
@@ -126,6 +133,52 @@ test('a world category the GM later deletes reaches the resolver as absence and 
   assert.equal(resolveComponent(after, record).category, 'reagent');
 });
 
+test('BOTH normalizers coerce the category, so the overriding branch is as matchable as the inheriting one', () => {
+  // The r1 asymmetry this pins: `resolveComponentCategory` trims, but it only runs on the
+  // INHERITING branch. An overriding record's category was handed back verbatim, so `'  ingot  '`
+  // resolved untrimmed and could never match `CraftingSystem.componentCategories`.
+  const [world] = normalizeComponentWorldDefaults([{ id: ENTITY_ID, category: '  ore  ' }]);
+  assert.equal(world.category, 'ore', 'the world default is trimmed at the normalizer');
+
+  const [padded] = normalizeComponentMemberships([
+    {
+      entityId: ENTITY_ID,
+      systemId: SYSTEM_ID,
+      inherit: { category: false },
+      category: '  ingot  ',
+    },
+  ]);
+  assert.equal(padded.category, 'ingot', 'and so is an OVERRIDING record');
+  assert.equal(padded.inherit.category, false, 'the record really is on the overriding branch');
+  assert.equal(
+    resolveComponent(world, padded).category,
+    'ingot',
+    'the overriding branch answers a token componentCategories can match'
+  );
+
+  for (const notACategory of [42, {}, [], '   ', null, true]) {
+    const [worldEntry] = normalizeComponentWorldDefaults([{ id: ENTITY_ID, category: notACategory }]);
+    assert.ok(
+      !('category' in worldEntry),
+      `a non-string or blank world category (${JSON.stringify(notACategory)}) normalizes to ABSENCE`
+    );
+    const [record] = normalizeComponentMemberships([
+      {
+        entityId: ENTITY_ID,
+        systemId: SYSTEM_ID,
+        inherit: { category: false },
+        category: notACategory,
+      },
+    ]);
+    assert.ok(!('category' in record), 'and so does a membership record it was authored on');
+    assert.equal(
+      resolveComponent(world, record).category,
+      'ore',
+      'a coerced-away section is not an override, so the world value shows'
+    );
+  }
+});
+
 // --- Additive component tags (criterion 5) -----------------------------------------------------
 
 test('effective tags are world tags MINUS muted PLUS system-only tags, with no inherit switch', () => {
@@ -152,6 +205,19 @@ test('effective tags are world tags MINUS muted PLUS system-only tags, with no i
   assert.deepStrictEqual(resolveComponentTags(['metal'], null), ['metal']);
   assert.deepStrictEqual(resolveComponentTags(undefined, record), ['forgeable', 'metal']);
   assert.deepStrictEqual(resolveComponent(world, null).tags, ['metal', 'reagent', 'rare']);
+});
+
+test('an AUTHORED EMPTY tag list normalizes to ABSENT, so no reader can tell it from absence', () => {
+  // The `complications` doctrine (`## Component` requirement 20): an empty list carries no meaning
+  // distinct from absence, so persisting one would mint a difference the domain does not have.
+  const [world] = normalizeComponentWorldDefaults([{ id: ENTITY_ID, tags: [] }]);
+  assert.ok(!('tags' in world), 'an authored empty world tag list is ABSENT, not []');
+  const [record] = normalizeComponentMemberships([
+    { entityId: ENTITY_ID, systemId: SYSTEM_ID, tags: ['   ', ''], mutedTags: [] },
+  ]);
+  assert.ok(!('tags' in record), 'a list whose every entry trims away is ABSENT too');
+  assert.ok(!('mutedTags' in record), 'and so is an empty muted list');
+  assert.deepStrictEqual(resolveComponent(world, record).tags, [], 'the resolved set is still a list');
 });
 
 // --- Essence: the soft disable, preserved verbatim (criteria 2 and 3) --------------------------
@@ -207,6 +273,70 @@ test('the two essence inherit switches are independent', () => {
 });
 
 // --- Tool: the hard block, the requirements seed, and the breakage authority (criteria 2 and 6) -
+
+test('the SEEDED sections are disjoint from the inherited ones, and stay that way', () => {
+  // Three world-default sections, TWO of them inherited. `requirements` is the third and is a SEED
+  // (`seedToolRequirements`), so promoting it into TOOL_SECTIONS would silently give it an inherit
+  // switch, a live world parent, and a UI row for a value the world scope cannot even address —
+  // a repair recipe names ingredient groups over the OWNING SYSTEM's components.
+  assert.deepStrictEqual([...TOOL_SEEDED_SECTIONS], ['requirements']);
+  for (const seeded of TOOL_SEEDED_SECTIONS) {
+    assert.ok(
+      !TOOL_SCOPE.sections.includes(seeded),
+      `${seeded} is SEEDED, so it must never appear in the resolver's section list`
+    );
+  }
+  const overlap = TOOL_SCOPE.sections.filter((section) => TOOL_SEEDED_SECTIONS.includes(section));
+  assert.deepStrictEqual(overlap, [], 'the two lists are disjoint in both directions');
+  assert.equal(
+    TOOL_SCOPE.sections.length + TOOL_SEEDED_SECTIONS.length,
+    3,
+    'three world-default sections in total'
+  );
+});
+
+test('a non-list requirements value is DROPPED rather than persisted', () => {
+  for (const notAList of ['not a list', 42, {}, null, true]) {
+    const [world] = normalizeToolWorldDefaults([{ id: ENTITY_ID, requirements: notAList }]);
+    assert.ok(
+      !('requirements' in world),
+      `a ${typeof notAList} requirements value never reaches disk as one`
+    );
+    const [record] = normalizeToolMemberships([
+      { entityId: ENTITY_ID, systemId: SYSTEM_ID, requirements: notAList },
+    ]);
+    assert.ok(!('requirements' in record), 'and the same holds on a membership record');
+    assert.ok(
+      !('requirements' in resolveTool(world, record)),
+      'so the resolver answers no requirements rather than a value nothing can iterate'
+    );
+  }
+});
+
+test('TOOL_BLOCKED matches the code the two shipped consumers already write as a bare literal', async () => {
+  // A hand-maintained mirror guard. Neither consumer is imported here: GatheringEngine drags the
+  // Foundry runtime in, and gatheringBlockedReasons is a player-app UI leaf — and the point of
+  // this module is that nothing depends on it yet. Epic 1357's consumer sweep (PR 8) converges
+  // them onto this export; until then, a rename here fails loudly instead of silently forking the
+  // vocabulary into two codes that mean the same refusal.
+  const mirrors = [
+    ['src/systems/GatheringEngine.js', /^\s{2}TOOL_BLOCKED: 'FABRICATE\.Gathering\.Blocked\./m],
+    [
+      'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',
+      /^\s{2}TOOL_BLOCKED: 'FABRICATE\.App\.Gathering\./m,
+    ],
+  ];
+  assert.equal(TOOL_BLOCKED, 'TOOL_BLOCKED', 'the constant carries the shipped code verbatim');
+  for (const [file, shippedEntry] of mirrors) {
+    const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.match(source, shippedEntry, `${file} still keys its blocked-reason map on this code`);
+    assert.match(
+      source,
+      new RegExp(`^\\s{2}${TOOL_BLOCKED}: '`, 'm'),
+      `${file} agrees with TOOL_BLOCKED, composed from the constant rather than re-typed`
+    );
+  }
+});
 
 test('a tool that is absent or disabled blocks the attempt with TOOL_BLOCKED', () => {
   const [record] = normalizeToolMemberships([

@@ -16,7 +16,9 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
 const {
+  MEMBERSHIP_KEY_SEPARATOR,
   countInheritingSystems,
+  defineScope,
   findMembership,
   findWorldDefault,
   inheritingSystemIds,
@@ -40,6 +42,7 @@ const { TOOL_SCOPE, normalizeToolMemberships, normalizeToolWorldDefaults, resolv
   await import('../src/systems/toolScope.js');
 
 const ENTITY_ID = 'ash-salt';
+const OTHER_ENTITY_ID = 'birch-tar';
 const SYSTEM_ID = 'blacksmithing';
 const OTHER_SYSTEM_ID = 'alchemy';
 const THIRD_SYSTEM_ID = 'cooking';
@@ -89,6 +92,15 @@ const ENTITY_CONTRACTS = [
 /**
  * The adversarial inputs criterion 7 enumerates, built fresh per call so one suite's mutation
  * cannot leak into another's.
+ *
+ * EVERY CASE CARRIES ITS EXPECTED OUTPUT LENGTH, because "DROPPED rather than repaired"
+ * (`## Scoped Entity Definitions` requirement 10) is a statement about a COUNT and a shape
+ * assertion cannot see it: a normalizer that repaired an id-less entry to `{ id: '' }` still
+ * satisfies `typeof entry.id === 'string'` on every entry it emits.
+ *
+ * @param {string} section
+ * @returns {Array<[string, unknown, number, number]>} why, input, expected world length, expected
+ *   membership length.
  */
 function adversarialInputs(section) {
   const cyclicSection = { note: 'a section value that points at itself' };
@@ -96,15 +108,22 @@ function adversarialInputs(section) {
   const cyclicEntry = { id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID };
   cyclicEntry.self = cyclicEntry;
   return [
-    ['a non-array corpus', null],
-    ['a non-array corpus that is a number', 42],
-    ['a non-array corpus that is a string', 'nope'],
-    ['non-object entries', [null, 42, 'nope', true, [], () => {}]],
-    ['an id-less entry', [{}, { id: '   ', entityId: '   ', systemId: '  ' }]],
-    ['an entry with only one half of the membership key', [{ entityId: ENTITY_ID }]],
+    ['a non-array corpus', null, 0, 0],
+    ['a non-array corpus that is a number', 42, 0, 0],
+    ['a non-array corpus that is a string', 'nope', 0, 0],
+    ['non-object entries', [null, 42, 'nope', true, [], () => {}], 0, 0],
+    ['an id-less entry', [{}, { id: '   ', entityId: '   ', systemId: '  ' }], 0, 0],
+    [
+      'an entry carrying only one half of the membership key',
+      [{ entityId: ENTITY_ID }, { systemId: SYSTEM_ID }, 42],
+      0,
+      0,
+    ],
     [
       'an unknown section key',
       [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID, notASection: 'drop me' }],
+      1,
+      1,
     ],
     [
       'an unknown key in the inherit map',
@@ -116,21 +135,34 @@ function adversarialInputs(section) {
           inherit: { notASection: false, [section]: 'not a boolean' },
         },
       ],
+      1,
+      1,
     ],
     [
       'an inherit map missing every section',
       [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: {} }],
+      1,
+      1,
     ],
     [
       'a non-object inherit map',
       [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: 7 }],
+      1,
+      1,
     ],
-    ['a record whose sections are entirely absent', [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID }]],
+    [
+      'a record whose sections are entirely absent',
+      [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID }],
+      1,
+      1,
+    ],
     [
       'a self-referential section value',
       [{ id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID, [section]: cyclicSection }],
+      1,
+      1,
     ],
-    ['a self-referential entry', [cyclicEntry]],
+    ['a self-referential entry', [cyclicEntry], 1, 1],
   ];
 }
 
@@ -199,6 +231,86 @@ function runScopedEntityContract(contract) {
     assert.equal(resolved.inherited[section], false);
   });
 
+  test(`${label} scope: an overriding switch that stores NO value still answers the world value`, () => {
+    // This record is REACHABLE, not adversarial junk: `setSectionInheritance` produces it whenever
+    // the world default is itself unauthored, and `normalizeMembership` emits it for import,
+    // copy-mode and the 1.30.0 migration — none of which go near the UI's seeding path. Resolving
+    // it as an override of nothing means a tool that stops breaking, or an essence whose property
+    // macro silently stops running.
+    const { worldDefault } = seedCorpus(contract);
+    const [record] = contract.normalizeRecords([
+      { entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: false } },
+    ]);
+    assert.ok(!(section in record), 'the normalizer preserves switch-off-with-no-value as authored');
+    assert.equal(record.inherit[section], false, 'the switch is kept, never repaired back to true');
+
+    const resolved = contract.resolve(worldDefault, record);
+    assert.deepStrictEqual(
+      resolved[section],
+      worldSections[section],
+      'an ABSENT section is not an override, so the world value shows rather than nothing'
+    );
+    assert.equal(
+      resolved.inherited[section],
+      false,
+      'the switch is still reported AS AUTHORED: off, with the world value showing, is the seed state'
+    );
+  });
+
+  test(`${label} scope: setSectionInheritance answers a NEW record and never mutates its input`, () => {
+    const { worldDefault, membership } = seedCorpus(contract);
+    const beforeOverride = structuredClone(membership);
+    const overridden = setSectionInheritance(membership, section, false, worldDefault);
+    assert.notEqual(overridden, membership, 'the answer is a NEW record');
+    assert.notEqual(overridden.inherit, membership.inherit, 'the inherit map is copied, not shared');
+    assert.deepStrictEqual(
+      membership,
+      beforeOverride,
+      'the caller keeps its record unchanged: PR 5 wires this to Svelte $state, where an in-place mutation never re-renders'
+    );
+
+    const beforeReInherit = structuredClone(overridden);
+    const reInherited = setSectionInheritance(overridden, section, true, worldDefault);
+    assert.notEqual(reInherited, overridden, 'the re-inherit direction answers a NEW record too');
+    assert.deepStrictEqual(overridden, beforeReInherit, 'and leaves its input untouched');
+  });
+
+  test(`${label} scope: the lookups key on the right entity AND the right system`, () => {
+    const worldDefaults = contract.normalizeWorld([
+      { id: ENTITY_ID, ...worldSections },
+      { id: OTHER_ENTITY_ID, [section]: localValue },
+    ]);
+    assert.equal(worldDefaults.length, 2, 'a two-entity corpus, so position cannot stand in for id');
+    assert.deepStrictEqual(
+      findWorldDefault(worldDefaults, OTHER_ENTITY_ID)?.[section],
+      localValue,
+      'the SECOND entity is found by id, not by position'
+    );
+    assert.deepStrictEqual(findWorldDefault(worldDefaults, ENTITY_ID)?.[section], worldSections[section]);
+    assert.equal(findWorldDefault(worldDefaults, 'no-such-entity'), null, 'an unknown id answers null');
+
+    const memberships = contract.normalizeRecords([
+      { entityId: ENTITY_ID, systemId: SYSTEM_ID },
+      { entityId: ENTITY_ID, systemId: OTHER_SYSTEM_ID },
+      { entityId: OTHER_ENTITY_ID, systemId: SYSTEM_ID },
+      { entityId: OTHER_ENTITY_ID, systemId: OTHER_SYSTEM_ID },
+    ]);
+    assert.equal(memberships.length, 4, 'two entities across two systems');
+    for (const entityId of [ENTITY_ID, OTHER_ENTITY_ID]) {
+      for (const systemId of [SYSTEM_ID, OTHER_SYSTEM_ID]) {
+        const found = findMembership(memberships, entityId, systemId);
+        assert.equal(found?.entityId, entityId, `the entity half of (${entityId}, ${systemId}) is keyed on`);
+        assert.equal(found?.systemId, systemId, `the system half of (${entityId}, ${systemId}) is keyed on`);
+      }
+    }
+    assert.equal(
+      findMembership(memberships, ENTITY_ID, THIRD_SYSTEM_ID),
+      null,
+      'a known entity in an unknown system is not a member'
+    );
+    assert.equal(findMembership(memberships, 'no-such-entity', SYSTEM_ID), null);
+  });
+
   test(`${label} scope: re-inheriting resolves to the raw world fixture and RETAINS the override`, () => {
     const { worldDefault, membership } = seedCorpus(contract);
     const overridden = setSectionInheritance(membership, section, false, worldDefault);
@@ -242,7 +354,7 @@ function runScopedEntityContract(contract) {
       { entityId: ENTITY_ID, systemId: SYSTEM_ID },
       overriding,
       { entityId: ENTITY_ID, systemId: THIRD_SYSTEM_ID },
-      { entityId: 'other-entity', systemId: SYSTEM_ID },
+      { entityId: OTHER_ENTITY_ID, systemId: SYSTEM_ID },
     ]);
     assert.deepStrictEqual(inheritingSystemIds(memberships, ENTITY_ID, section), [
       SYSTEM_ID,
@@ -257,17 +369,27 @@ function runScopedEntityContract(contract) {
   });
 
   test(`${label} scope: normalization is total and non-throwing on adversarial input`, () => {
-    for (const [why, input] of adversarialInputs(section)) {
+    for (const [why, input, expectedWorld, expectedRecords] of adversarialInputs(section)) {
       const world = contract.normalizeWorld(input);
       const records = contract.normalizeRecords(input);
       assert.ok(Array.isArray(world), `world defaults answer a list for ${why}`);
       assert.ok(Array.isArray(records), `memberships answer a list for ${why}`);
+      // The COUNT is the assertion that "dropped rather than repaired" lives or dies on.
+      assert.equal(world.length, expectedWorld, `world defaults DROP rather than repair ${why}`);
+      assert.equal(records.length, expectedRecords, `memberships DROP rather than repair ${why}`);
       for (const entry of world) {
         assert.equal(typeof entry.id, 'string');
+        assert.ok(entry.id.trim().length > 0, `no entry is repaired to a blank id for ${why}`);
         assert.ok(!('notASection' in entry), `an unknown section key is dropped for ${why}`);
       }
       for (const entry of records) {
-        assert.equal(membershipKey(entry.entityId, entry.systemId).includes('|'), true);
+        assert.equal(
+          membershipKey(entry.entityId, entry.systemId),
+          `${entry.entityId}${MEMBERSHIP_KEY_SEPARATOR}${entry.systemId}`,
+          `the key composes entity THEN system for ${why}`
+        );
+        assert.ok(entry.entityId.trim().length > 0, `neither half of the key is blank for ${why}`);
+        assert.ok(entry.systemId.trim().length > 0, `neither half of the key is blank for ${why}`);
         assert.ok(!('notASection' in entry), `an unknown section key is dropped for ${why}`);
         assert.ok(
           !('notASection' in entry.inherit),
@@ -332,6 +454,38 @@ function runScopedEntityContract(contract) {
 
 for (const contract of ENTITY_CONTRACTS) runScopedEntityContract(contract);
 
+// --- The primitive's own two invariants ---------------------------------------------------------
+
+test('membershipKey composes entity THEN system around the separator, exactly', () => {
+  // Written as a LITERAL rather than as `${a}${SEP}${b}`, which would re-implement the function
+  // under test and pin nothing about the separator. The argument order matters beyond aesthetics:
+  // this key IS the persisted record identity that the first-wins de-duplication reads.
+  assert.equal(membershipKey('ash-salt', 'blacksmithing'), 'ash-salt|blacksmithing');
+  assert.equal(MEMBERSHIP_KEY_SEPARATOR, '|');
+  assert.notEqual(
+    membershipKey('ash-salt', 'blacksmithing'),
+    membershipKey('blacksmithing', 'ash-salt'),
+    'the two halves are not interchangeable'
+  );
+});
+
+test('defineScope answers a frozen descriptor over a DEFENSIVE copy of the section list', () => {
+  const source = ['alpha', 'beta'];
+  const scope = defineScope({ sections: source });
+  source.push('gamma');
+  assert.deepStrictEqual(
+    scope.sections,
+    ['alpha', 'beta'],
+    'the caller cannot extend a scope after defining it: the list is copied, not captured'
+  );
+  assert.ok(Object.isFrozen(scope), 'the descriptor itself is frozen');
+  assert.ok(Object.isFrozen(scope.sections), 'and so is its section list');
+  assert.throws(() => scope.sections.push('delta'), TypeError, 'the frozen list refuses a push');
+  assert.throws(() => {
+    scope.enableable = true;
+  }, TypeError, 'the frozen descriptor refuses a structural flip');
+});
+
 // --- The dependency boundary (criterion 9) ----------------------------------------------------
 //
 // PARSED, never substring-searched. A substring search is defeated by any indirection or barrel
@@ -348,7 +502,12 @@ function stripComments(source) {
 
 /**
  * Every module specifier the file really imports: `import ... from`, bare `import '…'`, re-export
- * `export ... from`, and dynamic `import('…')`.
+ * `export ... from`, and dynamic `import('…')` in BOTH its quoted and its template-literal
+ * spellings.
+ *
+ * The template-literal pattern deliberately refuses an interpolation (`[^`$]`), because a computed
+ * specifier is not a specifier this extractor can read — `assertEveryDynamicImportIsReadable`
+ * below fails such a file outright rather than letting it pass as "no forbidden import found".
  */
 function extractImportSpecifiers(source) {
   const code = stripComments(source);
@@ -357,11 +516,41 @@ function extractImportSpecifiers(source) {
     /\b(?:import|export)\b[^'"();]*?\bfrom\s*['"]([^'"]+)['"]/g,
     /\bimport\s+['"]([^'"]+)['"]/g,
     /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /\bimport\s*\(\s*`([^`$]+)`\s*\)/g,
   ];
   for (const pattern of patterns) {
     for (const match of code.matchAll(pattern)) specifiers.push(match[1]);
   }
   return specifiers;
+}
+
+/**
+ * Every `import(` in the file opens with a readable string literal.
+ *
+ * Without this the boundary guard is only as strong as the extractor: a computed or concatenated
+ * dynamic specifier reads as ZERO specifiers, and "no forbidden import found" is then vacuously
+ * true. ESLint cannot cover this half at all — `no-restricted-imports` does not analyse dynamic
+ * imports in any form — so the whole dynamic boundary rests here.
+ */
+function assertEveryDynamicImportIsReadable(code, where) {
+  const openings = [...code.matchAll(/\bimport\s*\(/g)];
+  for (const opening of openings) {
+    const tail = code.slice(opening.index + opening[0].length);
+    assert.match(
+      tail,
+      /^\s*(?:['"][^'"]*['"]|`[^`$]*`)\s*\)/,
+      `${where}: every dynamic import must name a literal specifier this guard can read`
+    );
+  }
+}
+
+/**
+ * Both spellings a relative specifier may take: Node's ESM resolver demands the extension, but the
+ * bundler and the editor do not, so `'./componentScope'` is a real thing a future edit can write.
+ */
+function candidateTargets(fromFile, specifier) {
+  const resolved = path.resolve(path.dirname(fromFile), specifier);
+  return [resolved, `${resolved}.js`];
 }
 
 test('the specifier extractor is not vacuous: it finds the imports the scope modules really have', async () => {
@@ -375,16 +564,60 @@ test('the specifier extractor is not vacuous: it finds the imports the scope mod
   }
 });
 
-test('scopedDefinitions.js imports none of the three scope modules', async () => {
+test('the extractor reads every spelling a reverse edge could take', () => {
+  // Four spellings, and none of them is hypothetical: ESLint's `no-restricted-imports` sees only
+  // the first two (and only when the pattern list carries the extensionless form as well), and it
+  // does not analyse `import()` in ANY form. So the extractor has to read all four itself.
+  const sample = [
+    "import { x } from './componentScope.js';",
+    "export { y } from './essenceScope';",
+    "const a = await import('./toolScope');",
+    'const b = await import(`./componentScope.js`);',
+  ].join('\n');
+  assert.deepStrictEqual(extractImportSpecifiers(sample), [
+    './componentScope.js',
+    './essenceScope',
+    './toolScope',
+    './componentScope.js',
+  ]);
+});
+
+test('the dynamic-import readability guard rejects a specifier it cannot read', () => {
+  assert.throws(
+    () => assertEveryDynamicImportIsReadable('const m = await import(NAME);', 'sample'),
+    'a computed specifier fails the guard rather than reading as zero imports'
+  );
+  assert.throws(
+    () => assertEveryDynamicImportIsReadable('await import(`./${name}.js`);', 'sample'),
+    'and so does an interpolated template literal'
+  );
+  assertEveryDynamicImportIsReadable("await import('./ok.js');", 'sample');
+  assertEveryDynamicImportIsReadable('await import(`./ok.js`);', 'sample');
+});
+
+test('scopedDefinitions.js imports none of the three scope modules, in any spelling', async () => {
   const source = await readFile(PRIMITIVE_PATH, 'utf8');
+  const code = stripComments(source);
+  assertEveryDynamicImportIsReadable(code, 'scopedDefinitions.js');
   const forbidden = new Set(SCOPE_MODULES.map((name) => path.join(SYSTEMS_DIR, name)));
-  const resolved = extractImportSpecifiers(source)
+  const violations = extractImportSpecifiers(source)
     .filter((specifier) => specifier.startsWith('.'))
-    .map((specifier) => path.resolve(path.dirname(PRIMITIVE_PATH), specifier));
-  const violations = resolved.filter((target) => forbidden.has(target));
+    .flatMap((specifier) => candidateTargets(PRIMITIVE_PATH, specifier))
+    .filter((target) => forbidden.has(target));
   assert.deepStrictEqual(
     violations,
     [],
     'the dependency runs one way: the scope modules configure the primitive, never the reverse'
   );
+});
+
+test('the boundary guard is not vacuous: an extensionless reverse edge is caught', () => {
+  // Proving the guard CAN fail, on the exact spelling that slipped past the r1 extractor.
+  const forbidden = new Set(SCOPE_MODULES.map((name) => path.join(SYSTEMS_DIR, name)));
+  for (const specifier of ['./componentScope', './toolScope.js', './essenceScope']) {
+    const caught = candidateTargets(PRIMITIVE_PATH, specifier).filter((target) =>
+      forbidden.has(target)
+    );
+    assert.equal(caught.length, 1, `${specifier} resolves onto a forbidden module`);
+  }
 });
