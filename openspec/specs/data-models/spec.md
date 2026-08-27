@@ -1960,6 +1960,8 @@ WorldComponent | WorldEssence | WorldTool = {
 WorldDefaults = {
   id: string,                      // the world entity id
   [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
+  // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
+  // `requirements` on a tool. Both are ABSENT when unauthored.
 }
 
 // Layer 3 - the system membership record. Its ABSENCE means the entity does not exist there.
@@ -1969,6 +1971,8 @@ SystemMembershipRecord = {
   inherit: { [section: string]: boolean },  // an omitted section reads as INHERITED
   [section]: unknown,                       // the local override, RETAINED while dormant
   enabled?: boolean,                        // essences and tools ONLY; default true
+  // Per entity, BESIDE the sections and carrying no inherit switch: `tags` and `mutedTags` on
+  // a component, `requirements` on a tool. All are ABSENT when unauthored.
 }
 ```
 
@@ -2008,6 +2012,7 @@ SystemMembershipRecord = {
     It follows that **a normalized record ALIASES its input's section values** — normalization copies a section by reference, so a caller that keeps hold of what it handed in shares that object with the normalized corpus.
     A store must therefore treat a corpus it normalizes as given away rather than as still its own to mutate; the only deep copy in this contract is the tool `requirements` seed, which is a copy precisely because it is the one value that must NOT stay shared.
     A per-entity module that needs a SHAPE rule over its own section (the component category's trim-or-absent rule, for instance) states it at the normalizer rather than in a resolver branch, so that the inheriting and overriding branches carry the same guarantee.
+    The scope descriptor's optional `coerceSection` hook is where that rule is declared; it runs on BOTH records, and answering `undefined` from it means the section is ABSENT rather than an override of nothing.
 12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
     The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags` and their parallel icon maps; that vocabulary, its layering, its icon maps and its deletion semantics are modelled separately (epic 1357, PR 7).
     The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
@@ -2025,6 +2030,7 @@ SystemMembershipRecord = {
    That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
 3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
    There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
+   The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
 4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.
    Component membership is binary — present or absent.
    Essence enabling toggles effect transfer and macros and tool enabling evokes a drained leyline or a seasonal workshop; component enabling serves no purpose and is deliberately not implemented, and an `enabled` key in adversarial or hand-edited input is DROPPED by the component normalizer rather than carried.
@@ -2033,6 +2039,8 @@ SystemMembershipRecord = {
 
 1. The essence sections are `effectSource` and `macro`, with **two independent inherit switches**.
    They are two sections rather than one because a system may reasonably take the world's active-effect source and author its own property macro, or the reverse.
+   Neither name is new behaviour: `effectSource` is the essence's source reference — the shipped `sourceComponentId` and its `associatedSystemItemId` / `sourceItemUuid` aliases (`## EssenceDefinition` requirements 1-4), whose resolved item is the template whose active effects transfer — and `macro` is the shipped `propertyMacroUuid` (`## EssenceDefinition` requirement 9).
+   The section names are the TARGET names; mapping the shipped keys onto them is the migration's work (epic 1357, PR 3).
 2. `enabled` KEEPS its shipped meaning verbatim: it gates essence-carried **behaviour** and never essence **arithmetic** (`## EssenceDefinition` requirements 7-8).
    A disabled essence still matches, accumulates and is consumed exactly as before, because a mid-session toggle must not change what an already-held item is worth; what it withholds is what the essence carries ONTO a result, so neither its property macro nor its active-effect transfer runs.
 3. `enabled` defaults to TRUE on a record that authored none, matching `## EssenceDefinition` requirement 6.
@@ -2042,10 +2050,15 @@ SystemMembershipRecord = {
 ### Tool scope
 
 1. There are THREE tool world-default sections, TWO of them inherited.
-   `breakage` and `onBreak` are ordinary sections with their own inherit switches.
+   `breakage` and `onBreak` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage` and `Tool.onBreak` unchanged; `requirements` is the third and is SEEDED rather than inherited.
+   A tool membership record's `inherit` map therefore carries `breakage` and `onBreak` and nothing else, and a `requirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
 2. **`requirements` is a SEED, not a live parent.**
+   It is the shipped `Tool.repairRequirements` — the `flagBroken` repair recipe's ingredient groups — held at world scope as a starting point only.
    It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
-   Modelling it as a section with a permanently-false inherit switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the world scope cannot address.
+   Resolution answers it from the MEMBERSHIP RECORD ALONE and never reads it back out of the world defaults, because a seeded value the system has since edited is the only truth about that system's repair recipe.
+   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the world scope cannot address.
+   The seed is a DEEP copy, so neither scope can reach into the other through a shared reference — the one exception to requirement 11's aliasing rule.
+   A value structured cloning refuses degrades to a shallow copy rather than being dropped, because a seed that silently lost a repair recipe would be worse than one that shares a reference nothing structurally mutates.
 3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
    The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
 4. **The break mode is NOT a new field.**
