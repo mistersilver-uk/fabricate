@@ -81,7 +81,6 @@ The task editor lets you set:
 | :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Task basics        | Name, description, image, whether it is enabled, and how it is resolved                                                                                                                                                                    |
 | Visibility gate    | Turn task visibility on or off, then set its formula and required threshold                                                                                                                                                                |
-| Progressive checks | Choose the award mode plus the check formula and an optional threshold                                                                                                                                                                     |
 | Time requirement   | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years                                                                                                                                             |
 | Failure outcome    | Leave clear for Fabricate's default failure feedback, or set custom text or a macro                                                                                                                                                        |
 | Result groups      | Add, rename, delete, and reorder groups                                                                                                                                                                                                    |
@@ -95,8 +94,8 @@ Result rows do not store their own difficulty.
 
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
-A placeholder task can be saved while it is disabled, even when its progressive check formula is still blank.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.
+For a task resolved progressively that means one result group carrying at least one result.
 
 Task images can be typed directly or chosen with Foundry's image file picker when it is available.
 Cancelling the picker leaves the current path unchanged.
@@ -131,22 +130,17 @@ A routed task whose system has no gathering check formula reports a setup proble
 
 ## Progressive Checks
 
-Progressive gathering tasks need an award mode and a check formula.
+{: .warning }
+> **Progressive gathering is not available yet.**
+> The only gathering resolution mode you can select today is `d100`, and it rolls each drop against its own percentage chance rather than a formula.
+> Progressive and Routed by check appear in the resolution-mode card but are disabled, pending a future release.
+> Anything you author here is saved and starts applying as soon as those modes ship.
 
-<!-- markdownlint-disable markdownlint-sentences-per-line -->
+When progressive gathering does ship, the value it spends comes from the **system's** gathering check, not from the task.
+Author it on **Checks › Gathering**, beside the crafting and salvage checks.
+See [Gathering Checks]({% link checks/gathering.md %}).
 
-| Field           | Description                                                                    |
-| :-------------- | :----------------------------------------------------------------------------- |
-| Award mode      | One of equal, partial, or exceed                                               |
-| Check formula   | Required. A roll expression evaluated against the acting character's roll data |
-| Check threshold | Optional. When left blank the check just produces a value                      |
-
-<!-- markdownlint-enable markdownlint-sentences-per-line -->
-
-When you set a threshold, the rolled value is compared against it for success or failure.
-When you leave it blank, the check simply produces a value.
-
-The system-wide gathering check is authored on its own page, alongside the crafting and salvage checks.
+A task carries an award mode — equal, partial, or exceed — and its result difficulty comes from each chosen component's own difficulty rather than from the result row.
 
 {% include screenshot.html case="manager-checks-gathering" %}
 

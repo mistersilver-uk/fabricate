@@ -269,11 +269,20 @@ A prerequisite is three separate fields — a **property path**, a **comparison*
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Prerequisite | Path | Comparison | Value |
+|:-------------|:-----|:-----------|:------|
+| Trained in Crafting (Pathfinder 2e) | `actor.skills.crafting.rank` | at least | `1` |
+| Expert Crafter (Pathfinder 2e) | `actor.skills.crafting.rank` | at least | `2` |
+| Strength modifier of +2 or better (Pathfinder 2e) | `actor.system.abilities.str.mod` | at least | `2` |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .warning }
-> Fabricate also ships Pathfinder 2e prerequisite presets, and they are **not** listed here.
-> Their paths are written in the short form (`skills.cra.rank`), while the Pathfinder 2e *modifier* presets reach the same actor through the long form (`@actor.system.skills.crafting.totalModifier`).
-> Both are read off the same roll data, so they cannot both be right.
-> Verify a Pathfinder 2e prerequisite path against your own actor with `/r` before relying on it, exactly as for `@prof` above.
+> **Pathfinder 2e paths must start with `actor.` and D&D 5e paths must not.**
+> This is the game system's choice, not Fabricate's: D&D 5e spreads its `system` data onto the roll data, so `skills.arc.value` resolves there, while Pathfinder 2e's roll data is only `{ actor }`, so every path has to travel through it.
+> Two further Pathfinder 2e specifics worth knowing: its skill keys are full words (`crafting`, never `cra`), and a skill's proficiency **rank** lives on the prepared statistic at `actor.skills.<skill>.rank` rather than under `actor.system.skills`, whose entries carry a total modifier and a DC but no rank.
 
 The comparisons are equals, not equals, greater than, at least, less than, at most, is true, is false, and exists.
 The last three take no value, so the value field is hidden when you choose one.
