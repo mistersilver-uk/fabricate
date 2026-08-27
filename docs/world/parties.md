@@ -7,7 +7,7 @@ nav_order: 1
 
 # Parties
 
-Choose **World > Parties** at any time for the world party list and editor, including when no crafting system is selected.
+Choose **World > Parties** at any time for the world party list and editor (name, enabled state, members, and travel actor), including when no crafting system is selected.
 Each party is a fully expanded card in a full-width content area, so its editing controls are available without selecting the party first.
 When the list has more than one page, the pagination controls stay below the scrolling party cards and do not cover them.
 When no parties exist yet, the panel shows a simple **No parties yet** empty state.

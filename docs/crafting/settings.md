@@ -24,9 +24,23 @@ There are four modes: **Global**, **Restricted**, **Item**, and **Knowledge**.
 You choose one mode for each crafting system.
 Teaser mode is a separate discovery layer that can sit on top of any mode.
 
+Picture a campaign where novice adventurers know only basic recipes, such as a healing salve and a simple torch, while a master artificer has unlocked legendary weapon blueprints through months of questing.
 Fabricate's visibility system lets you control which recipes each player can see and when new ones become available.
 You might make every recipe visible from the start for a casual game, grant recipes to hand-picked characters for tighter narrative control, or gate crafting behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard.
-The [visibility modes below](#recipe-visibility) walk through each mode you can set on a crafting system.
+
+Choose the visibility mode in the **Recipe Visibility** card, below the resolution-mode card on this page.
+The card offers four modes: **Global**, **Restricted**, **Item**, and **Knowledge**.
+Exactly one mode is active for the whole system.
+Selecting a mode applies at once, so there is no separate save step, and switching modes never deletes or rewrites your recipes.
+A panel beside the selector summarises what the chosen mode turns on, such as the Access tab or the Books & Scrolls limits.
+You can also set the visibility mode through the API.
+Teaser mode is a separate discovery layer on top of these modes and is not one of the card's choices.
+See [Teaser Mode]({% link crafting/teaser-mode.md %}) for how to turn it on.
+
+If you are viewing **Access**, **Books & Scrolls**, or **Knowledge** and that section stops being available, Fabricate does not leave you stranded there.
+This can happen when you change the visibility mode, or when you switch to a different crafting system.
+Fabricate moves you to another section the new mode offers, trying **Access** first, then **Books & Scrolls**, then **Knowledge**.
+When none of those apply, it moves you to **Recipes** instead.
 
 ### Global Mode
 
@@ -134,3 +148,20 @@ For example, you can switch a system to Restricted mode, or to Knowledge mode wh
 See the [CraftingSystemManager API]({% link api/system-manager.md %}) and the [Recipe Visibility Service API]({% link api/visibility-service.md %}).
 
 ---
+
+---
+
+## See Also
+
+- [Access]({% link crafting/access.md %}).
+Grant individual recipes to characters and players in Restricted mode.
+- [Books & Scrolls]({% link crafting/books-scrolls.md %}).
+Author the recipe items that Item and Knowledge modes gate crafting behind.
+- [Knowledge]({% link crafting/knowledge.md %}).
+Audit and correct what each character actually carries and has learned.
+- [Teaser Mode]({% link crafting/teaser-mode.md %}).
+Reveal recipes gradually with fragment-based or threshold-based discovery.
+- [Recipes]({% link crafting/recipes/index.md %}).
+Create and edit recipes, including visibility configuration in the recipe editor.
+- [Recipe Visibility Service API]({% link api/visibility-service.md %}).
+Automate visibility and knowledge workflows programmatically.

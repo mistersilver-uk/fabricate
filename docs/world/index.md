@@ -24,5 +24,7 @@ They are reachable under every selection, and they stay reachable when no crafti
 {: .gm }
 > Every World page is GM-only, as the whole Crafting System Manager is.
 
-Only the current-realm override is gated on the selected crafting system.
-Parties, realms, and authored map links are identical under every selection.
+The `WORLD / every system` heading, Parties and Travel all remain visible when a system's Travel & Realms toggle is off and when no system is selected.
+Parties, realms and authored map links are all world-level and identical under every selection; only the current-realm override is gated on the selected crafting system.
+
+Create realms under **World > Travel > Realms** before assigning environments to them.

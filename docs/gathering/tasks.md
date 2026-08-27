@@ -41,9 +41,10 @@ Gathering Task records support:
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
 > See [Gathering Formulas]({% link gathering/formulas.md %}) for ready-to-use examples.
 
-Reusable event records are edited from the Gathering **Events** tab.
+Disabled Gathering Tasks never match for player gathering.
 
-{% include screenshot.html case="manager-gathering-event-editor-normal" caption="The Gathering Event editor, opened from the event browser." %}
+Reusable events are authored separately.
+See [Events]({% link gathering/events.md %}).
 
 ## How Drops Are Rolled
 
@@ -225,7 +226,7 @@ This is separate from the **Tool breakage outcome** setting above.
 The source decides whether a tool breaks.
 The outcome setting decides what a broken tool does to the gather.
 
-A missing or disabled library tool blocks the attempt, as does a tool the character does not own, a tool the character owns that is broken, and a failed tool requirement.
+A missing or disabled library tool blocks the attempt before Fabricate even checks the character's inventory, as does a tool the character does not own, a tool the character owns that is broken, and a failed tool requirement.
 
 A tool is recognised whether the character owns the tool's own source item directly or owns a copy dragged or duplicated from it.
 Fabricate matches the owned item against the tool's own source references, so dropping a copy of the source item onto the character still satisfies the requirement.

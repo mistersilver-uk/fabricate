@@ -10,8 +10,19 @@ has_children: true
 
 Location-aware gathering lets a GM describe campaign geography as first-class **realms**, group actors into Fabricate-managed [parties]({% link world/parties.md %}), and make gathering environments available or unavailable based on where the party currently is.
 
+Token-driven realm sensing from the travel actor's placed token is available.
+Realm modifiers applied to gathering calculations remain planned.
+
 **Travel** has two destinations: [Realms]({% link world/travel/realms.md %}), the realm library itself, and [Map Region Links]({% link world/travel/map-region-links.md %}), which pairs a realm with the Foundry Scene Regions that stand for it.
 The group is initially collapsed when the Crafting System Manager opens.
+
+{: .note }
+> A **Gathering Realm** is the Fabricate gathering-geography concept.
+> It is **not** a Foundry Scene Region drawn on the canvas.
+> That is the distinct Foundry object a realm maps onto.
+> Several Foundry Scene Regions can map onto one realm through the realm's scene mappings, so a single realm can span several drawn map areas.
+> A realm **never** decides which tasks or events belong to an environment (that is biome, plus danger for events).
+> It only decides location availability.
 
 {: .gm }
 > Realm-aware travel is **off by default** per crafting system and is enabled with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)).

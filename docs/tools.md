@@ -64,6 +64,14 @@ An invalid or failed save keeps the editor open and moves attention to **Validat
 Validation and operation failures use safe descriptions instead of technical error details.
 Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
 
+Because the library is a draft-and-save surface, your edits are held until you save, leaving with unsaved edits prompts before discarding, and a notice appears if someone else changed the Tool list while you were editing it.
+
+A Tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
+The Save button stays disabled until every Tool is valid; hover it to see the first failing reason.
+Tools belong to the crafting system that owns them and cannot be shared across systems.
+A gathering task, recipe, or salvage configuration only references them.
+See [Tools]({% link gathering/tasks.md %}#tools) for how a gathering task does that.
+
 ## Presence and prerequisites
 
 Every referenced Tool must be enabled and present before the activity can begin.

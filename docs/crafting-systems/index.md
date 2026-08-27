@@ -170,6 +170,19 @@ If your game counts qualifying dice across a pool rather than adding one die to 
 When both the Essences and Effect transfer features are enabled, Fabricate can copy active effects from essence source items to crafted results.
 See [Effect Transfer]({% link essences/effect-transfer.md %}) for how the feature is enabled, configured, and used, with worked examples.
 
+### Salvage
+
+When the salvage feature is enabled, players can dismantle components to recover partial materials.
+Salvaging can also be used to harvest monster corpses and world resources for usable parts.
+See [Salvage]({% link components/salvage.md %}) for resolution modes, salvage crafting checks, component configuration, and worked examples.
+
+### Gathering
+
+When the gathering feature is enabled, GMs can author environments, tasks, and events for the system's managed components.
+If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app.
+The action is removed again when no systems have gathering enabled.
+See [Gathering]({% link gathering/index.md %}) for the GM editor fields, task authoring, and validation behaviour.
+
 ### Recipe Visibility
 
 Recipe visibility controls which players can see and access recipes in the player Crafting tab, backed by the visibility service.
