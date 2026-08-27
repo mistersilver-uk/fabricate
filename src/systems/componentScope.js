@@ -5,6 +5,7 @@ import {
   normalizeWorldDefaults,
   resolveScopedDefinition,
 } from './scopedDefinitions.js';
+import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 
 /**
  * The component half of Scoped Entity Definitions (issue 1358, part of epic 1357).
@@ -238,4 +239,32 @@ export function resolveComponent(worldDefault, membership) {
   }
   resolved.tags = resolveComponentTags(world.tags, record);
   return resolved;
+}
+
+/**
+ * THE READ UNION for a component: what a crafting system's components list IS (issue 1359).
+ *
+ * The world components whose membership record for this system is PRESENT, each RESOLVED through the
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
+ * an id collision.
+ *
+ * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
+ * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
+ * membership record is a REFUSAL, never a PRUNE, so a reference to a world component this system is
+ * not a member of must be ABSENT from this answer and PRESENT in the basis. Filtering the basis by
+ * membership would convert that refusal into a silent, persisted deletion on the first normalize.
+ *
+ * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
+ *   worldCorpus The world scope store's published corpus.
+ * @param {string} systemId
+ * @param {unknown} systemComponents The system's surviving in-system array.
+ * @returns {Array<object>}
+ */
+export function resolveComponentScope(worldCorpus, systemId, systemComponents) {
+  return unionScopedDefinitions({
+    corpus: worldCorpus,
+    systemId,
+    systemDefinitions: systemComponents,
+    resolve: resolveComponent,
+  });
 }
