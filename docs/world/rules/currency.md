@@ -8,6 +8,11 @@ grand_parent: World
 
 # World Currency
 
+{: .note }
+> Under the **Actor data path** spend strategy each unit names a field on the actor.
+> That path is not a roll expression and cannot roll.
+> See [Expressions]({% link expressions.md %}#document-data-paths).
+
 Currency is a world setting, not a per-system one.
 A world runs a single game system, so there is exactly one way its actors store coins, and every crafting system that opts in shares the same coin ladder.
 GMs author it in **World > Rules & Resources > Currency**, in the manager rail.

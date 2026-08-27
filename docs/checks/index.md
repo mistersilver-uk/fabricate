@@ -94,6 +94,9 @@ Under the formula field, **What actually gets rolled** shows the same formula wi
 
 ### Defining modifiers
 
+A modifier's expression is an ordinary roll expression.
+See [Expressions]({% link expressions.md %}) for the syntax, the per-game-system data paths, and how bounds clamp what an entry contributes.
+
 Open **System settings** for the crafting system and find the **Modifiers** card, then choose **Add modifier**.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**.
 Write a character-data path with its leading `@` — for example `@abilities.med.mod` — because the field supplies nothing for you.

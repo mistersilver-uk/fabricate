@@ -7,6 +7,10 @@ parent: Components
 
 # Complications
 
+{: .note }
+> A complication's condition and effect are both roll expressions.
+> See [Expressions]({% link expressions.md %}) for the syntax.
+
 A complication is a consequence you author on a component, for the moment that component is produced as a stage of a progressive result.
 It fires during progressive salvage and progressive crafting today, and it is stored but does nothing yet for progressive gathering, which is planned and not yet available as a player-facing surface.
 A complication never fires for a component that is itself being salvaged or spent as an ingredient, only for one being produced.

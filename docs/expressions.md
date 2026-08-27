@@ -12,10 +12,11 @@ Most of those fields take more than a plain number, and the ones that do all sha
 This page is the reference for that syntax, wherever you meet it.
 
 {: .note }
-> Three different kinds of thing are covered here, and telling them apart is most of the battle.
+> Four different kinds of thing are covered here, and telling them apart is most of the battle.
 > A **roll expression** can roll dice and do arithmetic.
 > A **roll-data path** names one value on a character and does no arithmetic at all.
-> An **actor data path** names a field on the actor document itself.
+> A **document data path** names a field on an actor or an item.
+> A **currency denomination** names one of your game system's own coin types and is none of the above.
 > The field reference below says which one each field wants.
 
 ---
@@ -26,25 +27,26 @@ This page is the reference for that syntax, wherever you meet it.
 
 | Where | Field | Takes |
 |:------|:------|:------|
-| [Checks › Crafting / Salvage / Gathering]({% link checks/index.md %}) | **Roll expression** (The roll) | Roll expression |
+| [Checks › Crafting / Salvage / Gathering]({% link checks/index.md %}) | **Expression**, in the **Roll expression** section | Roll expression |
 | [Checks]({% link checks/index.md %}) | **DC** | A whole number, or a Dynamic DC macro — **not** an expression |
 | [World › Rules & Resources › Modifiers]({% link world/rules/modifiers.md %}) | **Expression** | Roll expression |
 | [World › Rules & Resources › Modifiers]({% link world/rules/modifiers.md %}) | **Minimum** and **Maximum** bounds | A whole number |
 | [World › Rules & Resources › Character Prerequisites]({% link world/rules/character-prerequisites.md %}) | **Property path** | Roll-data path |
-| [World › Rules & Resources › Currency]({% link world/rules/currency.md %}) | **Actor data path** | Actor data path |
+| [World › Rules & Resources › Currency]({% link world/rules/currency.md %}) | **Actor data path**, under that spend strategy only | Actor data path |
 | [Tools]({% link tools.md %}) | **Bonus expression** | Roll expression, and the one field that adds `@` for you |
-| [Tools]({% link tools.md %}) | **Tool requirement** | Roll expression, read as satisfied when it resolves above zero |
-| [Tools]({% link tools.md %}) | **Breakage dice expression** and its threshold | Roll expression, and a whole number |
+| [Tools]({% link tools.md %}) | **Dice expression** and **Break below** | Roll expression, and a number the roll must stay at or above |
 | [Gathering › Settings]({% link gathering/settings.md %}) | **Maximum stamina**, **Starting stamina**, **Amount per interval** | Roll expression |
-| [Gathering › Tasks]({% link gathering/tasks.md %}) | **Stamina cost** | Roll expression |
-| [Gathering › Tasks]({% link gathering/tasks.md %}) | **Visibility gate** formula and threshold | Roll expression, and a whole number |
-| [Gathering › Tasks]({% link gathering/tasks.md %}) | **Progressive check** formula and threshold | Roll expression, and a whole number |
-| [Gathering › Tasks]({% link gathering/tasks.md %}) and [Events]({% link gathering/events.md %}) | Per-row **modifier override** | Roll expression |
-| [Components › Complications]({% link components/complications.md %}) | **Condition dice expression** and **Effect dice expression** | Roll expression |
+| [Gathering › Tasks]({% link gathering/tasks.md %}) | **Stamina cost** | A whole number, 0 or more — **not** an expression |
+| [Gathering › Tasks]({% link gathering/tasks.md %}) | Per-cost **modifier reference** | A [modifier](#modifiers-and-modifier-references) from the library, an operator, and optional bounds |
+| [Gathering › Tasks]({% link gathering/tasks.md %}) | **Visibility gate** formula and threshold | Roll expression, both halves |
+| [Gathering › Tasks]({% link gathering/tasks.md %}) and [Events]({% link gathering/events.md %}) | Per-row **modifier reference**, and its expression override | A modifier from the library, or a roll expression that replaces it |
+| [Components › Complications]({% link components/complications.md %}) | **A dice expression resolves true** (condition), and **Roll a dice expression** (effect) | Roll expression |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Everything in the roll-expression rows uses the syntax in the next section, so an example that works in one of them works in all of them.
+Everything in the roll-expression rows uses the syntax in the next section.
+Numbers, character data, arithmetic and ordinary dice behave identically in all of them.
+One shape is the exception, and it is called out where it appears: a [dice count taken from character data](#dice-counts-from-character-data).
 
 ---
 
@@ -150,6 +152,12 @@ Wrapping a term in parentheses lets it decide **how many** dice to roll.
 > A dice count must resolve to a **non-negative whole number**.
 > If the value behind it can reach 0 or go negative, guard it with `max(1, …)` as above, or the expression fails and contributes nothing.
 
+{: .warning }
+> **This is the one shape that is not safe everywhere.**
+> The gathering fields evaluate it correctly.
+> A check modifier is pre-checked for rollability by a stricter, non-rolling pass, and a parenthetical dice count can fail that pass — in which case the modifier is treated as unrollable and contributes nothing, silently.
+> Test this shape in the field you actually mean to use it in before relying on it.
+
 ### What the dice engine refuses
 
 Three mistakes are common enough to name, because each one silently costs you the whole expression:
@@ -168,7 +176,8 @@ The `@` paths are **your game system's**, not Fabricate's.
 Fabricate never invents them and never translates between systems, so the same expression is right in one world and wrong in another.
 
 Fabricate ships preset bundles for two systems.
-Open **World › Rules & Resources › Modifiers** and choose **Seed presets** to put the whole set into your world, already written for the game system you are running.
+Open **World › Rules & Resources › Modifiers** and choose **Seed presets** to put them into your world, already written for the game system you are running.
+Seeding delivers the ability and skill entries in the tables below, and nothing else on this page.
 
 ### D&D 5e
 
@@ -179,10 +188,11 @@ Open **World › Rules & Resources › Modifiers** and choose **Seed presets** t
 | Ability modifier | `@abilities.str.mod`, and the same shape for `dex`, `con`, `int`, `wis`, `cha` |
 | Ability score | `@abilities.str.value` |
 | Skill total | `@skills.ath.total`, and the same shape for `acr`, `ste`, `prc`, `inv`, `nat`, `sur`, `his` |
-| Proficiency bonus | `@prof` |
-| Character level | `@details.level` |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Two more paths appear in examples on this page and are **not** part of the seeded set: `@prof` for the proficiency bonus and `@details.level` for character level.
+Both are real in D&D 5e, but verify them with `/r` before you rely on them, and note that `@details.level` is a **player-character** path — a D&D 5e NPC carries `@details.cr` instead, so an NPC crafter reads `@details.level` as 0.
 
 ### Pathfinder 2e
 
@@ -218,6 +228,31 @@ Everywhere else, find the path once and reuse it:
 
 ---
 
+## Modifiers and modifier references
+
+Two things share the word "modifier", and the difference decides where you write an expression.
+
+A **modifier** is an entry in the world's one shared library, at **World › Rules & Resources › Modifiers**.
+It carries the expression, and optional **Minimum** and **Maximum** bounds.
+
+A **modifier reference** is how something attaches that entry: a gathering drop row, an event, or a task's stamina cost.
+A reference carries no expression of its own by default.
+It names a library modifier, an **operator** of `+` or `-`, and its own optional bounds.
+
+That operator is how you make an attachment subtract.
+Write the expression positively in the library — `@abilities.str.mod` — and set the reference's operator to `-`.
+Do not negate inside the expression: an expression of `-@abilities.str.mod` attached with a `-` operator cancels out to an increase, and it also breaks on a negative value, because a Strength modifier of −1 substitutes to `--1`.
+
+A reference may override the library's expression for that one attachment.
+That override is a full roll expression and replaces the library entry's own.
+
+{: .warning }
+> Bounds that cannot be satisfied make an entry contribute **nothing at all**, rather than clamping to the nearest one.
+> A minimum above its maximum, or a bound too large for the dice grammar to express, is reported in the check's Validation section and the modifier is skipped.
+> Leaving a bound empty means no limit; a bound of `0` is a real limit of zero.
+
+---
+
 ## Roll-data paths
 
 [Character prerequisites]({% link world/rules/character-prerequisites.md %}) do **not** take a roll expression.
@@ -248,25 +283,35 @@ It falls back to `0` for a numeric comparison and to `false` for a boolean or ex
 
 ---
 
-## Actor data paths
+## Document data paths
 
-Two settings name a field on the **actor or item document** rather than on prepared roll data.
+Two settings name a field on an **actor or item document** rather than on prepared roll data.
 These are also plain dotted paths with no `@`, and they usually begin with `system.` because that is where a game system keeps its own data.
 
-| Setting | Example | What it names |
-|:--------|:--------|:--------------|
-| [Currency]({% link world/rules/currency.md %}) unit **Actor data path** | `system.currency.gp` | Where a coin balance is read from and written back to |
-| **Item stack quantity path** in the module settings | Your game system's default | Where an item stack keeps its count |
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Setting | Resolved against | Example |
+|:--------|:-----------------|:--------|
+| [Currency]({% link world/rules/currency.md %}) unit **Actor data path** | The acting actor | `system.currency.gp` |
+| **Item Stack Quantity Field**, in the module settings | Each item | `system.quantity` for D&D 5e, Pathfinder 2e and most systems |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+{: .warning }
+> A currency unit only carries an actor data path under the **Actor data path** spend strategy.
+> Choose a different strategy and a unit names something else entirely: under a provider it carries a **denomination**, one of your game system's own coin types, and under a macro it carries neither.
+> Fabricate's shipped D&D 5e currency preset uses paths; its Pathfinder 2e preset uses denominations, because Pathfinder 2e keeps coins as items rather than as a number on the actor.
+> See [Currency]({% link world/rules/currency.md %}) for the three strategies.
 
 Currency amounts themselves are **plain numbers**.
 A recipe's currency cost is an amount and a unit; it is not an expression and cannot roll.
-What varies per game system is only where the coins live, which is what the actor data path names.
+What varies per game system is only where the coins live.
 
 {: .warning }
-> The item stack quantity path is the one setting here with teeth.
+> The item stack quantity field is the one setting here with teeth.
 > If it points somewhere your items do not keep a count, crafting and salvage delete a whole stack instead of reducing it.
-> Fabricate checks the path against your world's items and warns you when it does not resolve.
-> See [Protecting Your Worlds]({% link data-safety.md %}).
+> Fabricate checks the field against your world's items and warns you when it does not resolve.
+> See [Troubleshooting]({% link help/troubleshooting.md %}#crafting-salvage-or-alchemy-deletes-a-whole-stack-instead-of-reducing-it).
 
 ---
 
@@ -280,12 +325,12 @@ This only matters when your expression rolls dice, but when it does it matters a
 |:------|:----------|:-------------|
 | **Maximum stamina** | Once per character, when the pool is first rolled or re-rolled from the GM's Roll/Reset button | Fixed for that character until re-rolled |
 | **Starting stamina** | Once, at the same moment as the maximum | Fixed for that character |
-| **Amount per interval** | Every time stamina regenerates as world time passes | Re-rolled each tick, so regeneration varies |
-| **Stamina cost** and **character modifiers** | Every gathering attempt | Re-rolled each attempt |
+| **Amount per interval** | Once per regeneration pass, then multiplied by however many whole intervals have elapsed | Rolled once per pass, not once per interval — advancing eight hours on an hourly interval gives `1d4 × 8`, not eight separate `1d4` rolls |
+| **Modifier references** on a cost, a drop row or an event | Every gathering attempt | Re-rolled each attempt. The task's own stamina cost is a fixed number and never rolls |
 | **Visibility gate** | Whenever a task's visibility is tested for a character | Re-rolled each test |
 | **Check roll expression** | Every attempt that rolls | Re-rolled each attempt |
 | **Check modifiers** | Every attempt, appended to the check's own roll | Rolled once, with the check, and shown on the chat card |
-| **Tool bonus** | Every eligible check | Re-rolled each check |
+| **Tool bonus** | Every eligible **crafting or salvage** check — gathering checks do not apply Tool bonuses | Resolved to a single number first, then added as one flat term, so its dice never appear in the check's own breakdown |
 | **Tool breakage dice** | Every time breakage is tested | Re-rolled each test |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -298,12 +343,13 @@ Different fields treat the number your expression produces differently.
 
 - **Stamina maximum, starting stamina and regeneration amount** are **rounded to a whole number and floored at 0**, so a negative result becomes `0`.
   Starting stamina is additionally capped at the rolled maximum.
-- **Costs and character modifiers** may be **negative**, which is how you make something cheaper or less likely.
-  A stamina cost is floored at 0 only after everything has been summed, so a `-2` modifier really does reduce it.
+- **Modifier references** may reduce as well as increase, through their `-` operator rather than through a negative expression.
+  A cost is floored at 0 only after everything has been summed, so a reducing modifier really does reduce it.
 - **Check modifier bounds** clamp what a modifier contributes, **after it rolls**.
   A `1d8` modifier with a maximum of `+6` contributes 6 on a roll of 7 and 3 on a roll of 3.
   Leaving a bound empty means no limit, and empty is not the same as zero.
-- **A tool requirement** is read as satisfied when its expression resolves **above zero**.
+- **A gathering stamina cost** is summed from its base and every modifier reference, then **rounded and floored at 0**.
+  A task whose base cost is 0 stays free whatever its modifiers say.
 
 ---
 
@@ -324,7 +370,7 @@ Skill-driven and tool-gated, with no randomness in the setup itself.
 | Modifier "Strength" | `@abilities.str.mod` | Applied by the smithing check |
 | Modifier "Smith's Tools" | `2` | A flat bonus the GM grants for good equipment |
 | Tool bonus on a masterwork hammer | `1` | A plain number is a plain number, `@` or no `@` |
-| Tool requirement on a forge | `abilities.str.mod` | Entered without `@`, and satisfied above zero, so a weak character cannot work it |
+| Gate on who may wield the forge | A **character prerequisite**, picked on the Tool's Requirements tab | Tools gate on prerequisites, not on a typed expression |
 | Prerequisite to learn a recipe | `tools.smith.value` at least `1` | Proficient with Smith's Tools |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -356,10 +402,10 @@ The one that uses the stamina economy, so evaluation timing does real work.
 | Maximum stamina | `10 + 2 * @abilities.con.mod` | Rolled once per character, so hardy characters forage longer |
 | Starting stamina | `floor((10 + 2 * @abilities.con.mod) / 2)` | Characters begin a session half-rested |
 | Amount per interval | `1d4` | Re-rolled every tick, so recovery is uneven |
-| Stamina cost on a difficult task | `3` | A flat price per attempt |
-| Character modifier "Survival" | `@skills.sur.total` | Shifts the drop chance on a `d100` gather |
-| Character modifier "Strong back" | `-@abilities.str.mod` | Negative, so a strong character pays less stamina |
-| Visibility gate on a rare herb | `@skills.nat.total` against a threshold | Only a knowledgeable character sees the task at all |
+| Stamina cost on a difficult task | `3` | A plain number — this field is a spinner, not an expression |
+| Drop-row modifier "Survival" | `@skills.sur.total`, attached with a `+` operator | Shifts the drop chance on a `d100` gather |
+| Cost modifier "Strong back" | `@abilities.str.mod`, attached with a `-` operator | The reference subtracts, so a strong character pays less stamina |
+| Visibility gate on a rare herb | `@skills.nat.total`, with a threshold of `15` | Both halves are expressions; the task shows at or above the threshold |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -389,7 +435,7 @@ Two Fabricate surfaces will also tell you before you commit:
 | The expression contributes nothing at all | The dice engine refused it. Check for a capitalised function name, a decimal without its leading zero, or a dice count above 999 |
 | A character-data term behaves as 0 | The path is wrong for this game system, or no character is resolved yet. Test it with `/r` |
 | A prerequisite is never met | The same cause. An unknown path falls back to `0` or `false`, so a typo reads as an unmet condition rather than an error |
-| A tool bonus does not apply | The Tool Studio adds `@` for you, so a path entered there with one of its own is stored twice over |
+| A tool bonus silently contributes 0 | The Tool Studio adds `@` only to a **bare path**. A compound entry such as `abilities.str.mod + 2` gets none, so its path term reads as 0. Write the compound with its own `@` |
 | Stamina always starts at 0 | The expression resolved negative, and stamina is floored at 0 |
 | A dice-count expression fails intermittently | The count reached 0 or went negative. Guard it with `max(1, …)` |
 | A modifier never exceeds a small number | It has a maximum bound set. Empty means no limit, but a bound of 0 is a real limit of zero |

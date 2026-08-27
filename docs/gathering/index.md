@@ -22,12 +22,15 @@ When the feature is on, the Crafting Admin panel's left rail grows a **Gathering
 | [Tasks]({% link gathering/tasks.md %}) | The reusable Gathering Task library: drop rows, availability, checks, timing, and required tools. |
 | [Events]({% link gathering/events.md %}) | The reusable event library that fires alongside a gathering attempt. |
 | [Settings]({% link gathering/settings.md %}) | System-level gathering rules: resolution mode, limitations, reward and event rules, and blind mode. |
-| [Formulas]({% link expressions.md %}) | The roll expressions the gathering fields accept, with worked examples. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The gathering check itself is authored beside the crafting and salvage checks.
 See [Checks › Gathering]({% link checks/gathering.md %}).
+
+The stamina, modifier and visibility-gate fields on these pages accept roll expressions.
+Those are not a gathering concept — the same syntax runs the crafting checks, tool bonuses and complications too.
+See [Expressions]({% link expressions.md %}).
 
 ---
 

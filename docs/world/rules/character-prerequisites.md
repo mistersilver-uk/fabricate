@@ -15,4 +15,7 @@ A recipe item, a tool or a complication names the prerequisites it needs by id; 
 
 Read {% link crafting/settings.md %} for how learning gates use them, and {% link tools.md %} for tool requirements.
 
+A prerequisite path is not a roll expression: it names one value and does no arithmetic.
+See {% link expressions.md %} for the difference, and for the paths each game system uses.
+
 {% include screenshot.html case="world-prerequisites" caption="The prerequisite library, each entry naming the character property it tests." %}
