@@ -221,6 +221,57 @@ export default [
     },
   },
 
+  // 5b. The Scoped Entity Definitions dependency boundary (issue 1358).
+  //
+  //     `scopedDefinitions.js` is the generic three-layer primitive; `componentScope.js`,
+  //     `essenceScope.js` and `toolScope.js` CONFIGURE it with their own section names and
+  //     field-level rules. The dependency runs one way only — the three scope modules import the
+  //     primitive, never the reverse — because the primitive is what the store, the migration, the
+  //     export upcast and the GM screens all have to agree with, and a primitive that reached back
+  //     into one entity's rules would make the other two entities' answers depend on it.
+  //
+  //     A cycle here would also be invisible to `import-x/no-cycle` for as long as the reverse edge
+  //     is the only one: an edge that no module completes is not a cycle yet, it is a cycle waiting
+  //     for the next caller. So the boundary is stated rather than inferred.
+  //
+  //     Belt AND braces: `tests/scoped-definitions.test.js` pins the same boundary by PARSING the
+  //     file's real import specifiers, because a lint rule is only enforced where lint is run and
+  //     the glob patterns below cannot see an indirection through a barrel re-export.
+  //
+  //     TWO SPELLINGS ARE LISTED PER MODULE, with and without the `.js` extension. Node's ESM
+  //     resolver rejects an extensionless relative specifier, but the bundler and the editor do
+  //     not, and `no-restricted-imports` matches the SPECIFIER TEXT rather than a resolved path —
+  //     so `'./componentScope'` slips a single-spelling pattern entirely.
+  //
+  //     THIS RULE DOES NOT SEE `import()` AT ALL — not a string-literal one, and not a
+  //     template-literal one. That is a limitation of the rule, not of the patterns, so the
+  //     DYNAMIC half of this boundary is enforced only by the parsing test, which extracts both
+  //     literal forms and additionally fails a computed specifier it cannot read.
+  {
+    files: ['src/systems/scopedDefinitions.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/componentScope.js',
+                '**/essenceScope.js',
+                '**/toolScope.js',
+                '**/componentScope',
+                '**/essenceScope',
+                '**/toolScope',
+              ],
+              message:
+                'scopedDefinitions.js is the generic primitive: the three scope modules import it, never the reverse.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //
