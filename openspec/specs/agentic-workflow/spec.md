@@ -753,6 +753,13 @@ A screenshot committed before this requirement's generator existed remains valid
 - **AND** the carve-out is decided by which namespace a frame occupies rather than by when it was committed, so a reader can tell the two populations apart without consulting history
 - **AND** the hand-curated population is closed and may only shrink, because a replacement for one of its frames is a new screenshot and must be generated
 
+#### Scenario: a documentation image that is not an application view
+
+- **WHEN** a documentation image depicts something the renderer has no route for, such as a palette reference assembled from the stylesheet rather than a screen the product draws
+- **THEN** it is exempt from generation, because a rule requiring a case for something no case can reach would be unsatisfiable rather than demanding
+- **AND** the exemption turns on what the artifact IS, not on the convenience of leaving it alone, so an application view that a case could reach is never covered by it
+- **AND** the exempt set is enumerated rather than inferred, so adding to it is a visible act
+
 ### Requirement: Provider-specific skill metadata
 
 Skills SHOULD include provider-specific metadata under the skill directory when that provider benefits from explicit discovery hints.

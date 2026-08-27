@@ -957,6 +957,7 @@ That reduces the reverse gate to the map restating itself.
 What is left of that pre-existing population stays exactly as it is.
 It remains valid documentation evidence and is not migrated, because retiring evidence that is still accurate buys nothing.
 The rule applies to a new or replaced screenshot.
+The population is also closed and may only shrink, and `tests/docs-screenshots.test.js` now enumerates what is in it and why no view case can reach it, so adding to it is a visible act rather than a silent one.
 
 `npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.
 Run it after any change that alters one of the mapped views, and read what it reports before committing.
