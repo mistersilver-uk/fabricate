@@ -33,6 +33,8 @@ A recipe item, a tool or a complication names the prerequisites it needs by id; 
 
 Read {% link visibility.md %} for how learning gates use them, and {% link tools.md %} for tool requirements.
 
+{% include screenshot.html case="world-prerequisites" caption="The prerequisite library, each entry naming the character property it tests." %}
+
 ## Modifiers
 
 Reusable, actor-driven expressions — `@abilities.med.mod`, `@prof`, `2` — resolved against the acting character.
@@ -42,6 +44,8 @@ A crafting, salvage or gathering check adds the modifiers it selects to its roll
 Each consumer chooses which entries apply and how they combine, but they all choose from this one list.
 
 See {% link crafting-checks.md %} for how checks select and combine them, and {% link gathering-expressions.md %} for the gathering side.
+
+{% include screenshot.html case="world-modifiers" caption="The modifier library, shared by crafting, salvage and gathering alike." %}
 
 ## Sharing, and what that means when you delete something
 

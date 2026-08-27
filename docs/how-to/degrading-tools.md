@@ -24,7 +24,7 @@ Then add the saved Tool from the recipe's **Tools** tab.
 4. Choose **Create from Item** to open the Tool editor.
 5. Open **Breakage** and choose **Limited uses**.
 6. Set **Maximum uses** to the number of tracked uses the Tool allows before it breaks.
-7. Choose **Destroy item**, **Mark as broken**, or **Replace with item**.
+7. Choose **Destroy the item**, **Mark as broken**, or **Replace with component**.
 8. For **Replace with component**, choose the managed Component awarded when the Tool breaks.
 9. Open **Validation** and resolve every issue.
 10. Choose **Save changes**.
@@ -43,11 +43,15 @@ Leave **Maximum uses** blank for unlimited use with tracking.
 
 ## Damaged and repairable Tools
 
-**Replace with item** is useful when a damaged variant should become a crafting ingredient.
+**Replace with component** is useful when a damaged variant should become a crafting ingredient.
 Choose a managed Component as the replacement, then create a separate repair recipe that consumes that Component and awards the working Tool Item.
+
+{% include screenshot.html case="manager-tool-stress-replacement" caption="A Tool set to break on a dice expression and leave a component behind when it does." %}
 
 **Mark as broken** can store **Repair materials** made from Components, tags, essences, and currency.
 The editor saves and validates those materials, but repair execution is planned and is not yet available.
+
+{% include screenshot.html case="manager-tool-stress-repair" caption="A Tool marked as broken on failure, over the ingredient groups its repair would take." %}
 
 If a replacement cannot be resolved or created, Fabricate keeps the original Tool.
 

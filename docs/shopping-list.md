@@ -25,6 +25,13 @@ The list shows three summary cards at the top, for the recipes you have queued, 
 Below them it lists the components and essences you still need to acquire, and the tools you need to acquire or repair.
 Components you already own in full drop off the list, so only shortfalls remain.
 
+{% include screenshot.html case="player-crafting-essence-shopping" caption="A queued recipe and the two shortfalls it left behind, an ingot and an essence amount." %}
+
+A recipe you can already make adds nothing to the list.
+Its requirements instead resolve to a plain account of what the craft is about to consume, and the list stays on its empty state.
+
+{% include screenshot.html case="player-crafting-consumption-plan" caption="A recipe with everything to hand, so the shopping list has nothing to ask for." %}
+
 The shopping list is scratch planning.
 It clears when you close the Crafting window.
 

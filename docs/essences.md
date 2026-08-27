@@ -32,6 +32,8 @@ Choose **Edit** to open the essence editor.
 
 Your search, filters, presentation choice, and page position all survive opening the editor and coming back.
 
+{% include screenshot.html case="manager-essences-normal" caption="The essence library in its list presentation, with one essence selected." %}
+
 ## Create or edit an essence
 
 Choose **Create essence** to start a new one, or **Edit** an existing row.
@@ -44,6 +46,8 @@ See [Effect Transfer via Essences](#effect-transfer-via-essences) and [The Essen
 - **Validation** lists anything unfinished, such as a missing description or a macro that no longer resolves.
 
 A live preview panel shows how the essence appears and what it currently does, updating as you edit.
+
+{% include screenshot.html case="manager-essence-edit-first-state" caption="The editor's Identity tab beside the live preview, on an essence that is currently disabled." %}
 
 Choose **Save** when you are done.
 An essence always saves, even with warnings, unless it has a blocking issue such as a missing name or icon.
@@ -111,8 +115,14 @@ For example, an option requiring "3 Fire essence" is satisfied by any combinatio
 - 1x Dragon Scale (3 Fire) meets it outright.
 - 3x Ember Shard (1 Fire each) also meets it.
 
+When two requirements on the same recipe both ask for essences, the player fills one shared pool rather than two separate ones.
+
+{% include screenshot.html case="player-crafting-essence-pool" caption="A player filling one essence pool that two of the recipe's requirements draw on." %}
+
 Because an essence is an option like any other, it can sit inside a group as one of several **Accept instead** alternatives on the recipe editor's Ingredients tab, or stand alone in its own group as a hard requirement.
 A group holding only a single essence option is a required essence, meaning the crafter must supply that essence amount in addition to the recipe's other groups.
+
+{% include screenshot.html case="player-crafting-essence-alternative" caption="The player's side of that choice, picking between a component and an essence amount for one requirement." %}
 
 A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
 Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.

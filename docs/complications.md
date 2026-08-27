@@ -51,6 +51,10 @@ Set **How the conditions combine** to **Any**, so one ticked condition is enough
 A complication with nothing ticked never fires.
 Each complication's row shows a short, automatically written sentence summarising its conditions and effects, so you can read what it does at a glance without opening it.
 
+A condition your system cannot satisfy yet is shown but greyed, with a line saying what is missing.
+
+{% include screenshot.html case="manager-component-complications-expanded" caption="An expanded complication, with its conditions above and its effects below." %}
+
 ### What It Does
 
 The **Then** card holds two optional effects, and a complication can carry either, both, or neither and still be a complete, narration-only entry:
@@ -86,8 +90,11 @@ Fabricate shows your authored complications, read-only, everywhere else that com
 - The component editor's own **Salvage** panel shows a read-only strip under any progressive stage that produces a component carrying complications.
 - The recipe editor's progressive stage cards show the same read-only strip for each result.
 
-Either strip carries an **Edit complications** link that takes you straight to that component's own Complications section.
+The salvage strip carries its own **Edit** control, named for complications so it reads apart from the row's other links, and a recipe stage's **Edit** control targets the same component.
+Either one opens the component the complications belong to, which is the only place they can be changed.
 These read-only strips always show everything you authored, whatever **Tell the player** says, because they are for you.
+
+{% include screenshot.html case="manager-recipe-complications-stage-strip" caption="Two progressive stages in the recipe editor, each carrying its component's complications read-only." %}
 
 ## Your Private Report
 
