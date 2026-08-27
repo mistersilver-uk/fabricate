@@ -56,6 +56,8 @@ When a player opens a progressive recipe, Fabricate lists that recipe's result s
 Each stage shows its position in that order, its component, and — where the component has one authored — its difficulty.
 Progressive stages carry no quantity: a stage is produced once or not at all, so there is nothing to count.
 
+{% include screenshot.html case="player-crafting-progressive" caption="The result stages of a progressive recipe, in the order they are produced." %}
+
 Where it can be worked out, a stage also shows a **Reached at** value.
 That is the lowest check value that reaches the stage, taking the earlier stages and the system's award mode into account.
 It is not a plain running total of the difficulties above it, because each award mode spends the check value differently.
@@ -100,6 +102,8 @@ See [Salvaging From the Inventory Tab]({% link salvage.md %}#salvaging-from-the-
 A progressive recipe has one ingredient set and one result group whose results are listed in difficulty order.
 For example, this means Iron Filings, then Steel Ingot, then Fine Steel Ingot, then Masterwork Ingot.
 See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+
+{% include screenshot.html case="manager-recipe-edit-results-progressive" %}
 
 {: .note }
 > Each result must point to a managed component with a difficulty of at least 1.

@@ -35,8 +35,14 @@ If you configure a roll formula, the check still rolls when a player crafts, but
 If you configure no roll formula, the craft proceeds with no check.
 Because it uses the same pass or fail check as Simple mode, a Routed by ingredients recipe can pick a per-recipe **Check tier** to shift its DC (but not the outcome-tier controls used by Routed by check).
 
+{% include screenshot.html case="coverage-mode-routed-ingredients-results" caption="One result group tied to each ingredient set." %}
+
 When a recipe has a single result group, you do not need to tie an ingredient set to it.
 The single result group is produced whenever the recipe is crafted.
+
+A player sees which materials lead to which result before committing to the craft.
+
+{% include screenshot.html case="player-crafting-ingredient-routed" %}
 
 ---
 
@@ -48,6 +54,11 @@ A crafting check is **required** in this mode.
 The check rolls the routed crafting check you configured on the system, then maps the roll to one of the named outcome tiers you defined there.
 The matched tier's name is the outcome that selects the result.
 How the roll maps to a tier depends on whether the check's tiers are relative or fixed.
+
+{% include screenshot.html case="coverage-mode-routed-check-checks" caption="The outcome tiers a routed check sorts results into." %}
+
+{% include screenshot.html case="player-crafting-routed-by-check" caption="The same recipe as a player sees it, listing the outcomes the roll can land in." %}
+
 See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers) for the difference.
 
 With relative tiers, the base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.

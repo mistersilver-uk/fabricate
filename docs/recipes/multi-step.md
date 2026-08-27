@@ -42,6 +42,9 @@ When a player opens a multi-step recipe in the **Crafting** tab, its required ma
 Each step appears as a numbered block, in order, and each block lists that step's own required materials.
 A block shows what the player has, what the step needs, and what is still missing.
 A short hint at the top of the list reminds players that the recipe is made in several steps and that each one is crafted in order.
+
+{% include screenshot.html case="player-crafting-multistep" caption="A multi-step recipe, with each step's materials listed in order." %}
+
 When time requirements are enabled, a fully revealed timed multi-step recipe shows the total duration in the recipe header before you start crafting.
 Each timed step also shows its own duration beside the step name.
 Instant steps do not show a duration.
@@ -87,6 +90,9 @@ A multi-step recipe is made up of an ordered list of steps.
 Each step has its own ingredient sets, result groups, optional required tools, and an optional time requirement.
 For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem.
 You author each step on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
+
+{% include screenshot.html case="manager-recipe-edit-multistep" caption="The steps of a multi-step recipe on the Overview tab." %}
+
 The public API can create and configure recipes too.
 See the [API reference]({% link api/recipe-manager.md %}) for those methods.
 

@@ -74,6 +74,10 @@ The toggles only decide whether each limitation is _active_ for the system.
 
 ## Environment Fields
 
+The **Gathering** menu opens on a browser of every environment the selected system holds.
+
+{% include screenshot.html case="manager-environments-browse-normal" %}
+
 Each environment belongs to one crafting system and stores:
 
 | Field              | Description                                                                                                               |
@@ -222,6 +226,8 @@ The selected crafting system's Gathering Tasks are managed from the Gathering **
 The task browser supports search, status/biome/availability filters, paging, row selection, enable toggles, duplicate and delete actions, and a right-side inspector with availability, a matching-environment count, and drop summaries.
 The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, and per-drop modifier tuning.
 
+{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser." %}
+
 Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only.
 Geography (the realm) is not a composition axis.
 Weather and time of day stay visible as current condition context.
@@ -247,6 +253,10 @@ Gathering Task records support:
 
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
 > See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
+
+Reusable event records are edited from the Gathering **Events** tab.
+
+{% include screenshot.html case="manager-gathering-event-editor-normal" caption="The Gathering Event editor, opened from the event browser." %}
 
 Reusable event records support:
 
@@ -366,6 +376,10 @@ Progressive gathering tasks need an award mode and a check formula.
 
 When you set a threshold, the rolled value is compared against it for success or failure.
 When you leave it blank, the check simply produces a value.
+
+The system-wide gathering check is authored on its own page, alongside the crafting and salvage checks.
+
+{% include screenshot.html case="manager-checks-gathering" %}
 
 ## Time Requirements
 

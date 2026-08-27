@@ -1,0 +1,234 @@
+{
+  "provenance": {
+    "foundryVersion": "14.365",
+    "chromeSha256": "6f9bc29bb3e20abf78aaa2182192e7233a008c2f7c45ade70e6082da20bebc8f",
+    "playwrightVersion": "1.61.0"
+  },
+  "screenshots": [
+    {
+      "case": "fabricate-app-shell",
+      "alt": "The Fabricate player window on the Crafting tab, with the recipe browser on the left, the selected recipe and its requirements in the middle, and the shopping list on the right.",
+      "sha256": "081554c7e009ebdf93d6479bc73cf1d92130a336d8677456acae5ec44347c1a1"
+    },
+    {
+      "case": "manager-default-selection",
+      "alt": "The Crafting Systems window showing the system library, with one system selected and its component, recipe and essence counts, enabled features and global conditions listed beside it.",
+      "sha256": "d6d75a5f45b06a7f316896d28f35e3c7e86ffc3038a0c0ec2466cdc4ab79887c"
+    },
+    {
+      "case": "manager-system-edit-normal",
+      "alt": "The System Overview settings page for a crafting system, showing its name and description alongside the optional feature toggles for gathering, salvage, essences and multi-step recipes.",
+      "sha256": "1680cb5a315f6cc45892c3d849b995caa2903089fcfa3440a6461db3b7e1d3a3"
+    },
+    {
+      "case": "manager-recipes-normal",
+      "alt": "The recipe browser for a crafting system, with recipes grouped by category and each row showing its requirement counts, its crafting check and whether it is enabled, beside a summary of the selected recipe.",
+      "sha256": "afcc074ede12b333c5b24b78d9dda47e16776258ec110545c9b4346837c56e36"
+    },
+    {
+      "case": "manager-crafting-settings",
+      "alt": "The Crafting settings page for a system, where the recipe resolution mode is chosen and recipe visibility is set.",
+      "sha256": "4cbd6cfebfa2b20ff6caa1848fa9360c962fddbc5bd5f4add7adc918595e7175"
+    },
+    {
+      "case": "manager-checks-crafting-modifiers",
+      "alt": "The Modifiers tab of a crafting check, listing the named check modifiers available to it, how they combine into the roll, and the cap on how many a player may pick.",
+      "sha256": "b588b60c3be3334ad23bdcb23cd4bc11e4f54685292cdf383b2fc4eb187df976"
+    },
+    {
+      "case": "manager-checks-crafting-recipe-tiers",
+      "alt": "The crafting page of the Checks screen with two named recipe difficulty tiers defined.",
+      "sha256": "e7ad559ac6ba1e1fbe2ca7254a9df2b61cd55725ecca0ac944e5a52cd9120776"
+    },
+    {
+      "case": "manager-checks-crafting-odds-enumerable",
+      "alt": "The crafting page of the Checks screen showing the odds of each outcome for a chosen character.",
+      "sha256": "1d8cc3ddd0f6b746270495db73841a7342bac496fcde57431e5f31823654d75d"
+    },
+    {
+      "case": "manager-checks-validation",
+      "alt": "The Validation page of the Checks screen, reporting each activity check as passing, warning or blocking, with one warning raised against the salvage check.",
+      "sha256": "f6aa7b299f747d41d37b6f5c78ea9f7f6e2ac2a812a30d11b5f19ebe85dab491"
+    },
+    {
+      "case": "player-crafting-roll-prompt",
+      "alt": "The crafting roll prompt, showing the formula, the check modifiers available to pick, a situational bonus field, the roll mode, and the advantage, normal and disadvantage buttons.",
+      "sha256": "bf690113a726f873519f71f12481cc4bc36d865186b0965cb60ebd2db2f60bb5"
+    },
+    {
+      "case": "player-crafting-roll-result",
+      "alt": "A finished craft in the Crafting tab, showing the check that was rolled, what the craft used, what it produced, and a Craft complete confirmation.",
+      "sha256": "067232cb684e19ce622c63be70f116d6a4c79722ce37e9f6293a885e17fa0523"
+    },
+    {
+      "case": "manager-component-edit-salvage",
+      "alt": "The salvage section of the component editor, showing the result groups a component breaks down into, the check outcome each group is awarded for, and the DC override set for this component.",
+      "sha256": "eb870b5b6d4e0e40154fa1470897576cca4ab8e69b9d7929648c3d7c8712b347"
+    },
+    {
+      "case": "player-salvage",
+      "alt": "The salvage view for a selected item in the Inventory tab, listing the ordered results a roll can reach, the difficulty of each, and what can go wrong along the way.",
+      "sha256": "079db1990b3f142b401a808f9881199ead5847ec954a0e73fb21794376f372c6"
+    },
+    {
+      "case": "player-salvage-tools",
+      "alt": "The salvage view for an item whose salvage needs tools, showing which tools are required and whether the character has them.",
+      "sha256": "80a1fffd1177bb9341a27365deb649983c0d6e68dca749ad66c612edb0767ac3"
+    },
+    {
+      "case": "player-inventory-bulk-mixed",
+      "alt": "The Inventory tab with four items selected at once and the bulk salvage panel beside them, showing what could go wrong, which of the selection will be broken down, and the best case the batch could return.",
+      "sha256": "696f31531c3a8047d4442fb0af163e2aed34b3f6d7c4db5c33c51081deeb5ee7"
+    },
+    {
+      "case": "manager-tool-parity-01-library-1280x720",
+      "alt": "The tool library for a crafting system, listing each tool with how it breaks and what happens when it does, below the system-wide breakage mode, with the selected tool summarised on the right.",
+      "sha256": "99d2ec6b07b3229210cd5bc627be037718b8abf2324c19930df89d52abb9223e"
+    },
+    {
+      "case": "manager-tool-parity-02-overview-1280x720",
+      "alt": "The Overview tab of the tool editor, showing the game-world Item a tool is linked to, its display label and description, and the toggle that enables it.",
+      "sha256": "30a323777f8d0a75e35e11c89f6ff510792752715c3488ec8a712bbf644ce9f7"
+    },
+    {
+      "case": "manager-tool-parity-03-breakage-1280x720",
+      "alt": "The breakage tab of the tool editor, where the chance of breaking and what happens on a break are set.",
+      "sha256": "1a072dd1410dd3bcd2c4b0fe4ab1e8f40d6f4313478acaefbc2a2ae894c89ee0"
+    },
+    {
+      "case": "manager-tool-parity-04-requirements-1280x720",
+      "alt": "The Requirements tab of the tool editor, where the character prerequisites that gate who may wield a tool are chosen, and what happens to a character who does not meet them.",
+      "sha256": "1cfc85ee57a0208bceea98c0af50c5971a9bc300e67945038696dfbfce73e737"
+    },
+    {
+      "case": "manager-recipe-edit-normal",
+      "alt": "The Overview tab of the recipe editor, showing a recipe’s name, flavour text, category and check tier, whether it is enabled or locked, and whether it crafts in one step or several.",
+      "sha256": "d1343f9e78767263d4be46777dcac4224d24a861983a338871f185bf6e4c9a1d"
+    },
+    {
+      "case": "manager-recipe-edit-ingredients",
+      "alt": "The Ingredients tab of the recipe editor, listing the components a recipe requires and how many of each, with the controls that add a component, a tag requirement or an essence requirement.",
+      "sha256": "cf5d8b0f59483f97ef80e65677dda774b20e69b8bb6d79de93b595c3862f9595"
+    },
+    {
+      "case": "manager-recipe-edit-results",
+      "alt": "The Results tab of the recipe editor for a simple recipe, showing what it produces on success and what it produces on a failed check.",
+      "sha256": "3a4556a9a7a943ac27efa10f762bda53b0a8000332e4953e9d48164d472f5517"
+    },
+    {
+      "case": "manager-recipe-edit-validation",
+      "alt": "The Validation tab of the recipe editor, reporting five passing structural checks, no warnings and nothing blocking the recipe from being enabled.",
+      "sha256": "8b9e576c7a7a4fedfa743e98cdacb29830942fe1e4c3fcd603f57a5cd5c80425"
+    },
+    {
+      "case": "manager-recipe-edit-access-rail",
+      "alt": "The Recipe access page, where individual recipes are granted to specific characters or players. Every recipe in this system currently shows No access.",
+      "sha256": "187fe487d75a8fc43b1fb87ae0c64657aa94ca0ced43c6d5a7c75444286e4f3e"
+    },
+    {
+      "case": "player-crafting-simple",
+      "alt": "The Crafting tab with a simple recipe ready to craft and its requirements already satisfied.",
+      "sha256": "3806a02aac0603d9dd42030e378593e05b4b1c5c5a21e1375fae710435713228"
+    },
+    {
+      "case": "coverage-mode-routed-ingredients-results",
+      "alt": "The results tab of the recipe editor for a recipe routed by ingredients, showing one result group for each route.",
+      "sha256": "b9953a07c7121b28e12bb7d3e203d340a670a73ab6595637825bca616a002e74"
+    },
+    {
+      "case": "coverage-mode-routed-check-checks",
+      "alt": "The Outcomes tab of a routed crafting check, showing its Ruined, Standard and Masterwork tiers, the roll thresholds between them, and which of them count as a success.",
+      "sha256": "ec6f82d3139714c08bfde9b5546d0986588a2c8e2ad547d6392d0af04df68bf2"
+    },
+    {
+      "case": "player-crafting-ingredient-routed",
+      "alt": "A recipe routed by ingredients selected in the Crafting tab, showing how the chosen ingredients decide the result.",
+      "sha256": "167be0f31f537175fcf870421c059a3a00c1469925348c123f0095731b9bfd8f"
+    },
+    {
+      "case": "player-crafting-routed-by-check",
+      "alt": "A recipe routed by check selected in the Crafting tab, showing the outcome tiers the roll can land in.",
+      "sha256": "a3d9d62e7b84c3c9f00399805e6bad90b1d09d702e8ee8a8bba6c77da39c558d"
+    },
+    {
+      "case": "manager-recipe-edit-results-progressive",
+      "alt": "The Results tab of the recipe editor for a progressive recipe, showing the ordered results, the difficulty attached to each, and the mishaps that some of them carry.",
+      "sha256": "66a581cde24ddf4c572da027458166c5a1f1302de2de7c4bbe4d2593ea2bcbbf"
+    },
+    {
+      "case": "player-crafting-progressive",
+      "alt": "A progressive recipe selected in the Crafting tab, showing each ordered result, the roll it is reached at, and what can go wrong along the way.",
+      "sha256": "a738f555b70c00a5ba8dceb0f831dc6480103e0353ec44f284eef29624555c79"
+    },
+    {
+      "case": "manager-recipe-edit-multistep",
+      "alt": "The Overview tab of the recipe editor for a multi-step recipe, showing its three ordered steps and how long each one takes.",
+      "sha256": "039bc302764eb2ded9618b697a727522106703b178663cb9c5360cbb62df4da5"
+    },
+    {
+      "case": "player-crafting-multistep",
+      "alt": "A multi-step recipe selected in the Crafting tab, showing its total duration and the first of its three steps, with the materials and tool that step needs.",
+      "sha256": "eca3dec2ac04a09c9fe9411399582ed2e747627e77ed4d9c1938226709add4e9"
+    },
+    {
+      "case": "manager-alchemy-settings",
+      "alt": "The Crafting settings page for a system with Alchemy chosen as its recipe resolution mode.",
+      "sha256": "8722e814ddb76e42492d13d5936f6f67cc7c9515c9b93ae4070aa1dda3ea8855"
+    },
+    {
+      "case": "manager-recipe-edit-results-alchemy",
+      "alt": "The Results tab of the recipe editor for an alchemy recipe, showing what a successful brew produces and what a failed check produces instead.",
+      "sha256": "ee9990ba1e7fd6b16c9369d347a30092be050b93bef0e01418c277caaadd821b"
+    },
+    {
+      "case": "player-alchemy-chooser",
+      "alt": "The Alchemy tab asking the player to choose a discipline, with each available discipline showing how many of its formulas the character knows.",
+      "sha256": "d996040cabd9e6c8bff0453238eb640f1eaa6ff857e62748c74028979ca91d83"
+    },
+    {
+      "case": "player-alchemy-workbench",
+      "alt": "The Alchemy Workbench with an empty bench, the character’s known recipes on the left with none revealed yet, and the components available to place on it on the right.",
+      "sha256": "2a4d1b329da05f1f2caa8984e725c8f0c6958d2332bc13bfef86aff32d0202a0"
+    },
+    {
+      "case": "manager-environments-browse-normal",
+      "alt": "The gathering environments browser, listing each environment with its selection mode, how many tasks it carries and whether it is on, and the selected environment summarised on the right.",
+      "sha256": "91a0f24457223a3a5ee35f9e50c3dcb03176c0824a6dd1392694d1e8b99697c9"
+    },
+    {
+      "case": "manager-gathering-task-editor-normal",
+      "alt": "The gathering task editor, showing a task’s identity and when it may be attempted, with the selected drop rule’s chance, count and modifiers on the right.",
+      "sha256": "c337e0bd10a31f17317b3fa58511e3f845b97bde3d4a6347e6f192eda2ee20af"
+    },
+    {
+      "case": "manager-gathering-event-editor-normal",
+      "alt": "The gathering event editor, showing an event’s identity, what it matches on, and the biome, time, weather and character modifiers that adjust its chance.",
+      "sha256": "402f8089dfb986fd5164263e309f7912bad05fefeec38f854a5308a13429b9b0"
+    },
+    {
+      "case": "manager-checks-gathering",
+      "alt": "The Gathering page of the Checks screen, showing that in d100 mode the gathering check is a fixed roll against each drop’s own chance, with nothing to configure.",
+      "sha256": "1e854deb322f3d55634f4152f3c8abf262e093df55233968c1a46989de28323c"
+    },
+    {
+      "case": "fabricate-journal",
+      "alt": "The Journal tab, listing a character’s active runs and the history of finished ones, with a multi-step run open beside them showing what its next step needs.",
+      "sha256": "d269f40cc5b07c5aa7634663b7938f8b1651335499743a4974c96bea9923d012"
+    },
+    {
+      "case": "fabricate-journal-craft-detail",
+      "alt": "A finished crafting run opened in the Journal tab, showing all three of its steps succeeded, what the last step required, and when the run started.",
+      "sha256": "7ed99a9ed3da144c3f2294996f97502c20c25ce49244c494838dc88f33069baf"
+    },
+    {
+      "case": "manager-books-scrolls-normal",
+      "alt": "The Books & Scrolls page, listing each recipe item with how many recipes it teaches and the learning cap set on it.",
+      "sha256": "acc30f565b9a15b3df6ff99637ffd6116a6ab5cb938f3d60eb7ea96b640ac31d"
+    },
+    {
+      "case": "manager-knowledge-owned-copies",
+      "alt": "The Knowledge page, listing the characters who hold copies of a system’s recipe items and, for the selected character, each copy with how many of its uses are spent.",
+      "sha256": "85c135276eb402ae331b227db21be472a7c97432141b350fd9a6ae191032517a"
+    }
+  ]
+}

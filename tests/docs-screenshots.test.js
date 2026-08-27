@@ -4,6 +4,8 @@ import { dirname, extname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { collectDocSourceFiles } from '../scripts/lib/docsScreenshotMap.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const docsDir = join(root, 'docs');
@@ -12,34 +14,40 @@ const screenshotsDir = join(docsDir, 'img', 'screenshots');
 // Directories under docs/ that are generated or vendored, never authored — they
 // must not count as references (otherwise a stale build artefact could keep a
 // deleted screenshot "alive").
-const IGNORED_DOCS_DIRS = new Set(['_site', 'vendor', '.jekyll-cache', 'node_modules']);
-const DOC_TEXT_EXTENSIONS = new Set(['.md', '.markdown', '.html']);
+//
+// `_includes`, `_layouts` and `_data` are skipped for a second reason. Jekyll's
+// template machinery lives there in .html and .json files, and this test scans
+// authored pages for literal screenshot file names. An image template under
+// `_includes` mentioning one would be a reference no page actually makes — a
+// phantom that keeps a deleted screenshot alive forever, which is exactly the
+// failure the orphan assertion below exists to catch.
+const IGNORED_DOCS_DIRS = new Set([
+  '_site',
+  'vendor',
+  '.jekyll-cache',
+  'node_modules',
+  '_includes',
+  '_layouts',
+  '_data',
+]);
 
-/**
- * Recursively collect authored doc source files (markdown + html), skipping the
- * generated/vendored trees in {@link IGNORED_DOCS_DIRS}.
- * @param {string} dir
- * @returns {Promise<string[]>}
- */
-async function collectDocFiles(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (IGNORED_DOCS_DIRS.has(entry.name)) continue;
-      files.push(...await collectDocFiles(join(dir, entry.name)));
-    } else if (DOC_TEXT_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
-      files.push(join(dir, entry.name));
-    }
-  }
-  return files;
-}
-
+// This test owns the FLAT `docs/img/screenshots/` directory and the seventeen
+// hand-curated frames in it. `docs/img/screenshots/lab/` holds generated frames
+// and belongs to `tests/docs-screenshot-map.test.js`. Two facts keep those
+// populations apart, and both are load-bearing rather than incidental:
+//
+//   1. the readdir below is NOT recursive, so `lab/` is never enumerated here;
+//   2. the reference pattern's character class contains no `/`, so it cannot
+//      match a `screenshots/lab/<name>.webp` path either.
+//
+// Change either one and this test starts claiming frames it does not own, while
+// the map test still claims them too — and a file both tests believe the other
+// is checking is a file neither is.
 const screenshotFiles = (await readdir(screenshotsDir))
   .filter(file => extname(file).toLowerCase() === '.webp')
   .sort((a, b) => a.localeCompare(b, 'en'));
 
-const docFiles = await collectDocFiles(docsDir);
+const docFiles = await collectDocSourceFiles(docsDir, IGNORED_DOCS_DIRS);
 const referenced = new Set();
 for (const file of docFiles) {
   const source = await readFile(file, 'utf8');

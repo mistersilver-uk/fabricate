@@ -17,6 +17,8 @@ You begin crafting in the Crafting flow and start gathering in the Gathering tab
 When no character is selected the Journal shows a short prompt:
 "Select a character to see their crafting, gathering, and salvage runs."
 
+{% include screenshot.html case="fabricate-journal" caption="The Journal, with active runs on the left and history beneath them." %}
+
 ---
 
 ## Active Runs
@@ -69,6 +71,8 @@ The requirements list what the run needs, which can include:
 - **Failure**, an explanation shown when a step has failed.
 
 When a run has succeeded, its detail panel also lists the **Crafted items** it produced, with quantities.
+
+{% include screenshot.html case="fabricate-journal-craft-detail" %}
 
 The right column adds three more cards for the selected run:
 

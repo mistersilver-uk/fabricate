@@ -19,7 +19,13 @@ For example, "Alchemy", "Blacksmithing", and "Enchanting" could each be their ow
 
 Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and click **Create System** in the Systems tab.
 
+{% include screenshot.html case="manager-default-selection" caption="The system library, with the selected system summarised on the right." %}
+
 ### System Settings
+
+Open a system from the library to edit its base settings.
+
+{% include screenshot.html case="manager-system-edit-normal" %}
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -307,6 +313,8 @@ Nothing is permanently disabled behind the scenes.
 The **Crafting** menu groups the recipe-focused sections of the Crafting Admin panel.
 It is always available.
 Whenever a crafting system is selected, the panel's left menu shows an expandable **Crafting** group, in the same style as the **Gathering** group.
+
+{% include screenshot.html case="manager-crafting-settings" %}
 
 Expand it to reveal its sections.
 **Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other sections appear, with **Knowledge** also depending on the system's resolution mode.

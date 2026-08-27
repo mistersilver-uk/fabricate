@@ -63,6 +63,8 @@ Leaving Checks for another screen with unsaved edits asks first, names which act
 Selecting an issue takes you to the page and section that raised it.
 A blocking issue never stops you saving, only enabling the system.
 
+{% include screenshot.html case="manager-checks-validation" %}
+
 ### The panel beside the page
 
 The panel to the right of each activity page carries links to this documentation and to the quickstart, the check's on or off switch, and a **This check** summary of its formula, outcome tiers, triggers, and applied modifiers.
@@ -88,11 +90,17 @@ Type a number into **Situational bonus** to add it to this roll, for example a b
 Leave the field blank to roll the check as configured.
 An entry that is not a valid modifier is ignored, and the check rolls with its base formula.
 
+{% include screenshot.html case="player-crafting-roll-prompt" caption="The roll prompt for a crafting check that offers modifiers to pick." %}
+
 Clicking **Roll** evaluates the check and posts the result to chat as a normal roll card.
 The roll uses your current chat roll mode, so a private or blind roll stays hidden from other players in the usual way.
 If the [Dice So Nice](https://foundryvtt.com/packages/dice-so-nice) module is installed, it animates the 3D dice for that roll.
 Dice So Nice is optional.
 Without it the roll still posts to chat as a normal roll card, just with no 3D animation.
+
+The Crafting tab also reports the outcome in place, so a player can see what the attempt produced without leaving the window.
+
+{% include screenshot.html case="player-crafting-roll-result" %}
 
 Clicking **Cancel**, or dismissing the dialog, aborts the attempt with no changes.
 No ingredients, currency, or Tools are consumed, and no run is recorded.
@@ -144,6 +152,9 @@ A number or a dice expression takes no `@` at all: write `2` or `1d4` as they st
 There is nothing to add to the roll formula: an entry that is eligible applies automatically.
 
 This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.
+
+{% include screenshot.html case="manager-checks-crafting-modifiers" %}
+
 The two READ it differently — a drop row works the expression out and shifts the chance by the result, while a check adds it to the roll — but **an expression that rolls dice is welcome in both**.
 A check appends the dice to its own roll formula, so a `1d4` modifier is rolled once together with the check, animates like any other die, and shows on the chat card.
 
@@ -583,6 +594,10 @@ Re-author your award thresholds whenever you move a progressive check onto a cou
 ### Setting the difficulty without a prompt
 
 Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
+You author the tiers themselves on the **Crafting** page of the **Checks** screen, where each one carries a name and the DC it puts in place of the base DC.
+
+{% include screenshot.html case="manager-checks-crafting-recipe-tiers" caption="Two named recipe difficulty tiers on a crafting check, each with the DC a recipe picking it is measured against." %}
+
 Where a dynamic DC macro is also in play, the recipe's chosen tier resolves first, and the macro is handed that value as its starting point.
 If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
 The two features compose rather than compete.
@@ -648,7 +663,13 @@ Treat a per-die trigger as unverified on a counting pool, and confirm it with a 
 
 ### What the previews will tell you
 
-The odds histogram on the check's panel deliberately abstains from drawing a chart for a counting formula, and it says so.
+Start with what the panel does when it can work the outcomes out.
+The frame below is an ordinary `1d20 + @abilities.int.mod` check on a routed system, and the **Chance per outcome** panel gives each named tier its own percentage for the chosen character.
+
+{% include screenshot.html case="manager-checks-crafting-odds-enumerable" caption="Chance per outcome, on an ordinary formula the panel can enumerate." %}
+
+A counting formula gets none of that.
+The odds histogram deliberately abstains from drawing a chart for one, and says on the panel that it has.
 That is correct behaviour: the panel refuses rather than showing a chart that would be wrong.
 The average reading, and any ranking built from it, are not trustworthy for a counting formula.
 Do not use them to compare one check against another.
