@@ -116,6 +116,11 @@ Clearing visibility removes the gate only when the task already had one saved.
 
 ## Routed Result Selection
 
+{: .warning }
+> **Routed gathering is not available yet either.**
+> Like progressive, it appears in the resolution-mode card but is disabled, pending a future release.
+> The rules below are what it will do once it ships, and anything you author now is saved until then.
+
 Routed gathering tasks do not carry their own result-selection setting.
 They are resolved by the system's gathering check, which you configure once for the whole system.
 When a routed task is attempted, the gathering check rolls and produces a named outcome.
@@ -140,7 +145,8 @@ When progressive gathering does ship, the value it spends comes from the **syste
 Author it on **Checks › Gathering**, beside the crafting and salvage checks.
 See [Gathering Checks]({% link checks/gathering.md %}).
 
-A task carries an award mode — equal, partial, or exceed — and its result difficulty comes from each chosen component's own difficulty rather than from the result row.
+The award mode — equal, partial, or exceed — is the system's too, authored beside the roll on **Checks › Gathering**.
+A task contributes only its results.
 
 {% include screenshot.html case="manager-checks-gathering" %}
 
