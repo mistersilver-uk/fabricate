@@ -229,6 +229,151 @@
       "case": "manager-knowledge-owned-copies",
       "alt": "The Knowledge page, listing the characters who hold copies of a system’s recipe items and, for the selected character, each copy with how many of its uses are spent.",
       "sha256": "85c135276eb402ae331b227db21be472a7c97432141b350fd9a6ae191032517a"
+    },
+    {
+      "case": "player-gathering-task-ready",
+      "alt": "The player Gathering tab with Frostmark Ridge selected. Its task rows each carry a success chance, and the panel on the right shows the chosen task with an Attempt button, a requirements card reading no special requirements, and what the task might yield.",
+      "sha256": "d9180047ff1281c238d6a3437d65da925aa7e284c4d2c11d2096b3c59b00e2a8"
+    },
+    {
+      "case": "player-gathering-events",
+      "alt": "The player Gathering tab with the Old Karrun Mine detail column on its Events tab. The environment's danger level and event chance sit above a searchable list of three events, and the panel on the right shows the selected event with its own chance.",
+      "sha256": "f9ff4e7f102c1b72ce50496c968e971bdfe00db348b59bb2e790c4a98520e699"
+    },
+    {
+      "case": "player-gathering-tool-blocked",
+      "alt": "The player Gathering tab showing a task the selected character cannot attempt. Its row carries a missing tools pill and a padlock, the Attempt button is greyed out, and the requirements card on the right lists a required Glass Alembic marked missing.",
+      "sha256": "0e66fbb69e624e5541764dfde6e51a35e84c608636a028009d62e9e331ec0a97"
+    },
+    {
+      "case": "player-gathering-timed-active",
+      "alt": "The player Gathering tab showing a timed task the selected character has already started. Its row carries an already in progress pill and a padlock, the Attempt button is greyed out, and the requirements card on the right says this actor already has an active gathering run for this task.",
+      "sha256": "e58d2559bf39f6dbb7426122a877d5ea865ac502a586dae5ec809042f9c48c06"
+    },
+    {
+      "case": "player-gathering-blind",
+      "alt": "The player Gathering tab with the blind environment Shadow Thicket selected. A single Attempt gathering action stands in place of task rows, a discovered tasks heading reads zero of two with nothing found yet, and the panel on the right reads no available tasks.",
+      "sha256": "658bf0f6aa9babb03fd6dbd98a54fcaf53b828acd1aa4bcf64fbcfa279535829"
+    },
+    {
+      "case": "player-gathering-realm-locked",
+      "alt": "The player Gathering tab with a realm-locked environment called The Deepvault in the environment list, greyed out under a not in current realm pill with a padlock over its image. The environment open in the detail column beside the list is blocked for a different reason, a linked scene the character has not visited.",
+      "sha256": "9d1e9a67e7a2f863f4495325f3f06dbd8e067d9144d5a5b5af5e8c150bbc14a0"
+    },
+    {
+      "case": "manager-environment-edit-placeholder",
+      "alt": "The environment editor's Overview tab for Sunlit Grove, showing its image, name, description and active toggle, its danger level and biome tags, and its player-facing behaviour and composition mode choices, with the linked scene, validation and runtime counts summarised on the right.",
+      "sha256": "e7f5595208f8b1b98babd754a0d18e2793d157d608055040e7f1884b242fa253"
+    },
+    {
+      "case": "manager-components-normal",
+      "alt": "The Components page for a crafting system, with a drop zone for adding items above the component library grouped by category, and the selected component with its tags, essence contributions and actions in the panel on the right.",
+      "sha256": "c4b3554d6127de5442ea0e4bc745d0bdc25d2a2627e1eab4a1410ab3c718e64c"
+    },
+    {
+      "case": "manager-environment-edit-automatic-force-add",
+      "alt": "The environment editor's Tasks tab in automatic composition mode, showing the tasks included by match, an empty excluded section, and the non-matching section with a row menu open on its Force add action.",
+      "sha256": "fd02602b221908204a151923d9e1ac1bb0c9669084673fe72f9f73e6d42508a3"
+    },
+    {
+      "case": "manager-world-travel-realms-normal",
+      "alt": "The Realms page under World and Travel. The Verdant Reach is expanded into a column of environments available to add beside an included environments column reading that no environments are in this realm yet, while the panel on the right carries the realm name, the two environments it records for the realm, and a note that no parties are currently in it.",
+      "sha256": "5a2f00bf6693389b0e5c16f592a89a9ef76a0b30ed6722606d89eada624faaf3"
+    },
+    {
+      "case": "manager-world-parties-normal",
+      "alt": "The World Parties page, with each party drawn as a full-width card carrying its name, an enabled pill, its member rows, and a travel actor panel with a current realm override picker beneath it.",
+      "sha256": "3322bfabfd1847a1facbd3acadc6b368df1bc2aff11198fe48e57cfd628dbf04"
+    },
+    {
+      "case": "manager-world-travel-map-normal",
+      "alt": "The Map Region Links page under World and Travel, with one scene region called Deep Gate Approach and a picker beside it linking that region to the realm The Underdeep, and a panel on the right naming the linked realm and reporting no parties in either.",
+      "sha256": "5cb9a52e9e8351822423953697b87509ed4e49f3144a2f4256917b37e3bf3875"
+    },
+    {
+      "case": "manager-essences-normal",
+      "alt": "The Essences page for a crafting system. Each row carries the icon, name, description, effects and macro pills, component and recipe counts and an enable switch, and the panel on the right shows the selected essence and what it does on craft.",
+      "sha256": "f52ce88fd971345fe828ccdfd080cf719ece7fd4621a03efa3109bcd928c1d14"
+    },
+    {
+      "case": "manager-essence-edit-first-state",
+      "alt": "The essence editor's Identity tab, with an icon picker, name, description, a row of palette colours and an enabled switch turned off, and a live preview on the right showing how the essence reads on an inventory tile and on a component.",
+      "sha256": "0ea93dcb7b173c8b5b0e385f7acf4210b6d2555acc2fb110874078cde400b8ab"
+    },
+    {
+      "case": "player-crafting-essence-pool",
+      "alt": "The player Crafting tab with a recipe whose two essence requirements draw on one shared pool. The Earth and Fire totals are filled, and a list of components below them carries a stepper for adding each one to the pool.",
+      "sha256": "22c231e8a9a61027d4d903d55a3b832b589173e874f87f4fd87fe5777b85ed53"
+    },
+    {
+      "case": "player-crafting-essence-alternative",
+      "alt": "The player Crafting tab with a recipe requirement offering two alternatives, a component called Coal and an amount of Fire essence. Coal is chosen, and a card below confirms what the craft will consume.",
+      "sha256": "1ebc4773f320118e0ae893b280aeff45a93f4319391a6b93b25c3841a69cf9c9"
+    },
+    {
+      "case": "player-crafting-essence-shopping",
+      "alt": "The player Crafting tab with a recipe the character cannot yet make. The shopping list on the right carries the queued recipe and the two shortfalls to acquire, an iron ingot and an amount of Fire essence.",
+      "sha256": "fcacd5b1f8c1acda64713d0cdff4573278175be31d62859fe349c64b304ad77c"
+    },
+    {
+      "case": "currency-actor-property",
+      "alt": "The World Currency page with the spend strategy set to reading coins from a field on the actor sheet, above a list of five coins from copper to platinum with reorder, edit and delete controls on each.",
+      "sha256": "71d054cff0f27d1529f4ff4d771c019b7541446ab8c7f5933917cfa1163b247f"
+    },
+    {
+      "case": "currency-actor-inventory",
+      "alt": "The World Currency page with the spend strategy set to reading coins from the actor's inventory, showing a warning that this game system has no preconfigured provider, above the same list of five coins.",
+      "sha256": "168e66c1a87a08680cc56edef5cebe87cfa69d9bdbecfff5acb10359fa0d2c0e"
+    },
+    {
+      "case": "currency-macro",
+      "alt": "The World Currency page with the spend strategy set to macros, showing four empty drop zones for the can afford, increment, decrement and balance macros with an explanation under each, above the list of coins.",
+      "sha256": "b4ff37edf553ce445192544540db6f81824f71be7ac3aea2fc10ab0493015dc0"
+    },
+    {
+      "case": "manager-component-complications-expanded",
+      "alt": "A component's complication expanded in the component editor, showing the conditions it can watch with three ticked and a dice expression filled in, and the effects below with a dice roll turned on and an empty macro drop zone.",
+      "sha256": "3ff01e3c8ec85a11077c77e2c98d3391411cd9636bbb05ad8efcceb10a0506c1"
+    },
+    {
+      "case": "manager-recipe-edit-books-scrolls",
+      "alt": "The recipe editor's Books and Scrolls tab, reading that no book or scroll teaches this recipe yet, with a note that a recipe is added to a book from the book's own editor and a button that opens the Books and Scrolls page.",
+      "sha256": "e315ef39fec70e93b181473a7a4eb7ba0915a969a880bff48b668a17d2f9c47a"
+    },
+    {
+      "case": "manager-knowledge-learned-lost-copy",
+      "alt": "The Knowledge page's Learned recipes tab for one character, listing five recipes with how each was learned, a note reading either no owned copy or no source copy to refund, and an erase memory button on every row.",
+      "sha256": "96828f2634033ac538f49a346bfe587515a89b4b21fc1b1e8c620d7bb08061f5"
+    },
+    {
+      "case": "world-prerequisites",
+      "alt": "The Character prerequisites page under World and Rules and Resources, listing five reusable conditions, each showing its name and the character property, comparison and value it tests.",
+      "sha256": "8e3923e8b6830a85618bb9a88e795c2fe1af35177dd43b03116438f4bfdce7fc"
+    },
+    {
+      "case": "world-modifiers",
+      "alt": "The Modifiers page under World and Rules and Resources, listing ten reusable expressions, each showing its name, an optional range and the character property or dice it resolves to.",
+      "sha256": "9795db3af66a9fda14b44bcba211eb3424f1087a6546c38e71dec67728038154"
+    },
+    {
+      "case": "manager-tool-stress-repair",
+      "alt": "A tool's Breakage tab with its on-break action set to mark the tool as broken, and a repair materials section below listing the ingredient groups a crafter can satisfy, with the tool's effective rules summarised on the right.",
+      "sha256": "092395fef8dd0fc8b7d1ec98885b6744dd37610e82c96f1533b05b7f5e85afbd"
+    },
+    {
+      "case": "manager-tool-stress-replacement",
+      "alt": "A tool's Breakage tab with breakage driven by a dice expression that breaks the tool below a threshold, an on-break action set to replace it with a component, and a picker naming the component produced when it breaks.",
+      "sha256": "5a184e7ace833aa764aa8186716b93c36ac5ff0f0480a478b730fa55f9846179"
+    },
+    {
+      "case": "manager-tool-stress-immune",
+      "alt": "A tool's Breakage tab in a system whose breakage is check-driven, with the tool marked immune, and the on-break actions greyed out under a note that immune tools never run one.",
+      "sha256": "07acb3cd1a960142239604f37c2e0b13c1c23956fd6fbe3a4b310e8b6a4a8bfa"
+    },
+    {
+      "case": "manager-checks-crafting-trigger-break-tools",
+      "alt": "The crafting check's Triggers tab, with one trigger expanded to show the condition it watches and how the result moves, and a card beneath it for breaking the required tools whenever that trigger fires.",
+      "sha256": "6b7f407ab386c88c55b428f51f3efba142897c3f5a049a5f778ee5d391259714"
     }
   ]
 }

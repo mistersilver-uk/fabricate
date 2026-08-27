@@ -24,7 +24,7 @@ Then choose the system's **Tool breakage outcome** under **Gathering Rules**.
 4. Open **Breakage** in the Tool editor.
 5. Under a **Tool-specific** breakage source, choose **Limited uses**, **Breakage chance**, or **Dice expression**.
 6. Under a **Check-driven** breakage source, choose whether this Tool is **Breakable** or **Immune**.
-7. Choose **Destroy item**, **Mark as broken**, or **Replace with item** as the **On-break action**.
+7. Choose **Destroy the item**, **Mark as broken**, or **Replace with component** as the **On-break action**.
 8. Open **Validation**, resolve every issue, and choose **Save changes**.
 9. Open **Gathering Tasks** and edit the task.
 10. Add the saved Tool to the task's required Tools.
@@ -44,10 +44,15 @@ The bonus can still apply when the same Tool is used for crafting or salvage.
 
 Set **Tool breakage source** to **Check-driven** when the gathering check should decide whether Tools break.
 Configure the gathering check's breakage conditions under **Checks**.
+An individual trigger on that check can also break the required Tools whenever it fires, whatever the failure policy says.
+
+{% include screenshot.html case="manager-checks-crafting-trigger-break-tools" caption="The Crafting check's Triggers tab, whose break-tools card the Gathering check carries too." %}
 
 The active check can break all required **Breakable** Tools.
 An **Immune** Tool is excluded.
 Its retained Tool-specific mechanic is not evaluated until the system returns to **Tool-specific**.
+
+{% include screenshot.html case="manager-tool-stress-immune" caption="An immune Tool, with its on-break actions greyed out because it never runs one." %}
 
 Immediate d100 gathering has no engine-evaluated check that can trigger check-driven Tool breakage.
 Use **Tool-specific** when an immediate d100 task needs per-attempt breakage.

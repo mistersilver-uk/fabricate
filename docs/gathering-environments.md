@@ -24,7 +24,7 @@ This action opens the player Gathering app.
 It is separate from the Crafting app and keeps its own character selection.
 Fabricate keeps the header action in step as crafting systems change, so disabling gathering on every system removes the action.
 
-![Fabricate gathering feature enabled](img/screenshots/fabricate-enable-gathering.webp)
+{% include screenshot.html case="manager-system-edit-normal" caption="The optional features on a system, with Gathering turned on." %}
 
 ## Gathering Resolution Mode
 
@@ -181,12 +181,13 @@ One case is worth knowing: if you force-add in automatic mode, switch that envir
 Switching modes does not clear your lists — that is what lets you switch back and forth without losing your work — so check the Non-matching list after switching if you are not sure what an environment carries.
 Automatic mode still honors records you explicitly excluded.
 
+{% include screenshot.html case="manager-environment-edit-automatic-force-add" caption="An automatic environment's Tasks tab, with the row menu open on Force add for a non-matching task." %}
+
 **Weather and time-of-day are runtime gates, not matching criteria.**
 A task or event whose required weather or time of day is not currently satisfied still matches the environment (by biome, plus danger for events) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn").
 In the player app the task is visible but not attemptable, marked **Conditions blocked**, and a blocked event is skipped during event selection.
 Changing the current gathering conditions to one of the required values flips the row back to available.
 
-![Fabricate environment task composition](img/screenshots/fabricate-configure-environment-tasks.webp)
 ![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
 
 ## Gathering Tools Library
@@ -273,9 +274,6 @@ Reusable event records support:
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Disabled Gathering Tasks and events never match for player gathering.
-
-![Fabricate gathering task editor](img/screenshots/fabricate-create-gathering-task.webp)
-![Fabricate gathering event editor](img/screenshots/fabricate-create-gathering-event.webp)
 
 ## How Drops Are Rolled
 
@@ -501,11 +499,19 @@ Cancelling the dialog aborts the attempt with no changes.
 The immediate d100 mode and timed tasks do not prompt.
 See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-from-the-ui) for the full behaviour.
 
-![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
-![Fabricate player gathering events](img/screenshots/fabricate-player-gathering-events.webp)
-![Fabricate player gathering missing tool](img/screenshots/fabricate-player-gathering-tool-blocked.webp)
-![Fabricate player timed gathering run](img/screenshots/fabricate-player-gathering-timed-active.webp)
-![Fabricate player blind gathering](img/screenshots/fabricate-player-gathering-blind.webp)
+{% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with one of its task rows selected." %}
+
+{% include screenshot.html case="player-gathering-blind" caption="A blind environment, offering one opaque action and a discovered count instead of task rows." %}
+
+A blocked task stays in the list rather than disappearing from it, and says why.
+
+{% include screenshot.html case="player-gathering-tool-blocked" caption="A task the character cannot attempt because it requires a tool they do not carry." %}
+
+{% include screenshot.html case="player-gathering-timed-active" caption="A timed task the character has already started, blocked until that run finishes." %}
+
+An environment whose events are fully disclosed to players carries a second **Events** tab in the detail column, listing what can happen there beside the environment's own event chance.
+
+{% include screenshot.html case="player-gathering-events" caption="The Events tab of an environment, with one of its events selected." %}
 
 ## Tools
 

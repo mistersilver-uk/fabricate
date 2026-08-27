@@ -51,6 +51,10 @@ Set **How the conditions combine** to **Any**, so one ticked condition is enough
 A complication with nothing ticked never fires.
 Each complication's row shows a short, automatically written sentence summarising its conditions and effects, so you can read what it does at a glance without opening it.
 
+A condition your system cannot satisfy yet is shown but greyed, with a line saying what is missing.
+
+{% include screenshot.html case="manager-component-complications-expanded" caption="An expanded complication, with its conditions above and its effects below." %}
+
 ### What It Does
 
 The **Then** card holds two optional effects, and a complication can carry either, both, or neither and still be a complete, narration-only entry:
@@ -84,10 +88,13 @@ Relatedly, if a complication you kept off is also set to roll a dice expression,
 Fabricate shows your authored complications, read-only, everywhere else that component appears as a progressive result, so you do not have to remember which component you last edited.
 
 - The component editor's own **Salvage** panel shows a read-only strip under any progressive stage that produces a component carrying complications.
-- The recipe editor's progressive stage cards show the same read-only strip for each result.
+- The recipe editor's progressive stage cards show the same read-only strip for each result whose component carries complications.
 
-Either strip carries an **Edit complications** link that takes you straight to that component's own Complications section.
+The salvage strip carries its own **Edit** control, named for complications so it reads apart from the row's other links, and a recipe stage's **Edit** control targets the same component.
+Either one opens the component the complications belong to, which is the only place they can be changed.
 These read-only strips always show everything you authored, whatever **Tell the player** says, because they are for you.
+
+{% include screenshot.html case="manager-recipe-edit-results-progressive" alt="The Results tab of the recipe editor for a progressive recipe, showing three ordered stages with the difficulty attached to each, and the read-only complications carried by two of them." caption="A recipe's progressive stages in the recipe editor, two of them carrying their component's complications read-only." %}
 
 ## Your Private Report
 

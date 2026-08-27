@@ -113,9 +113,13 @@ Realm create, edit, and delete live under **World > Travel > Realms**, as a real
   Deletion never blocks.
   Dangling references become stale repair evidence instead.
 
+{% include screenshot.html case="manager-world-travel-realms-normal" caption="The Realms page, with one realm expanded over the environments it can take." %}
+
 Scene mappings are authored under **World > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
 Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime.
 Existing modifier values are preserved untouched.
+
+{% include screenshot.html case="manager-world-travel-map-normal" caption="Map Region Links, pairing one of the active scene's regions with a realm." %}
 
 ### Realm settings
 
@@ -155,6 +159,8 @@ The override is single because a party is one set of tokens standing in one plac
   Violations are rejected at save time and shown inline next to the control that caused them.
 - **Deleting a party** removes its members, travel actor, and current-realm overrides for every crafting system, after confirmation.
 
+{% include screenshot.html case="manager-world-parties-normal" caption="The World Parties page, with each party expanded over its members and its travel actor." %}
+
 ### Stale references
 
 Members or travel actors whose actor no longer exists, and override realm ids whose realm was deleted, are preserved verbatim rather than silently dropped.
@@ -170,13 +176,14 @@ A party's current realm is resolved **per crafting system**, in this order:
 2. **Travel actor token sensing** checks the travel actor's placed tokens against realm Scene Region mappings and reports the *Travel actor* source label when it resolves.
 3. **Unresolved** means no current realm.
 
-To set the override, select one or more realm chips in the **Current realm override** section and click **Set current realm** (a party can be in several realms at once, e.g. overlapping geography).
-This control is available only while its Gathering-enabled crafting system is selected and **Enable Travel & Realms** is on; otherwise the Party editor explains the missing prerequisite and does not write an override.
-**Clear current realm** records an explicit "no override".
-Both writes are stamped with the updating user and time.
-Including a disabled realm still resolves it (the UI marks it **Disabled**), and override ids referencing deleted realms surface as stale repair evidence and do not resolve.
+To set the override, choose a realm from the **Current realm override** picker on the party's card.
+The picker's leading **Auto** option clears the override again and hands the party back to travel-actor sensing.
+The control is available only while a Gathering-enabled crafting system is selected and **Enable Travel & Realms** is on.
+Otherwise the party card explains the missing prerequisite in place of the picker and does not write an override.
+Setting an override and clearing it back to **Auto** are both stamped with the updating user and time.
+A disabled realm can still be chosen and still resolves, marked as disabled in the picker, and an override id whose realm was deleted surfaces as stale repair evidence and does not resolve.
 
-The party card includes the current-realm override control for the selected system.
+The picker sits beneath the travel-actor panel in the right-hand column of each party card.
 
 ## Environment Realm Membership
 
@@ -234,7 +241,7 @@ Each listed environment also carries redaction-safe location information (whethe
 That guidance covers the destination realms the viewer is allowed to see (non-secret or already discovered), plus a count of secret undiscovered destinations.
 Macros and future player UI can use this to show travel goals such as "Travel to Ashen March" without leaking secret geography.
 
-![Fabricate player realm-locked gathering](img/screenshots/fabricate-player-gathering-realm-locked.webp)
+{% include screenshot.html case="player-gathering-realm-locked" caption="A realm-locked environment in the player's environment column, listed but out of reach." %}
 
 ### The actor bar's current-realm chip
 

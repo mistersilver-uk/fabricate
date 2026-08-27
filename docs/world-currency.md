@@ -37,6 +37,8 @@ A short hint under the selector describes the strategy you have chosen.
 - **Macro** drives currency with macros you write, for any game system.
   The macro receives the actor and does whatever it needs, so this strategy is not tied to the inventory.
 
+{% include screenshot.html case="currency-actor-property" caption="The coin ladder under the actor data path strategy." %}
+
 ### The provider (Actor inventory)
 
 When you choose **Actor inventory**, a **Provider** selector appears.
@@ -47,17 +49,23 @@ When a provider is selected, it manages the denominations for you, so the unit l
 You can still reference those denominations by their abbreviation in a currency cost, but you cannot edit them here.
 In a world whose game system has no provider, Fabricate shows a note steering you to the **Macro** strategy instead, and leaves your own units untouched.
 
+{% include screenshot.html case="currency-actor-inventory" caption="The actor inventory strategy in a world whose game system ships no provider." %}
+
 ### The currency macros (Macro)
 
-The **Macro** strategy has three drop zones.
+The **Macro** strategy has four drop zones.
 You link each macro by dragging it from the Foundry macro directory onto a drop zone, and right-click a linked macro to unlink it.
 
 - **Can afford macro** runs before the craft to decide whether the actor can pay.
   Return a success result to allow the craft, or a failure result to block it.
+- **Increment macro** runs whenever coin has to go back to an actor.
+  That covers a player cancelling an in-progress craft when the system refunds on cancel, a companion module crediting coin, and returning a pooled cost that could not be taken in full.
+  It is optional, but without it Fabricate declines to take coin from a group at all, because it would have no way to give it back.
 - **Decrement macro** runs after a successful craft to spend the cost.
-- **Increment macro** runs to return currency when a player cancels an in-progress craft, if the
-  crafting system refunds on cancel.
-  Link it if you want cancelled crafts to give the coins back.
+- **Balance macro** is optional and reports how much the actor holds, counted in the smallest coin on your ladder.
+  Anything it returns that is not a number reads as unknown.
+
+{% include screenshot.html case="currency-macro" caption="The four macro drop zones, each explaining the question it answers." %}
 
 Each macro receives the currency cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
 If a macro reports failure or stops with an error during a craft, Fabricate stops the craft before any ingredients are consumed.
