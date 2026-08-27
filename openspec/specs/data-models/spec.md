@@ -1979,6 +1979,8 @@ SystemMembershipRecord = {
 2. **Resolution is per SECTION, never per FIELD.**
    A section is the unit of the inherit decision AND the unit of the answer: an overriding section's stored value is the whole answer for that section, and no field inside it falls back to the world.
    That is safe rather than lossy because turning a switch OFF SEEDS the local block from the current world value (requirement 5), so an override is complete the moment it exists.
+   An overriding switch over an ABSENT section is not an override and resolves to the world value, because absence is not a partial block and falling back to the whole world section is therefore still per-section: that record is reachable (`setSectionInheritance` produces it whenever the world default is itself unauthored, and normalization emits it for import, copy-mode and the `1.30.0` migration), and resolving it to nothing would stop a tool breaking or stop an essence's property macro running.
+   `inherited` still reports the switch AS AUTHORED in that state rather than repairing it to `true`, because a switch that is off while the world value shows is the seed state the editor renders.
 3. **An absent membership record means the entity does not exist in that system**: recipes there cannot reference it and players never see it.
    **This is a REFUSAL, never a PRUNE.**
    An unresolved reference is refused at use and left on disk; nothing derives a deletion from the absence of a membership record unless the membership corpus is a KNOWN-COMPLETE Valid Id Basis, which an unwritten or unreadable world setting is not.
@@ -2003,6 +2005,9 @@ SystemMembershipRecord = {
     Idempotence is required rather than incidental: the store, the migration and the export upcast each normalize possibly-already-normalized data.
 11. **A section VALUE is opaque to the shared primitive**, which never looks inside one, never walks one and never clones one.
     That is what makes requirement 10 total on adversarial input: a self-referential section value cannot starve a normalizer that does not descend into it, and an unbounded synchronous walk would surface as a `# cancelled` test run rather than as a failure on the bad case.
+    It follows that **a normalized record ALIASES its input's section values** — normalization copies a section by reference, so a caller that keeps hold of what it handed in shares that object with the normalized corpus.
+    A store must therefore treat a corpus it normalizes as given away rather than as still its own to mutate; the only deep copy in this contract is the tool `requirements` seed, which is a copy precisely because it is the one value that must NOT stay shared.
+    A per-entity module that needs a SHAPE rule over its own section (the component category's trim-or-absent rule, for instance) states it at the normalizer rather than in a resolver branch, so that the inheriting and overriding branches carry the same guarantee.
 12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
     The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags` and their parallel icon maps; that vocabulary, its layering, its icon maps and its deletion semantics are modelled separately (epic 1357, PR 7).
     The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
@@ -2016,6 +2021,8 @@ SystemMembershipRecord = {
    The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
    The failure this rule prevents is a RESET to `general` in every inheriting system on the first resolve, not a blank — a blank is unreachable, because an absent world category falls through to the local value.
    A world category the GM later deletes reaches the resolver as absence and takes that same path; `## CraftingSystem` requirement 6d governs the system-scope deletion case today.
+   An authored category is a token matched against `CraftingSystem.componentCategories`, so BOTH normalizers trim it and coerce a whitespace-only or non-string one to ABSENCE (requirement 11's shape-rule clause).
+   That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
 3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
    There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
 4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.

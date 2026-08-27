@@ -23,7 +23,14 @@
  * SECTION VALUES ARE OPAQUE HERE. This module never looks inside one, never walks one, and never
  * clones one; the per-entity modules own whatever shape a section carries. That is what makes
  * normalization total on adversarial input: a self-referential section value cannot starve a
- * normalizer that does not descend into it.
+ * normalizer that does not descend into it. A per-entity module that DOES have something to say
+ * about its own section's shape says it through `coerceSection` (`defineScope` below), which runs
+ * inside normalization so both resolution branches carry the same guarantee.
+ *
+ * A NORMALIZED SECTION VALUE IS COPIED BY REFERENCE, never cloned, which follows directly from
+ * that opacity: a normalized record ALIASES the caller's section values. That is deliberate, and
+ * `## Scoped Entity Definitions` requirement 11 states it, so a store built on these records
+ * treats the corpus it hands in as given away rather than as still its own to mutate.
  *
  * IT LIVES HERE, beside `modifierLibrary.js` and for the same reason: the eventual callers - the
  * world store, the migration, the export upcast and the GM screens - must agree byte for byte
@@ -74,9 +81,19 @@ function trimmedId(value) {
  * every entity would satisfy every statement about the record and still hand a screen the exact
  * value it would read to draw the toggle that ruling removes.
  *
+ * `coerceSection` is how a per-entity module states a rule about its OWN section's shape without
+ * this module learning that shape. It runs inside normalization, on BOTH records, and answering
+ * `undefined` means ABSENT. It exists because a rule applied only on the resolver's inheriting
+ * branch is not a guarantee: the overriding branch hands back the stored value verbatim, so a
+ * coercion that lived there would let `'  ingot  '` resolve untrimmed for an overriding system and
+ * trimmed for an inheriting one. Normalizing is the chokepoint every writer passes through, so it
+ * is the one place a shape rule holds for both branches at once.
+ *
  * @param {object} descriptor
  * @param {string[]} descriptor.sections Section names, in the order they are answered.
  * @param {boolean} [descriptor.enableable] Whether the entity carries an `enabled` flag.
+ * @param {(section: string, value: unknown) => unknown} [descriptor.coerceSection] Per-entity
+ *   section coercion; `undefined` means the section is absent.
  * @param {(entry: object) => object} [descriptor.worldExtras] Per-entity world-default fields.
  * @param {(entry: object) => object} [descriptor.membershipExtras] Per-entity membership fields.
  * @returns {Readonly<object>}
@@ -84,12 +101,14 @@ function trimmedId(value) {
 export function defineScope({
   sections,
   enableable = false,
+  coerceSection = (section, value) => value,
   worldExtras = () => ({}),
   membershipExtras = () => ({}),
 }) {
   return Object.freeze({
     sections: Object.freeze([...sections]),
     enableable,
+    coerceSection,
     worldExtras,
     membershipExtras,
   });
@@ -104,13 +123,19 @@ export function defineScope({
  * reserved `general` bucket (`## CraftingSystem` requirement 6a) - treating it as authored would
  * silently reset every inheriting system's category on the first resolve.
  *
+ * The scope's `coerceSection` may answer `undefined` for a value it will not accept, which is the
+ * same ABSENCE an unauthored section carries - and it must be, because a coerced-away section has
+ * to reach the resolver as "not an override" rather than as an override of nothing.
+ *
  * @param {object} source
  * @param {object} target
- * @param {readonly string[]} sections
+ * @param {Readonly<object>} scope
  */
-function attachAuthoredSections(source, target, sections) {
-  for (const section of sections) {
-    if (source[section] !== undefined) target[section] = source[section];
+function attachAuthoredSections(source, target, scope) {
+  for (const section of scope.sections) {
+    if (source[section] === undefined) continue;
+    const value = scope.coerceSection(section, source[section]);
+    if (value !== undefined) target[section] = value;
   }
 }
 
@@ -126,7 +151,7 @@ function normalizeWorldDefault(entry, scope) {
   const id = trimmedId(entry.id);
   if (!id) return null;
   const normalized = { id };
-  attachAuthoredSections(entry, normalized, scope.sections);
+  attachAuthoredSections(entry, normalized, scope);
   return Object.assign(normalized, scope.worldExtras(entry));
 }
 
@@ -200,7 +225,7 @@ function normalizeMembership(entry, scope) {
   // Read as `!== false` so the flag DEFAULTS TO TRUE, matching `## EssenceDefinition`
   // requirement 6: a record created by "add to system" is a member that is on.
   if (scope.enableable) normalized.enabled = entry.enabled !== false;
-  attachAuthoredSections(entry, normalized, scope.sections);
+  attachAuthoredSections(entry, normalized, scope);
   return Object.assign(normalized, scope.membershipExtras(entry));
 }
 
@@ -287,6 +312,19 @@ export function isSectionInherited(membership, section) {
  * because it is NOT A MEMBER rather than because it inherited an off: a world default carries no
  * enabled flag, and disabling world-wide is N membership edits, never a fourth layer.
  *
+ * AN OVERRIDING SECTION THAT STORES NOTHING IS NOT AN OVERRIDE, and falls back to the world value.
+ * That is still per-SECTION rather than per-FIELD: an ABSENT section is not a partial one, so
+ * nothing inside a stored block ever falls back. The state is reachable and is not junk -
+ * `setSectionInheritance` legitimately produces switch-off-with-no-value when the world default is
+ * itself unauthored, and `normalizeMembership` emits it happily for import, copy-mode and the
+ * `1.30.0` migration, none of which pass through the UI's seeding path. Without this the record
+ * `{inherit: {breakage: false}}` resolves to NO breakage at all - a tool that stops breaking - and
+ * `{inherit: {macro: false}}` silently stops running the world's property macro.
+ *
+ * `inherited[section]` still answers the switch AS AUTHORED (`false`), never a repair: a switch
+ * that is off while the world value shows is exactly the seed state a UI renders, and flipping it
+ * back to `true` here would misreport the GM's own toggle.
+ *
  * @param {object|null} worldDefault
  * @param {object|null} membership
  * @param {Readonly<object>} scope
@@ -300,7 +338,9 @@ export function resolveScopedDefinition(worldDefault, membership, scope) {
   for (const section of scope.sections) {
     const inheritsSection = isSectionInherited(record, section);
     inherited[section] = inheritsSection;
-    const value = inheritsSection ? world[section] : record?.[section];
+    const local = record?.[section];
+    // An ABSENT local section is not an override, so falling back is not per-field inheritance.
+    const value = inheritsSection || local === undefined ? world[section] : local;
     if (value !== undefined) resolved[section] = value;
   }
   resolved.member = record !== null;
