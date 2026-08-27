@@ -65,13 +65,16 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
 /**
  * The block reason a reference to an absent or disabled tool raises.
  *
- * THIS TOKEN IS ALREADY SHIPPED, as a bare literal, in two places this module deliberately does
- * not import: `GatheringEngine.js`'s private `DEFAULT_BLOCKED_REASON_KEYS` map and the player
- * app's `gatheringBlockedReasons.js` label and callout maps. Importing either would drag a Foundry
- * consumer, or a UI leaf, into a module whose whole point is that nothing depends on it yet, so
- * the three are held together by a drift guard in `tests/entity-scope-resolvers.test.js` that
- * reads both files and fails if the shipped literal stops matching this constant. Epic 1357's
- * consumer sweep (PR 8) is what converges them onto this one export.
+ * THIS TOKEN IS ALREADY SHIPPED, as a bare literal, in THREE files this module deliberately does
+ * not import: `GatheringEngine.js` (its private `DEFAULT_BLOCKED_REASON_KEYS` map plus four
+ * `_blockedReason` call sites), the player app's `gatheringBlockedReasons.js` label and callout
+ * maps, and `GatheringTaskRequirements.svelte`, which filters the token out of the requirement
+ * callouts. Importing this module into any of them would drag a Foundry consumer, or a UI leaf,
+ * into a module whose whole point is that nothing depends on it yet, so the shipped copies are
+ * held together by a drift guard in `tests/entity-scope-resolvers.test.js` that fails if the
+ * literal stops matching this constant. That guard scrapes the first two files only; the Svelte
+ * leaf is named here so epic 1357's consumer sweep (PR 8), which is what converges all three
+ * onto this one export, does not work from an undercount.
  *
  * @type {string}
  */
