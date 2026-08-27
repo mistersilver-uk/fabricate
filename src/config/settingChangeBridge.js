@@ -1,5 +1,5 @@
 import { craftingDataChange, emitCraftingDataChanged } from '../systems/craftingDataChange.js';
-import { INVALIDATION_DOMAINS } from '../systems/invalidationDomains.js';
+import { domainsForSystemFields, INVALIDATION_DOMAINS } from '../systems/invalidationDomains.js';
 
 import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
 
@@ -10,6 +10,9 @@ const PLAYER_CHARACTER_TYPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KE
 const CURRENCY_CONFIG_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CURRENCY_CONFIG}`;
 const TRAVEL_CONFIG_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TRAVEL_CONFIG}`;
 const CHARACTER_LIBRARIES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CHARACTER_LIBRARIES}`;
+const COMPONENT_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.COMPONENT_SCOPE}`;
+const ESSENCE_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ESSENCE_SCOPE}`;
+const TOOL_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TOOL_SCOPE}`;
 
 /**
  * The invalidation scopes a world currency edit produces (issue 1278).
@@ -55,39 +58,56 @@ function travelParticipantScopes(craftingSystemManager) {
 }
 
 /**
- * The scopes a character-libraries change announces (issue 1308): EVERY crafting system, each
- * carrying the UNION of the three invalidation domains the two libraries used to carry between
- * them.
+ * The scopes an UNATTRIBUTABLE world edit announces: EVERY crafting system, each carrying the same
+ * domain set.
  *
- * NO PARTICIPATION FILTER, unlike currency and travel above, because there is no participation
- * flag to filter on — any system may reference any entry by id, so any system may be affected.
+ * NO PARTICIPATION FILTER, unlike currency and travel above, because these world settings have no
+ * participation flag to filter on — any system may reference any entry by id, so any system may be
+ * affected.
  *
- * THE DOMAINS ARE A UNION, and narrowing them would silently under-invalidate. Before this move
- * the two libraries lived on the crafting system and were classified separately —
- * `modifiers: [RESOLUTION_CONFIG]` and `characterPrerequisites: [LABELLING,
- * ACCESS_AND_KNOWLEDGE]` — so an edit to either announced its own domains through the
- * `craftingSystems` write. One setting cannot say WHICH library moved, so it must announce all
- * three; copying the currency leg's `RESOLUTION_CONFIG`-only scope would silently stop
- * announcing `labelling` and `access-and-knowledge` altogether. This is the same
- * cannot-attribute-so-carry-all reasoning `invalidationDomains.js` applies to a component
- * rewrite.
+ * THE DOMAINS ARE A UNION PER KEY, and narrowing them would silently under-invalidate: one setting
+ * cannot say WHICH of the facts it carries moved. This is the same
+ * cannot-attribute-so-carry-all reasoning `invalidationDomains.js` applies to a component rewrite.
+ * Before issue 1308 the two character libraries lived on the crafting system and were classified
+ * separately — `modifiers: [RESOLUTION_CONFIG]` and `characterPrerequisites: [LABELLING,
+ * ACCESS_AND_KNOWLEDGE]` — so copying the currency leg's `RESOLUTION_CONFIG`-only scope would have
+ * stopped announcing `labelling` and `access-and-knowledge` altogether.
  *
  * @param {{ getSystems: () => any[] }|null|undefined} craftingSystemManager
+ * @param {readonly string[]} domains
  * @returns {Array<{systemId: string, domains: readonly string[]}>}
  */
-function characterLibraryScopes(craftingSystemManager) {
+function everySystemScopes(craftingSystemManager, domains) {
   const systems = craftingSystemManager?.getSystems?.() ?? [];
   return (Array.isArray(systems) ? systems : [])
     .filter((system) => system?.id)
-    .map((system) => ({
-      systemId: system.id,
-      domains: [
-        INVALIDATION_DOMAINS.LABELLING,
-        INVALIDATION_DOMAINS.RESOLUTION_CONFIG,
-        INVALIDATION_DOMAINS.ACCESS_AND_KNOWLEDGE,
-      ],
-    }));
+    .map((system) => ({ systemId: system.id, domains }));
 }
+
+/**
+ * The union of the three domains the two character libraries carried between them.
+ *
+ * @type {readonly string[]}
+ */
+const CHARACTER_LIBRARY_DOMAINS = Object.freeze([
+  INVALIDATION_DOMAINS.LABELLING,
+  INVALIDATION_DOMAINS.RESOLUTION_CONFIG,
+  INVALIDATION_DOMAINS.ACCESS_AND_KNOWLEDGE,
+]);
+
+/**
+ * The domains each world SCOPE key announces (issue 1359, epic 1357).
+ *
+ * DERIVED FROM `SYSTEM_FIELD_DOMAINS`, never restated. Each world scope shadows exactly one
+ * in-system key, so the honest answer is that key's own row: a world component edit is
+ * indistinguishable, to a consumer, from the `components` rewrite it will become after the
+ * migration. Deriving it is also what keeps `SYSTEM_FIELD_DOMAINS` free of the three rows it must
+ * NOT gain — that map classifies top-level keys of a persisted crafting-system record, and a world
+ * setting is not one.
+ */
+const COMPONENT_SCOPE_DOMAINS = domainsForSystemFields(['components']);
+const ESSENCE_SCOPE_DOMAINS = domainsForSystemFields(['essenceDefinitions']);
+const TOOL_SCOPE_DOMAINS = domainsForSystemFields(['tools']);
 
 function currencyParticipantScopes(craftingSystemManager) {
   const systems = craftingSystemManager?.getSystems?.() ?? [];
@@ -131,6 +151,74 @@ function announceScopedChange(source, manager, callAll) {
 }
 
 /**
+ * The WORLD-STORE legs: a replicated world setting whose reaction is always the same three steps —
+ * reload the store, republish the manager, then announce the scopes that edit produced.
+ *
+ * A TABLE rather than six near-identical branches, and the ORDER OF THE STEPS is the load-bearing
+ * part rather than the shape. `load()` MUST precede both announcements, because every consumer
+ * that reacts reads the corpus back through the store: announcing first hands them the pre-edit
+ * value and caches that as the new truth. `load()` only reads, so there is no
+ * write -> `updateSetting` -> write loop.
+ *
+ * The manager republish is UNCONDITIONAL, for the reason the currency leg first stated: a second
+ * GM's authoring surface is stale whether or not any crafting system currently participates, and
+ * the manager subscribes to the three published hooks rather than to the unpublished
+ * `craftingDataChanged` signal.
+ *
+ * A leg that produces NO scopes emits nothing at all, rather than an empty payload that
+ * `craftingDataChange` would route broadly.
+ *
+ * @type {ReadonlyArray<{key: string, store: string,
+ *   scopes: (manager: object) => Array<{systemId: string, domains: readonly string[]}>}>}
+ */
+const WORLD_STORE_LEGS = Object.freeze([
+  { key: CURRENCY_CONFIG_KEY, store: 'currencyConfigStore', scopes: currencyParticipantScopes },
+  { key: TRAVEL_CONFIG_KEY, store: 'travelStore', scopes: travelParticipantScopes },
+  {
+    key: CHARACTER_LIBRARIES_KEY,
+    store: 'characterLibrariesStore',
+    scopes: (manager) => everySystemScopes(manager, CHARACTER_LIBRARY_DOMAINS),
+  },
+  // Issue 1359 (epic 1357). Without these three, a client that booted before the migrating GM
+  // wrote keeps `isSeeded() === false` for the whole session — harmless while the change is
+  // additive, but once the migration strips the in-system arrays that client has an unseeded world
+  // corpus AND an empty legacy corpus, so its union read answers NOTHING and it sees no
+  // components, essences or tools at all until reload.
+  {
+    key: COMPONENT_SCOPE_KEY,
+    store: 'componentScopeStore',
+    scopes: (manager) => everySystemScopes(manager, COMPONENT_SCOPE_DOMAINS),
+  },
+  {
+    key: ESSENCE_SCOPE_KEY,
+    store: 'essenceScopeStore',
+    scopes: (manager) => everySystemScopes(manager, ESSENCE_SCOPE_DOMAINS),
+  },
+  {
+    key: TOOL_SCOPE_KEY,
+    store: 'toolScopeStore',
+    scopes: (manager) => everySystemScopes(manager, TOOL_SCOPE_DOMAINS),
+  },
+]);
+
+/**
+ * Run one world-store leg. See {@link WORLD_STORE_LEGS} for why the three steps are in this order.
+ *
+ * @param {{key: string, store: string, scopes: Function}} leg
+ * @param {object} targets The bridge's dependency bag.
+ * @returns {void}
+ */
+function runWorldStoreLeg(leg, targets) {
+  const { craftingSystemManager, callAll } = targets;
+  targets[leg.store]?.load?.();
+  callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
+  const scopes = leg.scopes(craftingSystemManager);
+  if (scopes.length > 0) {
+    emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
+  }
+}
+
+/**
  * Bridge a replicated Fabricate world-setting change into the local change hooks the
  * player app listens on.
  *
@@ -160,21 +248,19 @@ function announceScopedChange(source, manager, callAll) {
  *   depletion, a restock, a world-time respawn) are visible on every client. The
  *   store caches `environments` in memory and otherwise only re-reads at startup, so
  *   without this a client's node counts silently diverge from the world.
+ * @param {{ load: () => any }} [deps.travelStore] The world travel config store (issue 1282).
+ * @param {{ load: () => any }} [deps.characterLibrariesStore] The world character libraries store
+ *   (issue 1308).
+ * @param {{ load: () => any }} [deps.componentScopeStore] The world component scope store
+ *   (issue 1359), reloaded so a GM's world component edit is visible on every client. Absent it,
+ *   a client keeps an unseeded world corpus for the whole session.
+ * @param {{ load: () => any }} [deps.essenceScopeStore] The world essence scope store (issue 1359).
+ * @param {{ load: () => any }} [deps.toolScopeStore] The world tool scope store (issue 1359).
  * @param {(hook: string, payload: any) => void} deps.callAll Bound `Hooks.callAll`.
  * @returns {boolean} `true` when `settingKey` was a handled Fabricate data setting.
  */
-export function handleFabricateSettingChange(
-  settingKey,
-  {
-    craftingSystemManager,
-    recipeManager,
-    gatheringEnvironmentStore,
-    currencyConfigStore,
-    travelStore,
-    characterLibrariesStore,
-    callAll,
-  } = {}
-) {
+export function handleFabricateSettingChange(settingKey, targets = {}) {
+  const { craftingSystemManager, recipeManager, gatheringEnvironmentStore, callAll } = targets;
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
     if (craftingSystemManager?.reload?.()) {
       callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager.getSystems());
@@ -203,54 +289,9 @@ export function handleFabricateSettingChange(
     callAll?.('fabricate.gatheringEnvironmentsChanged');
     return true;
   }
-  if (settingKey === CURRENCY_CONFIG_KEY) {
-    // Re-read the replicated ladder into the store's cache, then tell the shells which systems
-    // it moved. `load()` only reads, so there is no write -> `updateSetting` -> write loop. A
-    // world where no system participates produces no scopes, and `emitCraftingDataChanged` is
-    // skipped entirely rather than emitting an empty payload that would route broadly.
-    currencyConfigStore?.load?.();
-    // Republish the MANAGER too, not only the player shells. Before issue 1278 a currency edit
-    // wrote the `craftingSystems` setting, so a second GM with the manager open saw it through
-    // the systems branch above; a world setting announces nothing, and the manager subscribes to
-    // the three published hooks rather than to the unpublished `craftingDataChanged` signal. So
-    // without this a second GM's World > Currency tab shows the pre-edit ladder until reload.
-    // Unconditional, because the manager's own currency tab is stale whether or not any crafting
-    // system currently participates.
-    callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
-    const scopes = currencyParticipantScopes(craftingSystemManager);
-    if (scopes.length > 0) {
-      emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
-    }
-    return true;
-  }
-  if (settingKey === TRAVEL_CONFIG_KEY) {
-    // Re-read the replicated realm library into the store's cache, then tell the shells which
-    // systems it moved. `load()` only reads, so there is no write -> `updateSetting` -> write
-    // loop. The manager republish is unconditional for the currency branch's reason: a second
-    // GM's World > Travel tab is stale whether or not any system currently participates.
-    travelStore?.load?.();
-    callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
-    const scopes = travelParticipantScopes(craftingSystemManager);
-    if (scopes.length > 0) {
-      emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
-    }
-    return true;
-  }
-  if (settingKey === CHARACTER_LIBRARIES_KEY) {
-    // Issue 1308. Re-read the replicated libraries into the store's cache, then tell the shells.
-    // `load()` only reads, so there is no write -> `updateSetting` -> write loop.
-    //
-    // The reload MUST precede the announcements: every consumer that reacts to them reads the
-    // libraries back through this store, so announcing first would hand them the pre-edit
-    // libraries and cache that as the new truth.
-    characterLibrariesStore?.load?.();
-    // Unconditional manager republish, for the currency branch's reason: a second GM's authoring
-    // surface is stale whether or not any crafting system currently references the library.
-    callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager?.getSystems?.() ?? []);
-    const scopes = characterLibraryScopes(craftingSystemManager);
-    if (scopes.length > 0) {
-      emitCraftingDataChanged(craftingDataChange({ source: 'systems', scopes }), callAll);
-    }
+  const worldStoreLeg = WORLD_STORE_LEGS.find((leg) => leg.key === settingKey);
+  if (worldStoreLeg) {
+    runWorldStoreLeg(worldStoreLeg, targets);
     return true;
   }
   if (settingKey === PLAYER_CHARACTER_TYPES_KEY) {
