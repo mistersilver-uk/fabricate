@@ -50,6 +50,70 @@ const BULK_ROWS = 5;
  */
 const CORPUS_ROW_SERIES = Object.freeze([25, 50, 100]);
 
+/**
+ * How many of the 5,000-component library ALSO exist at world scope (issue 1359, epic 1357).
+ *
+ * Half, deliberately, so BOTH halves of both unions are non-degenerate: 2,500 world entities with
+ * a membership record for the bench system, and 2,500 components that exist only in the system's
+ * own array. A fixture where the world corpus were empty would take the union's degenerate branch
+ * and measure nothing — which is exactly the gap this case exists to close, since every OTHER case
+ * in this registry either runs against a hand-built stub that never calls `_normalizeSystem` or
+ * seeds no world setting at all.
+ */
+const WORLD_SCOPE_ENTITIES = 2500;
+
+/**
+ * How many times the scoped union case REPEATS the same read.
+ *
+ * The point is not the wall clock: it is that `identityIndexBuilds` stays at ONE across all of
+ * them. A memo that was silently rebuilt per call would be `SCOPED_UNION_READS` builds, each
+ * O(world entities + memberships), and the committed count is what says which of the two is
+ * happening. One read could never distinguish them.
+ */
+const SCOPED_UNION_READS = 25;
+
+/**
+ * The world component scope payload for one bench world, in the PERSISTED shape.
+ *
+ * @param {object} world
+ * @returns {object}
+ */
+function worldComponentScope(world) {
+  const scoped = world.fixture.components.slice(0, WORLD_SCOPE_ENTITIES);
+  const entities = [];
+  const defaults = {};
+  const membership = {};
+  for (const component of scoped) {
+    entities.push({ id: component.id, name: component.name, img: component.img });
+    defaults[component.id] = { id: component.id, category: component.category };
+    membership[`${component.id}|${world.system.id}`] = {
+      entityId: component.id,
+      systemId: world.system.id,
+      inherit: {},
+    };
+  }
+  return { entities, defaults, membership };
+}
+
+/**
+ * A real `CraftingSystemManager` holding the bench system, with a LOADED world component scope
+ * store injected — the seam `src/main.js` fills from `game.fabricate`.
+ *
+ * @param {object} world
+ * @returns {{manager: object, store: object}}
+ */
+function scopedManager(world) {
+  world.settings.set('componentScope', worldComponentScope(world));
+  const store = world.modules.worldScopeStores.createComponentScopeStore();
+  store.load();
+  const manager = new world.modules.CraftingSystemManager(world.recipeManager, {
+    componentScopeStore: store,
+  });
+  manager.systems = new Map([[world.system.id, world.system]]);
+  manager.initialized = true;
+  return { manager, store };
+}
+
 /** Rows the alchemy workbench listing is bounded to. */
 const ALCHEMY_ROWS = 100;
 
@@ -289,6 +353,78 @@ function simpleCorpusCases() {
           0
         ),
       }),
+    },
+    {
+      id: 'craftingSystemManager.scopedUnionRead',
+      profile: 'simple-corpus',
+      description:
+        'The world-scope READ UNION (issue 1359) over a 2,500-entity world component corpus ' +
+        'unioned with the 5,000-component in-system library, read ' +
+        `${SCOPED_UNION_READS} times through the REAL CraftingSystemManager. ` +
+        'identityIndexBuilds must stay at 1: it is the committed proof that the memo is HIT ' +
+        'rather than rebuilt per call.',
+      setup: (context) => {
+        const world = worldFor(context);
+        return { world, ...scopedManager(world) };
+      },
+      run: ({ manager, world }) => {
+        let union = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          union = manager.resolveScopedComponents(world.system);
+        }
+        return union;
+      },
+      counts: ({ world }, union) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: union.length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        // The join payload cost of the new key, at this scale. World settings are delivered whole
+        // to every client and every edit rebroadcasts the whole value, so the BYTES are the fact
+        // #1070 asks for rather than the time.
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        // The harness shares ONE settings map across every case in a profile, so a case that left
+        // this key behind would silently change what `craftingSystemManager.normalizeImport` and
+        // `craftingSystemManager.save` measure afterwards.
+        world.settings.delete('componentScope');
+      },
+    },
+    {
+      id: 'craftingSystemManager.normalizeImport.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'The other half of issue 1359: initialize() runs _normalizeSystem over the whole ' +
+        '5,000-component library while the world component scope is SEEDED, so the Valid Id ' +
+        'Basis really does union a 2,500-id world roster with the in-system array on every ' +
+        'normalize instead of taking its degenerate branch.',
+      setup: (context) => {
+        const world = worldFor(context);
+        world.settings.set('componentScope', worldComponentScope(world));
+        world.settings.set('craftingSystems', [world.system]);
+        const store = world.modules.worldScopeStores.createComponentScopeStore();
+        store.load();
+        return { world, store };
+      },
+      run: async ({ world, store }) => {
+        const manager = new world.modules.CraftingSystemManager(world.recipeManager, {
+          componentScopeStore: store,
+        });
+        await manager.initialize();
+        return manager;
+      },
+      counts: ({ world }, manager) => ({
+        normalizedSystems: manager.systems.size,
+        normalizedComponents: [...manager.systems.values()].reduce(
+          (total, system) => total + (system.components?.length ?? 0),
+          0
+        ),
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        world.settings.delete('componentScope');
+      },
     },
     ...CORPUS_ROW_SERIES.map((rows) => ({
       id: `craftingListing.buildListing.corpusAxis@${rows}`,
