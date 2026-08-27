@@ -516,6 +516,13 @@ CraftingSystem = {
     A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }`.
     The governing rule is that authority decides WHETHER a Tool breaks, `checkBreakage` triggers decide WHEN under `checkDriven`, and the Tool's `onBreak` decides what happens.
     `checkBreakable: false` opts a Tool out of check-driven breakage without replacing or erasing its retained tool-specific mode.
+    21a.
+    **NOT YET LIVE** (issue 1358, made live by the epic 1357 world-scope migration): the switch gains a WORLD half carrying the SAME two tokens, and the per-system value becomes an OVERRIDE of it rather than the only place it is authored.
+    Resolution is `system.toolBreakage.authority ?? worldToolBreakage.authority`, and it is ABSENT-PRESERVING on the system side: a system that authored nothing INHERITS the world value rather than re-defaulting to `toolSpecific`, and an unrecognized system token is treated as absent for the same reason.
+    Only when neither scope authors a recognized token does the answer fall to `toolSpecific`, so a world that has authored no world value reads exactly as this requirement already shipped.
+    This is a MODIFICATION of this requirement and not a new field: recording the world break mode as new is how a FOURTH breakage control gets built beside `toolBreakage.authority`, `checkBreakable` and the gathering realm's `toolBreakagePolicy`, with no precedence rule between them.
+    The governing rule above is unchanged and gains exactly one clause: SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.
+    The per-tool control stays `checkBreakable`; the prototype's `tool` / `check` / `immune` spellings are not introduced.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
     Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
     A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
@@ -1022,6 +1029,8 @@ EssenceDefinition = {
    That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
    At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
 10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
+11. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
+    `## Scoped Entity Definitions` describes the target three-layer model and is not yet implemented; where the two disagree, this section is what the code does.
 
 ## RecipeItemDefinition
 
@@ -1346,6 +1355,8 @@ Represent one curated item entry available to recipes and salvage operations.
     Component normalization is an allowlist rebuild, so a component's persisted shape after a save is exactly what that rebuild emits and the key is absent for a component that authored none.
     This is the **omitted-when-default** doctrine of § Canonical-Write and Legacy-Read Compatibility Policy, whose in-file precedent is `salvage.checkModifierIds` and NOT `salvage.allowPlayerResultReorder` — the latter is stamped on both normalizer return paths and is therefore absent-reads-as-default but not byte-preserving.
     No earlier build ever wrote this key, so the write-side alias-retirement rule does not apply; what carries over is the AUDIT obligation at requirement 20.
+26. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
+    `## Scoped Entity Definitions` describes the target three-layer model and is not yet implemented; where the two disagree, this section is what the code does.
 
 ## Recipe
 
@@ -1918,6 +1929,123 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
     - one aggregated conflict report is returned at completion.
     A recipe rejected SOLELY for a signature collision is reported under its own reason, distinct from the malformed-recipe reason, because it is authored correctly and is refused only for the company it keeps; a recipe that is both malformed and colliding is reported as malformed, the fault to fix first.
 
+## Scoped Entity Definitions
+
+> **NOT YET LIVE.**
+> This section describes the target three-layer model introduced by issue 1358 and made live by the world-scope migration of epic 1357 (PR 3, release `1.30.0`).
+> The modules that implement it (`src/systems/scopedDefinitions.js`, `componentScope.js`, `essenceScope.js`, `toolScope.js`) ship inert and are imported by nothing.
+> Until that migration lands, `## Component`, `## EssenceDefinition` and `## Tool` describe what the code actually does, and where those sections and this one disagree, they are what the code does.
+
+### Purpose
+
+Components, essences and tools are world scope in their **identity** and per-system in their **behaviour**, and that split is why this section's shape differs from the three world-scope lifts above it.
+`## CurrencyConfig`, `## TravelConfig` and `## CharacterLibraries` each moved their SUBSTANCE wholly, because two crafting systems cannot meaningfully disagree about a coin ladder, a valley or a character stat, so at most a participation boolean stayed behind.
+Here the opposite is true: Ash Salt is one item in the world, but what it is worth in essences, what it salvages into and how hard it is to work are things a blacksmithing system and an alchemy system SHOULD disagree about.
+
+The per-`(entity, system)` membership record carries that disagreement, and it is a **generalization** of the participation flag rather than a fourth pattern: `requirements.currency.enabled` and `gatheringRealmSettings.enabled` are the degenerate case — one record per system instead of one per `(entity, system)`, with no overridable section.
+The prohibition those sections state still binds: no field is authored at BOTH scopes with independent values, which is what the inherit map exists to prevent.
+
+This is ONE cross-cutting section rather than three near-identical ones, on the `## Recipe Item Identity` precedent: the identity-and-resolution contract is stated once, and the three thin subsections below carry only what differs per entity.
+
+### Properties
+
+```js
+// Layer 1 - identity. One per entity, world scoped, never editable from a crafting system.
+WorldComponent | WorldEssence | WorldTool = {
+  id: string,
+  // name, description, icon, colour and the source item link. Modelled by epic 1357 PR 2.
+}
+
+// Layer 2 - the world defaults. The behaviour every system inherits until it overrides a section.
+WorldDefaults = {
+  id: string,                      // the world entity id
+  [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
+}
+
+// Layer 3 - the system membership record. Its ABSENCE means the entity does not exist there.
+SystemMembershipRecord = {
+  entityId: string,
+  systemId: string,
+  inherit: { [section: string]: boolean },  // an omitted section reads as INHERITED
+  [section]: unknown,                       // the local override, RETAINED while dormant
+  enabled?: boolean,                        // essences and tools ONLY; default true
+}
+```
+
+### Requirements
+
+1. There are THREE layers, in strict precedence: the World Component / World Essence / World Tool (identity), the world defaults (inherited behaviour), and the system membership record (per-`(entity, system)` behaviour and the fact of membership).
+   A world entity is never editable from a crafting system, and a membership record never carries identity.
+2. **Resolution is per SECTION, never per FIELD.**
+   A section is the unit of the inherit decision AND the unit of the answer: an overriding section's stored value is the whole answer for that section, and no field inside it falls back to the world.
+   That is safe rather than lossy because turning a switch OFF SEEDS the local block from the current world value (requirement 5), so an override is complete the moment it exists.
+3. **An absent membership record means the entity does not exist in that system**: recipes there cannot reference it and players never see it.
+   **This is a REFUSAL, never a PRUNE.**
+   An unresolved reference is refused at use and left on disk; nothing derives a deletion from the absence of a membership record unless the membership corpus is a KNOWN-COMPLETE Valid Id Basis, which an unwritten or unreadable world setting is not.
+4. **Sections are populated even for a non-member**, falling to the world-defaults branch, and that is intentional rather than incidental: the world-scope preview resolves with no system at all and needs exactly those values.
+   `member` is therefore the gate a caller must check — a populated section says nothing about whether the entity exists in the system.
+5. **Re-inheriting RETAINS the dormant local override.**
+   Turning a section's inherit switch OFF seeds the override from the current world value so no field is blank on first override; turning it back ON flips the switch ONLY.
+   The local block stays on disk, dormant and ignored by resolution, and re-overriding RESTORES it rather than re-seeding from the world.
+   Nothing is lost, so no confirmation is required and the inherit row's copy stays "fall back".
+6. Resolution answers `inherited` PER SECTION: `true` when there is no membership record, and otherwise the record's switch for that section.
+   A record whose `inherit` map OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
+7. **There is no world-level `enabled` flag.**
+   For an enableable entity, resolution answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
+   Disabling an entity world-wide is N membership edits, or a bulk action, and never a fourth layer.
+8. **`enabled` is opt-in PER ENTITY and the opt-out is STRUCTURAL rather than conventional.**
+   The generic resolver does not compute the key for every entity and let one path override it: an entity that carries no enabled flag gets an answer on which `"enabled" in result` is FALSE — the key is ABSENT, not `false`.
+   A resolver that answered `false` would satisfy every statement about the record and still hand a screen the exact value it would read to draw a toggle the domain does not have.
+9. **Every world-defaults editor states the INHERIT COUNT before the change lands**, because editing one world value changes behaviour in every inheriting system at once.
+   The count is the number of membership records for that entity whose section is inherited; a system with NO membership record is not counted, because the entity does not exist there and the edit changes nothing for it.
+10. **Normalization is total, non-throwing and idempotent**, on the `normalizeModifierLibrary` contract (`## ModifierLibrary` requirement 2).
+    A non-array corpus answers an empty list; a non-object or id-less entry is DROPPED rather than repaired; ids are trimmed and de-duplicated first-wins, on the `(entityId, systemId)` PAIR for a membership record; an unknown section key is dropped; an unknown key or a non-boolean value in the `inherit` map is dropped; and every absence-preserving field is left ABSENT rather than becoming `null`.
+    Idempotence is required rather than incidental: the store, the migration and the export upcast each normalize possibly-already-normalized data.
+11. **A section VALUE is opaque to the shared primitive**, which never looks inside one, never walks one and never clones one.
+    That is what makes requirement 10 total on adversarial input: a self-referential section value cannot starve a normalizer that does not descend into it, and an unbounded synchronous walk would surface as a `# cancelled` test run rather than as a failure on the bad case.
+12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
+    The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags` and their parallel icon maps; that vocabulary, its layering, its icon maps and its deletion semantics are modelled separately (epic 1357, PR 7).
+    The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
+    The reserved `general` component category is not part of that vocabulary and stays implicit.
+
+### Component scope
+
+1. The component sections are `category` alone.
+2. **`category` departs from the plain pattern on its INHERITING branch**: the world category wins IF AUTHORED, and otherwise the local value falls through.
+   "Authored" is ABSENCE, not truthiness, and specifically not the `general` default `## Component` requirement 13 gives `Component.category`.
+   The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
+   The failure this rule prevents is a RESET to `general` in every inheriting system on the first resolve, not a blank — a blank is unreachable, because an absent world category falls through to the local value.
+   A world category the GM later deletes reaches the resolver as absence and takes that same path; `## CraftingSystem` requirement 6d governs the system-scope deletion case today.
+3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
+   There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
+4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.
+   Component membership is binary — present or absent.
+   Essence enabling toggles effect transfer and macros and tool enabling evokes a drained leyline or a seasonal workshop; component enabling serves no purpose and is deliberately not implemented, and an `enabled` key in adversarial or hand-edited input is DROPPED by the component normalizer rather than carried.
+
+### Essence scope
+
+1. The essence sections are `effectSource` and `macro`, with **two independent inherit switches**.
+   They are two sections rather than one because a system may reasonably take the world's active-effect source and author its own property macro, or the reverse.
+2. `enabled` KEEPS its shipped meaning verbatim: it gates essence-carried **behaviour** and never essence **arithmetic** (`## EssenceDefinition` requirements 7-8).
+   A disabled essence still matches, accumulates and is consumed exactly as before, because a mid-session toggle must not change what an already-held item is worth; what it withholds is what the essence carries ONTO a result, so neither its property macro nor its active-effect transfer runs.
+3. `enabled` defaults to TRUE on a record that authored none, matching `## EssenceDefinition` requirement 6.
+4. **Disabled is not absent.**
+   A disabled essence is a MEMBER that is off and keeps its overrides; removing it from the system deletes the membership record and its overrides with it.
+
+### Tool scope
+
+1. There are THREE tool world-default sections, TWO of them inherited.
+   `breakage` and `onBreak` are ordinary sections with their own inherit switches.
+2. **`requirements` is a SEED, not a live parent.**
+   It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
+   Modelling it as a section with a permanently-false inherit switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the world scope cannot address.
+3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
+   The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
+4. **The break mode is NOT a new field.**
+   The world/system pair is `toolBreakage.authority` (`## CraftingSystem` requirement 21) carrying the same two tokens `toolSpecific` / `checkDriven`; the per-tool control under `checkDriven` stays `checkBreakable`.
+   The prototype's `tool` / `check` / `immune` spellings are not introduced, and `immune` is a retired name.
+   The governing rule is unchanged and gains exactly one clause: **SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.**
+
 ## Tool
 
 ### Purpose
@@ -2055,6 +2183,8 @@ Tool = {
     The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
     Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
     Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
+14. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
+    `## Scoped Entity Definitions` describes the target three-layer model and is not yet implemented; where the two disagree, this section is what the code does.
 
 ### Validation Matrix
 
