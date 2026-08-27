@@ -137,7 +137,7 @@ They are authored once and composed into environments.
 
 {: .note }
 Stamina costs, modifiers, and drop rates accept **formulas** (numbers, ability modifiers, dice).
-See [Gathering Expressions]({% link gathering/formulas.md %}) for D&D 5e and Pathfinder 2e examples.
+See [Expressions]({% link expressions.md %}) for D&D 5e and Pathfinder 2e examples.
 
 ## Step 6: Create a Gathering Event
 

@@ -39,7 +39,7 @@ Gathering Task records support:
 {: .note }
 
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
-> See [Gathering Formulas]({% link gathering/formulas.md %}) for ready-to-use examples.
+> See [Expressions]({% link expressions.md %}) for ready-to-use examples.
 
 Disabled Gathering Tasks never match for player gathering.
 

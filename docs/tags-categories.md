@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Tags & Categories
-nav_order: 6
+nav_order: 7
 ---
 
 # Tags & Categories
