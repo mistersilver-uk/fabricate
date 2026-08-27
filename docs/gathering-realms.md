@@ -180,7 +180,7 @@ To set the override, choose a realm from the **Current realm override** picker o
 The picker's leading **Auto** option clears the override again and hands the party back to travel-actor sensing.
 The control is available only while a Gathering-enabled crafting system is selected and **Enable Travel & Realms** is on.
 Otherwise the party card explains the missing prerequisite in place of the picker and does not write an override.
-Both writes are stamped with the updating user and time.
+Setting an override and clearing it back to **Auto** are both stamped with the updating user and time.
 A disabled realm can still be chosen and still resolves, marked as disabled in the picker, and an override id whose realm was deleted surfaces as stale repair evidence and does not resolve.
 
 The picker sits beneath the travel-actor panel in the right-hand column of each party card.

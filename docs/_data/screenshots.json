@@ -257,7 +257,7 @@
     },
     {
       "case": "player-gathering-realm-locked",
-      "alt": "The player Gathering tab with a realm-locked environment called The Deepvault in the environment list, greyed out under a not in current realm pill with a padlock over its image. The environment open above it is blocked for a different reason, a linked scene the character has not visited.",
+      "alt": "The player Gathering tab with a realm-locked environment called The Deepvault in the environment list, greyed out under a not in current realm pill with a padlock over its image. The environment open in the detail column beside the list is blocked for a different reason, a linked scene the character has not visited.",
       "sha256": "9d1e9a67e7a2f863f4495325f3f06dbd8e067d9144d5a5b5af5e8c150bbc14a0"
     },
     {
@@ -277,7 +277,7 @@
     },
     {
       "case": "manager-world-travel-realms-normal",
-      "alt": "The Realms page under World and Travel. The Verdant Reach is expanded into a column of environments available to add beside a column of the ones already in the realm, and the panel on the right carries the realm name, its environments and a note that no parties are currently in it.",
+      "alt": "The Realms page under World and Travel. The Verdant Reach is expanded into a column of environments available to add beside an included environments column reading that no environments are in this realm yet, while the panel on the right carries the realm name, the two environments it records for the realm, and a note that no parties are currently in it.",
       "sha256": "5a2f00bf6693389b0e5c16f592a89a9ef76a0b30ed6722606d89eada624faaf3"
     },
     {
@@ -342,7 +342,7 @@
     },
     {
       "case": "manager-knowledge-learned-lost-copy",
-      "alt": "The Knowledge page's Learned recipes tab for one character, listing five recipes with how each was learned and a note that there is no owned copy to refund, each with an erase memory button.",
+      "alt": "The Knowledge page's Learned recipes tab for one character, listing five recipes with how each was learned, a note reading either no owned copy or no source copy to refund, and an erase memory button on every row.",
       "sha256": "96828f2634033ac538f49a346bfe587515a89b4b21fc1b1e8c620d7bb08061f5"
     },
     {

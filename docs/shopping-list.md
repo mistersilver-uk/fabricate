@@ -27,10 +27,14 @@ Components you already own in full drop off the list, so only shortfalls remain.
 
 {% include screenshot.html case="player-crafting-essence-shopping" caption="A queued recipe and the two shortfalls it left behind, an ingot and an essence amount." %}
 
-A recipe you can already make adds nothing to the list.
-Its requirements instead resolve to a plain account of what the craft is about to consume, and the list stays on its empty state.
+Queueing a recipe you can already make still adds it to the list.
+**Planned recipes** goes up, the recipe joins the queue, and **Clear shopping list** appears, exactly as for a recipe you cannot yet afford.
+Only the components and tools to acquire stay empty, because there is nothing left to find.
 
-{% include screenshot.html case="fabricate-app-shell" caption="A recipe with everything to hand, so the shopping list on the right has nothing to ask for." %}
+What a craft will consume is not something the list answers.
+The centre column spells that out for the selected recipe on its own, whether or not the recipe is queued and whether or not you own the materials.
+
+{% include screenshot.html case="fabricate-app-shell" alt="The Fabricate player window on the Crafting tab, with the shopping list on the right reading zero planned recipes, zero missing components and zero unavailable tools above an empty state inviting the player to add recipes to plan the materials they will need, while the centre column lists what the selected craft will use and how many of each the character owns." caption="The shopping list before anything is queued: all three counts read zero and it rests on its empty state, while the centre column still accounts for what the selected craft will use." %}
 
 The shopping list is scratch planning.
 It clears when you close the Crafting window.

@@ -51,7 +51,7 @@ Choose a managed Component as the replacement, then create a separate repair rec
 **Mark as broken** can store **Repair materials** made from Components, tags, essences, and currency.
 The editor saves and validates those materials, but repair execution is planned and is not yet available.
 
-{% include screenshot.html case="manager-tool-stress-repair" caption="A Tool marked as broken on failure, over the ingredient groups its repair would take." %}
+{% include screenshot.html case="manager-tool-stress-repair" caption="A Tool set to mark itself broken when it breaks, over the ingredient groups its repair would take." %}
 
 If a replacement cannot be resolved or created, Fabricate keeps the original Tool.
 
