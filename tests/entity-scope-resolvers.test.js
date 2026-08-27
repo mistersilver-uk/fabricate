@@ -1,6 +1,6 @@
 // The genuinely per-entity rules of Scoped Entity Definitions (issue 1358, part of epic 1357):
 // the component category fallback, the additive component tags, the STRUCTURALLY absent component
-// `enabled` key, the essence soft disable, the tool requirements seed, and the tool-breakage
+// `enabled` key, the essence soft disable, the tool repairRequirements seed, and the tool-breakage
 // authority pair.
 //
 // Everything that holds identically for all three entities is asserted once, in the parameterized
@@ -35,7 +35,7 @@ const {
   normalizeToolWorldDefaults,
   resolveTool,
   resolveToolBreakageAuthority,
-  seedToolRequirements,
+  seedToolRepairRequirements,
   toolAttemptBlockReason,
 } = toolScope;
 
@@ -272,14 +272,14 @@ test('the two essence inherit switches are independent', () => {
   assert.deepStrictEqual(resolved.inherited, { effectSource: false, macro: true });
 });
 
-// --- Tool: the hard block, the requirements seed, and the breakage authority (criteria 2 and 6) -
+// --- Tool: the hard block, the repairRequirements seed, the breakage authority (criteria 2, 6) -
 
 test('the SEEDED sections are disjoint from the inherited ones, and stay that way', () => {
-  // Three world-default sections, TWO of them inherited. `requirements` is the third and is a SEED
-  // (`seedToolRequirements`), so promoting it into TOOL_SECTIONS would silently give it an inherit
-  // switch, a live world parent, and a UI row for a value the world scope cannot even address —
-  // a repair recipe names ingredient groups over the OWNING SYSTEM's components.
-  assert.deepStrictEqual([...TOOL_SEEDED_SECTIONS], ['requirements']);
+  // Three world-default sections, TWO of them inherited. `repairRequirements` is the third and is
+  // a SEED (`seedToolRepairRequirements`), so promoting it into TOOL_SECTIONS would silently give
+  // it an inherit switch, a live world parent, and a UI row for a value the world scope cannot
+  // even address — a repair recipe names ingredient groups over the OWNING SYSTEM's components.
+  assert.deepStrictEqual([...TOOL_SEEDED_SECTIONS], ['repairRequirements']);
   for (const seeded of TOOL_SEEDED_SECTIONS) {
     assert.ok(
       !TOOL_SCOPE.sections.includes(seeded),
@@ -295,20 +295,20 @@ test('the SEEDED sections are disjoint from the inherited ones, and stay that wa
   );
 });
 
-test('a non-list requirements value is DROPPED rather than persisted', () => {
+test('a non-list repairRequirements value is DROPPED rather than persisted', () => {
   for (const notAList of ['not a list', 42, {}, null, true]) {
-    const [world] = normalizeToolWorldDefaults([{ id: ENTITY_ID, requirements: notAList }]);
+    const [world] = normalizeToolWorldDefaults([{ id: ENTITY_ID, repairRequirements: notAList }]);
     assert.ok(
-      !('requirements' in world),
-      `a ${typeof notAList} requirements value never reaches disk as one`
+      !('repairRequirements' in world),
+      `a ${typeof notAList} repairRequirements value never reaches disk as one`
     );
     const [record] = normalizeToolMemberships([
-      { entityId: ENTITY_ID, systemId: SYSTEM_ID, requirements: notAList },
+      { entityId: ENTITY_ID, systemId: SYSTEM_ID, repairRequirements: notAList },
     ]);
-    assert.ok(!('requirements' in record), 'and the same holds on a membership record');
+    assert.ok(!('repairRequirements' in record), 'and the same holds on a membership record');
     assert.ok(
-      !('requirements' in resolveTool(world, record)),
-      'so the resolver answers no requirements rather than a value nothing can iterate'
+      !('repairRequirements' in resolveTool(world, record)),
+      'so the resolver answers no repairRequirements rather than a value nothing can iterate'
     );
   }
 });
@@ -348,32 +348,32 @@ test('a tool that is absent or disabled blocks the attempt with TOOL_BLOCKED', (
   assert.equal(toolAttemptBlockReason(resolveTool(null, enabled)), null);
 });
 
-test('tool requirements are SEEDED once on add and never re-read from the world defaults', () => {
+test('tool repairRequirements are SEEDED once on add and never re-read from the world defaults', () => {
   const [world] = normalizeToolWorldDefaults([
-    { id: ENTITY_ID, requirements: [{ id: 'group-1', options: ['whetstone'] }] },
+    { id: ENTITY_ID, repairRequirements: [{ id: 'group-1', options: ['whetstone'] }] },
   ]);
-  const seeded = seedToolRequirements(world);
+  const seeded = seedToolRepairRequirements(world);
   assert.deepStrictEqual(seeded, [{ id: 'group-1', options: ['whetstone'] }]);
-  assert.notEqual(seeded, world.requirements, 'the seed is a COPY, not the world list itself');
-  assert.notEqual(seeded[0], world.requirements[0], 'and it is a deep copy');
+  assert.notEqual(seeded, world.repairRequirements, 'the seed is a COPY, not the world list itself');
+  assert.notEqual(seeded[0], world.repairRequirements[0], 'and it is a deep copy');
 
   const [record] = normalizeToolMemberships([
-    { entityId: ENTITY_ID, systemId: SYSTEM_ID, requirements: seeded },
+    { entityId: ENTITY_ID, systemId: SYSTEM_ID, repairRequirements: seeded },
   ]);
   const [rewrittenWorld] = normalizeToolWorldDefaults([
-    { id: ENTITY_ID, requirements: [{ id: 'group-2', options: ['anvil'] }] },
+    { id: ENTITY_ID, repairRequirements: [{ id: 'group-2', options: ['anvil'] }] },
   ]);
   assert.deepStrictEqual(
-    resolveTool(rewrittenWorld, record).requirements,
+    resolveTool(rewrittenWorld, record).repairRequirements,
     [{ id: 'group-1', options: ['whetstone'] }],
     'a later world edit never reaches a system that has already been seeded'
   );
   assert.ok(
-    !('requirements' in resolveTool(rewrittenWorld, null)),
-    'requirements is answered from the membership record alone, never inherited'
+    !('repairRequirements' in resolveTool(rewrittenWorld, null)),
+    'repairRequirements is answered from the membership record alone, never inherited'
   );
-  assert.deepStrictEqual(seedToolRequirements(null), []);
-  assert.deepStrictEqual(seedToolRequirements({ requirements: 'not a list' }), []);
+  assert.deepStrictEqual(seedToolRepairRequirements(null), []);
+  assert.deepStrictEqual(seedToolRepairRequirements({ repairRequirements: 'not a list' }), []);
 });
 
 test('tool-breakage authority resolves system-over-world and never re-defaults an unauthored system', () => {

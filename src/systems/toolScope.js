@@ -12,13 +12,13 @@ import {
  * world-scope migration (epic 1357, PR 3) lands.
  *
  * THREE WORLD-DEFAULT SECTIONS, TWO OF THEM INHERITED. `breakage` and `onBreak` are ordinary
- * sections with their own inherit switches. `requirements` is the third, and it is a SEED rather
- * than a live parent: it is copied out of the world defaults when a tool is added to a system and
- * then diverges freely, so `seedToolRequirements` is a function the membership action calls once
- * and NOT a section the resolver reads through. Modelling it as a section with a permanently-false
- * inherit switch would be a lie the UI would then have to hide, and it would be untrue on its own
- * terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the
- * world scope cannot address.
+ * sections with their own inherit switches. `repairRequirements` is the third, and it is a SEED
+ * rather than a live parent: it is copied out of the world defaults when a tool is added to a
+ * system and then diverges freely, so `seedToolRepairRequirements` is a function the membership
+ * action calls once and NOT a section the resolver reads through. Modelling it as a section with a
+ * permanently-false inherit switch would be a lie the UI would then have to hide, and it would be
+ * untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's
+ * components, which the world scope cannot address.
  *
  * `enabled` KEEPS ITS SHIPPED MEANING VERBATIM. A reference to a tool that does not resolve, or
  * that resolves to a disabled tool, BLOCKS the attempt with `TOOL_BLOCKED` (`## Tool`
@@ -45,7 +45,7 @@ export const TOOL_SECTIONS = Object.freeze(['breakage', 'onBreak']);
  *
  * @type {readonly string[]}
  */
-export const TOOL_SEEDED_SECTIONS = Object.freeze(['requirements']);
+export const TOOL_SEEDED_SECTIONS = Object.freeze(['repairRequirements']);
 
 /**
  * The two tool-breakage authority tokens. Already shipped; the prototype's `tool` / `check` are
@@ -81,7 +81,7 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
 export const TOOL_BLOCKED = 'TOOL_BLOCKED';
 
 /**
- * Attach the seeded `requirements` list only when it was authored.
+ * Attach the seeded `repairRequirements` list only when it was authored.
  *
  * The list itself is OPAQUE - its members are ingredient groups this module has no business
  * inspecting - so it is preserved by reference and never walked.
@@ -89,8 +89,10 @@ export const TOOL_BLOCKED = 'TOOL_BLOCKED';
  * @param {object} entry
  * @returns {object}
  */
-function attachRequirements(entry) {
-  return Array.isArray(entry.requirements) ? { requirements: entry.requirements } : {};
+function attachRepairRequirements(entry) {
+  return Array.isArray(entry.repairRequirements)
+    ? { repairRequirements: entry.repairRequirements }
+    : {};
 }
 
 /**
@@ -101,8 +103,8 @@ function attachRequirements(entry) {
 export const TOOL_SCOPE = defineScope({
   sections: TOOL_SECTIONS,
   enableable: true,
-  worldExtras: attachRequirements,
-  membershipExtras: attachRequirements,
+  worldExtras: attachRepairRequirements,
+  membershipExtras: attachRepairRequirements,
 });
 
 /**
@@ -126,7 +128,7 @@ export function normalizeToolMemberships(raw) {
 }
 
 /**
- * Seed a new membership record's requirements from the world defaults.
+ * Seed a new membership record's `repairRequirements` from the world defaults.
  *
  * Called ONCE, when a tool is added to a system. The seed is a COPY rather than the world list
  * itself, so a later world edit cannot reach through into a system that has already diverged, and
@@ -137,13 +139,13 @@ export function normalizeToolMemberships(raw) {
  * @param {object|null} worldDefault
  * @returns {Array<object>}
  */
-export function seedToolRequirements(worldDefault) {
+export function seedToolRepairRequirements(worldDefault) {
   const world = worldDefault && typeof worldDefault === 'object' ? worldDefault : {};
-  if (!Array.isArray(world.requirements)) return [];
+  if (!Array.isArray(world.repairRequirements)) return [];
   try {
-    return structuredClone(world.requirements);
+    return structuredClone(world.repairRequirements);
   } catch {
-    return [...world.requirements];
+    return [...world.repairRequirements];
   }
 }
 
@@ -182,22 +184,24 @@ export function resolveToolBreakageAuthority(worldToolBreakage, systemToolBreaka
  * Resolve one `(tool, system)` pair.
  *
  * The answer carries `breakage` and `onBreak` (each when authored at the winning scope),
- * `requirements` when the membership record authored some, `member`, the per-section `inherited`
- * map, and `enabled`.
+ * `repairRequirements` when the membership record authored some, `member`, the per-section
+ * `inherited` map, and `enabled`.
  *
- * `requirements` is answered from the MEMBERSHIP RECORD ALONE and is never read back out of the
- * world defaults - a seeded value that a system has since edited is the only truth about that
+ * `repairRequirements` is answered from the MEMBERSHIP RECORD ALONE and is never read back out of
+ * the world defaults - a seeded value that a system has since edited is the only truth about that
  * system's repair recipe.
  *
  * @param {object|null} worldDefault
  * @param {object|null} membership
- * @returns {{breakage?: unknown, onBreak?: unknown, requirements?: Array<object>, member: boolean,
- *   enabled: boolean, inherited: {[section: string]: boolean}}}
+ * @returns {{breakage?: unknown, onBreak?: unknown, repairRequirements?: Array<object>,
+ *   member: boolean, enabled: boolean, inherited: {[section: string]: boolean}}}
  */
 export function resolveTool(worldDefault, membership) {
   const record = membership && typeof membership === 'object' ? membership : null;
   const resolved = resolveScopedDefinition(worldDefault, record, TOOL_SCOPE);
-  if (Array.isArray(record?.requirements)) resolved.requirements = record.requirements;
+  if (Array.isArray(record?.repairRequirements)) {
+    resolved.repairRequirements = record.repairRequirements;
+  }
   return resolved;
 }
 

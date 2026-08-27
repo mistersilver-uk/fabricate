@@ -1961,7 +1961,7 @@ WorldDefaults = {
   id: string,                      // the world entity id
   [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
-  // `requirements` on a tool. Both are ABSENT when unauthored.
+  // `repairRequirements` on a tool. Both are ABSENT when unauthored.
 }
 
 // Layer 3 - the system membership record. Its ABSENCE means the entity does not exist there.
@@ -1972,7 +1972,7 @@ SystemMembershipRecord = {
   [section]: unknown,                       // the local override, RETAINED while dormant
   enabled?: boolean,                        // essences and tools ONLY; default true
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` and `mutedTags` on
-  // a component, `requirements` on a tool. All are ABSENT when unauthored.
+  // a component, `repairRequirements` on a tool. All are ABSENT when unauthored.
 }
 ```
 
@@ -2010,7 +2010,7 @@ SystemMembershipRecord = {
 11. **A section VALUE is opaque to the shared primitive**, which never looks inside one, never walks one and never clones one.
     That is what makes requirement 10 total on adversarial input: a self-referential section value cannot starve a normalizer that does not descend into it, and an unbounded synchronous walk would surface as a `# cancelled` test run rather than as a failure on the bad case.
     It follows that **a normalized record ALIASES its input's section values** — normalization copies a section by reference, so a caller that keeps hold of what it handed in shares that object with the normalized corpus.
-    A store must therefore treat a corpus it normalizes as given away rather than as still its own to mutate; the only deep copy in this contract is the tool `requirements` seed, which is a copy precisely because it is the one value that must NOT stay shared.
+    A store must therefore treat a corpus it normalizes as given away rather than as still its own to mutate; the only deep copy in this contract is the tool `repairRequirements` seed, which is a copy precisely because it is the one value that must NOT stay shared.
     A per-entity module that needs a SHAPE rule over its own section (the component category's trim-or-absent rule, for instance) states it at the normalizer rather than in a resolver branch, so that the inheriting and overriding branches carry the same guarantee.
     The scope descriptor's optional `coerceSection` hook is where that rule is declared; it runs on BOTH records, and answering `undefined` from it means the section is ABSENT rather than an override of nothing.
 12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
@@ -2050,9 +2050,9 @@ SystemMembershipRecord = {
 ### Tool scope
 
 1. There are THREE tool world-default sections, TWO of them inherited.
-   `breakage` and `onBreak` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage` and `Tool.onBreak` unchanged; `requirements` is the third and is SEEDED rather than inherited.
-   A tool membership record's `inherit` map therefore carries `breakage` and `onBreak` and nothing else, and a `requirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
-2. **`requirements` is a SEED, not a live parent.**
+   `breakage` and `onBreak` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage` and `Tool.onBreak` unchanged; `repairRequirements` is the third and is SEEDED rather than inherited.
+   A tool membership record's `inherit` map therefore carries `breakage` and `onBreak` and nothing else, and a `repairRequirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
+2. **`repairRequirements` is a SEED, not a live parent.**
    It is the shipped `Tool.repairRequirements` — the `flagBroken` repair recipe's ingredient groups — held at world scope as a starting point only.
    It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
    Resolution answers it from the MEMBERSHIP RECORD ALONE and never reads it back out of the world defaults, because a seeded value the system has since edited is the only truth about that system's repair recipe.

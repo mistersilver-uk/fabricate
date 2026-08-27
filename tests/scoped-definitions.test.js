@@ -7,7 +7,7 @@
 // new-code duplication gate on their own.
 //
 // The genuinely per-entity rules — the component category fallback and its missing `enabled` key,
-// the essence soft disable, the tool requirements seed and the breakage authority — live in
+// the essence soft disable, the tool repairRequirements seed and the breakage authority — live in
 // `tests/entity-scope-resolvers.test.js`.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
