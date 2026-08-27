@@ -3842,7 +3842,6 @@ export class GatheringEngine {
       );
 
       await ChatMessage.create({
-        user: game.user?.id,
         speaker: ChatMessage.getSpeaker({ actor }),
         content,
       });
