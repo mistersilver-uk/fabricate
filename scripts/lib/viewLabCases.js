@@ -197,6 +197,13 @@ const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
   // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
+  // The shared empty panel. Both representative frames are POPULATED states — the components
+  // browser lists components and the player app shell lists recipes — so the dashed panel this
+  // primitive draws appears in neither, and a restyle of it would publish two frames that do not
+  // contain it. `manager-systems-empty` is the frame that does, and it is the frame
+  // `docs/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
+  // reader sees going stale.
+  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze(['manager-systems-empty']),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
   // its trigger with the search field and suppresses the in-popover search row; the
@@ -574,10 +581,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
+    // Deliberately NO pattern for `manager/EmptyState.svelte`, for the reason
+    // `manager-gathering-stamina-rolls` records about `Stepper`: `EmptyState` is in
+    // `MANAGER_PRIMITIVES`, so `BROAD_SIGNAL_PATTERN` matches it and `selectRenderFileCases`
+    // `continue`s on a broad-signal file BEFORE consulting any case's `sourceMatches` — such an
+    // entry would be unreachable. This case is reached instead through
+    // `BROAD_SIGNAL_CASE_OVERRIDES`, which is the seam for exactly this condition: a primitive
+    // whose changed presentation is absent from both representative frames.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
     ],
   }),
   managerCase({
