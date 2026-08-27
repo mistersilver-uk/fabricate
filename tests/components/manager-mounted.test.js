@@ -4145,7 +4145,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
       assert.deepEqual(
         linkHrefs,
-        [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
+        [href, 'https://mistersilver-uk.github.io/fabricate/help/quickstart'],
         `${activeTab} rail keeps both its docs page and the Quickstart`
       );
       for (const anchor of linkRow.querySelectorAll('a')) {

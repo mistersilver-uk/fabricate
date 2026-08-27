@@ -834,7 +834,7 @@
       </ManagerButton>
       <ManagerButton
         tag="a"
-        href="https://mistersilver-uk.github.io/fabricate/quickstart"
+        href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>

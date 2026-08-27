@@ -1822,7 +1822,7 @@ describe('CraftingSystemManager source contract', () => {
       'no-systems inspector should use localized setup copy'
     );
     assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/quickstart'),
+      rootSource.includes('https://mistersilver-uk.github.io/fabricate/help/quickstart'),
       'no-systems inspector should link to the published quickstart'
     );
     assert.ok(

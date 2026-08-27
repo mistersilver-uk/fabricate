@@ -1,7 +1,8 @@
 ---
 layout: default
 title: Troubleshooting
-nav_order: 16
+nav_order: 3
+parent: Help
 ---
 
 # Troubleshooting
@@ -525,7 +526,7 @@ Make sure Fabricate is up to date.
 The actor's stored crafting-run history may be corrupted.
 Ask your GM to clear that actor's crafting run history (this removes the run history only, not your recipes or crafting systems), then reload the page (F5) and re-open the Crafting App.
 
-**See also:** [Quickstart]({% link quickstart.md %}) covers opening the Crafting App for the first time.
+**See also:** [Quickstart]({% link help/quickstart.md %}) covers opening the Crafting App for the first time.
 
 ---
 
@@ -545,7 +546,7 @@ Make sure Fabricate is up to date.
 
 Ask your GM to clear that actor's crafting run history (this removes the run history only, not your recipes or crafting systems), then reload the page (F5) and re-open the Crafting App.
 
-**See also:** [Quickstart]({% link quickstart.md %}) covers opening the Crafting App for the first time.
+**See also:** [Quickstart]({% link help/quickstart.md %}) covers opening the Crafting App for the first time.
 
 ---
 

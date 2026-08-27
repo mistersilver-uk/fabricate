@@ -2,7 +2,8 @@
 layout: default
 title: Recipe Discovery
 parent: How-To Guides
-nav_order: 2
+nav_order: 1
+grand_parent: Help
 ---
 
 # Recipe Discovery

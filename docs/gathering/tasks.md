@@ -237,4 +237,4 @@ This covers both an item the character owns that is already broken and an owned 
 The **Broken** state is for display only.
 The attempt stays blocked either way, and holding a working copy of the tool alongside a broken one still reads as available.
 
-See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
+See the [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}) how-to for a worked example.

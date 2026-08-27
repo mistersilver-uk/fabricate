@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Protecting Your Worlds
-nav_order: 17
+nav_order: 15
 ---
 
 # Protecting Your Worlds

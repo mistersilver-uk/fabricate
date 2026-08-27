@@ -86,7 +86,7 @@ A loosely recognized copy can satisfy presence while being spared from usage and
 {: .note }
 
 > Use **Repair Item Data** or issue a fresh copy from the source Item when a Tool is present but does not track use or break.
-> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
+> See [Tools Not Breaking or Tracking Usage]({% link help/troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
 The **Requirements** tab can apply shared character prerequisites defined for the crafting system.
 Every selected prerequisite is required.
@@ -232,9 +232,9 @@ Gathering Tools stored by early versions are also reconciled into the system lib
 
 - [Recipes]({% link crafting/recipes/index.md %}).
   Configure recipe Tool requirements and bonus modes.
-- [Degrading Tools]({% link how-to/degrading-tools.md %}).
+- [Degrading Tools]({% link help/how-to/degrading-tools.md %}).
   Build a Tool that wears out through repeated crafting.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}).
   Apply the shared Tool setup to gathering.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
   Provide virtual Tool presence from a Scene Region station.

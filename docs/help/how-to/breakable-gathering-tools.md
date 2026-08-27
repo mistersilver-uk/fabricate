@@ -2,7 +2,8 @@
 layout: default
 title: Breakable Gathering Tools
 parent: How-To Guides
-nav_order: 4
+nav_order: 3
+grand_parent: Help
 ---
 
 # Breakable Gathering Tools
@@ -68,13 +69,13 @@ The chosen **On-break action** still commits when a Tool breaks.
 
 Presence accepts familiar Item copies, but usage and breakage require a durable identity match.
 A loosely recognized copy can allow the attempt while being spared from destructive changes.
-See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage) when that happens.
+See [Tools Not Breaking or Tracking Usage]({% link help/troubleshooting.md %}#tools-not-breaking-or-tracking-usage) when that happens.
 
 ## Learn more
 
 - [Tools]({% link tools.md %}).
   Learn the complete shared Tool authoring workflow.
-- [Degrading Tools]({% link how-to/degrading-tools.md %}).
+- [Degrading Tools]({% link help/how-to/degrading-tools.md %}).
   Build a limited-use crafting Tool.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
   Provide a Tool station without requiring actor ownership.

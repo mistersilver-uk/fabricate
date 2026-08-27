@@ -44,7 +44,7 @@ This means recipe scrolls work whether a player picks up the item directly or co
 
 > **Tip:** If a player owns a recipe scroll that was copied from a compendium but the recipe still shows as unknown, the copy may have lost track of the item it came from.
 Re-importing the recipe item from the compendium restores the link.
-A GM can also reconcile already-distributed copies in bulk with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+A GM can also reconcile already-distributed copies in bulk with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 ### Duplicating a Book or Scroll
 
@@ -62,7 +62,7 @@ A player holding the scroll learns only the scroll's recipes, and a player holdi
 {: .note }
 > This durable identity was added in a later version of Fabricate.
 > A copy that was duplicated and handed to a player before you updated may still be labelled as the item it was copied from.
-> A GM can reconcile those copies in bulk with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+> A GM can reconcile those copies in bulk with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 ### Limited Uses
 

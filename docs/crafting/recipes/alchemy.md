@@ -190,7 +190,7 @@ The most common ways a recipe is revealed are:
 When the discipline remembers your brews, a combination that matches a recipe reveals that recipe and adds it to your Known recipes list.
 - **By reading books and scrolls.** Some recipes are taught by an in-world item, such as a recipe book or a scroll.
 Learn these from the **Inventory** tab, and they appear in your Known recipes list too.
-See [Recipe Discovery]({% link how-to/recipe-discovery.md %}) for how books and scrolls are set up and learned.
+See [Recipe Discovery]({% link help/how-to/recipe-discovery.md %}) for how books and scrolls are set up and learned.
 
 Revealing a recipe never changes what you can brew.
 A revealed recipe is simply one the workbench will name for you and can load onto the bench.

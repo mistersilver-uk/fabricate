@@ -348,4 +348,4 @@ Run `game.fabricate.cleanupInteractables()` to strip them, then uninstall.
 
 - [Tools]({% link tools.md %}) is the system-owned Tool model that backs Tool stations.
 - [Gathering Environments]({% link gathering/index.md %}) is where you author the tasks and environments that gathering-task shortcuts reference, and where node availability, depletion, and respawn actually live.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) is a worked example of a tool that wears out.
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}) is a worked example of a tool that wears out.

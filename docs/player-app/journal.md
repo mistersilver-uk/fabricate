@@ -110,7 +110,7 @@ The Journal's **Tips** card states this so a paused countdown is not mistaken fo
 
 ## See Also
 
-- [Quickstart]({% link quickstart.md %}) walks through creating systems, gathering, and trying Fabricate as a player.
+- [Quickstart]({% link help/quickstart.md %}) walks through creating systems, gathering, and trying Fabricate as a player.
 - [Crafting Checks]({% link checks/crafting.md %}) explains the checks a crafting step rolls.
 - [Salvage]({% link components/salvage.md %}) covers how components break down into salvage results.
 - [Gathering Environments]({% link gathering/index.md %}) covers gathering, where gathering runs begin.

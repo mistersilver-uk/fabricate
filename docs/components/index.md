@@ -42,7 +42,7 @@ If Foundry reports an original compendium source but that source no longer exist
 > You can right-click an item in the Items sidebar, choose **Duplicate**, change the copy's name, art, and setup, and register that copy as a separate component.
 > The copy becomes its own component and does not collide with, or overwrite, the original.
 > This holds even when the original was imported from a compendium.
-> A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link troubleshooting.md %}#repairing-item-data).
+> A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
 When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.

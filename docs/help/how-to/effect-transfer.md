@@ -2,7 +2,8 @@
 layout: default
 title: Effect Transfer
 parent: How-To Guides
-nav_order: 5
+nav_order: 4
+grand_parent: Help
 ---
 
 # Effect Transfer

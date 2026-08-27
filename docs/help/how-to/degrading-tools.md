@@ -2,7 +2,8 @@
 layout: default
 title: Degrading Tools
 parent: How-To Guides
-nav_order: 3
+nav_order: 2
+grand_parent: Help
 ---
 
 # Degrading Tools
@@ -59,5 +60,5 @@ If a replacement cannot be resolved or created, Fabricate keeps the original Too
 
 - [Tools]({% link tools.md %}).
   Learn about Tool sources, prerequisites, bonuses, breakage authority, and validation.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}).
   Use the same Tool in a gathering task.

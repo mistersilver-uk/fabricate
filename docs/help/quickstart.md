@@ -1,7 +1,8 @@
 ---
 layout: default
 title: Quickstart
-nav_order: 2
+nav_order: 1
+parent: Help
 ---
 
 # Quickstart
@@ -197,4 +198,4 @@ The Crafting tab provides recipe browsing, actor and source selection, craft but
 - [Crafting Systems]({% link crafting-systems/index.md %}) covers resolution modes, features, and system configuration
 - [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
 - [API Reference]({% link api/index.md %}) is the full developer documentation
-- [Troubleshooting]({% link troubleshooting.md %}) has solutions for common setup issues
+- [Troubleshooting]({% link help/troubleshooting.md %}) has solutions for common setup issues

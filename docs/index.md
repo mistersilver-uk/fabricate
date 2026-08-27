@@ -61,59 +61,13 @@ GMs author single or multi-step recipes in the Crafting Admin panel across the o
 
 ## Quickstart
 
-Head to [Quickstart]({% link quickstart.md %}) for installation and your first Gathering Environment.
-
-## Crafting
-
-Players craft in the **Crafting** tab of the unified Fabricate window.
-They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
-A built-in **Shopping List** lets players queue several recipes and see one consolidated list of the components, essences, and tools they still need.
-GMs author recipes end to end in the Crafting Admin panel, across dedicated tabs for overview, ingredients, results, tools, and validation, with an access or books and scrolls tab appearing according to the system's recipe visibility mode.
-Steps are added on the overview tab, and each step's ingredients and results are edited on the ingredients and results tabs.
-See [Recipes]({% link crafting/recipes/index.md %}).
-
-## Salvage
-
-Players can break a managed item back down into component parts from the **Salvage** flow.
-Salvage can be a straight breakdown or gated behind a crafting check, and it supports progressive results that a roll spends down.
-Players can also select several items at once to salvage or permanently destroy them together in a single gesture.
-See [Salvage]({% link components/salvage.md %}).
-
-## Tools
-
-Recipes, gathering tasks, and salvage all require reusable, optionally breakable equipment through shared [Tools]({% link tools.md %}).
-Tools can be both things you would carry, like a hammer, knife, or satchel or things you would find in specific locations in the world, like a campfire, magical leyline, or forge.
-
-## Gathering
-
-GMs can define material gathering locations in [Gathering]({% link gathering/index.md %}) when a crafting system enables the "Gathering" feature.
-Gathering can also be location-aware!
-GMs can describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
-See [Travel]({% link world/travel/index.md %}).
-
-## Journal
-
-Players can track the runs their characters have started in the [Journal]({% link player-app/journal.md %}) tab of the unified Fabricate window.
-The Journal monitors crafting, gathering, and salvage runs together, shows world-time countdowns and history, and lets players continue crafting runs with **Trigger Next Step**.
-
-## Canvas Interactables
-
-GMs can place Tools and Gathering Tasks directly on the scene as **Scene Region** interactables (with an optional on-canvas marker).
-Players activate them by walking a token into the region.
-A non-blocking prompt appears, and clicking **Interact** opens the Fabricate UI.
-See [Canvas Interactables]({% link canvas-interactables.md %}).
-
-## Import and export
-
-You can export a complete crafting system to a JSON file and import it into another world.
-The export carries the whole authoring model, and import reports any references that do not exist in the target world.
-See [Import & Export]({% link crafting-systems/import-export.md %}).
+Head to [Quickstart]({% link help/quickstart.md %}) for installation and your first Gathering Environment.
 
 ## Having trouble?
 
-Check the [Troubleshooting]({% link troubleshooting.md %}) guide for solutions to common issues.
+Check the [Troubleshooting]({% link help/troubleshooting.md %}) guide for solutions to common issues.
 
 ## How-to guides
 
 Need a quick answer?
-The [How-To Guides]({% link how-to/index.md %}) cover common tasks like recipe discovery, degrading tools, and effect transfer.
+The [How-To Guides]({% link help/how-to/index.md %}) cover common tasks like recipe discovery, degrading tools, and effect transfer.

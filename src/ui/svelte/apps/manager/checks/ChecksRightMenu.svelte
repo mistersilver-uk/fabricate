@@ -472,7 +472,7 @@
     </a>
     <a
       class="manager-checks-rail-link"
-      href={`${DOCS_BASE}/quickstart`}
+      href={`${DOCS_BASE}/help/quickstart`}
       target="_blank"
       rel="noreferrer"
       data-checks-quickstart-link
