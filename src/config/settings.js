@@ -49,6 +49,31 @@ export const SETTING_KEYS = Object.freeze({
   // persistence change. The cost, accepted knowingly: a write to either library rewrites both,
   // so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
   CHARACTER_LIBRARIES: 'characterLibraries',
+  // Issue 1359 (epic 1357): the three WORLD-SCOPE entity definition settings — the World
+  // Component, World Essence and World Tool rosters, their world defaults, and the
+  // per-`(entity, system)` membership records. Each carries `{ entities, defaults, membership }`;
+  // `toolScope` carries the WORLD tool-breakage authority beside them, and nothing else does.
+  //
+  // THREE KEYS RATHER THAN ONE, and the reason is SEEDEDNESS INDEPENDENCE rather than write
+  // amplification — the counter-case to `CHARACTER_LIBRARIES` above, which shares one key for two
+  // libraries. `isSeeded()` is what makes a destructive prune decidable, and on a shared key it
+  // cannot be honest per entity type: a store writes the whole object, so one entity type's first
+  // write persists the others as EMPTY and converts UNKNOWN bases into real, empty, PRUNABLE ones
+  // in a single keystroke. Across three entity types whose references reach recipe ingredients,
+  // results, salvage, gathering drop rows, tool links and essence source components, that is not
+  // survivable. The accepted cost, stated as `CHARACTER_LIBRARIES` states its own: three keys are
+  // three non-atomic writes, so a partially-migrated corpus becomes observable — which is fine,
+  // because each entity type's union read and Valid Id Basis are independently valid in every
+  // interleaving.
+  //
+  // ADDITIVE UNTIL THE MIGRATION. Nothing writes these yet, so every world reads the registered
+  // default and `## CraftingSystem`'s `components` / `essenceDefinitions` / `tools` stay live and
+  // authoritative. `fabricate.worldVocabulary` is deliberately NOT registered here: epic 1357
+  // models the World Vocabulary in PR 7, and a persisted key whose values carry no canonical
+  // meaning is a live shape with no description.
+  COMPONENT_SCOPE: 'componentScope',
+  ESSENCE_SCOPE: 'essenceScope',
+  TOOL_SCOPE: 'toolScope',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -157,6 +182,30 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.CHARACTER_LIBRARIES]: {
     name: 'Character Libraries',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1359. `scope: 'world'` here is what admits each key to the DERIVED
+  // `WORLD_SCOPED_SETTING_KEYS` below — that set is filtered out of these definitions precisely so
+  // it cannot drift, so nothing restates these three there.
+  [SETTING_KEYS.COMPONENT_SCOPE]: {
+    name: 'World Component Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.ESSENCE_SCOPE]: {
+    name: 'World Essence Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.TOOL_SCOPE]: {
+    name: 'World Tool Scope',
     scope: 'world',
     config: false,
     type: Object,
