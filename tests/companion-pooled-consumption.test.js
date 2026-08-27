@@ -734,7 +734,13 @@ describe('the currency arm', () => {
     );
     // 1 gp is 100 cp on this ladder, and Idrin covers all of it.
     assert.deepEqual(result.ledger[0].takes, [
-      { actorUuid: 'Actor.Idrin', documentUuid: null, quantity: 100 },
+      {
+        actorUuid: 'Actor.Idrin',
+        documentUuid: null,
+        quantity: 100,
+        unitId: 'cp',
+        share: [{ unitId: 'gp', unitLabel: 'gp', amount: 1 }],
+      },
     ]);
     assert.equal(result.ledger[0].requested, 1, 'the ECHO is in the caller`s own denomination');
     assert.equal(result.ledger[0].consumed, 100, 'while the takes are coins, and coins are exact');
@@ -871,7 +877,13 @@ describe('the currency arm', () => {
     assertConsumeAnswer(result, COMPANION_OUTCOMES.consumeFailed);
     assert.equal(result.consumed, 100, 'one payer`s hundred copper is genuinely still gone');
     assert.deepEqual(result.ledger[0].takes, [
-      { actorUuid: 'Actor.Idrin', documentUuid: null, quantity: 100 },
+      {
+        actorUuid: 'Actor.Idrin',
+        documentUuid: null,
+        quantity: 100,
+        unitId: 'cp',
+        share: [{ unitId: 'gp', unitLabel: 'gp', amount: 1 }],
+      },
     ]);
   });
 });
@@ -1289,7 +1301,13 @@ describe('a seam that THROWS', () => {
     );
     assert.equal(result.consumed, 100, 'the coin is genuinely still gone, and the ledger says so');
     assert.deepEqual(result.ledger[0].takes, [
-      { actorUuid: 'Actor.Idrin', documentUuid: null, quantity: 100 },
+      {
+        actorUuid: 'Actor.Idrin',
+        documentUuid: null,
+        quantity: 100,
+        unitId: 'cp',
+        share: [{ unitId: 'gp', unitLabel: 'gp', amount: 1 }],
+      },
     ]);
   });
 });

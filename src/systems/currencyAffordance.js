@@ -39,6 +39,7 @@ import {
 } from './companionContract.js';
 import {
   currencyUnitDisplayName,
+  decomposeBaseAmount,
   findCurrencyUnit,
   formatCurrencyRequirement,
   resolveCurrencyUnitByName,
@@ -1467,12 +1468,30 @@ async function restorePooledDebit({ settled, spender, profile, baseUnit }) {
   return restoredEverything;
 }
 
-/** One ledger row: which actor paid how much of what, and whether it stuck. */
-function pooledLedgerRow(entry, baseUnit, { attempted, settled, message }) {
+/**
+ * One ledger row: which actor paid how much of what, and whether it stuck.
+ *
+ * `amount` is in the TERMINAL BASE UNIT, which every payer's spend is denominated in for the
+ * over-charging reason {@link consumePooledCurrency} states in full. `share` is that same amount
+ * said the way a table says it -- `decomposeBaseAmount`'s exact, integer decomposition down this
+ * ladder -- and the two are the SAME number rather than two figures a reader must reconcile.
+ *
+ * **IT IS ADDED RATHER THAN SUBSTITUTED, and the pairing is the point (issue 1342).** A caller
+ * doing arithmetic wants one scale and reads `amount`; a caller printing a line for a person wants
+ * denominations and reads `share`. Publishing only the decomposition would force every reader to
+ * re-multiply a ladder it may not have, and publishing only the base figure is what left a
+ * companion printing copper beside a cost it asked for in gold.
+ *
+ * The row is built for an UNATTEMPTED payer too, so `share` is computed from what that payer was
+ * PLANNED to pay. That is consistent with `amount` beside it, which has always been the planned
+ * figure on that leg.
+ */
+function pooledLedgerRow(entry, baseUnit, profile, { attempted, settled, message }) {
   const row = {
     ...describePooledActor(entry.reading.actor),
     unitId: baseUnit.id,
     amount: entry.amount,
+    share: decomposeBaseAmount(entry.amount, profile, baseUnit.id),
     attempted: attempted === true,
     settled: settled === true,
   };
@@ -1491,7 +1510,7 @@ async function runPooledDebit({ plan, spender, profile, baseUnit }) {
   let failure = null;
   for (const entry of plan) {
     if (failure !== null) {
-      ledger.push(pooledLedgerRow(entry, baseUnit, { attempted: false, settled: false }));
+      ledger.push(pooledLedgerRow(entry, baseUnit, profile, { attempted: false, settled: false }));
       continue;
     }
     const outcome = await applyPooledSpender({
@@ -1502,7 +1521,7 @@ async function runPooledDebit({ plan, spender, profile, baseUnit }) {
       profile,
       baseUnit,
     });
-    const record = pooledLedgerRow(entry, baseUnit, {
+    const record = pooledLedgerRow(entry, baseUnit, profile, {
       attempted: true,
       settled: outcome.ok,
       message: outcome.message,

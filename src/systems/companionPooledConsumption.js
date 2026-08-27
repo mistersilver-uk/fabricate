@@ -776,12 +776,21 @@ async function takeComponentBucket(bucket, undo) {
   return true;
 }
 
-/** One take line: WHICH document on WHICH actor paid, and how much. */
+/**
+ * One take line: WHICH document on WHICH actor paid, and how much.
+ *
+ * `unitId` and `share` are the CURRENCY arm's fields and a component line carries neither, so both
+ * are answered here as the empty case rather than left off. The published take has one shape on
+ * both arms, which is what lets a reader draw a take without first asking what kind of cost it
+ * came from; {@link module:src/systems/companionContract} states the same rule at the boundary.
+ */
 function allocationTakes(row) {
   return row.allocation.map(({ take, quantity }) => ({
     actorUuid: take.parent?.uuid ?? null,
     documentUuid: take.item?.uuid ?? null,
     quantity,
+    unitId: null,
+    share: [],
   }));
 }
 
@@ -840,10 +849,18 @@ async function takeComponentCosts(buckets, undo) {
  * **A currency take is denominated in the TERMINAL BASE UNIT while the row's `requested` echoes
  * the caller's own denomination**, so on a `gp -> sp -> cp` ladder a 2 gp cost reports
  * `requested: 2` beside `consumed: 200`. The two are deliberately not reconciled. Expressing a
- * payer's share back in the caller's unit would make it fractional — 150 cp is 1.5 gp, and a
- * three-way split of one unit does not sum back to one in floating point — and collapsing the
+ * payer's share back in the caller's SINGLE unit would make it fractional — 150 cp is 1.5 gp, and
+ * a three-way split of one unit does not sum back to one in floating point — and collapsing the
  * lines into a single whole-cost take would discard the per-actor attribution the ledger exists
  * to provide. A coin count is exact; a converted one is not.
+ *
+ * **`unitId` AND `share` ARE WHAT MAKE THAT FIGURE READABLE WITHOUT MAKING IT FRACTIONAL.** The
+ * first names the unit `quantity` is counted in, which the ledger has always known and this
+ * function used to drop on the floor; the second is `decomposeBaseAmount`'s exact integer
+ * decomposition of the same figure down this world's own ladder, so 15000 cp reads *150 gp* and
+ * 15003 cp reads *150 gp 3 cp*. Neither replaces `quantity` — see `pooledLedgerRow`'s own header
+ * in `currencyAffordance.js` for why the base figure and the decomposition are published together
+ * rather than one instead of the other.
  *
  * `documentUuid` is `null` on every line, because the spender never names a document: under
  * `actorProperty` and `macro` there is no item to name at all, and under `actorInventory` the
@@ -856,7 +873,13 @@ async function takeComponentCosts(buckets, undo) {
 function currencyTakes(ledger, keep) {
   return (Array.isArray(ledger) ? ledger : [])
     .filter((entry) => keep(entry))
-    .map((entry) => ({ actorUuid: entry.actorUuid, documentUuid: null, quantity: entry.amount }));
+    .map((entry) => ({
+      actorUuid: entry.actorUuid,
+      documentUuid: null,
+      quantity: entry.amount,
+      unitId: entry.unitId,
+      share: entry.share,
+    }));
 }
 
 /**
