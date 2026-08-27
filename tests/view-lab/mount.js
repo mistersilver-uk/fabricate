@@ -131,9 +131,19 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
-    // World Parties is the one Manager route that remains operable with no selected system.
-    // Clearing through the real admin store after construction reaches that state without
-    // weakening production's persisted-selection normalization.
+    // TWO things, and the name says only the second: a world seeded with NO crafting systems,
+    // and the persisted selection cleared through the real admin store after construction. Both
+    // halves are needed, because a Manager refresh resolves an empty selection back to the first
+    // available system — so only an empty LIBRARY makes 'nothing selected' stable. `buildLabWorld`
+    // is where the first half happens (`content.systems = []`), and clearing through the store
+    // rather than by seeding reaches the second without weakening production's
+    // persisted-selection normalization.
+    //
+    // So this IS the lab's suppress-the-seeded-systems input, as well as its clear-the-selection
+    // one: `manager-world-parties-no-selection` photographs the second half and
+    // `manager-systems-empty` the first. Before adding a param that means the same thing, note
+    // what it would cost — a new param here sits outside every marked region below, so a change
+    // to this file would select surface coverage rather than the frames it moved.
     clearSystem: params.get('clearSystem') === '1',
     // Seed an EMPTY party list, for the World > Parties empty state. It takes no
     // post-construction store call the way `clearSystem` does: the pane's empty state is a

@@ -549,6 +549,38 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-systems-empty',
+    label: 'Manager — System library empty',
+    // `beyond`: the live smoke seeds a crafting system before it opens the manager at all, so no
+    // smoke frame shows the library with nothing in it and there is no counterpart to fall short
+    // of. It is also the first screen a new installation draws, which is why it earns a frame
+    // despite having no twin.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // NO new lab input, and that is the finding rather than a shortcut. `clearSystem` already
+    // empties the world's crafting systems — `buildLabWorld` sets `content.systems = []` for it,
+    // because a real Manager refresh resolves an empty SELECTION back to the first available
+    // system and only an empty LIBRARY makes "nothing selected" stable. So the state this case
+    // photographs was already reachable from the query layer, and a second flag meaning the same
+    // thing would only have widened what a `mount.js` change selects.
+    query: { clearSystem: '1' },
+    steps: [],
+    expectView: 'systems',
+    // Both halves of what this frame is named for, in one assertion. The `:has()` requires the
+    // browse pane's dashed empty panel — and not its LOADING twin, which carries
+    // `data-systems-loading` and draws a setup card of its own — while the subject requires the
+    // first-run panel the inspector column renders only while the world holds no system at all.
+    expectSelector:
+      '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
+      ' .manager-setup-card',
+    kinds: ['manager', 'systems'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-selected-normal',
     label: 'Manager — Selected normal',
     smokeLabels: ['manager-selected-normal'],
@@ -3526,6 +3558,42 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/],
   }),
   managerCase({
+    id: 'manager-environment-edit-events',
+    label: 'Manager — Environment edit Events tab',
+    smokeLabels: ['manager-environment-edit-events'],
+    // `exact`: the smoke's own walk clicks this tab and photographs it without selecting anything,
+    // and so does this. The editor auto-selects the first available record of the tab's kind, so
+    // both frames carry a populated event inspector for the same reason.
+    reaches: 'exact',
+    // No fixture change. Sunlit Grove composes automatically and the two herbalism library events
+    // carry no biome or danger tags, so both match it: the Included list holds them, Excluded and
+    // Non-matching read zero. A zero there is the composition rule working, not a gap in the
+    // world — a matching-tagged event would have to be authored to make it read anything else,
+    // and that would be a `tests/view-lab/world/` change reaching every frame in the corpus.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-events' },
+    ],
+    expectView: 'environment-edit',
+    // The route survives a tab click that did nothing, so the assertion names the tab panel AND
+    // the inspector the auto-selection populates. Without the second half a frame of the Events
+    // tab with an empty inspector — the state a broken auto-selection produces — would publish
+    // under a name promising the composed event beside its matching evidence.
+    expectSelector:
+      '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-row.is-selected)' +
+      ' [data-record-inspector="event"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-gathering-events-normal',
     label: 'Manager — Gathering events normal',
     smokeLabels: ['manager-gathering-events-normal'],
@@ -4505,6 +4573,33 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-settings-normal',
+    label: 'Manager — Gathering settings as authored',
+    smokeLabels: ['manager-gathering-settings'],
+    // `exact`: the smoke reaches this tab by the same two gestures and photographs it without
+    // touching a control, which is the whole point of the frame — the settings a GM finds, not a
+    // state a walk drove them into.
+    reaches: 'exact',
+    // DELIBERATELY not `manager-gathering-economy-actors`, which reaches the same tab. That case
+    // enables the Stamina limitation, fills a maximum, rolls a pool and then scrolls the panel to
+    // the actor table, so it shows a driven state of a region far below this one. A documentation
+    // frame of the resolution and limitation cards has to be the untouched page.
+    query: { system: 'lab-herbalism' },
+    steps: ['Gathering', { selector: '#manager-gathering-nav-settings' }],
+    expectView: 'environments',
+    // The resolution-mode card, which sits above the limitation card and is the top of the page
+    // this frame is framed on. Named rather than left to `expectView` because the route key is the
+    // environments route for every gathering sub-tab, so the view assertion alone cannot tell this
+    // tab from the browser it opens on.
+    expectSelector:
+      '.fabricate-manager [data-gathering-resolution-card] [data-gathering-resolution-mode]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
     ],
   }),
   managerCase({
