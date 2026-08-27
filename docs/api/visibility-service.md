@@ -162,7 +162,7 @@ This is the shared deletion primitive behind erasing a single recipe, resetting 
 When `freeLearnBudget` is `true`, a cleared entry frees one consumed learn slot only when four things all hold: it names a source book, the actor still holds that book, the recipe still resolves, and that book actually caps learning.
 An entry failing any of the first three is an orphan case and gets no budget math at all: an auto-learned entry (no recorded source book), a source book the actor no longer holds, or a recipe id that no longer resolves.
 The fourth is not an orphan case: the source book is present and the recipe resolves, so the decrement runs, but an uncapped book's learn count was never incremented in the first place, so the decrement has nothing to give back.
-See [Knowledge]({% link visibility.md %}#learned-recipes-tab) for how the Knowledge surface states this to a GM before they erase a row.
+See [Knowledge]({% link crafting/knowledge.md %}#learned-recipes-tab) for how the Knowledge surface states this to a GM before they erase a row.
 
 **Returns:** `Promise<{ success: boolean, count: number }>`
 
@@ -196,7 +196,7 @@ It never throws.
 It returns `{ success, message, messageData }` so a macro can branch on the outcome and localize `message` at the presentation boundary.
 The Knowledge surface's per-character reset control, in the Crafting Admin panel, routes through this same facade for both of its reset grains.
 It remains available to macros and the console for the same reset outside that UI.
-See [Visibility & Knowledge]({% link visibility.md %}#resetting-a-characters-knowledge) for the GM-facing surface.
+See [Visibility & Knowledge]({% link crafting/knowledge.md %}#resetting-a-characters-knowledge) for the GM-facing surface.
 
 ### GM knowledge grant facade
 

@@ -71,15 +71,42 @@ export const DND5E_CHARACTER_PREREQUISITE_PRESETS = buildPresetBundle({
 });
 
 /**
- * Pathfinder 2e prerequisite presets. Paths assume the Foundry `pf2e` actor
- * roll-data shape (`@skills.<key>.rank`, proficiency ranks 0–4).
+ * Pathfinder 2e prerequisite presets.
+ *
+ * EVERY PATH HERE IS ROOTED AT `actor.`, and that is not a style choice. `pf2e`'s
+ * `ActorPF2e#getRollData()` returns `{ actor: this }` and NOTHING else — it does not
+ * spread `system` onto the roll data the way `dnd5e` does. A bare `skills.…` path is
+ * therefore unresolvable in every `pf2e` world, and because
+ * {@link evaluatePrerequisite} degrades an unknown path to `0` rather than throwing,
+ * it fails as a condition that can simply never be met. These presets carried bare
+ * paths until this was found, so a seeded `pf2e` world silently blocked recipe
+ * learning and Tool use with one console warning and nothing on screen.
+ *
+ * Two further shape facts, both verified against `pf2e` source rather than inferred:
+ *
+ * - Skill keys are FULL SLUGS (`crafting`), never the three-letter abbreviations the
+ *   `dnd5e` bundle uses (`cra`). See `CORE_SKILL_SLUGS` in `pf2e`'s `actor/values.ts`.
+ * - Proficiency `rank` lives on the PREPARED statistic (`actor.skills.<slug>.rank`,
+ *   `ZeroToFour | null`), NOT under `system.skills`. A `pf2e` skill's trace data
+ *   carries `value`, `totalModifier`, `dc` and `attribute` — no `rank` — which is why
+ *   `actor.system.skills.crafting.rank` is just as dead as the bare form on every
+ *   `pf2e` revision checked (`master` at the time of writing).
+ *   `resolveRollDataPath` walks plain properties, and reaches the prepared statistic
+ *   through the `actor` reference the roll data hands it.
+ *
+ * Ability modifiers DO live under `system` (`AbilityData.mod`), so `strongEnough`
+ * roots at `actor.system.abilities.…` and agrees with the sibling modifier bundle's
+ * `@actor.system.abilities.str.mod`.
+ *
+ * `tests/character-prerequisites.test.js` pins all three shapes so this cannot drift
+ * back.
  *
  * @type {ReadonlyArray<object>}
  */
 export const PF2E_CHARACTER_PREREQUISITE_PRESETS = buildPresetBundle({
-  trainedInCrafting: { path: 'skills.cra.rank', op: 'gte', value: 1 },
-  expertCrafter: { path: 'skills.cra.rank', op: 'gte', value: 2 },
-  strongEnough: { path: 'abilities.str.mod', op: 'gte', value: 2 },
+  trainedInCrafting: { path: 'actor.skills.crafting.rank', op: 'gte', value: 1 },
+  expertCrafter: { path: 'actor.skills.crafting.rank', op: 'gte', value: 2 },
+  strongEnough: { path: 'actor.system.abilities.str.mod', op: 'gte', value: 2 },
 });
 
 /**

@@ -13123,7 +13123,7 @@
               >
                 <ManagerButton
                   tag="a"
-                  href="https://mistersilver-uk.github.io/fabricate/gathering-environments"
+                  href="https://mistersilver-uk.github.io/fabricate/gathering/environments"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -13137,7 +13137,7 @@
                 </ManagerButton>
                 <ManagerButton
                   tag="a"
-                  href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                  href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -13287,7 +13287,7 @@
                 </ManagerButton>
                 <ManagerButton
                   tag="a"
-                  href="https://mistersilver-uk.github.io/fabricate/effect-transfer"
+                  href="https://mistersilver-uk.github.io/fabricate/essences/effect-transfer"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -13420,7 +13420,7 @@
               >
                 <ManagerButton
                   tag="a"
-                  href="https://mistersilver-uk.github.io/fabricate/crafting-systems#components"
+                  href="https://mistersilver-uk.github.io/fabricate/components/"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -13434,7 +13434,7 @@
                 </ManagerButton>
                 <ManagerButton
                   tag="a"
-                  href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                  href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -13734,7 +13734,7 @@
             >
               <ManagerButton
                 tag="a"
-                href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
                 target="_blank"
                 rel="noreferrer"
               >

@@ -23,7 +23,7 @@
  *    section excludes — and `setEnvironmentCompositionMode` clears nothing when a GM flips a
  *    mode. An automatic force entry is therefore residue from a manual editing session or
  *    from an imported bundle; it composed nothing before this migration and it must compose
- *    nothing after it, which is what keeps `docs/gathering-environments.md`'s documented
+ *    nothing after it, which is what keeps `docs/gathering/environments.md`'s documented
  *    guarantee true: switching from manual to automatic does not silently make force-added
  *    non-matching records available.
  *

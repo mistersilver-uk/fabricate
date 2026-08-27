@@ -826,7 +826,7 @@
       {/if}
       <ManagerButton
         tag="a"
-        href="https://mistersilver-uk.github.io/fabricate/recipes"
+        href="https://mistersilver-uk.github.io/fabricate/crafting/recipes/"
         target="_blank"
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
@@ -834,7 +834,7 @@
       </ManagerButton>
       <ManagerButton
         tag="a"
-        href="https://mistersilver-uk.github.io/fabricate/quickstart"
+        href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>

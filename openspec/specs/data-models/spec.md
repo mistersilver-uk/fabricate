@@ -1134,7 +1134,8 @@ CharacterPrerequisite = {
   id: string,     // stable reference stored by caps.learn.characterPrerequisiteIds
   name: string,   // GM label; defaults to "Prerequisite"
   icon: string,   // Font Awesome glyph; defaults to "fa-solid fa-user-shield"
-  path: string,   // dotted key into actor.getRollData(), stored WITHOUT a leading @ (e.g. "skills.cra.rank")
+  path: string,   // dotted key into actor.getRollData(), stored WITHOUT a leading @
+                  // (dnd5e: "skills.arc.value"; pf2e: "actor.skills.crafting.rank")
   op: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "isTrue" | "isFalse" | "exists", // default "gte"
   value: * | null, // comparand; forced to null for the valueless operators (isTrue/isFalse/exists)
 }
@@ -1148,7 +1149,10 @@ CharacterPrerequisite = {
 2. `op` is one of the nine word tokens above; an unknown or missing token normalizes to `"gte"`.
    The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
 3. `path` is stored WITHOUT a leading `@` (the `@` is a display/authoring affordance only); a leading `@` on input is stripped on normalization.
-   It is resolved at runtime as a dotted traversal of `actor.getRollData()`, which Foundry has already flattened (`skills.cra.rank` in pf2e, `skills.arc.value` in dnd5e).
+   It is resolved at runtime as a dotted traversal of `actor.getRollData()`.
+   WHAT THAT OBJECT CARRIES IS THE GAME SYSTEM'S CHOICE, and the two systems Fabricate ships presets for do not agree: `dnd5e` spreads `system` onto its roll data, so a bare `skills.arc.value` resolves, while `pf2e` returns `{ actor }` alone, so every `pf2e` path MUST be rooted at `actor.`.
+   Foundry itself flattens nothing; an earlier revision of this requirement said it did, and three shipped `pf2e` presets written against that claim could never be satisfied.
+   A path that names PREPARED state rather than stored data (`actor.skills.<slug>.rank`) resolves only against a live document, so callers MUST pass `actor.getRollData()` and MUST NOT pass a cloned or serialized projection.
 4. Evaluation is pure and Foundry-free (`evaluatePrerequisite` / `evaluatePrerequisites`).
    An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
    `evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.

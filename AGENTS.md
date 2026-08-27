@@ -17,7 +17,7 @@ See `openspec/README.md` for the block format and rules.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
-- Route quick-start documentation changes to `docs/quickstart.md` only.
+- Route quick-start documentation changes to `docs/help/quickstart.md` only.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 
 ## Default Agentic Workflow

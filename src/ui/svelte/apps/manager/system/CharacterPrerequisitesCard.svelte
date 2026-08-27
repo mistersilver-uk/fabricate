@@ -277,7 +277,7 @@
                       <input
                         type="text"
                         value={entry.path}
-                        placeholder="skills.cra.rank"
+                        placeholder="abilities.int.mod"
                         data-prerequisite-path
                         oninput={(event) => onUpdate(entry.id, { path: event.currentTarget.value })}
                       />

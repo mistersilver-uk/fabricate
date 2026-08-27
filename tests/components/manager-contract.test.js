@@ -1822,7 +1822,7 @@ describe('CraftingSystemManager source contract', () => {
       'no-systems inspector should use localized setup copy'
     );
     assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/quickstart'),
+      rootSource.includes('https://mistersilver-uk.github.io/fabricate/help/quickstart'),
       'no-systems inspector should link to the published quickstart'
     );
     assert.ok(
@@ -1841,7 +1841,7 @@ describe('CraftingSystemManager source contract', () => {
       'empty environments inspector should use localized setup copy'
     );
     assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering-environments'),
+      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering/environments'),
       'empty environments inspector should link to published gathering docs'
     );
     assert.equal(
@@ -2018,7 +2018,7 @@ describe('CraftingSystemManager source contract', () => {
       'empty recipes inspector should use localized setup copy'
     );
     assert.ok(
-      recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'),
+      recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/crafting/recipes/'),
       'empty recipes inspector should link to published recipe docs'
     );
     assert.ok(
@@ -2046,7 +2046,7 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(
       rootSource.includes(
-        'https://mistersilver-uk.github.io/fabricate/crafting-systems#components'
+        'https://mistersilver-uk.github.io/fabricate/components/'
       ),
       'empty components inspector should link to published component docs'
     );

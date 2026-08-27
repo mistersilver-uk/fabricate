@@ -49,7 +49,7 @@ You only need to follow the steps below to install it:
 
 ## Quick Start
 
-See [quickstart](https://mistersilver-uk.github.io/fabricate/quickstart.html) for a step-by-step guide.
+See [quickstart](https://mistersilver-uk.github.io/fabricate/help/quickstart.html) for a step-by-step guide.
 
 ## Documentation
 

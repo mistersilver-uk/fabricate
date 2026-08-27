@@ -1,7 +1,7 @@
 ---
 layout: default
 title: API Reference
-nav_order: 9
+nav_order: 17
 has_children: true
 ---
 
@@ -461,7 +461,7 @@ Hooks.once('fabricate.ready', async () => {
 
 The flags map onto the rich-state service accessors `staminaEnabled(systemId)` and `nodesEnabled(systemId)` (the single read used by enforcement, world-time regen/respawn drivers, and every UI surface).
 The derived `economyMode(systemId)` accessor is retained for back-compat and now returns `'both' | 'stamina' | 'nodes' | 'none'` (the `'both'` value is new in `0.8.0`).
-Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering-environments.md %}#gathering-limitations)).
+Worlds upgraded from before `0.8.0` have their legacy `economy.mode` enum migrated into these flags automatically (see [Gathering Limitations]({% link gathering/settings.md %}#gathering-limitations)).
 
 ### Realms, Parties, And Location
 
@@ -494,7 +494,7 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-See [Gathering Realms & Travel]({% link gathering-realms.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
+See [Gathering Realms & Travel]({% link world/travel/index.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
 
 ### Icon Vocabulary
 

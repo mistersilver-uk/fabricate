@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Tools
-nav_order: 5
+nav_order: 9
 ---
 
 # Tools
@@ -64,6 +64,14 @@ An invalid or failed save keeps the editor open and moves attention to **Validat
 Validation and operation failures use safe descriptions instead of technical error details.
 Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
 
+Because the library is a draft-and-save surface, your edits are held until you save, leaving with unsaved edits prompts before discarding, and a notice appears if someone else changed the Tool list while you were editing it.
+
+A Tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
+The Save button stays disabled until every Tool is valid; hover it to see the first failing reason.
+Tools belong to the crafting system that owns them and cannot be shared across systems.
+A gathering task, recipe, or salvage configuration only references them.
+See [Tools]({% link gathering/tasks.md %}#tools) for how a gathering task does that.
+
 ## Presence and prerequisites
 
 Every referenced Tool must be enabled and present before the activity can begin.
@@ -78,7 +86,7 @@ A loosely recognized copy can satisfy presence while being spared from usage and
 {: .note }
 
 > Use **Repair Item Data** or issue a fresh copy from the source Item when a Tool is present but does not track use or break.
-> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
+> See [Tools Not Breaking or Tracking Usage]({% link help/troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
 The **Requirements** tab can apply shared character prerequisites defined for the crafting system.
 Every selected prerequisite is required.
@@ -91,6 +99,9 @@ Choose what happens when those prerequisites fail:
 - **Bonus is withheld** keeps the Tool usable but suppresses its numeric bonus.
 
 ## Tool check bonuses
+
+A Tool's bonus is a roll expression.
+See [Expressions]({% link expressions.md %}) for the syntax, and for the one respect in which this field differs from every other expression field in Fabricate.
 
 Enable **Tool check bonus** in the **Requirements** tab and enter a bonus expression.
 The expression is evaluated against the actor who supplies the Tool.
@@ -124,7 +135,7 @@ Authority decides whether Tool-specific settings or the active check controls br
 The Tool's **Breakable** or **Immune** choice decides whether it participates in check-driven breakage.
 The **On-break action** decides what happens after a break.
 
-See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-triggers) for check-driven setup.
+See [Tool breakage triggers]({% link checks/crafting.md %}#tool-breakage-triggers) for check-driven setup.
 
 ## Tool-specific breakage mechanics
 
@@ -222,11 +233,11 @@ Gathering Tools stored by early versions are also reconciled into the system lib
 
 ## See Also
 
-- [Recipes]({% link recipes/index.md %}).
+- [Recipes]({% link crafting/recipes/index.md %}).
   Configure recipe Tool requirements and bonus modes.
-- [Degrading Tools]({% link how-to/degrading-tools.md %}).
+- [Degrading Tools]({% link help/how-to/degrading-tools.md %}).
   Build a Tool that wears out through repeated crafting.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}).
   Apply the shared Tool setup to gathering.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
   Provide virtual Tool presence from a Scene Region station.

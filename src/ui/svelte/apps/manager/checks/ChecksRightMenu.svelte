@@ -211,10 +211,12 @@
   // parity): the prototype has no such card, and it pushed every panel with a subject —
   // the activation switch, the preview, the digest — below the fold.
   const DOCS_LINKS = {
-    crafting: `${DOCS_BASE}/crafting-checks`,
-    salvage: `${DOCS_BASE}/salvage`,
-    gathering: `${DOCS_BASE}/gathering-environments`,
-    validation: `${DOCS_BASE}/crafting-checks`,
+    crafting: `${DOCS_BASE}/checks/crafting`,
+    salvage: `${DOCS_BASE}/checks/salvage`,
+    gathering: `${DOCS_BASE}/checks/gathering`,
+    // Validation has no page of its own; the Checks root is where the shared editor's
+    // validation behaviour is documented.
+    validation: `${DOCS_BASE}/checks/`,
   };
   const docsHref = $derived(DOCS_LINKS[activeTab] || DOCS_LINKS.crafting);
   const docsLabel = text('FABRICATE.Admin.Manager.Checks.Documentation', 'Documentation');
@@ -470,7 +472,7 @@
     </a>
     <a
       class="manager-checks-rail-link"
-      href={`${DOCS_BASE}/quickstart`}
+      href={`${DOCS_BASE}/help/quickstart`}
       target="_blank"
       rel="noreferrer"
       data-checks-quickstart-link

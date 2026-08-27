@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Canvas Interactables
-nav_order: 8.2
+nav_order: 15
 ---
 
 # Canvas Interactables
@@ -13,7 +13,7 @@ There are two kinds of interactable:
 
 - **Tool station** is a placed [Tool]({% link tools.md %}).
   Activating it opens the Fabricate **Crafting** tab with that station's Tool **present as a virtual tool**, so a player can use the Tool without owning a copy of the item (think of the forge belonging to the smithy, not the smith).
-- **Gathering-task shortcut** is a placed [Gathering Task]({% link gathering-environments.md %}).
+- **Gathering-task shortcut** is a placed [Gathering Task]({% link gathering/index.md %}).
   Activating it opens the gathering UI scoped to, and auto-selecting, a specific environment and task.
   It is a pure shortcut.
   It reads and draws down that **environment's own gathering supply**, exactly as if the player had opened gathering and picked that environment and task by hand.
@@ -225,7 +225,7 @@ Because there is a single source of truth, this follows:
 ### Depletion and respawn
 
 Running out of supply, and having it come back as time advances, are owned **entirely by the environment**.
-See [Gathering Environments]({% link gathering-environments.md %}).
+See [Gathering Environments]({% link gathering/index.md %}).
 The interactable carries no supply of its own.
 
 The marker, however, reflects that shared supply.
@@ -347,5 +347,5 @@ Run `game.fabricate.cleanupInteractables()` to strip them, then uninstall.
 ## See Also
 
 - [Tools]({% link tools.md %}) is the system-owned Tool model that backs Tool stations.
-- [Gathering Environments]({% link gathering-environments.md %}) is where you author the tasks and environments that gathering-task shortcuts reference, and where node availability, depletion, and respawn actually live.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) is a worked example of a tool that wears out.
+- [Gathering Environments]({% link gathering/index.md %}) is where you author the tasks and environments that gathering-task shortcuts reference, and where node availability, depletion, and respawn actually live.
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}) is a worked example of a tool that wears out.

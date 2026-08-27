@@ -43,11 +43,11 @@ When `craft()` is called, the engine:
    If essences are enabled, checks essence requirements.
 4. **Runs crafting check.**
    When the resolution mode has a usable check (an authored roll formula), rolls it and interprets the result per the resolution mode.
-   See [Crafting Checks]({% link crafting-checks.md %}).
+   See [Crafting Checks]({% link checks/crafting.md %}).
 5. **Applies failure consumption policy.**
    If the check fails, consumes ingredients and/or applies tool breakage according to `craftingCheck.consumption` settings.
    By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and tools are not broken (`breakToolsOnFail: false`, renamed from the legacy `consumeCatalystsOnFail`).
-   See [Failure consumption policy]({% link crafting-checks.md %}#failure-consumption-policy).
+   See [Failure consumption policy]({% link checks/crafting.md %}#what-a-failure-costs).
 6. **Resolves result groups.**
    Determines which result group(s) to create based on mode and check result.
 7. **Consumes ingredients.**
@@ -61,11 +61,11 @@ When `craft()` is called, the engine:
     Requires `system.features.essences` for the per-essence half.
     A macro whose return cannot be applied, or an essence macro whose own body throws, is skipped in isolation, leaving every other essence macro and the result's own macro unaffected.
     Only a script Macro runs; a non-script or unresolvable `propertyMacroUuid` is skipped silently.
-    See [Essences]({% link essences.md %}#the-essence-property-macro).
+    See [Essences]({% link essences/index.md %}#the-essence-property-macro).
 11. **Transfers effects.**
     If `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing, **enabled** essence definition and copies them to the result item.
     A disabled essence's active effects are never collected.
-    See [Effect Transfer]({% link effect-transfer.md %}).
+    See [Effect Transfer]({% link essences/effect-transfer.md %}).
 
 {: .note }
 > Step 5 only executes when the crafting check returns a failure result or check-result validation fails.
@@ -192,7 +192,7 @@ const nonTransferRecipe = {
 ```
 
 **Essence definitions drive which effects are transferred.** If the resolved ingredients contribute a "fire" essence, and the system has a Fire essence definition with a `sourceItemUuid` pointing to a "Flame Shard" item, all active effects on that Flame Shard are copied to the result.
-See [Essences]({% link essences.md %}) for how to configure essence definitions with source items.
+See [Essences]({% link essences/index.md %}) for how to configure essence definitions with source items.
 
 ### Example
 

@@ -6,11 +6,27 @@
  * `value` comparand.
  *
  * This module is intentionally Foundry-free so it can be unit-tested in
- * isolation. At runtime the caller passes `actor.getRollData()` as `rollData`;
- * Foundry has already resolved the system's shortcut keys (`skills.cra.rank` in
- * pf2e, `skills.arc.value` in dnd5e) onto that object. A mistyped or unknown
- * path never throws — it degrades to `0` (numeric operators) or `false`
- * (boolean/existence operators) and logs a single console warning.
+ * isolation. At runtime the caller passes `actor.getRollData()` as `rollData`.
+ *
+ * WHAT IS ON THAT OBJECT IS THE GAME SYSTEM'S CHOICE, and the two systems
+ * Fabricate ships presets for do not agree. `dnd5e` spreads `system` onto its
+ * roll data, so a bare `skills.arc.value` resolves. `pf2e` does not: its
+ * `getRollData()` returns `{ actor: this }` alone, so every `pf2e` path must be
+ * rooted at `actor.` (`actor.skills.crafting.rank`). This docstring previously
+ * asserted that Foundry resolves shortcut keys for both, which is what produced
+ * three shipped `pf2e` presets that could never be satisfied.
+ *
+ * A mistyped or unknown path never throws — it degrades to `0` (numeric
+ * operators) or `false` (boolean/existence operators) and logs a single console
+ * warning. That is deliberate, but it is also why a wrong path is invisible:
+ * prefer pinning a new preset's shape in a test over trusting it by eye.
+ *
+ * ONE CONSEQUENCE FOR CALLERS. A `pf2e` path reaches PREPARED state through the
+ * `actor` reference the roll data carries, so it resolves only against a live
+ * document. Every call site spells `actor?.getRollData?.() ?? actor?.system ?? {}`;
+ * that fallback yields an object with no `actor` key, under which every `pf2e` path
+ * reads 0 again — silently, per the rule above. Pass `getRollData()` output, never a
+ * cloned or serialized projection of it.
  */
 
 /**
@@ -225,7 +241,7 @@ export function evaluatePrerequisites(rollData, prereqs, options = {}) {
 
 /**
  * Render the collapsed-header / message preview string, e.g.
- * `@skills.cra.rank ≥ 2` or (valueless) `@flags.attuned is true`.
+ * `@skills.arc.value ≥ 1` or (valueless) `@flags.attuned is true`.
  *
  * @param {{path?: string, op?: string, value?: *}} prereq The prerequisite.
  * @returns {string} The `@path op value` preview.

@@ -3538,9 +3538,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       'both the docs link and the Quickstart survive'
     );
     const craftingDocs = craftingHelp.querySelector(
-      'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
+      'a[href="https://mistersilver-uk.github.io/fabricate/checks/crafting"]'
     );
-    assert.ok(craftingDocs, 'crafting help card links to the crafting-checks docs page');
+    assert.ok(craftingDocs, 'crafting help card links to the crafting checks docs page');
     assert.equal(craftingDocs.getAttribute('target'), '_blank');
     assert.equal(craftingDocs.getAttribute('rel'), 'noreferrer');
     assert.ok(
@@ -3565,7 +3565,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target
         .querySelector('[data-checks-help="salvage"]')
-        ?.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/salvage"]'),
+        ?.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/checks/salvage"]'),
       'salvage help card links to the salvage docs page'
     );
 
@@ -3589,9 +3589,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       target
         .querySelector('[data-checks-help="gathering"]')
         ?.querySelector(
-          'a[href="https://mistersilver-uk.github.io/fabricate/gathering-environments"]'
+          'a[href="https://mistersilver-uk.github.io/fabricate/checks/gathering"]'
         ),
-      'gathering help card links to the gathering docs page'
+      'gathering help card links to the gathering checks docs page'
     );
 
     // Validation spans the full width with no context menu.
@@ -4116,12 +4116,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     const cases = [
       {
         activeTab: 'crafting',
-        href: 'https://mistersilver-uk.github.io/fabricate/crafting-checks',
+        href: 'https://mistersilver-uk.github.io/fabricate/checks/crafting',
       },
-      { activeTab: 'salvage', href: 'https://mistersilver-uk.github.io/fabricate/salvage' },
+      { activeTab: 'salvage', href: 'https://mistersilver-uk.github.io/fabricate/checks/salvage' },
       {
         activeTab: 'gathering',
-        href: 'https://mistersilver-uk.github.io/fabricate/gathering-environments',
+        href: 'https://mistersilver-uk.github.io/fabricate/checks/gathering',
       },
     ];
     for (const { activeTab, href } of cases) {
@@ -4145,7 +4145,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       );
       assert.deepEqual(
         linkHrefs,
-        [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
+        [href, 'https://mistersilver-uk.github.io/fabricate/help/quickstart'],
         `${activeTab} rail keeps both its docs page and the Quickstart`
       );
       for (const anchor of linkRow.querySelectorAll('a')) {
