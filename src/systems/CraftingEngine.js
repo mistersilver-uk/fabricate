@@ -5365,7 +5365,6 @@ export class CraftingEngine {
 
     try {
       await ChatMessage.create({
-        user: game.user?.id,
         speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
         content,
       });
@@ -5543,7 +5542,6 @@ export class CraftingEngine {
 
     try {
       await ChatMessage.create({
-        user: game.user?.id,
         speaker: ChatMessage.getSpeaker({ actor }),
         content,
       });

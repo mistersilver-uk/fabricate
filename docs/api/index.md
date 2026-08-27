@@ -906,6 +906,16 @@ A partly-paid downtime cost is worse than an unpaid one.
 `consumed` is summed from the rows, which are summed from their own takes, so no two published figures can disagree.
 Read it as a four-way discrimination, because `success` alone cannot carry it:
 
+**A take's `quantity` is not in the unit you asked in, and two fields on the take say so.**
+A currency cost is settled per payer in the world's **terminal base unit**, because expressing each payer's slice in a higher denomination would over-charge the pool by up to `baseValue - 1` per payer.
+So a row echoing `requested: 250` in gold sits beside takes counted in copper, and printing one next to the other prints nonsense.
+
+- `take.unitId` names the unit `take.quantity` is counted in — `null` on a **component** take, which is a count of things and has no unit.
+- `take.share` is that same figure decomposed down your world's own ladder into whole coins: `15003` base units reads `[{unitId: 'gp', unitLabel: 'gp', amount: 150}, {unitId: 'cp', unitLabel: 'cp', amount: 3}]`. `[]` on a component take.
+
+Both arms answer both fields, so you can draw a take without first asking what kind of cost produced it.
+Use `share` for anything a person reads and `quantity` for anything you do arithmetic on; they are the same number, and the decomposition sums back to it exactly.
+
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | What the answer says | What actually happened |

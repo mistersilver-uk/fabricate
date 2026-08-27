@@ -635,6 +635,60 @@ export function currencyTotalForBase(balances, profile, baseUnitId) {
   return total;
 }
 
+/**
+ * A base-unit amount expressed in the DENOMINATIONS A TABLE ACTUALLY SPEAKS (issue 1342).
+ *
+ * The inverse of {@link currencyTotalForBase}, and the reason it exists is a seam rather than a
+ * convenience. A pooled currency take is settled and reported in the world's TERMINAL BASE UNIT —
+ * `pooledLedgerRow` in `currencyAffordance.js` stamps every payer's line with `baseUnit.id` — while
+ * the caller asked in its own denomination. So a 250 gp cost split across three sheets comes back
+ * as three copper figures, and a companion drawing them beside the request it made prints
+ * "250 gp: 15000, 10000, 0" over three different scales.
+ *
+ * Expressing a payer's share back in the CALLER's single unit is the thing this deliberately does
+ * NOT do, and `companionPooledConsumption.js` records why: 150 cp is 1.5 gp, and a three-way split
+ * of one coin does not sum back to one in floating point. A DECOMPOSITION has neither problem. It
+ * is exact in integers, it sums back to the base amount by construction, and it is how a person
+ * would say the number out loud.
+ *
+ * ## GREEDY, LARGEST FIRST, AND THE TIE-BREAK IS THE ONE THIS MODULE ALREADY USES
+ *
+ * The ordering is `buildSpendLadders`' own — descending `baseValue`, then `id` — so a world with
+ * two units of equal value decomposes the same way it spends. `distributeChange` above is the same
+ * walk over the same ordering; this returns the tally rather than writing balances.
+ *
+ * ## IT ANSWERS THE UNITS OF ONE LADDER ONLY
+ *
+ * Units are filtered to those sharing `baseUnitId`, exactly as `currencyTotalForBase` filters, so a
+ * world running two unrelated ladders cannot have one bleed into the other's change. A `baseUnitId`
+ * naming no terminal unit answers `[]` rather than inventing a denomination for the amount.
+ *
+ * @param {number} baseAmount The amount, counted in the terminal base unit.
+ * @param {{units: object[], metadata: Map<string, {baseUnitId: string, baseValue: number}>}} profile
+ * @param {string} baseUnitId The terminal base unit the amount is counted in.
+ * @returns {Array<{unitId: string, unitLabel: string, amount: number}>} Largest denomination
+ *   first, omitting every unit that takes none of it; `[]` for a non-positive or unresolvable
+ *   amount.
+ */
+export function decomposeBaseAmount(baseAmount, profile, baseUnitId) {
+  let remaining = Math.trunc(Number(baseAmount) || 0);
+  if (remaining <= 0) return [];
+  const ladder = (profile?.units || [])
+    .filter((unit) => profile?.metadata?.get(unit.id)?.baseUnitId === baseUnitId)
+    .map((unit) => ({ unit, value: profile.metadata.get(unit.id).baseValue }))
+    .filter((entry) => Number.isFinite(entry.value) && entry.value > 0)
+    .sort((left, right) => right.value - left.value || left.unit.id.localeCompare(right.unit.id));
+  const share = [];
+  for (const { unit, value } of ladder) {
+    const count = Math.floor(remaining / value);
+    if (count <= 0) continue;
+    share.push({ unitId: unit.id, unitLabel: currencyUnitDisplayName(unit), amount: count });
+    remaining -= count * value;
+    if (remaining <= 0) break;
+  }
+  return share;
+}
+
 function distributeChange(balances, amount, unitsByValue) {
   let remaining = amount;
   for (const { unit, value } of unitsByValue) {

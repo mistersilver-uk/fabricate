@@ -1382,14 +1382,59 @@ const ATTEMPTED_CONSUME_OUTCOMES = Object.freeze([
  * numeric property rather than as an item, which is the majority case: there is no document to
  * name, and `null` says so where `undefined` would not survive a log.
  *
+ * ## `quantity` IS NOT IN THE UNIT THE CALLER ASKED IN, AND `unitId` IS WHY IT CAN BE READ ANYWAY
+ *
+ * A currency take is settled in the world's TERMINAL BASE UNIT for the over-charging reason
+ * `consumePooledCurrency` states in full, while the ROW beside it echoes `requested` in the
+ * caller's own denomination. So `quantity` and `requested` are two scales, and a companion that
+ * printed one beside the other printed nonsense — this is exactly the defect these two fields
+ * close (issue 1342).
+ *
+ * - `unitId` names the unit `quantity` is counted in; `null` on a COMPONENT take, which is a count
+ *   of things and has no unit at all.
+ * - `share` is that same amount decomposed down this world's ladder into whole coins — 15003 base
+ *   units on a `gp -> sp -> cp` world reads `150 gp, 3 cp`. `[]` on a component take, and `[]` for
+ *   an amount that decomposes to nothing.
+ *
+ * **BOTH ARMS ANSWER BOTH FIELDS**, which is the shape rule rather than an accident of the
+ * currency arm being written second: a reader draws a take without first asking what kind of cost
+ * produced it, and a component line that simply omitted them would make `take.unitId` mean
+ * *component* on one row and *unreadable* on the next.
+ *
+ * `share` is DEEP-frozen, on the same rule the ledger's own `takes` is: a published array a caller
+ * can push into is a published array a caller will eventually be found pushing into.
+ *
  * @param {object} take the member's INTERNAL record of one document's contribution
- * @returns {Readonly<{actorUuid: string|null, documentUuid: string|null, quantity: number}>}
+ * @returns {Readonly<{actorUuid: string|null, documentUuid: string|null, quantity: number,
+ *   unitId: string|null, share: ReadonlyArray<object>}>}
  */
 function pooledConsumptionTake(take) {
   return Object.freeze({
     actorUuid: typeof take?.actorUuid === 'string' ? take.actorUuid : null,
     documentUuid: typeof take?.documentUuid === 'string' ? take.documentUuid : null,
     quantity: Number.isFinite(take?.quantity) ? take.quantity : 0,
+    unitId: typeof take?.unitId === 'string' ? take.unitId : null,
+    share: Object.freeze(
+      (Array.isArray(take?.share) ? take.share : []).map((entry) => pooledConsumptionShare(entry))
+    ),
+  });
+}
+
+/**
+ * Build one frozen denomination line of a currency take's {@link pooledConsumptionTake} `share`.
+ *
+ * Normalised the way every other published leaf is, because this one crosses out of the currency
+ * ladder's own arithmetic into a companion's chat card: a `unitLabel` is a string a GM authored on
+ * a world currency unit, and an `amount` that is not a finite number is not a coin count.
+ *
+ * @param {object} entry
+ * @returns {Readonly<{unitId: string|null, unitLabel: string, amount: number}>}
+ */
+function pooledConsumptionShare(entry) {
+  return Object.freeze({
+    unitId: typeof entry?.unitId === 'string' ? entry.unitId : null,
+    unitLabel: typeof entry?.unitLabel === 'string' ? entry.unitLabel : '',
+    amount: Number.isFinite(entry?.amount) ? entry.amount : 0,
   });
 }
 

@@ -84,7 +84,8 @@ const LEDGER_ROW_KEYS = Object.freeze([
   'outcome',
   'message',
 ]);
-const TAKE_KEYS = Object.freeze(['actorUuid', 'documentUuid', 'quantity']);
+const TAKE_KEYS = Object.freeze(['actorUuid', 'documentUuid', 'quantity', 'unitId', 'share']);
+const SHARE_KEYS = Object.freeze(['unitId', 'unitLabel', 'amount']);
 
 function readAnswer(outcome, { actorUuids = [], readings = [], messageData = null } = {}) {
   const expected = {
@@ -156,7 +157,9 @@ test('insufficient is a REFUSED ACT, where the read answering no is a success', 
   // And the read's own no is DATA — a reading's `sufficient: false` — never a failed call.
   const short = pooledHoldingsReadResult('read', null, {
     actorUuids: ['Actor.a'],
-    readings: [{ type: 'component', componentId: 'c1', requested: 3, available: 1, outcome: 'read' }],
+    readings: [
+      { type: 'component', componentId: 'c1', requested: 3, available: 1, outcome: 'read' },
+    ],
   });
   assert.equal(short.success, true, 'the question WAS answered, and the answer was no');
   assert.equal(short.readings[0].sufficient, false);
@@ -208,7 +211,14 @@ test('a TOOL reading is sufficient only when present, whatever its quantities sa
       readings: [
         // `available: 9` is deliberately generous: a damaged tool that IS on the sheet would
         // read as sufficient under the quantity rule, and must not.
-        { type: POOLED_COST_TYPES.tool, name: 'Alembic', requested: 1, available: 9, state, outcome: 'read' },
+        {
+          type: POOLED_COST_TYPES.tool,
+          name: 'Alembic',
+          requested: 1,
+          available: 9,
+          state,
+          outcome: 'read',
+        },
       ],
     });
     const [reading] = result.readings;
@@ -227,10 +237,26 @@ test('a reading is a complete frozen record whose index comes from the answer', 
   const result = pooledHoldingsReadResult('read', null, {
     actorUuids: ['Actor.a', 'Actor.b'],
     readings: [
-      { type: 'component', name: 'Ash', componentId: 'c1', systemId: 's1', requested: 1, available: 4, outcome: 'read' },
+      {
+        type: 'component',
+        name: 'Ash',
+        componentId: 'c1',
+        systemId: 's1',
+        requested: 1,
+        available: 4,
+        outcome: 'read',
+      },
       // `index: 99` is the mutation this case closes: a caller-supplied index would let a
       // record claim a position it does not occupy.
-      { index: 99, type: 'currency', name: 'gp', unitId: 'gp', requested: 5, available: 2, outcome: 'read' },
+      {
+        index: 99,
+        type: 'currency',
+        name: 'gp',
+        unitId: 'gp',
+        requested: 5,
+        available: 2,
+        outcome: 'read',
+      },
       { type: 'component', name: 'Nothing', outcome: 'componentNotFound' },
     ],
   });
@@ -320,13 +346,110 @@ test('a consume ledger sums its own takes, and the call sums its rows', () => {
   assert.ok(Object.isFrozen(result));
 });
 
+test('a take names the unit its quantity is counted in, and says it in coins (issue 1342)', () => {
+  const result = pooledHoldingsConsumeResult('consumed', null, {
+    actorUuids: ['Actor.a', 'Actor.b'],
+    ledger: [
+      {
+        type: 'currency',
+        unitId: 'gp',
+        requested: 150,
+        outcome: 'consumed',
+        // The two scales the whole pair exists to reconcile: the ROW echoes 150 gp, the TAKE is
+        // counted in the world's terminal base unit, and `share` is that same figure in coins.
+        takes: [
+          {
+            actorUuid: 'Actor.a',
+            quantity: 15_003,
+            unitId: 'cp',
+            share: [
+              { unitId: 'gp', unitLabel: 'gp', amount: 150 },
+              { unitId: 'cp', unitLabel: 'cp', amount: 3 },
+            ],
+          },
+        ],
+      },
+      {
+        // A COMPONENT take answers both fields as the empty case rather than omitting them, so a
+        // reader draws a take without first asking what kind of cost produced it.
+        type: 'component',
+        systemId: 's1',
+        componentId: 'c1',
+        requested: 2,
+        outcome: 'consumed',
+        takes: [{ actorUuid: 'Actor.b', documentUuid: 'Actor.b.Item.i1', quantity: 2 }],
+      },
+    ],
+  });
+
+  const [coin, ingot] = result.ledger;
+  assert.equal(coin.requested, 150, 'the row echoes the caller`s own denomination');
+  assert.equal(coin.takes[0].quantity, 15_003, 'and the take is in the terminal base unit');
+  assert.equal(coin.takes[0].unitId, 'cp', 'which the take now names');
+  assert.deepEqual(coin.takes[0].share, [
+    { unitId: 'gp', unitLabel: 'gp', amount: 150 },
+    { unitId: 'cp', unitLabel: 'cp', amount: 3 },
+  ]);
+  assert.equal(ingot.takes[0].unitId, null, 'a count of things has no unit');
+  assert.deepEqual(ingot.takes[0].share, [], 'and no denominations');
+
+  for (const row of result.ledger) {
+    for (const take of row.takes) {
+      assert.deepEqual(Object.keys(take), [...TAKE_KEYS], 'one shape on both arms');
+      assert.ok(Object.isFrozen(take.share), 'the share list is frozen');
+      for (const entry of take.share) {
+        assert.ok(Object.isFrozen(entry), 'and so is every denomination line');
+        assert.deepEqual(Object.keys(entry), [...SHARE_KEYS]);
+      }
+    }
+  }
+});
+
+test('a take normalises a share nobody could have meant (issue 1342)', () => {
+  const result = pooledHoldingsConsumeResult('consumed', null, {
+    actorUuids: ['Actor.a'],
+    ledger: [
+      {
+        type: 'currency',
+        unitId: 'gp',
+        requested: 1,
+        outcome: 'consumed',
+        takes: [
+          {
+            actorUuid: 'Actor.a',
+            quantity: 100,
+            unitId: 42,
+            share: [{ unitId: null, unitLabel: undefined, amount: '7' }, null],
+          },
+          // A take carrying no share at all is the shape a component line has, and it must not
+          // become `undefined` on a published leaf a companion iterates.
+          { actorUuid: 'Actor.a', quantity: 1 },
+        ],
+      },
+    ],
+  });
+  const [lax, bare] = result.ledger[0].takes;
+  assert.equal(lax.unitId, null, 'a unit id that is not a string is no unit id');
+  assert.deepEqual(lax.share, [
+    { unitId: null, unitLabel: '', amount: 0 },
+    { unitId: null, unitLabel: '', amount: 0 },
+  ]);
+  assert.deepEqual(bare.share, [], 'and an absent share is an empty one');
+});
+
 test('attempted is derived from the row outcome, so the flag cannot contradict it', () => {
   const result = pooledHoldingsConsumeResult('insufficient', null, {
     actorUuids: ['Actor.a'],
     ledger: [
       // The row that was short. A hostile `attempted: true` beside it is the mutation: it would
       // tell a caller a write was issued for a call that wrote nothing.
-      { type: 'component', componentId: 'c1', requested: 5, attempted: true, outcome: 'insufficient' },
+      {
+        type: 'component',
+        componentId: 'c1',
+        requested: 5,
+        attempted: true,
+        outcome: 'insufficient',
+      },
       { type: 'currency', unitId: 'gp', requested: 2, attempted: true, outcome: 'notAttempted' },
     ],
   });
@@ -356,16 +479,26 @@ test('neither factory lets a caller bag override a derived field', () => {
   const hostileRead = pooledHoldingsReadResult('readFailed', null, {
     success: true,
     actorUuids: ['Actor.a'],
-    readings: [{ type: 'component', requested: 1, available: 9, sufficient: true, outcome: 'read' }],
+    readings: [
+      { type: 'component', requested: 1, available: 9, sufficient: true, outcome: 'read' },
+    ],
   });
   assert.equal(hostileRead.success, false, 'a refusal is a refusal whatever the record claims');
-  assert.equal(hostileRead.readings[0].sufficient, true, 'the READING is still derived, not copied');
+  assert.equal(
+    hostileRead.readings[0].sufficient,
+    true,
+    'the READING is still derived, not copied'
+  );
 
-  const hostileConsume = pooledHoldingsConsumeResult('consumeFailed', { detail: 'x' }, {
-    success: true,
-    consumed: 500,
-    ledger: [{ type: 'component', outcome: 'consumeFailed', takes: [] }],
-  });
+  const hostileConsume = pooledHoldingsConsumeResult(
+    'consumeFailed',
+    { detail: 'x' },
+    {
+      success: true,
+      consumed: 500,
+      ledger: [{ type: 'component', outcome: 'consumeFailed', takes: [] }],
+    }
+  );
   assert.equal(hostileConsume.success, false);
   assert.equal(hostileConsume.consumed, 0, 'the total is the ledger’s, never the caller’s 500');
 });
@@ -461,7 +594,11 @@ test('each bounded refusal interpolates its OWN bound rather than restating the 
   ];
   for (const [label, key, bound] of bounded) {
     const string = localizedString(key);
-    assert.match(string, /\{max\}/, `${label}'s ${key} interpolates the bound as a max placeholder`);
+    assert.match(
+      string,
+      /\{max\}/,
+      `${label}'s ${key} interpolates the bound as a max placeholder`
+    );
     assert.doesNotMatch(
       string,
       new RegExp(String.raw`\b${bound}\b`),
