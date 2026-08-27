@@ -27,6 +27,6 @@ Enable both the **Essences** and **Effect Transfer** feature toggles on the syst
 
 ## Learn more
 
-- [Effect Transfer]({% link effect-transfer.md %})
-- [Essences]({% link essences.md %})
-- [Essences: Effect Transfer via Essences]({% link essences.md %}#effect-transfer-via-essences)
+- [Effect Transfer]({% link essences/effect-transfer.md %})
+- [Essences]({% link essences/index.md %})
+- [Essences: Effect Transfer via Essences]({% link essences/index.md %}#effect-transfer-via-essences)

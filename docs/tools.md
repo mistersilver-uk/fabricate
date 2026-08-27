@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Tools
-nav_order: 5
+nav_order: 8
 ---
 
 # Tools
@@ -124,7 +124,7 @@ Authority decides whether Tool-specific settings or the active check controls br
 The Tool's **Breakable** or **Immune** choice decides whether it participates in check-driven breakage.
 The **On-break action** decides what happens after a break.
 
-See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-triggers) for check-driven setup.
+See [Tool breakage triggers]({% link checks/crafting.md %}#tool-breakage-triggers) for check-driven setup.
 
 ## Tool-specific breakage mechanics
 
@@ -222,7 +222,7 @@ Gathering Tools stored by early versions are also reconciled into the system lib
 
 ## See Also
 
-- [Recipes]({% link recipes/index.md %}).
+- [Recipes]({% link crafting/recipes/index.md %}).
   Configure recipe Tool requirements and bonus modes.
 - [Degrading Tools]({% link how-to/degrading-tools.md %}).
   Build a Tool that wears out through repeated crafting.

@@ -49,10 +49,10 @@ Every key defaults to `false` when omitted, except `salvage`, which defaults to 
 | `itemTags` | `boolean` | `false` | Tag-based ingredient matching |
 | `essences` | `boolean` | `false` | Enable the essences system |
 | `propertyMacros` | `boolean` | `false` | Allow result property macros |
-| `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link effect-transfer.md %}). |
+| `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link essences/effect-transfer.md %}). |
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
-| `salvage` | `boolean` | `true` | Allow components to be broken down into constituent parts. Defaults on for backward compatibility; an explicit `false` is honoured. When enabled (the default), each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
-| `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering-environments.md %}). |
+| `salvage` | `boolean` | `true` | Allow components to be broken down into constituent parts. Defaults on for backward compatibility; an explicit `false` is honoured. When enabled (the default), each normalised component gains a `salvage` sub-object. See [Salvage]({% link components/salvage.md %}). |
+| `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering/index.md %}). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -408,7 +408,7 @@ Hooks.once('fabricate.ready', async () => {
 {: .note }
 > You can also trigger bulk import from the UI by dragging a compendium pack header onto the **Items** tab drop zone in the Crafting Admin panel.
 > The same deduplication logic applies.
-> See [Bulk compendium pack drop]({% link crafting-systems.md %}#bulk-compendium-pack-drop) for details.
+> See [Bulk compendium pack drop]({% link crafting-systems/index.md %}#bulk-compendium-pack-drop) for details.
 
 ### addToolFromUuid(systemId, itemUuid)
 
@@ -489,7 +489,7 @@ Hooks.once('fabricate.ready', async () => {
 
 When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here.
 The shape is normalised on write.
-See [Component Salvage]({% link salvage.md %}#component-salvage) for the GM-facing walkthrough.
+See [Component Salvage]({% link components/salvage.md %}#component-salvage) for the GM-facing walkthrough.
 
 `salvage.enabled` gates salvageability per component and defaults to `false`.
 It is clamped to `false` whenever the normalised `salvage.resultGroups` is empty, because a component that is salvageable but yields nothing is a forbidden state.
@@ -547,8 +547,8 @@ Each returned object has the following shape:
 | `description` | `string` | Flavour text (may be empty) |
 | `icon` | `string` | FontAwesome class string. Always a non-empty string, and defaults to `fas fa-mortar-pestle`. |
 | `colorToken` | `string\|null` | Palette key for the essence's colour, or `null` for the theme accent default |
-| `enabled` | `boolean` | Default `true`. Gates essence-carried *behaviour* only, never essence arithmetic: a disabled essence still matches, accumulates, and is consumed, but neither its effect transfer nor its property macro runs. See [Essences]({% link essences.md %}#enabling-and-disabling-an-essence). |
-| `propertyMacroUuid` | `string\|null` | UUID of a script Macro run against every result this essence contributes to, before that item is created. Requires `features.propertyMacros` and `features.essences`. See [Essences]({% link essences.md %}#the-essence-property-macro). |
+| `enabled` | `boolean` | Default `true`. Gates essence-carried *behaviour* only, never essence arithmetic: a disabled essence still matches, accumulates, and is consumed, but neither its effect transfer nor its property macro runs. See [Essences]({% link essences/index.md %}#enabling-and-disabling-an-essence). |
+| `propertyMacroUuid` | `string\|null` | UUID of a script Macro run against every result this essence contributes to, before that item is created. Requires `features.propertyMacros` and `features.essences`. See [Essences]({% link essences/index.md %}#the-essence-property-macro). |
 | `sourceItemUuid` | `string\|null` | Authoritative field. The `componentId` of the component linked to this essence, or `null`. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

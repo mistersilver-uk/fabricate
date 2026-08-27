@@ -61,7 +61,7 @@ You'll see three new header buttons:
 When no crafting systems are enabled, players do not see the **Craft Item** or **Gathering** buttons.
 
 The unified Fabricate window also has a **Journal** tab where players monitor the runs their characters have started across crafting, gathering, and salvage, and continue crafting runs.
-See [Journal]({% link journal.md %}).
+See [Journal]({% link player-app/journal.md %}).
 
 ## Step 2: Create a Crafting System
 
@@ -118,7 +118,7 @@ It is opt-in per crafting system.
 
 New environments without a gathering task are created as disabled draft shells.
 We'll enable it in Step 7 once it has some content.
-See [Gathering Environments]({% link gathering-environments.md %}) for the full field reference.
+See [Gathering Environments]({% link gathering/index.md %}) for the full field reference.
 
 ## Step 5: Create a Gathering Task
 
@@ -138,7 +138,7 @@ They are authored once and composed into environments.
 
 {: .note }
 Stamina costs, modifiers, and drop rates accept **formulas** (numbers, ability modifiers, dice).
-See [Gathering Expressions]({% link gathering-expressions.md %}) for D&D 5e and Pathfinder 2e examples.
+See [Gathering Expressions]({% link gathering/formulas.md %}) for D&D 5e and Pathfinder 2e examples.
 
 ## Step 6: Create a Gathering Event
 
@@ -194,7 +194,7 @@ The Crafting tab provides recipe browsing, actor and source selection, craft but
 
 ## See Also
 
-- [Crafting Systems]({% link crafting-systems.md %}) covers resolution modes, features, and system configuration
-- [Recipes]({% link recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
+- [Crafting Systems]({% link crafting-systems/index.md %}) covers resolution modes, features, and system configuration
+- [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
 - [API Reference]({% link api/index.md %}) is the full developer documentation
 - [Troubleshooting]({% link troubleshooting.md %}) has solutions for common setup issues

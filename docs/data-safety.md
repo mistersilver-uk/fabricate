@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Protecting Your Worlds
-nav_order: 10
+nav_order: 17
 ---
 
 # Protecting Your Worlds
@@ -15,7 +15,7 @@ Primarily, I've written this document to address valid concerns GM's might have 
 > They are not a substitute for your own Foundry backups.
 > Keep regular world backups, just as you would for any module.
 > You can also export an individual crafting system to a file from its manager.
-> See [Import & Export]({% link import-export.md %}).
+> See [Import & Export]({% link crafting-systems/import-export.md %}).
 
 ---
 

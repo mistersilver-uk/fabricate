@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Troubleshooting
-nav_order: 9
+nav_order: 16
 ---
 
 # Troubleshooting
@@ -43,9 +43,9 @@ This guide covers common issues GMs and players encounter when setting up or usi
 5. Confirm the recipe still belongs to an existing crafting system.
    If its system was deleted, the recipe will not show for players.
 
-**See also:** [Recipes]({% link recipes/index.md %}) for enabling and disabling recipes.
-[Visibility & Knowledge]({% link visibility.md %}) for list modes and knowledge access.
-[Crafting Systems]({% link crafting-systems.md %}#system-overview) for the System Overview and how broken systems and recipes are hidden.
+**See also:** [Recipes]({% link crafting/recipes/index.md %}) for enabling and disabling recipes.
+[Visibility & Knowledge]({% link crafting/settings.md %}) for list modes and knowledge access.
+[Crafting Systems]({% link crafting-systems/system-overview.md %}) for the System Overview and how broken systems and recipes are hidden.
 
 ---
 
@@ -72,7 +72,7 @@ The confirmation prompt runs a dry run first and tells you exactly what will hap
 3. If a recipe simply vanished from players but is still in the admin panel, the cause is a system or recipe problem, not deletion.
    Open the **Overview** to find and fix it.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}#system-settings) for the migration-first mode change and the System Overview.
+**See also:** [Crafting Systems]({% link crafting-systems/index.md %}#system-settings) for the migration-first mode change and the System Overview.
 
 ---
 
@@ -105,7 +105,7 @@ Recipes resolve immediately with no skill check, even though the Routed by check
    When it is off, the check is skipped.
 4. Attempt a craft and watch for any error or warning notifications from Fabricate about the check.
 
-**See also:** [Crafting Checks]({% link crafting-checks.md %}) for crafting check configuration.
+**See also:** [Crafting Checks]({% link checks/crafting.md %}) for crafting check configuration.
 
 ---
 
@@ -144,7 +144,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
    It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
 5. Fix whichever of those applies on **Checks › Crafting**, then return to the recipe's Overview tab.
 
-**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the library, the four combination rules, and the pick limit in full.
+**See also:** [Check modifiers]({% link checks/index.md %}#check-modifiers) covers the library, the four combination rules, and the pick limit in full.
 
 ---
 
@@ -170,8 +170,8 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
    Re-open the affected recipes and assign the result sets to a current outcome tier.
 4. If you rely on name matching instead of explicit assignment, confirm each result set name matches the outcome tier name once case and surrounding spaces are ignored.
 
-**See also:** [Routed Modes]({% link recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
-[Crafting Checks]({% link crafting-checks.md %}) for how a routed check rolls and resolves its difficulty.
+**See also:** [Routed Modes]({% link crafting/recipes/routed.md %}) for how outcomes match results, including explicit outcome assignment and name matching.
+[Crafting Checks]({% link checks/crafting.md %}) for how a routed check rolls and resolves its difficulty.
 
 ---
 
@@ -217,8 +217,8 @@ never used to.
    Nothing you have already assigned is deleted when you set it back to **Never**; those assignments
    simply stop being offered and stop routing, and they come back when you permit failure results again.
 
-**See also:** [Crafting Checks]({% link crafting-checks.md %}#on-failure) for the setting and its three
-values, and [Salvage]({% link salvage.md %}) for salvage's own On failure section.
+**See also:** [Crafting Checks]({% link checks/crafting.md %}#on-failure) for the setting and its three
+values, and [Salvage]({% link components/salvage.md %}) for salvage's own On failure section.
 
 ---
 
@@ -260,7 +260,7 @@ values, and [Salvage]({% link salvage.md %}) for salvage's own On failure sectio
    This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
-[Crafting Checks]({% link crafting-checks.md %}#failure-consumption-policy) covers consumption on failure settings.
+[Crafting Checks]({% link checks/crafting.md %}#failure-consumption-policy) covers consumption on failure settings.
 [Repairing Item Data](#repairing-item-data) covers the maintenance action that gives duplicated copies a durable identity link.
 
 ---
@@ -302,8 +302,8 @@ Additional causes:
 5. Check the components used as ingredients in the recipe.
    Do they have non-zero essence quantities assigned for the relevant essence?
 
-**See also:** [Effect Transfer]({% link effect-transfer.md %}) covers effect transfer configuration and the triple-flag pipeline.
-[Essences]({% link essences.md %}) covers essence definitions and source items.
+**See also:** [Effect Transfer]({% link essences/effect-transfer.md %}) covers effect transfer configuration and the triple-flag pipeline.
+[Essences]({% link essences/index.md %}) covers essence definitions and source items.
 
 ---
 
@@ -339,7 +339,7 @@ Additional causes:
 5. Is salvage enabled on the component you are trying to salvage?
 6. Is the salvage feature enabled on the crafting system?
 
-**See also:** [Salvage]({% link salvage.md %}) covers salvage configuration, salvage resolution modes, and salvage crafting checks.
+**See also:** [Salvage]({% link components/salvage.md %}) covers salvage configuration, salvage resolution modes, and salvage crafting checks.
 
 ---
 
@@ -375,7 +375,7 @@ Note that these lists share one setting.
 Adding an actor type so that a group, vehicle or caravan actor can be chosen as a party's travel actor also makes actors of that type eligible party members.
 If you would rather not widen both, drag the actor onto the travel-actor panel instead: a drop assigns any actor directly and ignores the type list.
 
-**See also:** [Gathering Environments]({% link gathering-environments.md %}#actor-selection-bar) covers the character bar from the player's side.
+**See also:** [Gathering Environments]({% link gathering/index.md %}#actor-selection-bar) covers the character bar from the player's side.
 
 ---
 
@@ -436,8 +436,8 @@ This is most common after upgrading to Foundry v12 or after importing items from
 **Expected behaviour after the fix:** A player who owns an actor copy of a compendium item will have that item recognised by Fabricate's recipe matching, whether the copy was made under Foundry v11 or Foundry v12 and later.
 The "Craftable only" filter will include the recipe once all required items are matched.
 
-**See also:** [Visibility & Knowledge]({% link visibility.md %}#how-matching-works) covers how owned compendium copies are matched on Foundry v12 and later.
-[Recipes]({% link recipes/index.md %}) covers linking recipe items in the editor.
+**See also:** [Visibility & Knowledge]({% link crafting/books-scrolls.md %}#how-matching-works) covers how owned compendium copies are matched on Foundry v12 and later.
+[Recipes]({% link crafting/recipes/index.md %}) covers linking recipe items in the editor.
 
 ---
 
@@ -504,8 +504,8 @@ A skipped description is never emptied; the text you already had is kept.
 The repair scans the actors in your world's Actors directory.
 It does not reach unlinked token copies that were never saved as world actors, or actors stored inside a compendium.
 
-**See also:** [Visibility & Knowledge]({% link visibility.md %}#duplicating-a-book-or-scroll) covers duplicating books and scrolls as an authoring workflow.
-[Crafting Systems]({% link crafting-systems.md %}#adding-components) covers duplicating items to author components.
+**See also:** [Visibility & Knowledge]({% link crafting/books-scrolls.md %}#duplicating-a-book-or-scroll) covers duplicating books and scrolls as an authoring workflow.
+[Crafting Systems]({% link components/index.md %}#adding-components) covers duplicating items to author components.
 
 ---
 
@@ -586,7 +586,7 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
    Only **Items** compendiums contain importable components.
    **Actor** or **Journal Entry** compendiums are silently filtered.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) covers adding components via drag-and-drop.
+**See also:** [Crafting Systems]({% link components/index.md %}#adding-components) covers adding components via drag-and-drop.
 
 ---
 
@@ -611,7 +611,7 @@ Make sure Fabricate is up to date.
 2. If you are dragging from a compendium, confirm the compendium is not locked or from a module that restricts access.
 3. Make sure Fabricate is updated to the latest version, which includes the more robust drag-data handling.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) explains adding components via drag-and-drop.
+**See also:** [Crafting Systems]({% link components/index.md %}#adding-components) explains adding components via drag-and-drop.
 
 ---
 
@@ -638,7 +638,7 @@ The message names the section that failed.
 Fabricate's own tabs keep working throughout.
 The message covers the whole section rather than one tab of it, so every tab belonging to that section shows it until the section is retried.
 
-**See also:** [Downtime Preview]({% link downtime-preview.md %}) covers installed companion modules that replace the GM downtime preview.
+**See also:** [Downtime Preview]({% link world/downtime.md %}) covers installed companion modules that replace the GM downtime preview.
 
 ---
 

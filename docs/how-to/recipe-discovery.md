@@ -41,6 +41,6 @@ Its **Learned recipes** tab names how each recipe was learned, and lets you eras
 
 ## Learn more
 
-- [Visibility & Knowledge]({% link visibility.md %})
-- [Visibility & Knowledge: Knowledge Modes]({% link visibility.md %}#knowledge-modes)
-- [Recipes: linking a recipe item]({% link recipes/index.md %}#recipe-structure)
+- [Visibility & Knowledge]({% link crafting/settings.md %})
+- [Visibility & Knowledge: Knowledge Modes]({% link crafting/knowledge.md %}-modes)
+- [Recipes: linking a recipe item]({% link crafting/recipes/index.md %}#recipe-structure)

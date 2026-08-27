@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Architecture Decisions
-nav_order: 20
+nav_order: 19
 has_children: true
 ---
 

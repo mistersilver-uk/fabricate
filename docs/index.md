@@ -70,14 +70,14 @@ They browse the recipes their character can see, choose which owned actors suppl
 A built-in **Shopping List** lets players queue several recipes and see one consolidated list of the components, essences, and tools they still need.
 GMs author recipes end to end in the Crafting Admin panel, across dedicated tabs for overview, ingredients, results, tools, and validation, with an access or books and scrolls tab appearing according to the system's recipe visibility mode.
 Steps are added on the overview tab, and each step's ingredients and results are edited on the ingredients and results tabs.
-See [Recipes]({% link recipes/index.md %}).
+See [Recipes]({% link crafting/recipes/index.md %}).
 
 ## Salvage
 
 Players can break a managed item back down into component parts from the **Salvage** flow.
 Salvage can be a straight breakdown or gated behind a crafting check, and it supports progressive results that a roll spends down.
 Players can also select several items at once to salvage or permanently destroy them together in a single gesture.
-See [Salvage]({% link salvage.md %}).
+See [Salvage]({% link components/salvage.md %}).
 
 ## Tools
 
@@ -86,14 +86,14 @@ Tools can be both things you would carry, like a hammer, knife, or satchel or th
 
 ## Gathering
 
-GMs can define material gathering locations in [Gathering Environments]({% link gathering-environments.md %}) when a crafting system enables the "Gathering" feature.
+GMs can define material gathering locations in [Gathering Environments]({% link gathering/index.md %}) when a crafting system enables the "Gathering" feature.
 Gathering can also be location-aware!
 GMs can describe campaign geography as realms, group actors into Fabricate-managed parties, and gate environments by the party's current realm.
-See [Gathering Realms & Travel]({% link gathering-realms.md %}).
+See [Gathering Realms & Travel]({% link world/travel/index.md %}).
 
 ## Journal
 
-Players can track the runs their characters have started in the [Journal]({% link journal.md %}) tab of the unified Fabricate window.
+Players can track the runs their characters have started in the [Journal]({% link player-app/journal.md %}) tab of the unified Fabricate window.
 The Journal monitors crafting, gathering, and salvage runs together, shows world-time countdowns and history, and lets players continue crafting runs with **Trigger Next Step**.
 
 ## Canvas Interactables
@@ -107,7 +107,7 @@ See [Canvas Interactables]({% link canvas-interactables.md %}).
 
 You can export a complete crafting system to a JSON file and import it into another world.
 The export carries the whole authoring model, and import reports any references that do not exist in the target world.
-See [Import & Export]({% link import-export.md %}).
+See [Import & Export]({% link crafting-systems/import-export.md %}).
 
 ## Having trouble?
 
