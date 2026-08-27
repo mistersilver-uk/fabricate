@@ -46,7 +46,7 @@ Set **Tool breakage source** to **Check-driven** when the gathering check should
 Configure the gathering check's breakage conditions under **Checks**.
 An individual trigger on that check can also break the required Tools whenever it fires, whatever the failure policy says.
 
-{% include screenshot.html case="manager-checks-crafting-trigger-break-tools" caption="The Crafting check's Triggers tab. The Gathering check carries the same tab and the same break-tools card." %}
+{% include screenshot.html case="manager-checks-crafting-trigger-break-tools" caption="The Crafting check's Triggers tab, whose break-tools card the Gathering check carries too." %}
 
 The active check can break all required **Breakable** Tools.
 An **Immune** Tool is excluded.
