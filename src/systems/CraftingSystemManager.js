@@ -28,6 +28,7 @@ import {
   advanceDefinitionRevision,
   findById,
   getDefinitionIndex,
+  getScopedDefinitionUnion,
   indexedMembershipLookups,
 } from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
@@ -69,6 +70,7 @@ import {
   resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
 } from './checkModifierResolver.js';
+import { resolveComponentScope } from './componentScope.js';
 import {
   craftingDataChange,
   domainsForRecord,
@@ -76,6 +78,7 @@ import {
   PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
+import { resolveEssenceScope } from './essenceScope.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
@@ -91,6 +94,7 @@ import {
 } from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { resolveToolScope } from './toolScope.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -138,6 +142,100 @@ const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
  * @param {unknown} legacy
  * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
  */
+/**
+ * Resolve an injected store seam, whether it was supplied as the store itself or as a lazy getter.
+ * Lazy is the production shape: `game.fabricate` is not populated when the manager is constructed.
+ *
+ * TOTAL. A getter that throws answers `null`, i.e. an UNKNOWN basis, rather than taking the
+ * normalizer down — the issue-970 failure mode, where a throw inside `_normalizeSystem` propagates
+ * through `hydrate` and out of `initialize()`.
+ *
+ * @param {object|(() => object|null)|null|undefined} seam
+ * @returns {object|null}
+ */
+function _resolveStoreSeam(seam) {
+  if (!seam) return null;
+  try {
+    return typeof seam === 'function' ? (seam() ?? null) : seam;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Valid Id Basis for ONE world-scope entity type (issue 1359, epic 1357): the union of the
+ * world roster and the system's surviving in-system array, or `null` when neither can vouch for
+ * an id.
+ *
+ * MIRRORS `_libraryBasis` EXACTLY, and every clause of it is load-bearing here for the same
+ * reason. The world half counts when `isSeeded('entities')` — the sub-key the id set is actually
+ * drawn from, never the aggregate no-argument form, which ORs across sub-keys and would report
+ * seeded on the strength of a sibling. The legacy half counts only when the in-system array is
+ * NON-EMPTY: an empty array is a legacy KEY, not a legacy corpus — it vouches for nothing while
+ * licensing a full prune. The answer is `null` — prune nothing — only when BOTH are absent.
+ *
+ * Deriving it from `isSeeded()` alone would return `null` on every unmigrated client for every
+ * system, silently disabling every reference prune in the corpus for a release; deriving it from
+ * the in-system array alone is the #1313 defect this work exists to avoid.
+ *
+ * NOT MEMBERSHIP-FILTERED, and that is the difference from the READ union
+ * (`resolveComponentScope` and its siblings). `## Scoped Entity Definitions` makes an absent
+ * membership record a REFUSAL, never a PRUNE, so a reference to a world entity this system is not
+ * a member of must survive normalization and be refused at use. Filtering here would convert that
+ * refusal into a silent, persisted deletion on the first normalize.
+ *
+ * @param {object|null} store The world scope store, or `null`.
+ * @param {unknown} legacy The system's surviving in-system array.
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
+function _scopeEntityBasis(store, legacy) {
+  const seeded = store?.isSeeded?.('entities') === true;
+  const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
+  if (!seeded && !legacyList) return null;
+  const ids = _idSet(legacyList ?? []);
+  if (seeded) for (const id of store.entityIds()) ids.add(id);
+  return ids;
+}
+
+/**
+ * The Valid Id Basis for ONE CATEGORY VOCABULARY — the allowance
+ * `normalizeCategoryIconMap` prunes an icon map against.
+ *
+ * THE SHARPEST OF THE SEVEN PRUNE SITES. The epic's migration empties
+ * `system.componentCategories`, so an ungated icon prune on a client whose world vocabulary has
+ * not been written deletes EVERY authored category icon — and the normalizer is a whitelist
+ * rebuild, so the loss persists on the next save.
+ *
+ * The world half is `fabricate.worldVocabulary`, which epic 1357 registers in PR 7 and which this
+ * change deliberately does not: a persisted key whose values carry no canonical meaning is a live
+ * shape with no description. Until it exists there is no world store to consult, so this is `null`
+ * exactly when the in-system vocabulary is empty. The signature takes the NORMALIZED list so the
+ * basis and the emitted vocabulary cannot disagree.
+ *
+ * @param {string[]} vocabulary The system's normalized category vocabulary.
+ * @returns {string[]|null} `null` means UNKNOWN — prune nothing.
+ */
+function _vocabularyBasis(vocabulary) {
+  return vocabulary.length > 0 ? vocabulary : null;
+}
+
+/**
+ * The names an icon map's entries may carry, given its vocabulary basis.
+ *
+ * With a KNOWN basis this is today's allowance verbatim: the reserved `general` bucket plus the
+ * vocabulary. With an UNKNOWN one it is the map's OWN keys, so `normalizeCategoryIconMap` still
+ * lower-cases every key and sanitizes every icon value — both non-destructive shape rules — while
+ * PRUNING NOTHING.
+ *
+ * @param {unknown} icons The raw icon map.
+ * @param {string[]|null} vocabulary The vocabulary basis.
+ * @returns {string[]}
+ */
+function _iconAllowance(icons, vocabulary) {
+  if (vocabulary !== null) return ['general', ...vocabulary];
+  return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
+}
+
 function _libraryBasis(store, key, readWorld, legacy) {
   const seeded = store?.isSeeded?.(key) === true;
   const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
@@ -215,6 +313,20 @@ export class CraftingSystemManager {
     this._characterLibrariesStore =
       seams.characterLibrariesStore ??
       (() => globalThis.game?.fabricate?.getCharacterLibrariesStore?.() ?? null);
+    // Issue 1359 (epic 1357): the three WORLD-SCOPE entity stores. Optional by design, exactly as
+    // the libraries store above is — a fixture that injects none gets an UNKNOWN basis and prunes
+    // nothing, which is the safe direction. Each defaults to a LAZY getter because
+    // `game.fabricate` is not populated when this manager is constructed, and the accessors it
+    // reads are deliberately NOT `_requireReady()`-gated: optional chaining absorbs an absent
+    // accessor but not a throw. See `_scopeBasis`.
+    this._componentScopeStore =
+      seams.componentScopeStore ??
+      (() => globalThis.game?.fabricate?.getComponentScopeStore?.() ?? null);
+    this._essenceScopeStore =
+      seams.essenceScopeStore ??
+      (() => globalThis.game?.fabricate?.getEssenceScopeStore?.() ?? null);
+    this._toolScopeStore =
+      seams.toolScopeStore ?? (() => globalThis.game?.fabricate?.getToolScopeStore?.() ?? null);
   }
 
   /**
@@ -226,13 +338,7 @@ export class CraftingSystemManager {
    * @private
    */
   _resolveCharacterLibrariesStore() {
-    const seam = this._characterLibrariesStore;
-    if (!seam) return null;
-    try {
-      return typeof seam === 'function' ? (seam() ?? null) : seam;
-    } catch {
-      return null;
-    }
+    return _resolveStoreSeam(this._characterLibrariesStore);
   }
 
   /**
@@ -281,6 +387,117 @@ export class CraftingSystemManager {
         system?.modifiers
       ),
     };
+  }
+
+  /**
+   * Build the VALID ID BASIS for one system's WORLD-SCOPE reference pruning (issue 1359, epic
+   * 1357) — the id sets `_normalizeSystem` and the five mutation-time bypass sites check
+   * references against before dropping anything, plus the two category vocabularies the icon maps
+   * are pruned against.
+   *
+   * RETURNS `null` FOR EACH BASIS IT CANNOT KNOW TO BE COMPLETE, and `null` means PRUNE NOTHING.
+   * NO CALL SITE MAY DEFAULT ONE TO `new Set()`: that is the same defect as an omitted argument,
+   * and it is exactly what `DOMAIN.md`'s Valid Id Basis rule forbids — a pass handed an empty set
+   * for an entity class prunes every key scoped to that class on every run.
+   *
+   * `validEssenceIds` therefore changes contract from "always a `Set`" to `Set|null` at every one
+   * of its call sites. `_normalizeEssenceQuantities` already tests `instanceof Set`, and that test
+   * becomes LOAD-BEARING rather than merely defensive.
+   *
+   * THIS IS NOT THE READ UNION. See `_scopeEntityBasis`: the basis is deliberately not
+   * membership-filtered, because an absent membership record is a refusal and never a prune.
+   * `resolveScopedComponents` and its siblings answer the other question.
+   *
+   * @param {object} system The system being normalized, still carrying any legacy in-system array.
+   * @returns {{componentIds: Set<string>|null, essenceIds: Set<string>|null,
+   *   toolIds: Set<string>|null, componentCategories: string[]|null,
+   *   recipeCategories: string[]|null}}
+   * @private
+   */
+  _scopeBasis(system) {
+    return {
+      componentIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._componentScopeStore),
+        system?.components ?? system?.managedItems ?? system?.items
+      ),
+      essenceIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._essenceScopeStore),
+        system?.essenceDefinitions ?? system?.essences
+      ),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      componentCategories: _vocabularyBasis(
+        normalizeCustomComponentCategories(system?.componentCategories)
+      ),
+      recipeCategories: _vocabularyBasis(normalizeCustomRecipeCategories(system?.categories)),
+    };
+  }
+
+  /**
+   * THE READ UNION for one system's components (issue 1359, epic 1357): the world components it is
+   * a MEMBER of, resolved through the three-layer resolver, unioned with its surviving in-system
+   * array, world winning on an id collision.
+   *
+   * Additive and unwired: `_normalizeSystem` still emits `components` exactly as it does today, and
+   * epic 1357's consumer sweep is what routes readers here. It exists now because the store, the
+   * memo and the basis have to be provably correct together before anything depends on them.
+   *
+   * MEMOIZED on `(world corpus, system array)` — never on a system id. See
+   * `getScopedDefinitionUnion`.
+   *
+   * @param {object|string} system The system record, or its id.
+   * @returns {Array<object>}
+   */
+  resolveScopedComponents(system) {
+    return this._resolveScopedUnion(
+      system,
+      this._componentScopeStore,
+      'components',
+      (corpus, record) => resolveComponentScope(corpus, record.id, record.components)
+    );
+  }
+
+  /**
+   * THE READ UNION for one system's essence definitions. See {@link resolveScopedComponents}.
+   *
+   * @param {object|string} system
+   * @returns {Array<object>}
+   */
+  resolveScopedEssences(system) {
+    return this._resolveScopedUnion(
+      system,
+      this._essenceScopeStore,
+      'essenceDefinitions',
+      (corpus, record) => resolveEssenceScope(corpus, record.id, record.essenceDefinitions)
+    );
+  }
+
+  /**
+   * THE READ UNION for one system's tools. See {@link resolveScopedComponents}.
+   *
+   * @param {object|string} system
+   * @returns {Array<object>}
+   */
+  resolveScopedTools(system) {
+    return this._resolveScopedUnion(system, this._toolScopeStore, 'tools', (corpus, record) =>
+      resolveToolScope(corpus, record.id, record.tools)
+    );
+  }
+
+  /**
+   * The shared body of the three read unions: resolve the system, resolve the store, then memoize.
+   *
+   * @param {object|string} system
+   * @param {object|(() => object|null)|null} seam
+   * @param {'components'|'essenceDefinitions'|'tools'} field
+   * @param {(corpus: object|null, system: object) => Array<object>} union
+   * @returns {Array<object>}
+   * @private
+   */
+  _resolveScopedUnion(system, seam, field, union) {
+    const record = typeof system === 'string' ? this.getSystem(system) : system;
+    if (!record?.id) return [];
+    const corpus = _resolveStoreSeam(seam)?.corpus?.() ?? null;
+    return getScopedDefinitionUnion(corpus, record[field], () => union(corpus, record));
   }
 
   /**
@@ -397,7 +614,16 @@ export class CraftingSystemManager {
       system.characterPrerequisites,
       () => foundry.utils.randomID()
     );
-    const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
+    // Issue 1359 (epic 1357): the WORLD-SCOPE Valid Id Basis. Derived from the RAW system, so the
+    // legacy half is judged on what was actually stored rather than on what this normalizer has
+    // already rebuilt, exactly as `_characterLibraryBasis` above is. `essenceIds` is `Set|null`
+    // from here on and MUST NOT be defaulted to an empty Set — see `_scopeBasis`.
+    // The essence half is derived from the ALREADY-NORMALIZED definitions rather than the raw
+    // ones, because that is precisely the set this pass used to prune against: normalization mints
+    // an id for an entry that lacks one and drops an entry it cannot repair, so a raw-derived
+    // legacy half would differ from today's behaviour by exactly those entries.
+    const scopeBasis = this._scopeBasis({ ...system, essenceDefinitions });
+    const essenceIds = scopeBasis.essenceIds;
     // Salvage-normalization context (issue 764), HOISTED above the component map so the
     // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
     // and Simple check formula flag. Both derivations are component-independent, so
@@ -452,8 +678,18 @@ export class CraftingSystemManager {
         def.associatedSystemItemId ||
         (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
       const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
+      // A source component that is not in `items` used to answer `null` unconditionally. That is
+      // only sound when the component basis is KNOWN: with an unwritten world store and an emptied
+      // in-system array the id may name a component this client simply cannot see, and nulling the
+      // authored uuid is a silent, persisted deletion. So the drop is now gated on the basis, and
+      // a retained value passes the SAME `_looksLikeDocumentUuid` guard the other branch applies —
+      // an unknown basis is a licence to keep, never a licence to emit junk.
       const sourceItemUuid = sourceComponentId
-        ? sourceComponent?.originItemUuid || sourceComponent?.registeredItemUuid || null
+        ? sourceComponent?.originItemUuid ||
+          sourceComponent?.registeredItemUuid ||
+          (scopeBasis.componentIds === null && this._looksLikeDocumentUuid(def.sourceItemUuid)
+            ? def.sourceItemUuid
+            : null)
         : this._looksLikeDocumentUuid(def.sourceItemUuid)
           ? def.sourceItemUuid
           : null;
@@ -572,24 +808,34 @@ export class CraftingSystemManager {
       // it: canonical spec forbids merging, aliasing, or cross-populating the two, so
       // a component category is never offered as a recipe category and vice versa.
       // The reserved `general` bucket is implied, never persisted in the array.
-      componentCategories: normalizeCustomComponentCategories(system.componentCategories),
+      // The SAME normalized list the vocabulary basis was derived from, so the emitted vocabulary
+      // and the allowance the icon map is pruned against cannot disagree. `null` basis and empty
+      // vocabulary are the same state by construction.
+      componentCategories: scopeBasis.componentCategories ?? [],
 
       // Per-category icons (issue 689). A parallel name-keyed map, kept separate
       // from the string vocabulary arrays so those stay backwards-compatible.
       // Each map is filtered to the categories that currently exist (plus the
       // reserved `general` bucket), so a removed category drops its icon on the
       // next normalize — updateSystem REPLACES the whole map, no `-=` needed.
-      categoryIcons: normalizeCategoryIconMap(system.categoryIcons, [
-        'general',
-        ...normalizeCustomRecipeCategories(system.categories),
-      ]),
-      componentCategoryIcons: normalizeCategoryIconMap(system.componentCategoryIcons, [
-        'general',
-        ...normalizeCustomComponentCategories(system.componentCategories),
-      ]),
+      // GATED ON THE VOCABULARY BASIS (issue 1359). Each map is pruned against its OWN
+      // vocabulary — `categoryIcons` against `categories`, `componentCategoryIcons` against
+      // `componentCategories` — and the two are gated separately because they are separate
+      // vocabularies that `## CraftingSystem` requirement 6b forbids merging or aliasing.
+      // With an UNKNOWN basis (an empty in-system vocabulary and no world vocabulary written)
+      // nothing is pruned: the epic's migration empties these arrays, and this normalizer is a
+      // whitelist rebuild, so an ungated prune would delete every authored icon PERMANENTLY.
+      categoryIcons: normalizeCategoryIconMap(
+        system.categoryIcons,
+        _iconAllowance(system.categoryIcons, scopeBasis.recipeCategories)
+      ),
+      componentCategoryIcons: normalizeCategoryIconMap(
+        system.componentCategoryIcons,
+        _iconAllowance(system.componentCategoryIcons, scopeBasis.componentCategories)
+      ),
 
       // Transitional aliases for existing UI code paths
-      categories: normalizeCustomRecipeCategories(system.categories),
+      categories: scopeBasis.recipeCategories ?? [],
       tags: this._normalizeStringList(system.tags ?? system.itemTags),
       essences: resolvedEssenceDefinitions.map((def) => def.id),
       enableTags: true,
@@ -4092,7 +4338,12 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // Issue 1359: the SAME Valid Id Basis `_normalizeSystem` uses, derived through the same
+    // helper rather than rebuilt here. This site BYPASSES `_normalizeSystem`, so before this it
+    // read the in-system array directly and handed `_normalizeComponent` a real-but-empty Set on
+    // any client whose world corpus had not replicated — which `_normalizeEssenceQuantities`
+    // cannot refuse. `Set|null`, and NEVER defaulted to an empty Set.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
       ...this._salvageNormalizationContext(system),
@@ -5154,7 +5405,9 @@ export class CraftingSystemManager {
     }
 
     // No match: create new component
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(
       {
         ...nextSnapshot,
@@ -5213,7 +5466,9 @@ export class CraftingSystemManager {
       );
     }
 
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       {
         ...existing,
@@ -5425,7 +5680,9 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.components.findIndex((i) => i.id === itemId);
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId },
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
@@ -5533,7 +5790,9 @@ export class CraftingSystemManager {
       hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
     if (!staged) return { updated: 0, componentIds: [] };
 
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const salvageContext = this._salvageNormalizationContext(system);
     const changedIds = [];
     for (let idx = 0; idx < system.components.length; idx += 1) {
