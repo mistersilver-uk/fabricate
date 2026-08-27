@@ -132,7 +132,7 @@ Before rebasing any branch at all, check whether its own PR already merged (`gh 
 Parallel (not stacked) PRs need the same care for a different reason: when two independent branches off `main` touch the SAME file or reference each other's paths, GitHub's `mergeable` flag only checks for a TEXTUAL conflict — a clean auto-merge can still leave a semantic duplicate (two copies of a rewritten section) or a dangling reference (one PR deletes a file a doc in the other still cites by path, which then fails `validate:agents`).
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
-- For quick-start docs work, route changes only to `docs/quickstart.md`.
+- For quick-start docs work, route changes only to `docs/help/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.
 - For UI work, do not let “screenshot captured” stand as acceptance.
 Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.

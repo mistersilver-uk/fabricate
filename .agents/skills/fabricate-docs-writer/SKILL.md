@@ -70,7 +70,7 @@ Stop and return `BLOCKED` when the assignment does not match the worktree.
 5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
 Treat the shipped canonical specs under `openspec/specs/` — and the issue delta as reconciled by the domain expert — as the source of truth for documented behaviour.
 6. Update only documentation that matches real behavior (the shipped canonical spec, not a superseded proposal).
-7. Keep quick-start content canonical in `docs/quickstart.md`.
+7. Keep quick-start content canonical in `docs/help/quickstart.md`.
 8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
 9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
 10. In a mutable documentation lane, commit only owned documentation paths locally and return the lifecycle's commit handoff to the workflow driver.
