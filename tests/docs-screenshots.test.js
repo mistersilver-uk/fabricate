@@ -31,8 +31,9 @@ const IGNORED_DOCS_DIRS = new Set([
   '_data',
 ]);
 
-// This test owns the FLAT `docs/img/screenshots/` directory and the seventeen
-// hand-curated frames in it. `docs/img/screenshots/lab/` holds generated frames
+// This test owns the FLAT `docs/img/screenshots/` directory and the hand-curated
+// frames in it — one, now that every curated frame a view case can reach has been
+// replaced by a generated one. `docs/img/screenshots/lab/` holds generated frames
 // and belongs to `tests/docs-screenshot-map.test.js`. Two facts keep those
 // populations apart, and both are load-bearing rather than incidental:
 //

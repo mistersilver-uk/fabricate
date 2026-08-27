@@ -64,7 +64,7 @@ Resource-node enforcement applies per task only where you author a node pool on 
 Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles.
 The toggles only decide whether each limitation is _active_ for the system.
 
-![Fabricate gathering settings](img/screenshots/fabricate-gathering-settings.webp)
+{% include screenshot.html case="manager-gathering-settings-normal" caption="The Limitation card, with neither limitation turned on." %}
 
 {: .note }
 
@@ -125,7 +125,7 @@ Leaving a task or event match tag empty means it matches any value for that dime
 Gathering rules are set per crafting system on the Gathering **Settings** tab.
 Once authored, they apply to every gathering environment in that system.
 
-![Fabricate gathering rules](img/screenshots/fabricate-gathering-settings.webp)
+{% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering rules for a system, in the inspector beside the Settings tab." %}
 
 | Rule                     | Values                                                                                                                                       |
 | :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -188,7 +188,7 @@ A task or event whose required weather or time of day is not currently satisfied
 In the player app the task is visible but not attemptable, marked **Conditions blocked**, and a blocked event is skipped during event selection.
 Changing the current gathering conditions to one of the required values flips the row back to available.
 
-![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
+{% include screenshot.html case="manager-environment-edit-events" caption="An automatic environment Events tab, with everything matching and nothing excluded." %}
 
 ## Gathering Tools Library
 

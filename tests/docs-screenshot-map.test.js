@@ -11,10 +11,11 @@
  * The reverse direction — "every committed image is named by the map" — is the one that catches an
  * image nobody generated: a browser grab, a leftover from an abandoned selection, a frame whose
  * map entry was deleted. It only works because the generated set lives in a directory of its own.
- * Mixed in with the seventeen hand-curated frames in the flat `docs/img/screenshots/`, the only
- * available test for "is this one of mine" would be "is it in the map", and the assertion would
- * reduce to the map restating itself. Five of the case ids even share the `fabricate-` prefix with
- * those curated files, so the two populations cannot be told apart by name either.
+ * Mixed in with the hand-curated frames in the flat `docs/img/screenshots/`, the only available
+ * test for "is this one of mine" would be "is it in the map", and the assertion would reduce to
+ * the map restating itself. Five case ids share the `fabricate-` prefix with the one curated file
+ * that remains, so the two populations cannot be told apart by name either — and that stays true
+ * however far the curated set shrinks, because the prefix is what makes them indistinguishable.
  *
  * `tests/docs-screenshots.test.js` owns the flat directory and this owns `lab/`. Neither may claim
  * the other's population, and neither is allowed to enumerate it by accident.

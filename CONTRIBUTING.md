@@ -950,12 +950,12 @@ Three files make up the mechanism.
 - `docs/img/screenshots/lab/` holds the generated images, one per mapped case.
 
 The generated set has a directory of its own, and that is load-bearing rather than tidiness.
-`docs/img/screenshots/` still holds seventeen hand-curated frames that predate the generator, five of the case ids share the `fabricate-` prefix with them, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
+`docs/img/screenshots/` still holds a hand-curated frame that predates the generator, five case ids share the `fabricate-` prefix with it, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
 That reduces the reverse gate to the map restating itself.
 `tests/docs-screenshots.test.js` owns the flat directory and `tests/docs-screenshot-map.test.js` owns `lab/`, and each says in its own comments which facts keep them apart.
 
-Those pre-existing seventeen frames stay exactly as they are.
-They remain valid documentation evidence and are not migrated, because retiring evidence that is still accurate buys nothing.
+What is left of that pre-existing population stays exactly as it is.
+It remains valid documentation evidence and is not migrated, because retiring evidence that is still accurate buys nothing.
 The rule applies to a new or replaced screenshot.
 
 `npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.

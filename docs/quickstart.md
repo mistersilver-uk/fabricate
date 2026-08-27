@@ -68,7 +68,7 @@ See [Journal]({% link journal.md %}).
 {: .gm }
 All crafting system editing requires the GM role.
 
-![Fabricate Create System](img/screenshots/fabricate-create-crafting-system.webp)
+{% include screenshot.html case="manager-systems-empty" caption="The crafting system library with nothing in it, and the first run panel beside it." %}
 
 1. Click **Manage Crafting Systems**
 2. In the **Systems** tab, click **Create System**
@@ -134,7 +134,7 @@ They are authored once and composed into environments.
 
 {% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, with the task identity and availability cards on the left and the selected drop rule on the right." %}
 
-![Fabricate gathering rules and limitations](img/screenshots/fabricate-gathering-settings.webp)
+{% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering Settings tab, with the resolution mode and limitation cards on the left and the system gathering rules on the right." %}
 
 {: .note }
 Stamina costs, modifiers, and drop rates accept **formulas** (numbers, ability modifiers, dice).
@@ -170,7 +170,7 @@ Return to the **Environments** tab and select the environment from Step 4 to add
 
 {% include screenshot.html case="manager-environment-edit-automatic-force-add" caption="The Tasks tab of an automatic environment, with Force add open on a non-matching task." %}
 
-![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
+{% include screenshot.html case="manager-environment-edit-events" caption="The Events tab of an automatic environment, with a composed event selected and its matching evidence beside it." %}
 
 ## Step 8: Gather as a Player
 
