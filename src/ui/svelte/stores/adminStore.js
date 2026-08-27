@@ -1188,7 +1188,7 @@ function _emptyWorldCurrencyState() {
     worldCurrency: {
       spendStrategy: 'actorProperty',
       providerId: '',
-      macros: { canAfford: '', increment: '', decrement: '' },
+      macros: { canAfford: '', increment: '', decrement: '', balance: '' },
       units: [],
     },
   };

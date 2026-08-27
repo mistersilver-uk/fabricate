@@ -7,8 +7,9 @@
  * its outcome tokens, the localization key each outcome answers with, and the two value
  * normalizers a member needs before it writes anything. The members themselves live where
  * their behaviour lives (`companionKnowledgeGrant.js`, `companionCheckRoll.js`,
- * `companionComponentAward.js`, `currencyAffordance.js`) and the descriptor is assigned onto
- * the facade in `src/main.js`.
+ * `companionComponentAward.js`, `companionPooledHoldings.js`,
+ * `companionPooledConsumption.js`, `currencyAffordance.js`) and the descriptor is assigned
+ * onto the facade in `src/main.js`.
  *
  * It sits under `src/systems/` rather than beside `src/ui/managerExtensions.js` because the
  * navigation seam is UI — route chrome pinned against a Svelte component — while this one is
@@ -74,7 +75,7 @@ export const COMPANION_PROMISES = Object.freeze({
 
 /**
  * WHERE a member is read from. A flat list of member names cannot resolve this set
- * uniformly, because two of the twelve members are not facade functions: `schemaVersion` is a
+ * uniformly, because two of the fourteen members are not facade functions: `schemaVersion` is a
  * number on the descriptor, and `findComponentItems` is a method on the object a `handle`
  * accessor RETURNS. Every row therefore declares its host and the path read off it, which is
  * what makes the member-resolution test mechanical rather than assumed.
@@ -105,7 +106,7 @@ export const COMPANION_MEMBER_KINDS = Object.freeze({
 /**
  * One member row.
  *
- * The single factory exists so the table below is twelve TUPLES rather than twelve repeated
+ * The single factory exists so the table below is fourteen TUPLES rather than fourteen repeated
  * frozen object literals: repeated near-identical literals are how a duplication block gets
  * reported, and a row that silently omits a field is invisible in that shape.
  *
@@ -128,8 +129,9 @@ const { value: VALUE, method: METHOD, accessor: ACCESSOR } = COMPANION_MEMBER_KI
  * The declared member set — the whole of the contract's surface, at exactly one promise tier
  * each.
  *
- * The members that WRITE are `grantRecipeKnowledge`, `awardComponents` and `creditCurrency`;
- * the rest read state, roll a check, settle one roll decision, or hand back a collaborator —
+ * The members that WRITE are `grantRecipeKnowledge`, `awardComponents`, `creditCurrency` and
+ * `consumePooledHoldings`; the rest read state, roll a check, settle one roll decision, or
+ * hand back a collaborator —
  * which is why the contract is named for the companion rather than for any one of them. The
  * word AWARD is deliberately not used loosely here any more: **Component Award** is a bound
  * domain term naming what `awardComponents` does, so the knowledge grant is called a grant
@@ -144,6 +146,12 @@ const { value: VALUE, method: METHOD, accessor: ACCESSOR } = COMPANION_MEMBER_KI
  * is the supported way to place a component on a sheet, so a companion that wants to place
  * one should call that instead of composing the write itself. Excluding this row would not
  * stop the call — only the deviation being written down.
+ *
+ * `consumePooledHoldings` is the first member that REMOVES value rather than placing it, and
+ * its sibling `readPooledHoldings` is the first that answers over a SET of actors rather than
+ * one. Both address their actors by UUID and not by id, because `game.actors.get()` cannot
+ * distinguish an unlinked token actor from its world prototype — a tolerable ambiguity for a
+ * member that GIVES, and a corrupting one for a member that DELETES (issue 1342).
  *
  * NEW ROWS ARE APPENDED, never interleaved (issue 1293). `getCraftingEngine().findComponentItems`
  * is named as "the eighth member" at four sites — twice in `tests/companion-facade.test.js`,
@@ -164,6 +172,8 @@ export const COMPANION_MEMBERS = Object.freeze(
     ['resolveBulkCheckDecision', HOST_FACADE, 'resolveBulkCheckDecision', STABLE, METHOD],
     ['awardComponents', HOST_FACADE, 'awardComponents', STABLE, METHOD],
     ['creditCurrency', HOST_FACADE, 'creditCurrency', STABLE, METHOD],
+    ['readPooledHoldings', HOST_FACADE, 'readPooledHoldings', STABLE, METHOD],
+    ['consumePooledHoldings', HOST_FACADE, 'consumePooledHoldings', STABLE, METHOD],
   ].map(companionMember)
 );
 
@@ -180,8 +190,8 @@ export const COMPANION_MEMBERS = Object.freeze(
  * Each token maps to itself so a caller reads
  * `result.outcome === COMPANION_OUTCOMES.alreadyKnown` rather than a bare string literal.
  * The authorization/readiness tokens are SHARED, but NOT uniformly: `gmOnly` and `notReady`
- * are answered by all SIX `stable` members that are METHODS — `schemaVersion` is a `stable`
- * VALUE and answers no outcome at all — while `noActor` is answered by the FIVE of those that
+ * are answered by all EIGHT `stable` members that are METHODS — `schemaVersion` is a `stable`
+ * VALUE and answers no outcome at all — while `noActor` is answered by the SEVEN of those that
  * target an actor: `resolveBulkCheckDecision` reads no actor and takes no `actorId`, so it can
  * never answer it. Each member answers with its OWN message key, because a failed grant
  * must not report itself in the words of a failed currency check.
@@ -260,6 +270,51 @@ export const COMPANION_OUTCOMES = Object.freeze({
   creditFailed: 'creditFailed',
   creditUnavailable: 'creditUnavailable',
   creditNotConfigured: 'creditNotConfigured',
+
+  // readPooledHoldings (issue 1342). `read` and `readFailed` are answered at BOTH levels — by
+  // the call and by an individual cost reading — on the rule the award block above states:
+  // minting a second word for a concept an existing token already names is how a caller ends up
+  // branching on both. Everything below them is ENTRY-LEVEL ONLY and can never be a call-level
+  // `outcome`; the list that says so as DATA is {@link POOLED_HOLDINGS_READ_ENTRY_OUTCOMES}.
+  //
+  // Both members address actors by UUID and BOTH fail closed on a set that does not fully
+  // resolve, which is what keeps a consume drawing from the same set a read reported. The two
+  // refusals split on WHAT resolved: the shared preamble answers `noActor` when NOT ONE of the
+  // supplied UUIDs addresses an actor — the same word every other actor-targeted member answers
+  // — and `invalidActorUuids` covers the request itself, meaning an absent, empty or
+  // over-bound list, a non-string entry, or a list where SOME resolved and some did not.
+  // Reading a pool over fewer actors than the caller believes is the harm both refuse.
+  //
+  // The names were chosen against near-misses. `invalidActorUuids` is not `invalidPool`,
+  // because POOL already names a resource reservoir in this domain. `balanceNotConfigured` is
+  // not `poolingUnsupported`, because nothing about pooling is unsupported — a `macro` world
+  // with no `balance` macro cannot answer for ONE actor either. `invalidCostType` names a
+  // string that names no axis at all, and `costTypeUnsupported` a DECLARED axis this member
+  // does not serve; the difference is "you mistyped" against "not yet".
+  read: 'read',
+  readFailed: 'readFailed',
+  balanceNotConfigured: 'balanceNotConfigured',
+  toolNotFound: 'toolNotFound',
+  invalidCostType: 'invalidCostType',
+  costTypeUnsupported: 'costTypeUnsupported',
+  invalidCosts: 'invalidCosts',
+  invalidActorUuids: 'invalidActorUuids',
+
+  // consumePooledHoldings (issue 1342). `consumed`, `consumeFailed` and `insufficient` are
+  // answered at BOTH levels; `notAttempted` is entry-level only, and it is what every OTHER
+  // cost reports when one cost's shortfall refuses the whole call before anything is written.
+  //
+  // `insufficient` stays distinct from `notAffordable` because that one is in the successful
+  // set: a QUESTION answered no is a success, a REFUSED ACT is not. Two tokens are deliberately
+  // NOT minted. `costNotFound` would be a third spelling of the shipped `componentNotFound`
+  // and `unitNotFound`, so a cost naming nothing answers one of those — or `toolNotFound` for
+  // a tool. `partiallyConsumed` would name a state this design cannot reach: the take is
+  // all-or-nothing by construction, so no call could answer it, and the dead-vocabulary sweep
+  // would then demand a key table entry for a refusal no member can emit.
+  consumed: 'consumed',
+  consumeFailed: 'consumeFailed',
+  insufficient: 'insufficient',
+  notAttempted: 'notAttempted',
 });
 
 /**
@@ -324,6 +379,15 @@ const SUCCESSFUL_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.awarded,
   COMPANION_OUTCOMES.partiallyAwarded,
   COMPANION_OUTCOMES.credited,
+  // The pooled READ answered the question it was asked, and a `consumed` take is an ACT THAT
+  // HAPPENED — the two rules this list already states. `insufficient` is deliberately ABSENT:
+  // a pool short of a cost is a refused act rather than a question answered no, which is the
+  // line separating it from `notAffordable` above; `consumeFailed` is absent for the reason
+  // `awardFailed` is. Omitting `read` would make every successful reading answer
+  // `success: false`, because `buildResult` computes `success` as membership here AND the
+  // presence of a message key (issue 1342).
+  COMPANION_OUTCOMES.read,
+  COMPANION_OUTCOMES.consumed,
 ]);
 
 /**
@@ -551,6 +615,192 @@ export const CURRENCY_CREDIT_MESSAGE_KEYS = Object.freeze({
 });
 
 /**
+ * The cost AXES a pooled request may name, published as symbols for the reason `callSites` is
+ * (issue 1342).
+ *
+ * `type` is a required, no-default, refused-on-mismatch input a caller types by hand, and
+ * `invalidCostType` is the whole of a typo's punishment — the argument the descriptor already
+ * makes for `callSite`. Reading `POOLED_COST_TYPES.component` is what stops a caller shipping
+ * `'components'`.
+ *
+ * WHICH axes a given member SERVES is that member's own behaviour and is not declared here:
+ * the read serves all three, the consume serves components and currency, and a tool cost on
+ * the consume answers `costTypeUnsupported` because tool WEAR is out of scope rather than
+ * because `tool` is not an axis.
+ */
+export const POOLED_COST_TYPES = Object.freeze({
+  component: 'component',
+  currency: 'currency',
+  tool: 'tool',
+});
+
+/**
+ * The axes this domain names that NO pooled member serves, declared as DATA so the two
+ * refusals stay decidable.
+ *
+ * A caller asking for an essence or a tag cost has not mistyped anything: it has named a real
+ * axis of a Fabricate requirement that these members do not read yet. That is
+ * `costTypeUnsupported` — "not yet" — where a string naming no axis at all is
+ * `invalidCostType` — "you mistyped". Collapsing the two would send an author looking for a
+ * spelling mistake that is not there. They are deliberately NOT in {@link POOLED_COST_TYPES}:
+ * that map is the set a caller may pass, and publishing a symbol for an axis every call
+ * refuses would advertise a capability that does not exist.
+ */
+export const POOLED_UNSERVED_COST_TYPES = Object.freeze(['essence', 'tag']);
+
+/**
+ * The three states a required tool can be read in.
+ *
+ * This is the SHIPPED Required Tool Display State vocabulary — the same three words
+ * `gatheringToolRuntime.js` and `GatheringEngine` already answer with — restated here as the
+ * published form rather than as a fourth spelling of it.
+ *
+ * That vocabulary is DISPLAY-ONLY in its own home, and it never relaxes the start-attempt tool
+ * gate. So a tool reading's `sufficient` is `state === 'present'` and NOTHING ELSE: a gate
+ * built on the state token alone would admit a `damaged` tool, which is exactly what the
+ * shipped gate refuses.
+ */
+export const POOLED_TOOL_STATES = Object.freeze({
+  present: 'present',
+  damaged: 'damaged',
+  missing: 'missing',
+});
+
+/** The tool states as a list, hoisted so the reading builder validates without re-deriving. */
+const POOLED_TOOL_STATE_TOKENS = Object.freeze(Object.values(POOLED_TOOL_STATES));
+
+/**
+ * The outcomes a pooled READING can answer with and a CALL never can (issue 1342).
+ *
+ * Declared as DATA on {@link COMPONENT_AWARD_ENTRY_OUTCOMES}' precedent, so the member's
+ * declared CALL-level set is its key table MINUS this list — computed rather than restated in
+ * two places that can disagree.
+ *
+ * `balanceNotConfigured` belongs here and not at call level, and that placement IS its
+ * behaviour: a `macro` world with no `balance` macro cannot answer a CURRENCY cost, and must
+ * still answer every component and tool cost in the same request. It reports `available: null`
+ * for its own reading and BLOCKS NOTHING.
+ *
+ * The list is the reading-ONLY tokens, not everything a reading can answer: `read` and
+ * `readFailed` are answered at both levels, so a reading's full vocabulary is this list PLUS
+ * those two.
+ */
+export const POOLED_HOLDINGS_READ_ENTRY_OUTCOMES = Object.freeze([
+  COMPANION_OUTCOMES.componentNotFound,
+  COMPANION_OUTCOMES.unitNotFound,
+  COMPANION_OUTCOMES.toolNotFound,
+  COMPANION_OUTCOMES.balanceNotConfigured,
+  COMPANION_OUTCOMES.invalidCostType,
+  COMPANION_OUTCOMES.costTypeUnsupported,
+  COMPANION_OUTCOMES.invalidQuantity,
+]);
+
+/**
+ * `readPooledHoldings`' outcome -> localization key table (issue 1342).
+ *
+ * The namespace is `Holdings.Read.*` — a NEW top-level `Holdings` namespace at
+ * `lang/en.json`'s domain-noun tier beside `Knowledge`, `Currency`, `Component`, `Check`,
+ * `Gathering`, `Alchemy`, `Tool` and `System`. (Written without its dotted prefix on purpose,
+ * following the shipped note on the grant's table: a partial key literal in a comment is
+ * captured by the localization guards as a namespace BASE, and a base declared only by a
+ * comment is a reference nothing renders.) POOLED HOLDINGS is the bound term for one answer
+ * over a combined supply, against BULK's many subjects settled serially.
+ *
+ * The table is the UNION of the call-level and reading-level vocabularies, because every
+ * reading carries its own `message` and because the dead-vocabulary sweep demands it.
+ *
+ * `InvalidCosts` and `InvalidActorUuids` are the only two strings that interpolate anything,
+ * and each interpolates its own BOUND as `max` rather than restating the number, exactly as
+ * `InvalidAwards` does — so neither string can drift from {@link POOLED_COSTS_MAX} or
+ * {@link POOLED_ACTORS_MAX}. Every READING-level key interpolates NOTHING, which is
+ * load-bearing rather than incidental: a reading carries no `messageData` at all, so a
+ * placeholder there would put literal braces in front of a GM. `Read` and `Failed` are the two
+ * answered at BOTH levels, so both are phrased to read as a statement about ONE cost while
+ * staying true of a whole call. The three refusals the FACADE answers with — `gmOnly`,
+ * `noActor`, `notReady` — are placeholder-free for the shipped reason recorded on the
+ * check-roll table.
+ */
+export const POOLED_HOLDINGS_READ_MESSAGE_KEYS = Object.freeze({
+  [COMPANION_OUTCOMES.read]: 'FABRICATE.Holdings.Read.Read',
+  [COMPANION_OUTCOMES.readFailed]: 'FABRICATE.Holdings.Read.Failed',
+  [COMPANION_OUTCOMES.componentNotFound]: 'FABRICATE.Holdings.Read.ComponentNotFound',
+  [COMPANION_OUTCOMES.unitNotFound]: 'FABRICATE.Holdings.Read.UnitNotFound',
+  [COMPANION_OUTCOMES.toolNotFound]: 'FABRICATE.Holdings.Read.ToolNotFound',
+  [COMPANION_OUTCOMES.balanceNotConfigured]: 'FABRICATE.Holdings.Read.BalanceNotConfigured',
+  [COMPANION_OUTCOMES.invalidCostType]: 'FABRICATE.Holdings.Read.InvalidCostType',
+  [COMPANION_OUTCOMES.costTypeUnsupported]: 'FABRICATE.Holdings.Read.CostTypeUnsupported',
+  [COMPANION_OUTCOMES.invalidQuantity]: 'FABRICATE.Holdings.Read.InvalidQuantity',
+  [COMPANION_OUTCOMES.invalidCosts]: 'FABRICATE.Holdings.Read.InvalidCosts',
+  [COMPANION_OUTCOMES.invalidActorUuids]: 'FABRICATE.Holdings.Read.InvalidActorUuids',
+  [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Holdings.Read.GMOnly',
+  [COMPANION_OUTCOMES.noActor]: 'FABRICATE.Holdings.Read.NoActor',
+  [COMPANION_OUTCOMES.notReady]: 'FABRICATE.Holdings.Read.NotReady',
+});
+
+/**
+ * The outcomes a pooled LEDGER ROW can answer with and a CALL never can (issue 1342).
+ *
+ * `notAttempted` is why this list exists at all: when one cost's shortfall refuses the whole
+ * call, every OTHER row reports `notAttempted` with `attempted: false` while the call answers
+ * `insufficient`. A call could never answer `notAttempted` — "nothing was attempted" is not a
+ * reason, it is the consequence of one.
+ *
+ * `systemNotFound` is a ROW answer here where `awardComponents` answers it at call level, and
+ * that follows from the request shape rather than from a difference of opinion: the award
+ * declares one `systemId` per call, while a downtime stage's requirements are mixed-system by
+ * construction, so each cost carries its own.
+ *
+ * The list is the row-ONLY tokens: `consumed`, `consumeFailed` and `insufficient` are answered
+ * at both levels, so a row's full vocabulary is this list PLUS those three.
+ */
+export const POOLED_HOLDINGS_CONSUME_ENTRY_OUTCOMES = Object.freeze([
+  COMPANION_OUTCOMES.notAttempted,
+  COMPANION_OUTCOMES.componentNotFound,
+  COMPANION_OUTCOMES.unitNotFound,
+  COMPANION_OUTCOMES.systemNotFound,
+  COMPANION_OUTCOMES.invalidCostType,
+  COMPANION_OUTCOMES.costTypeUnsupported,
+  COMPANION_OUTCOMES.invalidQuantity,
+]);
+
+/**
+ * `consumePooledHoldings`' outcome -> localization key table (issue 1342).
+ *
+ * A `Holdings.Consume.*` sibling of `Holdings.Read.*` and NOT a reuse of it: a failed consume
+ * must not report itself in the words of a failed read, which is the rule every member's own
+ * table exists to keep — and it bites hardest between these two, because the pair is designed
+ * to be called one after the other and a GM reading the second answer would have no way to
+ * tell which call produced it.
+ *
+ * `CreditNotConfigured` is placeholder-free HERE where the shipped `Currency.Credit` sibling
+ * interpolates `detail`, and that is the refusal's whole point: it is answered UP FRONT,
+ * before any mechanism has run and before any free text exists, because a `macro` world with
+ * no `increment` macro has published no way to give the coin back. `InvalidCosts` and
+ * `InvalidActorUuids` interpolate their own bounds as `max`; everything else interpolates
+ * nothing.
+ */
+export const POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS = Object.freeze({
+  [COMPANION_OUTCOMES.consumed]: 'FABRICATE.Holdings.Consume.Consumed',
+  [COMPANION_OUTCOMES.consumeFailed]: 'FABRICATE.Holdings.Consume.Failed',
+  [COMPANION_OUTCOMES.insufficient]: 'FABRICATE.Holdings.Consume.Insufficient',
+  [COMPANION_OUTCOMES.notAttempted]: 'FABRICATE.Holdings.Consume.NotAttempted',
+  [COMPANION_OUTCOMES.componentNotFound]: 'FABRICATE.Holdings.Consume.ComponentNotFound',
+  [COMPANION_OUTCOMES.unitNotFound]: 'FABRICATE.Holdings.Consume.UnitNotFound',
+  [COMPANION_OUTCOMES.systemNotFound]: 'FABRICATE.Holdings.Consume.SystemNotFound',
+  [COMPANION_OUTCOMES.invalidCostType]: 'FABRICATE.Holdings.Consume.InvalidCostType',
+  [COMPANION_OUTCOMES.costTypeUnsupported]: 'FABRICATE.Holdings.Consume.CostTypeUnsupported',
+  [COMPANION_OUTCOMES.invalidQuantity]: 'FABRICATE.Holdings.Consume.InvalidQuantity',
+  [COMPANION_OUTCOMES.invalidCosts]: 'FABRICATE.Holdings.Consume.InvalidCosts',
+  [COMPANION_OUTCOMES.invalidActorUuids]: 'FABRICATE.Holdings.Consume.InvalidActorUuids',
+  [COMPANION_OUTCOMES.creditNotConfigured]: 'FABRICATE.Holdings.Consume.CreditNotConfigured',
+  [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Holdings.Consume.InvalidCallSite',
+  [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Holdings.Consume.NotElected',
+  [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Holdings.Consume.GMOnly',
+  [COMPANION_OUTCOMES.noActor]: 'FABRICATE.Holdings.Consume.NoActor',
+  [COMPANION_OUTCOMES.notReady]: 'FABRICATE.Holdings.Consume.NotReady',
+});
+
+/**
  * The two localization keys the GM Knowledge surface's GRANTED source rungs render.
  *
  * Declared beside the contract, and not only in the renderer, for the reason the navigation
@@ -608,6 +858,33 @@ export const GRANTED_BY_MAX_LENGTH = 64;
  * caller answering `invalidAwards` supplies `{ max: AWARD_ENTRIES_MAX }` as its `messageData`.
  */
 export const AWARD_ENTRIES_MAX = 64;
+
+/**
+ * The longest `actorUuids` list either pooled member accepts, counted in ACTORS (issue 1342).
+ *
+ * Bounded on {@link AWARD_ENTRIES_MAX}' reasoning — widening what a published member accepts is
+ * free under the compatibility promise and narrowing it is a `schemaVersion` bump, so the cheap
+ * direction is the one that stays available — but bounded LOWER than it, because the work these
+ * members do is the PRODUCT of the two bounds rather than either one: every cost is scanned
+ * across every actor, and the consume then issues one batched write per actor that paid.
+ *
+ * The refusal string interpolates this bound as `max` rather than restating the number, so a
+ * caller answering `invalidActorUuids` supplies `{ max: POOLED_ACTORS_MAX }` as its
+ * `messageData`.
+ */
+export const POOLED_ACTORS_MAX = 32;
+
+/**
+ * The longest `costs` list either pooled member accepts, counted in ENTRIES (issue 1342).
+ *
+ * The other half of the product described on {@link POOLED_ACTORS_MAX}, and bounded for the
+ * same reason at the same number. A downtime stage names a handful of requirements; a list of
+ * this length is already far past anything an activity describes.
+ *
+ * The refusal string interpolates this bound as `max`, so a caller answering `invalidCosts`
+ * supplies `{ max: POOLED_COSTS_MAX }` as its `messageData`.
+ */
+export const POOLED_COSTS_MAX = 32;
 
 function buildResult(outcome, messageKeys, fallbackKey, messageData, extra) {
   const message = messageKeys[outcome] ?? fallbackKey;
@@ -939,6 +1216,261 @@ export function currencyCreditResult(outcome, messageData = null, credit = null)
 }
 
 /**
+ * The identity fields BOTH pooled per-entry builders echo back from the caller's own cost.
+ *
+ * Shared rather than written twice, because the two builders make the SAME promise about these
+ * five fields — a caller maps an answer back onto its request without having kept its own array
+ * — and two copies of that promise are two places for it to drift. An absent value is `null`
+ * and never `undefined`: `undefined` is the one value a published field cannot carry, because
+ * it does not survive being written to a log or a flag.
+ *
+ * @param {object|null} entry the member's INTERNAL record of one cost
+ * @returns {{type: string|null, systemId: *, componentId: *, unitId: *, requested: number|null}}
+ */
+function pooledCostEcho(entry) {
+  return {
+    type: typeof entry?.type === 'string' ? entry.type : null,
+    systemId: entry?.systemId ?? null,
+    componentId: entry?.componentId ?? null,
+    unitId: entry?.unitId ?? null,
+    requested: Number.isFinite(entry?.requested) ? entry.requested : null,
+  };
+}
+
+/**
+ * Freeze a member's internal per-entry list into the published one.
+ *
+ * The builder is called through an explicit arrow rather than passed by reference, for the
+ * reason recorded on {@link componentAwardResult}: `.map` supplies a THIRD argument, so a bare
+ * reference aligns a builder's signature with `.map`'s only by accident.
+ *
+ * @param {*} list the member's INTERNAL list, or anything at all
+ * @param {(entry: object, index: number) => object} build the per-entry builder
+ * @returns {ReadonlyArray<object>}
+ */
+function frozenPooledEntries(list, build) {
+  return Object.freeze(
+    (Array.isArray(list) ? list : []).map((entry, index) => build(entry, index))
+  );
+}
+
+/**
+ * The RESOLVED actor set, echoed back frozen.
+ *
+ * Echoed at all because both members fail closed on an unresolvable UUID: a caller must be able
+ * to see the exact set the answer was computed over, so that a consume it issues afterwards is
+ * known to have drawn from the set the read reported rather than a quietly smaller one.
+ *
+ * @param {*} list the member's INTERNAL record of what resolved
+ * @returns {ReadonlyArray<string>}
+ */
+function frozenActorUuids(list) {
+  return Object.freeze(
+    (Array.isArray(list) ? list : []).filter((uuid) => typeof uuid === 'string' && uuid !== '')
+  );
+}
+
+/**
+ * Build one frozen cost reading for {@link pooledHoldingsReadResult} (issue 1342).
+ *
+ * `index` is the record's POSITION in the answer, taken from the map rather than from the
+ * caller's entry, so it cannot disagree with where the record actually sits — the
+ * {@link componentAwardPlacement} rule. `message` is attached here rather than by the member,
+ * so a caller records each reading without composing free text out of `outcome`.
+ *
+ * - `available` — the POOLED count across the resolved actors, or `null`. `0` MEANS FABRICATE
+ *   CAN PROVE IT and `null` MEANS IT CANNOT: a currency reading in a `macro` world with no
+ *   `balance` macro answers `null`, while a component nobody is carrying answers `0`. That is
+ *   the shipped rule stated at {@link currencyCreditResult}, reused rather than re-derived, and
+ *   nobody should mint a fourth value.
+ * - `sufficient` — DERIVED from `available` against `requested`, and never passed in, on
+ *   {@link affordabilityResult}'s rule. `null` wherever `available` is `null`, so "the pool is
+ *   short" and "the pool could not be read" never collapse into the same confident `false`.
+ * - A TOOL is the one exception, and it is the delta's own: `sufficient` is
+ *   `state === 'present'` and NOTHING ELSE. `damaged` and `missing` both answer `false` even
+ *   though a damaged tool is physically there, because the shipped tool gate refuses a damaged
+ *   tool and a gate built on the state token alone would admit one.
+ * - `ambiguous` — `true` when the cost's NAME matched a component in more than one crafting
+ *   system. A strict boolean rather than a nullable one: `false` is a true statement about
+ *   every reading that resolved, and about every refusal too.
+ *
+ * @param {object} entry the member's INTERNAL record of one reading
+ * @param {number} index the entry's position in the caller's own `costs` list
+ * @returns {Readonly<object>}
+ */
+function pooledHoldingsReading(entry, index) {
+  const outcome = entry?.outcome;
+  const echo = pooledCostEcho(entry);
+  const state = POOLED_TOOL_STATE_TOKENS.includes(entry?.state) ? entry.state : null;
+  const available = Number.isFinite(entry?.available) ? entry.available : null;
+  let sufficient = null;
+  if (state !== null) sufficient = state === POOLED_TOOL_STATES.present;
+  else if (available !== null && echo.requested !== null) sufficient = available >= echo.requested;
+  return Object.freeze({
+    index,
+    ...echo,
+    name: typeof entry?.name === 'string' ? entry.name : null,
+    available,
+    sufficient,
+    state,
+    ambiguous: entry?.ambiguous === true,
+    outcome,
+    message:
+      POOLED_HOLDINGS_READ_MESSAGE_KEYS[outcome] ??
+      POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.readFailed],
+  });
+}
+
+/**
+ * Build `readPooledHoldings`' answer (issue 1342).
+ *
+ * Derived from the outcome and an INTERNAL reading record, on the same rule as
+ * {@link checkRollResult}: nothing here is overridable by a caller bag, which matters even on a
+ * member that writes nothing, because `buildResult` writes `success` BEFORE it spreads `extra`.
+ *
+ * - `actorUuids` — the RESOLVED set, echoed. `[]` on every refusal.
+ * - `readings` — one record per cost, in the caller's own order. A LIST, so its absence is `[]`;
+ *   `null` would force every caller to guard a `.length` read.
+ *
+ * The whole answer is DEEP-frozen — the result, both arrays and every reading — because
+ * `assertContractResult` checks `Object.isFrozen(result)` only, so a one-level freeze here would
+ * publish a mutable record with nothing failing.
+ *
+ * **This answer is exact at read time and is NOT a reservation.** Nothing stops an item moving
+ * between this call and a consume, so a caller that must not overdraw calls the consume and
+ * reads ITS refusal rather than trusting a `sufficient` it read a moment ago.
+ *
+ * @param {string} outcome one of {@link COMPANION_OUTCOMES}
+ * @param {object|null} [messageData] interpolation data; carries `max` for `invalidCosts` and
+ *   for `invalidActorUuids`
+ * @param {{actorUuids: string[], readings: Array<object>}|null} [record] the member's INTERNAL
+ *   reading record
+ * @returns {Readonly<{success: boolean, actorUuids: ReadonlyArray<string>,
+ *   readings: ReadonlyArray<object>, outcome: string, message: string, messageData?: object}>}
+ */
+export function pooledHoldingsReadResult(outcome, messageData = null, record = null) {
+  return buildResult(
+    outcome,
+    POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+    POOLED_HOLDINGS_READ_MESSAGE_KEYS[COMPANION_OUTCOMES.readFailed],
+    messageData,
+    {
+      actorUuids: frozenActorUuids(record?.actorUuids),
+      readings: frozenPooledEntries(record?.readings, pooledHoldingsReading),
+    }
+  );
+}
+
+/**
+ * The two row outcomes under which a WRITE WAS ISSUED for that cost, and so the two that answer
+ * `attempted: true`.
+ *
+ * Every other row answers `false`, INCLUDING the row whose own shortfall refused the call: a
+ * pool short of a cost is refused before anything is written, so nothing was attempted there
+ * either. Deriving `attempted` from this list rather than carrying it on the record is what
+ * stops the flag disagreeing with the outcome beside it.
+ */
+const ATTEMPTED_CONSUME_OUTCOMES = Object.freeze([
+  COMPANION_OUTCOMES.consumed,
+  COMPANION_OUTCOMES.consumeFailed,
+]);
+
+/**
+ * Build one frozen take line — WHICH document on WHICH actor paid, and how much.
+ *
+ * `documentUuid` is `null` rather than absent for a currency take a game system settles as a
+ * numeric property rather than as an item, which is the majority case: there is no document to
+ * name, and `null` says so where `undefined` would not survive a log.
+ *
+ * @param {object} take the member's INTERNAL record of one document's contribution
+ * @returns {Readonly<{actorUuid: string|null, documentUuid: string|null, quantity: number}>}
+ */
+function pooledConsumptionTake(take) {
+  return Object.freeze({
+    actorUuid: typeof take?.actorUuid === 'string' ? take.actorUuid : null,
+    documentUuid: typeof take?.documentUuid === 'string' ? take.documentUuid : null,
+    quantity: Number.isFinite(take?.quantity) ? take.quantity : 0,
+  });
+}
+
+/**
+ * Build one frozen ledger row for {@link pooledHoldingsConsumeResult} (issue 1342).
+ *
+ * - `takes` — the per-document lines that paid this cost, DEEP-frozen. `[]` when nothing was
+ *   taken, which is every refused row and every restored one.
+ * - `consumed` — SUMMED from `takes`, never passed in. A carried total could disagree with the
+ *   lines beside it and a reader would have no way to know which was right; summed, the ledger
+ *   IS the total.
+ * - `attempted` — DERIVED from the row's own outcome, so the flag and the token cannot
+ *   contradict each other.
+ *
+ * @param {object} entry the member's INTERNAL record of one cost's settlement
+ * @param {number} index the entry's position in the caller's own `costs` list
+ * @returns {Readonly<object>}
+ */
+function pooledConsumptionRow(entry, index) {
+  const outcome = entry?.outcome;
+  const takes = Object.freeze(
+    (Array.isArray(entry?.takes) ? entry.takes : []).map((take) => pooledConsumptionTake(take))
+  );
+  return Object.freeze({
+    index,
+    ...pooledCostEcho(entry),
+    attempted: ATTEMPTED_CONSUME_OUTCOMES.includes(outcome),
+    consumed: takes.reduce((total, take) => total + take.quantity, 0),
+    takes,
+    outcome,
+    message:
+      POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[outcome] ??
+      POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.consumeFailed],
+  });
+}
+
+/**
+ * Build `consumePooledHoldings`' answer (issue 1342).
+ *
+ * Derived from the outcome and an INTERNAL ledger, on the same rule as
+ * {@link componentAwardResult} — and the rule matters most here, on the one member that TAKES
+ * value away rather than placing it.
+ *
+ * - `actorUuids` — the RESOLVED set the take drew from, echoed.
+ * - `ledger` — one row per cost, in the caller's own order, naming which documents on which
+ *   actors paid. `[]` means NOTHING WAS ATTEMPTED; a fully populated ledger beside
+ *   `consumeFailed` means everything was attempted and the take was rolled back.
+ * - `consumed` — SUMMED from the ledger's own rows, which are themselves summed from their
+ *   takes, so one derivation rule reaches the published total and no two figures can disagree.
+ *   It is `null` for every pre-attempt refusal, on {@link componentAwardResult}'s stated
+ *   reasoning: the total is a SUM OVER the ledger, so an empty ledger makes it vacuous rather
+ *   than provably zero.
+ *
+ * **This member is NOT idempotent.** Calling it twice takes twice, and there is no natural key
+ * to absorb a repeat — which is why it declares a `callSite` and refuses `notElected` on every
+ * client but the elected executor's. Not double-consuming is the caller's own obligation.
+ *
+ * @param {string} outcome one of {@link COMPANION_OUTCOMES}
+ * @param {object|null} [messageData] interpolation data; carries `max` for `invalidCosts` and
+ *   for `invalidActorUuids`
+ * @param {{actorUuids: string[], ledger: Array<object>}|null} [record] the member's INTERNAL
+ *   ledger
+ * @returns {Readonly<{success: boolean, actorUuids: ReadonlyArray<string>, consumed: number|null,
+ *   ledger: ReadonlyArray<object>, outcome: string, message: string, messageData?: object}>}
+ */
+export function pooledHoldingsConsumeResult(outcome, messageData = null, record = null) {
+  const ledger = frozenPooledEntries(record?.ledger, pooledConsumptionRow);
+  return buildResult(
+    outcome,
+    POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+    POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS[COMPANION_OUTCOMES.consumeFailed],
+    messageData,
+    {
+      actorUuids: frozenActorUuids(record?.actorUuids),
+      consumed: ledger.length === 0 ? null : ledger.reduce((total, row) => total + row.consumed, 0),
+      ledger,
+    }
+  );
+}
+
+/**
  * The CALL-SITE rule, shared by every member that declares one and existing exactly ONCE.
  *
  * A second shared rule beside the authorization preamble, deliberately separate because it
@@ -948,7 +1480,7 @@ export function currencyCreditResult(outcome, messageData = null, credit = null)
  * `invalidQuantity`).
  *
  * It lives HERE, in the Foundry-free leaf that already owns {@link COMPANION_CALL_SITES},
- * rather than in any one member's module: four members now gate on it, and the canonical
+ * rather than in any one member's module: five members now gate on it, and the canonical
  * requirement is that the rule exists once. It is pure — the election arrives as a seam — so
  * this module stays a leaf, and a member that lifted its own copy would be free to drift on
  * exactly the question a write may not be wrong about (issue 1301, D13).
@@ -975,6 +1507,108 @@ export function gateCompanionCallSite(request, seams) {
     return COMPANION_OUTCOMES.notElected;
   }
   return null;
+}
+
+/**
+ * Resolve ONE address, treating a resolver that THROWS as an address that answered nothing.
+ *
+ * A `stable` member may not throw, and the resolver is a Foundry global a caller's own world
+ * hands in: an address it cannot parse must become one unresolvable actor — which the rule below
+ * then refuses on — rather than an exception escaping a member that publishes "never throws".
+ * It is logged rather than swallowed, because a resolver that throws on a WELL-FORMED address is
+ * a defect and a silent `null` would report it as an empty party.
+ *
+ * The throw is REAL and not defensive: `fromUuidSync` raises on a pack-sourced EMBEDDED address
+ * (`Compendium.<pack>.Actor.<id>.Item.<id>`), because its `strict` parameter defaults to `true`
+ * on both v13.350 and v14.365 and such an address cannot be resolved synchronously. A companion
+ * assembling addresses from its own data can hold one, and it must become a refusal here rather
+ * than an exception out of a member that publishes "never throws".
+ *
+ * @param {string} uuid one caller address, already known to be a non-empty string
+ * @param {{resolveActor: (uuid: string) => object|null}} seams
+ * @returns {object|null}
+ */
+function resolveOnePooledActor(uuid, seams) {
+  try {
+    return seams.resolveActor(uuid) ?? null;
+  } catch (error) {
+    console.error(`Fabricate | Could not resolve the pooled holdings address "${uuid}"`, error);
+    return null;
+  }
+}
+
+/**
+ * The ACTOR-SET rule BOTH pooled members apply, existing exactly ONCE (issue 1342).
+ *
+ * A sibling of {@link gateCompanionCallSite}, here for that rule's stated reason: the canonical
+ * requirement is that the rule exists once, it is pure — the resolver arrives as a seam — and a
+ * member that lifted its own copy would be free to drift on the one question a member that
+ * DELETES may not be wrong about. It also sits beside the vocabulary comment that already
+ * describes this split, so the rule and its reasoning cannot come to live in two files.
+ *
+ * The GM half is deliberately NOT here. Reading `game.user` is the facade's, and the facade calls
+ * this only once that gate has passed — which is what keeps this module a Foundry-free leaf.
+ *
+ * The split is on WHAT RESOLVED, and both halves fail closed:
+ *
+ * - `noActor` when NOT ONE of the supplied addresses answers — the same word every other
+ *   actor-targeted member answers, said about a set;
+ * - `invalidActorUuids` when the REQUEST itself is wrong: absent, empty, longer than
+ *   {@link POOLED_ACTORS_MAX}, carrying anything that is not a non-empty string, only PARTLY
+ *   resolved, or resolving to the SAME DOCUMENT TWICE.
+ *
+ * A partly resolved list is the request being wrong rather than the world being empty, and that
+ * placement is the whole point: pooling over fewer actors than the caller believes is the harm
+ * both members refuse, because a consume would then draw from a different set than the read
+ * reported.
+ *
+ * ## A repeated document is the SAME harm, from the other direction
+ *
+ * A pool is a SET, and every consumer downstream sums per entry: the read flat-maps each entry's
+ * items into the candidate order and sums its coin, and the consume drains that same order. So a
+ * document that appears twice is counted twice — a party holding one stack of five reads as
+ * holding ten, and a take of eight then plans five from the stack AND three from the same stack,
+ * writes the reduction, deletes the emptied document and publishes `consumed: 8` for five units
+ * that left a sheet. Nothing fails, so nothing rolls back. That is the permissive direction, on
+ * the member that DELETES.
+ *
+ * It is not a hypothetical caller error either. `fromUuidSync` resolves a LINKED token's actor
+ * address and its world actor address to the IDENTICAL document (`Token#actor` returns
+ * `this.baseActor` when `isLinked`), so two well-formed, visibly different addresses legitimately
+ * name one pool — and the ordering rule this API publishes ("the caller's order IS the allocation
+ * policy") actively invites prepending the acting character to a party list.
+ *
+ * Distinctness is by object IDENTITY and never by `id`, and that distinction is load-bearing in
+ * the opposite direction: an UNLINKED token's synthetic actor is a DIFFERENT document carrying
+ * the SAME `id` as its base actor (`ActorDelta#applyDelta` builds it from `baseActor.toObject()`
+ * with `_id` deleted), and those two are genuinely different pools. An `id`-keyed test would
+ * collapse them and refuse a legitimate party.
+ *
+ * @param {*} actorUuids the caller's own list of addresses
+ * @param {{resolveActor: (uuid: string) => object|null}} seams
+ * @returns {{actors: Array<object>|null, outcome: string|null, messageData: object|null}}
+ */
+export function gatePooledActorUuids(actorUuids, seams) {
+  const wanted = Array.isArray(actorUuids) ? actorUuids : [];
+  const addressable =
+    wanted.length > 0 &&
+    wanted.length <= POOLED_ACTORS_MAX &&
+    wanted.every((uuid) => typeof uuid === 'string' && uuid.trim() !== '');
+  const actors = addressable
+    ? wanted.map((uuid) => resolveOnePooledActor(uuid, seams)).filter(Boolean)
+    : [];
+  const distinct = new Set(actors).size === actors.length;
+  if (addressable && distinct && actors.length === wanted.length) {
+    return { actors, outcome: null, messageData: null };
+  }
+  if (addressable && actors.length === 0) {
+    return { actors: null, outcome: COMPANION_OUTCOMES.noActor, messageData: null };
+  }
+  return {
+    actors: null,
+    outcome: COMPANION_OUTCOMES.invalidActorUuids,
+    messageData: { max: POOLED_ACTORS_MAX },
+  };
 }
 
 /**

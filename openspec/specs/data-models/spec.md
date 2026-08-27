@@ -475,11 +475,15 @@ CraftingSystem = {
     Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
     When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding. - `"macro"` drives currency through GM-supplied macros.
     Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem, caller }`.
-    `caller` is `"craft"` or `"award"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund, and `"award"` on the world-scoped affordability check AND on the world-scoped currency credit (see the _CurrencyConfig_ section), on both of which `recipe` and `craftingSystem` are `null`.
-    The token is positive on BOTH arms rather than inferred from those nulls, because a macro can test a token, while a null recipe is indistinguishable from an occasion the macro has never heard of.
-    The discriminator is therefore the PAIR `(macro key, caller)` rather than either half alone, and that pair separates FOUR occasions with no cell shared: `canAfford` with `"craft"` is the craft-time affordability gate, `canAfford` with `"award"` is the published affordability check, `increment` with `"craft"` is the player-cancel refund, and `increment` with `"award"` is the published currency credit.
-    `decrement` is deliberately absent from that set because it is craft-only and unambiguous, so a GM reading "the four occasions" does not wonder where their spend macro went.
-    Because `recipe` and `craftingSystem` are `null` on BOTH `"award"` occasions, a macro that dereferences `context.recipe` without first testing `caller` throws on every one of them.
+    `caller` is `"craft"`, `"award"` or `"consume"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund; `"award"` on the world-scoped affordability check AND on the world-scoped currency credit (see the _CurrencyConfig_ section); and `"consume"` on the pooled holdings pair (see `companion-api`).
+    On every non-`"craft"` occasion `recipe` and `craftingSystem` are `null`.
+    The token is positive on EVERY arm rather than inferred from those nulls, because a macro can test a token, while a null recipe is indistinguishable from an occasion the macro has never heard of.
+    ONE token covers the pooled READ and the pooled DEBIT rather than two, because they are the halves of a single companion act and a macro branching on `caller` wants one branch for both; what separates them is the macro KEY, so a macro can still tell "you are being asked" from "you are being told" without a fourth token.
+    It is named `"consume"` and not `"cost"` because `"craft"` and `"award"` name the ACT rather than the thing being paid.
+    The discriminator is therefore the PAIR `(macro key, caller)` rather than either half alone, and the occasions it separates are: `canAfford` with `"craft"`, the craft-time affordability gate; `canAfford` with `"award"`, the published affordability check; `decrement` with `"craft"`, the craft-time spend; `decrement` with `"consume"`, the pooled holdings debit; `balance` with `"consume"`, the pooled holdings read; `increment` with `"craft"`, the player-cancel refund; `increment` with `"consume"`, the pooled debit's own intra-call give-back; and `increment` with `"award"`, the published currency credit.
+    **That last cell is the one pair that is not unique**, and it is declared rather than left to be discovered: a pooled consume that has to unwind a currency cost it already settled gives it back THROUGH the published credit, so a GM's `increment` macro sees `"award"` for that unwind exactly as it does for a credit a companion asked for outright.
+    A macro that needs to tell them apart cannot do it from the context, and does not need to: both are Fabricate returning coin it is entitled to return, and the `increment` macro's job is the same in each.
+    Because `recipe` and `craftingSystem` are `null` on every `"award"` and `"consume"` occasion, a macro that dereferences `context.recipe` without first testing `caller` throws on every one of them.
     A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player.
     Under `caller: "craft"` a failure aborts the craft before ingredient consumption.
     Under `caller: "award"` a macro that THREW answers a refusal DISTINGUISHABLE from a genuine shortfall: `MacroCoinSpender` marks its catch branch `thrown: true`, and the affordability check reports that the question could not be answered rather than that the actor cannot pay.
@@ -490,16 +494,21 @@ CraftingSystem = {
     The `wroteNothing` marker is what carries that last distinction, and a reader of both members tests it FIRST.
     Three of the four unrunnable spellings additionally carry `thrown: true` — the two that throw today, plus a non-`script` macro, whose command is chat text compiled as JavaScript and so throws for any body that is not also valid JS — solely so that the shipped affordability answer for each of them does not move; the blank-command spelling carries `wroteNothing` alone, for the same reason in the other direction.
     **This MOVES a shipped answer, and that is declared rather than discovered:** a player cancelling a craft in an `actorProperty` world whose `actorPath` is mis-typed now receives a PARTIAL refund rather than a reported full one, with a console error, because a discarded write was never a refund.
-    The `increment` macro performs TWO occasions, not one.
+    The `increment` macro performs THREE occasions, not one.
     The first is the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
     The second is the world-scoped currency credit published to a companion module, which reaches this same macro with `caller: "award"`.
+    The third is a pooled holdings consume giving coin back — either the currency leg's own intra-call restore, at `caller: "consume"`, or the member's outer unwind, which routes through the published credit and therefore arrives at `caller: "award"`.
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
-    The published credit answers such a world with _the world cannot express this credit_, never with _the spender declined_, because `increment` is the ONE macro key of the three that is optional and a missing one is therefore a documented-normal world state rather than a broken one.
-    That argument is `increment`'s alone: profile validation REQUIRES `canAfford` and `decrement`, so a `macro` world missing either fails validation and answers `ladderInvalid` before a spender exists at all.
+    The published credit answers such a world with _the world cannot express this credit_, never with _the spender declined_, because `increment` is optional and a missing one is therefore a documented-normal world state rather than a broken one.
+    **A pooled holdings consume goes further and refuses to take currency from that world at all**, up front and before the pool is read, answering `creditNotConfigured` having written nothing: taking coin a world has published no way to return is the one failure a member that deletes may not risk, and the refusal reads world configuration alone so it never needs a reading to decide.
+    That argument is `increment`'s and `balance`'s alone among the four keys: profile validation REQUIRES `canAfford` and `decrement`, so a `macro` world missing either fails validation and answers `ladderInvalid` before a spender exists at all.
+    The `balance` key ASKS rather than acts, and is therefore interpreted differently from every other key: a returned NUMBER is the answer — `0` meaning provably none — and anything else means _cannot see_, where the shared spend interpretation would read a bare `250` as a refusal.
+    It is optional on `increment`'s precedent, and a world that never authors it loses the pooled read and keeps every craft-time behaviour unchanged.
+    Adding the key needed no migration: normalization iterates the declared key list and runs on every read, so `macros.balance: ""` backfills in every existing world for free.
     Under the credit a THROWN `increment` macro answers that whether anything was credited is UNKNOWN, never a decline; an `increment` uuid that names nothing RUNNABLE answers _the world cannot credit_, exactly as a missing one does.
     "Nothing runnable" is defined POSITIVELY and gated before anything is run, rather than discovered from a syntax error, because `Macro#command` is a string field on EVERY macro type: a uuid that resolves to nothing, a document with no string command, a macro whose type is not `script`, and a blank command are all the same fact.
     The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
-20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
+20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement`/`balance` UUID strings (each default `""`).
     Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
     Absent fields back-compat default to `""`/empty macros with no migration.
     The retired `inventoryMode` field is never emitted.
@@ -692,7 +701,7 @@ It is persisted as the `fabricate.currencyConfig` world setting (`scope: "world"
 type CurrencyConfig = {
   spendStrategy: "actorProperty" | "actorInventory" | "macro"; // default "actorProperty"
   providerId: string; // default ""; meaningful only under actorInventory, always persisted
-  macros: { canAfford: string; increment: string; decrement: string }; // default all ""; meaningful only under macro
+  macros: { canAfford: string; increment: string; decrement: string; balance: string }; // default all ""; meaningful only under macro
   units: CurrencyUnit[]; // default []
 };
 ```
@@ -737,6 +746,23 @@ type CurrencyConfig = {
     That first conjunct is what licensed a world-scoped surface reaching GM-authored macro code with caller-chosen arguments at all, and it is NOT true of the credit.
 14. The CREDIT performs exactly one write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
     Its safety therefore rests on TWO gates rather than one: the GM gate at the facade, and the call-site and election gate that requires a caller declaring a `broadcast` call site to be this client's elected executor.
+15. A THIRD pair of world-scoped paths reads and spends against a SET of actors: the pooled balance read and the pooled debit behind the companion contract's pooled holdings members.
+    They answer against the WORLD configuration alone on requirement 10's reasoning, and neither consults a crafting system's `requirements.currency.enabled` toggle.
+    The pooled read is the only currency path that fires a GM's `balance` macro, and it fires it once per actor, SERIALLY: firing N of a world's own automation concurrently is a behaviour a GM cannot reason about, and the set is a party, so N is small.
+16. **A pooled balance COMPOSES BY ADDITION, and that is a property of the readers rather than an assumption.**
+    Every coin spender's balance read answers the actor's whole ladder branch expressed in ONE terminal base unit — 1 gp and 10 sp are the same 100 copper to all of them — so N actors' answers are N numbers in one denomination and their sum is the pool.
+    No pooled path re-derives a conversion rate.
+    **A pool containing ONE unreadable actor is UNREADABLE, not partial.**
+    The pooled `available` is `null` the moment any actor answers _cannot see_, because a sum over a subset is a number about a different group than the caller asked about — and it is always too SMALL, so a gate built on it would refuse parties that can pay while looking authoritative.
+    Per-actor readings are still reported individually so a caller can say which actor and why.
+    An EMPTY actor set reads `0` rather than `null`: nothing was unreadable, and the pool provably holds nothing; refusing an empty set belongs to the calling member, not to this path.
+17. **Every per-actor spend in a pooled debit is denominated in the TERMINAL BASE UNIT, and that is a correctness requirement rather than a style.**
+    The recipe-shaped aggregation expresses a requirement back in a representative unit by rounding UP, which exists so a SINGLE payer is never under-charged; applied per actor across N payers the same rounding over-charges the POOL by up to `baseValue - 1` for every payer, so on a `gp → sp → cp` ladder four characters splitting one cost could be charged nearly 4 gp more than it.
+    In the base unit that ceiling is the identity, so the pool pays exactly what was asked, and the spend path breaks higher denominations to satisfy a base-unit requirement, so paying in copper costs an actor holding only gold nothing extra.
+    A pooled debit's amount must be a positive SAFE-INTEGER count whose product with the unit's base value is also a safe integer, on the CREDIT's rule rather than the check's: admitting a fraction would let the debit take an amount the published credit cannot express, so a companion could remove money it could not put back through the API.
+    A pooled debit is all-or-nothing — the pool is tested against the total before anything is written — and a failure part-way gives back every payment that settled, in the SAME base-unit amount it was taken, which restores an actor's TOTAL exactly even though their coin MIX may differ.
+    A give-back that itself FAILED is recorded and does NOT become a zero-mutation claim, and that exclusion is the whole reason the debit refuses up front in a world that cannot give coin back.
+    The pooled READ, unlike the debit, converts its answer BACK into the caller's own unit and FLOORS it, because a pool holding three and a half gold pieces cannot pay four, and because deriving a sufficiency from two different denominations would err PERMISSIVE.
 
 ## TravelConfig
 
@@ -915,7 +941,8 @@ type CurrencyUnit = {
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
-     Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
+     Additionally, the config-level `canAfford` and `decrement` macros must be set; the `increment` and `balance` macros are both OPTIONAL, and a world missing either is a documented-normal state rather than a broken one.
+     What each absence costs is stated positively, because "optional" alone tells a GM nothing: with no `increment` macro the world cannot refund a cancelled craft, the published currency credit answers _the world cannot express this credit_, and the pooled holdings consume refuses a currency cost up front rather than taking coin it could not give back; with no `balance` macro the world can still spend coin but cannot report it, so every pooled currency reading answers _cannot see_ and nothing else in the request is affected.
      The `"macro"` requirement is unchanged by the abbreviation default: an empty `abbreviation` (the new default for an unauthored unit) still produces the missing-abbreviation validation error under `"macro"`.
 7. When a stored `abbreviation` strictly equals the unit `id` **and** the id has the generated-id shape (`/^[A-Za-z0-9]{10,}$/`, matching `foundry.utils.randomID()` or the crypto fallback), normalization treats the abbreviation as unauthored and resets it to the empty string (legacy self-heal).
    Short or non-alphanumeric semantic ids are **deliberately left un-healed** even when `abbreviation === id`: they fail the generated-id shape guard, so a hand-authored abbreviation that intentionally equals a semantic id (e.g. the seeded preset coin keys `cp`/`sp`/`ep`/`gp`/`pp`, the only such ids in practice) is preserved.
@@ -1803,8 +1830,11 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
    With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
 3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated per terminal base unit — **before** any item or currency mutation.
    On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
-4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
+4. On the CRAFT path, currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
+   The scope matters because the companion contract's pooled holdings consume settles in the same order for a different reason, and the two agree rather than merely coinciding: an earlier draft of that member had them opposed.
+   Here the order follows from the craft's own sequencing; there it follows from which leg has a reliable inverse — a deleted component is restorable exactly, while a currency give-back may be absent or lossy — so the recoverable leg is taken first in both.
    Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded — the settled deductions are NOT rolled back, and the craft still proceeds.
+   That last clause is the craft path's alone: the pooled consume gives back everything it took in the same call, which is the difference between a craft that has already produced its result and a companion request that has produced nothing yet.
    Deduction is aggregated per terminal base unit and stops at the first group that fails, so no further currency is taken for a craft already in an anomalous state; the deduction reports which groups settled.
    A time-gated step that consumes at START records on its run ONLY the spends that actually settled, never the intended plan.
    A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.

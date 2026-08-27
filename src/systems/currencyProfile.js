@@ -84,7 +84,8 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
  * - `actorInventory` — a preconfigured provider (filtered by `game.system.id`) owns the
  *   denomination ladder; units located by `denomination`.
  * - `macro` — the GM supplies custom `canAfford`/`decrement` macros (the macro receives the actor
- *   and does whatever it likes), with units keyed by `abbreviation`.
+ *   and does whatever it likes), with units keyed by `abbreviation`. `increment` (refund) and
+ *   `balance` (holdings read) are optional peers of those two.
  *
  * @type {Set<string>}
  */
@@ -93,12 +94,25 @@ const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 /**
  * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
- * the craft, `decrement` performs the spend, and `increment` performs the refund on a player-cancel
- * reversal (issue 848). Used by the normalizer and the macro spender to iterate the macro slots.
+ * the craft, `decrement` performs the spend, `increment` performs the refund on a player-cancel
+ * reversal (issue 848), and `balance` REPORTS holdings rather than acting on them (issue 1342).
+ * Used by the normalizer, the editor and the macro spender to iterate the macro slots.
+ *
+ * ## `balance` needs no migration, and this is where that is recorded
+ *
+ * {@link normalizeCurrencyConfig} iterates THIS array, and `CurrencyConfigStore.load()` normalizes
+ * on EVERY read — it never trusts the stored shape. So a world persisted before `balance` existed
+ * reads back with `macros.balance: ''` the first time anything asks for its config, with no
+ * migration step and no `migrationVersion` advance. Do not add one: a migration here would rewrite
+ * every world's setting to produce the value the normalizer already produces for free.
+ *
+ * The keys are APPENDED rather than inserted, because the array is the render order of the macro
+ * fields in `WorldCurrencyTab.svelte`, and the three shipped fields should not move under a GM who
+ * knows where they are.
  *
  * @type {string[]}
  */
-export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement'];
+export const CURRENCY_MACRO_KEYS = ['canAfford', 'increment', 'decrement', 'balance'];
 
 // The provider/macro settings only carry meaning under their owning strategy (`providerId` for
 // `actorInventory`, `macros` for `macro`), but they are always persisted so flipping the strategy
@@ -144,7 +158,8 @@ function resolveSpendStrategy(currency = {}) {
  * @param {object} [currency]
  * @param {{ randomID?: () => string }} [options]
  * @returns {{ enabled: boolean, spendStrategy: string, providerId: string,
- *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ *   macros: { canAfford: string, increment: string, decrement: string, balance: string },
+ *   units: object[] }}
  */
 export function normalizeCurrencyConfig(currency = {}, options = {}) {
   const randomID = typeof options.randomID === 'function' ? options.randomID : undefined;
@@ -174,7 +189,8 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
  * @param {object} [config]
  * @param {{ randomID?: () => string }} [options]
  * @returns {{ spendStrategy: string, providerId: string,
- *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ *   macros: { canAfford: string, increment: string, decrement: string, balance: string },
+ *   units: object[] }}
  */
 export function normalizeWorldCurrencyConfig(config = {}, options = {}) {
   // Legacy `provider: 'system'` + `systemAdapter` configs used to be resolved by
@@ -205,6 +221,110 @@ export function findCurrencyUnit(units = [], unitId = '') {
   const id = String(unitId || '').trim();
   if (!id) return null;
   return (Array.isArray(units) ? units : []).find((unit) => unit?.id === id) || null;
+}
+
+/**
+ * EVERY string a currency unit answers to, in DISPLAY PRECEDENCE, declared exactly once.
+ *
+ * One list, read in two directions. {@link currencyUnitDisplayName} takes the FIRST non-empty
+ * entry — the shipped `abbreviation` -> `label` -> `id` chain, which was spelled out at three
+ * separate sites before this list existed. {@link resolveCurrencyUnitByName} takes ALL of them and
+ * matches a caller's string against the set.
+ *
+ * Deriving the reverse direction from the forward one is the whole point, and it is a correctness
+ * property rather than tidiness: a name Fabricate PRINTED must be a name Fabricate ACCEPTS. If the
+ * two field sets were chosen independently, a unit could render as "Gold Pieces" on one surface and
+ * then be unresolvable when a caller handed that exact string back — which is precisely the
+ * asymmetry the pooled holdings read exposed for currency (issue 1342).
+ *
+ * The reads are tolerant in the same places {@link normalizeCurrencyUnit} is tolerant
+ * (`abbr` beside `abbreviation`, `name` beside `label`), so a raw, not-yet-normalized unit
+ * resolves by the same names its normalized form would.
+ */
+const CURRENCY_UNIT_NAME_FIELDS = Object.freeze([
+  (unit) => String(unit?.abbreviation || unit?.abbr || '').trim(),
+  (unit) => String(unit?.label || unit?.name || '').trim(),
+  (unit) => String(unit?.id || '').trim(),
+]);
+
+/**
+ * The human name of a unit — `abbreviation`, then `label`, then `id`, first non-empty wins.
+ *
+ * The single home of a chain that was written out at three sites: the requirement formatter here,
+ * the sub-unit picker projection below, and `currencyAffordance`'s shortfall messages. A GM
+ * reading "you need 50 gp" from a craft and "50 gp" from a companion refusal must be reading the
+ * same derivation, not two that happen to agree.
+ *
+ * @param {object|null} unit A currency unit, raw or normalized.
+ * @returns {string} The display name, or `''` when the unit names itself in no way at all.
+ */
+export function currencyUnitDisplayName(unit) {
+  for (const read of CURRENCY_UNIT_NAME_FIELDS) {
+    const value = read(unit);
+    if (value) return value;
+  }
+  return '';
+}
+
+/**
+ * Resolve a unit from a string a HUMAN wrote — its id, its abbreviation or its label.
+ *
+ * The inverse of {@link currencyUnitDisplayName}, and the counterpart to
+ * {@link findCurrencyUnit}, which matches an id and only an id. It exists because a caller that
+ * authors requirements the way a person speaks — "gold", "gp", "Gold Pieces" — otherwise cannot
+ * name a coin at all, while the component and tool axes of the same request resolve their names
+ * case-insensitively. One request should not mean two different things by "name" (issue 1342).
+ *
+ * ## Two tiers, and the order is load-bearing
+ *
+ * 1. **An exact `id` match wins outright**, through {@link findCurrencyUnit} itself, so a caller
+ *    that already passes a unit id gets BYTE-IDENTICAL behaviour to before this function existed
+ *    — whatever labels the world carries. That is what makes tier 2 purely additive rather than a
+ *    change of meaning. It also protects a world whose ids are ordinary words: an id is the GM's
+ *    durable handle for a coin and survives a rename, where a label is display text that can be
+ *    retyped at any moment, so letting another unit's LABEL shadow this unit's ID would let an
+ *    unrelated edit silently redirect a working caller. That is the same durable-identity-beats-
+ *    display-name precedence the component matcher already applies.
+ * 2. **Otherwise every name folds into ONE tier**, compared case-insensitively after trimming, the
+ *    way the component definition index folds its own name lookup. Abbreviation does NOT beat
+ *    label, deliberately: {@link currencyUnitDisplayName} renders whichever of the two is present,
+ *    so a caller holding a string Fabricate printed cannot know which field it came from. Ranking
+ *    them would resolve a genuine collision by a coin flip that looks authoritative; keeping them
+ *    level makes the collision VISIBLE.
+ *
+ * ## Ambiguity is reported, never resolved silently
+ *
+ * When more than one unit answers to the folded name — two units sharing a label, or one unit's
+ * label colliding with another's abbreviation — `ambiguous` is `true` and `unit` is the first in
+ * ladder order. The caller decides what that means. A pooled holdings read surfaces it on the
+ * reading's own `ambiguous` field, exactly as it does for a component name that matches in two
+ * crafting systems, because a caller is liable to CONSUME by the id a read handed back and a
+ * quietly chosen coin is a quietly chosen debit.
+ *
+ * A unit with no `id` is skipped: it is unaddressable by any caller, so resolving a name to it
+ * could only produce a lookup that then misses.
+ *
+ * @param {object[]} [units] The world coin ladder, raw or normalized.
+ * @param {string} [name] The caller's string.
+ * @returns {{ unit: object|null, ambiguous: boolean }}
+ */
+export function resolveCurrencyUnitByName(units = [], name = '') {
+  const wanted = String(name ?? '').trim();
+  if (!wanted) return { unit: null, ambiguous: false };
+
+  const exact = findCurrencyUnit(units, wanted);
+  if (exact) return { unit: exact, ambiguous: false };
+
+  const folded = wanted.toLowerCase();
+  const matches = (Array.isArray(units) ? units : []).filter(
+    (unit) =>
+      String(unit?.id || '').trim() !== '' &&
+      CURRENCY_UNIT_NAME_FIELDS.some((read) => {
+        const value = read(unit);
+        return value !== '' && value.toLowerCase() === folded;
+      })
+  );
+  return { unit: matches[0] ?? null, ambiguous: matches.length > 1 };
 }
 
 function integerGcd(a, b) {
@@ -389,6 +509,12 @@ function buildUnitResolver(byId, errors) {
 // (canAfford) and deduct (decrement); both are required. `increment` performs the player-cancel
 // refund (issue 848) and stays OPTIONAL — a system with no increment macro simply cannot refund a
 // macro-mode cancel (the reversal reports the failure rather than aborting).
+//
+// `balance` (issue 1342) stays OPTIONAL on exactly that precedent, and the precedent is what makes
+// the choice safe rather than lenient: requiring it would make every world that already authored a
+// valid macro ladder INVALID at craft time, because `validateCurrencyProfile` is the same gate the
+// engine's afford check and deduction run through. A missing `balance` macro costs a world only the
+// pooled holdings read, which answers "cannot see" and blocks nothing.
 function collectMacroConfigErrors(macros, errors) {
   const safeMacros = macros && typeof macros === 'object' ? macros : {};
   if (!String(safeMacros.canAfford || '').trim()) {
@@ -411,11 +537,13 @@ function collectMacroConfigErrors(macros, errors) {
  * - `actorInventory`: each unit's `denomination` (defaulting to its id) must be a pf2e coin key
  *   (`pp`/`gp`/`sp`/`cp`).
  * - `macro`: each unit must have a non-empty `abbreviation` (macros match coins by abbreviation),
- *   and the config-level `canAfford` and `decrement` macros must be set (`increment` optional).
+ *   and the config-level `canAfford` and `decrement` macros must be set (`increment` and
+ *   `balance` optional).
  *
  * @param {object[]} [units]
  * @param {{ spendStrategy?: string,
- *   macros?: { canAfford?: string, increment?: string, decrement?: string } }} [options]
+ *   macros?: { canAfford?: string, increment?: string, decrement?: string, balance?: string }
+ *   }} [options]
  * @returns {{ valid: boolean, errors: string[], units: object[], metadata: Map }}
  */
 export function validateCurrencyProfile(units = [], options = {}) {
@@ -469,7 +597,7 @@ export function validateCurrencyProfile(units = [], options = {}) {
  */
 export function formatCurrencyRequirement(requirement, units = []) {
   const unit = findCurrencyUnit(units, requirement?.unit);
-  const label = unit?.abbreviation || unit?.label || requirement?.unit || '';
+  const label = currencyUnitDisplayName(unit) || requirement?.unit || '';
   return `${requirement?.amount ?? 0} ${label}`.trim();
 }
 
@@ -744,7 +872,7 @@ export function currencySubUnitOptions(units = [], parentUnitId = '') {
     .map((unit) => ({
       id: unit.id,
       label: unit.label || unit.id,
-      abbreviation: unit.abbreviation || unit.label || unit.id,
+      abbreviation: currencyUnitDisplayName(unit),
     }));
 }
 

@@ -1,6 +1,7 @@
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 
 import {
+  CURRENCY_MACRO_KEYS,
   buildCurrencyRefundUpdates,
   buildCurrencySpendUpdates,
   currencyTotalForBase,
@@ -20,8 +21,20 @@ import {
  *
  * `check` reports affordability for the up-front gate; `spend` performs the deduction and is the
  * authoritative insufficient-funds signal. The pure spend math and validation stay in
- * `currencyProfile.js`; the spenders own the actor I/O. `readCoins` remains on the
- * actor-property/inventory spenders as the shared affordability primitive that `check` wraps.
+ * `currencyProfile.js`; the spenders own the actor I/O. `readCoins` is the shared affordability
+ * primitive that `check` wraps on the actor-property/inventory spenders, and since issue 1342 the
+ * macro spender answers it too, through the GM's optional `balance` macro.
+ *
+ * ## `readCoins` is SYNCHRONOUS on two spenders and ASYNCHRONOUS on the third
+ *
+ * {@link MacroCoinSpender#readCoins} must run a macro, so it returns a Promise where the other two
+ * return a value. Every caller that may see a macro spender therefore has to `await` it, and the
+ * two shipped callers that CANNOT await — {@link checkAffordabilityViaReadCoins} and
+ * {@link buildAffordCurrencyProbe} — are unaffected only because neither is ever reached with a
+ * macro spender: the probe short-circuits the `macro` strategy above its `readCoins` call, and
+ * `MacroCoinSpender.check` does not go through the shared helper at all. A future caller that
+ * reads coins synchronously must keep one of those two properties, because `Promise.valid` is
+ * `undefined` rather than `false` and would read as a successful zero-balance answer.
  *
  * ## The two markers on a refusal, and what each one claims (issue 1301)
  *
@@ -149,6 +162,47 @@ export function interpretMacroSpendResult(result, { fallbackMessage } = {}) {
     return { valid: false, message: String(result.message || fallback) };
   }
   return { valid: false, message: fallback };
+}
+
+/**
+ * Interpret a `balance` macro's return value into the `readCoins` shape (issue 1342).
+ *
+ * **It is a separate interpreter from {@link interpretMacroSpendResult}, and it has to be.** That
+ * one answers `{ valid, message }` for a macro asked to DO something, and a bare number falls
+ * through its object test to `{ valid: false }` — so a `balance` macro that correctly returned
+ * `250` would be read as a refusal. The two questions have different answer spaces and cannot
+ * share a reader.
+ *
+ * **The rule is null-versus-zero, and it runs one way only.** A finite number — INCLUDING `0` —
+ * means the macro answered and the actor provably holds that much. Anything else means the
+ * question was not answered, and answers `{ valid: false }`, which every caller turns into a
+ * `null` "cannot see". Mapping an unanswered question to `0` is the exact lie this rule exists to
+ * prevent: a broken macro would report every actor as penniless, and a pooled gate built on that
+ * would refuse a well-funded party — or, worse at the other member, report a party as unable to
+ * pay for something it can plainly afford.
+ *
+ * A non-finite number (`NaN`, `Infinity`) is NOT a count and is refused with everything else. So
+ * is a numeric STRING: `currencyAffordance.js`'s request-side amount rule accepts `'5'` because a
+ * companion legitimately holds an authored activity field as text, but a macro is code the GM
+ * wrote for this contract and `Number('')` is `0` — coercing here would turn an empty return into
+ * a provable zero.
+ *
+ * Pure — no Foundry access — so it is unit-testable in isolation.
+ *
+ * @param {any} result - the macro's raw return value.
+ * @param {{ fallbackMessage?: string }} [options]
+ * @returns {{ valid: boolean, copperValue?: number, message?: string }}
+ */
+export function interpretMacroBalanceResult(result, { fallbackMessage } = {}) {
+  if (typeof result === 'number' && Number.isFinite(result)) {
+    return { valid: true, copperValue: result };
+  }
+  return {
+    valid: false,
+    message:
+      fallbackMessage ||
+      'The "balance" currency macro did not return a number, so the balance could not be read.',
+  };
 }
 
 /**
@@ -384,12 +438,18 @@ export class ActorInventoryCoinSpender {
 
 /**
  * Macro-backed actor-inventory spender. Under the `actorInventory` strategy's `macro` mode the
- * GM supplies their own currency macros: `canAfford` gates the craft, `decrement` spends, and
- * `increment` refunds. The `increment` macro is invoked by {@link refund} on the player-cancel
- * reversal (issue 848) — the refund flow it was always reserved for. Every macro path builds the
- * agreed context (supplied by the engine via `ctx.macroContext`) and passes the macro's return
- * value through the shared, pure {@link interpretMacroSpendResult}, so a `false`/`null`/throw
- * aborts loudly rather than silently granting a free craft or dropping a refund.
+ * GM supplies their own currency macros: `canAfford` gates the craft, `decrement` spends,
+ * `increment` refunds, and `balance` REPORTS holdings without acting on them. The `increment`
+ * macro is invoked by {@link refund} on the player-cancel reversal (issue 848) — the refund flow
+ * it was always reserved for. Every ACTING macro path builds the agreed context (supplied by the
+ * engine via `ctx.macroContext`) and passes the macro's return value through the shared, pure
+ * {@link interpretMacroSpendResult}, so a `false`/`null`/throw aborts loudly rather than silently
+ * granting a free craft or dropping a refund.
+ *
+ * `balance` (issue 1342) is the one key that ASKS rather than acts, so {@link readCoins} reads it
+ * through {@link interpretMacroBalanceResult} instead — a number is an answer there, and
+ * `interpretMacroSpendResult` would read `250` as a refusal. It shares every other mechanic
+ * (resolution, the four refusal shapes, the throw guard) through {@link _invokeMacro}.
  *
  * The context carries a `caller` discriminator (`'craft'` or `'award'`) and, on an award call,
  * `recipe: null` and `craftingSystem: null` — see `CURRENCY_SPEND_CALLERS` in
@@ -397,8 +457,16 @@ export class ActorInventoryCoinSpender {
  */
 export class MacroCoinSpender {
   /**
+   * The macro slots are copied by ITERATING {@link CURRENCY_MACRO_KEYS}, not by naming them
+   * (issue 1342). The three keys used to be hardcoded here, which meant a GM could author a
+   * fourth macro in an editor that persisted it, a normalizer that emitted it and a config the
+   * spender then silently dropped on the floor — the failure mode being a configured macro that
+   * simply never runs, with nothing anywhere reporting why. Iterating the declared list makes the
+   * constructor follow the vocabulary instead of shadowing it, so the next key needs no edit here.
+   *
    * @param {object} [options]
-   * @param {{ canAfford?: string, increment?: string, decrement?: string }} [options.macros]
+   * @param {{ canAfford?: string, increment?: string, decrement?: string, balance?: string }}
+   *   [options.macros]
    * @param {(uuid: string, context: object) => Promise<any>} [options.runMacro]
    * @param {(uuid: string) => Promise<object|null>} [options.resolveMacro] resolves a macro
    *   document for the gate below; defaults to a guarded `fromUuid`, in the shape
@@ -406,11 +474,10 @@ export class MacroCoinSpender {
    *   drivable without a Foundry global.
    */
   constructor({ macros = {}, runMacro = MacroExecutor.run, resolveMacro } = {}) {
-    this._macros = {
-      canAfford: String(macros?.canAfford || '').trim(),
-      increment: String(macros?.increment || '').trim(),
-      decrement: String(macros?.decrement || '').trim(),
-    };
+    this._macros = {};
+    for (const key of CURRENCY_MACRO_KEYS) {
+      this._macros[key] = String(macros?.[key] || '').trim();
+    }
     this._runMacro = typeof runMacro === 'function' ? runMacro : MacroExecutor.run;
     this._resolveMacro =
       typeof resolveMacro === 'function'
@@ -485,8 +552,27 @@ export class MacroCoinSpender {
    * was silent.
    */
   async _runMacroKey(key, actor, requirement, ctx) {
-    const macroUuid = this._macros[key];
     const fallbackMessage = `Could not spend currency (${formatCurrencyRequirement({ unit: requirementUnitId(requirement), amount: requirement?.amount }, ctx?.profile?.units || [])}).`;
+    return this._invokeMacro(key, ctx, {
+      fallbackMessage,
+      interpret: (result) => interpretMacroSpendResult(result, { fallbackMessage }),
+    });
+  }
+
+  /**
+   * The resolve-then-gate-then-run mechanics, shared by every macro key.
+   *
+   * Extracted (issue 1342) so `balance` reuses the four refusal shapes and their markers rather
+   * than growing a second copy of them. Only the INTERPRETATION differs between keys, so only the
+   * interpretation is injected — see {@link interpretMacroBalanceResult} for why a holdings answer
+   * cannot share {@link interpretMacroSpendResult}.
+   *
+   * Every refusal here answers `{ valid: false }` and NEVER a value, which is what keeps the
+   * null-versus-zero rule true for the balance read: the four "the macro never ran" shapes and the
+   * "no macro configured" shape all reach a caller as "cannot see", never as "holds nothing".
+   */
+  async _invokeMacro(key, ctx, { fallbackMessage, interpret }) {
+    const macroUuid = this._macros[key];
     if (!macroUuid) {
       // `wroteNothing` and NOT `thrown`, so a `macro` world with no `canAfford` configured
       // answers `checkAffordability` exactly what it answers today. That answer is itself a
@@ -509,12 +595,44 @@ export class MacroCoinSpender {
 
     const context = ctx?.macroContext || {};
     try {
-      const result = await this._runMacro(macroUuid, context);
-      return interpretMacroSpendResult(result, { fallbackMessage });
+      return interpret(await this._runMacro(macroUuid, context));
     } catch (error) {
+      // `thrown` and deliberately NOT `wroteNothing`: a macro that threw part-way may already
+      // have moved coins, so nothing here can prove the zero. The world-scoped credit tests
+      // `wroteNothing` before `thrown`, so adding it here would silently reclassify a broken
+      // `increment` macro from `creditUnavailable` to the retry-safe `creditNotConfigured`.
       console.error(`Fabricate | Currency ${key} macro failed (${macroUuid}):`, error);
       return { valid: false, thrown: true, message: fallbackMessage };
     }
+  }
+
+  /**
+   * Read the actor's holdings through the GM-supplied `balance` macro (issue 1342) — the macro
+   * strategy's answer to the same question {@link ActorPropertyCoinSpender#readCoins} answers, so
+   * a pooled holdings read composes across all three strategies rather than excluding one.
+   *
+   * **ASYNCHRONOUS, where the other two spenders' `readCoins` is synchronous.** See this module's
+   * header for which callers that constrains and why the shipped ones are safe.
+   *
+   * **`copperValue` is in the requirement unit's TERMINAL BASE UNIT**, exactly as it is on the
+   * other two spenders: the whole ladder branch's value, expressed in the branch's smallest coin.
+   * The macro is told which unit was asked about through `ctx.macroContext.requirement.unit` and
+   * is given the ladder in `ctx.macroContext.units`; the `cost` it receives carries a ZERO
+   * amount, because a balance read proposes no cost.
+   *
+   * **A refusal never becomes a zero.** Every failure path answers `{ valid: false, message }`,
+   * and callers publish `null`.
+   *
+   * @param {object|null} actor
+   * @param {{ profile?: object, unit?: object, macroContext?: object }} [ctx]
+   * @returns {Promise<{ valid: boolean, copperValue?: number, message?: string }>}
+   */
+  async readCoins(actor, ctx = {}) {
+    const fallbackMessage = `Could not read a currency balance for ${actor?.name || 'actor'}: the "balance" currency macro did not return a number.`;
+    return this._invokeMacro('balance', ctx, {
+      fallbackMessage,
+      interpret: (result) => interpretMacroBalanceResult(result, { fallbackMessage }),
+    });
   }
 
   /**

@@ -1790,7 +1790,7 @@
     $viewState.worldCurrency || {
       spendStrategy: 'actorProperty',
       providerId: '',
-      macros: { canAfford: '', increment: '', decrement: '' },
+      macros: { canAfford: '', increment: '', decrement: '', balance: '' },
       units: [],
     }
   );
@@ -1830,6 +1830,7 @@
       canAfford: '',
       increment: '',
       decrement: '',
+      balance: '',
     }
   );
   const currencyProviderOptions = $derived(

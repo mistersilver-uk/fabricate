@@ -34,6 +34,8 @@ import {
   AWARD_ENTRIES_MAX,
   COMPANION_OUTCOMES,
   COMPONENT_AWARD_ENTRY_OUTCOMES,
+  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   COMPONENT_AWARD_MESSAGE_KEYS,
   CURRENCY_CREDIT_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
@@ -1226,6 +1228,11 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
       'two comments in',
       'the one route that lets a component award STACK',
       'ten TUPLES',
+      // Falsified by the two pooled members (issue 1342).
+      'the twelve members',
+      'twelve TUPLES',
+      'all SIX `stable` members',
+      'the FIVE of those that target an actor',
     ]) {
       assert.equal(
         PROSE.includes(phrase),
@@ -1271,6 +1278,11 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
       CHECK_ROLL_MESSAGE_KEYS,
       COMPONENT_AWARD_MESSAGE_KEYS,
       CURRENCY_CREDIT_MESSAGE_KEYS,
+      // The pooled pair targets a SET of actors, which is still targeting an actor: both
+      // answer `noActor`, so both belong in the count the prose claims (issue 1342). Leaving
+      // them out would let the prose keep saying FIVE and stay green.
+      POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+      POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
     ].filter((table) => table[COMPANION_OUTCOMES.noActor] !== undefined).length;
 
     const claims = [

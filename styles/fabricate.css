@@ -10235,10 +10235,13 @@
   gap: var(--fab-space-3);
 }
 
-/* The three custom-macro drop zones (canAfford / increment / decrement) sit side-by-side in a
-   single responsive row, collapsing to fewer columns on narrow widths. */
+/* The custom-macro drop zones (canAfford / increment / decrement / balance) sit side-by-side in a
+   single responsive row, collapsing to fewer columns on narrow widths. `auto-fit` rather than a
+   literal column count: the field list is generated from CURRENCY_MACRO_KEYS, so a hardcoded
+   count silently wraps the newest field onto a short second row the first time the vocabulary
+   grows (issue 1342 added a fourth). The track floor is what decides the column count. */
 .fabricate-manager .manager-currency-macro-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: start;
 }
 
