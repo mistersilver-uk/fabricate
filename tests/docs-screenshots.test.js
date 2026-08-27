@@ -48,8 +48,25 @@ const IGNORED_DOCS_DIRS = new Set([
 // Change either one and this test starts claiming frames it does not own, while
 // the map test still claims them too — and a file both tests believe the other
 // is checking is a file neither is.
-const screenshotFiles = (await readdir(screenshotsDir))
-  .filter(file => extname(file).toLowerCase() === '.webp')
+const screenshotEntries = await readdir(screenshotsDir, { withFileTypes: true });
+const isGeneratedFrame = entry => entry.isFile() && extname(entry.name).toLowerCase() === '.webp';
+const screenshotFiles = screenshotEntries
+  .filter(isGeneratedFrame)
+  .map(entry => entry.name)
+  .sort((a, b) => a.localeCompare(b, 'en'));
+
+// Everything in the flat directory that the `.webp` filter above drops.
+//
+// Without this the exemption gate is an equality over `.webp` ALONE, so a curated `.png` or
+// `.jpg` dropped in here is invisible to all four tests in this file: it is not in
+// `screenshotFiles`, so it cannot be an orphan, cannot be missing, and cannot break the
+// equality with the enumerated set. Asserting the residue is empty apart from the one
+// subdirectory that belongs to another test closes that off at the source, and keeps the
+// filter's meaning ("a generated frame is a .webp file") rather than widening it.
+const OTHER_TESTS_OWN = ['lab/'];
+const unownedEntries = screenshotEntries
+  .filter(entry => !isGeneratedFrame(entry))
+  .map(entry => (entry.isDirectory() ? `${entry.name}/` : entry.name))
   .sort((a, b) => a.localeCompare(b, 'en'));
 
 const screenshotMap = await readDocsScreenshotMap(root);
@@ -98,8 +115,10 @@ test('every docs screenshot reference resolves to a committed file', () => {
 // frame means deleting its entry, and adding one means writing a reason next to it in a diff a
 // reviewer reads — which is what "adding to it is a visible act" has to mean to be worth saying.
 //
-// It is not a general licence. An entry naming something the View Lab could render is refused
-// below: the lab renders application routes, and these are exempt for being something else.
+// What no test here can decide is whether a given artifact IS an application view — that is a
+// reviewer's judgement, and the enumeration exists to force it into a diff someone reads rather
+// than to automate it. The mechanical checks below are narrower than the name of the set: they
+// refuse an exempt frame that collides with a generated case id or with the generated map.
 const NOT_AN_APPLICATION_VIEW = new Map([
   [
     'fabricate-themes.webp',
@@ -115,6 +134,14 @@ test('the hand-curated population is exactly the enumerated non-view set', () =>
     'an empty exempt set makes both directions below vacuous — if the last curated frame is gone, ' +
       'delete this gate and the exemption scenario it holds, rather than leaving a check that ' +
       'cannot fail'
+  );
+
+  assert.deepEqual(
+    unownedEntries,
+    OTHER_TESTS_OWN,
+    'docs/img/screenshots/ holds an entry that is neither a .webp frame nor the lab/ subdirectory. ' +
+      'The equality below covers .webp only, so a curated .png or .jpg parked here would be ' +
+      'exempt from every check in this file: publish it as a generated .webp frame, or delete it'
   );
 
   const enumerated = [...NOT_AN_APPLICATION_VIEW.keys()].sort((a, b) => a.localeCompare(b, 'en'));
@@ -136,16 +163,17 @@ test('the hand-curated population is exactly the enumerated non-view set', () =>
   );
 });
 
-test('nothing exempt is a view the case registry could reach', () => {
+test('no exempt frame collides with a generated case or the generated map', () => {
   const caseIds = new Set(VIEW_LAB_CASES.map(viewCase => viewCase.id));
-  const reachable = [...NOT_AN_APPLICATION_VIEW.keys()]
+  const namesACase = [...NOT_AN_APPLICATION_VIEW.keys()]
     .map(file => basename(file, '.webp'))
     .filter(stem => caseIds.has(stem));
   assert.deepEqual(
-    reachable,
+    namesACase,
     [],
-    'these exempt frames name a View Lab case, so a case CAN reach them and the exemption does not ' +
-      'apply: publish them through an image slot like every other generated frame'
+    'these exempt frames are named after a registered View Lab case id, so a case reaches that ' +
+      'name and the exemption does not apply to it: publish them through an image slot like ' +
+      'every other generated frame'
   );
 
   const mapped = new Set(screenshotMap.screenshots.map(entry => entry.case));

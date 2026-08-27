@@ -25,10 +25,10 @@
  * WHY GENERATED FRAMES SIT IN THEIR OWN DIRECTORY
  * -----------------------------------------------
  * `docs/img/screenshots/` holds the hand-curated frames that predate this generator, and the one
- * that remains shares the `fabricate-` prefix with five View Lab case ids. Mixed into one directory, the only way to
- * tell a generated frame from a curated one is "is it in the map", which reduces the reverse gate
- * to restating the map to itself. A real subdirectory makes that direction an enumeration of what
- * is actually on disk, so it can fail.
+ * that remains shares the `fabricate-` prefix with five View Lab case ids. Mixed into one
+ * directory, the only way to tell a generated frame from a curated one is "is it in the map",
+ * which reduces the reverse gate to restating the map to itself. A real subdirectory makes that
+ * direction an enumeration of what is actually on disk, so it can fail.
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
