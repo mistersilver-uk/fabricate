@@ -65,6 +65,14 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
 /**
  * The block reason a reference to an absent or disabled tool raises.
  *
+ * THIS TOKEN IS ALREADY SHIPPED, as a bare literal, in two places this module deliberately does
+ * not import: `GatheringEngine.js`'s private `DEFAULT_BLOCKED_REASON_KEYS` map and the player
+ * app's `gatheringBlockedReasons.js` label and callout maps. Importing either would drag a Foundry
+ * consumer, or a UI leaf, into a module whose whole point is that nothing depends on it yet, so
+ * the three are held together by a drift guard in `tests/entity-scope-resolvers.test.js` that
+ * reads both files and fails if the shipped literal stops matching this constant. Epic 1357's
+ * consumer sweep (PR 8) is what converges them onto this one export.
+ *
  * @type {string}
  */
 export const TOOL_BLOCKED = 'TOOL_BLOCKED';

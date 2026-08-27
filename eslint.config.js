@@ -237,6 +237,16 @@ export default [
   //     Belt AND braces: `tests/scoped-definitions.test.js` pins the same boundary by PARSING the
   //     file's real import specifiers, because a lint rule is only enforced where lint is run and
   //     the glob patterns below cannot see an indirection through a barrel re-export.
+  //
+  //     TWO SPELLINGS ARE LISTED PER MODULE, with and without the `.js` extension. Node's ESM
+  //     resolver rejects an extensionless relative specifier, but the bundler and the editor do
+  //     not, and `no-restricted-imports` matches the SPECIFIER TEXT rather than a resolved path —
+  //     so `'./componentScope'` slips a single-spelling pattern entirely.
+  //
+  //     THIS RULE DOES NOT SEE `import()` AT ALL — not a string-literal one, and not a
+  //     template-literal one. That is a limitation of the rule, not of the patterns, so the
+  //     DYNAMIC half of this boundary is enforced only by the parsing test, which extracts both
+  //     literal forms and additionally fails a computed specifier it cannot read.
   {
     files: ['src/systems/scopedDefinitions.js'],
     rules: {
@@ -245,7 +255,14 @@ export default [
         {
           patterns: [
             {
-              group: ['**/componentScope.js', '**/essenceScope.js', '**/toolScope.js'],
+              group: [
+                '**/componentScope.js',
+                '**/essenceScope.js',
+                '**/toolScope.js',
+                '**/componentScope',
+                '**/essenceScope',
+                '**/toolScope',
+              ],
               message:
                 'scopedDefinitions.js is the generic primitive: the three scope modules import it, never the reverse.',
             },
