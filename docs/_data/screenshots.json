@@ -374,6 +374,21 @@
       "case": "manager-checks-crafting-trigger-break-tools",
       "alt": "The crafting check's Triggers tab, with one trigger expanded to show the condition it watches and how the result moves, and a card beneath it for breaking the required tools whenever that trigger fires.",
       "sha256": "6b7f407ab386c88c55b428f51f3efba142897c3f5a049a5f778ee5d391259714"
+    },
+    {
+      "case": "manager-systems-empty",
+      "alt": "The Crafting Systems window on a world with no crafting systems, showing the empty system library with a Create system button and a first run panel listing the three steps to set one up.",
+      "sha256": "eb33d8d3b184045bb13feb231cf2f80612cfd8d9d48de417a8ed47bad38f6e74"
+    },
+    {
+      "case": "manager-gathering-settings-normal",
+      "alt": "The gathering Settings tab for a crafting system, showing the gathering resolution mode card, the limitation mode card with neither limitation turned on, and the system gathering rules in the inspector beside them.",
+      "sha256": "7dabd060898f37e6af8219a938fb2f8839e6daa36cef498f3c0c49fa6349900b"
+    },
+    {
+      "case": "manager-environment-edit-events",
+      "alt": "The Events tab of the environment editor, showing two library events included by match, nothing excluded, no non-matching events, and the selected event with its matching evidence and base chance modifier beside it.",
+      "sha256": "6b5d279eb5ba421fae017c5b161598378fb9f9790905d3ed99c2559a4c2eb00f"
     }
   ]
 }

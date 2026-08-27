@@ -596,10 +596,10 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 260 cases: 148 `exact`, 3 `window`, 109 `beyond`.
+As of this writing the registry holds 263 cases: 150 `exact`, 3 `window`, 110 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 38 of the 260 publishable cases.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 38 of the 263 publishable cases.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
 It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
@@ -950,13 +950,14 @@ Three files make up the mechanism.
 - `docs/img/screenshots/lab/` holds the generated images, one per mapped case.
 
 The generated set has a directory of its own, and that is load-bearing rather than tidiness.
-`docs/img/screenshots/` still holds seventeen hand-curated frames that predate the generator, five of the case ids share the `fabricate-` prefix with them, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
+`docs/img/screenshots/` still holds a hand-curated frame that predates the generator, five case ids share the `fabricate-` prefix with it, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
 That reduces the reverse gate to the map restating itself.
 `tests/docs-screenshots.test.js` owns the flat directory and `tests/docs-screenshot-map.test.js` owns `lab/`, and each says in its own comments which facts keep them apart.
 
-Those pre-existing seventeen frames stay exactly as they are.
-They remain valid documentation evidence and are not migrated, because retiring evidence that is still accurate buys nothing.
+What is left of that pre-existing population stays exactly as it is.
+It remains valid documentation evidence and is not migrated, because retiring evidence that is still accurate buys nothing.
 The rule applies to a new or replaced screenshot.
+The population is also closed and may only shrink, and `tests/docs-screenshots.test.js` now enumerates what is in it and why no view case can reach it, so adding to it is a visible act rather than a silent one.
 
 `npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.
 Run it after any change that alters one of the mapped views, and read what it reports before committing.
