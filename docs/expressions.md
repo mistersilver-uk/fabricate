@@ -266,9 +266,14 @@ A prerequisite is three separate fields — a **property path**, a **comparison*
 | Proficient in Arcana (D&D 5e) | `skills.arc.value` | at least | `1` |
 | Intelligence modifier of +2 or better (D&D 5e) | `abilities.int.mod` | at least | `2` |
 | Strength score of 21 or better (D&D 5e) | `abilities.str.value` | at least | `21` |
-| Trained in Crafting (Pathfinder 2e) | `skills.cra.rank` | at least | `1` |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+{: .warning }
+> Fabricate also ships Pathfinder 2e prerequisite presets, and they are **not** listed here.
+> Their paths are written in the short form (`skills.cra.rank`), while the Pathfinder 2e *modifier* presets reach the same actor through the long form (`@actor.system.skills.crafting.totalModifier`).
+> Both are read off the same roll data, so they cannot both be right.
+> Verify a Pathfinder 2e prerequisite path against your own actor with `/r` before relying on it, exactly as for `@prof` above.
 
 The comparisons are equals, not equals, greater than, at least, less than, at most, is true, is false, and exists.
 The last three take no value, so the value field is hidden when you choose one.
@@ -326,7 +331,7 @@ This only matters when your expression rolls dice, but when it does it matters a
 | **Maximum stamina** | Once per character, when the pool is first rolled or re-rolled from the GM's Roll/Reset button | Fixed for that character until re-rolled |
 | **Starting stamina** | Once, at the same moment as the maximum | Fixed for that character |
 | **Amount per interval** | Once per regeneration pass, then multiplied by however many whole intervals have elapsed | Rolled once per pass, not once per interval — advancing eight hours on an hourly interval gives `1d4 × 8`, not eight separate `1d4` rolls |
-| **Modifier references** on a cost, a drop row or an event | Every gathering attempt | Re-rolled each attempt. The task's own stamina cost is a fixed number and never rolls |
+| **Modifier references** on a cost, a drop row or an event | Every gathering attempt, and again to show the cost in the player listing | Re-rolled each time, so a **rolling** cost modifier can display one number and charge another. Use a flat expression for a cost you want a player to be able to trust. The task's own stamina cost is a fixed number and never rolls |
 | **Visibility gate** | Whenever a task's visibility is tested for a character | Re-rolled each test |
 | **Check roll expression** | Every attempt that rolls | Re-rolled each attempt |
 | **Check modifiers** | Every attempt, appended to the check's own roll | Rolled once, with the check, and shown on the chat card |
@@ -345,6 +350,7 @@ Different fields treat the number your expression produces differently.
   Starting stamina is additionally capped at the rolled maximum.
 - **Modifier references** may reduce as well as increase, through their `-` operator rather than through a negative expression.
   A cost is floored at 0 only after everything has been summed, so a reducing modifier really does reduce it.
+  A **check** modifier has no reference and so no operator, which is why a negative expression such as `1d4 - 2` is the only way for one to subtract from a roll.
 - **Check modifier bounds** clamp what a modifier contributes, **after it rolls**.
   A `1d8` modifier with a maximum of `+6` contributes 6 on a roll of 7 and 3 on a roll of 3.
   Leaving a bound empty means no limit, and empty is not the same as zero.
@@ -401,7 +407,7 @@ The one that uses the stamina economy, so evaluation timing does real work.
 |:------|:-----------|:----|
 | Maximum stamina | `10 + 2 * @abilities.con.mod` | Rolled once per character, so hardy characters forage longer |
 | Starting stamina | `floor((10 + 2 * @abilities.con.mod) / 2)` | Characters begin a session half-rested |
-| Amount per interval | `1d4` | Re-rolled every tick, so recovery is uneven |
+| Amount per interval | `1d4` | Rolled once per regeneration pass, so a long time skip pays one roll covering every elapsed hour, not one roll each |
 | Stamina cost on a difficult task | `3` | A plain number — this field is a spinner, not an expression |
 | Drop-row modifier "Survival" | `@skills.sur.total`, attached with a `+` operator | Shifts the drop chance on a `d100` gather |
 | Cost modifier "Strong back" | `@abilities.str.mod`, attached with a `-` operator | The reference subtracts, so a strong character pays less stamina |
