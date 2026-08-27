@@ -111,6 +111,12 @@ function adversarialInputs(section) {
     ['a non-array corpus', null, 0, 0],
     ['a non-array corpus that is a number', 42, 0, 0],
     ['a non-array corpus that is a string', 'nope', 0, 0],
+    [
+      'a non-array corpus that is a plain OBJECT record',
+      { id: ENTITY_ID, entityId: ENTITY_ID, systemId: SYSTEM_ID },
+      0,
+      0,
+    ],
     ['non-object entries', [null, 42, 'nope', true, [], () => {}], 0, 0],
     ['an id-less entry', [{}, { id: '   ', entityId: '   ', systemId: '  ' }], 0, 0],
     [
@@ -399,6 +405,29 @@ function runScopedEntityContract(contract) {
           assert.equal(typeof value, 'boolean', `the inherit map holds only booleans for ${why}`);
         }
       }
+    }
+  });
+
+  test(`${label} scope: a non-boolean inherit value is DROPPED rather than coerced`, () => {
+    const { worldDefault } = seedCorpus(contract);
+    // The `typeof value === 'boolean'` sweep in the adversarial test above CANNOT see a
+    // coercion — `Boolean(x)` satisfies it by construction — and a TRUTHY non-boolean coerces
+    // to the same `true` a dropped key resolves to. Only the ABSENCE of the key, plus the
+    // resolve a FALSY one would otherwise flip, can tell dropped from coerced.
+    for (const notABoolean of ['yes', 0, '', null, 1, {}]) {
+      const [record] = contract.normalizeRecords([
+        { entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: notABoolean } },
+      ]);
+      const shown = JSON.stringify(notABoolean);
+      assert.ok(
+        !(section in record.inherit),
+        `a non-boolean ${shown} is DROPPED from the inherit map rather than coerced`
+      );
+      assert.equal(
+        contract.resolve(worldDefault, record).inherited[section],
+        true,
+        `a dropped ${shown} leaves ${section} INHERITING rather than overriding`
+      );
     }
   });
 
