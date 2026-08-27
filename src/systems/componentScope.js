@@ -24,7 +24,10 @@ import {
  * special case inside the generic resolver:
  *
  * - `category` is a section, but its INHERITING branch is special: the world category wins IF
- *   AUTHORED, and otherwise the local value falls through. See `resolveComponentCategory`.
+ *   AUTHORED, and otherwise the local value falls through. See `resolveComponentCategory`. Its
+ *   SHAPE rule - a trimmed non-empty string, or absence - is stated once at the normalizer
+ *   (`coerceComponentSection`) rather than on that branch, so the overriding branch, which hands
+ *   the stored value straight back, is bound by it too.
  * - `tags` is NOT a section and has no inherit switch at all: the effective set is additive, with
  *   per-tag muting. See `resolveComponentTags`.
  *
@@ -81,6 +84,37 @@ function attachLabels(target, key, raw) {
 }
 
 /**
+ * Whether a category token was actually authored.
+ *
+ * "Authored" is ABSENCE, not truthiness, and specifically not the `general` default
+ * `## Component` requirement 13 gives `Component.category`.
+ *
+ * @param {unknown} category
+ * @returns {boolean}
+ */
+function isAuthoredCategory(category) {
+  return typeof category === 'string' && category.trim().length > 0;
+}
+
+/**
+ * Coerce a component section at NORMALIZATION time, so both resolution branches carry one rule.
+ *
+ * A category is a token matched against `CraftingSystem.componentCategories`, so an untrimmed or
+ * non-string one is not a category at all and normalizes to ABSENCE. Doing this here rather than
+ * in `resolveComponentCategory` is the whole point: that helper only runs on the INHERITING
+ * branch, and the overriding branch hands back the stored value verbatim, so `'  ingot  '` would
+ * otherwise resolve trimmed for one system and untrimmed - and unmatchable - for the next.
+ *
+ * @param {string} section
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function coerceComponentSection(section, value) {
+  if (section !== 'category') return value;
+  return isAuthoredCategory(value) ? value.trim() : undefined;
+}
+
+/**
  * The component scope descriptor.
  *
  * @type {Readonly<object>}
@@ -89,6 +123,7 @@ export const COMPONENT_SCOPE = defineScope({
   sections: COMPONENT_SECTIONS,
   // Structural, not a default. See the module note.
   enableable: false,
+  coerceSection: coerceComponentSection,
   worldExtras: (entry) => attachLabels({}, 'tags', entry.tags),
   membershipExtras: (entry) => {
     const extras = attachLabels({}, 'tags', entry.tags);
@@ -106,6 +141,9 @@ export const COMPONENT_SCOPE = defineScope({
  * `general` on the first resolve. The failure this prevents is a RESET to `general`, not a blank -
  * a blank is unreachable, because an absent world category falls through to the local value.
  *
+ * An authored category is TRIMMED here, and a whitespace-only or non-string one normalizes to
+ * ABSENCE. See `coerceComponentSection`.
+ *
  * @param {unknown} raw
  * @returns {Array<object>}
  */
@@ -119,24 +157,14 @@ export function normalizeComponentWorldDefaults(raw) {
  * An `enabled` key in the input is DROPPED rather than carried: the component path has no such
  * field, and adversarial or hand-edited input must not mint one.
  *
+ * The record's own category is trimmed and absence-coerced by the SAME rule the world defaults
+ * get, which is what makes an overriding system's category as matchable as an inheriting one's.
+ *
  * @param {unknown} raw
  * @returns {Array<object>}
  */
 export function normalizeComponentMemberships(raw) {
   return normalizeMemberships(raw, COMPONENT_SCOPE);
-}
-
-/**
- * Whether a category token was actually authored.
- *
- * "Authored" is ABSENCE, not truthiness, and specifically not the `general` default
- * `## Component` requirement 13 gives `Component.category`.
- *
- * @param {unknown} category
- * @returns {boolean}
- */
-function isAuthoredCategory(category) {
-  return typeof category === 'string' && category.trim().length > 0;
 }
 
 /**
