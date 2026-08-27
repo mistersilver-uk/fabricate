@@ -32,42 +32,38 @@ GMs author single or multi-step recipes in the Crafting Admin panel across the o
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Feature                    | Description                                                                                                                                                  |
-|:---------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **System-Agnostic**        | Works with any Foundry game system, with no dependency on a specific ruleset                                                                                 |
-| **Crafting Systems**       | Define independent systems with their own component libraries, essences, and rules                                                                           |
-| **Player Crafting**        | Browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab                                                          |
-| **Recipe Authoring**       | Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, and validation, plus an access or books and scrolls tab according to the system's recipe visibility mode                                   |
-| **Resolution Modes**       | Simple, routed by ingredients, routed by check, progressive, and alchemy crafting with optional and mandatory skill checks, depending on the resolution mode |
-| **Multi-Step Recipes**     | Chain steps that must be completed in sequence, with optional time gates                                                                                     |
-| **Tools**                  | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage                                                                |
-| **Salvage**                | Players break components down into their constituent parts                                                                                                    |
-| **Gathering Environments** | GM-authored places where characters can gather components to craft with                                                                                      |
-| **Shopping List**          | Queue recipes in the Crafting tab and see one consolidated list of the materials you still need                                                              |
-| **Journal**                | Player-facing tab to monitor crafting, gathering, and salvage runs and continue crafting runs                                                                |
-| **Canvas Interactables**   | Place Tools and Gathering Tasks as Scene Regions players activate by walking a token in                                                                      |
-| **Essences**               | Abstract properties on items for flexible ingredient matching                                                                                                |
-| **Visibility & Knowledge** | Control which recipes players can see, learn, or unlock, with recipe books and scrolls that teach them                                                       |
-| **Effect Transfer**        | Transfer active effects from ingredients to crafted items                                                                                                    |
-| **Import & Export**        | Back up a whole crafting system or move it between worlds as a JSON file (and a compendium for the items - manual for now)                                   |
-| **Macro Integration**      | Customise crafting checks, property generation, and success/failure hooks                                                                                    |
-| **Alchemy Workbench**      | Hide recipes and let players discover formulas by experimentation                                                                                            |
-| **Recipe Graph**           | Planned feature. Visualise recipe dependencies as an interactive graph in the GM admin panel                                                                 |
+| Feature                            | Description                                                                                                                                                                                                  |
+|:-----------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **System-Agnostic**                | Works with any Foundry game system, with no dependency on a specific ruleset                                                                                                                                 |
+| **Crafting Systems**               | Define independent systems with their own component libraries, essences, and rules                                                                                                                           |
+| **Player Crafting**                | Browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab                                                                                                          |
+| **Recipe Authoring**               | Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, and validation, plus an access or books and scrolls tab according to the system's recipe visibility mode |
+| **Resolution Modes**               | Simple, routed by ingredients, routed by check, progressive, and alchemy crafting with optional and mandatory skill checks, depending on the resolution mode                                                 |
+| **Multi-Step Recipes**             | Chain steps that must be completed in sequence, with optional time gates                                                                                                                                     |
+| **Tools**                          | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage                                                                                                                |
+| **Salvage**                        | Players break components down into their constituent parts                                                                                                                                                   |
+| **Gathering Environments**         | GM-authored places where characters can gather components to craft with                                                                                                                                      |
+| **Shopping List**                  | Queue recipes in the Crafting tab and see one consolidated list of the materials you still need                                                                                                              |
+| **Journal**                        | Player-facing tab to monitor crafting, gathering, and salvage runs and continue crafting runs                                                                                                                |
+| **Canvas Interactables**           | Place Tools and Gathering Tasks as Scene Regions players activate by walking a token in                                                                                                                      |
+| **Essences**                       | Abstract properties on items for flexible ingredient matching                                                                                                                                                |
+| **Visibility & Knowledge**         | Control which recipes players can see, learn, or unlock, with recipe books and scrolls that teach them                                                                                                       |
+| **Effect Transfer**                | Transfer active effects from ingredients to crafted items                                                                                                                                                    |
+| **Import & Export**                | Back up a whole crafting system or move it between worlds as a JSON file (and a compendium for the items - manual for now)                                                                                   |
+| **Macro Integration**              | Customise crafting checks, property generation, and success/failure hooks                                                                                                                                    |
+| **Alchemy Workbench**              | Hide recipes and let players discover formulas by experimentation                                                                                                                                            |
+| **Recipe Graph**                   | Planned feature. Visualise recipe dependencies as an interactive graph in the GM admin panel                                                                                                                 |
+| **Handling Huge Crafting Systems** | Fabricate can handle crafting systems with thousands of components and recipes, as well as actor inventories with hundreds of items/item stacks without slowing down                                          |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 {: .tip }
 > Use the **search bar** in the sidebar to quickly find settings, configuration options, and examples across the documentation.
 
-## Quickstart
+## Get help
 
-Head to [Quickstart]({% link help/quickstart.md %}) for installation and your first Gathering Environment.
+Visit the [Help]({% link help/index.md %}) page for:
 
-## Having trouble?
-
-Check the [Troubleshooting]({% link help/troubleshooting.md %}) guide for solutions to common issues.
-
-## How-to guides
-
-Need a quick answer?
-The [How-To Guides]({% link help/how-to/index.md %}) cover common tasks like recipe discovery, degrading tools, and effect transfer.
+- A [Quickstart]({% link help/quickstart.md %}) guide for installation and your first Gathering Environment.
+- The [Troubleshooting]({% link help/troubleshooting.md %}) guide for solutions to common issues.
+- A set of [How-To Guides]({% link help/how-to/index.md %}) covering common tasks like recipe discovery, degrading tools, and effect transfer.

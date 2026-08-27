@@ -48,9 +48,9 @@ Removing a custom component category is reference-safe.
 Fabricate asks you to confirm on the row and tells you how many components will be reassigned to **General**.
 Confirming moves those components to **General** rather than leaving them pointing at a category that no longer exists.
 
-## Item tags
+## Component tags
 
-Item tags allow component labeling plus tag-based ingredient matching.
+Component tags allow labeling and tag-based ingredient matching.
 Tags are many-valued, so a component can carry as many as you like.
 Tags are always stored in lowercase, so the add form previews the exact text it will save.
 Tags are assigned to components in the component editor only.

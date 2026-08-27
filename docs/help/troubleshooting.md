@@ -19,7 +19,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 - The recipe is disabled.
   Disabled recipes do not appear in the player crafting app (they remain in the GM admin panel with a grey "Disabled" badge).
-- The recipe is restricted to specific users and the current player is not on the allow-list.
+- The recipe is restricted to specific users and the current player is not on the allow-list (restricted recipe visibility mode).
 - The system uses knowledge mode and the player has not learned the recipe or does not own a matching recipe item.
 - The recipe belongs to a crafting system that no longer exists.
 - The crafting system has a blocker, or this individual recipe is broken.
@@ -226,7 +226,7 @@ values, and [Salvage]({% link components/salvage.md %}) for salvage's own On fai
 ## Tools Not Breaking or Tracking Usage
 
 {: .note }
-> The standalone **Catalyst** concept was retired in version 0.6.0.
+> **Catalysts** were retired in version 0.6.0.
 > Required-but-reusable equipment is now modelled by [Tools]({% link tools.md %}).
 > Existing catalyst data migrates to Tools automatically.
 

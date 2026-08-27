@@ -25,13 +25,12 @@ Fabricate ships through three channels: the public registry, a private closed-be
 The channel you are on is **fixed at install time** — it is the manifest URL you installed from.
 If you are a tester or a patron and want to move between channels (for example from early access to public, or from beta to early access), the only supported route is to **uninstall Fabricate and reinstall from the other channel's manifest URL**.
 Foundry will never offer that switch as an in-place update: a private channel is deliberately not advertised as an upgrade of the public one, so its testers and patrons are never quietly moved off it.
-That is the privacy property working as designed, not a bug.
 {: .note }
 
 ### Theme
 
-Fabricate defaults to the **Fabricate** colour theme.
-The module includes six additional themes:
+Fabricate defaults to the **Fabricate** colour theme, which looks super cool.
+If for some reason it's not right for your game, the module also includes six additional themes:
 
 - **Mythwright**
 - **Ironblood Forge**
@@ -42,11 +41,10 @@ The module includes six additional themes:
 
 Open Foundry's module settings for Fabricate and set **Fabricate Theme** to switch palettes.
 Changing the theme updates open Fabricate app windows immediately.
-You don't need to close and reopen them.
 
-![Fabricate colour themes](img/screenshots/fabricate-themes.webp)
+![Fabricate colour themes](../img/screenshots/fabricate-themes.webp)
 
-**Foundry Native** is a fixed Foundry-inspired Fabricate palette.
+**Foundry Native** is a fixed Fabricate palette _inspired_ by Foundry.
 It is designed to sit closer to Foundry's default visual language, but it does not dynamically follow your active Foundry skin or third-party Foundry theme.
 {: .note }
 
@@ -57,7 +55,7 @@ You'll see three new header buttons:
 
 - **Craft Item** (all users): opens the unified Fabricate window on the Crafting tab, where players browse recipes, pick an actor and component sources, and craft.
 - **Gathering** (all users): opens the unified Fabricate window on the Gathering tab.
-- **Manage Crafting Systems** (GM only): opens the Fabricate GM admin panel
+- **Manage Crafting Systems** (GM only): opens the Fabricate GM admin panel.
 
 When no crafting systems are enabled, players do not see the **Craft Item** or **Gathering** buttons.
 
@@ -82,9 +80,9 @@ All crafting system editing requires the GM role.
 
 ## Step 3: Add Components
 
-Fabricate recipes reference *components*.
+Fabricate recipes reference _Components_.
 These are items imported into your crafting system's library.
-So long as you use that same world or compendium item, or copies of it, to create new instances, Fabricate will recognize it as the original component.
+So long as you use that same world or compendium item, or copies of it, to create new instances, Fabricate will recognize it as the original component, even if it is renamed.
 
 1. In the GM admin, open the **Components** page
 2. Drag items from the Items sidebar or a compendium into the components drop zone
@@ -106,7 +104,7 @@ It is opt-in per crafting system.
 3. Give it a **Name** and optional **Description** (like the "Azure Grove" or "Sunken Ruins")
 4. Choose a **Selection Mode**:
 
-- **Targeted** shows players a list of task rows
+- **Targeted** shows players a list of tasks to attempt
 - **Blind** shows a single opaque gather action that resolves a hidden task at random
 
 1. Select a danger level for the environment (used to match tasks and events)
@@ -143,7 +141,7 @@ See [Gathering Expressions]({% link gathering/formulas.md %}) for D&D 5e and Pat
 
 ## Step 6: Create a Gathering Event
 
-Events are reusable library records that can fire alongside a gather attempt.
+Events define what can happen alongside a gathering attempt.
 They add flavour, complications, and can even cause a gathering attempt to fail.
 
 1. Open the **Events** tab under Gathering and create an event

@@ -19,19 +19,6 @@ Use alchemy mode for systems where recipes are secrets, such as a witch's grimoi
 
 ---
 
-## Current State
-
-GMs author alchemy recipes and systems in the Crafting Admin panel, and the public API can create them too.
-The panel sets the system's Alchemy check, and the recipe editor authors a recipe's identity, its ingredients, its result sets, its tools, and its linked recipe item.
-Players craft alchemy from the Alchemy Workbench, a tab in the Fabricate window.
-See [The Alchemy Workbench](#the-alchemy-workbench) below.
-
-A submitted combination is a set of items chosen by the player for a crafting character.
-Fabricate uses those items to match recipes and to consume the submitted inventory when the system is set up to do so.
-See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) for the API used to submit a combination.
-
----
-
 ## How It Works
 
 1. A crafting system is created with its resolution mode set to Alchemy.
