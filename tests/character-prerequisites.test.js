@@ -188,6 +188,13 @@ test('presets: bundles keyed by foundry system id', () => {
   }
 });
 
+// Shape sources (pf2e master; re-verify on a major pf2e release):
+//   ActorPF2e#getRollData()  src/module/actor/base.ts           -> `{ actor: this }`, no system spread
+//   CORE_SKILL_SLUGS         src/module/actor/values.ts         -> 'crafting', never 'cra'
+//   Statistic#rank           src/module/system/statistic/       -> ZeroToFour | null, on the PREPARED
+//                                                                 statistic; skill TRACE data carries
+//                                                                 value/totalModifier/dc/attribute, no rank
+//   AbilityData.mod          src/module/actor/creature/data.ts  -> abilities live under `system`
 test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2e-shaped rollData', () => {
   // `pf2e`'s ActorPF2e#getRollData() returns `{ actor: this }` and nothing else — it
   // does NOT spread `system` the way `dnd5e` does. A bare `skills.…` path is therefore
@@ -212,10 +219,13 @@ test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2
     },
   };
   for (const preset of PF2E_CHARACTER_PREREQUISITE_PRESETS) {
-    assert.notEqual(
-      resolveRollDataPath(pf2eRollData, preset.path),
-      undefined,
-      `pf2e preset "${preset.id}" does not resolve against pf2e-shaped roll data`
+    // NUMBER, not merely defined: `actor.skills.crafting` (one segment short) resolves to
+    // the Statistic object and would pass a not-undefined check, then coerce to 0 at
+    // runtime -- the original never-satisfiable failure wearing a different path.
+    assert.equal(
+      typeof resolveRollDataPath(pf2eRollData, preset.path),
+      'number',
+      `pf2e preset "${preset.id}" must resolve to a number against pf2e-shaped roll data`
     );
   }
   assert.equal(evaluatePrerequisite(pf2eRollData, { path: 'actor.skills.crafting.rank', op: 'gte', value: 2 }), true);
@@ -235,10 +245,10 @@ test('presets: dnd5e paths stay bare, because dnd5e spreads system onto its roll
     abilities: { int: { mod: 2 }, str: { value: 21 } },
   };
   for (const preset of DND5E_CHARACTER_PREREQUISITE_PRESETS) {
-    assert.notEqual(
-      resolveRollDataPath(dnd5eRollData, preset.path),
-      undefined,
-      `dnd5e preset "${preset.id}" does not resolve against dnd5e-shaped roll data`
+    assert.equal(
+      typeof resolveRollDataPath(dnd5eRollData, preset.path),
+      'number',
+      `dnd5e preset "${preset.id}" must resolve to a number against dnd5e-shaped roll data`
     );
   }
 });

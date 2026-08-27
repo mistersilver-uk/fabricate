@@ -20,6 +20,13 @@
  * operators) or `false` (boolean/existence operators) and logs a single console
  * warning. That is deliberate, but it is also why a wrong path is invisible:
  * prefer pinning a new preset's shape in a test over trusting it by eye.
+ *
+ * ONE CONSEQUENCE FOR CALLERS. A `pf2e` path reaches PREPARED state through the
+ * `actor` reference the roll data carries, so it resolves only against a live
+ * document. Every call site spells `actor?.getRollData?.() ?? actor?.system ?? {}`;
+ * that fallback yields an object with no `actor` key, under which every `pf2e` path
+ * reads 0 again — silently, per the rule above. Pass `getRollData()` output, never a
+ * cloned or serialized projection of it.
  */
 
 /**

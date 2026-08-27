@@ -89,7 +89,8 @@ export const DND5E_CHARACTER_PREREQUISITE_PRESETS = buildPresetBundle({
  * - Proficiency `rank` lives on the PREPARED statistic (`actor.skills.<slug>.rank`,
  *   `ZeroToFour | null`), NOT under `system.skills`. A `pf2e` skill's trace data
  *   carries `value`, `totalModifier`, `dc` and `attribute` — no `rank` — which is why
- *   `actor.system.skills.crafting.rank` would be just as dead as the bare form.
+ *   `actor.system.skills.crafting.rank` is just as dead as the bare form on every
+ *   `pf2e` revision checked (`master` at the time of writing).
  *   `resolveRollDataPath` walks plain properties, and reaches the prepared statistic
  *   through the `actor` reference the roll data hands it.
  *
