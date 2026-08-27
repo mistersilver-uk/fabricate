@@ -11,15 +11,17 @@
  *   - an async all-affordable gate over the chosen `currencySpends` (engine, before any mutation),
  *   - an async deduction over the same spends (engine, after item consumption).
  *
- * It also answers TWO questions that have no recipe at all, and the second one WRITES:
+ * It also answers FOUR questions that have no recipe at all, and two of them WRITE:
  * {@link checkWorldCurrencyAffordability}, the world-scoped affordability answer the companion
- * contract publishes as `game.fabricate.checkAffordability` (issue 1289), and
+ * contract publishes as `game.fabricate.checkAffordability` (issue 1289);
  * {@link creditWorldCurrency}, the world-scoped credit it publishes as
- * `game.fabricate.creditCurrency` (issue 1301). Everything above is recipe-keyed and reads a
- * crafting system's participation toggle; those two are not, and deliberately do not — a
- * downtime activity is not a recipe and belongs to no crafting system. They share the world
- * ladder resolution ({@link resolveWorldCurrencyRequest}) and the spend context with the recipe
- * paths, and nothing else.
+ * `game.fabricate.creditCurrency` (issue 1301); and the POOLED pair
+ * {@link readPooledCurrencyBalance} and {@link consumePooledCurrency}, which ask the same two
+ * things of a SET of actors for the companion pooled holdings members (issue 1342). Everything
+ * above them is recipe-keyed and reads a crafting system's participation toggle; those four are
+ * not, and deliberately do not — a downtime activity is not a recipe and belongs to no crafting
+ * system. They share the world ladder resolution ({@link resolveWorldCurrencyLadder}) and the
+ * spend context with the recipe paths, and nothing else.
  *
  * The spend math and validation stay in `currencyProfile.js`; the spenders own the actor I/O. This
  * module only wires the strategy → spender resolution and the cross-unit aggregation.
@@ -36,8 +38,10 @@ import {
   gateCompanionCallSite,
 } from './companionContract.js';
 import {
+  currencyUnitDisplayName,
   findCurrencyUnit,
   formatCurrencyRequirement,
+  resolveCurrencyUnitByName,
   validateCurrencyProfile,
 } from './currencyProfile.js';
 
@@ -298,13 +302,22 @@ export function aggregateCurrencySpends(currencySpends, profile) {
  * anything craft-shaped.
  *
  * Declared beside the context builder, and frozen, for the reason the navigation seam declares its
- * tone classes beside its tone list: a third caller added without a token of its own is then a
+ * tone classes beside its tone list: a further caller added without a token of its own is then a
  * syntactically visible omission rather than an `undefined` a macro silently reads as "not an
  * award".
  */
 export const CURRENCY_SPEND_CALLERS = Object.freeze({
   craft: 'craft',
   award: 'award',
+  // The pooled holdings pair (issue 1342). `consume` and NOT `cost`, because `craft` and `award`
+  // name the ACT a macro is participating in, not the thing being paid — a token spelled after
+  // the noun would be the odd one out and would tell a macro nothing about what is happening.
+  //
+  // ONE token covers the pooled READ and the pooled DEBIT, because they are the two halves of a
+  // single companion act and a macro branching on `caller` wants the same branch for both. What
+  // separates them is the macro KEY: the read runs `balance` and the debit runs `decrement`, so a
+  // macro can already tell "you are being asked" from "you are being told" without a fourth token.
+  consume: 'consume',
 });
 
 /**
@@ -693,13 +706,16 @@ function resolveCreditAmount(amount) {
 }
 
 /**
- * The human name of a resolved unit, through the same `abbreviation` → `label` → `id` chain
- * {@link formatCurrencyRequirement} uses, so the contract's message and a craft-time shortfall
- * message name the same coin the same way. Split out because the localization keys interpolate the
- * amount and the unit into SEPARATE placeholders, which a preformatted `"1 gp"` cannot fill.
+ * The human name of a resolved unit. A DELEGATE to {@link currencyUnitDisplayName}, which is now
+ * the one home of the `abbreviation` → `label` → `id` chain this used to respell — so the
+ * contract's message and a craft-time shortfall message cannot name the same coin two ways.
+ *
+ * Kept as a local alias rather than inlined at its three call sites because the reason it was split
+ * out has not changed: the localization keys interpolate the amount and the unit into SEPARATE
+ * placeholders, which a preformatted `"1 gp"` cannot fill.
  */
 function unitDisplayName(unit) {
-  return unit?.abbreviation || unit?.label || unit?.id || '';
+  return currencyUnitDisplayName(unit);
 }
 
 /**
@@ -740,6 +756,32 @@ function resolveWorldCurrencyRequest(
     return { outcome: COMPANION_OUTCOMES.invalidAmount, messageData: null };
   }
 
+  const ladder = resolveWorldCurrencyLadder(unitId, seams);
+  if (ladder.outcome) return ladder;
+  return { ...ladder, amount: requested };
+}
+
+/**
+ * Resolve the LADDER half of a world-scoped currency question — the world settings, the validated
+ * profile, the named unit and that unit's integer base value — with no amount involved.
+ *
+ * Split out of {@link resolveWorldCurrencyRequest} (issue 1342) because the pooled HOLDINGS read
+ * asks a question that has no amount at all: "what does this set of actors hold?". Before the
+ * split, the only way to reach this resolution was through the amount rule, and a read would have
+ * had to invent an amount to get past it — which would have made a genuinely amount-free question
+ * answer `invalidAmount`, or, worse, made a caller pass `1` and get a refusal that named the wrong
+ * problem.
+ *
+ * The amount rule still runs FIRST for the two members that have one, so no shipped answer moves:
+ * `resolveWorldCurrencyRequest` calls this only after its own `invalidAmount` refusal, preserving
+ * the ordering its docblock calls load-bearing.
+ *
+ * @param {*} unitId
+ * @param {object} [seams]
+ * @returns {{outcome: string, messageData: object|null}|{outcome: null, unit: object,
+ *   baseValue: number, profile: object, world: object}}
+ */
+function resolveWorldCurrencyLadder(unitId, seams = {}) {
   const world = resolveWorldCurrencySettings(seams);
   // An empty ladder is separated from an invalid one because they are different people's
   // problems: a world that has never been configured versus one whose configuration is broken.
@@ -771,7 +813,7 @@ function resolveWorldCurrencyRequest(
     };
   }
 
-  return { outcome: null, unit, amount: requested, baseValue, profile, world };
+  return { outcome: null, unit, baseValue, profile, world };
 }
 
 /**
@@ -989,8 +1031,14 @@ async function runWorldCurrencyCredit({ actor, unit, amount, baseValue, profile,
 
   // VERIFIED on `actorInventory` alone, by name (D7b). `actorProperty` is made truthful by the
   // spender testing `actor.update`'s own return, which is stronger than a re-read and raises no
-  // prepared-versus-`_source` question; `macro` cannot be verified at all, because
-  // `MacroCoinSpender` exposes no `readCoins` — which is precisely why `creditUnavailable` exists.
+  // prepared-versus-`_source` question; `macro` is NOT verified — which is precisely why
+  // `creditUnavailable` exists.
+  //
+  // `MacroCoinSpender` did acquire a `readCoins` (issue 1342), and this list deliberately did not
+  // grow to include `macro`. That reader runs the OPTIONAL `balance` macro, so observing the
+  // credit through it would make a shipped member's answer depend on a key a world need not
+  // author: every `macro` world without one would move from today's `credited` to
+  // `creditNotConfigured`, breaking a published member to gain a verification it cannot perform.
   const observed = world.spendStrategy === 'actorInventory';
   const readContext = { profile, unit, units: profile.units };
   let before = 0;
@@ -1094,4 +1142,545 @@ export async function creditWorldCurrency(actor, { unitId, amount, callSite } = 
   if (request.outcome) return currencyCreditResult(request.outcome, request.messageData);
 
   return runWorldCurrencyCredit({ actor, ...request, seams });
+}
+
+// ---------------------------------------------------------------------------
+// The POOLED currency balance and debit (issue 1342).
+//
+// A companion settling a downtime activity asks about a PARTY, not an actor: what a set of
+// characters holds BETWEEN them, and then that the set pays. Both questions are world-scoped for
+// the reason the two above are — a downtime stage is not a recipe and belongs to no crafting
+// system — and both live HERE rather than in a leaf of their own for the reason the credit does:
+// they need `resolveWorldCurrencySettings`, `resolveWorldCurrencyLadder` and `buildSpendContext`,
+// all three private, and this module has already recorded that exporting privates "would widen a
+// heavily-shared module's surface for no gain".
+//
+// The change's plan proposed exporting `resolveWorldCurrencyRequest` and assembling the pooled
+// pair in a new module. That is the same widening under a different name — the request resolution
+// is the most-shared thing in this file — so the direction is inverted: the POOLED FUNCTIONS are
+// what this module exports, and every private they need stays private. The companion leaves
+// compose these two rather than re-deriving what a denomination means.
+// ---------------------------------------------------------------------------
+
+// `insufficient`, `balanceNotConfigured` and `consumeFailed` were spelled HERE, in a local
+// `POOLED_CURRENCY_OUTCOMES` block, for as long as the contract had no member that could answer
+// them: publishing a word into `COMPANION_OUTCOMES` before anything emits it would have put a dead
+// entry in a vocabulary that runs a dead-entry sweep. That block was explicitly a FORWARD
+// REFERENCE, guarded by a test asserting the two spellings agreed. The contract now declares all
+// three beside the pooled members that answer them, so the forward reference is retired and this
+// module reads them from `COMPANION_OUTCOMES` like every other outcome it answers — one
+// vocabulary, one home. Each token's rationale lives with its declaration (issue 1342).
+
+/**
+ * Resolve a coin from a string a HUMAN wrote, against the WORLD ladder (issue 1342).
+ *
+ * A two-line composition, and it is exported for the reason the pooled pair above is: what the
+ * caller needs is `resolveWorldCurrencySettings`, which is private and stays private —
+ * "exporting privates would widen a heavily-shared module's surface for no gain". So the FUNCTION
+ * is what this module exports and the private it needs does not move.
+ *
+ * It exists because the pooled holdings READ takes a NAME on every axis: its component and tool
+ * costs resolve case-insensitively against definition names, so its currency cost must resolve the
+ * same way rather than demanding an internal unit id nobody outside Fabricate holds. Routing it
+ * through the same world-settings resolver the balance read uses is what stops the two disagreeing
+ * about which ladder is being asked about — including on the `globalThis.game` fallback, which a
+ * caller reading `getCurrencyConfig` for itself would silently miss.
+ *
+ * Reading only: it resolves an identity and touches no actor.
+ *
+ * @param {string} name The caller's string — a unit id, abbreviation or label.
+ * @param {{ getCurrencyConfig?: () => object }} [seams]
+ * @returns {{ unit: object|null, ambiguous: boolean }} See {@link resolveCurrencyUnitByName}.
+ */
+export function resolveWorldCurrencyUnitByName(name, seams = {}) {
+  return resolveCurrencyUnitByName(resolveWorldCurrencySettings(seams).units, name);
+}
+
+/**
+ * Resolve the TERMINAL BASE UNIT of a unit's ladder branch — the coin whose own `baseValue` is
+ * exactly `1`, and the denomination every pooled debit is expressed in.
+ *
+ * Returns `null` when the branch does not terminate in a `baseValue === 1` unit. A valid profile
+ * always produces one (`buildUnitResolver` assigns `{ baseUnitId: unit.id, baseValue: 1 }` to any
+ * unit that contains nothing), so this is an ASSERTION of the invariant the denomination rule
+ * depends on rather than a state reachable from a validated profile today.
+ *
+ * @param {object} profile - a validated currency profile.
+ * @param {object} unit - the requested unit.
+ * @returns {object|null}
+ */
+function resolveTerminalBaseUnit(profile, unit) {
+  const baseUnitId = profile?.metadata?.get(unit?.id)?.baseUnitId;
+  const baseUnit = findCurrencyUnit(profile?.units || [], baseUnitId);
+  const baseValue = Number(profile?.metadata?.get(baseUnit?.id)?.baseValue) || 0;
+  return baseValue === 1 ? baseUnit : null;
+}
+
+/**
+ * Build the spender `ctx` for one actor's leg of a pooled question, in the pooled `caller` voice.
+ *
+ * `amount` is `0` on the READ, because a balance question proposes no cost: the macro is told
+ * which unit is being asked about through `requirement.unit` and receives a zero-amount `cost`
+ * entry rather than an invented one.
+ */
+function buildPooledContext({ profile, unit, amount, actor }) {
+  const ctx = buildSpendContext({
+    profile,
+    unit,
+    amount,
+    recipe: null,
+    config: null,
+    caller: CURRENCY_SPEND_CALLERS.consume,
+  });
+  ctx.macroContext.actor = actor || null;
+  return ctx;
+}
+
+/** The identity fields a pooled reading or ledger row reports an actor by. */
+function describePooledActor(actor) {
+  return {
+    actorId: String(actor?.id ?? ''),
+    actorUuid: String(actor?.uuid ?? ''),
+    actorName: String(actor?.name ?? ''),
+  };
+}
+
+/**
+ * Read ONE actor's holdings on a unit's ladder branch, normalising a missing reader, a refusal, a
+ * non-numeric answer and a throw into the same `copperValue: null` "cannot see".
+ *
+ * `await`ed unconditionally, because {@link MacroCoinSpender#readCoins} is asynchronous where the
+ * other two spenders' is synchronous, and awaiting a plain value yields the same value.
+ *
+ * The one thing this must never do is turn a failure into `0`. A pooled sum over a `0` that meant
+ * "I could not tell" reads as a confident, wrong answer about a party's money, and on the debit
+ * side it would silently move the shortfall onto whichever actors Fabricate could read.
+ */
+async function readPooledActorCoins(spender, actor, { profile, unit }) {
+  const described = describePooledActor(actor);
+  if (typeof spender?.readCoins !== 'function') {
+    return {
+      ...described,
+      actor,
+      copperValue: null,
+      message: 'This currency spender cannot read a coin balance.',
+    };
+  }
+  try {
+    const ctx = buildPooledContext({ profile, unit, amount: 0, actor });
+    const read = await spender.readCoins(actor || null, ctx);
+    if (!read?.valid) {
+      return {
+        ...described,
+        actor,
+        copperValue: null,
+        message: read?.message || "The actor's coin balance could not be read.",
+      };
+    }
+    const copperValue = Number(read.copperValue);
+    if (!Number.isFinite(copperValue)) {
+      return {
+        ...described,
+        actor,
+        copperValue: null,
+        message: "The actor's coin balance was not reported as a number.",
+      };
+    }
+    return { ...described, actor, copperValue };
+  } catch (error) {
+    console.error('Fabricate | Could not read a coin balance for a pooled currency read', error);
+    return { ...described, actor, copperValue: null, message: error?.message || String(error) };
+  }
+}
+
+/**
+ * Sum what a SET of actors holds on one unit's ladder branch — the pooled half of the holdings
+ * read a companion asks about a party (issue 1342).
+ *
+ * **It composes by ADDITION, and that is a property of the readers rather than an assumption.**
+ * Both `ActorPropertyCoinSpender.readCoins` and `ActorInventoryCoinSpender.readCoins` answer
+ * `copperValue` as the actor's WHOLE ladder branch expressed in one terminal base unit — 1 gp and
+ * 10 sp are the same 100 copper to both — so N actors' answers are N numbers in one denomination
+ * and their sum is the pool. `MacroCoinSpender.readCoins` answers in the same denomination by
+ * contract. Nothing here re-derives a rate.
+ *
+ * **A pool containing one unreadable actor is UNREADABLE, not partial.** `available` is `null` the
+ * moment any actor answers "cannot see", because a sum over a subset is a number about a different
+ * group than the caller asked about — and it is always too SMALL, so a gate built on it would
+ * refuse parties that can pay while looking authoritative. The per-actor `readings` still report
+ * every actor individually, so a caller can say which one and why.
+ *
+ * **An EMPTY actor set reads `0`, not `null`.** Nothing was unreadable; the pool provably holds
+ * nothing. Refusing an empty set is the calling member's decision, not this one's.
+ *
+ * Performs no write.
+ *
+ * @param {Array<object|null>} actors - already-resolved actor documents.
+ * @param {{ unitId?: string }} request
+ * @param {object} [seams] - as {@link checkWorldCurrencyAffordability}'s.
+ * @returns {Promise<{outcome: string, messageData: object|null}|{outcome: null, unit: object,
+ *   baseUnit: object, baseValue: number, profile: object, world: object, spender: object|null,
+ *   available: number|null, readings: object[]}>}
+ */
+export async function readPooledCurrencyBalance(actors, { unitId } = {}, seams = {}) {
+  const ladder = resolvePooledLadder(unitId, seams);
+  if (ladder.outcome) return ladder;
+  const pooled = await poolActorCoins(actors, ladder);
+  return { ...ladder, ...pooled };
+}
+
+/**
+ * The ladder, the terminal base unit and the resolved spender — everything BOTH pooled functions
+ * need before either touches an actor.
+ *
+ * Shared so the debit can take its up-front refusals in the right ORDER. A debit that reached the
+ * "this world cannot give currency back" gate only by way of the pooled read would have run a GM's
+ * `balance` macro N times before refusing, which makes an intended zero-effect refusal observably
+ * do something; and the gate reads only world configuration, so it never needed a reading in the
+ * first place.
+ */
+function resolvePooledLadder(unitId, seams) {
+  const ladder = resolveWorldCurrencyLadder(unitId, seams);
+  if (ladder.outcome) return ladder;
+
+  const { unit, baseValue, profile, world } = ladder;
+  const baseUnit = resolveTerminalBaseUnit(profile, unit);
+  if (!baseUnit) {
+    return {
+      outcome: COMPANION_OUTCOMES.ladderInvalid,
+      messageData: {
+        detail: `Currency unit "${unit.id}" does not reach a terminal base denomination.`,
+      },
+    };
+  }
+  return {
+    outcome: null,
+    unit,
+    baseUnit,
+    baseValue,
+    profile,
+    world,
+    spender: resolveCoinSpender(world, seams),
+  };
+}
+
+/**
+ * Read every actor and sum what can be summed — the ONE place the null-propagation rule lives, so
+ * the read a companion is shown and the read the debit gates on cannot disagree.
+ */
+async function poolActorCoins(actors, { spender, profile, unit }) {
+  const readings = [];
+  for (const actor of Array.isArray(actors) ? actors : []) {
+    // Serially rather than `Promise.all`: the `macro` strategy runs a GM-authored macro per
+    // actor, and firing N of those concurrently at a world's own automation is a behaviour a GM
+    // cannot reason about. The set is a party, so N is small.
+    readings.push(await readPooledActorCoins(spender, actor, { profile, unit }));
+  }
+  const unreadable = readings.some((reading) => reading.copperValue === null);
+  const available = unreadable
+    ? null
+    : readings.reduce((total, reading) => total + reading.copperValue, 0);
+  return { available, readings };
+}
+
+/**
+ * Choose which actors pay how much, in the TERMINAL BASE UNIT.
+ *
+ * First-fit over the caller's own actor order: each actor pays as much of what remains as they
+ * hold, and the next covers the rest. The caller's order IS the allocation policy, which is why it
+ * is not sorted here — a companion that wants a party fund drained before a character's purse says
+ * so by the order it supplies.
+ *
+ * `remaining` is returned rather than asserted away, so a caller that somehow reached here without
+ * a sufficiency test refuses instead of silently taking a partial payment.
+ */
+function planPooledDebit(readings, requiredBase) {
+  const plan = [];
+  let remaining = requiredBase;
+  for (const reading of readings) {
+    if (remaining <= 0) break;
+    const amount = Math.min(remaining, reading.copperValue);
+    if (amount <= 0) continue;
+    plan.push({ reading, amount });
+    remaining -= amount;
+  }
+  return { plan, remaining };
+}
+
+/**
+ * Invoke one spender method for one planned payer, normalising a falsy result and a throw into the
+ * same `{ ok, message }` shape — the pooled analogue of {@link applySpenderToGroup}, which cannot
+ * be reused because it is recipe-shaped: it hardcodes `caller: 'craft'` and builds its context from
+ * an aggregated group rather than from a per-actor payment.
+ */
+async function applyPooledSpender({ spender, method, verb, entry, profile, baseUnit }) {
+  const requirement = { unit: baseUnit, amount: entry.amount };
+  const ctx = buildPooledContext({
+    profile,
+    unit: baseUnit,
+    amount: entry.amount,
+    actor: entry.reading.actor,
+  });
+  const formatted = formatCurrencyRequirement(
+    { unit: baseUnit.id, amount: entry.amount },
+    profile.units
+  );
+  const fallbackMessage = `Could not ${verb} currency (${formatted}) for ${entry.reading.actorName || 'actor'}.`;
+  try {
+    const result = await spender[method](entry.reading.actor || null, requirement, ctx);
+    if (result?.valid) return { ok: true };
+    return { ok: false, message: result?.message || fallbackMessage };
+  } catch (error) {
+    console.error(`Fabricate | Failed to ${verb} pooled currency`, error);
+    return { ok: false, message: error?.message || fallbackMessage };
+  }
+}
+
+/**
+ * Give back every payment that settled before a failure, in the SAME denomination it was taken.
+ *
+ * Base value in, base value out: a 250 cp take that had to break a gold piece is given back as
+ * 250 cp, so the actor's TOTAL is restored exactly even though their coin MIX may differ from
+ * before. That is the honest limit of `buildCurrencyRefundUpdates`, which "simply adds `amount` of
+ * the requirement's own denomination back" and makes no change.
+ *
+ * A give-back that itself fails is recorded and does NOT become a zero-mutation claim — that
+ * exclusion is the whole reason the debit refuses up front in a world that cannot give back.
+ */
+async function restorePooledDebit({ settled, spender, profile, baseUnit }) {
+  let restoredEverything = true;
+  for (const entry of settled) {
+    const outcome = await applyPooledSpender({
+      spender,
+      method: 'refund',
+      verb: 'restore',
+      entry,
+      profile,
+      baseUnit,
+    });
+    entry.record.restored = outcome.ok;
+    if (!outcome.ok) {
+      restoredEverything = false;
+      entry.record.message = outcome.message;
+    }
+  }
+  return restoredEverything;
+}
+
+/** One ledger row: which actor paid how much of what, and whether it stuck. */
+function pooledLedgerRow(entry, baseUnit, { attempted, settled, message }) {
+  const row = {
+    ...describePooledActor(entry.reading.actor),
+    unitId: baseUnit.id,
+    amount: entry.amount,
+    attempted: attempted === true,
+    settled: settled === true,
+  };
+  if (message) row.message = message;
+  return row;
+}
+
+/**
+ * Drive the planned payments, ABORTING at the first failure and then giving back everything that
+ * already settled. Unattempted payers are still reported, as `attempted: false`, so a caller can
+ * tell "tried and failed" from "never tried".
+ */
+async function runPooledDebit({ plan, spender, profile, baseUnit }) {
+  const ledger = [];
+  const settled = [];
+  let failure = null;
+  for (const entry of plan) {
+    if (failure !== null) {
+      ledger.push(pooledLedgerRow(entry, baseUnit, { attempted: false, settled: false }));
+      continue;
+    }
+    const outcome = await applyPooledSpender({
+      spender,
+      method: 'spend',
+      verb: 'spend',
+      entry,
+      profile,
+      baseUnit,
+    });
+    const record = pooledLedgerRow(entry, baseUnit, {
+      attempted: true,
+      settled: outcome.ok,
+      message: outcome.message,
+    });
+    ledger.push(record);
+    if (outcome.ok) settled.push({ ...entry, record });
+    else failure = outcome.message;
+  }
+  if (failure === null) return { ledger, failure: null, wroteNothing: false };
+
+  const restoredEverything = await restorePooledDebit({ settled, spender, profile, baseUnit });
+  // Zero-mutation here means NET zero, not never-written: the restore fired its own writes. It is
+  // a truthful claim because the give-back is exact in base value, and it is the claim a companion
+  // actually needs, since it is what makes the failed call safe to retry.
+  return { ledger, failure, wroteNothing: restoredEverything };
+}
+
+/**
+ * A pooled debit's amount rule — the CREDIT's rule, not the check's.
+ *
+ * A coin count is a whole number, and `requiredBase = amount × baseValue` has to stay exact for
+ * the base denomination to mean anything. Admitting `2.5` would make that product a float whose
+ * integrality is a tolerance argument, and would let the debit take an amount the published credit
+ * refuses to express — so a companion could remove money it could not put back through the API.
+ */
+function resolvePooledDebitBase(amount, baseValue) {
+  const requested = resolveCreditAmount(amount);
+  if (requested === null) return null;
+  const requiredBase = requested * baseValue;
+  return Number.isSafeInteger(requiredBase) && requiredBase > 0 ? requiredBase : null;
+}
+
+/**
+ * The refusals a pooled debit takes BEFORE it reads or writes anything, each provably
+ * zero-mutation because nothing has been invoked yet.
+ *
+ * The `increment` gate is the one with a reason beyond validation. `increment` is explicitly
+ * OPTIONAL (`currencyProfile.js` — "a system with no increment macro simply cannot refund"), so a
+ * `macro` world can be perfectly valid and still have published no way to hand coin back. Taking
+ * from such a world is taking something Fabricate cannot return, so the debit refuses it up front
+ * with `creditNotConfigured` — the same word the world-scoped credit uses for the same fact, in
+ * the same voice: a GM configuration gap reported as a refusal, never as a domain answer.
+ *
+ * The general `refund` test beside it catches a spender with no give-back at all. In a shipped
+ * world it is unreachable (all three spenders define `refund`); it is what states the rule as
+ * "refuse to take what you cannot give back" rather than as one strategy's special case.
+ */
+function refusePooledDebitUpFront(world, spender) {
+  if (typeof spender?.spend !== 'function') {
+    return {
+      outcome: COMPANION_OUTCOMES.creditNotConfigured,
+      messageData: {
+        detail: `No currency spender is available for the "${world.spendStrategy}" spend strategy.`,
+      },
+    };
+  }
+  if (typeof spender?.refund !== 'function') {
+    return {
+      outcome: COMPANION_OUTCOMES.creditNotConfigured,
+      messageData: {
+        detail: `The "${world.spendStrategy}" spend strategy cannot give currency back, so it is not used to take any.`,
+      },
+    };
+  }
+  if (world.spendStrategy === 'macro' && !String(world.macros?.increment || '').trim()) {
+    return {
+      outcome: COMPANION_OUTCOMES.creditNotConfigured,
+      messageData: {
+        detail:
+          'This world spends currency through macros and has no "increment" macro configured, so currency taken could not be given back.',
+      },
+    };
+  }
+  return null;
+}
+
+/** A pooled debit refusal that wrote nothing, in the member's own answer shape. */
+function pooledDebitRefusal(outcome, messageData, extra = {}) {
+  return {
+    outcome,
+    messageData: messageData ?? null,
+    wroteNothing: true,
+    requiredBase: null,
+    baseUnitId: '',
+    available: null,
+    ledger: [],
+    ...extra,
+  };
+}
+
+/**
+ * Take `amount` of `unitId` from a SET of actors' combined holdings, against the WORLD currency
+ * ladder (issue 1342) — the currency leg of the pooled holdings consume a companion uses to settle
+ * a downtime activity's cost.
+ *
+ * **Every per-actor spend is denominated in the TERMINAL BASE UNIT, and that is a correctness
+ * requirement rather than a style.** `aggregateCurrencySpends` expresses a requirement back in a
+ * representative unit with `Math.ceil(requiredBase / baseValue)`, which exists so a SINGLE payer
+ * is never under-charged. Applied per actor across N payers the same rounding over-charges the
+ * POOL by up to `baseValue - 1` for every payer: on a `gp -> sp -> cp` ladder, four characters
+ * each covering part of a cost would be charged up to 3.96 gp more than the cost. In the base unit
+ * `baseValue` is `1` by definition, so the ceiling is the identity and the pool pays exactly what
+ * was asked. `buildCurrencySpendUpdates` breaks higher denominations to satisfy a base-unit
+ * requirement, so paying in copper costs an actor holding only gold nothing extra.
+ *
+ * **All-or-nothing.** The pool is tested against the total BEFORE anything is written, and a
+ * failure part-way gives back every payment that settled — which is what makes the up-front
+ * refusal in a world that cannot give coin back load-bearing rather than fussy.
+ *
+ * **Not idempotent**, for the reason the credit is not: nothing Fabricate can read distinguishes a
+ * repeated debit from a second, intended one. The caller owns not double-consuming.
+ *
+ * **`wroteNothing` is what a caller retries on.** It is `true` for every refusal taken before the
+ * first spend, and for a failure whose give-back fully succeeded; it is `false` the moment a
+ * give-back failed, because then Fabricate cannot say what the party is holding.
+ *
+ * The GM gate, the actor resolution, the readiness refusal and the `callSite` election belong to
+ * the companion member that wraps this function — this one is handed resolved actor documents, in
+ * the order they should pay.
+ *
+ * @param {Array<object|null>} actors - already-resolved actor documents, in payment order.
+ * @param {{ unitId?: string, amount?: number|string }} request
+ * @param {object} [seams] - as {@link creditWorldCurrency}'s.
+ * @returns {Promise<{outcome: string|null, messageData: object|null, wroteNothing: boolean,
+ *   requiredBase: number|null, baseUnitId: string, available: number|null, ledger: object[]}>}
+ */
+export async function consumePooledCurrency(actors, { unitId, amount } = {}, seams = {}) {
+  const ladder = resolvePooledLadder(unitId, seams);
+  if (ladder.outcome) return pooledDebitRefusal(ladder.outcome, ladder.messageData);
+
+  const { baseUnit, baseValue, profile, world, spender } = ladder;
+  const requiredBase = resolvePooledDebitBase(amount, baseValue);
+  if (requiredBase === null) return pooledDebitRefusal(COMPANION_OUTCOMES.invalidAmount, null);
+
+  // BEFORE the pool is read, not merely before it is written. These refusals read world
+  // configuration alone, and taking them here is what makes "wrote nothing" also mean "ran
+  // nothing" — a GM's `balance` macro is not fired N times on the way to a refusal that was
+  // decided by the config it never consulted.
+  const refusal = refusePooledDebitUpFront(world, spender);
+  if (refusal) {
+    return pooledDebitRefusal(refusal.outcome, refusal.messageData, {
+      requiredBase,
+      baseUnitId: baseUnit.id,
+    });
+  }
+
+  const { available, readings } = await poolActorCoins(actors, ladder);
+  const planned = { requiredBase, baseUnitId: baseUnit.id, available };
+
+  if (available === null) {
+    const detail = readings.find((reading) => reading.copperValue === null)?.message || '';
+    return pooledDebitRefusal(COMPANION_OUTCOMES.balanceNotConfigured, { detail }, planned);
+  }
+
+  const { plan, remaining } = planPooledDebit(readings, requiredBase);
+  if (available < requiredBase || remaining > 0) {
+    return pooledDebitRefusal(
+      COMPANION_OUTCOMES.insufficient,
+      {
+        required: String(requiredBase),
+        available: String(available),
+        unit: unitDisplayName(baseUnit),
+      },
+      planned
+    );
+  }
+
+  const { ledger, failure, wroteNothing } = await runPooledDebit({
+    plan,
+    spender,
+    profile,
+    baseUnit,
+  });
+  return {
+    outcome: failure === null ? null : COMPANION_OUTCOMES.consumeFailed,
+    messageData: failure === null ? null : { detail: failure },
+    wroteNothing,
+    ...planned,
+    ledger,
+  };
 }

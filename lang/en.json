@@ -1477,6 +1477,44 @@
         "NotReady": "Fabricate is still starting up, so components cannot be awarded yet."
       }
     },
+    "Holdings": {
+      "Read": {
+        "Read": "Read from the combined holdings of the characters asked about.",
+        "Failed": "The pooled holdings could not be read.",
+        "ComponentNotFound": "No component of that name in any crafting system.",
+        "UnitNotFound": "No currency unit of that name on the world coin ladder.",
+        "ToolNotFound": "No tool of that name in any crafting system.",
+        "BalanceNotConfigured": "How much coin the characters are carrying could not be read — this world's coin ladder is empty or invalid, or it spends coin through a macro and has published no balance macro. Nothing else in this request was affected.",
+        "InvalidCostType": "A cost must name one of the axes Fabricate reads: a component, a currency unit, or a tool.",
+        "CostTypeUnsupported": "That is a Fabricate cost axis, but not one the pooled holdings read answers yet.",
+        "InvalidQuantity": "The quantity a cost asks for must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "InvalidCosts": "The costs to read must be a list of between one and {max} entries, each naming exactly an axis, a name and a quantity.",
+        "InvalidActorUuids": "The characters to read must be a list of between one and {max} character UUIDs, and every one of them must resolve — nothing is read from a partly resolved set.",
+        "GMOnly": "Only a GM can read the pooled holdings of a group of characters.",
+        "NoActor": "None of the characters asked about could be found.",
+        "NotReady": "Fabricate is still starting up, so pooled holdings cannot be read yet."
+      },
+      "Consume": {
+        "Consumed": "Taken from the combined holdings of the characters.",
+        "Failed": "The pooled holdings could not be taken. Anything already taken was given back where Fabricate could give it back; any cost still reporting an amount consumed names what could not be returned, and the takes beside it name who is still short.",
+        "Insufficient": "The characters are not carrying enough to pay this, so nothing was taken.",
+        "NotAttempted": "Nothing was taken for this cost, because the request was refused before it was reached — usually because another cost in the same request could not be paid.",
+        "ComponentNotFound": "No such component to take in this crafting system.",
+        "UnitNotFound": "No such currency unit on the world coin ladder.",
+        "SystemNotFound": "No crafting system of that id to take components from.",
+        "InvalidCostType": "A cost must name one of the axes Fabricate takes: a component or a currency unit.",
+        "CostTypeUnsupported": "That is a Fabricate cost axis, but not one the pooled holdings take settles.",
+        "InvalidQuantity": "The quantity a cost asks to be taken must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "InvalidCosts": "The costs to take must be a list of between one and {max} entries, each naming an axis, the resolved ids that identify what to take, and a quantity.",
+        "InvalidActorUuids": "The characters to take from must be a list of between one and {max} character UUIDs, and every one of them must resolve — nothing is taken from a partly resolved set.",
+        "CreditNotConfigured": "This world spends coin through a macro and has published no increment macro, so Fabricate has no way to give the coin back if the take has to be undone. Nothing was taken.",
+        "InvalidCallSite": "Taking from pooled holdings must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client took nothing.",
+        "GMOnly": "Only a GM can take from the pooled holdings of a group of characters.",
+        "NoActor": "None of the characters to take from could be found.",
+        "NotReady": "Fabricate is still starting up, so pooled holdings cannot be taken yet."
+      }
+    },
     "Admin": {
       "Title": "Crafting Admin",
       "Selected": "Selected:",
@@ -4303,9 +4341,11 @@
           "MacroCanAfford": "Can afford macro",
           "MacroCanAffordHint": "Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.",
           "MacroIncrement": "Increment macro",
-          "MacroIncrementHint": "Runs to return currency when a player cancels an in-progress craft, if the system refunds on cancel.",
+          "MacroIncrementHint": "Runs whenever currency has to go back to an actor: a player cancelling an in-progress craft (if the system refunds on cancel), a companion module crediting coin, and giving back a pooled cost whose take could not be completed. Optional — but without it Fabricate refuses to take coin from a group at all, because it would have no way to return it.",
           "MacroDecrement": "Decrement macro",
           "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
+          "MacroBalance": "Balance macro",
+          "MacroBalanceHint": "Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as \"unknown\".",
           "MacroDropHint": "Drag a macro here to link it.",
           "MacroDropZoneLabel": "{field}: drag a macro here to link it.",
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",

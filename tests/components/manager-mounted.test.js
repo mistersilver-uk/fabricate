@@ -38,6 +38,7 @@ import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterF
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
+import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
 // The shipped array transform the store publishes hydrated cards through (issue 1081). The
 // DOM guards below drive the REAL one rather than restating it, so a revert to re-wrapping
 // the same card objects turns them red. Safe to import here: the projection is a deliberate
@@ -21825,30 +21826,39 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'setCurrencySpendStrategy' && call[1] === 'macro'));
   });
 
-  it('mounts the macro strategy with three macro drop zones and no inventory-mode select', async () => {
+  it('mounts the macro strategy with a drop zone per macro slot and no inventory-mode select', async () => {
     await mountCurrencyEditor({
       selectedCurrency: {
         enabled: true,
         spendStrategy: 'macro',
         providerId: '',
-        macros: { canAfford: '', increment: '', decrement: '' },
+        macros: {},
         units: [],
       },
     });
 
     const macroRow = target.querySelector('[data-world-currency-macros]');
     assert.ok(macroRow, 'macro zones container should render');
-    // The three drop zones share one single-row container.
+    // The drop zones share one single-row container.
     assert.ok(
       macroRow.classList.contains('manager-currency-macro-row'),
-      'the three macro drop zones should share the single-row container'
+      'the macro drop zones should share the single-row container'
     );
+    // Counted from the DECLARED vocabulary rather than from a literal, because the whole failure
+    // mode this covers is a slot a GM cannot author: adding a key to `CURRENCY_MACRO_KEYS` without
+    // adding its field renders one zone fewer, and a hardcoded 3 would have gone on passing.
+    const expected = CURRENCY_MACRO_KEYS.length;
     const dropzones = macroRow.querySelectorAll('[data-world-currency-macro-dropzone]');
-    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
+    assert.equal(dropzones.length, expected, 'macro strategy should show one zone per macro slot');
     assert.equal(
       target.querySelectorAll('[data-world-currency-macro-dropzone]').length,
-      3,
-      'all three drop zones live inside the single-row container'
+      expected,
+      'every drop zone lives inside the single-row container'
+    );
+    assert.deepEqual(
+      [...dropzones].map((zone) => zone.getAttribute('data-world-currency-macro-dropzone')).sort(),
+      [...CURRENCY_MACRO_KEYS].sort(),
+      'and each zone is bound to a declared slot'
     );
     // The removed nested inventory-mode select must not render.
     assert.equal(target.querySelector('[data-world-currency-inventory-mode-select]'), null);
@@ -21860,20 +21870,25 @@ describe('CraftingSystemManager mounted behavior', () => {
         enabled: true,
         spendStrategy: 'macro',
         providerId: '',
-        macros: { canAfford: '', increment: '', decrement: '' },
+        macros: {},
         units: [],
       },
     });
 
+    const expected = CURRENCY_MACRO_KEYS.length;
     const dropzones = [...target.querySelectorAll('[data-world-currency-macro-dropzone]')];
-    assert.equal(dropzones.length, 3, 'macro strategy should show three drop zones');
+    assert.equal(dropzones.length, expected, 'macro strategy should show one zone per macro slot');
     const labels = dropzones.map((zone) => zone.getAttribute('aria-label'));
     // Every empty drop zone must expose a non-empty, distinct accessible name (not the shared hint).
     assert.ok(
       labels.every((label) => label && label.length > 0),
       'each drop zone should have an aria-label'
     );
-    assert.equal(new Set(labels).size, 3, 'the three drop-zone aria-labels should be distinct');
+    assert.equal(
+      new Set(labels).size,
+      expected,
+      'the drop-zone aria-labels should be distinct from one another'
+    );
   });
 
   it('shows a no-provider callout for actorInventory on a no-provider system and keeps units editable', async () => {

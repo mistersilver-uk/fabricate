@@ -37,6 +37,12 @@ import {
   GRANTED_BY_MAX_LENGTH,
   GRANTED_SOURCE_MESSAGE_KEYS,
   KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  POOLED_ACTORS_MAX,
+  POOLED_COSTS_MAX,
+  POOLED_HOLDINGS_CONSUME_ENTRY_OUTCOMES,
+  POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
+  POOLED_HOLDINGS_READ_ENTRY_OUTCOMES,
+  POOLED_HOLDINGS_READ_MESSAGE_KEYS,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
@@ -44,6 +50,8 @@ import {
   currencyCreditResult,
   knowledgeGrantResult,
   normalizeGrantedBy,
+  pooledHoldingsConsumeResult,
+  pooledHoldingsReadResult,
 } from '../src/systems/companionContract.js';
 import {
   assertContractResult,
@@ -77,6 +85,11 @@ const EXPECTED_MEMBERS = Object.freeze([
   ['resolveBulkCheckDecision', 'facade', 'stable', 'method'],
   ['awardComponents', 'facade', 'stable', 'method'],
   ['creditCurrency', 'facade', 'stable', 'method'],
+  // Appended again for the same reason, one issue later (1342). These two are the first
+  // members addressed by actor UUID rather than by id, and `consumePooledHoldings` is the
+  // first that REMOVES value.
+  ['readPooledHoldings', 'facade', 'stable', 'method'],
+  ['consumePooledHoldings', 'facade', 'stable', 'method'],
 ]);
 
 /** Every outcome token declared for this `schemaVersion`, closed by enumeration. */
@@ -125,6 +138,23 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'creditFailed',
   'creditUnavailable',
   'creditNotConfigured',
+  // readPooledHoldings (issue 1342). `read` and `readFailed` are answered at BOTH levels; the
+  // six after them are READING-level only and can never be a call-level `outcome`, and
+  // `invalidCosts`/`invalidActorUuids` are the two call-level request refusals.
+  'read',
+  'readFailed',
+  'balanceNotConfigured',
+  'toolNotFound',
+  'invalidCostType',
+  'costTypeUnsupported',
+  'invalidCosts',
+  'invalidActorUuids',
+  // consumePooledHoldings (issue 1342). Neither `costNotFound` nor `partiallyConsumed` is
+  // here, and their absence is asserted rather than remembered further down.
+  'consumed',
+  'consumeFailed',
+  'insufficient',
+  'notAttempted',
 ]);
 
 /**
@@ -164,6 +194,16 @@ const MEMBER_KEY_TABLES = Object.freeze([
   Object.freeze({
     name: 'creditCurrency',
     keys: CURRENCY_CREDIT_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'readPooledHoldings',
+    keys: POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+    shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
+  }),
+  Object.freeze({
+    name: 'consumePooledHoldings',
+    keys: POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
     shared: Object.freeze(['gmOnly', 'noActor', 'notReady']),
   }),
 ]);
@@ -322,11 +362,20 @@ test('the member table is exactly the declared set at its declared promise tiers
 });
 
 test('AC-1 — the member table grew by APPENDING, and the eighth member did not move', () => {
-  assert.equal(COMPANION_MEMBERS.length, 12, 'ten members plus the award and the credit');
+  assert.equal(
+    COMPANION_MEMBERS.length,
+    14,
+    'ten members, plus the award and the credit, plus the pooled read and the pooled consume'
+  );
   assert.deepEqual(
     [COMPANION_MEMBERS[10].name, COMPANION_MEMBERS[11].name],
     ['awardComponents', 'creditCurrency'],
-    'the two new rows are at indices 10 and 11'
+    'the award and the credit did not move off indices 10 and 11'
+  );
+  assert.deepEqual(
+    [COMPANION_MEMBERS[12].name, COMPANION_MEMBERS[13].name],
+    ['readPooledHoldings', 'consumePooledHoldings'],
+    'the two pooled rows are at indices 12 and 13, appended after them'
   );
   // The index assertion is the point: four sites name this row "the eighth member", and an
   // interleaved row falsifies all of them with no assertion noticing.
