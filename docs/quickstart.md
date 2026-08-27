@@ -85,11 +85,11 @@ Fabricate recipes reference *components*.
 These are items imported into your crafting system's library.
 So long as you use that same world or compendium item, or copies of it, to create new instances, Fabricate will recognize it as the original component.
 
-1. In the GM admin, switch to the **Components** tab
+1. In the GM admin, open the **Components** page
 2. Drag items from the Items sidebar or a compendium into the components drop zone
 3. Your item is now registered as a Fabricate component
 
-![Fabricate created component](img/screenshots/fabricate-created-component.webp)
+{% include screenshot.html case="manager-components-normal" caption="The Components page, with the drop zone above the library it fills." %}
 
 Once you start adding recipes, the **Crafting** page lists every recipe the system holds.
 
@@ -100,8 +100,8 @@ Once you start adding recipes, the **Crafting** page lists every recipe the syst
 Gathering lets actors collect materials from your component library at places you define.
 It is opt-in per crafting system.
 
-1. In the GM admin, open your system's **Gathering** section and, on the **Settings** tab, enable the "Gathering" feature
-2. Switch to the **Environments** tab under **Gathering** and click **Create Environment**
+1. In the GM admin, open **System Overview** and turn on the **Gathering** optional feature, on the same card you saved in Step 2
+2. Open **Environments** under **Gathering** and click **Create Environment**
 3. Give it a **Name** and optional **Description** (like the "Azure Grove" or "Sunken Ruins")
 4. Choose a **Selection Mode**:
 
@@ -112,9 +112,9 @@ It is opt-in per crafting system.
 2. Optionally add **Biome** tags (also used in matching) and/or link a Scene to gate gathering in that environment
 3. If you like, give your environment an image
 
-![Fabricate Enable Gathering](img/screenshots/fabricate-enable-gathering.webp)
-![Fabricate create environment](img/screenshots/fabricate-create-environment.webp)
-![Fabricate create gathering environment](img/screenshots/fabricate-create-gathering-environment.webp)
+{% include screenshot.html case="manager-environments-browse-normal" caption="The environment browser for a system, listing every environment it holds." %}
+
+{% include screenshot.html case="manager-environment-edit-placeholder" caption="The environment editor's Overview tab, where the fields above are set." %}
 
 New environments without a gathering task are created as disabled draft shells.
 We'll enable it in Step 7 once it has some content.
@@ -132,7 +132,8 @@ They are authored once and composed into environments.
   The drop row order is the rank used by the system's Gathering Rules when you choose "Highest ranked successful drop" in the gathering reward rules.
 4. Optionally set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
 
-![Fabricate gathering task editor](img/screenshots/fabricate-create-gathering-task.webp)
+{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, with the task identity and availability cards on the left and the selected drop rule on the right." %}
+
 ![Fabricate gathering rules and limitations](img/screenshots/fabricate-gathering-settings.webp)
 
 {: .note }
@@ -150,7 +151,7 @@ They add flavour, complications, and can even cause a gathering attempt to fail.
   That's the chance the event triggers on a gathering attempt
 4. Optionally add one or more roll **modifier** and **Weather**/**time of day** gates
 
-![Fabricate gathering event editor](img/screenshots/fabricate-create-gathering-event.webp)
+{% include screenshot.html case="manager-gathering-event-editor-normal" caption="The Gathering Event editor, with the event identity and matching cards on the left and its modifiers on the right." %}
 
 How a triggered event affects the attempt is controlled by the system's **Event outcome** rule:
 
@@ -167,7 +168,8 @@ Return to the **Environments** tab and select the environment from Step 4 to add
 2. On the **Tasks** and **Events** tabs, confirm the tasks and events you want are included for this environment
 3. Enable the environment and save
 
-![Fabricate environment task composition](img/screenshots/fabricate-configure-environment-tasks.webp)
+{% include screenshot.html case="manager-environment-edit-automatic-force-add" caption="The Tasks tab of an automatic environment, with Force add open on a non-matching task." %}
+
 ![Fabricate environment event composition](img/screenshots/fabricate-configure-environment-events.webp)
 
 ## Step 8: Gather as a Player
@@ -175,17 +177,18 @@ Return to the **Environments** tab and select the environment from Step 4 to add
 Once enabled, the environment appears in the player **Gathering** tab for any actor that can gather there.
 Players open it from the **Gathering** header button in the Items sidebar, pick a character they own in the actor-selection bar, select an environment, and attempt the tasks available to them.
 
-![Fabricate player gathering task](img/screenshots/fabricate-player-gathering-task.webp)
+{% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with a task selected and ready to attempt." %}
 
 The same player surface shows why an attempt is blocked.
 For example, a required Tool appears in the right-hand requirements panel when the selected actor does not have it.
 
-![Fabricate player gathering missing tool](img/screenshots/fabricate-player-gathering-tool-blocked.webp)
+{% include screenshot.html case="player-gathering-tool-blocked" caption="A task blocked because the selected character does not carry the tool it requires." %}
 
 Timed tasks stay visible while the active run is in progress, and blind environments show a single opaque gather action until tasks are discovered.
 
-![Fabricate player timed gathering run](img/screenshots/fabricate-player-gathering-timed-active.webp)
-![Fabricate player blind gathering](img/screenshots/fabricate-player-gathering-blind.webp)
+{% include screenshot.html case="player-gathering-timed-active" caption="A timed task the character has already started, blocked until that run finishes." %}
+
+{% include screenshot.html case="player-gathering-blind" caption="A blind environment, offering one opaque action instead of task rows." %}
 
 The Crafting tab provides recipe browsing, actor and source selection, craft buttons, favourites, and shopping-list planning in the UI.
 

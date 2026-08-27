@@ -229,6 +229,51 @@
       "case": "manager-knowledge-owned-copies",
       "alt": "The Knowledge page, listing the characters who hold copies of a system’s recipe items and, for the selected character, each copy with how many of its uses are spent.",
       "sha256": "85c135276eb402ae331b227db21be472a7c97432141b350fd9a6ae191032517a"
+    },
+    {
+      "case": "player-gathering-task-ready",
+      "alt": "The player Gathering tab with Frostmark Ridge selected. Its task rows each carry a success chance, and the panel on the right shows the chosen task with an Attempt button, a requirements card reading no special requirements, and what the task might yield.",
+      "sha256": "d9180047ff1281c238d6a3437d65da925aa7e284c4d2c11d2096b3c59b00e2a8"
+    },
+    {
+      "case": "player-gathering-events",
+      "alt": "The player Gathering tab with the Old Karrun Mine detail column on its Events tab. The environment's danger level and event chance sit above a searchable list of three events, and the panel on the right shows the selected event with its own chance.",
+      "sha256": "f9ff4e7f102c1b72ce50496c968e971bdfe00db348b59bb2e790c4a98520e699"
+    },
+    {
+      "case": "player-gathering-tool-blocked",
+      "alt": "The player Gathering tab showing a task the selected character cannot attempt. Its row carries a missing tools pill and a padlock, the Attempt button is greyed out, and the requirements card on the right lists a required Glass Alembic marked missing.",
+      "sha256": "0e66fbb69e624e5541764dfde6e51a35e84c608636a028009d62e9e331ec0a97"
+    },
+    {
+      "case": "player-gathering-timed-active",
+      "alt": "The player Gathering tab showing a timed task the selected character has already started. Its row carries an already in progress pill and a padlock, the Attempt button is greyed out, and the requirements card on the right says this actor already has an active gathering run for this task.",
+      "sha256": "e58d2559bf39f6dbb7426122a877d5ea865ac502a586dae5ec809042f9c48c06"
+    },
+    {
+      "case": "player-gathering-blind",
+      "alt": "The player Gathering tab with the blind environment Shadow Thicket selected. A single Attempt gathering action stands in place of task rows, a discovered tasks heading reads zero of two with nothing found yet, and the panel on the right reads no available tasks.",
+      "sha256": "658bf0f6aa9babb03fd6dbd98a54fcaf53b828acd1aa4bcf64fbcfa279535829"
+    },
+    {
+      "case": "player-gathering-realm-locked",
+      "alt": "The player Gathering tab with a realm-locked environment called The Deepvault in the environment list, greyed out under a not in current realm pill with a padlock over its image. The environment open above it is blocked for a different reason, a linked scene the character has not visited.",
+      "sha256": "9d1e9a67e7a2f863f4495325f3f06dbd8e067d9144d5a5b5af5e8c150bbc14a0"
+    },
+    {
+      "case": "manager-environment-edit-placeholder",
+      "alt": "The environment editor's Overview tab for Sunlit Grove, showing its image, name, description and active toggle, its danger level and biome tags, and its player-facing behaviour and composition mode choices, with the linked scene, validation and runtime counts summarised on the right.",
+      "sha256": "e7f5595208f8b1b98babd754a0d18e2793d157d608055040e7f1884b242fa253"
+    },
+    {
+      "case": "manager-components-normal",
+      "alt": "The Components page for a crafting system, with a drop zone for adding items above the component library grouped by category, and the selected component with its tags, essence contributions and actions in the panel on the right.",
+      "sha256": "c4b3554d6127de5442ea0e4bc745d0bdc25d2a2627e1eab4a1410ab3c718e64c"
+    },
+    {
+      "case": "manager-environment-edit-automatic-force-add",
+      "alt": "The environment editor's Tasks tab in automatic composition mode, showing the tasks included by match, an empty excluded section, and the non-matching section with a row menu open on its Force add action.",
+      "sha256": "fd02602b221908204a151923d9e1ac1bb0c9669084673fe72f9f73e6d42508a3"
     }
   ]
 }
