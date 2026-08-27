@@ -54,15 +54,22 @@ CraftingSystem = {
     itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   categories: string[], // custom recipe categories only; reserved "general" is implicit
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   componentCategories?: string[], // default []; custom COMPONENT categories only; reserved "general" is implicit; independent of `categories`
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   categoryIcons?: Record<string, string>, // default {}; optional per-recipe-category Font Awesome icon, keyed by lowercased category name (may include "general")
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   componentCategoryIcons?: Record<string, string>, // default {}; the same, for component categories
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   itemTags: string[],
 
   // Emitted unconditionally by normalization (empty array when features.essences is off).
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   essenceDefinitions: EssenceDefinition[],
 
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
   membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
@@ -623,6 +630,13 @@ CraftingSystem = {
     All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
     A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
     An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
+
+36. **EIGHT in-system keys are SHADOWED by a world scope setting and remain LIVE AND AUTHORITATIVE** (issue 1359, epic 1357).
+    They are `components`, `essenceDefinitions`, `tools`, `componentCategories`, `itemTags`, `categories`, `componentCategoryIcons` and `categoryIcons`.
+    `## Scoped Entity Definitions` requirement 13 registers `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope`, but that change is ADDITIVE: nothing writes them yet, so every world reads the registered default and each key above is what the code actually stores, reads and resolves against.
+    Each is marked `SHADOWED` in the shape above; `tools` is declared under `## Tool` requirement 2 rather than in that shape and carries the same note.
+    The world-scope migration (epic 1357, PR 3) is what relocates them and what makes the crafting-system normalizer stop emitting them; until it lands, a reader who finds two descriptions of one entity should follow this section.
+    Until then the world corpus is nevertheless part of each key's VALID ID BASIS — see `## Scoped Entity Definitions` requirement 16 — so a reference is pruned only when BOTH halves can vouch for the id set, and a world setting that has never been written vouches for nothing.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -1931,10 +1945,13 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 
 ## Scoped Entity Definitions
 
-> **NOT YET LIVE.**
-> This section describes the target three-layer model introduced by issue 1358 and made live by the world-scope migration of epic 1357 (PR 3, release `1.30.0`).
-> The modules that implement it (`src/systems/scopedDefinitions.js`, `componentScope.js`, `essenceScope.js`, `toolScope.js`) ship inert and are imported by nothing.
-> Until that migration lands, `## Component`, `## EssenceDefinition` and `## Tool` describe what the code actually does, and where those sections and this one disagree, they are what the code does.
+> **PARTLY LIVE — PER REQUIREMENT, not per section.**
+> A section-level "partly live" marker tells a reader nothing they can act on, so the split is stated exactly.
+>
+> **LIVE** as of issue 1359: the three persisted shapes and their settings keys (requirement 13), the store contract (requirement 14), the TWO-UNION requirement (requirement 15) and the Valid Id Basis requirement (requirement 16), together with the three-layer resolution contract of requirements 1-12 that they read through.
+>
+> **NOT YET LIVE**, until the world-scope migration of epic 1357 (PR 3, release `1.30.0`): the migration itself, the relocation of a crafting system's own definitions, the normalizer shedding `components` / `essenceDefinitions` / `tools` and the vocabulary keys, and the WORLD tool-breakage authority (`### Tool scope` requirement 5).
+> Until then nothing WRITES a world scope setting, so every world reads the registered default, `## Component`, `## EssenceDefinition` and `## Tool` describe the LIVE per-system shape, and where those sections and this one disagree, they are what the code does.
 
 ### Purpose
 
@@ -2018,6 +2035,51 @@ SystemMembershipRecord = {
     The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
     The reserved `general` component category is not part of that vocabulary and stays implicit.
 
+13. **The three layers are PERSISTED as three separate world settings** (issue 1359), each `scope: "world"`, `config: false`, `type: Object`, default `{}`:
+
+    | Setting key | Holds |
+    | --- | --- |
+    | `fabricate.componentScope` | `{ entities[], defaults{}, membership{} }` |
+    | `fabricate.essenceScope` | the same shape |
+    | `fabricate.toolScope` | the same shape, plus the WORLD tool-breakage authority alone |
+
+    `entities` is the world entity roster (layer 1), `defaults` a map of entity id to world defaults (layer 2), and `membership` a map of `"<entityId>|<systemId>"` to membership record (layer 3).
+    A map key is DERIVED FROM ITS RECORD on every normalize rather than trusted, so a hand-edited or imported payload whose key and record disagree cannot produce a lookup that finds the wrong record.
+    `fabricate.worldVocabulary` is deliberately NOT among them: the World Vocabulary is modelled separately (requirement 12), and a persisted key whose values carry no canonical meaning is a live shape with no description.
+14. **The three keys are SEPARATE ON PURPOSE, and the reason is seededness independence rather than write amplification.**
+    `isSeeded()` is the predicate that makes a destructive prune decidable (requirement 16), and on a SHARED key it cannot be honest per entity type: a store writes the whole object, so one entity type's first write persists the others as empty and converts an UNKNOWN basis into a real, empty, PRUNABLE one in a single keystroke.
+    `## CharacterLibraries` requirement 1 shares one key for two libraries only so that a fourth near-identical persistence shell is not written, and a parameterized store factory removes that reason; it survives that hazard only because its legacy in-system half still vouches for the ids, which three entity types whose references reach recipe ingredients, results, salvage, gathering drop rows, tool links and essence source components would not.
+
+    Three keys REDUCE but do not REMOVE the clobber window: separate keys are separate `Setting` documents and cannot lose each other's update, but the INTRA-key window is unchanged — a whole scope value is read-modify-written per edit, and Foundry offers no per-key merge and no compare-and-set — so it is mitigated only by publishing the cache BEFORE awaiting the write, within one client.
+    The accepted cost, as `## CharacterLibraries` requirement 3 states its own: three keys are three non-atomic writes, so a partially-migrated corpus becomes observable where one key made it impossible.
+    That is accepted because each entity type's union read and Valid Id Basis are independently valid in every interleaving.
+
+    Each store READS RAW, records key presence, THEN normalizes; answers `isSeeded(subKey)` over the NAMED RAW sub-keys `entities` / `defaults` / `membership`, because Foundry synthesizes a document for an unwritten key and offers no value-level presence answer; publishes its cache BEFORE awaiting the write; never THROWS from a load, degrading an unreadable or malformed setting to an unknown basis rather than taking the module down; and never gates persistence on validity, because a GM authors incrementally.
+    Each publishes exactly ONE normalized corpus and replaces it WHOLESALE, never mutating it in place, so a replicated write invalidates a derived read by object identity and no revision counter is minted for world scope.
+15. **THERE ARE TWO UNIONS AND THEY ARE NOT THE SAME UNION.**
+
+    The **READ** union answers what a system's entity list IS: the world entities whose membership record for that system is PRESENT, resolved through requirements 1-8, unioned with that system's surviving in-system array, WORLD WINNING on an id collision.
+    It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities.
+    An unfiltered union would give every system every world entity and delete the membership model; a raw-entity union would hand back world defaults in place of a system's own overrides, bypassing the inherit map.
+
+    The **BASIS** union answers which ids a reference may name without being pruned, and is deliberately NOT membership-filtered, because requirement 3 makes an absent membership record a REFUSAL and never a PRUNE: a reference to a world entity a system is not a member of must survive normalization and be refused at use.
+    Filtering the basis by membership would convert that refusal into a silent, persisted deletion on the first normalize.
+
+    A world entity with no membership record for system S is therefore ABSENT from S's read union and PRESENT in S's basis, and one function serving both cannot satisfy that pair.
+
+    The READ union is BOUNDED by the migration and is not a permanent read-alias: migrations run on the ACTIVE GM alone, so every player and assistant GM spends at least one session reading settings that have not been written, and before the migration the in-system arrays ARE the corpus.
+16. **The VALID ID BASIS is `null` — prune nothing — only when NEITHER half can vouch for an id**, per entity type.
+    The world half counts when `isSeeded("entities")`: the sub-key the id set is actually drawn from, never the aggregate no-argument form, which ORs across sub-keys and would report seeded on the strength of a sibling.
+    The legacy half counts when the system's in-system array is NON-EMPTY, because an empty array is a legacy KEY rather than a legacy corpus — it vouches for nothing while licensing a full prune.
+    The basis is the UNION of the two id sets, and `null` only when the store is unseeded AND the in-system array is empty.
+    Deriving it from `isSeeded()` alone returns `null` on every unmigrated client for every system and silently disables every reference prune in the corpus; deriving it from the in-system array alone is the failure this contract exists to prevent.
+
+    **NO CONSUMER MAY DEFAULT THE BASIS TO AN EMPTY SET.**
+    That is the same defect as an omitted argument, and it re-arms exactly the failure the basis exists to prevent.
+    The rule binds every destructive pass, including the ones that BYPASS the crafting-system normalizer — a mutation-time path that rebuilds an in-system-only basis of its own is the shape this has already been got wrong in once.
+    The same rule governs each CATEGORY VOCABULARY: an icon map is pruned against its own vocabulary only when that vocabulary is a known-complete basis, because a normalizer that is a whitelist rebuild makes an ungated prune permanent on the next save.
+    Each icon map is gated by ITS OWN vocabulary — `componentCategoryIcons` against `componentCategories`, `categoryIcons` against `categories` — and never by the other's, on `## CraftingSystem` requirement 6b's prohibition against merging or aliasing the two.
+
 ### Component scope
 
 1. The component sections are `category` alone.
@@ -2065,6 +2127,13 @@ SystemMembershipRecord = {
    The world/system pair is `toolBreakage.authority` (`## CraftingSystem` requirement 21) carrying the same two tokens `toolSpecific` / `checkDriven`; the per-tool control under `checkDriven` stays `checkBreakable`.
    The prototype's `tool` / `check` / `immune` spellings are not introduced, and `immune` is a retired name.
    The governing rule is unchanged and gains exactly one clause: **SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.**
+5. **The WORLD tool-breakage authority is persisted by `fabricate.toolScope` ALONE and carries no per-system half.**
+   The per-system override stays where `## CraftingSystem` requirement 21 puts it — on the crafting system — because a second per-system home would author one field at two scopes, which the Purpose above prohibits.
+   It is ABSENCE-PRESERVING at world scope: an unauthored or unrecognized authority persists NO key rather than a minted `toolSpecific`, since a minted default is indistinguishable from a GM's deliberate choice.
+
+   **It is INERT until the crafting-system normalizer becomes absent-preserving.**
+   That normalizer substitutes `toolSpecific` for anything missing or unrecognised on EVERY normalize, so every persisted system already carries a concrete value and `system.toolBreakage.authority ?? world` can never fall through.
+   Making the world half reachable is the migration's flip (epic 1357, PR 3), and that migration MUST treat every system's existing `toolBreakage.authority` as AUTHORED rather than defaulted, because the corpus cannot distinguish the two and treating a defaulted `toolSpecific` as absent would silently hand every existing system the world's authority.
 
 ## Tool
 
@@ -2136,6 +2205,7 @@ Tool = {
    The `name` + `img` + `description` display snapshot is captured at registration or relinking time and is NOT auto-refreshed when the GM changes the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
    The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
+   `system.tools` is SHADOWED by the `fabricate.toolScope` world setting (issue 1359) and remains LIVE AND AUTHORITATIVE until the world-scope migration; see `## CraftingSystem` requirement 36.
    Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
    Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
    The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
