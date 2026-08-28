@@ -72,6 +72,7 @@ import {
   isWorldAddressable,
   referencedComponentIds,
   RESERVED_CATEGORY,
+  sectionIsAuthoredBy,
   WORLD_DEFAULT_SECTIONS,
 } from '../migration/worldScopeDefaults.js';
 
@@ -277,13 +278,18 @@ export function recheckWorldDefault({
     const value = record[section];
     if (value === undefined) continue;
 
-    // THE EVERY-MEMBER PRECONDITION, and it is the SAME predicate the migration applies rather
-    // than a second one. The migration asks "will the membership record this member produces carry
-    // an override for this section"; at import time the membership RECORD is what is in hand, so
-    // the predicate reduces to a key-presence test on that record.
+    // THE EVERY-MEMBER PRECONDITION, applied through the MIGRATION'S OWN PREDICATE rather than a
+    // second one — literally the same function, not the same rule restated.
+    //
+    // It does NOT reduce to a key-presence test, and that reduction is exactly the gap a
+    // hand-authored payload walks through. `buildMembershipRecord` writes `category` only when it
+    // is trimmed-non-empty, so for a record IT produced the two readings agree; a hand-authored
+    // record may carry `category: ''` or `'  '`, which passes key presence, is coerced to ABSENCE
+    // by the store on the way in, and then falls back to the very world default this precondition
+    // was asked to decide — handing the imported system a category no GM authored.
     if (
       FALLBACK_EXPOSED_SECTIONS.has(section) &&
-      members.some((entry) => entry.record[section] === undefined)
+      members.some((entry) => !sectionIsAuthoredBy(entry.record, entityType, section))
     ) {
       declined.push({ section, referenceValue: section });
       continue;

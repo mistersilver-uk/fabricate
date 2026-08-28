@@ -115,12 +115,20 @@ export const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBre
  * `buildMembershipRecord` judges it — because the question is precisely "will the membership
  * record this member produces carry an override for this section".
  *
+ * EXPORTED since issue 1364, so the import-time re-check applies THIS predicate rather than a
+ * second one, over the membership records in hand at that point. The reduction to a bare
+ * key-presence test does NOT hold there: it is sound only for a record `buildMembershipRecord`
+ * produced, and a hand-authored payload is a first-class input to the import. A `category` of
+ * `''` or `'  '` carries the key while `coerceComponentSection` coerces it to ABSENCE on the way
+ * into the store, so a key-presence reading admits the world default and the imported system then
+ * RESOLVES a value no GM authored — the exact outcome CONSTRAINT 0 exists to prevent.
+ *
  * @param {object} record
  * @param {string} entityType
  * @param {string} section
  * @returns {boolean}
  */
-function sectionIsAuthoredBy(record, entityType, section) {
+export function sectionIsAuthoredBy(record, entityType, section) {
   if (entityType === 'components') return Boolean(trimmedString(record.category));
   if (section === 'breakage') return record.breakage !== undefined;
   if (section === 'onBreak') return record.onBreak !== undefined;
