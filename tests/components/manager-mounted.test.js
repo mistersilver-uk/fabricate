@@ -10,7 +10,7 @@ import {
   symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from 'svelte';
@@ -45,6 +45,12 @@ import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
 // leaf with no `.svelte` and no Foundry globals in its graph, and this is the test file's own
 // module scope rather than the compiled mount closure.
 import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComponentRowProjection.js';
+// The REAL manager store and its shipped service fixtures (issue 1362). The world-scope
+// propagation block at the foot of this file drives the actual publish path rather than a
+// hand-written `viewState`, because what it has to prove is that `adminStore` publishes the
+// world corpus on every trigger — which a fake store would assert about itself.
+import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -1305,6 +1311,10 @@ function editRecipeName(target, value) {
   nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
 }
 
+// EVERY `.svelte` THIS SUITE HAS COMPILED, recorded as it goes, so the closure walk below has
+// something to compare the module graph against.
+const compiledSveltePaths = new Set();
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
@@ -1316,6 +1326,59 @@ function writeCompiledSvelte(sourcePath) {
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
+  compiledSveltePaths.add(sourcePath.replaceAll('\\', '/'));
+}
+
+/**
+ * THE CLOSURE WALK THIS SUITE NEVER HAD (issue 1362).
+ *
+ * `createMountedComponentHarness` validates its declared dependency closure and THROWS naming
+ * the missing module and its importer chain. This suite predates it, drives its own compile,
+ * and had no such validation — so a `.svelte` the mounted root's module graph reaches but the
+ * hand-written list above omits does NOT fail: the import hangs, and `node --test` reports
+ * every blocked test as `# cancelled`, never `# fail`. Four separate comments in the list above
+ * warn a reader about it; none of them could detect it.
+ *
+ * The walk is the STATIC graph, not the rendered one, because that is what actually hangs: a
+ * compiled `.svelte.js` imports its children unconditionally, so an `{#if}` that never runs
+ * does not keep a child out of the graph.
+ *
+ * @param {string} rootPath The mounted root, repo-relative.
+ * @throws {Error} naming every reached-but-uncompiled component and who imports it.
+ */
+function assertCompiledSvelteClosure(rootPath) {
+  const seen = new Set();
+  const queue = [rootPath];
+  const missing = [];
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const absolute = resolve(repoRoot, current);
+    if (!existsSync(absolute)) continue;
+    const source = readFileSync(absolute, 'utf8');
+    for (const match of source.matchAll(/from\s+['"](\.[^'"]+\.svelte)['"]/g)) {
+      const child = relative(repoRoot, resolve(dirname(absolute), match[1])).replaceAll('\\', '/');
+      if (!compiledSveltePaths.has(child)) missing.push(`${child}  (imported by ${current})`);
+      queue.push(child);
+    }
+  }
+  // NON-VACUITY. A walk that silently found nothing would make the assertion below pass over an
+  // empty graph, which is the failure this whole function exists to convert into a loud one.
+  if (seen.size < 50) {
+    throw new Error(
+      `the compiled-closure walk reached only ${seen.size} components from ${rootPath}; the walk ` +
+        'is broken, so it cannot be trusted to find an omission'
+    );
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      "this suite hand-rolls its compile list, and these components are in the mounted root's " +
+        'STATIC module graph but were never compiled into the temp tree. Left alone they do not ' +
+        'fail — they HANG, and `node --test` reports every blocked test as `# cancelled`. Add a ' +
+        `writeCompiledSvelte(...) call for each:\n  ${missing.join('\n  ')}`
+    );
+  }
 }
 
 // Inject a recipe knowledge mode onto a selected system so tests can exercise the
@@ -3289,6 +3352,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       : resolve(repoRoot, '../../..', 'node_modules');
     symlinkSync(dependencyRoot, join(tempRoot, 'node_modules'), 'junction');
     compileManagerRoot();
+    // BEFORE the first import, so an omission is a thrown error naming the file rather than a
+    // hang reported as `# cancelled`.
+    assertCompiledSvelteClosure('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
     Component = (
       await import(
         pathToFileURL(
@@ -3651,9 +3717,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target
         .querySelector('[data-checks-help="gathering"]')
-        ?.querySelector(
-          'a[href="https://mistersilver-uk.github.io/fabricate/checks/gathering"]'
-        ),
+        ?.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/checks/gathering"]'),
       'gathering help card links to the gathering checks docs page'
     );
 
@@ -14699,10 +14763,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldTravelItem('travel').querySelector('.manager-nav-count').textContent.trim(),
       '1'
     );
-    assert.equal(
-      worldTravelItem('travel').getAttribute('aria-controls'),
-      'manager-travel-submenu'
-    );
+    assert.equal(worldTravelItem('travel').getAttribute('aria-controls'), 'manager-travel-submenu');
     assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
     assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
 
@@ -14844,11 +14905,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-downtime-tablist]').getAttribute('aria-label'),
       'Localized downtime sections'
     );
-    assert.match(target.querySelector('.downtime-premium').textContent, /Localized Fabricate Premium/);
-    assert.equal(
-      tabs[0].getAttribute('aria-describedby'),
-      'world-downtime-tooltip-tracking'
+    assert.match(
+      target.querySelector('.downtime-premium').textContent,
+      /Localized Fabricate Premium/
     );
+    assert.equal(tabs[0].getAttribute('aria-describedby'), 'world-downtime-tooltip-tracking');
     assert.equal(
       target.querySelector('#world-downtime-tooltip-tracking').textContent.trim(),
       'Localized tracking tooltip'
@@ -15234,7 +15295,11 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
     mountedPanel.focus();
-    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    assert.equal(
+      document.activeElement,
+      mountedPanel,
+      'the companion panel owns focus before removal'
+    );
     unregister();
     await settleDowntimeProvider();
     assert.deepEqual(cleanups, ['tracking', 'activities']);
@@ -15662,7 +15727,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const cleanupConnections = [];
     registry.publicApi.registerWorldNavProvider(
       downtimeProvider({
-        mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
+        mount:
+          ({ target: mountTarget }) =>
+          () =>
+            cleanupConnections.push(mountTarget.isConnected),
       })
     );
     mountDowntimeManager([], {}, {}, { managerExtensions: registry });
@@ -16369,7 +16437,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     stop();
     target.querySelector('#manager-downtime-nav-crew').click();
     await settleRouteExit();
-    assert.deepEqual(asked, [], 'an unsubscribed guard is not consulted, and stopping twice is safe');
+    assert.deepEqual(
+      asked,
+      [],
+      'an unsubscribed guard is not consulted, and stopping twice is safe'
+    );
     assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
 
     // The retired mount's context cannot register a new guard over the mount that replaced it.
@@ -16737,7 +16809,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.deepEqual(downtimeRailIds(), ['ledger', 'crew']);
-    assert.deepEqual(downtimeTabIds(), [], 'the companion holds the surface, so Core draws no strip');
+    assert.deepEqual(
+      downtimeTabIds(),
+      [],
+      'the companion holds the surface, so Core draws no strip'
+    );
 
     unregisterProvider();
     await settleDowntimeProvider();
@@ -16867,7 +16943,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     worldNavItem('downtime').click();
     await settleRouteExit();
 
-    assert.deepEqual(hooks.map(([name]) => name), [MANAGER_HOOKS.SURFACE_MOUNTED]);
+    assert.deepEqual(
+      hooks.map(([name]) => name),
+      [MANAGER_HOOKS.SURFACE_MOUNTED]
+    );
     assert.deepEqual(hooks[0][1], {
       schemaVersion: 1,
       surfaceId: 'downtime',
@@ -17547,7 +17626,11 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     await setExperimentalFeatures(false);
 
-    assert.equal(managerRoute(), 'world-downtime', 'the open route is not yanked out from under it');
+    assert.equal(
+      managerRoute(),
+      'world-downtime',
+      'the open route is not yanked out from under it'
+    );
     assert.ok(Boolean(activeCompanionPanel()), 'the companion panel is still on screen');
     assert.deepEqual(cleanups, [], 'nothing was torn down, so no unsaved work was discarded');
     assert.deepEqual(asked, [], 'and nothing prompted either — this is not a navigation at all');
@@ -17575,7 +17658,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     assert.equal(managerRoute(), 'world', 'the GM leaves through the exit they chose');
-    assert.deepEqual(cleanups, ['ledger'], 'and the companion is disposed exactly once, on the way');
+    assert.deepEqual(
+      cleanups,
+      ['ledger'],
+      'and the companion is disposed exactly once, on the way'
+    );
     assertDowntimeRailAbsent();
 
     // AND CANNOT RETURN. The rail entry is gone and both entries refuse, which is what makes the
@@ -20053,13 +20140,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
         .map((node) => node.textContent.trim()),
-      [
-        'Crafting Systems',
-        'Alchemy',
-        'Gathering',
-        'Environments',
-        'New Gathering Environment',
-      ]
+      ['Crafting Systems', 'Alchemy', 'Gathering', 'Environments', 'New Gathering Environment']
     );
     assert.equal(
       target.querySelector('.manager-subtitle').textContent.trim(),
@@ -22067,9 +22148,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Expand the gp unit's editor.
     const card = target.querySelector('.manager-currency-unit-card');
-    card
-      .querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]')
-      .click();
+    card.querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]').click();
     await tick();
     flushSync();
 
@@ -25117,11 +25196,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       // The negative half, in the same fixture against the same spy: an off-page card that is
       // NOT the selection costs nothing. Without it, a cohort-wide hydrate would satisfy the
       // assertion above and defeat the page scoping entirely.
-      assert.equal(
-        requests.has('c2'),
-        false,
-        'an off-page card that is not selected is not asked'
-      );
+      assert.equal(requests.has('c2'), false, 'an off-page card that is not selected is not asked');
       for (const id of rendered) {
         assert.equal(requests.has(id), true, `the rendered row ${id} was asked`);
       }
@@ -25185,7 +25260,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       await tick();
       flushSync();
       target
-        .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+        .querySelector(
+          '[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]'
+        )
         .click();
       await tick();
       flushSync();
@@ -25200,18 +25277,14 @@ describe('CraftingSystemManager mounted behavior', () => {
         0,
         'pre-condition: the components browser is not mounted on this route'
       );
-      const picked = Array.from(
-        target.querySelectorAll('[data-gathering-component-card]')
-      ).map((node) => node.dataset.gatheringComponentCard);
+      const picked = Array.from(target.querySelectorAll('[data-gathering-component-card]')).map(
+        (node) => node.dataset.gatheringComponentCard
+      );
       assert.ok(picked.includes('c2'), 'pre-condition: the picker rendered the second component');
 
       // `c2` is never the inspector's selection and never the editor's subject, so the picker
       // is the only thing in this tree that can have asked for it.
-      assert.equal(
-        requests.has('c2'),
-        true,
-        'the picker asked its own rendered page to hydrate'
-      );
+      assert.equal(requests.has('c2'), true, 'the picker asked its own rendered page to hydrate');
     });
   });
 
@@ -25326,7 +25399,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
 
     const inspectorDescription = () =>
-      target.querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
+      target
+        .querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
         .textContent.trim();
     const inspectorPillTone = () =>
       target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
@@ -25512,11 +25586,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         !herbRow.querySelector('.manager-vocabulary-chip-unused'),
         'a tag used only as a recipe ingredient placeholder is NOT unused'
       );
-      assert.match(
-        herbRow.textContent,
-        /1 reference/,
-        'and the row reports that one reference'
-      );
+      assert.match(herbRow.textContent, /1 reference/, 'and the row reports that one reference');
       assert.deepEqual(
         reads,
         { ingredientSets: 0, steps: 0 },
@@ -25532,6 +25602,138 @@ describe('CraftingSystemManager mounted behavior', () => {
         { ingredientSets: 1, steps: 1 },
         'the counters CAN go up — reading either field is what does it'
       );
+    });
+  });
+
+  // ── The world scope corpus reaches the DOM, on every publish trigger (issue 1362) ─────────
+  //
+  // ASSERTED AT THE DOM, NEVER BY OBJECT IDENTITY. Identity is a proxy that fails in both
+  // directions here: the projection legitimately republishes an equal corpus on a no-op, and a
+  // bare `{...corpus}` would satisfy an identity check while reaching no rendered element at
+  // all. The rail's own count badge is the assertion target, because it is the one thing on
+  // screen this PR actually derives from the world corpus.
+  describe('world scope publication (issue 1362)', () => {
+    let scopeStores;
+
+    /**
+     * A minimal scope store with the two methods the projection reads. Deliberately NOT the
+     * real `ScopedDefinitionStore`: this block is about the publish path, and a fake whose
+     * corpus a test can swap under it is how the settings-bridge reload is modelled.
+     *
+     * @param {Array<object>} entities
+     * @returns {object}
+     */
+    function scopeStore(entities) {
+      let corpus = { entities, defaults: [], membership: [] };
+      return {
+        corpus: () => corpus,
+        isSeeded: () => true,
+        replace(next) {
+          corpus = { entities: next, defaults: [], membership: [] };
+        },
+        mutateInPlace(next) {
+          // The negative control's seam: edit the SAME object rather than replacing it.
+          corpus.entities.length = 0;
+          corpus.entities.push(...next);
+        },
+      };
+    }
+
+    function worldEntities(count, prefix) {
+      return Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index + 1}` }));
+    }
+
+    async function mountWithRealStore() {
+      scopeStores = {
+        component: scopeStore(worldEntities(3, 'comp')),
+        essence: scopeStore(worldEntities(2, 'ess')),
+        tool: scopeStore(worldEntities(1, 'tool')),
+      };
+      const forge = makeSystem({ id: 'sys1', name: 'Forge' });
+      const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
+      const systems = [forge, alchemy];
+      const services = createServices(forge, [], [], {
+        getCraftingSystemManager: () => ({
+          getSystems: () => systems,
+          getSystem: (id) => systems.find((system) => system.id === id) || null,
+          getItems: () => [],
+        }),
+        getComponentScopeStore: () => scopeStores.component,
+        getEssenceScopeStore: () => scopeStores.essence,
+        getToolScopeStore: () => scopeStores.tool,
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, { target, props: { store, services: {} } });
+      flushSync();
+      await tick();
+      flushSync();
+      return store;
+    }
+
+    function railCounts() {
+      return ['component-catalogue', 'essence-catalogue', 'tool-catalogue'].map((leaf) =>
+        target.querySelector(`#manager-world-nav-${leaf} .manager-nav-count`)?.textContent?.trim()
+      );
+    }
+
+    async function settle(store) {
+      await store.refresh();
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    it('publishes the world corpus to the rail on LOAD', async () => {
+      await mountWithRealStore();
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    it('republishes it on the SETTINGS-BRIDGE reload, and the DOM moves', async () => {
+      // The bridge reloads the store and re-emits `craftingSystemsChanged`, which the manager
+      // app answers with `refresh()`. Modelled by replacing the corpus wholesale, exactly as
+      // `ScopedDefinitionStore#load` does.
+      const store = await mountWithRealStore();
+      scopeStores.component.replace(worldEntities(7, 'comp'));
+      await settle(store);
+      assert.deepEqual(railCounts(), ['7', '2', '1']);
+    });
+
+    it('republishes it on a CRAFTING SYSTEM CHANGE, unchanged', async () => {
+      const store = await mountWithRealStore();
+      const before = JSON.parse(JSON.stringify(get(store.viewState).worldScope));
+      await store.selectSystem('sys2');
+      await settle(store);
+      // The world corpus is world scope: a system change must republish it and must not alter
+      // it. Deep-equal rather than identity, because the projection answers a NEW object every
+      // publish by design.
+      assert.deepEqual(get(store.viewState).worldScope, before);
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    it('MUTATION PROOF: an in-place corpus edit does not reach the DOM', async () => {
+      // The negative control for the three assertions above. `ScopedDefinitionStore` replaces
+      // its corpus WHOLESALE for exactly this reason — the resolved-union memo keys on the
+      // object's identity — and a projection that read a mutated-in-place corpus would publish
+      // a stale count. Proving the DOM assertion CAN red is what stops the three tests above
+      // from being satisfied by any republish at all.
+      const store = await mountWithRealStore();
+      scopeStores.component.mutateInPlace(worldEntities(9, 'comp'));
+      // No refresh: nothing told the store anything happened, which is the whole point.
+      flushSync();
+      await tick();
+      flushSync();
+      assert.deepEqual(
+        railCounts(),
+        ['3', '2', '1'],
+        'an in-place edit with no publish must not reach the DOM'
+      );
+      // And the same edit DOES reach it once a publish runs, so the assertion above is a
+      // measurement rather than a rail that never updates.
+      await settle(store);
+      assert.deepEqual(railCounts(), ['9', '2', '1']);
     });
   });
 });
