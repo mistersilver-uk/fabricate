@@ -19,8 +19,4 @@
   pageId="world-component-entry"
   icon="fas fa-cube"
   title={text('FABRICATE.Admin.Manager.Scoped.ComponentEntryTitle', 'Component entry')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.ComponentEntrySubtitle',
-    'Identity, the world category and tags, and a row per crafting system that has this Component.'
-  )}
 />

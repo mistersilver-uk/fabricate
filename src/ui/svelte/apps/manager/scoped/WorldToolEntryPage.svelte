@@ -19,8 +19,4 @@
   pageId="world-tool-entry"
   icon="fas fa-hammer"
   title={text('FABRICATE.Admin.Manager.Scoped.ToolEntryTitle', 'Tool entry')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.ToolEntrySubtitle',
-    'Identity, the three world-default sections and the world break mode, with a row per crafting system that has this Tool.'
-  )}
 />

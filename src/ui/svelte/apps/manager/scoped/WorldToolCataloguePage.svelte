@@ -19,8 +19,4 @@
   pageId="world-tools"
   icon="fas fa-screwdriver-wrench"
   title={text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle',
-    'One Tool per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.'
-  )}
 />

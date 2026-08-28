@@ -16,16 +16,21 @@
   surface is not here yet; it does not draw a disabled facsimile of the editor, because a
   disabled control is a promise about a shape that has not been designed.
 
+  IT DOES NOT REPEAT THE PAGE HEADER. The header above it already carries the screen's title
+  and its subtitle, so the empty state states the ONE thing the header does not: that the
+  authoring surface is not built yet. The first frame of this page showed the subtitle three
+  times over.
+
   Props:
    - pageId: the `data-scoped-page` value.
-   - title / subtitle: already localized by the caller.
+   - title: the screen's name, already localized, as the empty state's own anchor.
    - icon: the empty state's glyph.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../EmptyState.svelte';
 
-  let { pageId = '', title = '', subtitle = '', icon = 'fas fa-cubes-stacked' } = $props();
+  let { pageId = '', title = '', icon = 'fas fa-cubes-stacked' } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -38,16 +43,12 @@
     <EmptyState
       {icon}
       {title}
-      hint={subtitle}
+      hint={text(
+        'FABRICATE.Admin.Manager.Scoped.Placeholder.Body',
+        'The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next.'
+      )}
       dataAttr="data-scoped-placeholder"
       dataValue={pageId}
-    >
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.Scoped.Placeholder.Body',
-          'The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next.'
-        )}
-      </p>
-    </EmptyState>
+    />
   </section>
 </main>

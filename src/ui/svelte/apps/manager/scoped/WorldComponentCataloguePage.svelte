@@ -19,8 +19,4 @@
   pageId="world-components"
   icon="fas fa-cubes-stacked"
   title={text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle', 'Component catalogue')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle',
-    'One Component per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.'
-  )}
 />

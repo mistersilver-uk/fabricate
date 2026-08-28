@@ -19,8 +19,4 @@
   pageId="world-essence-entry"
   icon="fas fa-vial"
   title={text('FABRICATE.Admin.Manager.Scoped.EssenceEntryTitle', 'Essence entry')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.EssenceEntrySubtitle',
-    'Identity and the two world defaults, each stating how many systems inherit it before the change lands.'
-  )}
 />

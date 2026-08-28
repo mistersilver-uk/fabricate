@@ -4352,7 +4352,35 @@
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
+  // ONE derivation for each world scoped-entity route's subtitle, keyed by route, so a page
+  // and the placeholder body inside it cannot drift into saying two different things.
+  //
+  // COMPLETE LITERAL KEYS, never a `${...}` suffix on a shared base. An interpolated key is
+  // invisible to `ui-lang-keys-resolve` and to the orphan scan, so a missing string would ship
+  // silently and every one of these seven would read as an unreferenced key.
+  function worldScopedSubtitle() {
+    if (currentView === 'world-components')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle', '');
+    if (currentView === 'world-component-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentEntrySubtitle', '');
+    if (currentView === 'world-essences')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueSubtitle', '');
+    if (currentView === 'world-essence-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceEntrySubtitle', '');
+    if (currentView === 'world-tools')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle', '');
+    if (currentView === 'world-tool-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolEntrySubtitle', '');
+    if (currentView === 'world-vocabulary')
+      return text('FABRICATE.Admin.Manager.Scoped.VocabularySubtitle', '');
+    return '';
+  }
+
   function viewSubtitle() {
+    // The seven world scoped-entity routes (issue 1362). Without a branch of its own a route
+    // falls through to the generic system-library subtitle, which describes crafting systems
+    // — the one thing these screens deliberately do not have.
+    if (isWorldScopedRoute) return worldScopedSubtitle();
     if (currentView === 'recipes')
       return text(
         'FABRICATE.Admin.Manager.Recipe.Subtitle',
@@ -8952,7 +8980,14 @@
         system and "Export" would sit disabled against a selected-system id the route does not
         even have.
       -->
-      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute}
+      <!--
+        The world scoped-entity routes join that exclusion (issue 1362), for the identical
+        reason and with the identical consequence: they have no selected crafting system by
+        design, so the fallthrough's Create would create a crafting system and its Export would
+        sit permanently disabled against an id the route does not have. Each screen's own
+        actions belong on the surface that owns them, which PRs 6a-c and 7 build.
+      -->
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}

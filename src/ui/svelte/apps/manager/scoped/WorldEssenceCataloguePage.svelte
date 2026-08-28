@@ -19,8 +19,4 @@
   pageId="world-essences"
   icon="fas fa-flask-vial"
   title={text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.EssenceCatalogueSubtitle',
-    'One Essence per world, shared by every system. The world sets the effect source and the property macro; each system inherits them or overrides its own.'
-  )}
 />

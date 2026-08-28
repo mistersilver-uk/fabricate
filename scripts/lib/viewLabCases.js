@@ -985,21 +985,40 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     // KEPT AND LOAD-BEARING. The prototype has NO collapsed rail state, so the parity oracle
     // structurally cannot reach this; this frame and the full-width set-equality gate are its
-    // only evidence. What it has to show is the count badge surviving the 56px icon strip —
-    // the badge is the one thing a collapsed rail keeps, and clipping it is silent.
+    // only evidence.
+    //
+    // WHAT IT SHOWS IS THE FOUR LEAVES SURVIVING AS AN ICON STRIP — the glyph reachable inside
+    // its 56px button, and the route still active. It does NOT show a count badge, and that
+    // correction is worth recording: the plan expected an unclipped badge at 56px, and the
+    // shipped rail hides `.manager-nav-count` outright when it collapses. Asserting a badge
+    // here therefore failed the capture on the first run, correctly. The only badge a
+    // collapsed rail keeps is the Checks parent's `manager-nav-issue-badge`, which is a
+    // different element with its own rule; making a world leaf's record count behave like an
+    // issue count would be a rail-wide UX change, not this PR's.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-manager-rail-toggle]' },
     ],
     expectView: 'world-components',
-    // The badge INSIDE the collapsed rail. Asserting the button alone would pass on a rail
-    // whose badge had been clipped away entirely, which is the one thing this frame exists for.
+    // The ACTIVE leaf inside the collapsed rail. Asserting the leaf alone would pass on a rail
+    // that never collapsed, so the state and the element are asserted together.
     expectSelector:
-      '.manager-body.is-rail-collapsed #manager-world-nav-component-catalogue .manager-nav-count',
+      '.manager-body.is-rail-collapsed #manager-world-nav-component-catalogue.is-active',
+    // And every one of the four leaves keeps its glyph INSIDE its 56px button, which is what
+    // makes the strip navigable at all once the labels are gone.
     expectContained: [
       {
         container: '#manager-world-nav-component-catalogue',
-        target: '#manager-world-nav-component-catalogue .manager-nav-count',
+        target: '#manager-world-nav-component-catalogue > i',
+      },
+      { container: '#manager-world-nav-vocabulary', target: '#manager-world-nav-vocabulary > i' },
+      {
+        container: '#manager-world-nav-essence-catalogue',
+        target: '#manager-world-nav-essence-catalogue > i',
+      },
+      {
+        container: '#manager-world-nav-tool-catalogue',
+        target: '#manager-world-nav-tool-catalogue > i',
       },
     ],
     position: { width: 1280, height: 900 },

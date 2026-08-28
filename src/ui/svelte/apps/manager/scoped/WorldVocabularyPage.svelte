@@ -19,8 +19,4 @@
   pageId="world-vocabulary"
   icon="fas fa-tags"
   title={text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
-  subtitle={text(
-    'FABRICATE.Admin.Manager.Scoped.VocabularySubtitle',
-    'Component categories, Component tags and recipe categories, each with a usage count and a deletion warning naming how many inheriting rule sets are affected.'
-  )}
 />
