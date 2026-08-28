@@ -9600,6 +9600,86 @@
   padding: var(--fab-space-4);
 }
 
+/* The scoped-entity preview shell's DEFAULT class stem (issue 1362).
+
+   `ScopedEntityPreview` takes its stem as a prop so a converted site keeps the rules that
+   already target it — `ToolBehaviorPreview` passes `manager-tool-preview`, whose five rules
+   are further down this file. Its DEFAULT stem had no rules at all, so the shell rendered
+   unstyled for any caller that did not bring its own, and the component's own doc said these
+   names were declared here when they were not. The six scoped editors PRs 6a-c and 7 build are
+   exactly those callers, and requirement 7 of `### GM World Scoped Entity Routes` closes this
+   file to them — so the default has to arrive with the shell.
+
+   Deliberately in the global sheet rather than a scoped `<style>` on the component: the stem is
+   a dynamic class, so Svelte cannot prove a scoped selector is used and would emit an
+   unused-selector warning that `lint:svelte:warnings` fails on. */
+.fabricate-manager .manager-scoped-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-scoped-preview-identity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-preview-identity > img {
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-scoped-preview-identity h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-scoped-preview-identity p {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-scoped-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-preview-live {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  font-size: 0.72rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-scoped-preview-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
 /* The placeholder body. It states what is not built yet and draws no facsimile of the editor
    that is coming: a disabled control is a promise about a shape nobody has designed. */
 .fabricate-manager .manager-scoped-placeholder {

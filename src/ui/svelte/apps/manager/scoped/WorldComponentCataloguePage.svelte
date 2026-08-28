@@ -2,21 +2,17 @@
 <!--
   The world Component catalogue (issue 1362). PR 6a replaces this body with the catalogue list, its inspector and its bulk selection; the route, the rail entry and the full-width treatment are already here.
 
-  A THIN CALL to the shared `ScopedPlaceholderPage`: the title, the hook and the sentence are
-  everything this file owns while the screen is a placeholder.
+  A THIN CALL to the shared `ScopedPlaceholderPage`: the route hook, the glyph and the
+  screen name are everything this file owns while the screen is a placeholder. The shell
+  resolves the lang key, so no page repeats a `localize` import or a `text()` helper.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
   import ScopedPlaceholderPage from './ScopedPlaceholderPage.svelte';
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 </script>
 
 <ScopedPlaceholderPage
   pageId="world-components"
   icon="fas fa-cubes-stacked"
-  title={text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle', 'Component catalogue')}
+  titleKey="FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle"
+  titleFallback="Component catalogue"
 />

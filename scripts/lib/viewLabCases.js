@@ -928,6 +928,14 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '#manager-world-nav-component-catalogue > i',
       },
       { container: '#manager-world-nav-vocabulary', target: '#manager-world-nav-vocabulary > i' },
+      {
+        container: '#manager-world-nav-essence-catalogue',
+        target: '#manager-world-nav-essence-catalogue > i',
+      },
+      {
+        container: '#manager-world-nav-tool-catalogue',
+        target: '#manager-world-nav-tool-catalogue > i',
+      },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],

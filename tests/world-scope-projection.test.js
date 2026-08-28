@@ -23,7 +23,10 @@ import {
   normalizeEssenceWorldDefaults,
 } from '../src/systems/essenceScope.js';
 import { normalizeToolMemberships, normalizeToolWorldDefaults } from '../src/systems/toolScope.js';
-import { createWorldScopeEntityActions } from '../src/ui/svelte/stores/worldScopeActions.js';
+import {
+  createWorldScopeActions,
+  createWorldScopeEntityActions,
+} from '../src/ui/svelte/stores/worldScopeActions.js';
 import {
   buildWorldScopeState,
   emptyWorldScopeState,
@@ -420,6 +423,78 @@ test('copyMembership clones sections independently and stamps NO provenance key'
   assert.notEqual(copy.breakage, source.breakage, 'the copy is independent');
   assert.equal('from' in copy, false, 'the normalizer would discard a provenance key');
   assert.equal('copiedFromSystemId' in copy, false);
+});
+
+// ── The COMPOSITION, which is the thing `adminStore` actually calls ───────────────────────
+//
+// `createWorldScopeEntityActions` had every property below asserted of it and the composition
+// over it had NONE, so `createWorldScopeActions` could have returned `{}` and shipped green.
+// That is the shape this repository keeps paying for: a covered leaf under an uncovered
+// composition root, where the root is the only thing production reaches. PRs 6a-c build
+// directly on `store.worldScope`, so it is asserted here as its own subject.
+
+test('the composition builds all three entity types and wires each to its own store', async () => {
+  const stores = {
+    component: storeFor('component'),
+    essence: storeFor('essence'),
+    tool: storeFor('tool'),
+  };
+  const actions = createWorldScopeActions({
+    getStores: {
+      component: () => stores.component.store,
+      essence: () => stores.essence.store,
+      tool: () => stores.tool.store,
+    },
+  });
+
+  assert.deepEqual(Object.keys(actions).sort(), ['component', 'essence', 'tool']);
+
+  // EACH IS WIRED TO ITS OWN STORE, and that is the half a shape check cannot see: three
+  // action families all pointed at one store would satisfy every key assertion while writing
+  // every component into `fabricate.essenceScope`.
+  await actions.component.createEntity({ id: 'ash-salt' });
+  await actions.essence.createEntity({ id: 'ember' });
+  await actions.tool.createEntity({ id: 'hammer' });
+  assert.deepEqual(
+    stores.component.store.listEntities().map((entry) => entry.id),
+    ['ash-salt']
+  );
+  assert.deepEqual(
+    stores.essence.store.listEntities().map((entry) => entry.id),
+    ['ember']
+  );
+  assert.deepEqual(
+    stores.tool.store.listEntities().map((entry) => entry.id),
+    ['hammer']
+  );
+});
+
+test('the composition preserves each type\'s KEY SET, which is part of the contract', () => {
+  const actions = createWorldScopeActions({ getStores: {} });
+  // The structural absences survive composition. A composition that built every type from one
+  // descriptor would hand the component path a `setEnabled` the normalizer drops, and the
+  // essence and tool paths tag writes neither carries.
+  assert.equal('setEnabled' in actions.component, false);
+  assert.equal('setWorldTags' in actions.component, true);
+  assert.equal('setMutedTags' in actions.component, true);
+  for (const entityType of ['essence', 'tool']) {
+    assert.equal('setEnabled' in actions[entityType], true, entityType);
+    assert.equal('setWorldTags' in actions[entityType], false, entityType);
+    assert.equal('setMutedTags' in actions[entityType], false, entityType);
+  }
+  assert.deepEqual(
+    ['component', 'essence', 'tool'].map((entityType) => actions[entityType].entityType),
+    ['component', 'essence', 'tool'],
+    'each family reports the type it writes'
+  );
+});
+
+test('the composition tolerates an absent getStores map without throwing', async () => {
+  // `adminStore` builds this at construction time, before `services` can resolve anything, so
+  // a missing seam must degrade to a refusing action family rather than take the store down.
+  const actions = createWorldScopeActions({});
+  assert.equal(await actions.tool.createEntity({ id: 'hammer' }), false);
+  assert.equal(await actions.component.addToSystem('ash-salt', 'sys-forge'), false);
 });
 
 test('every action answers false rather than throwing when there is no store', async () => {

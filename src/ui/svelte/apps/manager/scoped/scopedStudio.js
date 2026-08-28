@@ -28,18 +28,30 @@
  * what would be thrown away.
  */
 
+import { TOOL_SEEDED_SECTIONS } from '../../../../../systems/toolScope.js';
 import { WORLD_SCOPE_DESCRIPTORS } from '../../../stores/worldScopeProjection.js';
 
 /**
  * The world-default sections that are SEEDED onto a membership record rather than inherited,
  * per entity type. A seeded section renders no inherit row.
  *
+ * THE TOOL LIST IS IMPORTED, NEVER RESTATED. `toolScope.js` already exports
+ * `TOOL_SEEDED_SECTIONS`, and a second copy of it here is the mirror-rot this repository
+ * guards against everywhere else: rename the section there and this copy goes on filtering a
+ * name nothing declares, silently.
+ *
+ * It is also INERT TODAY, and saying so is the point. `TOOL_SECTIONS` does not carry
+ * `repairRequirements` — the resolver never reads through it — so subtracting it from the
+ * descriptor's sections removes nothing. That makes "a seeded section renders no row" an
+ * assertion satisfied by an EMPTY filter, so the suite proves it against this constant
+ * directly rather than against the rendered row set alone.
+ *
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const SCOPED_SEEDED_SECTIONS = Object.freeze({
   component: Object.freeze([]),
   essence: Object.freeze([]),
-  tool: Object.freeze(['repairRequirements']),
+  tool: TOOL_SEEDED_SECTIONS,
 });
 
 /**

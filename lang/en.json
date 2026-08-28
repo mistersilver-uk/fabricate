@@ -5757,6 +5757,7 @@
           "VocabularyTitle": "Tags & Categories",
           "VocabularySubtitle": "Component categories, Component tags and recipe categories, each with a usage count and a deletion warning naming how many inheriting rule sets are affected.",
           "Placeholder": {
+            "Title": "Not built yet",
             "Body": "The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next."
           },
           "Sections": {

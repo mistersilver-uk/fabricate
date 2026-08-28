@@ -16,10 +16,18 @@
 
   ── THE CLASS STEM IS A PROP ────────────────────────────────────────────────────────────
   `classPrefix` derives the five class names (`<prefix>`, `<prefix>-identity`,
-  `<prefix>-chips`, `<prefix>-live`, `<prefix>-rules`), all of which are declared in
-  `styles/fabricate.css`. Passing the stem rather than hard-coding one is what lets a
-  converted site keep the rules that already target it: only this PR may edit that stylesheet,
-  so a primitive that renamed them would strand every rule it did not also move.
+  `<prefix>-chips`, `<prefix>-live`, `<prefix>-rules`). Passing the stem rather than
+  hard-coding one is what lets a converted site keep the rules that already target it:
+  `ToolBehaviorPreview` passes `manager-tool-preview`, whose rules predate this shell, and a
+  primitive that renamed them would strand every rule it did not also move.
+
+  BOTH STEMS ARE DECLARED IN `styles/fabricate.css` — the tool site's, and the DEFAULT. The
+  default shipped with no rules at all, so the shell rendered unstyled for any caller that did
+  not bring its own; the six scoped editors PRs 6a-c and 7 build are exactly those callers, and
+  `### GM World Scoped Entity Routes` requirement 7 closes that stylesheet to them. The rules
+  are global rather than a scoped `<style>` here because the stem is a DYNAMIC class: Svelte
+  cannot prove a scoped selector is used, and would emit the unused-selector warning
+  `lint:svelte:warnings` fails on.
 
   Props:
    - classPrefix: the site's class stem.

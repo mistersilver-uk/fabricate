@@ -23,9 +23,13 @@
  * - tool `addToSystem` delegates to `seedToolRepairRequirements`, the once-only DEEP COPY.
  *   A fully generic membership-create ships tool adoption that silently loses the repair
  *   recipe - the defect the opacity principle produces on its own.
- * - component tags delegate to `resolveComponentTags` for the READ; the WRITE is additive
- *   with per-tag muting and no inherit switch, which is why `tags` gets its own two actions
- *   and is never routed through `updateMembershipSection`.
+ * - component tags are additive with per-tag muting and carry NO inherit switch, which is why
+ *   `tags` gets its own two write actions and is never routed through
+ *   `updateMembershipSection`. THE READ SIDE IS NOT HERE: `resolveComponentTags`
+ *   (`componentScope.js`) is what folds the world set, the muted list and the system's own
+ *   tags into an effective one, and nothing in this module calls it, because a write path has
+ *   no reason to resolve. Said plainly because the earlier wording implied this module had
+ *   shipped the read, which PR 6a would have built on.
  *
  * ## `setEnabled` DOES NOT EXIST on the component type
  *
