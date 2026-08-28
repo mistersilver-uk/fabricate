@@ -66,7 +66,11 @@ import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
  * The resolved-union memo (`src/utils/definitionIndex.js`) keys on the corpus OBJECT, so this
  * store publishes exactly one and replaces it wholesale in `load()` and `_persist()`. Nothing
  * mutates it in place, which is what makes replication invalidate the memo by identity and is why
- * no revision counter is minted for world scope.
+ * no revision counter is minted for world scope. Keying on the corpus object rather than on any
+ * one of its three arrays is deliberate: a store publishes THREE arrays — `entities`, `defaults`
+ * and `membership` — and {@link unionScopedDefinitions} reads all three, so keying on one alone
+ * would be a PARTIAL identity, missing an invalidation that changed only `defaults` or
+ * `membership` while `entities` stayed the same reference.
  *
  * ## The seams are injected, not imported
  *

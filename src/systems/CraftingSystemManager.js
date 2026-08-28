@@ -118,31 +118,6 @@ const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components'
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
 
 /**
- * Collect the trimmed ids of every entry across the given lists into one Set.
- *
- * @param {...Array<{id?: unknown}>} lists
- * @returns {Set<string>}
- */
-/**
- * The Valid Id Basis for ONE library: the union of the world list and the system's surviving
- * legacy copy, or `null` when neither can vouch for an id.
- *
- * PER LIBRARY, because the two are independent. A setting payload carrying only `modifiers` says
- * nothing about whether a prerequisite has ever been authored, so an aggregate seeded flag would
- * hand this a real, empty, PRUNABLE basis derived from a key that is simply absent.
- *
- * A legacy copy counts only when it is NON-EMPTY. An empty array is a legacy key, not a legacy
- * library: it vouches for nothing while licensing a full prune, and every pre-1308 save emitted
- * one, so treating its presence as a basis would arm the exact failure this whole mechanism
- * exists to prevent.
- *
- * @param {object|null} store
- * @param {'characterPrerequisites'|'modifiers'} key
- * @param {() => Array<object>} readWorld
- * @param {unknown} legacy
- * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
- */
-/**
  * Resolve an injected store seam, whether it was supplied as the store itself or as a lazy getter.
  * Lazy is the production shape: `game.fabricate` is not populated when the manager is constructed.
  *
@@ -236,6 +211,25 @@ function _iconAllowance(icons, vocabulary) {
   return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
 }
 
+/**
+ * The Valid Id Basis for ONE library: the union of the world list and the system's surviving
+ * legacy copy, or `null` when neither can vouch for an id.
+ *
+ * PER LIBRARY, because the two are independent. A setting payload carrying only `modifiers` says
+ * nothing about whether a prerequisite has ever been authored, so an aggregate seeded flag would
+ * hand this a real, empty, PRUNABLE basis derived from a key that is simply absent.
+ *
+ * A legacy copy counts only when it is NON-EMPTY. An empty array is a legacy key, not a legacy
+ * library: it vouches for nothing while licensing a full prune, and every pre-1308 save emitted
+ * one, so treating its presence as a basis would arm the exact failure this whole mechanism
+ * exists to prevent.
+ *
+ * @param {object|null} store
+ * @param {'characterPrerequisites'|'modifiers'} key
+ * @param {() => Array<object>} readWorld
+ * @param {unknown} legacy
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
 function _libraryBasis(store, key, readWorld, legacy) {
   const seeded = store?.isSeeded?.(key) === true;
   const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
@@ -243,6 +237,12 @@ function _libraryBasis(store, key, readWorld, legacy) {
   return _idSet(seeded ? readWorld() : [], legacyList ?? []);
 }
 
+/**
+ * Collect the trimmed ids of every entry across the given lists into one Set.
+ *
+ * @param {...Array<{id?: unknown}>} lists
+ * @returns {Set<string>}
+ */
 function _idSet(...lists) {
   const ids = new Set();
   for (const list of lists) {

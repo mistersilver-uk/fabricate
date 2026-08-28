@@ -15,23 +15,6 @@ const ESSENCE_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ESSENC
 const TOOL_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TOOL_SCOPE}`;
 
 /**
- * The invalidation scopes a world currency edit produces (issue 1278).
- *
- * Currency used to be per-system state, so editing it wrote `requirements` on a crafting system
- * and the ordinary systems branch announced `resolution-config` for THAT system. The ladder is
- * world scope now and no system record changes, so without this a GM's edit is invisible to every
- * connected player: their shells keep projecting costs against the ladder they last read.
- *
- * The scope stays PER SYSTEM rather than becoming one unattributable world-wide scope, because
- * `craftingDataChange` treats an unattributable leg as poisoning the whole payload into a broad
- * invalidation. Only systems that PARTICIPATE are listed: a system with
- * `requirements.currency.enabled === false` resolves nothing against the ladder, so re-narrowing
- * it would be work with no possible observable difference.
- *
- * @param {{ getSystems: () => any[] }|null|undefined} craftingSystemManager
- * @returns {Array<{systemId: string, domains: readonly string[]}>}
- */
-/**
  * The invalidation scopes a world travel edit produces (issue 1282).
  *
  * Realms used to live on the crafting system, so editing one wrote `craftingSystems` and the
@@ -109,6 +92,23 @@ const COMPONENT_SCOPE_DOMAINS = domainsForSystemFields(['components']);
 const ESSENCE_SCOPE_DOMAINS = domainsForSystemFields(['essenceDefinitions']);
 const TOOL_SCOPE_DOMAINS = domainsForSystemFields(['tools']);
 
+/**
+ * The invalidation scopes a world currency edit produces (issue 1278).
+ *
+ * Currency used to be per-system state, so editing it wrote `requirements` on a crafting system
+ * and the ordinary systems branch announced `resolution-config` for THAT system. The ladder is
+ * world scope now and no system record changes, so without this a GM's edit is invisible to every
+ * connected player: their shells keep projecting costs against the ladder they last read.
+ *
+ * The scope stays PER SYSTEM rather than becoming one unattributable world-wide scope, because
+ * `craftingDataChange` treats an unattributable leg as poisoning the whole payload into a broad
+ * invalidation. Only systems that PARTICIPATE are listed: a system with
+ * `requirements.currency.enabled === false` resolves nothing against the ladder, so re-narrowing
+ * it would be work with no possible observable difference.
+ *
+ * @param {{ getSystems: () => any[] }|null|undefined} craftingSystemManager
+ * @returns {Array<{systemId: string, domains: readonly string[]}>}
+ */
 function currencyParticipantScopes(craftingSystemManager) {
   const systems = craftingSystemManager?.getSystems?.() ?? [];
   return (Array.isArray(systems) ? systems : [])
