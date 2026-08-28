@@ -169,6 +169,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,
       getCharacterLibrariesStore: () =>
         game?.fabricate?.getCharacterLibrariesStore?.() ?? null,
+      // The three world-scope entity stores (issue 1362, epic 1357). `src/main.js` already
+      // constructs, loads, publishes and replicates all three, so nothing there changes; this
+      // is the only place the manager can reach them, and it uses the same
+      // `game.fabricate.getXStore?.() ?? null` idiom every other world store here uses.
+      getComponentScopeStore: () => game?.fabricate?.getComponentScopeStore?.() ?? null,
+      getEssenceScopeStore: () => game?.fabricate?.getEssenceScopeStore?.() ?? null,
+      getToolScopeStore: () => game?.fabricate?.getToolScopeStore?.() ?? null,
       getGatheringRealmStore: () => game?.fabricate?.getGatheringRealmStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getCurrentSceneRegions: () =>
