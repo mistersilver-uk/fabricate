@@ -1132,6 +1132,44 @@ test('16(a): an essence default naming a component the MERGED roster lacks is de
   );
 });
 
+test('16(a) positive: a component the DESTINATION holds is addressable, so the section LANDS', async () => {
+  // THE DISCRIMINATING ARM, and without it the negative arm above is green under the very
+  // mutation it names: a component absent from the destination AND from the incoming slice is
+  // declined either way, so that fixture cannot tell the MERGED roster from the incoming one.
+  // Here the referenced component is in the DESTINATION alone.
+  //
+  // REDDENS WHEN: the addressability check is bound to the SOURCE roster — the incoming slice's
+  // own `entities` — instead of the merged destination roster.
+  const world = await destinationWorld({
+    componentScope: {
+      entities: [{ id: 'held-by-destination', name: 'Held' }],
+      defaults: {},
+      membership: {},
+    },
+    essenceScope: emptySeededScope(),
+    toolScope: emptySeededScope(),
+  });
+
+  const { summary } = await runImport(
+    world,
+    envelope({
+      system: { essenceDefinitions: [{ id: 'fire', name: 'Fire' }] },
+      essenceScope: slice({
+        entities: [{ id: 'fire', name: 'Fire' }],
+        defaults: [{ id: 'fire', effectSource: { sourceComponentId: 'held-by-destination' } }],
+        membership: [membershipRecord('fire', SOURCE_SYSTEM_ID, { inherit: {} })],
+      }),
+    })
+  );
+
+  assert.deepEqual(
+    world.persisted('essences').defaults.fire,
+    { id: 'fire', effectSource: { sourceComponentId: 'held-by-destination' } },
+    'the merged roster is the destination UNION the incoming slice, so this reference resolves'
+  );
+  assert.equal(reported(summary, REFERENCE_KINDS.WORLD_DEFAULT_DECLINED).length, 0);
+});
+
 test('16(b): a tool default whose onBreak replacement names an absent component is declined', async () => {
   const world = await seededEmptyWorld();
   const { summary } = await runImport(
