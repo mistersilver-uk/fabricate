@@ -307,3 +307,66 @@ describe('main.js settings hook wiring', () => {
     );
   });
 });
+
+// --- World scope stores (issue 1359, epic 1357) ---------------------------------------------
+// A client that booted before the migrating GM wrote keeps `isSeeded() === false` for the whole
+// session. That is harmless while this change is additive — but once the epic's migration strips
+// the in-system arrays, that client has an unseeded world corpus AND an empty legacy corpus, so
+// its union read answers NOTHING and it sees no components, essences or tools at all until reload.
+describe('the world scope legs', () => {
+  const SCOPES = [
+    { name: 'componentScope', key: 'fabricate.componentScope', target: 'componentScopeStore' },
+    { name: 'essenceScope', key: 'fabricate.essenceScope', target: 'essenceScopeStore' },
+    { name: 'toolScope', key: 'fabricate.toolScope', target: 'toolScopeStore' },
+  ];
+
+  for (const scope of SCOPES) {
+    it(`reloads the ${scope.name} store BEFORE announcing, so a consumer reads the post-edit corpus`, async () => {
+      // THE ORDER IS THE WHOLE POINT. Every consumer that reacts reads the corpus back through the
+      // store, so announcing first hands it the pre-edit value and caches that as the new truth.
+      // Proven by a consumer that reads from INSIDE the announcement, rather than by asserting a
+      // call order — a `['load','emit']` order assertion passes against a `load()` that read the
+      // wrong key.
+      const { createComponentScopeStore, createEssenceScopeStore, createToolScopeStore } =
+        await import('../src/systems/worldScopeStores.js');
+      const factories = {
+        componentScope: createComponentScopeStore,
+        essenceScope: createEssenceScopeStore,
+        toolScope: createToolScopeStore,
+      };
+      const values = new Map();
+      const store = factories[scope.name]({
+        getSetting: (key) => values.get(key),
+        setSetting: async (key, value) => values.set(key, value),
+      });
+      store.load();
+      assert.equal(store.isSeeded('entities'), false, 'unwritten before the replicated write');
+
+      // The replicated write lands in the settings store first; the hook fires afterwards.
+      values.set(scope.name, { entities: [{ id: 'w1', name: 'Replicated' }] });
+
+      const observed = [];
+      const handled = handleFabricateSettingChange(scope.key, {
+        [scope.target]: store,
+        craftingSystemManager: { getSystems: () => [{ id: 's1' }] },
+        callAll: () => {
+          observed.push({
+            seeded: store.isSeeded('entities'),
+            ids: store.listEntities().map((entity) => entity.id),
+          });
+        },
+      });
+
+      assert.equal(handled, true);
+      assert.ok(observed.length > 0, 'the leg announced at least once');
+      for (const seen of observed) {
+        assert.equal(seen.seeded, true, 'isSeeded() is RE-DERIVED before any consumer is told');
+        assert.deepEqual(seen.ids, ['w1'], 'and the corpus is the post-edit one');
+      }
+    });
+
+    it(`tolerates a missing ${scope.name} store`, () => {
+      assert.equal(handleFabricateSettingChange(scope.key, { callAll: () => {} }), true);
+    });
+  }
+});

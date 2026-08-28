@@ -4,6 +4,7 @@ import {
   normalizeWorldDefaults,
   resolveScopedDefinition,
 } from './scopedDefinitions.js';
+import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 
 /**
  * The essence half of Scoped Entity Definitions (issue 1358, part of epic 1357).
@@ -99,4 +100,32 @@ export function resolveEssence(worldDefault, membership) {
  */
 export function essenceCarriesBehaviour(resolved) {
   return Boolean(resolved?.member) && resolved?.enabled === true;
+}
+
+/**
+ * THE READ UNION for an essence: what a crafting system's essences list IS (issue 1359).
+ *
+ * The world essences whose membership record for this system is PRESENT, each RESOLVED through the
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
+ * an id collision.
+ *
+ * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
+ * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
+ * membership record is a REFUSAL, never a PRUNE, so a reference to a world essence this system is
+ * not a member of must be ABSENT from this answer and PRESENT in the basis. Filtering the basis by
+ * membership would convert that refusal into a silent, persisted deletion on the first normalize.
+ *
+ * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
+ *   worldCorpus The world scope store's published corpus.
+ * @param {string} systemId
+ * @param {unknown} systemEssences The system's surviving in-system array.
+ * @returns {Array<object>}
+ */
+export function resolveEssenceScope(worldCorpus, systemId, systemEssences) {
+  return unionScopedDefinitions({
+    corpus: worldCorpus,
+    systemId,
+    systemDefinitions: systemEssences,
+    resolve: resolveEssence,
+  });
 }

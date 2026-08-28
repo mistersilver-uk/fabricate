@@ -4,6 +4,7 @@ import {
   normalizeWorldDefaults,
   resolveScopedDefinition,
 } from './scopedDefinitions.js';
+import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 
 /**
  * The tool half of Scoped Entity Definitions (issue 1358, part of epic 1357).
@@ -160,6 +161,25 @@ function isAuthorityToken(value) {
 }
 
 /**
+ * Normalize the WORLD tool-breakage authority for persistence (issue 1359).
+ *
+ * ABSENCE-PRESERVING. An unauthored or unrecognized value answers `{}` — no `toolBreakage` key at
+ * all — rather than minting `toolSpecific`, because a minted default at world scope is
+ * indistinguishable from a GM's deliberate choice and would silently become the value every
+ * absent-preserving system inherits once the normalizer flip lands.
+ *
+ * Answers a PARTIAL OBJECT rather than the block itself, so `createToolScopeStore` can spread it
+ * over the three sub-keys without a presence test of its own.
+ *
+ * @param {unknown} raw The raw `toolBreakage` block from the persisted scope value.
+ * @returns {{toolBreakage?: {authority: string}}}
+ */
+export function normalizeWorldToolBreakage(raw) {
+  const authority = raw && typeof raw === 'object' ? raw.authority : undefined;
+  return isAuthorityToken(authority) ? { toolBreakage: { authority } } : {};
+}
+
+/**
  * Resolve the effective tool-breakage authority for one crafting system.
  *
  * ABSENT-PRESERVING ON THE SYSTEM SIDE: a system that authored nothing INHERITS the world value
@@ -218,4 +238,32 @@ export function resolveTool(worldDefault, membership) {
 export function toolAttemptBlockReason(resolved) {
   if (!resolved?.member || resolved.enabled !== true) return TOOL_BLOCKED;
   return null;
+}
+
+/**
+ * THE READ UNION for a tool: what a crafting system's tools list IS (issue 1359).
+ *
+ * The world tools whose membership record for this system is PRESENT, each RESOLVED through the
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
+ * an id collision.
+ *
+ * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
+ * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
+ * membership record is a REFUSAL, never a PRUNE, so a reference to a world tool this system is
+ * not a member of must be ABSENT from this answer and PRESENT in the basis. Filtering the basis by
+ * membership would convert that refusal into a silent, persisted deletion on the first normalize.
+ *
+ * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
+ *   worldCorpus The world scope store's published corpus.
+ * @param {string} systemId
+ * @param {unknown} systemTools The system's surviving in-system array.
+ * @returns {Array<object>}
+ */
+export function resolveToolScope(worldCorpus, systemId, systemTools) {
+  return unionScopedDefinitions({
+    corpus: worldCorpus,
+    systemId,
+    systemDefinitions: systemTools,
+    resolve: resolveTool,
+  });
 }

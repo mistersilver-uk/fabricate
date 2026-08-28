@@ -21,6 +21,11 @@ import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { CharacterLibrariesStore } from './systems/CharacterLibrariesStore.js';
+import {
+  createComponentScopeStore,
+  createEssenceScopeStore,
+  createToolScopeStore
+} from './systems/worldScopeStores.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
@@ -1081,6 +1086,23 @@ class Fabricate {
       randomID: () => foundry.utils.randomID()
     });
     this.characterLibrariesStore.load();
+    // Issue 1359 (epic 1357): the three WORLD-SCOPE entity stores. Constructed and loaded HERE —
+    // AFTER `registerSettings()`, AFTER `await this._runMigrations()`, and BEFORE both managers —
+    // and the ORDER IS SILENT WHEN WRONG, which is why it is stated rather than left to the
+    // reader. Reading an unregistered key throws inside `ClientSettings##assertSetting`; because
+    // `load()` is guarded, a mis-ordering degrades to a permanently UNSEEDED store and a `null`
+    // Valid Id Basis with no crash and nothing in the console. `CraftingSystemManager` derives
+    // that basis on every normalize, so a manager built ahead of these would prune every world
+    // reference against an empty basis.
+    //
+    // A source-order assertion in `tests/scoped-definition-read-and-basis.test.js` pins it,
+    // because `src/main.js` is not otherwise reachable by a unit test.
+    this.componentScopeStore = createComponentScopeStore({ getSetting, setSetting });
+    this.componentScopeStore.load();
+    this.essenceScopeStore = createEssenceScopeStore({ getSetting, setSetting });
+    this.essenceScopeStore.load();
+    this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
+    this.toolScopeStore.load();
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
@@ -1783,6 +1805,44 @@ class Fabricate {
    */
   getCharacterLibrariesStore() {
     return this.characterLibrariesStore ?? null;
+  }
+
+  /**
+   * Get the world COMPONENT scope store (issue 1359, epic 1357).
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore} and
+   * {@link Fabricate#getCharacterLibrariesStore} and emphatically NOT
+   * {@link Fabricate#getGatheringRealmStore}: `CraftingSystemManager` resolves this lazily during
+   * `initialize()`, and its call site guards with optional chaining, which absorbs an ABSENT
+   * accessor but not a THROW. A readiness throw here would surface as a crash inside
+   * `_normalizeSystem` — the issue-970 shape, where the manager never initializes at all — rather
+   * than as the unknown basis that call site is written to tolerate.
+   *
+   * @returns {object|null}
+   */
+  getComponentScopeStore() {
+    return this.componentScopeStore ?? null;
+  }
+
+  /**
+   * Get the world ESSENCE scope store (issue 1359). Ungated, for
+   * {@link Fabricate#getComponentScopeStore}'s reason.
+   *
+   * @returns {object|null}
+   */
+  getEssenceScopeStore() {
+    return this.essenceScopeStore ?? null;
+  }
+
+  /**
+   * Get the world TOOL scope store (issue 1359). Ungated, for
+   * {@link Fabricate#getComponentScopeStore}'s reason. It carries the WORLD tool-breakage
+   * authority beside the three sub-keys.
+   *
+   * @returns {object|null}
+   */
+  getToolScopeStore() {
+    return this.toolScopeStore ?? null;
   }
 
   /**
@@ -4893,6 +4953,12 @@ Hooks.once('ready', async () => {
     currencyConfigStore: fabricate.currencyConfigStore,
     travelStore: fabricate.gatheringRealmStore,
     characterLibrariesStore: fabricate.characterLibrariesStore,
+    // Issue 1359. Without these three the bridge legs receive `undefined` and NO-OP silently: the
+    // key is still "handled", so nothing reports the miss, and the client's world corpus stays at
+    // whatever it read at boot for the rest of the session.
+    componentScopeStore: fabricate.componentScopeStore,
+    essenceScopeStore: fabricate.essenceScopeStore,
+    toolScopeStore: fabricate.toolScopeStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {
