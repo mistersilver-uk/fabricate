@@ -1,7 +1,15 @@
 /**
  * The pure half of the world-scope entity merge an import performs (issue 1364, part of epic
- * 1357): the three per-layer merges, and the DESTINATION re-check of every world default the
- * import would add.
+ * 1357): the DESTINATION re-check of every world default the import would add, and the corpus
+ * readers the merge decides it against.
+ *
+ * THE MERGE LOOPS THEMSELVES ARE NOT HERE. `_persistScopedEntityRosters` and
+ * `_persistScopedEntityMemberships` in `src/systems/CompendiumImporter.js` own them, because each
+ * one is a store write and a report push as much as a collection walk. What this module owns is
+ * everything those loops need to be DECIDABLE: `sliceRecords`, `mergedEntityIds`,
+ * `mergedMembershipUnion`, `membershipKeySet` and `recheckWorldDefault`. The merge rule below is
+ * stated here anyway, because the re-check's whole shape follows from it - a destination record
+ * already present WINS, so only an ADDED one is ever re-examined.
  *
  * IT LIVES HERE, BESIDE THE IMPORTER RATHER THAN INSIDE IT, for two reasons. The first is
  * ordinary: `CompendiumImporter` is a large orchestrator, and a changed function is re-flagged as

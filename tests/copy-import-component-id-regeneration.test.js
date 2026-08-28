@@ -22,8 +22,14 @@
  * Two copies from one origin used to share no component id; they now share one for every LINKED
  * component, because sharing an id is what stops the second import creating a second world record
  * for an item the destination already holds. The old guarantee survives, restated: two copies
- * share an id only when their source-reference sets INTERSECT, which is the relation the `1.30.0`
- * grouping unions on — so an UNLINKED component still mints a disjoint id on every import.
+ * share an id only when each INTERSECTS THE SAME destination world entity — so an UNLINKED
+ * component, which intersects none, still mints a disjoint id on every import.
+ *
+ * It is NOT "when their own sets intersect each other": a destination entity's set may have been
+ * widened by the `1.30.0` grouping's union, so two records sharing no reference at all can each
+ * intersect it, and what keeps them on distinct ids is the INJECTIVE binding rather than the
+ * intersection relation (`openspec/specs/import-export/spec.md` -> Copy-mode identifier
+ * rebinding).
  */
 
 import assert from 'node:assert/strict';
