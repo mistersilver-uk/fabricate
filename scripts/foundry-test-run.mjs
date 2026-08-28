@@ -10704,6 +10704,14 @@ async function main() {
         // FRAMES a run captures, and this section captures none: it is acceptance criterion 6c's
         // only runtime proof, and gating it on the `tools` token would skip the world-scope
         // identity check in every scoped run that happens not to select a token unrelated to it.
+        //
+        // THE COST OF THAT PAIR IS STATED RATHER THAN LEFT TO BE DISCOVERED. Ungated plus
+        // `rethrow: true` means EVERY scoped screenshot run now pays this behavioural section, and
+        // a failure in it aborts the phase — costing every later section's frames, including ones
+        // the scoped run was invoked to capture. That is the deliberate trade: this is the only
+        // place the shipped flag repair is exercised against a live world, and a scoped run that
+        // silently skipped it would let a real regression reach `main` behind a green capture job.
+        // `craftingSetup` and `cleanup.crafterId` are both in scope for any run that reaches D0.
         {
           await runFixturedScreenshotSection({
             results,

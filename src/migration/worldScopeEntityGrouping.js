@@ -380,8 +380,21 @@ export function groupIdentity(group, entityType) {
  * Whether the union kept every source reference this member claimed.
  *
  * A member whose references are all present in the world entity's union lost nothing, so the
- * difference in field SHAPE is not a rename a GM needs to see. A member that lost one - which
- * only the donor's primaries can cause, when a primary is demoted - still reports.
+ * difference in field SHAPE is not a rename a GM needs to see. A member that lost one still
+ * reports.
+ *
+ * **IT IS A TAUTOLOGY UNDER {@link groupIdentity}, AND SAYING SO IS THE POINT.** That function
+ * collects EVERY member's references into `primaries ∪ aliases`, so `kept` is a superset of every
+ * member's own reference set and this predicate cannot currently answer `false`. Measured: forcing
+ * it to `true` leaves the acceptance corpus's rename report byte-identical, so its greenness under
+ * that mutation is a property of the union rather than a coverage gap, and no test can redden it.
+ * It is kept as a guard against a regression to donor-wins NARROWING, which is the one change that
+ * would make it answer `false` and start reporting the loss.
+ *
+ * The direction that IS reachable is over-reporting: forcing it to `false`, or dropping the filter
+ * that calls it, tells the GM about renames that never happened - including the DONOR being told
+ * its own identity changed inside its own group. `tests/world-scope-entity-grouping.test.js` pins
+ * that direction.
  *
  * @param {object} record
  * @param {object} identity

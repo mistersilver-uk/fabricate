@@ -9,13 +9,15 @@
  *  (a) THE ENTITY PROJECTION, whose unit is the `(system, entity)` pair;
  *  (b) THE RESOLVED REFERENCE CLOSURE, because recipes, gathering tasks and events, salvage
  *      result groups, `IngredientSet` refs and system-level fields are NOT pairs — so a missed
- *      rewrite site produces a reference to a retired id, the newly-decidable basis prunes it on
- *      the round-trip save, and every entity field stays identical.
+ *      rewrite site leaves a reference to a retired id that no longer RESOLVES, while every
+ *      entity field stays identical and projection (a) reports a clean pass.
  *
  * THE AFTER LEG ROUND-TRIPS THROUGH THE REAL NORMALIZE-AND-SAVE SEAM, never a hand-written
- * stand-in: production hydrates through `_normalizeSystem` and writes back, and `#### D10` states
- * outright that the newly-decidable basis PRUNES on that first save. Comparing against the
- * un-round-tripped output would certify a corpus state the world never durably occupies.
+ * stand-in: production hydrates through `_normalizeSystem` and writes back, so the comparison has
+ * to be against the state the world durably occupies rather than against the migration's raw
+ * output. That seam performs exactly ONE basis-gated prune — the essence source-uuid retention —
+ * and prunes no recipe, salvage or gathering reference at `1.30.0`; the registry's requirement 18
+ * measures ZERO references disappearing across this whole acceptance set.
  */
 
 import assert from 'node:assert/strict';
@@ -374,16 +376,30 @@ test('every crafting-system export fixture in tests/fixtures survives the differ
   console.log(`# world-scope differential examined ${examined} export fixture(s)`);
 });
 
-test('two of the three essence-source spellings are RE-DERIVED by the normalizer', () => {
-  // A MEASURED FINDING, recorded rather than asserted away. Deleting the rewrite of
-  // `associatedSystemItemId` or of `sourceItemUuid` is GREEN in this differential, and the
-  // reason is not a projection gap: `_normalizeSystem` recomputes BOTH from `sourceComponentId`
-  // on every load, so a stale value in either is repaired before any reader sees it.
+test('the essence-source spelling the normalizer re-derives, and the one it only CONDITIONALLY does', () => {
+  // A MEASURED FINDING, recorded rather than asserted away — and CORRECTED, because an earlier
+  // form of this note called BOTH re-derived spellings defence-in-depth. Only ONE of them is, and
+  // reading the other as redundant would invite a later lane to delete a leg that prevents
+  // permanent data loss.
   //
-  // Only `sourceComponentId` decides anything durable — and deleting the whole essence leg, or
-  // that one site, DOES redden. The other two rewrites are defence-in-depth for a payload read
-  // before any hydrate, and this arm states which is which so a later lane does not read their
-  // greenness as coverage.
+  // `associatedSystemItemId` IS defence-in-depth. `_normalizeSystem` recomputes it from
+  // `sourceComponentId` UNCONDITIONALLY (`CraftingSystemManager.js`, the transitional-alias line),
+  // so a stale value is repaired before any reader sees it, across every input arm: a resolvable
+  // component, an emptied in-system array with an unknown basis, an aliases-only link, and a
+  // legacy uuid-as-id. Deleting its rewrite leg is green for a real reason.
+  //
+  // `sourceItemUuid` is NOT. It is re-derived only when the essence STILL RESOLVES to a component,
+  // because `sourceComponentId` falls back to `sourceItemUuid` only when that value is a live
+  // component id (`itemIds.has(def.sourceItemUuid)`). An essence whose ONLY spelling is
+  // `sourceItemUuid` holding a legacy component id therefore reaches the migration intact — the
+  // runner hands the migration chain the RAW persisted payload and no earlier migration backfills
+  // it (`migrateRenameSourceUuidFields.js` says outright that this is a different field family) —
+  // and if its re-keyed id is not rewritten it resolves to nothing and ALL THREE spellings
+  // normalize to `null`. Nothing recovers that: every consumer reads
+  // `sourceComponentId || associatedSystemItemId` and none falls back to `sourceItemUuid`.
+  // The arm below this one exercises exactly that, and it must SKIP `normalizeCorpus` to do it,
+  // because hydrating first backfills the other two spellings and erases the shape the
+  // `sourceItemUuid` rewrite leg defends.
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const normalized = manager._normalizeSystem({
     id: 'sys-a',
@@ -404,6 +420,85 @@ test('two of the three essence-source spellings are RE-DERIVED by the normalizer
   const essence = normalized.essenceDefinitions[0];
   assert.equal(essence.associatedSystemItemId, 'comp-1', 're-derived from sourceComponentId');
   assert.equal(essence.sourceItemUuid, 'Item.aaa', "re-derived from the component's own uuid");
+});
+
+test('an essence whose ONLY source spelling is `sourceItemUuid` survives the re-key', () => {
+  // THE ARM THAT SEES THE DATA LOSS, and the only one that can: it runs the migration over the
+  // RAW persisted corpus, exactly as `MigrationRunner` does, instead of over a corpus already
+  // hydrated by `normalizeCorpus`. Hydrating first backfills `sourceComponentId` and
+  // `associatedSystemItemId` from this very field, which removes the shape under test.
+  //
+  // `sys-new`'s `comp-9` and `sys-old`'s `comp-1` share a source item, so the group elects the
+  // older system's id and `comp-9` is re-keyed to `comp-1`. The essence names it through
+  // `sourceItemUuid` alone — `## EssenceDefinition` requirement 3 permits that legacy spelling to
+  // hold a component id — so the `sourceItemUuid` leg of `rewriteEssenceReferences` is the ONLY
+  // thing that carries it across. Without it the normalize below answers `null` for all three
+  // spellings and the effect source is destroyed permanently.
+  const raw = {
+    recipes: [],
+    gatheringConfig: { systems: {} },
+    systems: [
+      {
+        id: 'sys-old',
+        name: 'Older system',
+        enabled: true,
+        features: { salvage: true, essences: true },
+        components: [
+          {
+            id: 'comp-1',
+            name: 'Ash Salt',
+            originItemUuid: 'Item.shared',
+            registeredItemUuid: 'Item.shared',
+          },
+        ],
+        essenceDefinitions: [],
+        tools: [],
+      },
+      {
+        id: 'sys-new',
+        name: 'Younger system',
+        enabled: true,
+        features: { salvage: true, essences: true },
+        components: [
+          {
+            id: 'comp-9',
+            name: 'Ash Salt',
+            originItemUuid: 'Item.shared',
+            registeredItemUuid: 'Item.shared',
+          },
+        ],
+        // THE SHAPE UNDER TEST: no `sourceComponentId`, no `associatedSystemItemId`.
+        essenceDefinitions: [{ id: 'ash', name: 'Ash', sourceItemUuid: 'comp-9' }],
+        tools: [],
+      },
+    ],
+  };
+
+  const result = migrateWorldScopeEntities({
+    recipes: raw.recipes,
+    systems: raw.systems,
+    gatheringConfig: raw.gatheringConfig,
+    componentScope: {},
+    essenceScope: {},
+    toolScope: {},
+    worldScopeRekeyMap: {},
+  });
+  const migratedYounger = result.systems.find((system) => system.id === 'sys-new');
+  assert.equal(
+    migratedYounger.essenceDefinitions[0].sourceItemUuid,
+    'comp-1',
+    'the migration itself must rewrite the legacy component id held in `sourceItemUuid`'
+  );
+
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const essence = manager._normalizeSystem(migratedYounger).essenceDefinitions[0];
+  assert.equal(essence.sourceComponentId, 'comp-1', 'the effect source still RESOLVES after hydrate');
+  assert.equal(essence.associatedSystemItemId, 'comp-1', 'and the transitional alias follows it');
+  assert.equal(
+    essence.sourceItemUuid,
+    'Item.shared',
+    "and the uuid is re-derived from the resolved component's own source item"
+  );
 });
 
 test('the ONE basis-gated prune the round-trip seam performs, and why the prune branch is a GUARD', async () => {
@@ -725,6 +820,7 @@ test('every membership record OVERRIDES every section, with the system own value
   const SCOPES = { components: COMPONENT_SCOPE, essences: ESSENCE_SCOPE, tools: TOOL_SCOPE };
   const FIELDS = { components: 'components', essences: 'essenceDefinitions', tools: 'tools' };
   let checked = 0;
+  let withWorldDefault = 0;
 
   for (const scenario of scenarioSpecs()) {
     const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
@@ -743,6 +839,7 @@ test('every membership record OVERRIDES every section, with the system own value
         );
         assert.ok(record, `${scenario.name}: ${membership.entityId} has no in-system record`);
         const worldDefault = payload.defaults?.[membership.entityId] ?? null;
+        if (worldDefault) withWorldDefault += 1;
         const resolved = resolveScopedDefinition(worldDefault, membership, SCOPES[entityType]);
         for (const [section, sourceOf] of Object.entries(SECTION_SOURCES[entityType])) {
           assert.equal(
@@ -770,9 +867,16 @@ test('every membership record OVERRIDES every section, with the system own value
       }
     }
   }
-  // ANTI-VACUITY: a loop that examined nothing reports the same clean pass as one that examined
-  // every record.
+  // ANTI-VACUITY, IN TWO PARTS, because `checked` alone is not enough. It counts SECTIONS
+  // EXAMINED, and this arm's whole subject is the FALLBACK — which cannot fire at all when no
+  // world default exists. On a corpus that elected none, every `resolved[section]` would come from
+  // the membership record by default and the arm would be exactly as blind as the version that
+  // omitted the world default entirely.
   assert.ok(checked > 40, `the arm must actually examine sections (${checked})`);
+  assert.ok(
+    withWorldDefault > 0,
+    `and some of those records must actually HAVE a world default (${withWorldDefault})`
+  );
 });
 
 // ---------------------------------------------------------------------------

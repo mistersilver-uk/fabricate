@@ -249,6 +249,53 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
   }
 });
 
+test('the union RESHAPING a member source link is not reported as an identity change', () => {
+  // THE OTHER HALF OF THE UNION RULE, and the one nothing pinned. Ruling 3 keeps the DONOR's two
+  // primaries and demotes every other member's into `aliasItemUuids`, so after the union almost
+  // every member's own source-link projection DIFFERS from the world entity's in SHAPE while
+  // losing no reference at all. `unionAbsorbed` is what stops that difference being reported, and
+  // without it the GM is told about renames that did not happen — including, absurdly, the DONOR
+  // being told its own identity changed inside its own group.
+  //
+  // MEASURED, so the mutation budget is honest: forcing `unionAbsorbed` to `true` is BYTE-
+  // IDENTICAL over the whole acceptance corpus, because `groupIdentity` collects EVERY member's
+  // references into `primaries ∪ aliases` and the predicate is therefore a tautology under the
+  // union. It is a defensive guard against a regression to donor-wins narrowing, not a reachable
+  // branch, and no test can redden that direction. Forcing it to `false` DOES redden, and that is
+  // the direction this arm owns: over-reporting.
+  const grouping = buildWorldScopeGrouping([
+    system('sys-a', { components: [component('c-a', ['Item.a'])] }),
+    system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
+    system('sys-c', { components: [component('c-c', ['Item.b', 'Item.c'])] }),
+  ]);
+  const [entity] = grouping.entities.components;
+
+  // THE PREMISE, asserted rather than assumed: the donor's OWN projection really does disagree
+  // with the group identity on a source-link field, so the suppression had something to suppress.
+  const donorRecord = component('c-a', ['Item.a']);
+  assert.notDeepEqual(
+    identityOf(donorRecord, 'components').aliasItemUuids,
+    entity.identity.aliasItemUuids,
+    'the premise: the union WIDENED the donor own alias list'
+  );
+
+  const sourceLink = ['originItemUuid', 'registeredItemUuid', 'aliasItemUuids'];
+  for (const rename of grouping.renames) {
+    assert.deepEqual(
+      rename.changedFields.filter((field) => sourceLink.includes(field)),
+      [],
+      `${rename.systemId}/${rename.oldId}: a reshaped-but-not-narrowed source link is NOT a rename`
+    );
+  }
+  assert.deepEqual(
+    grouping.renames.filter((rename) => rename.systemId === rename.donorSystemId),
+    [],
+    'and the donor is never reported as having renamed itself'
+  );
+  // ANTI-VACUITY: an empty rename list would satisfy both loops above.
+  assert.ok(grouping.renames.length > 0, 'the two re-keyed members are still reported');
+});
+
 test('EVERY rename is reported, and a byte-identical group produces none', () => {
   const shared = { name: 'Ash Salt', img: 'a.png', description: 'A' };
   const identical = buildWorldScopeGrouping([
