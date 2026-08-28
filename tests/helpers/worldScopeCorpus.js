@@ -108,7 +108,7 @@ export function makeScopeStore(entityType, value) {
  * `(corpus identity, system array identity, revision, length)` and a pure migration bumps no
  * revision, so a manager that already read the BEFORE leg would serve the PRE-migration union.
  *
- * @param {object} CraftingSystemManager The imported class.
+ * @param {new (...args: any[]) => any} CraftingSystemManager The imported class.
  * @param {{componentScope?: unknown, essenceScope?: unknown, toolScope?: unknown}} [payloads]
  * @returns {object}
  */
@@ -134,7 +134,7 @@ export function makeManagerWithScope(CraftingSystemManager, payloads = {}) {
  * nothing before the migration and ZERO disappear after the round trip. So the round trip's value
  * is that it is the REAL seam, not that it drops references — see the differential's guard arm.
  *
- * @param {object} CraftingSystemManager
+ * @param {new (...args: any[]) => any} CraftingSystemManager
  * @param {object} corpus `{ systems, recipes, gatheringConfig, componentScope, ... }`
  * @returns {object} the corpus with `systems` replaced by their normalized form.
  */
@@ -460,7 +460,7 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
  * The BEFORE state: a raw corpus hydrated through the REAL normalizer with UNSEEDED scope stores,
  * which is exactly what a pre-migration world holds on disk.
  *
- * @param {object} CraftingSystemManager
+ * @param {new (...args: any[]) => any} CraftingSystemManager
  * @param {object} raw
  * @returns {object}
  */
@@ -851,7 +851,7 @@ function project(record, entityType) {
  * PROJECTION (a) — the entity projection: every field a production reader consumes, per
  * `(system, entity)` pair.
  *
- * @param {object} CraftingSystemManager
+ * @param {new (...args: any[]) => any} CraftingSystemManager
  * @param {object} corpus
  * @param {boolean} throughScope Whether to read through the scope resolvers (the AFTER leg).
  * @returns {Record<string, object>}
@@ -902,7 +902,7 @@ export function projectEntities(CraftingSystemManager, corpus, throughScope) {
  * A reference resolving to nothing is recorded as `UNRESOLVED:<site path>` and never dropped, so
  * a prune is a VISIBLE DIFFERENCE rather than an absence.
  *
- * @param {object} CraftingSystemManager
+ * @param {new (...args: any[]) => any} CraftingSystemManager
  * @param {object} corpus
  * @param {boolean} throughScope
  * @returns {Record<string, unknown>}
