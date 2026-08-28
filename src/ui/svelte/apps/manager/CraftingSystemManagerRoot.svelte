@@ -2769,6 +2769,13 @@
     components: worldScopeState.component?.entities?.length ?? 0,
     essences: worldScopeState.essence?.entities?.length ?? 0,
     tools: worldScopeState.tool?.entities?.length ?? 0,
+    // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
+    // reason is a one-way door: `## GM World Scoped Entity Routes` requirement 7 bars every
+    // later PR in this epic from touching this file, so a badge omitted here could never be
+    // added. It reads a key `worldScopeProjection.js` does not publish yet and answers 0, which
+    // is truthful — no world vocabulary exists — and PR 7 lights it up by publishing
+    // `worldScope.vocabulary.total` from that NON-gateway module, with no edit here.
+    vocabulary: worldScopeState.vocabulary?.total ?? 0,
   });
 
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
@@ -10011,12 +10018,22 @@
             UNGATED and reachable with NO crafting system selected, like Parties, Travel and
             Rules & Resources: the world catalogue has to be authorable before any system opts
             into anything.
+
+            EVERY LEAF CARRIES AN EXPLICIT `aria-label`, which is not belt-and-braces here. The
+            collapsed rail hides BOTH `.manager-nav-label` and `.manager-nav-count`
+            (`styles/fabricate.css`), leaving only an `aria-hidden` glyph — so without one the
+            button's accessible name is EMPTY at 56px, which is a state this PR ships a frame
+            of. Parties, Travel, Rules & Resources and Downtime all do the same.
           -->
           <button
             type="button"
             class={`manager-nav-button manager-world-nav-item ${currentView === 'world-components' || currentView === 'world-component-entry' ? 'is-active' : ''}`}
             id="manager-world-nav-component-catalogue"
             data-world-nav-item="component-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
+              'Component catalogue'
+            )}
             aria-current={currentView === 'world-components' ||
             currentView === 'world-component-entry'
               ? 'page'
@@ -10037,6 +10054,7 @@
             class={`manager-nav-button manager-world-nav-item ${currentView === 'world-vocabulary' ? 'is-active' : ''}`}
             id="manager-world-nav-vocabulary"
             data-world-nav-item="vocabulary"
+            aria-label={text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
             aria-current={currentView === 'world-vocabulary' ? 'page' : undefined}
             onclick={() => setView('world-vocabulary')}
           >
@@ -10044,12 +10062,17 @@
             <span class="manager-nav-label">
               {text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
             </span>
+            <span class="manager-nav-count">{worldScopedCounts.vocabulary}</span>
           </button>
           <button
             type="button"
             class={`manager-nav-button manager-world-nav-item ${currentView === 'world-essences' || currentView === 'world-essence-entry' ? 'is-active' : ''}`}
             id="manager-world-nav-essence-catalogue"
             data-world-nav-item="essence-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle',
+              'Essence Catalogue'
+            )}
             aria-current={currentView === 'world-essences' || currentView === 'world-essence-entry'
               ? 'page'
               : undefined}
@@ -10066,6 +10089,10 @@
             class={`manager-nav-button manager-world-nav-item ${currentView === 'world-tools' || currentView === 'world-tool-entry' ? 'is-active' : ''}`}
             id="manager-world-nav-tool-catalogue"
             data-world-nav-item="tool-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle',
+              'Tools Catalogue'
+            )}
             aria-current={currentView === 'world-tools' || currentView === 'world-tool-entry'
               ? 'page'
               : undefined}

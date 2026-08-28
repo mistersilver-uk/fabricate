@@ -43,6 +43,23 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
+// The parsers, the anchor and the aside assertion are SHARED with the two recipe-edit
+// suites through this helper (issue 1362 review S4). Two copies of an anchor are two
+// things to keep in step, which is the whole reason the helper exists — and the copy that
+// lived here was byte-identical to the helper's, at SonarCloud's ten-line duplication floor.
+import {
+  assertAsideBuiltFromSet,
+  assertPredicatesMatchTheirIds,
+  declaration,
+  isManagerBodySubject,
+  namesManagerBody,
+  parseFullWidthViews,
+  routeIdOf,
+  splitTopLevel,
+  topLevelRules,
+  trackCount,
+} from './helpers/fullWidthRoute.js';
+
 const ROOT = resolve(import.meta.dirname, '..');
 const CSS_PATH = 'styles/fabricate.css';
 const ROOT_COMPONENT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
@@ -76,137 +93,6 @@ const BASELINE_MEMBERS = Object.freeze([
 const SHARED_BASELINE = '.fabricate-manager .manager-body::shared-3-track';
 
 /**
- * Split on top-level separators, ignoring any inside parentheses or brackets.
- *
- * @param {string} value
- * @param {string} separator A single character.
- * @returns {string[]}
- */
-function splitTopLevel(value, separator) {
-  const parts = [];
-  let token = '';
-  let parens = 0;
-  let brackets = 0;
-  for (const character of value) {
-    if (character === '(') parens += 1;
-    if (character === ')') parens -= 1;
-    if (character === '[') brackets += 1;
-    if (character === ']') brackets -= 1;
-    if (character === separator && parens === 0 && brackets === 0) {
-      parts.push(token);
-      token = '';
-      continue;
-    }
-    token += character;
-  }
-  parts.push(token);
-  return parts.map((part) => part.trim()).filter(Boolean);
-}
-
-/**
- * Every TOP-LEVEL rule in the stylesheet, as `{prelude, declarations}`.
- *
- * A rule is top-level when its opening brace sits at depth 0, which is exactly what excludes
- * the `@container` re-declarations. Nested blocks inside a rule are dropped from its
- * declarations rather than parsed, and comments are stripped first so a selector quoted in
- * prose cannot be read as a rule.
- *
- * @returns {Array<{prelude: string, declarations: string}>}
- */
-function topLevelRules() {
-  const source = css.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
-  const rules = [];
-  let depth = 0;
-  let prelude = '';
-  let declarations = '';
-  let ruleDepth = -1;
-  for (const character of source) {
-    if (character === '{') {
-      if (depth === 0 && !prelude.trim().startsWith('@')) ruleDepth = 0;
-      if (ruleDepth === 0 && depth === 0) {
-        declarations = '';
-      } else if (ruleDepth === 0) {
-        // A nested block inside a top-level rule: its content is not this rule's.
-        declarations += ' ';
-      }
-      depth += 1;
-      if (depth > 1 || ruleDepth !== 0) prelude = '';
-      continue;
-    }
-    if (character === '}') {
-      depth -= 1;
-      if (depth === 0 && ruleDepth === 0) {
-        rules.push({ prelude: prelude.trim(), declarations });
-        ruleDepth = -1;
-        declarations = '';
-      }
-      prelude = '';
-      continue;
-    }
-    if (depth === 1 && ruleDepth === 0) declarations += character;
-    if (depth === 0) prelude += character;
-  }
-  return rules;
-}
-
-/**
- * The value of one declaration in a block, or `null`.
- *
- * @param {string} declarations
- * @param {string} property
- * @returns {string|null}
- */
-function declaration(declarations, property) {
-  for (const entry of splitTopLevel(declarations, ';')) {
-    const colon = entry.indexOf(':');
-    if (colon === -1) continue;
-    if (entry.slice(0, colon).trim() !== property) continue;
-    return entry.slice(colon + 1).trim();
-  }
-  return null;
-}
-
-/**
- * The route id a selector scopes to, or `''` for the unscoped base rule.
- *
- * @param {string} selector
- * @returns {string}
- */
-function routeIdOf(selector) {
-  return /\[data-manager-view\^?="([^"]+)"\]/.exec(selector)?.[1] ?? '';
-}
-
-/**
- * Whether a selector names `.manager-body` as a WHOLE CLASS TOKEN.
- *
- * Anchored at both ends rather than a bare `includes`, for the reason the View Lab's hook
- * scan records: a rename to `.manager-body-outer` (or any longer name containing it) leaves a
- * substring test matching, so the parse goes on "finding" rules that no longer exist and the
- * non-empty guard below can never fire.
- *
- * @param {string} value
- * @returns {boolean}
- */
-function namesManagerBody(value) {
-  return /(?<![\w-])\.manager-body(?![\w-])/.test(value);
-}
-
-/**
- * Whether ONE selector's subject is `.manager-body` itself rather than a descendant of it.
- *
- * `.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-button` also declares
- * `grid-template-columns`, and it is a rule about a NAV BUTTON. Classifying it would put a
- * one-track entry into the layout sets and let a real collapsed-sibling omission hide behind
- * a hand-written exemption for it.
- *
- * @param {string} selector
- * @returns {boolean}
- */
-function isManagerBodySubject(selector) {
-  return /(?<![\w-])\.manager-body(\.is-rail-collapsed)?\s*$/.test(selector);
-}
-
-/**
  * The stylesheet's own classification of every top-level `.manager-body` grid rule.
  *
  * @returns {Map<string, {layoutClass: string, plain: boolean, collapsed: boolean}>} Keyed by
@@ -214,11 +100,11 @@ function isManagerBodySubject(selector) {
  */
 function classifyStylesheet() {
   const bases = new Map();
-  for (const rule of topLevelRules()) {
+  for (const rule of topLevelRules(css)) {
     if (!namesManagerBody(rule.prelude)) continue;
     const columns = declaration(rule.declarations, 'grid-template-columns');
     if (!columns) continue;
-    const tracks = splitTopLevel(columns, ' ').length;
+    const tracks = trackCount(columns);
     for (const selector of splitTopLevel(rule.prelude, ',')) {
       if (!isManagerBodySubject(selector)) continue;
       const collapsed = selector.includes('.is-rail-collapsed');
@@ -237,33 +123,10 @@ function classifyStylesheet() {
   return bases;
 }
 
-/**
- * The registry's own set, parsed out of the root component's SOURCE.
- *
- * Parsed rather than imported, because `FULL_WIDTH_VIEWS` lives in a `.svelte` instance scope
- * and this file compiles no Svelte. That is also why the seven world entries are written out
- * literally there rather than mapped: an interpolated selector would leave nothing here to
- * compare.
- *
- * @returns {Array<{id: string, layoutClass: string, selector: string}>}
- */
-function parseRegistry() {
-  const start = rootSource.indexOf('const FULL_WIDTH_VIEWS = Object.freeze([');
-  assert.ok(start >= 0, 'FULL_WIDTH_VIEWS is no longer declared in the manager root');
-  const end = rootSource.indexOf('\n  ]);', start);
-  assert.ok(end > start, 'FULL_WIDTH_VIEWS is not terminated as expected');
-  const body = rootSource.slice(start, end);
-  const entries = [];
-  const pattern =
-    /id:\s*'([^']+)',[\s\S]*?layoutClass:\s*'([^']+)',[\s\S]*?selector:\s*\n?\s*'([^']+)',/g;
-  for (const match of body.matchAll(pattern)) {
-    entries.push({ id: match[1], layoutClass: match[2], selector: match[3] });
-  }
-  return entries;
-}
-
 const STYLESHEET_BASES = classifyStylesheet();
-const REGISTRY = parseRegistry();
+// Parsed through the helper, so this suite and the two recipe-edit suites resolve the set
+// from ONE anchor. It carries each entry's `predicate` source text as well.
+const REGISTRY = parseFullWidthViews(rootSource);
 
 const stylesheetSet = new Set(
   [...STYLESHEET_BASES]
@@ -331,16 +194,7 @@ test('every released route declares its collapsed sibling at equal specificity',
 test('the aside chain is BUILT from the set rather than restating it', () => {
   // The twelve-clause chain this replaced is how the two halves drifted twice. A restated
   // condition would satisfy every assertion above and still render the wrong strip.
-  assert.match(
-    rootSource,
-    /\{#if !fullWidthLayout\}\s*\n\s*<aside\s+class="manager-inspector"/,
-    'the inspector aside must render on `!fullWidthLayout`, not on a hand-restated chain'
-  );
-  assert.match(
-    rootSource,
-    /const fullWidthLayout = \$derived\(\s*\n?\s*FULL_WIDTH_VIEWS\.find\(/,
-    '`fullWidthLayout` must be derived from FULL_WIDTH_VIEWS'
-  );
+  assertAsideBuiltFromSet(rootSource);
   // Needles from the RETIRED chain specifically, not fragments that also occur in the
   // header-actions chain a few hundred lines above: a needle that matched both would have
   // failed on a correct conversion, which is how a guard gets loosened until it proves nothing.
@@ -355,6 +209,21 @@ test('the aside chain is BUILT from the set rather than restating it', () => {
       `the old aside chain clause ${JSON.stringify(dead)} is still restated in the root`
     );
   }
+});
+
+test('every entry\'s PREDICATE answers for its own id', () => {
+  // THE FIELD THAT SHIPS THE DEFECT, and the one this gate could not see (issue 1362 review
+  // M1). `fullWidthLayout` derives from `predicate` and from nothing else; `id` and `selector`
+  // are read at runtime by nothing at all. Swapping two routes' predicates — the inspector
+  // suppressed on the wrong screen — left ALL FIVE tests here green, plus manager-contract,
+  // manager-layout, view-lab-cases and view-lab-source-coverage. The equivalent SELECTOR swap
+  // reds the selector-to-id test below, so the gate was built to catch this class of edit and
+  // missed the only field that decides anything.
+  //
+  // The two non-token predicates are NAMED with their exact expected text rather than skipped,
+  // mirroring how `SELF_OWNED_THREE_TRACK` above names its members: an exemption that merely
+  // skipped them would let either be rewritten into anything.
+  assertPredicatesMatchTheirIds(rootSource);
 });
 
 test('every registry entry names a route the router can actually reach', () => {

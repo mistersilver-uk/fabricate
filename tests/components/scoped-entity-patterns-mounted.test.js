@@ -17,6 +17,9 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+// The seeded-section list the row set subtracts. Imported so the assertion below is about
+// a NON-EMPTY filter rather than about an empty one that removes nothing.
+import { SCOPED_SEEDED_SECTIONS } from '../../src/ui/svelte/apps/manager/scoped/scopedStudio.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -30,6 +33,23 @@ const SCOPED_RAW_MODULES = [
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
 ];
+
+/**
+ * The class the shipped no-state primitive actually renders.
+ *
+ * Named once and asserted from BOTH directions below, because the version of this that read
+ * `.manager-empty-state` matched nothing in the repository and therefore could never fail —
+ * acceptance criterion 5's "no group chrome" half was decorative for the whole of PR 5.
+ */
+const EMPTY_STATE_SELECTOR = '.manager-empty';
+
+const emptyStateHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-scoped-empty-state-',
+  rawModules: [],
+  compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
+  componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte',
+});
 
 const inheritHarness = createMountedComponentHarness({
   repoRoot,
@@ -143,6 +163,27 @@ describe('MembershipActions (mounted)', () => {
   });
 });
 
+describe('the empty-state selector the InheritRow negative depends on', () => {
+  before(() => emptyStateHarness.setup());
+  after(() => emptyStateHarness.teardown());
+  afterEach(() => emptyStateHarness.remount());
+
+  it('MATCHES the shipped no-state primitive, so the negative above is a measurement', async () => {
+    // A NEGATIVE ASSERTION IS ONLY WORTH ITS POSITIVE CONTROL. `querySelectorAll(x).length === 0`
+    // is satisfied by a selector naming a class nothing renders, which is exactly what
+    // `.manager-empty-state` was. Mounting the real primitive and requiring the SAME constant to
+    // find it is what makes "InheritRow renders no empty state" a measurement rather than a
+    // sentence.
+    const root = await emptyStateHarness.mount({ icon: 'fas fa-inbox', title: 'Nothing here' });
+    assert.equal(
+      root.querySelectorAll(EMPTY_STATE_SELECTOR).length,
+      1,
+      `${EMPTY_STATE_SELECTOR} must match the rendered EmptyState, or every "no empty state" ` +
+        'assertion in this file is vacuous'
+    );
+  });
+});
+
 describe('InheritRow (mounted)', () => {
   before(() => inheritHarness.setup());
   after(() => inheritHarness.teardown());
@@ -157,21 +198,39 @@ describe('InheritRow (mounted)', () => {
     );
     // No header, no divider, no empty state: chrome costs more space than the one control
     // it would frame and says nothing the row does not.
+    //
+    // `.manager-empty` IS THE SHIPPED CLASS. This read `.manager-empty-state`, which occurs
+    // NOWHERE in the repository — `EmptyState.svelte` renders `class="manager-empty …"` — so
+    // the assertion could not have failed on any tree at all. The suite below mounts the real
+    // primitive and asserts this same selector MATCHES, which is what stops the negative going
+    // quietly vacuous again.
     assert.equal(root.querySelectorAll('h2, h3, h4, hr').length, 0, 'no group chrome');
-    assert.equal(root.querySelectorAll('.manager-empty-state').length, 0, 'no empty state');
+    assert.equal(root.querySelectorAll(EMPTY_STATE_SELECTOR).length, 0, 'no empty state');
   });
 
   it('draws exactly TWO rows for a tool, and none for the SEEDED section', async () => {
+    // NON-VACUITY FIRST. "A seeded section renders none" is satisfied by an EMPTY seeded list,
+    // which removes nothing — and the tool list is inert today for a second reason:
+    // `TOOL_SECTIONS` never carried `repairRequirements`, so the resolver does not read
+    // through it and the subtraction removes nothing either way. Asserting the list is
+    // non-empty and then asserting no row bears its name is what makes the negative a
+    // measurement rather than a sentence.
+    assert.ok(
+      SCOPED_SEEDED_SECTIONS.tool.length > 0,
+      'the tool seeded-section list is empty, so "a seeded section renders none" filters nothing'
+    );
     const root = await inheritHarness.mount({ entityType: 'tool' });
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')].map((row) =>
       row.getAttribute('data-scoped-inherit-row')
     );
     assert.deepEqual(rows, ['breakage', 'onBreak']);
-    assert.equal(
-      rows.includes('repairRequirements'),
-      false,
-      'a seeded section has no live parent to fall back to, so it draws no switch'
-    );
+    for (const seeded of SCOPED_SEEDED_SECTIONS.tool) {
+      assert.equal(
+        rows.includes(seeded),
+        false,
+        `${seeded} is SEEDED: it has no live parent to fall back to, so it draws no switch`
+      );
+    }
   });
 
   it('draws two rows for an essence', async () => {

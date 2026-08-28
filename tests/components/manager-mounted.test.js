@@ -14753,6 +14753,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
     assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    // EVERY WORLD LEAF CARRIES AN EXPLICIT ACCESSIBLE NAME AND ITS OWN COUNT (issue 1362).
+    //
+    // Both halves are about the COLLAPSED rail, and both are invisible at full width.
+    // `styles/fabricate.css` hides `.manager-nav-label` AND `.manager-nav-count` at 56px,
+    // leaving only an `aria-hidden` glyph — so a leaf without an `aria-label` has an EMPTY
+    // accessible name in exactly the state this epic ships a frame of. The four scoped-entity
+    // leaves shipped without one, and without the count its system sibling and every other
+    // World entry carries.
+    //
+    // The count is pinned here rather than left to a later PR because it is a ONE-WAY DOOR:
+    // `openspec/specs/ui-integration/spec.md` `### GM World Scoped Entity Routes` requirement 7
+    // bars every later PR in this epic from touching `CraftingSystemManagerRoot.svelte`, so a
+    // badge omitted now could never be added. They read 0 until a corpus exists, which is
+    // truthful — and PR 7 fills the vocabulary one from `worldScopeProjection.js`, which is not
+    // a gateway path.
+    for (const [item, label] of [
+      ['component-catalogue', 'Component catalogue'],
+      ['vocabulary', 'Tags & Categories'],
+      ['essence-catalogue', 'Essence Catalogue'],
+      ['tool-catalogue', 'Tools Catalogue'],
+    ]) {
+      const leaf = worldNavItem(item);
+      assert.ok(Boolean(leaf), `the world rail renders the ${item} leaf`);
+      assert.equal(
+        leaf.getAttribute('aria-label'),
+        label,
+        `${item} needs an explicit accessible name: the collapsed rail hides its label and its ` +
+          'count, so without one the button is unnamed at 56px'
+      );
+      assert.ok(
+        Boolean(leaf.querySelector('.manager-nav-count')),
+        `${item} needs its own count badge, as every other World entry has — and it cannot be ` +
+          'added later, because spec requirement 7 closes this file to every later PR'
+      );
+    }
     assert.equal(
       worldTravelItem('travel').querySelector('.manager-nav-label').textContent.trim(),
       'Travel'
