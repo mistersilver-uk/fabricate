@@ -4662,9 +4662,18 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     });
     if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');
 
+    // Character prerequisites are WORLD scope (issue 1308/1311): the Tool Studio
+    // Requirements tab's `prerequisiteOptions` (`ToolRequirementsTab.svelte`, threaded
+    // through `ToolEditView`) reads `selectedCharacterPrerequisites`, which is
+    // `$viewState.worldCharacterPrerequisites` — the `characterLibraries` world setting's
+    // `characterPrerequisites` list — never `getSystem(id).characterPrerequisites`. The
+    // fixture below temporarily REPLACES that world list with the 5-row parity corpus and
+    // must restore the pre-fixture world list afterward, so what is captured here for
+    // restoration is the world list, not the system's (now-unused) legacy field.
+    const worldCharacterLibraries = game.settings.get('fabricate', 'characterLibraries') || {};
     const restore = {
       tools: clone(system.tools || []),
-      characterPrerequisites: clone(system.characterPrerequisites || []),
+      characterPrerequisites: clone(worldCharacterLibraries.characterPrerequisites || []),
       toolBreakage: clone(system.toolBreakage || { authority: 'toolSpecific' }),
       recipeToolIds: clone(recipe.toolIds || []),
       recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
@@ -4691,11 +4700,16 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       value,
     }));
     await csm.updateSystem(systemId, {
-      characterPrerequisites: parityPrerequisites,
       // The parity frame owns an exact eight-row fixture. Clear the unrelated
       // smoke tools first; restoration below reinstates the original array.
       tools: [],
       toolBreakage: { authority: 'toolSpecific' },
+    });
+    // Read-modify-write: `settings.set` REPLACES the whole `characterLibraries` value, so
+    // the world modifier library seeded earlier must be spread back in rather than dropped.
+    await game.settings.set('fabricate', 'characterLibraries', {
+      ...worldCharacterLibraries,
+      characterPrerequisites: parityPrerequisites,
     });
     let { item: upsertedTool } = await csm.upsertTool(systemId, {
       id: requestedToolId,
@@ -4778,8 +4792,14 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.();
     await csm.updateSystem(systemId, {
       tools: fixture.tools,
-      characterPrerequisites: fixture.characterPrerequisites,
       toolBreakage: fixture.toolBreakage,
+    });
+    // Character prerequisites are WORLD scope; restore the pre-fixture world list rather
+    // than a system-scoped field (see the matching comment in `setupToolStudioFixture`).
+    // Read-modify-write so the world modifier library is not clobbered.
+    await game.settings.set('fabricate', 'characterLibraries', {
+      ...(game.settings.get('fabricate', 'characterLibraries') || {}),
+      characterPrerequisites: fixture.characterPrerequisites,
     });
     await rm.updateRecipe(recipeId, {
       toolIds: fixture.recipeToolIds,
@@ -7574,13 +7594,9 @@ async function main() {
           requirements: {
             currency: { enabled: true }
           },
-          // Two character prerequisites so the System Settings Character
-          // Prerequisites list renders populated for the issue-768 list-ergonomics
-          // evidence (section collapse, copy-to-modifiers).
-          characterPrerequisites: [
-            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
-            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
-          ],
+          // Character prerequisites moved to the WORLD `characterLibraries` setting
+          // alongside modifiers (issue 1308/1311) — seeded below, next to the modifier
+          // library, rather than on this system-scoped payload. See the comment there.
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -8193,14 +8209,24 @@ async function main() {
         // gathering tool gate both read `getSystem(id).tools`. Persist through the canonical
         // manager update after the Gathering fixture exists.
         //
-        // Modifiers moved to WORLD scope (issue 1308, rehomed onto its own route by issue
-        // 1311): World > Rules & Resources > Modifiers reads the `characterLibraries` world
-        // setting's `modifiers` list ONLY (`CharacterLibrariesStore#listModifiers`,
-        // `WorldModifiersTab.svelte`) — it does not fall back to `getSystem(id).modifiers`.
-        // `resolveModifierLibrary` (`src/systems/characterLibraries.js`) still unions in a
-        // system's legacy `modifiers` for worlds the 1.28.0 migration has not yet lifted, but
-        // this smoke world is created fresh under current code, so nothing exercises that
-        // fallback here — seeding only the world list is what the screen actually needs.
+        // Modifiers AND character prerequisites both moved to WORLD scope (issue 1308,
+        // rehomed onto their own World > Rules & Resources routes by issue 1311). Every
+        // screen that lists either — World > Rules & Resources > Modifiers /
+        // Character Prerequisites, and every per-activity picker fed from
+        // `selectedSystemModifiers` / `selectedCharacterPrerequisites` in
+        // `CraftingSystemManagerRoot.svelte` (Checks cards, salvage/gathering modifier
+        // pickers, and the Tool Studio Requirements tab) — reads the `characterLibraries`
+        // world setting ONLY (`CharacterLibrariesStore#listModifiers` /
+        // `#listCharacterPrerequisites`); none of them fall back to
+        // `getSystem(id).modifiers` / `.characterPrerequisites`. `resolveModifierLibrary`
+        // and `resolveCharacterPrerequisiteLibrary` (`src/systems/characterLibraries.js`)
+        // still union in a system's legacy copies for worlds the 1.28.0 migration has not
+        // yet lifted, but this smoke world is created fresh under current code, so nothing
+        // exercises that fallback here — seeding only the world lists is what every
+        // consumer actually needs. This is the FIRST write to `characterLibraries` in the
+        // run, so a plain object literal is safe; any LATER write to this setting (e.g. the
+        // Tool Studio fixture below) must read-modify-write it instead, because
+        // `settings.set` REPLACES the whole value rather than merging.
         await csm.updateSystem(systemId, {
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
@@ -8218,6 +8244,10 @@ async function main() {
               icon: 'fa-solid fa-campground',
               expression: '@skills.survival.value'
             }
+          ],
+          characterPrerequisites: [
+            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
+            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
           ]
         });
 

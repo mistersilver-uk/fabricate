@@ -439,7 +439,7 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
 });
 
-test('Phase C seeds world modifiers canonically before the settings-list action', () => {
+test('Phase C seeds world modifiers and character prerequisites canonically before the settings-list action', () => {
   const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
   const gatheringStart = HARNESS.indexOf(
     "await game.settings.set('fabricate', 'gatheringConfig'",
@@ -514,6 +514,21 @@ test('Phase C seeds world modifiers canonically before the settings-list action'
   assert.match(characterLibrariesCall, /modifiers:\s*\[/);
   assert.match(characterLibrariesCall, /smoke-mod-herbalism/);
   assert.match(characterLibrariesCall, /smoke-mod-survival/);
+  // Character prerequisites moved to WORLD scope alongside modifiers (issue 1308/1311):
+  // the base 2-entry corpus must ride the SAME characterLibraries write, not a
+  // `characterPrerequisites` key on the system-creation payload — a regression there
+  // would silently stop feeding both the World > Rules & Resources > Character
+  // Prerequisites screen and the Tool Studio Requirements tab.
+  assert.match(characterLibrariesCall, /characterPrerequisites:\s*\[/);
+  assert.match(characterLibrariesCall, /smoke-pre-trained/);
+  assert.match(characterLibrariesCall, /smoke-pre-focused/);
+
+  const systemCreationPatch = HARNESS.slice(phaseCStart, gatheringStart);
+  assert.doesNotMatch(
+    systemCreationPatch,
+    /characterPrerequisites:\s*\[/,
+    'the system-creation payload must not carry its own characterPrerequisites list any more'
+  );
 
   assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
   assert.match(beforeFirstAction, /modifierRowCount !== 2/);
@@ -1219,9 +1234,19 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
   assert.ok(HARNESS.includes('visibleToolRowCount !== 8'));
+  // Character prerequisites are WORLD scope (issue 1308/1311): the parity fixture must
+  // write the 5-row corpus through a read-modify-write `characterLibraries` settings.set
+  // AFTER the system-scoped tools/toolBreakage patch, never back onto
+  // `csm.updateSystem(systemId, { characterPrerequisites })` — that field is no longer
+  // what the Tool Studio Requirements tab (or any other screen) reads.
   assert.match(
     HARNESS,
-    /characterPrerequisites: parityPrerequisites,[\s\S]*?The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}/,
+    /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}[\s\S]*?\}\);[\s\S]*?settings\.set\('fabricate', 'characterLibraries', \{[\s\S]*?\.\.\.worldCharacterLibraries,[\s\S]*?characterPrerequisites: parityPrerequisites,/,
+  );
+  assert.doesNotMatch(
+    HARNESS,
+    /await csm\.updateSystem\(systemId, \{[\s\S]{0,40}characterPrerequisites: parityPrerequisites/,
+    'system.characterPrerequisites must not be reintroduced onto the Tool Studio updateSystem call',
   );
   assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
   assert.match(
