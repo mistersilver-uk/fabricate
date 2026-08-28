@@ -24,7 +24,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
-import { recheckWorldDefault } from '../src/systems/worldScopeImportMerge.js';
+import {
+  INCOMING_SYSTEM_TOKEN,
+  membershipKeySet,
+  mergedEntityIds,
+  mergedMembershipUnion,
+  recheckWorldDefault,
+  sliceRecords,
+} from '../src/systems/worldScopeImportMerge.js';
 
 /** One membership-union entry, in the shape the re-check consumes. */
 function member(entityId, systemId, record = {}) {
@@ -255,3 +262,104 @@ for (const scenario of [
     else assert.equal(record.id, scenario.record.id, 'and a surviving record keeps its id');
   });
 }
+
+// ---------------------------------------------------------------------------
+// The CORPUS READERS the re-check decides against
+//
+// `recheckWorldDefault` is only as honest as the corpus it is handed, and all four readers below
+// were unexercised: the suite imported one of the module's five functions. The gap was live rather
+// than cosmetic — dropping `mergedEntityIds`' INCOMING leg survives the whole acceptance suite,
+// because its addressability arms deliberately place the component in the DESTINATION alone and
+// the mirror case never existed.
+// ---------------------------------------------------------------------------
+
+/** A slice in the PERSISTED map shape. */
+function mapSlice(subKey, records) {
+  return { [subKey]: Object.fromEntries(records.map((record, index) => [`k${index}`, record])) };
+}
+
+test('sliceRecords: reads BOTH shapes and drops anything that is not a record', () => {
+  // The envelope carries arrays and the store persists maps, and this reader is what lets one
+  // corpus be assembled from both without either side converting first.
+  const records = [{ id: 'a' }, { id: 'b' }];
+  assert.deepEqual(sliceRecords({ entities: records }, 'entities'), records, 'the ARRAY form');
+  assert.deepEqual(
+    sliceRecords(mapSlice('entities', records), 'entities'),
+    records,
+    'and the persisted MAP form, whose keys are discarded'
+  );
+  assert.deepEqual(
+    sliceRecords({ entities: [null, 'x', 7, [], { id: 'a' }] }, 'entities'),
+    [{ id: 'a' }],
+    'a non-record entry is dropped rather than repaired — an array is not a record either'
+  );
+  for (const slice of [null, undefined, [], 'not a slice']) {
+    assert.deepEqual(sliceRecords(slice, 'entities'), [], 'a non-slice reads as EMPTY');
+  }
+});
+
+test('mergedEntityIds: unions the DESTINATION and the INCOMING roster', () => {
+  // THE MUTATION THIS EXISTS FOR: iterating `[persistedSlice]` alone. It survives the whole
+  // acceptance suite and would silently DECLINE every world default referencing a component the
+  // payload itself brings — which is the ordinary import, not an edge case.
+  //
+  // REDDENS WHEN: either leg is dropped. The two single-leg arms below are what make that
+  // specific: a union arm alone passes if the surviving leg happens to carry both ids.
+  const destination = { entities: [{ id: 'dest' }] };
+  const incoming = { entities: [{ id: 'inc' }] };
+
+  assert.deepEqual([...mergedEntityIds(destination, null)], ['dest'], 'the DESTINATION leg alone');
+  assert.deepEqual([...mergedEntityIds(null, incoming)], ['inc'], 'the INCOMING leg alone');
+  assert.deepEqual(
+    [...mergedEntityIds(destination, incoming)].sort(),
+    ['dest', 'inc'],
+    'and the union of the two'
+  );
+  assert.deepEqual(
+    [...mergedEntityIds(mapSlice('entities', [{ id: ' padded ' }]), { entities: [{ id: '' }] })],
+    ['padded'],
+    'ids are trimmed, a blank id names nothing, and the persisted map shape is read'
+  );
+});
+
+test('mergedMembershipUnion: the incoming half counts as ONE SYNTHETIC system', () => {
+  // The incoming records are counted under a synthetic token and NEVER under the payload's own
+  // system id, because that id names the destination's system in neither mode: copy mode has not
+  // minted one yet, and a keep-mode overwrite may have resolved an existing system by NAME.
+  //
+  // REDDENS WHEN: the incoming records carry their own `systemId` through — the token assertion
+  // fails; or when the persisted half is re-tokened too, which would erase the destination's
+  // system boundaries and make the repair-requirements constraint vacuous.
+  const union = mergedMembershipUnion(
+    { membership: [{ entityId: 'e1', systemId: 'dest-sys' }] },
+    { membership: [{ entityId: 'e1', systemId: 'payload-sys' }] }
+  );
+  assert.deepEqual(
+    union.map((entry) => [entry.entityId, entry.systemId]),
+    [
+      ['e1', 'dest-sys'],
+      ['e1', INCOMING_SYSTEM_TOKEN],
+    ],
+    'the destination keeps its own system id and the incoming record is re-tokened'
+  );
+  assert.equal(union[1].record.systemId, 'payload-sys', 'the RECORD is carried through untouched');
+
+  assert.deepEqual(
+    mergedMembershipUnion(
+      { membership: [{ entityId: 'e1' }] },
+      { membership: [{ systemId: 'payload-sys' }] }
+    ),
+    [],
+    'a persisted record with no systemId and an incoming record with no entityId are both dropped'
+  );
+});
+
+test('membershipKeySet: keys the union with the shipped separator', () => {
+  // Constraint (d) asks its question in `(componentId, systemId)` space, so this set has to agree
+  // with the store's own key derivation rather than with a second spelling of it.
+  assert.deepEqual(
+    [...membershipKeySet([{ entityId: 'c1', systemId: 'sys-a' }, { entityId: 'c1', systemId: 'sys-b' }])],
+    [membershipKey('c1', 'sys-a'), membershipKey('c1', 'sys-b')],
+    'one key per pair, derived exactly as the store derives it'
+  );
+});
