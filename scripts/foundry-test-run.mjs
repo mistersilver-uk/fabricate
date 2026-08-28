@@ -8189,11 +8189,22 @@ async function main() {
           }
         });
 
-        // Modifiers and Tools are SYSTEM-OWNED (the `craftingSystems` setting). Persist both
-        // through the canonical manager update after the Gathering fixture exists: the System
-        // Settings list reads `getSystem(id).modifiers`, while the Tools view and gathering tool
-        // gate read `getSystem(id).tools`.
+        // Tools remain SYSTEM-OWNED (the `craftingSystems` setting): the Tools view and the
+        // gathering tool gate both read `getSystem(id).tools`. Persist through the canonical
+        // manager update after the Gathering fixture exists.
+        //
+        // Modifiers moved to WORLD scope (issue 1308, rehomed onto its own route by issue
+        // 1311): World > Rules & Resources > Modifiers reads the `characterLibraries` world
+        // setting's `modifiers` list ONLY (`CharacterLibrariesStore#listModifiers`,
+        // `WorldModifiersTab.svelte`) — it does not fall back to `getSystem(id).modifiers`.
+        // `resolveModifierLibrary` (`src/systems/characterLibraries.js`) still unions in a
+        // system's legacy `modifiers` for worlds the 1.28.0 migration has not yet lifted, but
+        // this smoke world is created fresh under current code, so nothing exercises that
+        // fallback here — seeding only the world list is what the screen actually needs.
         await csm.updateSystem(systemId, {
+          tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
+        });
+        await game.settings.set('fabricate', 'characterLibraries', {
           modifiers: [
             {
               id: 'smoke-mod-herbalism',
@@ -8207,8 +8218,7 @@ async function main() {
               icon: 'fa-solid fa-campground',
               expression: '@skills.survival.value'
             }
-          ],
-          tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
+          ]
         });
 
         // Reference the deliberately-unlabelled tool from the Brew Healing Potion
@@ -9015,15 +9025,23 @@ async function main() {
           await page.waitForTimeout(150);
         }
 
-        // --- World currency configuration (#393, rehomed by #1278) ---
-        // The ladder is WORLD scope now, so this walks to World > Currency rather than a
-        // crafting system's Settings tab, and needs no participation toggle to get there: the
-        // page is ungated precisely so a GM can author the coins BEFORE any system enables
-        // them. Seed the dnd5e (actorProperty) ladder, then capture each spend strategy. The
-        // smoke world is dnd5e, so the actorInventory branch shows the no-provider callout
-        // (the pf2e provider grid needs a pf2e world, which the e2e fixtures do not ship).
+        // --- World currency configuration (#393, rehomed by #1278, folded under Rules &
+        // Resources by #1311) ---
+        // The ladder is WORLD scope now, so this walks to World > Rules & Resources > Currency
+        // rather than a crafting system's Settings tab, and needs no participation toggle to
+        // get there: the page is ungated precisely so a GM can author the coins BEFORE any
+        // system enables them. Seed the dnd5e (actorProperty) ladder, then capture each spend
+        // strategy. The smoke world is dnd5e, so the actorInventory branch shows the
+        // no-provider callout (the pf2e provider grid needs a pf2e world, which the e2e
+        // fixtures do not ship).
+        //
+        // Currency is a Rules & Resources SUBITEM (`#manager-rules-nav-currency`), not the
+        // standalone top-level `#manager-world-nav-currency` item issue 1278 originally added —
+        // issue 1311 folded it under the same group as Modifiers and Character Prerequisites,
+        // and the walk is already on that route from the modifiers capture above (the Rules
+        // submenu stays expanded), so this only needs to select the sibling subitem.
         await setManagerWindowSize(page, { width: 1280, height: 900 });
-        await page.locator('.fabricate-manager #manager-world-nav-currency').first().click();
+        await page.locator('.fabricate-manager #manager-rules-nav-currency').first().click();
         await page.waitForTimeout(300);
         const currencyCard = page.locator('.fabricate-manager [data-world-currency-units]').first();
         await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });

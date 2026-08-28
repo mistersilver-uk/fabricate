@@ -439,16 +439,13 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
 });
 
-test('Phase C seeds system modifiers canonically before the settings-list action', () => {
+test('Phase C seeds world modifiers canonically before the settings-list action', () => {
   const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
   const gatheringStart = HARNESS.indexOf(
     "await game.settings.set('fabricate', 'gatheringConfig'",
     phaseCStart
   );
-  const systemPatchStart = HARNESS.indexOf(
-    '// Modifiers and Tools are SYSTEM-OWNED',
-    gatheringStart
-  );
+  const systemPatchStart = HARNESS.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
   const systemPatchEnd = HARNESS.indexOf(
     '// Reference the deliberately-unlabelled tool',
     systemPatchStart
@@ -485,10 +482,39 @@ test('Phase C seeds system modifiers canonically before the settings-list action
     'the retired-key guard must permit nested task, drop-row, and event references'
   );
   assert.doesNotMatch(gatheringPatch, topLevelCharacterModifiers);
-  assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
-  assert.match(systemPatch, /smoke-mod-herbalism/);
-  assert.match(systemPatch, /smoke-mod-survival/);
-  assert.match(systemPatch, /tools:\s*game\.settings\.get/);
+
+  // Tools stay on the canonical `csm.updateSystem` system-scoped write; modifiers moved to the
+  // WORLD `characterLibraries` setting (issue 1308/1311) and must NOT be a key of that same
+  // `updateSystem` payload any more — a regression back onto `system.modifiers` would silently
+  // stop feeding the World > Rules & Resources > Modifiers screen, which reads the world list
+  // only.
+  const updateSystemCallStart = systemPatch.indexOf('await csm.updateSystem(systemId, {');
+  const updateSystemCallEnd = systemPatch.indexOf('});', updateSystemCallStart);
+  assert.ok(
+    updateSystemCallStart >= 0 && updateSystemCallEnd > updateSystemCallStart,
+    'the canonical csm.updateSystem tools patch must remain bounded'
+  );
+  const updateSystemCall = systemPatch.slice(updateSystemCallStart, updateSystemCallEnd);
+  assert.match(updateSystemCall, /tools:\s*game\.settings\.get/);
+  assert.doesNotMatch(
+    updateSystemCall,
+    /modifiers\s*:/,
+    'system.modifiers must not be reintroduced onto the canonical updateSystem call'
+  );
+
+  const characterLibrariesCallStart = systemPatch.indexOf(
+    "await game.settings.set('fabricate', 'characterLibraries'",
+    updateSystemCallEnd
+  );
+  assert.ok(
+    characterLibrariesCallStart > updateSystemCallEnd,
+    'the world characterLibraries modifier seed must follow the tools-only system patch'
+  );
+  const characterLibrariesCall = systemPatch.slice(characterLibrariesCallStart, systemPatchEnd);
+  assert.match(characterLibrariesCall, /modifiers:\s*\[/);
+  assert.match(characterLibrariesCall, /smoke-mod-herbalism/);
+  assert.match(characterLibrariesCall, /smoke-mod-survival/);
+
   assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
   assert.match(beforeFirstAction, /modifierRowCount !== 2/);
 });
