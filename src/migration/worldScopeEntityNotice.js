@@ -30,9 +30,11 @@ function localizeWith(localize, key, data, fallback) {
  * The one-time notice describing what the `1.30.0` migration did.
  *
  * SEVERITY IS DERIVED, not passed: a pass that merely created world entities is INFORMATIONAL,
- * while a rename, a refusal or a newly-prunable reference is something the GM has to act on and
- * is therefore a PERMANENT warning. A pass that changed nothing produces NO message at all,
- * because a notice that always fires is a notice nobody reads.
+ * while a rename, a refusal or a reference that already resolves to nothing is something the GM
+ * has to act on and is therefore a PERMANENT warning. Those references are REPORTED, never pruned
+ * - the registry's requirement 18 measures ZERO disappearing at `1.30.0` - so the notice says so
+ * in its own copy rather than implying a deletion the GM must race. A pass that changed nothing
+ * produces NO message at all, because a notice that always fires is a notice nobody reads.
  *
  * @param {object|null} report The transient `_worldScopeEntityReport`.
  * @param {(key: string, data?: object) => string|undefined} localize

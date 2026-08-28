@@ -1666,8 +1666,9 @@ class Fabricate {
     }
 
     // 1.30.0 (issue 1363): what the world-scope entity migration actually did. The composition
-    // is NOT here — the counts, the rename list, the refusals and the newly-prunable references
-    // all live in `buildWorldScopeEntityNotice`, because nothing in this file can be executed by
+    // is NOT here — the counts, the rename list, the refusals and the references that already
+    // resolve to nothing (which the pass REPORTS and never prunes) all live in
+    // `buildWorldScopeEntityNotice`, because nothing in this file can be executed by
     // a unit test and a source-text grep can pin a DISPATCH but never a SUM. What remains here is
     // the Foundry edge: the GM gate, the localizer, and the channel.
     //
@@ -5254,9 +5255,11 @@ async function runOwnedItemComponentIdentityRestamp() {
  * NORMALLY, so this pass runs on the SAME BOOT as a torn migration. The reachable sequence
  * without the gate: the three scope legs land (they precede `craftingSystems`), so the corpus
  * reads as seeded; this pass remaps, clears the map and advances its version; the next boot finds
- * an already-re-keyed `craftingSystems`, re-derives an EMPTY map, never rewrites
- * `gatheringConfig`'s old ids, and the newly-decidable basis prunes them permanently — and this
- * pass will not re-run either, because its version was advanced.
+ * an already-re-keyed `craftingSystems`, re-derives an EMPTY map, and NEVER rewrites
+ * `gatheringConfig`'s old ids — which are then permanently unrepairable, because the map that
+ * recorded what to rewrite is gone and this pass will not re-run either, its version having been
+ * advanced. (The loss is the lost DECISION RECORD, not a prune: nothing prunes those references at
+ * `1.30.0` — see the migration registry's requirement 18. They simply stop resolving, for good.)
  *
  * THE COMPARISON MUST BE `compareSemver`, NEVER A BARE JS `>=`. `migrationVersion` is a STRING
  * setting, so `migrationVersion >= '1.30.0'` is LEXICOGRAPHIC and is TRUE for `'1.4.0'` through

@@ -128,8 +128,11 @@ export function makeManagerWithScope(CraftingSystemManager, payloads = {}) {
  * given scope stores and hand back what would be persisted.
  *
  * A HAND-ROLLED STAND-IN IS LOOSER THAN THIS and would produce false passes — it will not
- * reproduce the basis-gated essence-source prune, and the whole point of the round trip is that
- * `#### D10`'s newly-decidable basis PRUNES on the first save after upgrade.
+ * reproduce the basis-gated essence-source prune, which is the ONE prune this seam performs.
+ * `#### D10`'s basis does become newly-decidable at upgrade, but it prunes no recipe, salvage or
+ * gathering reference at `1.30.0`: measured across every scenario here, ten references resolve to
+ * nothing before the migration and ZERO disappear after the round trip. So the round trip's value
+ * is that it is the REAL seam, not that it drops references — see the differential's guard arm.
  *
  * @param {object} CraftingSystemManager
  * @param {object} corpus `{ systems, recipes, gatheringConfig, componentScope, ... }`

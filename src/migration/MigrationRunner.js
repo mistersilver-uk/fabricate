@@ -660,9 +660,11 @@ const MIGRATIONS = [
     // pre-flip normalizer body as a fixture function and shows the post-flip one leaves the
     // re-minted token in place.
     downgradeLosesData: false,
-    // Reports entities created, groups merged, every rename, refusals and the newly-prunable
-    // references through the transient `_worldScopeEntityReport` field (captured and deleted
-    // by the runner below for the GM notice).
+    // Reports entities created, groups merged, every rename, refusals, the references that
+    // ALREADY resolve to nothing (reported, never pruned - see requirement 18) and the
+    // world-default sections a constraint declined, through the transient
+    // `_worldScopeEntityReport` field (captured and deleted by the runner below for the GM
+    // notice).
     migrate: (data) => migrateWorldScopeEntities(data),
   },
   // Future migrations added here in version order
@@ -1020,8 +1022,9 @@ export class MigrationRunner {
 
     // 1.30.0 reports what the world-scope entity migration did (issue 1363): entities created
     // per type, groups merged, EVERY rename with its two systems, the `(system, entityType)`
-    // pairs it REFUSED to re-key, and the references the newly-decidable Valid Id Basis will
-    // prune on the next save. Captured for the GM notice and stripped so the transient field is
+    // pairs it REFUSED to re-key, and the references that ALREADY resolve to nothing — which the
+    // pass REPORTS and does not prune; they become prunable only at the consumer sweep, per the
+    // registry's requirement 18. Captured for the GM notice and stripped so the transient field is
     // never persisted — the loop above spread-merges a migration's return into the DATA payload
     // rather than into this summary, so a report can only travel this way.
     let worldScopeEntityReport = null;
