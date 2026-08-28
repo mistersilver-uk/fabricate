@@ -1920,6 +1920,9 @@
           "IssueAlchemySignatureCollision": "Two recipes share an ingredient signature, so alchemy attempts are ambiguous."
         },
         "Nav": {
+          "ComponentRules": "Component Rules",
+          "EssenceRules": "Essence Rules",
+          "ToolRules": "Tool Rules",
           "Systems": "Crafting Systems",
           "SystemsShort": "Systems",
           "Components": "Components",
@@ -5742,6 +5745,23 @@
           "RolePlayer": "Player"
         },
         "Scoped": {
+          "ComponentCatalogueTitle": "Component catalogue",
+          "ComponentCatalogueSubtitle": "One Component per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.",
+          "ComponentEntryTitle": "Component entry",
+          "ComponentEntrySubtitle": "Identity, the world category and tags, and a row per crafting system that has this Component.",
+          "EssenceCatalogueTitle": "Essence Catalogue",
+          "EssenceCatalogueSubtitle": "One Essence per world, shared by every system. The world sets the effect source and the property macro; each system inherits them or overrides its own.",
+          "EssenceEntryTitle": "Essence entry",
+          "EssenceEntrySubtitle": "Identity and the two world defaults, each stating how many systems inherit it before the change lands.",
+          "ToolCatalogueTitle": "Tools Catalogue",
+          "ToolCatalogueSubtitle": "One Tool per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.",
+          "ToolEntryTitle": "Tool entry",
+          "ToolEntrySubtitle": "Identity, the three world-default sections and the world break mode, with a row per crafting system that has this Tool.",
+          "VocabularyTitle": "Tags & Categories",
+          "VocabularySubtitle": "Component categories, Component tags and recipe categories, each with a usage count and a deletion warning naming how many inheriting rule sets are affected.",
+          "Placeholder": {
+            "Body": "The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next."
+          },
           "Sections": {
             "Category": "Category",
             "EffectSource": "Effect source",

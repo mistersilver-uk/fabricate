@@ -9547,6 +9547,113 @@
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
+/* The seven world scoped-entity routes (issue 1362, epic 1357) release the third column.
+   Each is a single authored surface — a catalogue, an entry editor or the World Vocabulary —
+   with nothing to put in an inspector, so the aside is suppressed in
+   `CraftingSystemManagerRoot.svelte` and the column released here. Those two are ONE decision
+   and `tests/manager-full-width-gate.test.js` asserts them against each other by selector
+   string, which is what stops this pair drifting the way `checks` (issue 1096) and
+   `world-currency` (issue 1311) each did.
+
+   SELECTORS ARE GROUPED. The gate parses a group exactly as it parses a singleton, and
+   fourteen near-identical blocks is churn in the one file no later lane in this epic may
+   reopen. */
+.fabricate-manager[data-manager-view="world-components"] .manager-body,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-essences"] .manager-body,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-tools"] .manager-body,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* EQUAL SPECIFICITY, or the collapse no-ops. `.manager-body.is-rail-collapsed` beats a
+   single-class rule, so a released column with no collapsed sibling silently snaps back to
+   three tracks the moment the GM collapses the rail. The gate requires both. */
+.fabricate-manager[data-manager-view="world-components"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-essences"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-tools"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+/* THE ROWS OVERRIDE SITS ON `.manager-main`, not on `.manager-body`, which declares no
+   `grid-template-rows` at all — writing it there would be inventing a row model for every
+   route that shares the base rule. The page owns one scrolling region: the header is chrome
+   above it, and the placeholder (and later the catalogue) is the single row inside it. */
+.fabricate-manager[data-manager-view="world-components"] .manager-main,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-essences"] .manager-main,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-tools"] .manager-main,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
+}
+
+/* The placeholder body. It states what is not built yet and draws no facsimile of the editor
+   that is coming: a disabled control is a promise about a shape nobody has designed. */
+.fabricate-manager .manager-scoped-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* The inherit row set (issue 1362). NO GROUP CHROME — no header, no divider, no empty state —
+   because a one-section entity draws exactly one row, and chrome around a single control costs
+   more vertical space than the control it frames. */
+.fabricate-manager .manager-scoped-inherit-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2) 0;
+}
+
+.fabricate-manager .manager-scoped-inherit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-inherit-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-scoped-inherit-note {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--fab-text-muted);
+}
+
+/* The membership action cluster. It wraps rather than overflowing, because the tool path
+   carries one more control than the component path and the rail column is the narrowest
+   place either is rendered. */
+.fabricate-manager .manager-scoped-membership-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
 /* World > Parties owns the entire content column: the card editor makes the former
    inspector redundant. The route marker comes from the root so World does not release
    its column for any future world surface by accident. This list and the root's
