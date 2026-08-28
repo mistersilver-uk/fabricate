@@ -45,8 +45,10 @@
  *
  * The maintainer's ruling extends `#### D3`'s oldest-wins rule from IDENTITY to BEHAVIOUR: six
  * sections take a world default from the OLDEST contributing system, the same donor that wins
- * identity. Two are deliberately excluded for two DIFFERENT reasons, and four constraints can
- * decline an individual section. `worldScopeDefaults.js` states all of it and owns the election.
+ * identity. Two are deliberately excluded for two DIFFERENT reasons, and FIVE constraints can
+ * decline an individual section - CONSTRAINT 0, which requires that EVERY LIVE MEMBER of the group
+ * authored the section, plus four addressability rules. `worldScopeDefaults.js` states all of it
+ * and owns the election.
  *
  * NOTHING RESOLVES THROUGH THEM AT MIGRATION TIME, which is why the corpus differential is
  * unchanged by them: every membership record is still created fully OVERRIDING every section with
@@ -54,7 +56,16 @@
  * an override a GM clears later - which is exactly the state the catalogue editors exist to fill.
  *
  * A world default a CONSTRAINT declined is reported as `refusedDefaultSections`, distinct from a
- * section the donor simply never authored: a GM can act on the first and not on the second.
+ * section the donor simply never authored. **THAT FIELD IS A DIAGNOSTIC, NOT A GM-FACING FACT, AND
+ * IT IS DELIBERATELY ABSENT FROM THE NOTICE.** An earlier form of this note said a GM could act on
+ * it; CONSTRAINT 0 makes decline the DOMINANT class, so surfacing it would fire on nearly every
+ * migrated world - which `worldScopeEntityNotice.js` rejects by name, because a notice that always
+ * fires is a notice nobody reads, and the severity derivation would flip almost every pass to a
+ * PERMANENT warning. It is also not actionable at `1.30.0`: nothing resolves through a world
+ * default until the consumer sweep, so a declined section has NO observable consequence in the
+ * GM's world, and the remedy once the catalogue editors ship is to author the world default
+ * directly rather than to backfill the section in every member system. It is carried on the
+ * transient report for the acceptance suite and for the editors of PRs 6a-c.
  */
 
 import { electWorldDefault } from './worldScopeDefaults.js';
@@ -626,7 +637,8 @@ export function migrateWorldScopeEntities(data) {
     // ZERO on a correctly ordered pass. See the fourth-target walk above.
     payloadRewriteRepairs,
     // The world-default sections a CONSTRAINT declined, distinct from the ones the donor simply
-    // did not author. A GM can act on the first and not on the second.
+    // did not author. A DIAGNOSTIC, not a GM-facing fact: see the module note for why it is kept
+    // out of the notice rather than added to it.
     refusedDefaultSections,
   };
 

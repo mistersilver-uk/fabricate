@@ -1993,7 +1993,8 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > It binds now, and the consumer sweep of epic 1357 is what will read through it.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
-> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and four constraints can decline an individual section.
+> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
+> The first of the five is the every-live-member precondition on `category`, `breakage` and `onBreak` — the three sections a membership record cannot express an empty override for — and `### Component scope` and `### Tool scope` each state it for their own.
 > Every membership record is nevertheless created fully OVERRIDING, so NO section resolves through the world layer at migration time and resolved behaviour is unchanged — a world default matters only for a system added later, or an override a GM clears later.
 >
 > **STILL NOT LIVE after `1.30.0`**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
@@ -2189,7 +2190,8 @@ SystemMembershipRecord = {
 Each membership record carries its own system's `category` VERBATIM — that is an override, and `general` is a legitimate stored token there — and its own `tags`, with no `mutedTags`.
 
 **The WORLD default `category` IS written, elected from the OLDEST contributing system**, and requirement 2's `general` prohibition binds that election directly: a world `category` is never the reserved bucket, because an absence-preserving world category that minted it would reset every inheriting system on the first resolve.
-It is also declined outright whenever any member system left the section unauthored, because a membership record cannot express an empty `category` override — `coerceComponentSection` coerces `''` to absence, and an absent section under an `inherit: false` switch falls back to the world value by requirement 12's own rule.
+It is also declined outright whenever any member system left the section unauthored, because a membership record cannot express an empty `category` override — `coerceComponentSection` coerces `''` to absence, and an absent section under an `inherit: false` switch falls back to the world value by requirement 2 of `## Scoped Entity Definitions`.
+`### Tool scope` declines `breakage` and `onBreak` on the same rule, for a related but not identical reason: those two are inexpressible as an empty override because they collide by NAME with the surviving in-system record, where `category`'s coercion forecloses it first.
 
 **The WORLD `tags` are left UNAUTHORED, and for a DIFFERENT reason** that must not be conflated with the one above: requirement 3's tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once whoever the donor is.
 That hazard is independent of which system authored the list, which is why no donor rule can rescue it; requirement 3 therefore binds the world catalogue EDITOR rather than the migration.
@@ -2239,13 +2241,24 @@ That hazard is independent of which system authored the list, which is why no do
    **The binding constraint on the migration (epic 1357, PR 3):**
    a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
    The `1.30.0` migration WRITES a world `effectSource` default, elected from the OLDEST contributing system, and this constraint is what decides whether it may: the donor's value is lifted only when EVERY reference it carries is world-addressable — a document UUID, or a component id in the world roster — and is DECLINED outright otherwise.
-   Independently of that, `effectSource` is written onto EVERY membership record as an override with the switch OFF, world-addressable or not, and that write is UNCONDITIONAL: an absent section under an `inherit: false` switch falls back to the world value by requirement 12's own rule, so an absence-preserving write would silently hand a system that authored nothing the donor's source.
-   An empty `{}` is a real overriding value every reader treats as "no source", which is what makes the unconditional write expressible here and not for `category`.
+   Independently of that, `effectSource` is written onto EVERY membership record as an override with the switch OFF, world-addressable or not, and that write is UNCONDITIONAL: an absent section under an `inherit: false` switch falls back to the world value by requirement 2 of `## Scoped Entity Definitions`, so an absence-preserving write would silently hand a system that authored nothing the donor's source.
+   An empty `{}` is a real overriding value every reader treats as "no source", which is what makes the unconditional write expressible here and not for `category` or for `### Tool scope`'s `breakage` and `onBreak`.
+   `effectSource` and `macro` are NEW section names that collide with nothing on the in-system record, so writing them can never overwrite a live in-system block through requirement 15's read union — which is the property the other three lack, and why those take an every-member precondition on their world default instead of an unconditional membership write.
    So a non-world-addressable referent still reaches the system side exactly as this requirement mandates; what changes is that a world-addressable one ALSO seeds the world default.
    Essences group by trimmed `id` and their ids are NEVER re-keyed, so no essence reference is rewritten by that pass and its re-key map carries no essence leg.
    Nothing further is needed for the membership case: a member system that is not a member of the referenced world component resolves the source, fails to resolve the component, and lands in `## EssenceDefinition` requirement 4's retained-evidence state — the REFUSAL requirement 15's basis union exists to preserve, never a prune.
 
 ### Tool scope
+
+**What the `1.30.0` migration writes here, and the precondition on the two inherited sections.**
+Each membership record carries its own system's `breakage`, `onBreak` and seeded `repairRequirements` verbatim, and all three ALSO take a WORLD default, elected from the OLDEST contributing system wherever the migration registry's constraints permit.
+**`breakage` and `onBreak` are DECLINED outright whenever any member system of the group left the section unauthored**, on the same rule `### Component scope` states for `category`, and the rule is stated here too rather than left to be inferred from there.
+A membership record cannot express an EMPTY `breakage` or `onBreak` override, so a member that authored neither carries an ABSENT section, and an absent section under an `inherit: false` switch resolves to the WORLD value by requirement 2 of `## Scoped Entity Definitions` — which would hand that member the donor's breakage mode or on-break action.
+
+**Why an empty override is inexpressible for these two, which is the fact the decline rests on.**
+`breakage` and `onBreak` are spelled IDENTICALLY at world scope and on the shipped in-system `Tool` record, and requirement 15's read union spreads the RESOLVED sections LAST over that in-system record.
+An override of `{}` would therefore ERASE a live in-system block rather than mean "no breakage", and `## CraftingSystem` requirement 36 keeps the in-system record authoritative until the consumer sweep, so that block is still where a GM's post-migration edits land.
+`### Essence scope`'s `effectSource` and `macro` escape all of this because they are NEW section names that collide with nothing on the in-system record, which is why requirement 5 there can mandate an UNCONDITIONAL write instead; `repairRequirements` escapes it because requirement 2 below answers it from the membership record alone.
 
 1. There are THREE tool world-default sections, TWO of them inherited.
    `breakage` and `onBreak` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage` and `Tool.onBreak` unchanged; `repairRequirements` is the third and is SEEDED rather than inherited.

@@ -25,9 +25,19 @@
  * WORLD value - that is a stated requirement, not an accident, because an absent section is not a
  * partial one. So a membership record that omits a section still falls back. `buildMembershipRecord`
  * is necessarily absence-preserving for `category`, `breakage` and `onBreak`, because NONE of the
- * three can express an empty override: `coerceComponentSection` coerces `''` to absence, and a
- * `breakage: {}` or `onBreak: {}` IS an override but one the read union spreads LAST over the
- * surviving in-system block, handing every reader a shape it mis-reads.
+ * three can express an empty override - and the reason differs between them.
+ *
+ * `coerceComponentSection` coerces `''` to absence, so an empty `category` is unstorable outright.
+ * `breakage: {}` and `onBreak: {}` ARE storable overrides, and the objection to them is a NAME
+ * COLLISION: both keys are spelled identically at world scope and on the shipped in-system `Tool`,
+ * and `unionScopedDefinitions` spreads the RESOLVED sections LAST over the surviving in-system
+ * record (`src/systems/scopedDefinitionStore.js`), so `{}` would OVERWRITE a live in-system block
+ * rather than mean "no breakage". The in-system arrays stay authoritative until the consumer sweep
+ * (`## CraftingSystem` requirement 36), so that block is where a GM's post-migration edits land.
+ * The read union has NO PRODUCTION CONSUMER at `1.30.0`, so this is a hazard the sweep would
+ * inherit rather than one any reader meets today - which is why it is designed out here, at the
+ * only moment the whole corpus is in hand, rather than left for the release that first reads
+ * through the union to discover.
  *
  * A world default for a section some member left unauthored would therefore CHANGE THAT MEMBER'S
  * RESOLVED BEHAVIOUR at migration time - silently handing it the donor's category, breakage mode
