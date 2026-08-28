@@ -273,21 +273,37 @@ test('the map image is DISJOINT from its key set on every accepted pair', () => 
 });
 
 test('the OUTPUT-uniqueness post-condition refuses a pair disjointness alone would allow', () => {
-  // `sys-b`'s `keep` is NOT re-keyed, and `move` would be re-keyed ONTO it. The map
-  // `{move: keep}` is perfectly disjoint — its image `keep` is not one of its keys — yet the
-  // pair would emit two definitions with the id `keep`, which is silently last-wins in both
-  // index builders and makes one of them unreachable with no error.
+  // TWO definitions in ONE system pointing at the SAME source item. They are one world entity,
+  // so `q` is re-keyed onto `p` — and the map `{q: p}` is PERFECTLY DISJOINT, because its image
+  // `p` is not one of its keys. Yet the pair would emit two definitions with the id `p`, which
+  // is silently last-wins in both index builders and makes one of them unreachable with no
+  // error. Only a post-condition on the OUTPUT can see it.
+  //
+  // THE FIXTURE MATTERS AND AN EARLIER ONE WAS VACUOUS: a cross-system collision that also
+  // re-keys the colliding id is caught by the disjointness check FIRST, so it proves nothing
+  // about this post-condition and survives its removal.
   const grouping = buildWorldScopeGrouping([
+    system('sys-a', { components: [component('p', ['Item.x']), component('q', ['Item.x'])] }),
+  ]);
+  assert.deepEqual(
+    grouping.refusals,
+    [{ systemId: 'sys-a', entityType: 'components', reason: 'outputIdCollision' }],
+    'the pair must be REFUSED on its OUTPUT, and for that reason rather than for disjointness'
+  );
+  assert.ok(isRefusedPair(grouping.refusals, 'sys-a', 'components'));
+  assert.equal(grouping.rekeyMap['sys-a'], undefined, 'a refused pair contributes no map at all');
+
+  // The DISJOINTNESS refusal is a genuinely different case, and is pinned separately so neither
+  // check can be deleted behind the other.
+  const nonDisjoint = buildWorldScopeGrouping([
     system('sys-a', { components: [component('keep', ['Item.a'])] }),
     system('sys-b', {
       components: [component('move', ['Item.a']), component('keep', ['Item.b'])],
     }),
   ]);
-  assert.ok(
-    isRefusedPair(grouping.refusals, 'sys-b', 'components'),
-    'the pair must be REFUSED on its OUTPUT, not merely checked on its input'
-  );
-  assert.equal(grouping.rekeyMap['sys-b'], undefined, 'a refused pair contributes no map at all');
+  assert.deepEqual(nonDisjoint.refusals, [
+    { systemId: 'sys-b', entityType: 'components', reason: 'nonDisjointMap' },
+  ]);
 });
 
 test('a refusal in one system does not refuse the others', () => {

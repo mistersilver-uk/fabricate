@@ -573,6 +573,24 @@ export function scenarioSpecs() {
       }),
     },
     {
+      // TWO definitions in ONE system pointing at the SAME source item. Its map is DISJOINT and
+      // its OUTPUT collides, so only the output-uniqueness post-condition refuses it.
+      name: 'two definitions in one system sharing a source item',
+      raw: buildRawCorpus({
+        seed: 99,
+        systems: [
+          {
+            id: 'sys-a',
+            components: [
+              { id: 'comp-p', refs: [uuidA] },
+              { id: 'comp-q', refs: [uuidA] },
+            ],
+            tools: [],
+          },
+        ],
+      }),
+    },
+    {
       name: 'empty arrays and a system with nothing at all',
       raw: buildRawCorpus({
         seed: 88,

@@ -23,6 +23,10 @@ import test from 'node:test';
 
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
 import { buildWorldScopeGrouping } from '../src/migration/worldScopeEntityGrouping.js';
+import { COMPONENT_SCOPE } from '../src/systems/componentScope.js';
+import { ESSENCE_SCOPE } from '../src/systems/essenceScope.js';
+import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
+import { TOOL_SCOPE } from '../src/systems/toolScope.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 import {
   installFoundryStubs,
@@ -303,18 +307,107 @@ test('post-conditions: ids are unique per (system, entityType), references resol
 test('the drift detector is EMPTY on the migration own output, for every corpus in the Inputs set', () => {
   for (const scenario of scenarioSpecs()) {
     const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
-    const { migrated } = migrateAndSave(before);
-    const drift = reportWorldIdentityDrift(migrated.systems, {
+    const { migrated, saved } = migrateAndSave(before);
+    const scopeCorpus = {
       components: migrated.componentScope,
       essences: migrated.essenceScope,
       tools: migrated.toolScope,
-    });
+    };
     assert.deepEqual(
-      drift,
+      reportWorldIdentityDrift(migrated.systems, scopeCorpus),
       [],
       `${scenario.name}: the two copies must be EQUAL at migration time — that claim is what makes the deferred shed reconcilable`
     );
+    // AND ACROSS THE ROUND TRIP, which is the arm that catches a normalizer that stops emitting
+    // a lifted key. Comparing two re-normalized corpora cannot see that: both legs lose the key
+    // together and stay equal. The world entity does NOT go through the normalizer, so it still
+    // carries the field, and the drift detector reports exactly that asymmetry.
+    assert.deepEqual(
+      reportWorldIdentityDrift(saved.systems, scopeCorpus),
+      [],
+      `${scenario.name}: the normalize-and-save round trip must PRESERVE every lifted identity field`
+    );
   }
+});
+
+test('every membership record OVERRIDES every section, with the system own value VERBATIM', () => {
+  // THE ARM THAT CATCHES AN OMITTED SECTION OVERRIDE, and it cannot be stated through
+  // `buildMembershipRecord` — a rebuild-and-compare would omit the same section on both sides
+  // and stay green. It reads the SECTION SOURCES off the in-system record independently, and
+  // resolves the membership record with NO world default, which is exactly the state the
+  // migration leaves the world in.
+  const SECTION_SOURCES = {
+    components: {
+      category: (record) =>
+        typeof record.category === 'string' && record.category.trim()
+          ? record.category.trim()
+          : undefined,
+    },
+    essences: {
+      effectSource: (record) => {
+        const source = {};
+        for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
+          if (record[field] !== undefined) source[field] = record[field];
+        }
+        return source;
+      },
+      macro: (record) => record.propertyMacroUuid,
+    },
+    tools: {
+      breakage: (record) => record.breakage,
+      onBreak: (record) => record.onBreak,
+    },
+  };
+  const SCOPES = { components: COMPONENT_SCOPE, essences: ESSENCE_SCOPE, tools: TOOL_SCOPE };
+  const FIELDS = { components: 'components', essences: 'essenceDefinitions', tools: 'tools' };
+  let checked = 0;
+
+  for (const scenario of scenarioSpecs()) {
+    const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
+    const { migrated } = migrateAndSave(before);
+    for (const [entityType, payloadKey] of [
+      ['components', 'componentScope'],
+      ['essences', 'essenceScope'],
+      ['tools', 'toolScope'],
+    ]) {
+      const payload = migrated[payloadKey];
+      if (!payload?.membership) continue;
+      for (const membership of Object.values(payload.membership)) {
+        const system = migrated.systems.find((entry) => entry.id === membership.systemId);
+        const record = (system?.[FIELDS[entityType]] ?? []).find(
+          (entry) => entry.id === membership.entityId
+        );
+        assert.ok(record, `${scenario.name}: ${membership.entityId} has no in-system record`);
+        const resolved = resolveScopedDefinition(null, membership, SCOPES[entityType]);
+        for (const [section, sourceOf] of Object.entries(SECTION_SOURCES[entityType])) {
+          assert.equal(
+            resolved.inherited[section],
+            false,
+            `${scenario.name}: ${membership.entityId}/${membership.systemId}.${section} must NOT inherit`
+          );
+          assert.deepEqual(
+            resolved[section] ?? null,
+            sourceOf(record) ?? null,
+            `${scenario.name}: ${membership.entityId}/${membership.systemId}.${section} must resolve to the system OWN value, verbatim`
+          );
+          checked += 1;
+        }
+        if (SCOPES[entityType].enableable) {
+          assert.equal(resolved.enabled, record.enabled !== false);
+        }
+        if (entityType === 'tools') {
+          assert.deepEqual(
+            membership.repairRequirements ?? [],
+            record.repairRequirements ?? [],
+            `${scenario.name}: the SEEDED repairRequirements are copied verbatim`
+          );
+        }
+      }
+    }
+  }
+  // ANTI-VACUITY: a loop that examined nothing reports the same clean pass as one that examined
+  // every record.
+  assert.ok(checked > 40, `the arm must actually examine sections (${checked})`);
 });
 
 // ---------------------------------------------------------------------------
