@@ -10,6 +10,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { effectiveToolBreakageAuthority } from '../src/systems/toolBreakageAuthority.js';
 
 // Minimal stubs so the module can load without a Foundry runtime.
 let idCounter = 0;
@@ -325,16 +326,38 @@ test('_normalizeSystem preserves the complete canonical Tool shape and strips Ki
   assert.equal('kind' in tool, false);
 });
 
-test('_normalizeSystem defaults toolBreakage.authority to toolSpecific when absent', () => {
+// THE FLIP (issue 1363, epic 1357, PR 3). This normalizer used to MINT `toolSpecific` for an
+// absent or unrecognised authority on every normalize, which meant every persisted system carried
+// a concrete value and the WORLD half of `resolveToolBreakageAuthority` was provably unreachable.
+// It is ABSENCE-PRESERVING now: no key at all. The shipped read-shape guarantee that a system with
+// no persisted `toolBreakage` READS AS `toolSpecific` is preserved — but by the RESOLVER, which is
+// where the world value can be consulted, rather than by minting a value the corpus cannot tell
+// apart from a GM's deliberate choice.
+test('_normalizeSystem emits NO toolBreakage key at all when none was authored', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S' });
-  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+  assert.equal('toolBreakage' in system, false, 'an unauthored authority must not be minted');
 });
 
-test('_normalizeSystem coerces an unknown toolBreakage.authority to toolSpecific', () => {
+test('_normalizeSystem drops an unknown toolBreakage.authority rather than coercing it', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'bogus' } });
-  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+  assert.equal('toolBreakage' in system, false);
+});
+
+test('the shipped read shape survives the flip: no authored authority still RESOLVES as toolSpecific', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 's', name: 'S' });
+  // `## CraftingSystem` requirement 21's guarantee, now answered where the world half can be
+  // consulted. With no world value authored the answer is bit-identical to the pre-flip mint.
+  assert.equal(effectiveToolBreakageAuthority(system, null), 'toolSpecific');
+  assert.equal(effectiveToolBreakageAuthority(system, {}), 'toolSpecific');
+  // …and the world half is REACHABLE for the first time, which is the whole point of the flip.
+  assert.equal(
+    effectiveToolBreakageAuthority(system, { authority: 'checkDriven' }),
+    'checkDriven',
+    'a system that authored nothing inherits the world authority'
+  );
 });
 
 test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {

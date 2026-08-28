@@ -249,13 +249,14 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   const summary = await runner.run();
 
-  // SEVEN, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
+  // EIGHT, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
   // the routed DC-source downgrade boundary, issue 1098's 1.25.0 seeds the failure-result
   // policy, issue 1278's 1.26.0 lifts currency to world scope, issue 1282's 1.27.0 lifts travel,
   // issue 1308's 1.28.0 lifts both character libraries, and issue 1315's 1.29.0 folds manual
-  // force lists into their picked lists; the runner counts every entry it applies.
-  assert.equal(summary.ran, 7);
-  assert.equal(store.get('migrationVersion'), '1.29.0');
+  // force lists into their picked lists, and issue 1363's 1.30.0 lifts components, essences and
+  // tools to world scope; the runner counts every entry it applies.
+  assert.equal(summary.ran, 8);
+  assert.equal(store.get('migrationVersion'), '1.30.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

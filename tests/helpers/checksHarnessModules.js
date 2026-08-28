@@ -96,6 +96,14 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // evaluator reads like over-filling; it is not, and the check is mechanical — drop any
   // one of them and the checks suites HANG rather than fail.
   'src/toolBreakageRuntime.js',
+  // Issue 1363 (epic 1357, PR 3): `toolBreakageRuntime.js` now resolves the EFFECTIVE
+  // tool-breakage authority through the world scope rather than re-defaulting locally, so its
+  // closure gains the resolver and the two pure scope modules underneath it. Mechanical, like
+  // every entry in this block: drop one and the suite HANGS rather than fails.
+  'src/systems/toolBreakageAuthority.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedDefinitionStore.js',
   'src/config/flags.js',
   'src/config/stackQuantityPathPresets.js',
   'src/models/Ingredient.js',

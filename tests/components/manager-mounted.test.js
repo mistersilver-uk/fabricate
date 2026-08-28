@@ -817,6 +817,14 @@ function compileManagerRoot() {
     // rather than failing one. It imports nothing, so this entry closes the graph.
     'src/config/playerCharacterTypes.js',
     'src/toolBreakageRuntime.js',
+    // Issue 1363 (epic 1357, PR 3): `toolBreakageRuntime.js` now resolves the EFFECTIVE
+    // tool-breakage authority through the world scope rather than re-defaulting locally, so its
+    // closure gains the resolver and the two pure scope modules underneath it. Mechanical, like
+    // every entry in this block: drop one and the suite HANGS rather than fails.
+    'src/systems/toolBreakageAuthority.js',
+    'src/systems/toolScope.js',
+    'src/systems/scopedDefinitions.js',
+    'src/systems/scopedDefinitionStore.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
