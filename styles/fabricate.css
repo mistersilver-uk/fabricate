@@ -9622,9 +9622,12 @@
   overflow-y: auto;
 }
 
+/* THE TRACK IS THE IMAGE'S OWN WIDTH, and the third track is `max-content`, both matching the
+   converted tool site below. A 44px track under a 46px image overflows its own column by 2px
+   and eats the `--fab-space-2` gap; an `auto` third track is free to grow past its content. */
 .fabricate-manager .manager-scoped-preview-identity {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 46px minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
@@ -9638,8 +9641,21 @@
   object-fit: cover;
 }
 
+/* THE MIDDLE CHILD IS AN UNCLASSED `<div>` AND A GRID ITEM, so its `min-width: auto` resolves
+   to the min-content width of the `h3` below — which carries `white-space: nowrap`. Without
+   this it overflows the `minmax(0, 1fr)` track and the ellipsis pair on the heading can never
+   take effect: a long world entity name blows the identity row out of the aside instead of
+   truncating inside it. The converted tool site carries the same rule for the same reason. */
+.fabricate-manager .manager-scoped-preview-identity > div {
+  min-width: 0;
+}
+
+/* The serif family is the prototype's, and it is the type authority for this heading; the
+   converted tool site below carries it too, so a scoped editor that used the default stem
+   would otherwise render its identity title in the body face. */
 .fabricate-manager .manager-scoped-preview-identity h3 {
   margin: 0;
+  font-family: var(--fab-font-serif);
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--fab-mv2-text);
@@ -9677,16 +9693,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  min-width: 0;
-}
-
-/* The placeholder body. It states what is not built yet and draws no facsimile of the editor
-   that is coming: a disabled control is a promise about a shape nobody has designed. */
-.fabricate-manager .manager-scoped-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
   min-width: 0;
 }
 

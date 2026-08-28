@@ -32,6 +32,13 @@
    - titleKey / titleFallback: the screen's name, resolved here for the `<main>` accessible
      name. NOT rendered inside the empty state — the `<h1>` above already shows it.
    - icon: the empty state's glyph.
+
+  ITS ONE RULE IS SCOPED HERE, not in `styles/fabricate.css`. The class is STATIC, so Svelte can
+  prove the selector is used and `lint:svelte:warnings` stays at zero — the dynamic-class reason
+  that keeps `ScopedEntityPreview`'s stem in the global sheet does not apply to it. It matters
+  because `### GM World Scoped Entity Routes` requirement 7 closes that stylesheet to PRs 6a, 6b,
+  6c and 7 — the four lanes that DELETE these pages — so a rule left there would outlive its only
+  subject as an orphan no epic PR is permitted to remove.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -47,7 +54,7 @@
   const title = $derived(text(titleKey, titleFallback));
 </script>
 
-<main class="manager-main manager-scoped-main" data-scoped-page={pageId} aria-label={title}>
+<main class="manager-main" data-scoped-page={pageId} aria-label={title}>
   <section class="manager-scoped-placeholder">
     <EmptyState
       {icon}
@@ -61,3 +68,15 @@
     />
   </section>
 </main>
+
+<style>
+  /* The placeholder body. It states what is not built yet and draws no facsimile of the editor
+     that is coming: a disabled control is a promise about a shape nobody has designed. */
+  .manager-scoped-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+  }
+</style>
