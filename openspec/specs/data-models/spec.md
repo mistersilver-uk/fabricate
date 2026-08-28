@@ -2001,6 +2001,12 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > **What the CONSUMER SWEEP (PR 8a, the READ repointing half) retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and `## CraftingSystem` requirement 36 states which and why.
 > The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
 > The READ union's no-production-consumer state likewise persists past `1.30.0` and is retired by the sweep, so `## Component`, `## EssenceDefinition` and `## Tool` still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does.
+>
+> **EXPOSED BUT UNREACHABLE** as of issue 1362, and this is a state of its own rather than a variant of the others: a WRITER now exists in `src/`.
+> `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
+> Nothing in `src/` CALLS it: every world scoped-entity route this repository renders is a placeholder, so no GM can reach one.
+> The READ union is untouched by this and keeps no production consumer.
+> Stated explicitly because the difference matters to the next reader in exactly one direction: a GM cannot author a world entity today, and code that could is nevertheless present and binding.
 
 ### Purpose
 
@@ -2173,6 +2179,13 @@ SystemMembershipRecord = {
     The basis is the UNION of the two id sets, and `null` only when the store is unseeded AND the in-system array is empty.
     Deriving it from `isSeeded()` alone returns `null` on every unmigrated client for every system and silently disables every reference prune in the corpus; deriving it from the in-system array alone is the failure this contract exists to prevent.
 
+    **THE FIRST GM-AUTHORED WORLD ENTITY FLIPS `isSeeded()`, AND THAT IS A BASIS INPUT.**
+    Issue 1362 ships the first writer that is not the migration, so `isSeeded("entities")` can now become true on a world that has never been migrated: `worldScope.<type>.createEntity` persists the setting, and the write replicates to every client.
+    The basis stays KNOWN-COMPLETE across that transition, and it is worth stating why rather than leaving a destructive-prune gate to be re-derived.
+    The basis is the UNION of the world set with the system's SURVIVING legacy array, so the moment the world half starts vouching the legacy half has not stopped: a world that authors one component still carries every in-system component it had, and both id sets are in the basis.
+    The predicate is PER SUB-KEY, so a component write cannot vouch for essences or tools — each entity type has its own setting and its own `isSeeded("entities")`.
+    What a GM cannot do is empty the basis by authoring into it.
+
     **NO CONSUMER MAY DEFAULT THE BASIS TO AN EMPTY SET.**
     That is the same defect as an omitted argument, and it re-arms exactly the failure the basis exists to prevent.
     The rule binds every destructive pass, including the ones that BYPASS the crafting-system normalizer — a mutation-time path that rebuilds an in-system-only basis of its own is the shape this has already been got wrong in once.
@@ -2238,7 +2251,7 @@ That hazard is independent of which system authored the list, which is why no do
    `repairRequirements` cannot be a live parent because ingredient groups are named over the OWNING SYSTEM's components, which world scope cannot address.
    `effectSource` escapes that only because THIS SECTION makes components a world entity: `sourceItemUuid` is a world document UUID and is globally addressable already, and `sourceComponentId` is world-addressable exactly when it names a WORLD component.
 
-   **The binding constraint on the migration (epic 1357, PR 3):**
+   **The binding constraint on EVERY WRITER, not only the migration:**
    a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
    The `1.30.0` migration WRITES a world `effectSource` default, elected from the OLDEST contributing system, and this constraint is what decides whether it may: the donor's value is lifted only when EVERY reference it carries is world-addressable — a document UUID, or a component id in the world roster — and is DECLINED outright otherwise.
    Independently of that, `effectSource` is written onto EVERY membership record as an override with the switch OFF, world-addressable or not, and that write is UNCONDITIONAL: an absent section under an `inherit: false` switch falls back to the world value by requirement 2 of `## Scoped Entity Definitions`, so an absence-preserving write would silently hand a system that authored nothing the donor's source.
@@ -2246,6 +2259,10 @@ That hazard is independent of which system authored the list, which is why no do
    `effectSource` and `macro` are NEW section names that collide with nothing on the in-system record, so writing them can never overwrite a live in-system block through requirement 15's read union — which is the property the other three lack, and why those take an every-member precondition on their world default instead of an unconditional membership write.
    So a non-world-addressable referent still reaches the system side exactly as this requirement mandates; what changes is that a world-addressable one ALSO seeds the world default.
    Essences group by trimmed `id` and their ids are NEVER re-keyed, so no essence reference is rewritten by that pass and its re-key map carries no essence leg.
+   Issue 1362 ships the SECOND, `worldScope.essence.updateWorldDefaultSection`, and it writes OPAQUELY by design: requirement 11's section values are opaque to the store, and the normalizer coerces a section's SHAPE rather than its ADDRESSABILITY, so neither can enforce this.
+   **The enforcement point is therefore the PICKER.**
+   A world-defaults editor offers only world-addressable referents — it lists world components and document UUIDs, and it does not offer a system's own component list — because the layer below it accepts whatever it is handed.
+   An essence whose shipped `sourceComponentId` names a component that did not itself become a world component therefore migrates its source onto the SYSTEM side, as an override with the switch off, and never onto the world default.
    Nothing further is needed for the membership case: a member system that is not a member of the referenced world component resolves the source, fails to resolve the component, and lands in `## EssenceDefinition` requirement 4's retained-evidence state — the REFUSAL requirement 15's basis union exists to preserve, never a prune.
 
 ### Tool scope

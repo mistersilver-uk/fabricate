@@ -98,6 +98,25 @@ The comparison MUST record each artifact's stable identity and dimensions, autho
 - **AND** a source declaration, token name, or gate fixture copied from the implementation is not accepted as proof that the visual effect exists
 - **AND** a reusable shipped primitive is used for the same behavior unless the approved inventory documents an incompatibility
 
+#### Scenario: extending a multi-PR prototype's parity oracle
+
+The parity oracle for a prototype spanning several PRs lives under `tmp/` beside the prototype, because a prototype is a design artefact rather than a repository asset.
+Its CLOSED SCREEN LIST does not: it is versioned here, with the PR that owes each screen, so removing a screen from the gate is a spec diff a reviewer sees rather than an untracked edit nobody does.
+
+- **WHEN** a prototype's screens are delivered across several PRs and the first of them establishes the oracle
+- **THEN** that PR authors the PROTOTYPE half complete — every screen, every region, every alignment group and every inventory root — so the deferred screens are already measured on the reference side and a later PR supplies locators rather than deciding what to measure
+- **AND** every screen it cannot yet reach in the subject carries an `unreachable` note stating WHY, which asserts the absence: the run fails the moment the subject starts rendering that element, so an excuse cannot outlive the constraint it records
+- **AND** for the world-scoped component, essence and tool work of epic 1357 the deferred screens are exactly fourteen — `catalogue`, `entry`, `system` and `profile` (PR 6a); `essences`, `essEntry`, `essProfile` and `sysEss` (PR 6b); `tools`, `toolEntry`, `toolProfile` and `sysTools` (PR 6c); `wvocab` and `svocab` (PR 7)
+- **AND** the prototype's fifteenth token, `stub`, is EXCLUDED from that fourteen because the gateway PR owns it — it is the counterpart of the placeholder pages that PR ships, the one screen it proves reachable, and it is named explicitly so the exclusion reads as a decision rather than an omission
+- **AND** a later PR extends the oracle only by deleting an `unreachable` note and supplying locators; it adds no screen, no alignment group and no shared region, because those are claims about the reference rather than about its own work
+- **AND** a PR that DELETES a screen, a region or an alignment group rather than supplying its locators is a finding against that PR
+
+#### Scenario: a product state the prototype cannot reach
+
+- **WHEN** a rendered state has no counterpart in the prototype at all — a collapsed rail the mockup never draws, a responsive breakpoint below its fixed width
+- **THEN** it is recorded as product-only and out of the oracle's reach rather than being added to the reference side
+- **AND** its evidence is a captured frame plus whatever mechanical gate covers the same decision, and the plan says which, because a state the oracle structurally cannot see has no other witness
+
 ### Requirement: Branch and PR workflow
 
 All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.
