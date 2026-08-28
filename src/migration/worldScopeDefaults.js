@@ -17,7 +17,34 @@
  *   mandates treating every existing value as AUTHORED. The other six sections carry values a GM
  *   really authored, and the only open question was whose.
  *
- * ## THE FOUR CONSTRAINTS, and why a refusal is per SECTION rather than per entity
+ * ## CONSTRAINT 0: EVERY LIVE MEMBER MUST HAVE AUTHORED THE SECTION
+ *
+ * This one is not about addressability, and it is the one the whole safety argument rests on.
+ *
+ * `resolveScopedDefinition` resolves an `inherit: false` switch over an ABSENT section to the
+ * WORLD value - that is a stated requirement, not an accident, because an absent section is not a
+ * partial one. So a membership record that omits a section still falls back. `buildMembershipRecord`
+ * is necessarily absence-preserving for `category`, `breakage` and `onBreak`, because NONE of the
+ * three can express an empty override: `coerceComponentSection` coerces `''` to absence, and a
+ * `breakage: {}` or `onBreak: {}` IS an override but one the read union spreads LAST over the
+ * surviving in-system block, handing every reader a shape it mis-reads.
+ *
+ * A world default for a section some member left unauthored would therefore CHANGE THAT MEMBER'S
+ * RESOLVED BEHAVIOUR at migration time - silently handing it the donor's category, breakage mode
+ * or on-break action - which is precisely the condition this whole election was granted on. So a
+ * section is elected ONLY when every live member authored it, and the safety argument becomes
+ * true BY CONSTRUCTION rather than by fixture choice.
+ *
+ * THREE SECTIONS NEED NO SUCH CHECK, for two different reasons, and both are worth stating:
+ *
+ * - `effectSource` and `macro` are written UNCONDITIONALLY by the membership builder, because
+ *   both CAN express emptiness - `{}` and `null` are real overriding values every reader reads as
+ *   "no source" and "no macro". Nothing can fall back to them.
+ * - `repairRequirements` is not a resolver section at all: `resolveTool` answers it from the
+ *   membership record ALONE and never reads the world defaults, so an unauthored one resolves to
+ *   absence and the union's surviving in-system half supplies it.
+ *
+ * ## THE FOUR ADDRESSABILITY CONSTRAINTS, and why a refusal is per SECTION rather than per entity
  *
  * A refused section simply gets no world default. Nothing is lost by that: every membership
  * record still OVERRIDES every section with its own system's value verbatim, so resolution at
@@ -61,6 +88,34 @@ export const WORLD_DEFAULT_SECTIONS = Object.freeze({
 
 /** The reserved component category that must NEVER be persisted at world scope. */
 const RESERVED_CATEGORY = 'general';
+
+/**
+ * The sections a membership record CANNOT express an empty override for, and which therefore fall
+ * back to the world value when a member authored none. See CONSTRAINT 0 in the module note.
+ *
+ * `effectSource` and `macro` are absent because the builder writes them unconditionally;
+ * `repairRequirements` is absent because it is not a resolver section.
+ *
+ * @type {ReadonlySet<string>}
+ */
+const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBreak']);
+
+/**
+ * Whether ONE member record authored a section at all, judged exactly as
+ * `buildMembershipRecord` judges it — because the question is precisely "will the membership
+ * record this member produces carry an override for this section".
+ *
+ * @param {object} record
+ * @param {string} entityType
+ * @param {string} section
+ * @returns {boolean}
+ */
+function sectionIsAuthoredBy(record, entityType, section) {
+  if (entityType === 'components') return Boolean(trimmedString(record.category));
+  if (section === 'breakage') return record.breakage !== undefined;
+  if (section === 'onBreak') return record.onBreak !== undefined;
+  return true;
+}
 
 function isPlainObject(value) {
   return value != null && typeof value === 'object' && !Array.isArray(value);
@@ -129,6 +184,8 @@ function collectOptionComponentIds(option, collected) {
  * @param {string} options.entityType
  * @param {string} options.entityId The world id.
  * @param {object} options.donorRecord The REWRITTEN in-system record of the oldest contributor.
+ * @param {Array<object>} [options.memberRecords] Every live member's REWRITTEN record. A section
+ *   no member left unauthored is required by CONSTRAINT 0; defaults to the donor alone.
  * @param {ReadonlySet<string>} options.worldComponentIds The world component roster.
  * @param {(componentId: string, systemId: string) => boolean} options.isMemberOf
  * @param {readonly string[]} options.memberSystemIds Every system in the group.
@@ -138,6 +195,7 @@ export function electWorldDefault({
   entityType,
   entityId,
   donorRecord,
+  memberRecords,
   worldComponentIds,
   isMemberOf,
   memberSystemIds,
@@ -145,8 +203,19 @@ export function electWorldDefault({
   const refusedSections = [];
   const record = { id: entityId };
   if (!isPlainObject(donorRecord)) return { record: null, refusedSections };
+  const members = arrayOf(memberRecords).filter((entry) => isPlainObject(entry));
+  const liveRecords = members.length > 0 ? members : [donorRecord];
 
   for (const section of WORLD_DEFAULT_SECTIONS[entityType] ?? []) {
+    // CONSTRAINT 0, applied before every other: a section some member left unauthored would
+    // change that member's RESOLVED behaviour the moment a world default existed for it.
+    if (
+      FALLBACK_EXPOSED_SECTIONS.has(section) &&
+      liveRecords.some((member) => !sectionIsAuthoredBy(member, entityType, section))
+    ) {
+      refusedSections.push(section);
+      continue;
+    }
     const elected = electSection({
       entityType,
       section,

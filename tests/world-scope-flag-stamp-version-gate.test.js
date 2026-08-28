@@ -28,7 +28,10 @@ import {
   TOOL_FLAG_STAMP_TARGET,
   WORLD_SCOPE_IDENTITY_FLAG_TARGET,
 } from '../src/config/settings.js';
-import { mayClearWorldScopeRekeyMap } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import {
+  mayClearWorldScopeRekeyMap,
+  remapCompletedCleanly,
+} from '../src/migration/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
@@ -39,6 +42,20 @@ function bodyOf(name) {
   assert.ok(start > 0, `${name} must exist in src/main.js`);
   const end = MAIN.indexOf('\n}\n', start);
   assert.ok(end > start, `${name} must be a complete function`);
+  return MAIN.slice(start, end);
+}
+
+/** The body of one named `async` METHOD on the `Fabricate` facade. */
+function methodBodyOf(name) {
+  const start = MAIN.indexOf(`  async ${name}() {`);
+  assert.ok(start > 0, `${name} must exist as a Fabricate method in src/main.js`);
+  const end = MAIN.indexOf(
+    `
+  }
+`,
+    start
+  );
+  assert.ok(end > start, `${name} must be a complete method`);
   return MAIN.slice(start, end);
 }
 
@@ -101,4 +118,65 @@ test('a world with NOTHING to re-key still advances the remap version, so it sto
     /\breturn;/,
     'an empty map must NOT return early: the pass would then re-check on every boot forever'
   );
+});
+
+// ---------------------------------------------------------------------------
+// The PUBLIC recovery action, and the second withhold that makes it reachable
+// ---------------------------------------------------------------------------
+
+test('the recovery action is ACTIVE-GM ONLY, matching the boot pass', () => {
+  // NOT A PERMISSION CHECK BUT A SINGLE-WRITER RULE, and it has to be here rather than inherited:
+  // the method calls `applyWorldScopeIdentityFlagRemap` DIRECTLY, which carries no gate of its
+  // own, so it bypasses the one inside `runWorldScopeIdentityFlagRemap`. `game.fabricate` is
+  // bound on every client and the pass walks the UNFILTERED actor collection, so a player
+  // invoking it would have every write it does not own rejected by the server — one red toast
+  // per refusal, each one mis-booked as a locked-pack skip.
+  const body = methodBodyOf('remapWorldScopeIdentityFlags');
+  const gateIndex = body.indexOf('game.users?.activeGM?.id !== game.user?.id');
+  const applyIndex = body.indexOf('applyWorldScopeIdentityFlagRemap(');
+  assert.ok(gateIndex > 0, 'the public method must carry the active-GM gate itself');
+  assert.ok(applyIndex > gateIndex, 'and it must gate BEFORE it does any work');
+  assert.match(body.slice(gateIndex, applyIndex), /return null;/, 'a refused call answers null');
+  // The boot pass keeps its own copy of the same gate, so neither inherits from the other.
+  assert.match(
+    bodyOf('runWorldScopeIdentityFlagRemap'),
+    /game\.users\?\.activeGM\?\.id !== game\.user\?\.id/
+  );
+});
+
+test('the docblock does not claim a recovery the gating makes unreachable', () => {
+  // The method is reachable exactly when the map is still PENDING, and the boot pass clears it
+  // on any clean, non-torn boot. So the states it names must be states that WITHHOLD the clear.
+  const source = MAIN.slice(0, MAIN.indexOf('  async remapWorldScopeIdentityFlags() {'));
+  const docblock = source.slice(source.lastIndexOf('/**'));
+  assert.match(docblock, /TORN MIGRATION/, 'state 1 withholds the clear');
+  assert.match(docblock, /PARTIAL REMAP/, 'state 2 must be one that ALSO withholds the clear');
+  assert.match(docblock, /ACTIVE-GM ONLY/, 'and the gate is stated');
+  assert.doesNotMatch(
+    docblock,
+    /GM-gated by the pass itself/,
+    'the claim that was false: this method bypasses the pass that carries that gate'
+  );
+});
+
+test('a PARTIAL remap withholds the clear AND the version advance', () => {
+  // Without this, a transient rejection writing one actor leaves it naming retired ids, destroys
+  // the decision record, and un-withholds the startup prune that then deletes its runs.
+  assert.equal(remapCompletedCleanly({ skippedErrors: 0 }), true);
+  assert.equal(remapCompletedCleanly({ skippedErrors: 1 }), false);
+  assert.equal(remapCompletedCleanly({ skippedErrors: 3, lockedSkips: 0 }), false);
+  // A LOCKED skip is a STANDING condition a re-run cannot improve, so it must NOT withhold —
+  // withholding on it would retain the map forever.
+  assert.equal(remapCompletedCleanly({ skippedErrors: 0, lockedSkips: 9 }), true);
+  assert.equal(remapCompletedCleanly(null), true, 'a pass that did not run withholds nothing');
+  assert.equal(remapCompletedCleanly(undefined), true);
+
+  const body = bodyOf('runWorldScopeIdentityFlagRemap');
+  const withholdIndex = body.indexOf('if (!remapCompletedCleanly(summary))');
+  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {}');
+  const versionIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,');
+  assert.ok(withholdIndex > 0, 'the second withhold is wired');
+  assert.ok(clearIndex > withholdIndex, 'the clear sits after it');
+  assert.ok(versionIndex > withholdIndex, 'and so does the version advance');
+  assert.match(body.slice(withholdIndex, clearIndex), /return;/);
 });

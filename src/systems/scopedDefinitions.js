@@ -3,7 +3,7 @@
  * of epic 1357), and the normalizers for the two records it resolves over.
  *
  * NO LIVE RESOLUTION PATH REACHES THE THREE-LAYER RESOLVER YET, and the consumer sweep
- * (epic 1357, PR 8) is what changes that. The older claim here — "nothing in the shipped runtime
+ * (epic 1357, PR 8a - the READ repointing half) is what changes that. The older claim here — "nothing in the shipped runtime
  * imports this module" — was already false when it was written (`scopedDefinitionStore.js`
  * imports `findWorldDefault` and `membershipKey`, and that store is reached from
  * `CraftingSystemManager`) and `1.30.0` makes it emphatically false, because that store's read

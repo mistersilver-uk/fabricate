@@ -111,7 +111,8 @@ World:
 - `fabricate.characterLibraries` for the world character libraries — the character-prerequisite library and the modifier library, as `{ characterPrerequisites, modifiers }` (a crafting system carries NEITHER, and no participation flag either; the libraries ride along with crafting-system import/export as their own envelope slice)
 - `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope` for the world-scope entity definitions — each `{ entities, defaults, membership }`, with the WORLD tool-breakage authority carried by `fabricate.toolScope` alone (see `## Scoped Entity Definitions` in `data-models`).
   THREE keys rather than one, because `isSeeded()` cannot be honest per entity type on a shared key: a store writes the whole object, so one entity type's first write persists the others as empty and turns an UNKNOWN Valid Id Basis into a real, empty, prunable one.
-  THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM: one world entity per resolved source item, holding identity alone, plus one fully-overriding membership record per original definition.
+  THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM, plus one fully-overriding membership record per original definition.
+  COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; ESSENCES group by trimmed `id` instead, and essence ids are NEVER re-keyed.
   It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE until the consumer sweep repoints their readers.
   Every membership record is created fully OVERRIDING, so resolved behaviour is unchanged and a world default matters only for a system added later.
 - `fabricate.migrationVersion`

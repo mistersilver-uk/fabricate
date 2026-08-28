@@ -112,7 +112,15 @@ import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAd
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
-import { mayClearWorldScopeRekeyMap, remapWorldScopeIdentityFlags } from './migration/remapWorldScopeIdentityFlags.js';
+// ALIASED, because the facade below exposes a PUBLIC method of the same name that wraps this
+// one with the active-GM gate and the pending-map check. Two same-named callables in one
+// module is a readability trap on a public surface: a reader of `applyWorldScope...` cannot
+// tell which is which, and the wrong one is the ungated one.
+import {
+  mayClearWorldScopeRekeyMap,
+  remapCompletedCleanly,
+  remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
+} from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
@@ -1756,20 +1764,40 @@ class Fabricate {
   /**
    * Re-run the `1.30.0` world-scope identity-flag repair (issue 1363).
    *
-   * A GM-FACING RECOVERY ACTION, not a test hook. The one-shot `ready` pass WITHHOLDS itself in
-   * two states it reports rather than hides: a torn migration leaves the re-key map pending and
-   * the pass declines to consume it, and a locked-pack or refused write leaves individual
-   * documents in the source-reference tier and counts them. This is how a GM re-runs the repair
-   * once they have fixed the cause, without waiting for a boot on which the one-shot happens to
-   * be eligible.
+   * A GM-FACING RECOVERY ACTION, not a test hook. It is reachable exactly when the boot-time
+   * one-shot has WITHHELD itself, which it does in two states it reports rather than hides:
    *
-   * IDEMPOTENT and GM-gated by the pass itself. It performs the remap ONLY; it does not clear
-   * the map or advance the one-shot version, so the ordinary boot-time gating still decides
-   * when the decision record may be destroyed.
+   * - a TORN MIGRATION leaves the re-key map pending, and the pass declines to consume a
+   *   decision record the next boot may still need;
+   * - a PARTIAL REMAP - one or more documents whose write was rejected, counted as
+   *   `skippedErrors` - withholds the clear too, because a transient rejection is a failure a
+   *   re-run can genuinely fix.
    *
-   * @returns {Promise<object|null>} the pass summary, or `null` when nothing is pending.
+   * Both states leave the map PENDING, which is what makes this method reachable at all: once
+   * the boot pass clears the map there is nothing left to remap and this answers `null`. A
+   * LOCKED-PACK skip is deliberately not one of those states - a locked compendium is a standing
+   * condition a re-run cannot improve, so it is reported and the map is still cleared.
+   *
+   * **ACTIVE-GM ONLY**, matching {@link runWorldScopeIdentityFlagRemap}. That is a
+   * SINGLE-WRITER rule rather than a permission check: `game.fabricate` is bound on every
+   * client and the pass walks the UNFILTERED actor collection, so a player invoking it would
+   * have every write it does not own rejected by the server - one red toast per refusal, and
+   * every one of them mis-booked as a locked-pack skip.
+   *
+   * IDEMPOTENT. It performs the remap ONLY; it does not clear the map or advance the one-shot
+   * version, so the ordinary boot-time gating still decides when the decision record may be
+   * destroyed.
+   *
+   * @returns {Promise<object|null>} the pass summary; `null` when this client is not the active
+   *   GM, or when no re-key is pending.
    */
   async remapWorldScopeIdentityFlags() {
+    if (game.users?.activeGM?.id !== game.user?.id) {
+      console.warn(
+        'Fabricate | world-scope identity repair declined: it writes across every actor in the world, so it runs on the ACTIVE GM alone. Ask the active GM to run it, or take over as active GM first.'
+      );
+      return null;
+    }
     const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
     if (!hasPendingWorldScopeRekey(() => rekeyMap)) return null;
     return applyWorldScopeIdentityFlagRemap(rekeyMap);
@@ -5263,8 +5291,9 @@ async function runWorldScopeIdentityFlagRemap() {
     // itself gated on migration completion, so a world whose migration deferred BEFORE writing
     // the map re-runs on a later boot rather than short-circuiting.
     const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    let summary = null;
     if (hasPendingWorldScopeRekey(() => rekeyMap)) {
-      await applyWorldScopeIdentityFlagRemap(rekeyMap);
+      summary = await applyWorldScopeIdentityFlagRemap(rekeyMap);
     }
 
     // THE CLEAR, and the version advance, share ONE gate. See the docblock. The predicate lives
@@ -5273,6 +5302,16 @@ async function runWorldScopeIdentityFlagRemap() {
     if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
       console.warn(
         'Fabricate | world-scope re-key map RETAINED: the 1.30.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    // THE SECOND WITHHOLD, and it is a different question from the first. The gate above asks
+    // whether the PRODUCING migration completed; this asks whether THIS pass did. A rejected
+    // write leaves that actor naming retired ids, and destroying the map here would both strand
+    // it and un-withhold the startup prune that then deletes its runs on the next boot.
+    if (!remapCompletedCleanly(summary)) {
+      console.warn(
+        `Fabricate | world-scope re-key map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldScopeIdentityFlags().`
       );
       return;
     }
@@ -5293,7 +5332,7 @@ async function runWorldScopeIdentityFlagRemap() {
  * @param {object} rekeyMap The pending `fabricate.worldScopeRekeyMap`.
  */
 async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
-    const summary = await remapWorldScopeIdentityFlags({
+    const summary = await remapIdentityFlagsAcrossActors({
       actors: game.actors ?? [],
       rekeyMap,
       // Two depths, deliberately: the crafting and salvage containers, the roles map, the legacy

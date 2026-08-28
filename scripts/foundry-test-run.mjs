@@ -4602,8 +4602,14 @@ async function restoreWorldScopeIdentityFixture(page, { fixture }) {
       const previous = (entry.key.startsWith('roles.') || entry.key === 'componentId'
         ? before.itemFlags
         : before.actorFlags)[entry.key];
-      if (previous === null || previous === undefined) await document.unsetFlag(namespace, key);
-      else await document.setFlag(namespace, key, previous);
+      // UNSET FIRST, ALWAYS. `Document#update`'s recursive merge never REMOVES a key, so writing
+      // the previous container back over a seeded one leaves every seeded run in it — and the
+      // smoke world is REUSED, so that residue outlives the run. Unsetting and then re-writing
+      // is the only sequence that leaves the world exactly as the fixture found it.
+      await document.unsetFlag(namespace, key);
+      if (previous !== null && previous !== undefined) {
+        await document.setFlag(namespace, key, previous);
+      }
     }
     await game.settings.set('fabricate', 'worldScopeRekeyMap', before.rekeyMap ?? {});
   }, { fixture });
@@ -10687,14 +10693,22 @@ async function main() {
         //
         // Its fixture is purely ADDITIVE persisted state — one world setting and a handful of
         // flags on ONE owned item and its actor — and the `finally` restore removes every one,
-        // so the section is net-zero even when it fails. `rethrow: false` because a behavioural
-        // failure here must be reported without costing every later section its frames; the
-        // step ledger carries the verdict into `summary.json`.
-        if (shouldRunScreenshotSection('tools')) {
+        // so the section is net-zero even when it fails.
+        //
+        // `rethrow: true`, matching the Tool Studio section and NOT the Knowledge one. The
+        // shared scaffold reserves `false` for a purely EVIDENTIAL section, whose only cost on
+        // failure is its own frames; this section captures no frames at all and is pure
+        // behavioural assertion, so a failure here is a product regression that must abort the
+        // phase rather than be recorded and walked past.
+        // DELIBERATELY UNGATED by `shouldRunScreenshotSection`. Screenshot scoping decides which
+        // FRAMES a run captures, and this section captures none: it is acceptance criterion 6c's
+        // only runtime proof, and gating it on the `tools` token would skip the world-scope
+        // identity check in every scoped run that happens not to select a token unrelated to it.
+        {
           await runFixturedScreenshotSection({
             results,
             step: 'world-scope-identity-remap',
-            rethrow: false,
+            rethrow: true,
             setup: () => setupWorldScopeIdentityFixture(page, {
               systemId: craftingSetup.systemId,
               actorId: cleanup.crafterId,

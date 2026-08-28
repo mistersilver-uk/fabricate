@@ -9,6 +9,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { WORLD_DEFAULT_SECTIONS } from '../src/migration/worldScopeDefaults.js';
+import { COMPONENT_SCOPE } from '../src/systems/componentScope.js';
+import { ESSENCE_SCOPE } from '../src/systems/essenceScope.js';
+import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
+import { TOOL_SCOPE } from '../src/systems/toolScope.js';
 import {
   buildWorldScopeGrouping,
   identityOf,
@@ -187,10 +191,13 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
   // with B and nothing at all with A. Taking A's links as a unit would DELETE C's unique uuid
   // permanently, and an owned Item sourced from it would then stop resolving at the
   // source-reference tier - the tier this change's whole degradation story rests on.
+  // `Item.c` IS CLAIMED BY EXACTLY ONE MEMBER, and that is the point of the fixture: with every
+  // reference held by two or more members, a hypothetical "union only what >= 2 members share"
+  // implementation would pass this arm while still deleting the uuids only one member claims.
   const grouping = buildWorldScopeGrouping([
     system('sys-a', { components: [component('c-a', ['Item.a'])] }),
     system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
-    system('sys-c', { components: [component('c-c', ['Item.b'])] }),
+    system('sys-c', { components: [component('c-c', ['Item.b', 'Item.c'])] }),
   ]);
   assert.equal(grouping.entities.components.length, 1, 'the premise: one transitive group');
   const [entity] = grouping.entities.components;
@@ -199,8 +206,8 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
   assert.equal(entity.identity.registeredItemUuid, 'Item.a');
   assert.deepEqual(
     entity.identity.aliasItemUuids,
-    ['Item.b'],
-    "and C's unique uuid survives as an alias rather than being deleted"
+    ['Item.b', 'Item.c'],
+    "C's uuids survive as aliases, INCLUDING the one no other member claims"
   );
 
   // DISPLAY IDENTITY IS STILL DONOR-WINS-AS-A-UNIT. Only the source links union.
@@ -218,7 +225,7 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
     systems: [
       system('sys-a', { components: [component('c-a', ['Item.a'])] }),
       system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
-      system('sys-c', { components: [component('c-c', ['Item.b'])] }),
+      system('sys-c', { components: [component('c-c', ['Item.b', 'Item.c'])] }),
     ],
     gatheringConfig: {},
     componentScope: {},
@@ -226,7 +233,8 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
     toolScope: {},
     worldScopeRekeyMap: {},
   });
-  const ownedFromC = { uuid: 'Item.owned', _stats: { duplicateSource: 'Item.b' } };
+  // Sourced from the uuid ONLY C claimed, which donor-wins would have deleted outright.
+  const ownedFromC = { uuid: 'Item.owned', _stats: { duplicateSource: 'Item.c' } };
   for (const migratedSystem of migrated.systems) {
     const resolved = resolveComponentForItem(
       ownedFromC,
@@ -456,6 +464,31 @@ test('every membership record is created with EVERY SECTION OVERRIDDEN and its v
   assert.deepEqual(toolRecord.repairRequirements, [{ id: 'rr', options: [] }]);
 });
 
+test('macro and effectSource are written UNCONDITIONALLY, so neither can fall back', async () => {
+  // THE RAW CORPUS IS WHERE THIS BITES, and it is why the differential cannot carry this arm:
+  // it normalizes its corpora, and `_normalizeEssenceDefinition` always MINTS
+  // `propertyMacroUuid`, so an absence-preserving write is inert there. The migration reads the
+  // RAW `craftingSystems` setting, and `propertyMacroUuid` is new at issue 1036 - so any world
+  // not re-saved since carries essences with no such key at all.
+  const { resolveScopedDefinition } = await import('../src/systems/scopedDefinitions.js');
+  const { ESSENCE_SCOPE } = await import('../src/systems/essenceScope.js');
+
+  // A record that PREDATES the field: no `propertyMacroUuid` key, no source spellings.
+  const membership = buildMembershipRecord({ id: 'fire' }, 'essences', 'fire', 'sys-b');
+  assert.equal(membership.macro, null, 'an absent macro is written as an explicit null');
+  assert.deepEqual(membership.effectSource, {}, 'and an absent source as an explicit empty map');
+
+  // Resolved against a DONOR world default that DOES author both, neither may fall back.
+  const worldDefault = {
+    id: 'fire',
+    macro: 'Macro.donor',
+    effectSource: { sourceComponentId: 'x' },
+  };
+  const resolved = resolveScopedDefinition(worldDefault, membership, ESSENCE_SCOPE);
+  assert.equal(resolved.macro, null, "the member must NOT inherit the donor's property macro");
+  assert.deepEqual(resolved.effectSource, {}, "nor the donor's effect source");
+});
+
 test('a membership effectSource is written for EVERY essence, world-addressable or not', () => {
   const record = buildMembershipRecord({ id: 'fire' }, 'essences', 'fire', 'sys-a');
   assert.deepEqual(record.effectSource, {}, 'the section is present even when it names nothing');
@@ -506,7 +539,10 @@ test('a WORLD DEFAULT is elected from the donor, and NEVER the reserved `general
   }
 });
 
-test('the world defaults change NOTHING at migration time, because every section is overridden', () => {
+test('the world defaults change NOTHING at migration time, RESOLVED VALUE by resolved value', () => {
+  // THE SWITCH IS NOT THE VALUE, and asserting the switch was this arm's structural blindness:
+  // `inherit: false` over an ABSENT section is exactly the state that FALLS BACK to the world
+  // value, so `inherit[section] === false` is satisfied by the very records that inherit.
   // The whole safety argument for electing a donor: a world default is only ever consulted for a
   // system added LATER, or an override a GM clears later. The corpus differential is what proves
   // it end to end; this pins the mechanism directly.
@@ -520,25 +556,54 @@ test('the world defaults change NOTHING at migration time, because every section
     toolScope: {},
     worldScopeRekeyMap: {},
   });
+  const SCOPES = { components: COMPONENT_SCOPE, essences: ESSENCE_SCOPE, tools: TOOL_SCOPE };
+  const FIELDS = { components: 'components', essences: 'essenceDefinitions', tools: 'tools' };
+  const OWN_VALUE = {
+    category: (record) => record.category,
+    effectSource: (record) => {
+      const source = {};
+      for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
+        if (record[field] !== undefined) source[field] = record[field];
+      }
+      return source;
+    },
+    macro: (record) => record.propertyMacroUuid ?? null,
+    breakage: (record) => record.breakage,
+    onBreak: (record) => record.onBreak,
+  };
+
   let checked = 0;
+  let withWorldDefault = 0;
   for (const [entityType, key] of [
     ['components', 'componentScope'],
     ['essences', 'essenceScope'],
     ['tools', 'toolScope'],
   ]) {
     for (const membership of Object.values(result[key].membership)) {
+      const system = result.systems.find((entry) => entry.id === membership.systemId);
+      const record = (system?.[FIELDS[entityType]] ?? []).find(
+        (entry) => entry.id === membership.entityId
+      );
+      assert.ok(record, `${membership.entityId} has no in-system record`);
+      const worldDefault = result[key].defaults?.[membership.entityId] ?? null;
+      if (worldDefault) withWorldDefault += 1;
+      const resolved = resolveScopedDefinition(worldDefault, membership, SCOPES[entityType]);
       for (const section of WORLD_DEFAULT_SECTIONS[entityType]) {
         if (section === 'repairRequirements') continue;
-        assert.equal(
-          membership.inherit[section],
-          false,
-          `${entityType}.${section} must be OVERRIDDEN, so no world default is consulted`
+        assert.deepEqual(
+          resolved[section] ?? null,
+          OWN_VALUE[section](record) ?? null,
+          `${entityType}.${section} for ${membership.entityId}/${membership.systemId} must ` +
+            'resolve to the SYSTEM OWN value, never the donor value'
         );
         checked += 1;
       }
     }
   }
   assert.ok(checked >= 15, `the arm must actually examine sections (${checked})`);
+  // ANTI-VACUITY: with no world default in play the fallback cannot fire, so an arm that only
+  // ever saw `null` would prove nothing at all.
+  assert.ok(withWorldDefault > 0, 'and some of them must actually HAVE a world default');
   assert.ok(
     Object.keys(result.componentScope.defaults).length > 0,
     'and the premise: this corpus really does elect some world defaults'
@@ -559,8 +624,73 @@ test('CONSTRAINT 1: a donor whose category is the reserved `general` elects NO w
   assert.deepEqual(elect('reagent').record, { id: 'c1', category: 'reagent' });
   assert.equal(elect('general').record, null, 'the reserved bucket is never persisted');
   assert.deepEqual(elect('general').refusedSections, ['category'], 'and the refusal is REPORTED');
+  // An UNAUTHORED section is refused too, by CONSTRAINT 0 rather than by this one - a membership
+  // record cannot express an empty `category` override, so a world default would be inherited.
   assert.equal(elect('').record, null);
-  assert.deepEqual(elect('').refusedSections, [], 'an unauthored section is not a refusal');
+  assert.deepEqual(elect('').refusedSections, ['category']);
+});
+
+test('CONSTRAINT 0: a section ANY member left unauthored elects NO world default', async () => {
+  // THE BLOCKING DEFECT THIS CLOSES. `resolveScopedDefinition` resolves an `inherit: false` switch
+  // over an ABSENT section to the WORLD value - a stated requirement, not an accident - and
+  // `buildMembershipRecord` is necessarily absence-preserving for `category`, `breakage` and
+  // `onBreak`, because none of the three can express an empty override. So a world default for a
+  // section some member never authored silently hands that member the DONOR's value, which is
+  // exactly the "resolved behaviour is unchanged" condition the election was granted on.
+  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const elect = (memberRecords) =>
+    electWorldDefault({
+      entityType: 'tools',
+      entityId: 't1',
+      donorRecord: memberRecords[0],
+      memberRecords,
+      worldComponentIds: new Set(),
+      isMemberOf: () => true,
+      memberSystemIds: memberRecords.map((_, index) => `sys-${index}`),
+    });
+
+  const authored = {
+    id: 't1',
+    breakage: { mode: 'limitedUses', maxUses: 3 },
+    onBreak: { mode: 'destroy' },
+  };
+  assert.ok(
+    elect([authored, { ...authored }]).record.breakage,
+    'every member authored it: elected'
+  );
+
+  const partial = elect([authored, { id: 't1' }]);
+  assert.equal(partial.record, null, 'one member authored NEITHER section, so neither is elected');
+  assert.deepEqual(partial.refusedSections.sort(), ['breakage', 'onBreak']);
+
+  // PER SECTION, not per entity: a member missing only `onBreak` still elects `breakage`.
+  const mixed = elect([authored, { id: 't1', breakage: { mode: 'limitedUses', maxUses: 9 } }]);
+  assert.ok(mixed.record.breakage, 'breakage is authored by both');
+  assert.equal('onBreak' in mixed.record, false);
+  assert.deepEqual(mixed.refusedSections, ['onBreak']);
+});
+
+test('CONSTRAINT 0 does NOT apply to the three sections that cannot fall back', async () => {
+  // `effectSource` and `macro` are written UNCONDITIONALLY by the membership builder, and both
+  // CAN express emptiness, so nothing falls back to them. `repairRequirements` is not a resolver
+  // section at all. Applying constraint 0 to them would lose the ruling's value for no safety.
+  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const elected = electWorldDefault({
+    entityType: 'essences',
+    entityId: 'fire',
+    donorRecord: { id: 'fire', sourceComponentId: 'Item.abc', propertyMacroUuid: 'Macro.a' },
+    // The second member authored NEITHER, and both are still elected.
+    memberRecords: [
+      { id: 'fire', sourceComponentId: 'Item.abc', propertyMacroUuid: 'Macro.a' },
+      { id: 'fire' },
+    ],
+    worldComponentIds: new Set(),
+    isMemberOf: () => true,
+    memberSystemIds: ['sys-a', 'sys-b'],
+  });
+  assert.deepEqual(elected.record.effectSource, { sourceComponentId: 'Item.abc' });
+  assert.equal(elected.record.macro, 'Macro.a');
+  assert.deepEqual(elected.refusedSections, []);
 });
 
 test('CONSTRAINT 2 and 3: a non-world-addressable reference declines its section', async () => {
@@ -604,12 +734,25 @@ test('CONSTRAINT 2 and 3: a non-world-addressable reference declines its section
 
 test('CONSTRAINT 4: repairRequirements lifts only when every group system is a MEMBER', async () => {
   const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  // `breakage` and `onBreak` are authored so CONSTRAINT 0 does not fire and this arm isolates
+  // constraint 4; `repairRequirements` is exempt from constraint 0 in any case.
   const donorRecord = {
     id: 't1',
+    breakage: { mode: 'limitedUses', maxUses: 1 },
+    onBreak: { mode: 'destroy' },
     repairRequirements: [
       {
         id: 'rr',
-        options: [{ quantity: 1, match: { type: 'component', componentId: 'world-c' } }],
+        options: [
+          {
+            quantity: 1,
+            match: { type: 'component', componentId: 'other-c' },
+            // Z4: the ONLY reference to `world-c` lives in an ALTERNATIVE, so an unguarded
+            // `alternatives` recursion in the constraint would miss it and lift a seed naming a
+            // component the group cannot address.
+            alternatives: [{ quantity: 1, match: { type: 'component', componentId: 'world-c' } }],
+          },
+        ],
       },
     ],
   };
@@ -624,22 +767,33 @@ test('CONSTRAINT 4: repairRequirements lifts only when every group system is a M
     });
 
   assert.ok(
-    elect(['world-c'], () => true, ['sys-a', 'sys-b']).record.repairRequirements,
+    elect(['world-c', 'other-c'], () => true, ['sys-a', 'sys-b']).record.repairRequirements,
     'every group system is a member, so the seed can never dangle'
   );
+  // Z4, stated as its own arm: the ALTERNATIVE's reference alone decides the refusal.
+  const alternativeOnly = elect(['other-c'], () => true, ['sys-a']);
+  assert.equal(
+    'repairRequirements' in (alternativeOnly.record ?? {}),
+    false,
+    'a component reachable only through `options[].alternatives[]` still binds constraint 4'
+  );
+  assert.deepEqual(alternativeOnly.refusedSections, ['repairRequirements']);
   // A component the SECOND system is not a member of: the seed would dangle there.
-  const partial = elect(['world-c'], (componentId, systemId) => systemId === 'sys-a', [
+  const partial = elect(['world-c', 'other-c'], (componentId, systemId) => systemId === 'sys-a', [
     'sys-a',
     'sys-b',
   ]);
-  assert.equal(partial.record, null);
+  // The OTHER sections still elect; only `repairRequirements` is declined, which is what makes
+  // the refusal per SECTION rather than per entity.
+  assert.equal('repairRequirements' in partial.record, false);
+  assert.ok(partial.record.breakage);
   assert.deepEqual(partial.refusedSections, ['repairRequirements']);
   // A component that is not a world component at all.
   const local = elect([], () => true, ['sys-a']);
-  assert.equal(local.record, null);
+  assert.equal('repairRequirements' in local.record, false);
   assert.deepEqual(local.refusedSections, ['repairRequirements']);
   // A SINGLE-member group always satisfies it, which is why the rule is not restrictive.
-  assert.ok(elect(['world-c'], () => true, ['sys-a']).record.repairRequirements);
+  assert.ok(elect(['world-c', 'other-c'], () => true, ['sys-a']).record.repairRequirements);
 });
 
 test('every world entity carries ONLY identity fields, plus its id', () => {

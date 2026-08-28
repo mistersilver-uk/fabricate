@@ -866,7 +866,11 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    Two unlinked "Ash Salt"s in two systems are not provably the same thing, and merging on a name would be a silent irreversible content change made on a guess.
 3. **"OLDEST" IS STORED CORPUS POSITION, and this is a DECLARED exception** to § Migration Registry's rule that a migration MUST NOT depend on corpus order, taken under the three conditions that rule states.
    Systems carry no timestamp and `randomID()` is not time-ordered, so array position is the only age fact the corpus holds.
-   On a disagreement the OLDEST contributing definition wins every identity field AS A UNIT, never field-by-field, so no chimera identity is minted; and EVERY rename is reported by name with both systems, while a byte-identical group produces none.
+   On a disagreement the OLDEST contributing definition wins every DISPLAY identity field AS A UNIT, never field-by-field, so no chimera identity is minted
+   **The THREE SOURCE-LINK fields are UNIONED across the group instead, because donor-wins would DELETE data there.**
+   Union-find guarantees only that a group is CONNECTED, not that every member shares a reference with the donor: in a chain A-B-C where C shares a uuid with B and nothing with A, taking A's links as a unit deletes the uuids only C claimed, and an owned Item sourced from one of them stops resolving at the source-reference tier.
+   The donor's `originItemUuid` and `registeredItemUuid` stay the primaries and every member's references are collected into `aliasItemUuids`, so the set may only ever WIDEN.
+   EVERY rename is reported by name with both systems, while a byte-identical group produces none.
 4. **The ID-CLAIM LADDER is deterministic**, so a re-run chooses identically: the oldest contributing id if unclaimed, else the next-oldest if unclaimed, else `<oldestId>-w<n>` with the smallest unclaimed `n >= 2`.
    Steps 2 and 3 exist because component and tool ids are NOT globally unique — copy-import preserves them.
 5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair's own definitions are byte-identical to their input.
@@ -931,14 +935,23 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
     A role leaf is written through a flattened `Document#update` key, which Foundry expands on every dot, so a dotted `systemId` nests one level deeper than any reader indexing `roles[systemId]`.
     An unsafe segment is SKIPPED and counted in the report.
     The `alchemyDeadEnds` `systemId` is a VALUE-side object key rather than a dotted update-path segment, so the guard does not apply to it.
+15a. **The remap is also available as a GM RECOVERY ACTION**, `game.fabricate.remapWorldScopeIdentityFlags()`.
+    It is ACTIVE-GM only, matching the boot pass, because it writes across every actor in the world and `game.fabricate` is bound on every client; it performs the remap alone and never clears the map or advances the one-shot version.
+    It is reachable exactly when the boot pass WITHHELD itself — a torn migration, or a partial remap — because both leave the map pending, and once the map is cleared it answers `null`.
+
 16. **Between the settings write and the remap, resolution degrades to the SOURCE-REFERENCE tier**, which this change does not touch.
     A source Item in a LOCKED pack is skipped and stays in that tier permanently — accepted, stated, and counted in the report.
 17. **The map CLEAR is gated on the PRODUCING MIGRATION HAVING COMPLETED, and whenever the clear is withheld the pass withholds its own version advance too.**
     Gating for the pass to RUN is corpus-derived plus its own Number version; gating for it to DESTROY the decision record is `compareSemver(migrationVersion, '1.30.0') >= 0` and NEVER a bare JavaScript `>=`, which is a LEXICOGRAPHIC compare and is TRUE for `'1.4.0'` through `'1.9.0'` — all six registered migration versions, and the worlds running the longest multi-migration pass.
     The version advance shares that gate because the shipped one-shot precedent writes its version unconditionally: a pass that skips the clear but advances its version short-circuits on every later boot and NEVER clears, orphaning the setting permanently.
-18. **The pass causes a NEWLY-DECIDABLE PRUNE, and reports it.**
-    Once the scope settings are seeded, the Valid Id Basis reports KNOWN for a system whose in-system array is EMPTY, where it previously reported `null`, so a genuinely dangling reference becomes prunable on the first save after upgrade — permanently, because the crafting-system normalizer is an allowlist rebuild.
-    That is CORRECT, but it is a destructive consequence this migration causes, so the pass computes those references and lists them under `flaggedForReview` and the GM notice names them.
+18. **The pass REPORTS every reference that resolves to nothing, and does NOT delete any of them.**
+    They are listed under `flaggedForReview` and named in the GM notice.
+
+    **The report is not a predicted deletion, and this is stated because an earlier form of this requirement said it was.**
+    Measured across the whole acceptance set, ten references resolve to nothing before the migration and ZERO disappear after the round-trip save.
+    Two independent facts explain that: the crafting-system normalizer consumes the component basis at exactly ONE site — the essence source-uuid retention — and prunes no recipe ingredient, salvage result, gathering drop row or tool link against it; and the basis was ALREADY known for any system with a non-empty in-system array, which after this migration is every system, because `1.30.0` does not shed those arrays.
+    The newly-decidable case is a system whose in-system array is EMPTY, and that becomes the common case only when the CONSUMER SWEEP sheds them.
+    So these references become prunable AT THE SWEEP; the value of reporting them here is that this is the one moment the whole corpus is walked.
 19. **The TRANSIENT REPORT** carries entities created per type, groups merged, every rename with its two systems, transitively-formed groups, refusals with reasons and the newly-prunable references, through a `_worldScopeEntityReport` field the runner captures and DELETES so it is never persisted.
 20. **Mutated setting keys:** `worldScopeRekeyMap`, `recipes`, `componentScope`, `essenceScope`, `toolScope`, `craftingSystems`, `gatheringConfig`.
 21. **The downgrade is LOSSLESS FOR DATA and is declared `downgradeLosesData: false`**, checked rather than copied.

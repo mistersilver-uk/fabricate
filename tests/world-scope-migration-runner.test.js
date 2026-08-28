@@ -87,6 +87,19 @@ function makeRunner(initial, tear = {}) {
 const worldCache = new Map();
 
 /**
+ * The index of one named scenario.
+ *
+ * BY NAME, NOT BY POSITION: `scenarioSpecs()` grows, and a positional selector silently retargets
+ * a different corpus when it does — which is how this arm came to assert on one that carries no
+ * dangling reference at all.
+ */
+function scenarioIndex(name) {
+  const index = scenarioSpecs().findIndex((scenario) => scenario.name === name);
+  assert.ok(index >= 0, `no scenario named ${name}`);
+  return index;
+}
+
+/**
  * A world sitting at `1.29.0`, so only the `1.30.0` entry is pending.
  *
  * MEMOIZED AND DEEP-CLONED. `_normalizeSystem` mints an id for a record that lacks one, from a
@@ -353,7 +366,9 @@ test('the report is threaded through all four legs and is NEVER persisted', asyn
 });
 
 test('the GM notice names every rename, every refusal and every newly-prunable reference', async () => {
-  const { runner } = makeRunner(worldAt129(4));
+  const { runner } = makeRunner(
+    worldAt129(scenarioIndex('dangling references and colliding essence slugs'))
+  );
   const summary = await runner.run();
   const notice = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, () => undefined);
   assert.ok(notice.message.length > 0, 'the notice must be PRESENT, not inferred');

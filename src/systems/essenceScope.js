@@ -10,7 +10,7 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * The essence half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
  * `## EssenceDefinition` describes the shipped per-system shape and stays authoritative until
- * the CONSUMER SWEEP (epic 1357, PR 8) repoints the readers. The `1.30.0` world-scope migration
+ * the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration
  * (PR 3) seeds the world corpus this module reads and writes one fully-overriding membership
  * record per essence; `essenceDefinitions` is the one of the three arrays the sweep can retire in
  * full, and it is not retired here.

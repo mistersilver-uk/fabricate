@@ -332,3 +332,56 @@ test('the pending predicate reads a MAP and nothing else, and fails closed', () 
     'no accessor at all is unreadable, and unreadable fails CLOSED'
   );
 });
+
+// ---------------------------------------------------------------------------
+// The MUTATION-TIME door, end to end through the real manager
+// ---------------------------------------------------------------------------
+
+test('_cleanupCraftingPreferences WITHHOLDS its sweep while a re-key map is pending', async () => {
+  // THE OTHER DOOR, and it needs its own end-to-end arm. The startup half is proven through the
+  // real `SalvageRunManager`; this half was asserted only at the pure `buildStartupPassList`
+  // seam, which cannot see a WRONG SETTING KEY at the composition site: `getSetting` would then
+  // answer `undefined`, the pending predicate would answer `false`, and the gate would resolve
+  // TRUE on every boot — invisible to every seam-level arm.
+  const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+  const { SETTING_KEYS } = await import('../src/config/settings.js');
+
+  const run = async (rekeyMap) => {
+    const stored = new Map([
+      [SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, rekeyMap],
+      // One live key and one stale key, so a sweep that runs is visible by what it removes.
+      [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, { 'salvage:comp-live': [], 'salvage:comp-gone': [] }],
+    ]);
+    const previous = globalThis.game;
+    globalThis.game = {
+      ...previous,
+      user: {},
+      users: {},
+      actors: [],
+      settings: {
+        get: (namespace, key) => stored.get(key),
+        set: async (namespace, key, value) => stored.set(key, value),
+      },
+    };
+    try {
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      manager.systems = new Map([['sys-a', { id: 'sys-a', components: [{ id: 'comp-live' }] }]]);
+      manager.recipeManager = { getRecipes: () => [] };
+      await manager._cleanupCraftingPreferences({ subject: 'a test' });
+      return Object.keys(stored.get(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER) ?? {}).sort();
+    } finally {
+      globalThis.game = previous;
+    }
+  };
+
+  assert.deepEqual(
+    await run({ 'sys-a': { components: { 'comp-old': 'comp-live' } } }),
+    ['salvage:comp-gone', 'salvage:comp-live'],
+    'with a re-key PENDING the sweep is withheld and the stale key survives untouched'
+  );
+  assert.deepEqual(
+    await run({}),
+    ['salvage:comp-live'],
+    'and with no re-key pending the sweep runs exactly as it always did'
+  );
+});

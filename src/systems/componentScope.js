@@ -11,7 +11,7 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * The component half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
  * `## Component` describes the shipped per-system shape and stays authoritative until the
- * CONSUMER SWEEP (epic 1357, PR 8) repoints the readers. The `1.30.0` world-scope migration
+ * CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration
  * (PR 3) makes this module's read union correct for a migrated world and seeds the world corpus
  * it reads; it deliberately does NOT shed the in-system array, because every lifted field still
  * has live production readers.

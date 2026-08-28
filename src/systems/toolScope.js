@@ -10,7 +10,7 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * The tool half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
  * `## Tool` describes the shipped per-system shape and stays authoritative until the CONSUMER
- * SWEEP (epic 1357, PR 8) repoints the readers. The `1.30.0` world-scope migration (PR 3) is what
+ * SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration (PR 3) is what
  * makes THIS module live: `resolveToolBreakageAuthority` below is reached by the four non-UI
  * effective-authority readers from that release onward, because the crafting-system normalizer
  * became absence-preserving in the same change.
@@ -78,7 +78,7 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
  * into a module whose whole point is that nothing depends on it yet, so the shipped copies are
  * held together by a drift guard in `tests/entity-scope-resolvers.test.js` that fails if the
  * literal stops matching this constant. That guard scrapes the first two files only; the Svelte
- * leaf is named here so epic 1357's consumer sweep (PR 8), which is what converges all three
+ * leaf is named here so epic 1357's consumer sweep (PR 8a), which is what converges all three
  * onto this one export, does not work from an undercount.
  *
  * @type {string}

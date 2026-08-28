@@ -72,6 +72,30 @@ import { compareSemver } from './MigrationRunner.js';
 export const WORLD_SCOPE_MIGRATION_VERSION = '1.30.0';
 
 /**
+ * Whether the remap finished CLEANLY, i.e. wrote everything it planned to.
+ *
+ * IT IS A SECOND, INDEPENDENT WITHHOLD, and it exists because the first one cannot see this
+ * failure at all. `mayClearWorldScopeRekeyMap` asks whether the PRODUCING migration completed;
+ * this asks whether the CONSUMING pass did. A transient rejection writing one actor's run
+ * container is counted in `skippedErrors` and nothing else notices it: the pass returns normally,
+ * the migration completed, so the map would be destroyed with that actor still naming retired
+ * ids - and the startup prune, no longer withheld because the map is gone, deletes the run on the
+ * next boot.
+ *
+ * `lockedSkips` is deliberately NOT part of this predicate. A locked compendium is a STANDING
+ * state a re-run cannot improve, so withholding on it would retain the map forever; it is
+ * reported to the GM instead. `skippedErrors` is a TRANSIENT failure a re-run genuinely can fix,
+ * which is the whole distinction.
+ *
+ * @param {object|null} summary The pass summary, or `null` when the pass did not run.
+ * @returns {boolean}
+ */
+export function remapCompletedCleanly(summary) {
+  if (!summary || typeof summary !== 'object') return true;
+  return Number(summary.skippedErrors) === 0;
+}
+
+/**
  * Whether this pass may DESTROY the re-key map — i.e. whether the producing migration has
  * COMPLETED on this world.
  *

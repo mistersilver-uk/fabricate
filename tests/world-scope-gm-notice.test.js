@@ -253,16 +253,24 @@ test('each half of the remap notice appears independently of the other', () => {
 test('src/main.js dispatches BOTH notices, each on the right channel', () => {
   // An omitted dispatch fails SILENT — the consumer is guarded and the notice simply never
   // appears — which is why its PRESENCE is asserted rather than inferred.
+  const composeIndex = MAIN.indexOf('buildWorldScopeEntityNotice(worldScopeEntityReport');
+  assert.ok(composeIndex > 0, 'the migration notice is composed from the transient report');
+  // ANCHORED TO THIS BLOCK, and the anchoring is the whole point. An unanchored `MAIN` match for
+  // the severity dispatch is satisfied by the 1.21.0 retired-crafting-mod dispatch, which is
+  // byte-identical apart from indentation - so deleting THIS branch, and downgrading every
+  // rename, refusal and prune warning from a permanent WARN to a transient info, stayed green.
+  const worldScopeBlock = MAIN.slice(composeIndex, composeIndex + 700);
   assert.match(
-    MAIN,
-    /const notice = buildWorldScopeEntityNotice\(worldScopeEntityReport,/,
-    'the migration notice is composed from the transient report'
+    worldScopeBlock,
+    /notice\.severity === 'warn'/,
+    'the severity the composer derived must actually select the channel'
   );
   assert.match(
-    MAIN,
-    /if \(notice\.severity === 'warn'\) ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\);/,
+    worldScopeBlock,
+    /ui\.notifications\?\.warn\?\.\(notice\.message, \{ permanent: true \}\)/,
     'a warning notice is PERMANENT, because the GM has to act on a rename or a prune'
   );
+  assert.match(worldScopeBlock, /ui\.notifications\?\.info\?\.\(notice\.message\)/);
   assert.match(
     MAIN,
     /const notice = buildWorldScopeIdentityRemapNotice\(summary,/,

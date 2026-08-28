@@ -95,8 +95,13 @@ test('the REAL remap turns the seeded plan into exactly the expected values', as
   const stored = {
     fabricate: {
       fabricate: {
-        roles: { [IDS.systemId]: { componentId: IDS.oldComponentId, toolId: IDS.oldToolId } },
-        componentId: IDS.oldComponentId,
+        // SEEDED FROM THE PLAN, never from the ids directly: the plan is the artifact the
+        // harness writes, so a seed transcribed independently drifts from it silently and the
+        // drift then surfaces only in a container.
+        roles: {
+          [IDS.systemId]: { componentId: plan.componentFlag.value, toolId: plan.toolFlag.value },
+        },
+        componentId: plan.legacyScalar.value,
         craftingRuns: plan.craftingRuns.value,
         salvageRuns: plan.salvageRuns.value,
         alchemyDeadEnds: plan.alchemyDeadEnds.value,

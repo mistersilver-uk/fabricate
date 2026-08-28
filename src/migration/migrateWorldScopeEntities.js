@@ -214,30 +214,45 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
   };
   if (entityType === 'components') {
     // `category` verbatim, because this is an OVERRIDE and `general` is a legitimate stored
-    // token there. The `general` prohibition binds an absence-preserving WORLD default, which
-    // this pass writes none of. `tags` verbatim and NO `mutedTags`: the tag merge is ADDITIVE
-    // with no inherit switch, so a world tag list would be granted to every member system at
-    // once — which is why no world tag list is written either.
+    // token there. The `general` prohibition binds the WORLD default, which
+    // `worldScopeDefaults.js` refuses to mint.
+    //
+    // THE WRITE IS ABSENCE-PRESERVING AND MUST BE, because an empty override is NOT EXPRESSIBLE
+    // for this section: `coerceComponentSection` coerces `''` to absence, and an ABSENT section
+    // under an `inherit: false` switch FALLS BACK to the world value by design. So a system that
+    // authored no category cannot be given one that means "nothing". The world default is
+    // DECLINED instead whenever any member left the section unauthored — see
+    // `worldScopeDefaults.js`, which is what keeps resolution unchanged at migration time.
     if (trimmedString(record.category)) membership.category = record.category.trim();
     const tags = arrayOf(record.tags).filter((tag) => trimmedString(tag));
     if (tags.length > 0) membership.tags = tags.map((tag) => tag.trim());
     return membership;
   }
   if (entityType === 'essences') {
-    // WRITTEN FOR EVERY ESSENCE, world-addressable or not: the world-addressability constraint
-    // binds a WORLD essence default, and this pass writes none, so it is satisfied vacuously
-    // and the uniform system-side rule is applied to all of them.
+    // BOTH SECTIONS ARE WRITTEN UNCONDITIONALLY, and that is what makes them safe rather than
+    // merely tidy: an ABSENT section under an `inherit: false` switch FALLS BACK to the world
+    // value, so an absence-preserving write would silently hand a system that authored nothing
+    // the DONOR's effect source or property macro. Both can express emptiness — `{}` and `null`
+    // are real, overriding values that every reader treats as "no source" and "no macro" — so
+    // neither needs the world default to be declined the way `category` does.
     const effectSource = {};
     for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
       if (record[field] !== undefined) effectSource[field] = record[field];
     }
     membership.effectSource = effectSource;
-    if (record.propertyMacroUuid !== undefined) membership.macro = record.propertyMacroUuid;
+    membership.macro = record.propertyMacroUuid ?? null;
     membership.enabled = record.enabled !== false;
     return membership;
   }
+  // ABSENCE-PRESERVING, AND NECESSARILY SO. Neither section can express an empty override: `{}`
+  // IS an override, but the read union spreads the resolved value LAST, so `breakage: {}` would
+  // overwrite the surviving in-system block with a shape every reader mis-reads. The world
+  // default is DECLINED instead whenever any member left the section unauthored.
   if (record.breakage !== undefined) membership.breakage = cloneJson(record.breakage);
   if (record.onBreak !== undefined) membership.onBreak = cloneJson(record.onBreak);
+  // NOT A RESOLVER SECTION. `resolveTool` answers `repairRequirements` from the membership record
+  // ALONE and never reads the world defaults, so an unauthored one cannot fall back to the
+  // donor's and needs no decline.
   if (Array.isArray(record.repairRequirements)) {
     membership.repairRequirements = cloneJson(record.repairRequirements);
   }
@@ -316,19 +331,25 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
 }
 
 /**
- * The references `#### D10`'s newly-decidable Valid Id Basis will prune on the next save.
+ * The references that resolve to NOTHING, reported so a GM can review them.
  *
- * Once the scope settings are seeded, `_scopeEntityBasis` reports KNOWN for a system whose
- * in-system array is EMPTY, where it previously reported `null`. A genuinely dangling reference
- * there becomes prunable on the first save after upgrade, permanently, because `_normalizeSystem`
- * is an allowlist rebuild. That is CORRECT — the basis really is known-complete now — but it is a
- * destructive consequence this migration causes, so it is computed and reported by name.
+ * **THIS IS A REPORT, NOT A PREDICTED DELETION, and the correction is measured rather than
+ * argued.** An earlier form of this docblock - and of the GM notice - said these references
+ * "will be removed on the next save now that the world scope is seeded". Across every corpus in
+ * the acceptance set, TEN references resolve to nothing before the migration and ZERO disappear
+ * after the round trip. Two facts explain it, and both are independently verifiable:
  *
- * @param {Array<object>} systems The REWRITTEN systems.
- * @param {Array<object>} recipes The REWRITTEN recipes.
- * @param {object} gatheringConfig The REWRITTEN gathering config.
- * @param {Record<string, Set<string>>} worldRoster Entity ids per entity type.
- * @returns {Array<{systemId: string, entityType: string, referenceId: string}>}
+ * - `_normalizeSystem` consumes `scopeBasis.componentIds` at exactly ONE site, the essence
+ *   source-uuid retention. It prunes no recipe ingredient, no salvage result, no gathering drop
+ *   row and no tool link against the component basis at all.
+ * - The basis was ALREADY known for any system with a NON-EMPTY in-system array, which after
+ *   this migration is every system, because `1.30.0` does not shed those arrays. The
+ *   newly-decidable case is a system whose array is EMPTY, and that becomes the common case only
+ *   when the CONSUMER SWEEP sheds them.
+ *
+ * So these references are already broken and become PRUNABLE at the sweep; this release deletes
+ * none of them. The report is still worth making - it is the one moment the whole corpus is
+ * walked end to end - but a notice predicting a deletion that never happens is worse than none.
  */
 function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster) {
   const flagged = [];
@@ -561,15 +582,20 @@ export function migrateWorldScopeEntities(data) {
         (member) => !isRefusedPair(grouping.refusals, member.systemId, entityType)
       );
       if (liveMembers.length === 0) continue;
-      const donorSystem = systemsById.get(liveMembers[0].systemId);
-      const donorRecord = arrayOf(donorSystem?.[ENTITY_TYPE_FIELDS[entityType]]).find(
-        (candidate) => trimmedString(candidate?.id) === entity.id
-      );
+      const recordFor = (systemId) =>
+        arrayOf(systemsById.get(systemId)?.[ENTITY_TYPE_FIELDS[entityType]]).find(
+          (candidate) => trimmedString(candidate?.id) === entity.id
+        );
+      const memberRecords = liveMembers.map((member) => recordFor(member.systemId)).filter(Boolean);
+      const donorRecord = memberRecords[0];
       if (!donorRecord) continue;
       const { record, refusedSections } = electWorldDefault({
         entityType,
         entityId: entity.id,
         donorRecord,
+        // EVERY live member's record, because a section only one of them authored must NOT
+        // become a world default: the members that authored none would fall back to it.
+        memberRecords,
         worldComponentIds,
         isMemberOf,
         memberSystemIds: liveMembers.map((member) => member.systemId),

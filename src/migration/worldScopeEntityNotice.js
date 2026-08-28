@@ -119,7 +119,7 @@ export function buildWorldScopeEntityNotice(report, localize) {
         localize,
         'FABRICATE.Migration.WorldScopeEntities.FlaggedForReview',
         { count: flagged.length, references: named },
-        `${flagged.length} reference(s) already pointed at nothing and will be removed on the next save now that the world scope is seeded: ${named}.`
+        `${flagged.length} reference(s) already point at nothing, and Fabricate can now tell: ${named}. Nothing has been removed - review them when you get a chance.`
       )
     );
   }
@@ -132,8 +132,14 @@ export function buildWorldScopeEntityNotice(report, localize) {
 /**
  * The one-time notice describing the degradations the identity-flag remap could not repair.
  *
- * SILENT ON A CLEAN PASS. It reports only the two facts a GM can act on: a crafting system whose
- * id cannot be a flag-path segment, and a source document that refused its write.
+ * SILENT ON A CLEAN PASS. It reports the three facts a GM can act on, and the THIRD is the one
+ * that matters most: a crafting system whose id cannot be a flag-path segment, a document that
+ * refused its write, and a document the pass FAILED to update at all.
+ *
+ * THE THIRD IS NOT COSMETIC. `skippedErrors` is a transient failure - a rejected update, a
+ * malformed document - that leaves that actor still naming retired ids. It also WITHHOLDS the
+ * re-key map clear, so the GM needs to know both that the repair is incomplete and that it will
+ * be retried; a notice silent on it would leave a partial repair looking like a complete one.
  *
  * @param {object|null} summary The remap pass summary.
  * @param {(key: string, data?: object) => string|undefined} localize
@@ -142,7 +148,8 @@ export function buildWorldScopeEntityNotice(report, localize) {
 export function buildWorldScopeIdentityRemapNotice(summary, localize) {
   const unsafe = arrayOf(summary?.unsafeSystemIdSkips);
   const locked = Number(summary?.lockedSkips) || 0;
-  if (unsafe.length === 0 && locked === 0) return '';
+  const failed = Number(summary?.skippedErrors) || 0;
+  if (unsafe.length === 0 && locked === 0 && failed === 0) return '';
   const clauses = [];
   if (unsafe.length > 0) {
     const named = unsafe.join(', ');
@@ -162,6 +169,16 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
         'FABRICATE.Migration.WorldScopeEntities.LockedSkips',
         { count: locked },
         `${locked} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by source item.`
+      )
+    );
+  }
+  if (failed > 0) {
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldScopeEntities.SkippedErrors',
+        { count: failed },
+        `${failed} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().`
       )
     );
   }

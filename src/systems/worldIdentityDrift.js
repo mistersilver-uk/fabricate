@@ -2,7 +2,7 @@
  * THE WORLD IDENTITY SNAPSHOT DRIFT DETECTOR (issue 1363, epic 1357, PR 3).
  *
  * The `1.30.0` migration makes two copies of every entity's identity: the in-system record,
- * which stays **LIVE AND AUTHORITATIVE** until the consumer sweep (PR 8), and the WORLD IDENTITY
+ * which stays **LIVE AND AUTHORITATIVE** until the consumer sweep (PR 8a, the READ repointing half), and the WORLD IDENTITY
  * SNAPSHOT held on `fabricate.componentScope` / `essenceScope` / `toolScope`. The two are EQUAL
  * AT MIGRATION TIME BY CONSTRUCTION — the migration writes the merged identity back onto every
  * in-system record — and the snapshot goes stale on the GM's first post-migration identity edit,
@@ -26,7 +26,7 @@
  *
  * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME
  *
- * PR 8 must run this detector before repointing any reader, and must REPORT every divergence
+ * PR 8a - the READ repointing half of the split consumer sweep - must run this detector before repointing any reader, and must REPORT every divergence
  * rather than silently resolve it. These are the writers that make divergence reachable:
  *
  *   - `CraftingSystemManager#createItem`

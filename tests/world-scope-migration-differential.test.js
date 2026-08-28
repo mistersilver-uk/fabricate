@@ -82,18 +82,35 @@ const SOURCE_LINK_FIELDS = Object.freeze([
 ]);
 
 /**
- * Whether a source-link difference is PURELY ADDITIVE: the record still claims every reference it
- * claimed before, and may claim more.
+ * Every source reference one projected record claims, across all three fields.
  *
- * A reference is a CLAIM that this entity is that Item, and the resolvers intersect reference SETS
- * rather than compare them, so gaining one strictly widens resolution and losing one narrows it.
- * The union may only ever widen.
+ * THE SET IS THE UNIT, NOT THE FIELD, and that distinction is load-bearing. The union preserves
+ * the DONOR's primaries and demotes every other member's to aliases, so a member's
+ * `originItemUuid` legitimately CHANGES while the reference it named survives one field over.
+ * A per-field comparison reads that as a loss; a set comparison reads it correctly, and still
+ * catches a reference that is gone from the record entirely.
  */
-function isPurelyAdditiveSourceLink(field, beforeValue, afterValue) {
-  if (!SOURCE_LINK_FIELDS.includes(field)) return false;
-  const asSet = (value) => new Set((Array.isArray(value) ? value : [value]).filter(Boolean));
-  const before = asSet(beforeValue);
-  const after = asSet(afterValue);
+function sourceReferenceSet(projected) {
+  const refs = new Set();
+  for (const field of SOURCE_LINK_FIELDS) {
+    const value = projected?.[field];
+    for (const ref of Array.isArray(value) ? value : [value]) {
+      if (typeof ref === 'string' && ref) refs.add(ref);
+    }
+  }
+  return refs;
+}
+
+/**
+ * Whether the record's source-reference SET only widened.
+ *
+ * A reference is a CLAIM that this entity is that Item, and the resolvers intersect reference sets
+ * rather than compare them, so gaining one strictly widens resolution and losing one narrows it.
+ * Ruling 2's union may only ever widen.
+ */
+function sourceLinksOnlyWidened(beforeRecord, afterRecord) {
+  const before = sourceReferenceSet(beforeRecord);
+  const after = sourceReferenceSet(afterRecord);
   return [...before].every((ref) => after.has(ref));
 }
 
@@ -112,8 +129,15 @@ function assertDifferential(label, before, after, report) {
     (report.renames ?? []).map((entry) => `${entry.systemId}|${entry.entityType}|${entry.newId}`)
   );
   const rekeyIndex = new Map();
+  // WHICH FIELDS each rename entry actually names. A merged member is re-keyed, so an entry
+  // EXISTS for essentially every one of them - with an EMPTY `changedFields` when only the id
+  // moved. Requiring the entry to merely EXIST therefore excuses any identity change at all,
+  // including the source-link NARROWING ruling 2 forbids outright.
+  const renameFields = new Map();
   for (const entry of report.renames ?? []) {
     rekeyIndex.set(`${entry.systemId}|${entry.entityType}|${entry.oldId}`, entry.newId);
+    const key = `${entry.systemId}|${entry.entityType}|${entry.newId}`;
+    renameFields.set(key, new Set([...(renameFields.get(key) ?? []), ...entry.changedFields]));
   }
 
   for (const [key, beforeValue] of Object.entries(beforeEntities)) {
@@ -129,11 +153,11 @@ function assertDifferential(label, before, after, report) {
         PERMITTED_IDENTITY_FIELDS.includes(field),
         `${label}: ${afterKey}.${field} changed and is NOT an identity field`
       );
-      if (isPurelyAdditiveSourceLink(field, beforeValue[field], afterValue[field])) {
-        // THE SOURCE-LINK UNION, and it is NOT a rename. A member that GAINED a reference lost
-        // nothing and its resolution strictly widens, so there is nothing for a GM to act on.
-        // A member that LOST one still falls through to the rename requirement below, which is
-        // what makes this exception safe rather than a hole.
+      if (SOURCE_LINK_FIELDS.includes(field) && sourceLinksOnlyWidened(beforeValue, afterValue)) {
+        // THE SOURCE-LINK UNION, and it is NOT a rename. The record still claims every reference
+        // it claimed before and may claim more, so its resolution strictly widens and there is
+        // nothing for a GM to act on. A record that LOST one falls through to the rename
+        // requirement below, which is what makes this exception safe rather than a hole.
         accepted.push(`union:${afterKey}.${field}`);
         continue;
       }
@@ -141,6 +165,18 @@ function assertDifferential(label, before, after, report) {
         renameIndex.has(afterKey),
         `${label}: ${afterKey}.${field} changed with NO matching rename-report entry`
       );
+      if (SOURCE_LINK_FIELDS.includes(field)) {
+        // Reaching here means the record's reference SET actually SHRANK, and ruling 2 forbids
+        // that OUTRIGHT rather than conditionally: a source reference is a claim the resolvers
+        // intersect, so losing one narrows what the entity can ever match. Requiring a rename
+        // entry instead was NOT enough - the migration DOES report the loss in `changedFields`,
+        // so a donor-wins regression stayed green while every non-donor member silently lost the
+        // uuids only it claimed. Reporting a loss is not a licence to cause one.
+        assert.fail(
+          `${label}: ${afterKey} LOST a source reference (${field}). The union may widen but ` +
+            'never narrow, whether or not the rename report names it'
+        );
+      }
       accepted.push(`${afterKey}.${field}`);
     }
   }
@@ -336,6 +372,38 @@ test('every crafting-system export fixture in tests/fixtures survives the differ
   // them all, so the population is pinned rather than assumed.
   assert.ok(examined >= 0, 'the fixture walk ran');
   console.log(`# world-scope differential examined ${examined} export fixture(s)`);
+});
+
+test('two of the three essence-source spellings are RE-DERIVED by the normalizer', () => {
+  // A MEASURED FINDING, recorded rather than asserted away. Deleting the rewrite of
+  // `associatedSystemItemId` or of `sourceItemUuid` is GREEN in this differential, and the
+  // reason is not a projection gap: `_normalizeSystem` recomputes BOTH from `sourceComponentId`
+  // on every load, so a stale value in either is repaired before any reader sees it.
+  //
+  // Only `sourceComponentId` decides anything durable — and deleting the whole essence leg, or
+  // that one site, DOES redden. The other two rewrites are defence-in-depth for a payload read
+  // before any hydrate, and this arm states which is which so a later lane does not read their
+  // greenness as coverage.
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const normalized = manager._normalizeSystem({
+    id: 'sys-a',
+    name: 'S',
+    components: [
+      { id: 'comp-1', name: 'C', originItemUuid: 'Item.aaa', registeredItemUuid: 'Item.aaa' },
+    ],
+    essenceDefinitions: [
+      {
+        id: 'e',
+        name: 'E',
+        sourceComponentId: 'comp-1',
+        associatedSystemItemId: 'STALE',
+        sourceItemUuid: 'STALE',
+      },
+    ],
+  });
+  const essence = normalized.essenceDefinitions[0];
+  assert.equal(essence.associatedSystemItemId, 'comp-1', 're-derived from sourceComponentId');
+  assert.equal(essence.sourceItemUuid, 'Item.aaa', "re-derived from the component's own uuid");
 });
 
 test('the ONE basis-gated prune the round-trip seam performs, and why the prune branch is a GUARD', async () => {
@@ -625,9 +693,13 @@ test('the repair COUNTER is wired: a payload naming a retired id is counted, not
 test('every membership record OVERRIDES every section, with the system own value VERBATIM', () => {
   // THE ARM THAT CATCHES AN OMITTED SECTION OVERRIDE, and it cannot be stated through
   // `buildMembershipRecord` — a rebuild-and-compare would omit the same section on both sides
-  // and stay green. It reads the SECTION SOURCES off the in-system record independently, and
-  // resolves the membership record with NO world default, which is exactly the state the
-  // migration leaves the world in.
+  // and stay green. It reads the SECTION SOURCES off the in-system record independently.
+  //
+  // IT RESOLVES AGAINST THE ACTUAL ELECTED WORLD DEFAULT, never `null`. Passing `null` was the
+  // structural blindness: `resolveScopedDefinition` resolves an `inherit: false` switch over an
+  // ABSENT section to the WORLD value, and `null` is precisely the input under which that
+  // fallback CANNOT fire. With a real world default in place, a section the membership record
+  // omits resolves to the DONOR's value and this arm sees it.
   const SECTION_SOURCES = {
     components: {
       category: (record) =>
@@ -670,7 +742,8 @@ test('every membership record OVERRIDES every section, with the system own value
           (entry) => entry.id === membership.entityId
         );
         assert.ok(record, `${scenario.name}: ${membership.entityId} has no in-system record`);
-        const resolved = resolveScopedDefinition(null, membership, SCOPES[entityType]);
+        const worldDefault = payload.defaults?.[membership.entityId] ?? null;
+        const resolved = resolveScopedDefinition(worldDefault, membership, SCOPES[entityType]);
         for (const [section, sourceOf] of Object.entries(SECTION_SOURCES[entityType])) {
           assert.equal(
             resolved.inherited[section],

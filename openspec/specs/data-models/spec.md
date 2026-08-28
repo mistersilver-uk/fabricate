@@ -645,7 +645,7 @@ CraftingSystem = {
     An earlier form of this requirement attributed the shed of all eight keys to the migration; that was aspirational on both counts, and it is corrected here and in the `## Scoped Entity Definitions` banner together, because both carried the identical attribution.
     `components` PERMANENTLY retains `essences`, `difficulty`, `complications`, `salvage` and `id`; `tools` permanently retains `componentId`, `label`, `requirement`, `prerequisites`, `bonus`, `checkBreakable` and `id`.
     `id` is in both lists because it is the JOIN KEY the read union merges on, and a retained-field list omitting it describes an unjoinable record.
-    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` alone") and `### Tool scope` requirement 1 (whose closing "and nothing else" is what makes the enumeration exhaustive), which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
+    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` alone") and `### Tool scope` requirement 1, whose OPENING sentence ("There are THREE tool world-default sections, TWO of them inherited") is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
     That is the genuine distinction from `COMPONENT_SECTIONS`, which is a mutable constant a later PR can edit; it is not the membership allowlist either, since the entity roster preserves every authored field verbatim.
 
     **`essenceDefinitions` IS retirable in full, and the SECTION COUNT is not why.**
@@ -1018,7 +1018,7 @@ Define one essence type used by components and recipe requirements.
 
 **What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
 The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `id`, `name`, `icon`, `colorToken`, `description` — to a WORLD ESSENCE, and its `effectSource`, `macro` and `enabled` onto a per-system membership record.
-Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8) repoints the readers: every shipped writer writes this copy, and every shipped reader reads it.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8a, the READ repointing half) repoints the readers: every shipped writer writes this copy, and every shipped reader reads it.
 The world copy is the **World Identity Snapshot**: taken from this record at migration time, equal to it by construction at that moment, written by nothing thereafter, and read by nothing until the sweep.
 This record OWNS nothing the three destinations do not cover, which is what makes `essenceDefinitions` the one of the three in-system arrays the sweep can retire IN FULL — see `## CraftingSystem` requirement 36, and note that the two-section count is NOT the reason.
 
@@ -1067,8 +1067,8 @@ EssenceDefinition = {
    That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
    At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
 10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
-11. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
+11. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ## RecipeItemDefinition
@@ -1225,7 +1225,7 @@ Represent one curated item entry available to recipes and salvage operations.
 
 **What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
 The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `name`, `img`, `description` and the source link — to a WORLD COMPONENT, and its `category` and `tags` onto a per-system membership record.
-Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8) repoints the readers.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8a, the READ repointing half) repoints the readers.
 This record PERMANENTLY retains `id`, `essences`, `difficulty`, `complications` and the whole `salvage` block: they have no destination in the scope model at all, and moving them would need an explicit amendment to `## Scoped Entity Definitions` `### Component scope` requirement 1.
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
@@ -1403,8 +1403,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     Component normalization is an allowlist rebuild, so a component's persisted shape after a save is exactly what that rebuild emits and the key is absent for a component that authored none.
     This is the **omitted-when-default** doctrine of § Canonical-Write and Legacy-Read Compatibility Policy, whose in-file precedent is `salvage.checkModifierIds` and NOT `salvage.allowPlayerResultReorder` — the latter is stamped on both normalizer return paths and is therefore absent-reads-as-default but not byte-preserving.
     No earlier build ever wrote this key, so the write-side alias-retirement rule does not apply; what carries over is the AUDIT obligation at requirement 20.
-26. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
+26. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ## Recipe
@@ -1997,7 +1997,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > Every membership record is nevertheless created fully OVERRIDING, so NO section resolves through the world layer at migration time and resolved behaviour is unchanged — a world default matters only for a system added later, or an override a GM clears later.
 >
 > **STILL NOT LIVE after `1.30.0`**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
-> **What the CONSUMER SWEEP (PR 8) retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and `## CraftingSystem` requirement 36 states which and why.
+> **What the CONSUMER SWEEP (PR 8a, the READ repointing half) retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and `## CraftingSystem` requirement 36 states which and why.
 > The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
 > The READ union's no-production-consumer state likewise persists past `1.30.0` and is retired by the sweep, so `## Component`, `## EssenceDefinition` and `## Tool` still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does.
 
@@ -2104,6 +2104,15 @@ SystemMembershipRecord = {
     What the migration adds is the schema it WRITES, which a reader may now rely on for any entity the migration created:
 
     - a WORLD COMPONENT and a WORLD TOOL carry `id`, `name`, `img`, `description` and the source link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`);
+
+    **THE SOURCE LINK IS UNIONED ACROSS THE GROUP; the display fields are not.**
+    `name`, `img` and `description` are taken from the OLDEST contributing definition as a unit.
+    The three source-link fields are the exception: the donor's `originItemUuid` and `registeredItemUuid` are kept as the primaries and EVERY member's references are collected into `aliasItemUuids`.
+    Donor-wins is wrong for them because union-find guarantees only that a group is CONNECTED, not that every member shares a reference with the donor: in a chain A-B-C where C shares a uuid with B and nothing with A, taking A's links as a unit DELETES the uuids only C claimed, and an owned Item sourced from one of them stops resolving at the source-reference tier.
+    Unioning is safe in the direction the deletion is not — a source reference is a CLAIM, every member has already made its own, and the resolvers intersect reference SETS rather than compare them, so a longer list resolves strictly more.
+
+    **The migration WRITES THE UNION BACK onto every in-system record**, which is what keeps the two copies equal, and it has a consequence worth stating rather than discovering: after `1.30.0` a component or tool in a NON-DONOR system claims every other member system's source uuids, so `## Component`'s and `## Tool`'s own presence matching widens accordingly.
+    `## EssenceDefinition` is unaffected — a world essence carries no source link at all.
     - a WORLD ESSENCE carries `id`, `name`, `icon`, `colorToken` and `description`, and no source link, because an essence has no source item.
 
     ABSENCE IS PART OF THAT SCHEMA: a field the elected identity does not carry is not minted, and the migration DELETES it from the in-system record too, so the two copies agree on absence as well as on value.
@@ -2178,8 +2187,12 @@ SystemMembershipRecord = {
 
 **What the `1.30.0` migration writes here, and what it deliberately leaves UNAUTHORED.**
 Each membership record carries its own system's `category` VERBATIM — that is an override, and `general` is a legitimate stored token there — and its own `tags`, with no `mutedTags`.
-The WORLD default `category` and the WORLD `tags` are left UNAUTHORED, so requirement 2's `general` prohibition and requirement 3's additive-tag rule bind the world catalogue EDITOR rather than the migration.
-Both would otherwise be actively harmful at migration time: a world `general` would reset every inheriting system's category on the first resolve, and a world tag list would be granted to every member system at once, because the tag merge is additive with no inherit switch.
+
+**The WORLD default `category` IS written, elected from the OLDEST contributing system**, and requirement 2's `general` prohibition binds that election directly: a world `category` is never the reserved bucket, because an absence-preserving world category that minted it would reset every inheriting system on the first resolve.
+It is also declined outright whenever any member system left the section unauthored, because a membership record cannot express an empty `category` override — `coerceComponentSection` coerces `''` to absence, and an absent section under an `inherit: false` switch falls back to the world value by requirement 12's own rule.
+
+**The WORLD `tags` are left UNAUTHORED, and for a DIFFERENT reason** that must not be conflated with the one above: requirement 3's tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once whoever the donor is.
+That hazard is independent of which system authored the list, which is why no donor rule can rescue it; requirement 3 therefore binds the world catalogue EDITOR rather than the migration.
 
 1. The component sections are `category` alone.
 2. **`category` departs from the plain pattern on its INHERITING branch**: the world category wins IF AUTHORED, and otherwise the local value falls through.
@@ -2225,7 +2238,10 @@ Both would otherwise be actively harmful at migration time: a world `general` wo
 
    **The binding constraint on the migration (epic 1357, PR 3):**
    a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
-   The `1.30.0` migration SATISFIES IT VACUOUSLY, because it writes no world essence default at all, and it therefore applies the uniform system-side rule to EVERY essence: an `effectSource` is written onto the membership record, as an override with the switch OFF, whether or not its referent is world-addressable.
+   The `1.30.0` migration WRITES a world `effectSource` default, elected from the OLDEST contributing system, and this constraint is what decides whether it may: the donor's value is lifted only when EVERY reference it carries is world-addressable — a document UUID, or a component id in the world roster — and is DECLINED outright otherwise.
+   Independently of that, `effectSource` is written onto EVERY membership record as an override with the switch OFF, world-addressable or not, and that write is UNCONDITIONAL: an absent section under an `inherit: false` switch falls back to the world value by requirement 12's own rule, so an absence-preserving write would silently hand a system that authored nothing the donor's source.
+   An empty `{}` is a real overriding value every reader treats as "no source", which is what makes the unconditional write expressible here and not for `category`.
+   So a non-world-addressable referent still reaches the system side exactly as this requirement mandates; what changes is that a world-addressable one ALSO seeds the world default.
    Essences group by trimmed `id` and their ids are NEVER re-keyed, so no essence reference is rewritten by that pass and its re-key map carries no essence leg.
    Nothing further is needed for the membership case: a member system that is not a member of the referenced world component resolves the source, fails to resolve the component, and lands in `## EssenceDefinition` requirement 4's retained-evidence state — the REFUSAL requirement 15's basis union exists to preserve, never a prune.
 
@@ -2278,7 +2294,7 @@ are always by id into the per-system library.
 
 **What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
 The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `name`, `img`, `description` and the source link — to a WORLD TOOL, and its `breakage`, `onBreak`, `repairRequirements` and `enabled` onto a per-system membership record.
-Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8) repoints the readers.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer sweep (PR 8a, the READ repointing half) repoints the readers.
 This record PERMANENTLY retains `id`, `componentId` (which names a component in THAT system's candidate set), the user-authored `label`, `requirement`, `prerequisites`, `bonus` and `checkBreakable`.
 
 **"World Identity Snapshot" is NOT the per-tool DISPLAY SNAPSHOT this section already describes**, and capture time does NOT separate them — the Properties block below labels the shipped copy the "Registration/**migration-time** DISPLAY SNAPSHOT", so a discriminator built on the capture moment is denied by its own citation.
@@ -2340,7 +2356,7 @@ Tool = {
    The `name` + `img` + `description` display snapshot is captured at registration or relinking time and is NOT auto-refreshed when the GM changes the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
    The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
-   `system.tools` is SHADOWED by the `fabricate.toolScope` world setting (issue 1359) and remains LIVE AND AUTHORITATIVE until the CONSUMER SWEEP (epic 1357, PR 8); see `## CraftingSystem` requirement 36.
+   `system.tools` is SHADOWED by the `fabricate.toolScope` world setting (issue 1359) and remains LIVE AND AUTHORITATIVE until the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half); see `## CraftingSystem` requirement 36.
    Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
    Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
    The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
@@ -2408,8 +2424,8 @@ Tool = {
     The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
     Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
     Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
-14. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
+14. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ### Validation Matrix
@@ -3481,7 +3497,7 @@ The report names the omitted passes and the entity kinds that decided them.
 It MUST NOT fail the operation it reports on: an omitted pass is what this gate exists to survive, so it must not stop a boot and must not fail a GM's delete.
 
 **One destructive door remains OUTSIDE this requirement, and it is not safe.**
-The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, EXCEPT where the pass consumes a migration's output — the component and tool flag stamps withhold their advance until `migrationVersion` reaches `1.30.0`, because the deferred branch of a migration pass returns normally and an unconditional advance would gate the repair off forever (issue 1363), so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
 It is recorded here so that this gate is not read as making it safe.
 The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 

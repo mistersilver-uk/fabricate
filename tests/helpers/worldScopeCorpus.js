@@ -191,11 +191,12 @@ function rawComponent({
           id: `sg-${id}`,
           results: [
             { componentId: id, quantity: 1 },
-            // A DANGLING result, when the scenario asks for one. It lives INSIDE the system, so
-            // `_normalizeSystem` prunes it on the round-trip save — which is what makes
-            // `#### D10`'s newly-decidable prune reachable end to end. A dangling reference in a
-            // RECIPE is never pruned by that seam, because the round trip re-normalizes systems
-            // alone, so a recipe-only fixture left the differential's prune branch dead code.
+            // A DANGLING result, when the scenario asks for one. It exercises the
+            // `flaggedForReview` REPORT, not a prune: measured across every scenario here, ten
+            // references resolve to nothing before the migration and ZERO disappear after the
+            // round trip. `_normalizeSystem` prunes no corpus reference against the component
+            // basis at all - its single consumer of that basis is the essence source-uuid
+            // retention. See the differential's own guard arm, which states the same thing.
             ...(danglingResultId ? [{ componentId: danglingResultId, quantity: 1 }] : []),
           ],
         },
@@ -251,7 +252,7 @@ function rawTool({
 }
 
 /** One raw essence definition, before normalization. */
-function rawEssence({ id, name, sourceComponentId = null, macro = null }) {
+function rawEssence({ id, name, sourceComponentId = null, macro = null, omitMacroKey = false }) {
   return {
     id,
     name,
@@ -259,8 +260,17 @@ function rawEssence({ id, name, sourceComponentId = null, macro = null }) {
     colorToken: 'rose',
     description: `${name} essence`,
     enabled: true,
-    propertyMacroUuid: macro,
+    // `omitMacroKey` models a record that PREDATES the field. `propertyMacroUuid` is new at
+    // issue 1036, so any world not re-saved since carries essences with no such key - and that
+    // is exactly the shape an absence-preserving membership write hands the DONOR's macro to.
+    ...(omitMacroKey ? {} : { propertyMacroUuid: macro }),
+    // ALL THREE SPELLINGS, because the walk rewrites all three and two of them were the gaps
+    // `#### D9` closed. A fixture carrying only the canonical one leaves the other two outside
+    // the differential entirely.
     sourceComponentId,
+    ...(sourceComponentId
+      ? { associatedSystemItemId: sourceComponentId, sourceItemUuid: sourceComponentId }
+      : {}),
   };
 }
 
@@ -384,6 +394,7 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
         name: essence.name ?? `${essence.id} in ${systemId}`,
         sourceComponentId: essence.sourceComponentId ?? null,
         macro: essence.macro ?? null,
+        omitMacroKey: essence.omitMacroKey === true,
       })
     );
     const components = (spec.components ?? []).map((component) =>
@@ -510,6 +521,67 @@ export function scenarioSpecs() {
           { id: 'sys-a', components: [{ id: 'comp-1', refs: [uuidA] }], tools: [] },
           { id: 'sys-b', components: [{ id: 'comp-2', refs: [uuidA, uuidB] }], tools: [] },
           { id: 'sys-c', components: [{ id: 'comp-3', refs: [uuidB] }], tools: [] },
+        ],
+      }),
+    },
+    {
+      // Z2. An essence whose SOURCE is a component the migration re-keys. Without it the whole
+      // essence-source reference class sits outside the differential: deleting
+      // `rewriteEssenceReferences` from the system leg was GREEN across every other scenario.
+      name: 'an essence whose source component is re-keyed',
+      raw: buildRawCorpus({
+        seed: 111,
+        systems: [
+          { id: 'sys-a', components: [{ id: 'comp-1', refs: [uuidA] }], essences: [], tools: [] },
+          {
+            id: 'sys-b',
+            components: [{ id: 'comp-9', refs: [uuidA] }],
+            // `comp-9` is re-keyed onto `comp-1`, so every spelling of this source must move
+            // with it - including `associatedSystemItemId` and the legacy `sourceItemUuid`.
+            essences: [{ id: 'ember', sourceComponentId: 'comp-9' }],
+            tools: [],
+          },
+        ],
+      }),
+    },
+    {
+      // Z3. A member that KEEPS its id, so a narrowing of its source links is NOT excused by a
+      // rename entry that exists only because the id changed.
+      // THE ABSENT-SECTION FALLBACK. The donor authors a property macro and the member's essence
+      // predates the field entirely, so an absence-preserving membership write would leave that
+      // member with an `inherit: false` switch over an ABSENT section - which resolves to the
+      // WORLD value, i.e. the donor's macro, on every craft.
+      name: 'a member whose essence predates the property-macro field',
+      raw: buildRawCorpus({
+        seed: 333,
+        systems: [
+          {
+            id: 'sys-a',
+            components: [{ id: 'comp-1', refs: [uuidA] }],
+            essences: [{ id: 'fire', macro: 'Macro.donor' }],
+            tools: [],
+          },
+          {
+            id: 'sys-b',
+            components: [{ id: 'comp-2', refs: [uuidA] }],
+            essences: [{ id: 'fire', omitMacroKey: true }],
+            tools: [],
+          },
+        ],
+      }),
+    },
+    {
+      name: 'a merged member that keeps its own id',
+      raw: buildRawCorpus({
+        seed: 222,
+        systems: [
+          { id: 'sys-a', components: [{ id: 'comp-1', refs: [uuidA] }], essences: [], tools: [] },
+          {
+            id: 'sys-b',
+            components: [{ id: 'comp-1', refs: [uuidA, uuidB] }],
+            essences: [],
+            tools: [],
+          },
         ],
       }),
     },
