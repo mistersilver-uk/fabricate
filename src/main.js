@@ -1176,7 +1176,14 @@ class Fabricate {
       },
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
-      isGM: () => game.user?.isGM === true
+      isGM: () => game.user?.isGM === true,
+      // The three world-scope entity stores (issue 1364). They are constructed above, so they are
+      // injected DIRECTLY rather than resolved through `game.fabricate` at merge time: the
+      // importer fails CLOSED on an absent seam, so a lazy accessor lookup is a silent no-op that
+      // reads exactly like a successful import.
+      componentScopeStore: this.componentScopeStore,
+      essenceScopeStore: this.essenceScopeStore,
+      toolScopeStore: this.toolScopeStore
     });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,

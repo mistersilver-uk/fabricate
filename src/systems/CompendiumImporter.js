@@ -30,13 +30,6 @@ const CURRENCY_CONFIG_KEY = 'currencyConfig';
 const TRAVEL_CONFIG_KEY = 'travelConfig';
 const CHARACTER_LIBRARIES_KEY = 'characterLibraries';
 
-/** The `game.fabricate` accessor each world-scope entity store is reached through. */
-const SCOPE_STORE_ACCESSORS = Object.freeze({
-  components: 'getComponentScopeStore',
-  essences: 'getEssenceScopeStore',
-  tools: 'getToolScopeStore',
-});
-
 /** The report owner type each world-scope entity type reuses. */
 const SCOPE_OWNER_TYPES = Object.freeze({
   components: 'component',
@@ -252,9 +245,7 @@ export class CompendiumImporter {
     // is reused as-is.
     this._reportProgress = seams.reportProgress ?? null;
     this._activeProgressReporter = null;
-    // The three world-scope entity stores (issue 1364), injected exactly as `environmentStore` is
-    // and resolved LAZILY through `game.fabricate` when they are not, because this importer is
-    // constructed before `ready` on one of its two call paths.
+    // The three world-scope entity stores (issue 1364), injected exactly as `environmentStore` is.
     this._scopeStoreSeams = {
       components: seams.componentScopeStore ?? null,
       essences: seams.essenceScopeStore ?? null,
@@ -270,14 +261,20 @@ export class CompendiumImporter {
    * first write flips a whole world's Valid Id Basis from UNKNOWN to KNOWN. `_persistCharacterLibraries`
    * returns early on an absent seam for the same reason.
    *
+   * **IT IS THE INJECTED SEAM ALONE, WITH NO `game.fabricate` FALLBACK, AND THE ABSENCE IS
+   * DELIBERATE.** A lazy accessor lookup keyed on a hand-maintained mirror of `game.fabricate`'s
+   * method names looks like belt-and-braces and is the opposite: because the merge fails closed,
+   * a mirror that drifts — a renamed accessor, a moved store — makes every world-scope import
+   * silently merge NOTHING and still report success, and no test can see the difference between
+   * that and a correct fallback. Both production call sites inject the three stores explicitly and
+   * are pinned by a source contract, which is a guard that can fail.
+   *
    * @param {'components'|'essences'|'tools'} entityType
    * @returns {object|null}
    * @private
    */
   _scopeStore(entityType) {
-    const seam = this._scopeStoreSeams[entityType];
-    if (seam) return seam;
-    return globalThis.game?.fabricate?.[SCOPE_STORE_ACCESSORS[entityType]]?.() ?? null;
+    return this._scopeStoreSeams[entityType] ?? null;
   }
 
   /**

@@ -556,6 +556,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             getSetting: (key) => getSetting(key),
             setSetting: (key, value) => setSetting(key, value),
             isGM: () => game.user?.isGM === true,
+            // The three world-scope entity stores (issue 1364), injected exactly as the
+            // environment store is. The importer fails CLOSED on an absent seam, so leaving these
+            // to a lazy lookup would make a broken accessor present as a successful import that
+            // merged nothing.
+            componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,
+            essenceScopeStore: game.fabricate.getEssenceScopeStore?.() ?? null,
+            toolScopeStore: game.fabricate.getToolScopeStore?.() ?? null,
           });
           summary = await importer.importFromPackData(packData, {
             overwriteExisting: result.conflictMode === 'overwrite',
