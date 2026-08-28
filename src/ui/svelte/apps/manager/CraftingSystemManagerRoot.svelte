@@ -148,6 +148,7 @@
   import WorldToolCataloguePage from './scoped/WorldToolCataloguePage.svelte';
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
+  import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -2770,13 +2771,51 @@
     essences: worldScopeState.essence?.entities?.length ?? 0,
     tools: worldScopeState.tool?.entities?.length ?? 0,
     // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
-    // reason is a one-way door: `## GM World Scoped Entity Routes` requirement 7 bars every
+    // reason is a one-way door: `### GM World Scoped Entity Routes` requirement 7 bars every
     // later PR in this epic from touching this file, so a badge omitted here could never be
-    // added. It reads a key `worldScopeProjection.js` does not publish yet and answers 0, which
-    // is truthful — no world vocabulary exists — and PR 7 lights it up by publishing
-    // `worldScope.vocabulary.total` from that NON-gateway module, with no edit here.
+    // added.
+    //
+    // BOTH HALVES ARE WIRED, not just this one. `worldScopeProjection.js` publishes
+    // `worldScope.vocabulary.total` today — 0 until a vocabulary store exists — and
+    // `adminStore`'s `_worldScopeStores` already reads an optional fourth `vocabulary` leg, so
+    // PR 7 registers its store and its projection without reopening either gateway file. The
+    // field name `total` is the contract between the two; `### GM World Vocabulary Route`
+    // names it and `tests/world-scope-projection.test.js` pins it.
     vocabulary: worldScopeState.vocabulary?.total ?? 0,
   });
+
+  // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
+  //
+  // The three entry routes are the only World screens whose trail is THREE crumbs — the
+  // prototype's `crumbFor` maps an entry to `[World, <catalogue>, <entity name>]`, with the
+  // middle crumb clickable back to the catalogue. That middle crumb is the only way back out
+  // of an entry editor, which is released to full width and so has no inspector to carry one.
+  //
+  // IT IS ROOT STATE BECAUSE THE BREADCRUMB IS SHELL CHROME. A page cannot render a crumb, and
+  // requirement 7 of `### GM World Scoped Entity Routes` closes this file to PRs 6a, 6b and 6c
+  // — so the subject a later lane will choose has to be expressible through a prop it already
+  // has. `onOpenEntry` is that prop: a catalogue row calls it with the entity id, this shell
+  // performs the navigation, and the third crumb follows from the published corpus with no
+  // further edit here.
+  let worldScopedEntryId = $state('');
+  const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
+  const worldScopedEntryCrumb = $derived(
+    scopedEntryName(
+      worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
+      worldScopedEntryId
+    )
+  );
+
+  // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
+  // other navigation passes, and the subject is recorded only once that gate has allowed the
+  // move — a refused exit must not leave the shell naming a record it did not navigate to.
+  function openWorldScopedEntry(view, entityId) {
+    const nextEntryId = typeof entityId === 'string' ? entityId : String(entityId ?? '');
+    return afterTruthyResult(confirmRouteExit(view), () => {
+      worldScopedEntryId = nextEntryId;
+      activeView = view;
+    });
+  }
 
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
   //
@@ -8633,10 +8672,39 @@
               >
             {/if}
             {#if isWorldScopedRoute}
-              <!-- `World > <screen>`, one level, because these ARE world screens rather than
-                   destinations inside a group. -->
+              <!--
+                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE, which is the prototype's own
+                `crumbFor` shape: a catalogue is `World > <screen>` because it IS a world screen
+                rather than a destination inside a group, and an entry is
+                `World > <catalogue> > <entity>` with the catalogue crumb CLICKABLE.
+
+                The middle crumb is not decoration. An entry editor is released to full width
+                and therefore renders no inspector, so this crumb is the only affordance that
+                takes the GM back to the list they came from — the same "a button wherever it is
+                not the leaf" rule the World crumb above follows.
+              -->
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-world-scoped={currentView}>{viewTitle()}</span>
+              {#if worldScopedEntryRoute}
+                <button
+                  type="button"
+                  data-breadcrumb-world-scoped-catalogue={worldScopedEntryRoute.catalogueView}
+                  onclick={() => setView(worldScopedEntryRoute.catalogueView)}
+                  >{text(
+                    worldScopedEntryRoute.catalogueTitleKey,
+                    worldScopedEntryRoute.catalogueTitleFallback
+                  )}</button
+                >
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                <!-- The entity's OWN name when the corpus can supply one, falling back to the
+                     screen's title: an entry route with no subject chosen yet, or a subject the
+                     corpus no longer holds, has nothing to name and must not print an empty
+                     crumb. -->
+                <span data-breadcrumb-world-scoped={currentView} title={worldScopedEntryCrumb}
+                  >{worldScopedEntryCrumb || viewTitle()}</span
+                >
+              {:else}
+                <span data-breadcrumb-world-scoped={currentView}>{viewTitle()}</span>
+              {/if}
             {/if}
             {#if isWorldRulesRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -10530,18 +10598,39 @@
         per-page `data-scoped-page` hook. These SEVEN FILES are what PRs 6a, 6b, 6c and 7
         replace, which is the whole reason they are separate components rather than seven
         branches of markup here: no later lane in this epic needs to reopen this file.
+
+        AND THE ROUTE SEAM THOSE LANES CONSUME. A catalogue takes `onOpenEntry(entityId)` and an
+        entry takes the `entityId` it was opened on plus the way back to its catalogue. The
+        placeholder bodies use none of the four — they render an empty state — but the wiring is
+        here rather than in 6a/6b/6c because it is the SHELL that owns routing, the breadcrumb
+        and the confirm-discard gate, and requirement 7 closes this file to all three.
       -->
-      <WorldComponentCataloguePage />
+      <WorldComponentCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
+      />
     {:else if currentView === 'world-component-entry'}
-      <WorldComponentEntryPage />
+      <WorldComponentEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-components')}
+      />
     {:else if currentView === 'world-essences'}
-      <WorldEssenceCataloguePage />
+      <WorldEssenceCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
+      />
     {:else if currentView === 'world-essence-entry'}
-      <WorldEssenceEntryPage />
+      <WorldEssenceEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-essences')}
+      />
     {:else if currentView === 'world-tools'}
-      <WorldToolCataloguePage />
+      <WorldToolCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+      />
     {:else if currentView === 'world-tool-entry'}
-      <WorldToolEntryPage />
+      <WorldToolEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-tools')}
+      />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage />
     {:else if currentView === 'world-downtime'}

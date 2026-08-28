@@ -4782,11 +4782,20 @@ export function createAdminStore(services) {
     return _buildWorldScopeState({ stores: _worldScopeStores(), systems: _allSystems() });
   }
 
+  // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
+  // with PR 7 of epic 1357, but this file is one of the five gateway paths requirement 7 of
+  // `### GM World Scoped Entity Routes` closes to that PR — so a producer leg added later could
+  // only be added by reopening the file this change promises no later lane needs to touch. It
+  // reads through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings,
+  // which answers `null` until the service is registered; `projectWorldVocabulary` then
+  // publishes `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful,
+  // because a world with no vocabulary store has no world vocabulary.
   function _worldScopeStores() {
     return {
       component: services.getComponentScopeStore?.() ?? null,
       essence: services.getEssenceScopeStore?.() ?? null,
       tool: services.getToolScopeStore?.() ?? null,
+      vocabulary: services.getVocabularyScopeStore?.() ?? null,
     };
   }
 

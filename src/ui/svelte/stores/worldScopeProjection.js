@@ -96,6 +96,66 @@ export function emptyWorldScopeEntityState(entityType) {
 }
 
 /**
+ * The three vocabularies the World Vocabulary holds, in the order its screen lists them.
+ *
+ * The World Vocabulary is NOT a scoped-entity layer - it holds the vocabularies the scoped
+ * entities draw FROM - so it has no sections, no membership and no per-system rows, and it is
+ * projected by its own function rather than through {@link projectWorldScopeEntity}.
+ *
+ * @type {readonly string[]}
+ */
+export const WORLD_VOCABULARY_KINDS = Object.freeze([
+  'componentCategories',
+  'componentTags',
+  'recipeCategories',
+]);
+
+/**
+ * The World Vocabulary projection when no vocabulary store is registered.
+ *
+ * `total` is 0 and `available` is false, which is the state PR 7 replaces: the rail leaf's
+ * count badge reads 0, which is TRUTHFUL rather than a placeholder, because a world with no
+ * vocabulary store has no world vocabulary.
+ *
+ * @returns {object}
+ */
+export function emptyWorldVocabularyState() {
+  const state = { available: false, total: 0 };
+  for (const kind of WORLD_VOCABULARY_KINDS) state[kind] = [];
+  return state;
+}
+
+/**
+ * Project the World Vocabulary corpus.
+ *
+ * `total` IS THE PUBLISHED FIELD NAME, and it is a contract rather than an implementation
+ * detail: `CraftingSystemManagerRoot.svelte` reads `worldScope.vocabulary.total` for the
+ * `Tags & Categories` rail leaf's count badge, and requirement 7 of
+ * `### GM World Scoped Entity Routes` bars PR 7 from that file - so a producer that published
+ * `count` or `entries.length` instead would leave the badge reading 0 forever with every test
+ * still green. `ui-integration/spec.md`'s `### GM World Vocabulary Route` names it, and
+ * `tests/world-scope-projection.test.js` pins it.
+ *
+ * The three vocabularies are summed rather than deduplicated across kinds: a category and a tag
+ * that happen to share a label are two entries in the world's vocabulary, and the prototype's
+ * own badge is the same sum of its three lists.
+ *
+ * @param {{componentCategories?: unknown, componentTags?: unknown, recipeCategories?: unknown}
+ *   |null} corpus
+ * @returns {object}
+ */
+export function projectWorldVocabulary(corpus) {
+  if (!corpus || typeof corpus !== 'object') return emptyWorldVocabularyState();
+  const state = { available: true, total: 0 };
+  for (const kind of WORLD_VOCABULARY_KINDS) {
+    const entries = Array.isArray(corpus[kind]) ? corpus[kind] : [];
+    state[kind] = entries;
+    state.total += entries.length;
+  }
+  return state;
+}
+
+/**
  * The empty projection for all three entity types.
  *
  * @returns {{worldScope: object}}
@@ -105,6 +165,7 @@ export function emptyWorldScopeState() {
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     worldScope[entityType] = emptyWorldScopeEntityState(entityType);
   }
+  worldScope.vocabulary = emptyWorldVocabularyState();
   return { worldScope };
 }
 
@@ -306,8 +367,16 @@ function readCorpus(store) {
  * Answers the top-level `worldScope` key `adminStore` publishes, ALWAYS as a new object, so a
  * `$derived` over it re-propagates on every publish.
  *
+ * THE FOURTH LEG IS THE WORLD VOCABULARY, and it is optional. `adminStore`'s `_worldScopeStores`
+ * reads it through the same `services.getVocabularyScopeStore?.() ?? null` idiom as the other
+ * three, so it degrades to `null` - and to a `total: 0` projection - until PR 7 registers the
+ * store. That leg exists NOW because `adminStore.js` is one of the five gateway files
+ * requirement 7 of `### GM World Scoped Entity Routes` closes to PR 7: a producer wired later
+ * could only be wired by reopening the file this PR promises no later lane needs to touch.
+ *
  * @param {object} [options]
- * @param {Record<string, object|null>} [options.stores] `{component, essence, tool}` scope stores.
+ * @param {Record<string, object|null>} [options.stores] `{component, essence, tool, vocabulary}`
+ *   scope stores; `vocabulary` may be absent.
  * @param {unknown} [options.systems] The crafting-system roster.
  * @returns {{worldScope: object}}
  */
@@ -320,5 +389,6 @@ export function buildWorldScopeState({ stores = {}, systems = [] } = {}) {
       ...readCorpus(stores?.[entityType] ?? null),
     });
   }
+  worldScope.vocabulary = projectWorldVocabulary(readCorpus(stores?.vocabulary ?? null).corpus);
   return { worldScope };
 }
