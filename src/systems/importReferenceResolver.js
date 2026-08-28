@@ -176,6 +176,25 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
  * on either side carries no evidence either way, and reporting it would fire on the commonest
  * operation there is - re-importing a pack the destination already has.
  *
+ * **THE ESSENCE ARM IS VACUOUS IN PRACTICE, AND SAYING SO IS THE POINT.** The DESTINATION side is
+ * what makes it so: `WORLD_IDENTITY_FIELDS.essences` lifts only `name` / `icon` / `colorToken` /
+ * `description`, because an essence id is a stable semantic slug the `1.30.0` grouping treats as
+ * the identity itself, so no world essence entity the migration or an export ever produced
+ * carries a source link and `destination.refs.size` is 0 for every one of them. The INCOMING side
+ * is not empty - an essence definition's own `sourceItemUuid` is a THIRD, unrelated field family
+ * that `sourceReferencesOf` happens to read - so it is the destination half alone that
+ * short-circuits the positive-evidence guard. The loop still covers all three entity types
+ * because the rule is stated over all three and a hand-authored world essence carrying a link
+ * would then be covered without an edit; it is written down so no one mistakes the arm for tested
+ * behaviour.
+ *
+ * **IT DELIBERATELY DOES NOT COVER COPY-MODE COMPONENTS, AND THE MANY-TO-ONE CASE IS NOT ITS
+ * JOB.** This pass runs BEFORE `rebindCopyComponentIds`, so under copy mode a component's id here
+ * is a PRE-REBIND id that is about to be replaced; reporting a collision on it would name an
+ * identifier the prepared payload does not contain. The converse hazard - two incoming components
+ * binding to ONE destination entity - is reported by the id-claim ladder in
+ * {@link rebindCopyComponentIds}, which is the only place that knows which record claimed what.
+ *
  * @param {object} prepared
  * @param {unknown} worldEntityIndex
  * @param {'keep'|'copy'} mode
@@ -288,6 +307,34 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
  * candidate. The tie-break is deterministic for the reason the id-claim ladder's is: a re-run must
  * choose identically.
  *
+ * ## AND THE BINDING IS INJECTIVE: ONE DESTINATION ENTITY, AT MOST ONE INCOMING RECORD
+ *
+ * The converse of multi-match is the one that loses data, and it is not exotic. TWO incoming
+ * records can intersect ONE destination entity - directly, when they share a
+ * `registeredItemUuid`, and transitively, when the destination entity's own set was WIDENED by
+ * the `1.30.0` grouping's union so that `c1{Item.x}` and `c2{Item.y}`, which share nothing with
+ * each other, both intersect it. "Intersects a destination entity" is therefore NOT an
+ * equivalence relation over the incoming records and cannot partition them.
+ *
+ * Without a claim ladder both records bind to the same id and the SECOND one vanishes whole:
+ * `_normalizeSystem` keeps only the last of a duplicate id in `itemById`, and the read union
+ * de-duplicates by entity id, so the component disappears from the UI, from the index and from
+ * the engine with no error anywhere. The migration REFUSES the same corpus outright
+ * (`outputIdCollision`), so silently collapsing it here would give one release two answers to one
+ * question.
+ *
+ * So {@link bindToDestination} carries the ID-CLAIM LADDER's three rungs, keyed on the
+ * DESTINATION id rather than on a group's members: the best intersecting candidate if unclaimed,
+ * else the NEXT unclaimed intersecting candidate in the same ranked order, else mint. Every
+ * contested destination id is reported naming BOTH owners.
+ *
+ * **The middle rung is not polish.** Mint-immediately is neither order-stable nor idempotent:
+ * destination roster order is the key order of a persisted setting that nothing in this pipeline
+ * sorts, and a record that mints because its best candidate was taken adds one world entity per
+ * import, forever, because the entity it minted last time is never the one it prefers this time.
+ * Taking the next unclaimed candidate binds to that minted entity on the second run instead, so
+ * the second and every later import adds nothing.
+ *
  * ## ONE ID CLASS, NOT THREE, AND FIVE REWRITE TARGETS
  *
  * Only components ever regenerated. Tools and essences continue to bind by id verbatim, and their
@@ -337,10 +384,17 @@ export function rebindCopyComponentIds(
   const idMap = {};
   /** The incoming ids that BOUND to a destination world entity rather than minting. */
   const matched = new Set();
+  /**
+   * The ID-CLAIM LADDER's state: destination entity id -> the incoming record that took it.
+   * It is what makes the binding INJECTIVE, and it is a Map rather than a Set because a
+   * contention is only actionable if the report can name BOTH owners.
+   */
+  const claimed = new Map();
   for (const component of components) {
     if (!component || typeof component !== 'object' || !component.id) continue;
     const refs = sourceReferenceSet(component, 'components', components);
-    const bound = refs.length > 0 ? bindToDestination(refs, roster, component, report) : null;
+    const bound =
+      refs.length > 0 ? bindToDestination(refs, roster, component, report, claimed) : null;
     if (bound) {
       idMap[component.id] = bound;
       matched.add(component.id);
@@ -376,36 +430,88 @@ export function rebindCopyComponentIds(
 /**
  * Bind one incoming component to a destination world entity, or answer `null` to mint.
  *
+ * THE ID-CLAIM LADDER, keyed on the destination id: the best intersecting candidate if
+ * UNCLAIMED, else the next unclaimed candidate in the same ranked order, else mint. `claimed` is
+ * threaded across the whole payload's records, which is what makes the binding INJECTIVE - see
+ * {@link rebindCopyComponentIds}'s note for what a non-injective binding silently destroys, and
+ * why the middle rung rather than an immediate mint is what makes a re-import idempotent.
+ *
  * @param {string[]} refs
  * @param {Array<{id: string, refs: Set<string>}>} roster In ROSTER ORDER, which is the tie-break.
- * @param {object} component The incoming record, for the ambiguity report's owner.
+ * @param {object} component The incoming record, for the report's owner.
  * @param {object[]|null} report
+ * @param {Map<string, object>} claimed Destination id -> the incoming record that took it.
  * @returns {string|null}
  */
-function bindToDestination(refs, roster, component, report) {
-  let winner = null;
-  let best = 0;
-  const candidates = [];
-  for (const entity of roster) {
-    const size = intersectionSize(refs, entity.refs);
-    if (size === 0) continue;
-    candidates.push(entity.id);
-    // STRICTLY greater, scanning in roster order, is what makes the tie-break FIRST-WINS.
-    if (size > best) {
-      best = size;
-      winner = entity.id;
-    }
-  }
-  if (!winner) return null;
-  if (candidates.length > 1 && Array.isArray(report)) {
-    for (const losing of candidates) {
-      if (losing === winner) continue;
-      report.push(
-        reportEntry(REFERENCE_KINDS.WORLD_ENTITY_COLLISION, 'component', component, losing)
-      );
-    }
-  }
+function bindToDestination(refs, roster, component, report, claimed) {
+  const candidates = rankedCandidates(refs, roster);
+  if (candidates.length === 0) return null;
+
+  // Everything ranked ABOVE the winner is, by construction, already claimed by another incoming
+  // record; everything BELOW it is an ordinary multi-match loser.
+  const winnerIndex = candidates.findIndex((candidate) => !claimed.has(candidate.id));
+  const contested = winnerIndex === -1 ? candidates : candidates.slice(0, winnerIndex);
+  const beaten = winnerIndex === -1 ? [] : candidates.slice(winnerIndex + 1);
+  reportBinding(report, component, claimed, contested, beaten);
+
+  // RUNG 3 - every intersecting candidate is spoken for, so this record mints its own id.
+  if (winnerIndex === -1) return null;
+
+  const winner = candidates[winnerIndex].id;
+  claimed.set(winner, component);
   return winner;
+}
+
+/**
+ * Every destination entity one incoming reference set intersects, best match first.
+ *
+ * Ranked by intersection size DESCENDING, ties by ROSTER POSITION so first wins. The position is
+ * carried explicitly rather than left to `Array#sort`'s stability, because the ranking is the
+ * whole of the determinism guarantee and a re-run must choose identically.
+ *
+ * @param {string[]} refs
+ * @param {Array<{id: string, refs: Set<string>}>} roster
+ * @returns {Array<{id: string, size: number, position: number}>}
+ */
+function rankedCandidates(refs, roster) {
+  const candidates = [];
+  for (const [position, entity] of roster.entries()) {
+    const size = intersectionSize(refs, entity.refs);
+    if (size > 0) candidates.push({ id: entity.id, size, position });
+  }
+  candidates.sort((left, right) => right.size - left.size || left.position - right.position);
+  return candidates;
+}
+
+/**
+ * Report one record's binding outcome: every CONTESTED destination id, and every candidate the
+ * winner merely beat.
+ *
+ * A contested id is reported against BOTH owners - the record that claimed it and the record that
+ * wanted it - because a contention naming only one of them tells a GM that something collided
+ * without telling them what with, and the whole point of the entry is that the second record has
+ * had to take a different id (or mint one) rather than silently disappear.
+ *
+ * @param {object[]|null} report
+ * @param {object} component The record being bound.
+ * @param {Map<string, object>} claimed
+ * @param {Array<{id: string}>} contested
+ * @param {Array<{id: string}>} beaten
+ */
+function reportBinding(report, component, claimed, contested, beaten) {
+  if (!Array.isArray(report)) return;
+  const push = (owner, referenceValue) => {
+    report.push(
+      reportEntry(REFERENCE_KINDS.WORLD_ENTITY_COLLISION, 'component', owner, referenceValue)
+    );
+  };
+  for (const candidate of contested) {
+    push(claimed.get(candidate.id), candidate.id);
+    push(component, candidate.id);
+  }
+  for (const candidate of beaten) {
+    if (!claimed.has(candidate.id)) push(component, candidate.id);
+  }
 }
 
 /**
