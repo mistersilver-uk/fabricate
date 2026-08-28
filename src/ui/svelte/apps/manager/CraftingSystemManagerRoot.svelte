@@ -811,6 +811,11 @@
   const placeholderViews = [
     {
       id: 'graph',
+      // The rail id, as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
+      // Both harnesses target every rail entry by id since issue 1362, and an interpolated one
+      // is invisible to the source gate that checks the id is rendered at all — the same
+      // weakening the View Lab's own hook scan records for a stem-built selector.
+      navId: 'manager-nav-graph',
       icon: 'fas fa-project-diagram',
       labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
       fallback: 'Graph',
@@ -9918,9 +9923,13 @@
           {/if}
         {/if}
         {#each visiblePlaceholderViews as view (view.labelKey)}
+          <!-- A stable id here too (issue 1362). Both harnesses target every rail entry by id,
+               and a planned-view placeholder is still a rail entry the smoke's membership loop
+               names. -->
           <button
             type="button"
             class="manager-nav-button"
+            id={view.navId}
             disabled
             title={text(
               'FABRICATE.Admin.Manager.PlannedView',
