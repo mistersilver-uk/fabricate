@@ -42,7 +42,9 @@ const { migrateWorldScopeEntities } = await import(
   '../src/migration/migrateWorldScopeEntities.js'
 );
 const { resolveComponentScope } = await import('../src/systems/componentScope.js');
-const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
+const { CompendiumImporter, scopeStoreDelegate } = await import(
+  '../src/systems/CompendiumImporter.js'
+);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SYSTEM_ID = 'sys-source';
@@ -1171,6 +1173,44 @@ test('19: a LOSING candidate is reported even when another record has already cl
   );
 });
 
+test('19: a NON-intersecting destination entity is not a candidate at all', () => {
+  // THE ZERO-INTERSECTION FLOOR, and it is now the SOLE guard rather than one of two. The
+  // pre-ladder binder scanned for `size > best` starting from `best = 0`, so a zero-intersection
+  // candidate could never win even if the filter were removed; `findIndex(!claimed.has(...))` has
+  // no such floor, and takes whatever the candidate list contains.
+  //
+  // The roster must be NON-EMPTY, and that is the whole trick: an empty roster mints whatever the
+  // floor does, so it would pass either way.
+  //
+  // REDDENS WHEN: the intersection filter is relaxed to `size >= 0` — the unrelated component
+  // collapses onto the destination entity AND its own roster record is dropped as "matched", which
+  // is the silent data loss this whole binding exists to prevent.
+  const packData = prepareForImport(
+    envelope({
+      system: {
+        components: [{ id: 'c1', name: 'Silver bar', registeredItemUuid: 'Item.silver' }],
+      },
+    }),
+    'copy',
+    {
+      worldEntityIndex: {
+        components: [{ id: 'D1', name: 'Iron bar', registeredItemUuid: 'Item.iron' }],
+        essences: [],
+        tools: [],
+      },
+    }
+  );
+
+  const boundId = packData.system.components[0].id;
+  assert.notEqual(boundId, 'D1', 'a component sharing NO reference with the roster MINTS');
+  assert.deepEqual(
+    packData.componentScope.entities.map((entity) => entity.id),
+    [boundId],
+    'and its own world entity record SURVIVES, under the minted id — a false match would have ' +
+      'dropped it as already held by the destination'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Criterion 9a — the copy-mode binding is INJECTIVE, through the ID-CLAIM LADDER
 // ---------------------------------------------------------------------------
@@ -1504,6 +1544,21 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
       assert.ok(site.includes(`${seam}:`), `${path} must inject ${seam}`);
     }
   }
+
+  // `src/main.js` builds this importer INSIDE the same method that constructs the three stores, so
+  // it is the one site with an ordering hazard — and the hazard is silent, because the merge fails
+  // closed. It must therefore resolve each store LAZILY through the shipped delegator, exactly as
+  // the `environmentStore` seam two lines above it already does, rather than capture a field whose
+  // assignment happens to precede it today.
+  //
+  // REDDENS WHEN: a seam reverts to `componentScopeStore: this.componentScopeStore`.
+  const mainSite = importerConstructionSite(sites['src/main.js']);
+  for (const seam of seamNames) {
+    assert.ok(
+      mainSite.includes(`${seam}: scopeStoreDelegate(() => this.${seam})`),
+      `src/main.js must resolve ${seam} lazily, not capture the field at construction`
+    );
+  }
 });
 
 test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one merges', async () => {
@@ -1553,6 +1608,50 @@ test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one
     world.persisted('components').entities.map((entity) => entity.id),
     ['c1'],
     'and the SAME import through the seamed importer lands the world entity'
+  );
+});
+
+test('11: the SHIPPED delegator is fail-closed on an unassigned field and resolves LATE', async () => {
+  // THE SHAPE PRODUCTION ACTUALLY WIRES, now that both call sites always hand over a seam object.
+  // The reachable failure is no longer "no seam" but "seam present, field not assigned yet", which
+  // is why this arm runs the SHIPPED `scopeStoreDelegate` rather than a copy of its shape.
+  //
+  // REDDENS WHEN: the delegator's `isSeeded` stops demanding a strict `true` from a real store
+  // (first half), or when it resolves the field ONCE at construction instead of on every call
+  // (second half).
+  const world = await seededEmptyWorld();
+  const payload = () => envelope({ system: { components: [component('c1')] } });
+  const prepare = () =>
+    prepareForImport(payload(), 'keep', { worldEntityIndex: world.worldEntityIndex() });
+
+  // An owner that has not reached its store construction yet — exactly the state a seam captured
+  // eagerly at the top of a long `initialize()` would freeze forever.
+  const owner = { componentScopeStore: null, essenceScopeStore: null, toolScopeStore: null };
+  const importer = new CompendiumImporter(world.systemManager, world.recipeManager, {
+    getSetting: world.getSetting,
+    setSetting: world.setSetting,
+    isGM: () => true,
+    reportProgress: () => {},
+    componentScopeStore: scopeStoreDelegate(() => owner.componentScopeStore),
+    essenceScopeStore: scopeStoreDelegate(() => owner.essenceScopeStore),
+    toolScopeStore: scopeStoreDelegate(() => owner.toolScopeStore),
+  });
+
+  await importer.importFromPackData(prepare(), { overwriteExisting: true });
+  assert.deepEqual(
+    world.persisted('components').entities,
+    [],
+    'an unassigned field is indistinguishable from an unmigrated world — the merge is SKIPPED'
+  );
+
+  // The other half, and the reason a delegator is worth having at all: the SAME seam merges once
+  // the owner assigns the field. A seam that resolved once at construction would still be empty.
+  owner.componentScopeStore = world.stores.components;
+  await importer.importFromPackData(prepare(), { overwriteExisting: true });
+  assert.deepEqual(
+    world.persisted('components').entities.map((entity) => entity.id),
+    ['c1'],
+    'and the same seam merges once the field is assigned, because it resolves on every call'
   );
 });
 

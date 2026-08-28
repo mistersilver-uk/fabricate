@@ -205,6 +205,41 @@ function upcastComponentSourceFields(component) {
   return next;
 }
 
+/**
+ * A thin delegating view of ONE world-scope entity store, resolved on every call (issue 1364).
+ *
+ * IT LIVES BESIDE THE IMPORTER RATHER THAN AT THE WIRING SITE, because the rule it encodes is
+ * this importer's: the world-scope merge FAILS CLOSED, so an absent store is skipped silently and
+ * a seam that answered anything optimistic would turn "merged nothing" into "reported success".
+ * Keeping the adapter next to `_scopeStore` is what stops the two halves of that contract drifting
+ * apart, and it is what lets a test exercise the SHIPPED delegator instead of a copy of it.
+ *
+ * It exists at all for the reason the importer's `environmentStore` delegator does: the seam is
+ * built while the field it names may not be assigned yet, so it closes over a READ rather than
+ * over a value. Closing over the FIELD rather than an accessor NAME is also what distinguishes it
+ * from the `game.fabricate` accessor mirror it replaced — a rename here is a rename of a property
+ * the wiring site reads, not of a string in a hand-maintained table.
+ *
+ * `isSeeded` answers a strict `true` only when a real store says so, so an unassigned field is
+ * indistinguishable from an unmigrated world and the merge is skipped — which also means `save` is
+ * unreachable without a real store behind it.
+ *
+ * The three methods are exactly what the world-scope merge calls. It is a shared factory rather
+ * than three inline literals at the wiring site because three near-identical blocks are what the
+ * duplication gate counts.
+ *
+ * @param {() => object|null|undefined} resolve Reads the owning field at call time.
+ * @returns {{isSeeded: (subKey: string) => boolean, get: () => object|null,
+ *   save: (value: object) => Promise<unknown>|undefined}}
+ */
+export function scopeStoreDelegate(resolve) {
+  return {
+    isSeeded: (subKey) => resolve()?.isSeeded?.(subKey) === true,
+    get: () => resolve()?.get?.() ?? null,
+    save: (value) => resolve()?.save?.(value),
+  };
+}
+
 export class CompendiumImporter {
   /**
    * @param {object} craftingSystemManager

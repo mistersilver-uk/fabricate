@@ -11,7 +11,7 @@ import {
 } from './models/toolDisplay.js';
 import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
-import { CompendiumImporter } from './systems/CompendiumImporter.js';
+import { CompendiumImporter, scopeStoreDelegate } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
@@ -1177,13 +1177,16 @@ class Fabricate {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
-      // The three world-scope entity stores (issue 1364). They are constructed above, so they are
-      // injected DIRECTLY rather than resolved through `game.fabricate` at merge time: the
-      // importer fails CLOSED on an absent seam, so a lazy accessor lookup is a silent no-op that
-      // reads exactly like a successful import.
-      componentScopeStore: this.componentScopeStore,
-      essenceScopeStore: this.essenceScopeStore,
-      toolScopeStore: this.toolScopeStore
+      // The three world-scope entity stores (issue 1364) resolve lazily through thin delegating
+      // objects, for the environment store's reason above and one of its own. The merge fails
+      // CLOSED on an absent store, so a seam that captured a still-undefined field would make
+      // every world-scope import merge NOTHING and still report success — which is exactly the
+      // failure deleting the `game.fabricate` accessor mirror was meant to end. A delegator closes
+      // over the FIELD rather than an accessor name, so it needs no ordering comment to stay true
+      // and a rename cannot slip past it.
+      componentScopeStore: scopeStoreDelegate(() => this.componentScopeStore),
+      essenceScopeStore: scopeStoreDelegate(() => this.essenceScopeStore),
+      toolScopeStore: scopeStoreDelegate(() => this.toolScopeStore)
     });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
