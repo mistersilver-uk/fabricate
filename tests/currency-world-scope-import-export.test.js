@@ -21,6 +21,7 @@ import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 
 import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
+import { emptyCopyOptions } from './helpers/worldEntityIndex.js';
 
 function importerOver(seedCurrencyConfig) {
   return importerOverSettings({ currencyConfig: seedCurrencyConfig });
@@ -275,7 +276,7 @@ describe('the ladder survives the WHOLE import composition, not just the merge h
   it('carries it through COPY mode too, without rebinding unit ids', () => {
     // Unit ids are world scope and shared by every crafting system, so rebinding them the way a
     // copy rebinds recipe and component ids would orphan the very costs the copy carries.
-    const packData = prepareForImport(envelope(), 'copy');
+    const packData = prepareForImport(envelope(), 'copy', emptyCopyOptions());
 
     assert.deepEqual(
       packData.currencyConfig.units.map((unit) => unit.id),

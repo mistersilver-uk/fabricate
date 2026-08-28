@@ -97,7 +97,7 @@ export const WORLD_DEFAULT_SECTIONS = Object.freeze({
 });
 
 /** The reserved component category that must NEVER be persisted at world scope. */
-const RESERVED_CATEGORY = 'general';
+export const RESERVED_CATEGORY = 'general';
 
 /**
  * The sections a membership record CANNOT express an empty override for, and which therefore fall
@@ -108,7 +108,7 @@ const RESERVED_CATEGORY = 'general';
  *
  * @type {ReadonlySet<string>}
  */
-const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBreak']);
+export const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBreak']);
 
 /**
  * Whether ONE member record authored a section at all, judged exactly as
@@ -153,15 +153,24 @@ function trimmedString(value) {
  * @param {ReadonlySet<string>} worldComponentIds
  * @returns {boolean}
  */
-function isWorldAddressable(reference, worldComponentIds) {
+export function isWorldAddressable(reference, worldComponentIds) {
   const value = trimmedString(reference);
   if (!value) return true;
   if (value.includes('.')) return true;
   return worldComponentIds.has(value);
 }
 
-/** Every component id an ingredient-group list references, including through `alternatives`. */
-function referencedComponentIds(groups, collected = new Set()) {
+/**
+ * Every component id an ingredient-group list references, including through `alternatives`.
+ *
+ * EXPORTED since issue 1364, so the import-time re-check decides constraint 4 with the SAME
+ * enumeration the election used rather than a hand-written second walk of the same shape.
+ *
+ * @param {unknown} groups
+ * @param {Set<string>} [collected]
+ * @returns {Set<string>}
+ */
+export function referencedComponentIds(groups, collected = new Set()) {
   for (const group of arrayOf(groups)) {
     for (const option of arrayOf(group?.options)) collectOptionComponentIds(option, collected);
   }

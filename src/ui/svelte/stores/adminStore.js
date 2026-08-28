@@ -9178,6 +9178,12 @@ export function createAdminStore(services) {
     // And the world character libraries (issue 1308), for the same reason and with the same
     // consequence.
     const characterLibraries = services.getCharacterLibrariesStore?.()?.get?.() || {};
+    // And the three WORLD-SCOPE ENTITY settings (issue 1364), membership-filtered by the exporter
+    // to this system. Omitting one exports an empty world roster, empty world defaults and no
+    // membership records, so the destination's world corpus learns nothing about the system.
+    const componentScope = services.getComponentScopeStore?.()?.get?.() || {};
+    const essenceScope = services.getEssenceScopeStore?.()?.get?.() || {};
+    const toolScope = services.getToolScopeStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
@@ -9186,7 +9192,10 @@ export function createAdminStore(services) {
       gatheringConfig,
       currencyConfig,
       travelConfig,
-      characterLibraries
+      characterLibraries,
+      componentScope,
+      essenceScope,
+      toolScope
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);

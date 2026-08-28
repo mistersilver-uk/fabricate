@@ -54,6 +54,8 @@
 
 import { WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';
 
+import { subKeyEntries } from './scopedDefinitionStore.js';
+
 const ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 
 /** The `craftingSystem` array each entity type is stored under. */
@@ -69,13 +71,6 @@ function isPlainObject(value) {
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
-}
-
-/** The entries of a scope sub-key, whether it arrived as a map or as an array. */
-function subKeyEntries(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (isPlainObject(raw)) return Object.values(raw);
-  return [];
 }
 
 /**

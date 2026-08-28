@@ -169,10 +169,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,
       getCharacterLibrariesStore: () =>
         game?.fabricate?.getCharacterLibrariesStore?.() ?? null,
-      // The three world-scope entity stores (issue 1362, epic 1357). `src/main.js` already
-      // constructs, loads, publishes and replicates all three, so nothing there changes; this
-      // is the only place the manager can reach them, and it uses the same
+      // The three world-scope entity stores (issues 1362 and 1364, epic 1357). `src/main.js`
+      // already constructs, loads, publishes and replicates all three, so nothing there changes;
+      // this is the only place the manager can reach them, and it uses the same
       // `game.fabricate.getXStore?.() ?? null` idiom every other world store here uses.
+      // They are also what the Export button passes to `buildExportPayload`: that button and
+      // `game.fabricate.exportSystem` are two paths to one payload, and every parameter after
+      // `version` is DEFAULTED, so a slice missing from one path exports empty from that path
+      // alone and nothing reports it.
       getComponentScopeStore: () => game?.fabricate?.getComponentScopeStore?.() ?? null,
       getEssenceScopeStore: () => game?.fabricate?.getEssenceScopeStore?.() ?? null,
       getToolScopeStore: () => game?.fabricate?.getToolScopeStore?.() ?? null,
@@ -535,7 +539,15 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }
 
           const mode = result.conflictMode === 'copy' ? 'copy' : 'keep';
-          const packData = prepareForImport(data, mode);
+          // The DESTINATION world's entity roster (issue 1364). Copy mode REQUIRES it: without it
+          // every incoming component mints a fresh id and the world acquires a second record for
+          // every item it already holds.
+          const worldEntityIndex = {
+            components: game.fabricate.getComponentScopeStore?.()?.listEntities?.() ?? [],
+            essences: game.fabricate.getEssenceScopeStore?.()?.listEntities?.() ?? [],
+            tools: game.fabricate.getToolScopeStore?.()?.listEntities?.() ?? [],
+          };
+          const packData = prepareForImport(data, mode, { worldEntityIndex });
 
           const systemManager = game.fabricate.getCraftingSystemManager();
           const recipeManager = game.fabricate.getRecipeManager();

@@ -1548,6 +1548,10 @@
           "taskLink": "Task links",
           "eventLink": "Event links",
           "recipeItem": "Recipe item links",
+          "worldEntityCollision": "World entity identity collisions",
+          "worldEntityMissing": "Missing world entities",
+          "worldDefaultDeclined": "Declined world defaults",
+          "worldToolBreakageDropped": "Dropped world tool breakage authority",
           "unknown": "Other references"
         },
         "OwnerType": {

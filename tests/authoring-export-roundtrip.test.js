@@ -24,6 +24,7 @@ const {
   FIXTURE_REALM_ID,
   normalizeExportEnvelope,
 } = await import('./helpers/fullAuthoringFixture.js');
+const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
 test('round-trip: export → import(keep) → export is deep-equal modulo volatile fields', async () => {
   const fixture = buildFullAuthoringFixture();
@@ -32,7 +33,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
   // Envelope carries the explicit schema markers.
-  assert.equal(first.schemaVersion, 5);
+  assert.equal(first.schemaVersion, 6);
   assert.equal(first.runtimeStateIncluded, false);
   // Runtime state stripped on export.
   for (const env of first.gatheringEnvironments) {
@@ -200,7 +201,7 @@ test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', (
   const h = makeHarness(fixture);
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
-  const copy = prepareForImport(first, 'copy');
+  const copy = prepareForImport(first, 'copy', emptyCopyOptions());
 
   // System + environment container ids regenerated.
   assert.equal(copy.system.id, undefined, 'system id stripped for copy');

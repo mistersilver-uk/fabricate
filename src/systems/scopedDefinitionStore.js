@@ -105,10 +105,19 @@ function plainObject(value) {
  * TOLERANT OF BOTH, because the persisted shape is a map while every normalizer #1358 ships takes
  * an array, and an import or a hand edit may legitimately deliver either.
  *
+ * EXPORTED since issue 1364, because the export assembler and the world identity drift detector
+ * both need exactly this tolerance and a third copy of it is how the persisted shape and its
+ * readers drift apart. The drift detector's own copy tested `isPlainObject(raw)` where this one
+ * tests truthiness-and-object; both lines are reached only AFTER the array branch returns, so
+ * `isPlainObject` there reduced to `raw != null && typeof raw === 'object'` and the only value the
+ * truthiness test rejects that it accepted is `null`, which `raw != null` rejects too. The two
+ * were behaviourally identical, so folding them changes no caller's read tolerance
+ * (`## Scoped Entity Definitions` requirement 13).
+ *
  * @param {unknown} raw
  * @returns {unknown[]}
  */
-function subKeyEntries(raw) {
+export function subKeyEntries(raw) {
   if (Array.isArray(raw)) return raw;
   if (raw && typeof raw === 'object') return Object.values(raw);
   return [];

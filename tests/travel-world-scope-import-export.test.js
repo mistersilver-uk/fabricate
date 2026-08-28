@@ -35,6 +35,7 @@ import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.
 
 import { makeHarness } from './helpers/authoringExportHarness.js';
 import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
+import { emptyCopyOptions } from './helpers/worldEntityIndex.js';
 
 const SOURCE_SYSTEM_ID = 'sys-wayfaring';
 const VALE_ID = 'realm-northreach-vale';
@@ -126,7 +127,7 @@ function importerInto(world) {
 
 /** Run the WHOLE composition, exactly as `game.fabricate.importSystemFromFile` does. */
 async function runWholeComposition(world, envelope, mode = 'keep') {
-  const packData = prepareForImport(envelope, mode);
+  const packData = prepareForImport(envelope, mode, emptyCopyOptions());
   const summary = await importerInto(world).importFromPackData(packData, {
     overwriteExisting: true,
   });

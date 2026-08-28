@@ -16,6 +16,7 @@ import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js'
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { normalizeTravelConfig } from './gatheringRealms.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
+import { subKeyEntries } from './scopedDefinitionStore.js';
 
 /**
  * Integer schema-version marker written onto every export envelope. Distinct
@@ -23,7 +24,7 @@ import { normalizeModifierLibrary } from './modifierLibrary.js';
  * exports carry no `schemaVersion` and are treated as schema `1` by the
  * migration layer.
  */
-export const FABRICATE_EXPORT_SCHEMA_VERSION = 5;
+export const FABRICATE_EXPORT_SCHEMA_VERSION = 6;
 
 /**
  * Default current-condition selection used when resetting runtime condition
@@ -143,6 +144,81 @@ export function assembleCharacterLibrariesAuthoringBundle(characterLibraries) {
     characterPrerequisites: normalizeCharacterPrerequisiteList(source.characterPrerequisites),
     modifiers: normalizeModifierLibrary(source.modifiers),
   };
+}
+
+/**
+ * The WORLD-SCOPE ENTITY slice of an export for ONE crafting system (issue 1364, epic 1357):
+ * the World Component / World Essence / World Tool roster, the donor-elected world defaults and
+ * the per-`(entity, system)` membership records.
+ *
+ * ONE PARAMETERIZED ASSEMBLER, CALLED THREE TIMES. The three scopes carry the same three sub-keys
+ * and the same filter, so three near-identical functions would be three copies of one rule — and
+ * `tests/**` and `src/**` alike count against the SonarCloud new-code duplication gate.
+ *
+ * ## It filters by MEMBERSHIP, unlike the three world-scope slices before it
+ *
+ * Currency, travel and the character libraries travel WHOLE because there is no owning system to
+ * filter them by. That reasoning does not transfer: here there IS an owning relation and it is
+ * membership. `membership` is filtered to `systemId === systemId`, and `entities` and `defaults`
+ * are filtered to exactly the entity ids that filtered set names. Shipping the unfiltered roster
+ * would import a foreign world's ENTIRE component roster — every entity of every system that
+ * world runs — which is the opposite of what a per-system export means.
+ *
+ * The consequence is stated rather than discovered later: a reference in the exported system
+ * naming a world entity the system has NO membership record for does not travel. That is
+ * `## Scoped Entity Definitions` requirement 3's REFUSAL rather than a prune, and it lands in the
+ * destination as an ordinary broken internal reference — reported verbatim, never repaired.
+ *
+ * ## It carries the ARRAY projection, not the persisted map
+ *
+ * Requirement 13 makes both shapes normative and DISCARDS the map key on read, re-deriving it from
+ * the record on write. Arrays win here for three reasons: every other envelope slice is a list,
+ * every normalizer takes an array, and the persisted membership key EMBEDS THE SOURCE SYSTEM ID,
+ * which neither import mode's destination shares — so every carried key would be stale on arrival.
+ *
+ * ## The WORLD TOOL-BREAKAGE AUTHORITY IS NOT ASSEMBLED
+ *
+ * `toolScope` carries a fourth sub-key the other two do not. It does NOT travel: the `1.30.0`
+ * migration writes no world authority at all, so a "seed only into an unconfigured destination"
+ * rule on the currency/travel precedent would fire on essentially every import and hand a
+ * destination world an authority no GM there authored. Emitting the three sub-keys only is
+ * necessary but NOT sufficient, because a HAND-EDITED payload never reaches this assembler — the
+ * payload upcast drops it and reports it.
+ *
+ * @param {unknown} scopeValue The scope store's persisted projection (`store.get()`), or its
+ *   published corpus; both sub-key shapes are read.
+ * @param {string} systemId The exported system's id.
+ * @returns {{entities: object[], defaults: object[], membership: object[]}}
+ */
+export function assembleScopedEntityBundle(scopeValue, systemId) {
+  const source = scopeValue && typeof scopeValue === 'object' ? scopeValue : {};
+  const owner = typeof systemId === 'string' ? systemId.trim() : '';
+
+  const membership = subKeyEntries(source.membership).filter(
+    (record) => isRecord(record) && record.systemId === owner && trimmed(record.entityId)
+  );
+  const memberIds = new Set(membership.map((record) => record.entityId.trim()));
+
+  const entities = subKeyEntries(source.entities).filter(
+    (record) => isRecord(record) && memberIds.has(trimmed(record.id))
+  );
+  const defaults = subKeyEntries(source.defaults).filter(
+    (record) => isRecord(record) && memberIds.has(trimmed(record.id))
+  );
+
+  return {
+    entities: structuredClone(entities),
+    defaults: structuredClone(defaults),
+    membership: structuredClone(membership),
+  };
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function trimmed(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**

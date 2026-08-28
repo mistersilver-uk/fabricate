@@ -11,6 +11,19 @@
  *   (d) no-dangle completeness (collector + independent literal-path sweep)
  *   (e) keep-mode untouched (green by design)
  *   (f) key-aware NEGATIVE — no blanket string-replace (green by design)
+ *
+ * AMENDED BY ISSUE 1364, which RETRACTS mint-everything in favour of MATCH-OR-MINT. Copy mode now
+ * binds an incoming component to the destination world entity its SOURCE REFERENCES name, and
+ * mints only when nothing matches. Cases (a), (c), (d) and (f) are unchanged in substance and run
+ * against an EMPTY destination index, where every component is unmatched and therefore mints —
+ * which is exactly the pre-1364 behaviour they were written for.
+ *
+ * Case (b) INVERTS, and that inversion is the point of the change rather than a casualty of it.
+ * Two copies from one origin used to share no component id; they now share one for every LINKED
+ * component, because sharing an id is what stops the second import creating a second world record
+ * for an item the destination already holds. The old guarantee survives, restated: two copies
+ * share an id only when their source-reference sets INTERSECT, which is the relation the `1.30.0`
+ * grouping unions on — so an UNLINKED component still mints a disjoint id on every import.
  */
 
 import assert from 'node:assert/strict';
@@ -31,6 +44,26 @@ const {
   OLD_COMPONENT_IDS,
   COLLIDING_NON_COMPONENT_ID,
 } = await import('./helpers/copyImportComponentFixture.js');
+
+/**
+ * A destination world with no entities at all, which is what makes every component UNMATCHED and
+ * therefore minted. Frozen so a case cannot grow it by accident and change a sibling's meaning.
+ */
+const EMPTY_WORLD_ENTITY_INDEX = Object.freeze({
+  components: Object.freeze([]),
+  essences: Object.freeze([]),
+  tools: Object.freeze([]),
+});
+
+/**
+ * The real production copy-mode call site, against a given destination index.
+ *
+ * @param {object} [worldEntityIndex]
+ * @returns {object}
+ */
+function copyImport(worldEntityIndex = EMPTY_WORLD_ENTITY_INDEX) {
+  return prepareForImport(buildCopyImportComponentFixture(), 'copy', { worldEntityIndex });
+}
 
 function idMapFromKeepAndCopy(keep, copy) {
   const oldIds = keep.system.components.map((c) => c.id);
@@ -75,7 +108,7 @@ function liveRecipeComponentIds(recipeJson) {
 
 test('(a) copy-import regenerates every component id and remaps every D1 reference site', () => {
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
-  const copy = prepareForImport(buildCopyImportComponentFixture(), 'copy');
+  const copy = copyImport();
   const { map, oldIds, newIds } = idMapFromKeepAndCopy(keep, copy);
   const oldIdSet = new Set(oldIds);
 
@@ -113,23 +146,43 @@ test('(a) copy-import regenerates every component id and remaps every D1 referen
 // (b) Residual closure
 // ---------------------------------------------------------------------------
 
-test('(b) two systems copy-imported from the same origin share no component id', () => {
-  const origin = buildCopyImportComponentFixture();
-  const copy1 = prepareForImport(origin, 'copy');
-  const copy2 = prepareForImport(origin, 'copy');
+test('(b) a second copy from one origin BINDS to the first copy\'s world entities (issue 1364)', () => {
+  // The shared, GROWING destination index: the first import's world entities are what the second
+  // import matches against, which is exactly what the two live call sites build from the three
+  // world-scope entity stores.
+  const worldEntityIndex = { components: [], essences: [], tools: [] };
 
-  const ids1 = new Set(copy1.system.components.map((c) => c.id));
-  const ids2 = new Set(copy2.system.components.map((c) => c.id));
+  const copy1 = copyImport(worldEntityIndex);
+  worldEntityIndex.components.push(...copy1.componentScope.entities);
+  const copy2 = copyImport(worldEntityIndex);
 
-  for (const id of ids1) {
-    assert.ok(!ids2.has(id), `copy 1 and copy 2 must not share component id ${id}`);
+  const ids1 = copy1.system.components.map((c) => c.id);
+  const ids2 = copy2.system.components.map((c) => c.id);
+
+  // Every fixture component is LINKED — each carries an `originItemUuid` — so every one of them
+  // binds rather than minting. Pre-1364 this assertion was its exact negation.
+  assert.deepEqual(ids2, ids1, 'a second copy must bind to the first copy\'s world entity ids');
+  assert.equal(
+    copy2.componentScope.entities.length,
+    0,
+    'a MATCHED entity adds no world entity — its incoming roster record is dropped'
+  );
+
+  // The RETAINED half of the old guarantee: an UNLINKED component has no source references to
+  // intersect, so it can never bind and mints a disjoint id on every import.
+  const unlinkedOrigin = buildCopyImportComponentFixture();
+  for (const component of unlinkedOrigin.system.components) {
+    delete component.originItemUuid;
+    delete component.registeredItemUuid;
+    component.aliasItemUuids = [];
   }
-
-  // No reference in either copy points at the other's component ids.
-  const refs1 = collectComponentRefSites(copy1).map((s) => s.value);
-  const refs2 = collectComponentRefSites(copy2).map((s) => s.value);
-  assert.equal(refs1.filter((v) => ids2.has(v)).length, 0, 'copy 1 refs never point at copy 2 ids');
-  assert.equal(refs2.filter((v) => ids1.has(v)).length, 0, 'copy 2 refs never point at copy 1 ids');
+  const unlinked1 = prepareForImport(unlinkedOrigin, 'copy', { worldEntityIndex });
+  worldEntityIndex.components.push(...unlinked1.componentScope.entities);
+  const unlinked2 = prepareForImport(unlinkedOrigin, 'copy', { worldEntityIndex });
+  const unlinkedIds1 = new Set(unlinked1.system.components.map((c) => c.id));
+  for (const id of unlinked2.system.components.map((c) => c.id)) {
+    assert.ok(!unlinkedIds1.has(id), `an unlinked component must still mint a disjoint id: ${id}`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +191,7 @@ test('(b) two systems copy-imported from the same origin share no component id',
 
 test('(c) the copied system is craftable identically to its origin (live-model isomorphism)', () => {
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
-  const copy = prepareForImport(buildCopyImportComponentFixture(), 'copy');
+  const copy = copyImport();
   const { map, oldIds, newIds } = idMapFromKeepAndCopy(keep, copy);
   const newIdSet = new Set(newIds);
   const oldIdSet = new Set(oldIds);
@@ -185,7 +238,7 @@ test('(c) the copied system is craftable identically to its origin (live-model i
 // ---------------------------------------------------------------------------
 
 test('(d) no within-payload component reference dangles after the copy transform', async () => {
-  const copy = prepareForImport(buildCopyImportComponentFixture(), 'copy');
+  const copy = copyImport();
   const oldIdSet = new Set(OLD_COMPONENT_IDS);
   const newIdSet = new Set(copy.system.components.map((c) => c.id));
 
@@ -236,7 +289,7 @@ test('(e) keep-mode leaves every component id and reference byte-identical', () 
 // ---------------------------------------------------------------------------
 
 test('(f) a non-reference value equal to a component id is NOT rewritten', () => {
-  const copy = prepareForImport(buildCopyImportComponentFixture(), 'copy');
+  const copy = copyImport();
 
   // recipeIds[] (book membership) is NOT a component reference: it must survive verbatim
   // even though its value equals a pre-regeneration component id.
@@ -275,7 +328,7 @@ test('scope pin: rebindCopyComponentIds is the exported copy transform on import
 
   // keep-mode never regenerates; copy-mode does — anchoring behaviour to the call site.
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
-  const copy = prepareForImport(buildCopyImportComponentFixture(), 'copy');
+  const copy = copyImport();
   assert.equal(keep.system.components[0].id, 'comp-ore', 'keep mode preserves the authored id');
   assert.notEqual(copy.system.components[0].id, 'comp-ore', 'copy mode regenerates the id');
 });
