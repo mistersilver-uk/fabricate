@@ -101,13 +101,14 @@ The comparison MUST record each artifact's stable identity and dimensions, autho
 #### Scenario: extending a multi-PR prototype's parity oracle
 
 The parity oracle for a prototype spanning several PRs lives under `tmp/` beside the prototype, because a prototype is a design artefact rather than a repository asset.
-Its CLOSED SCREEN LIST does not: it is versioned here, with the PR that owes each screen, so removing a screen from the gate is a spec diff a reviewer sees rather than an untracked edit nobody does.
+Its CLOSED SCREEN LIST is not versioned here either.
+It belongs to the WORK — the epic or issue that owns the prototype — because it names that prototype's screens and the PRs that owe them, and it stops being true the moment the work lands.
+What this spec versions is the RULE below, which is reusable by any prototype; the roster the rule is applied to is recorded on the owning issue, where removing a screen is a visible edit to a tracked decision rather than a silent one.
 
 - **WHEN** a prototype's screens are delivered across several PRs and the first of them establishes the oracle
 - **THEN** that PR authors the PROTOTYPE half complete — every screen, every region, every alignment group and every inventory root — so the deferred screens are already measured on the reference side and a later PR supplies locators rather than deciding what to measure
 - **AND** every screen it cannot yet reach in the subject carries an `unreachable` note stating WHY, which asserts the absence: the run fails the moment the subject starts rendering that element, so an excuse cannot outlive the constraint it records
-- **AND** for the world-scoped component, essence and tool work of epic 1357 the deferred screens are exactly fourteen — `catalogue`, `entry`, `system` and `profile` (PR 6a); `essences`, `essEntry`, `essProfile` and `sysEss` (PR 6b); `tools`, `toolEntry`, `toolProfile` and `sysTools` (PR 6c); `wvocab` and `svocab` (PR 7)
-- **AND** the prototype's fifteenth token, `stub`, is EXCLUDED from that fourteen because the gateway PR owns it — it is the counterpart of the placeholder pages that PR ships, the one screen it proves reachable, and it is named explicitly so the exclusion reads as a decision rather than an omission
+- **AND** a screen the gateway PR itself delivers is EXCLUDED from the deferred roster and named as an exclusion on the owning issue, so it reads as a decision rather than an omission
 - **AND** a later PR extends the oracle only by deleting an `unreachable` note and supplying locators; it adds no screen, no alignment group and no shared region, because those are claims about the reference rather than about its own work
 - **AND** a PR that DELETES a screen, a region or an alignment group rather than supplying its locators is a finding against that PR
 
