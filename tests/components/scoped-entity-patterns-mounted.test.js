@@ -215,6 +215,12 @@ describe('InheritRow (mounted)', () => {
     // through it and the subtraction removes nothing either way. Asserting the list is
     // non-empty and then asserting no row bears its name is what makes the negative a
     // measurement rather than a sentence.
+    //
+    // AND THE FILTER ITSELF REMAINS UNEXERCISED, which this comment records rather than
+    // implies. Replacing `inheritableSections`' body with `return [...descriptor.sections]`
+    // leaves this suite and every other one green: no entity type declares a section that is
+    // also seeded, so there is nothing for the subtraction to remove. What is guarded here is
+    // the CONSTANT and the row set it feeds, not the subtraction.
     assert.ok(
       SCOPED_SEEDED_SECTIONS.tool.length > 0,
       'the tool seeded-section list is empty, so "a seeded section renders none" filters nothing'

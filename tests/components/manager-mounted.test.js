@@ -265,6 +265,25 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/scoped/${scopedPage}.svelte`);
   }
+  // The entry routes' breadcrumb seam (issue 1362) — a plain module, copied raw rather than
+  // compiled, the same way `crafting/craftingNav.js` is. The ROOT imports it statically for the
+  // three-crumb entry trail, and this suite hand-rolls its temp tree with no dependency
+  // validator for `.js`, so omitting it does not fail one test: it HANGS the whole file behind
+  // one ERR_MODULE_NOT_FOUND and `node --test` reports every blocked test as `# cancelled`.
+  {
+    const moduleDestination = join(
+      tempRoot,
+      'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'
+    );
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'),
+        'utf8'
+      )
+    );
+  }
   // The shared scoped-entity patterns (issue 1362): the Tool Studio's preview and both
   // validation tabs are converted onto them, so both are in this root's static graph.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte');
@@ -25640,6 +25659,106 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   });
 
+  // ── The four rail-reachable world scoped-entity routes actually render (issue 1362) ───────
+  //
+  // NOTHING ELSE IN `npm test` RENDERS A PLACEHOLDER PAGE. `data-scoped-page` appears only in
+  // the View Lab registry, which is a capture gate rather than a unit gate, so a swapped
+  // `titleKey`, a duplicated `pageId` or a route wired to the wrong page shipped green here and
+  // failed only at capture. `tests/components/manager-contract.test.js` covers all SEVEN pages
+  // from source; this covers the four a GM can actually reach, through the rail, in the DOM.
+  describe('world scoped-entity routes (issue 1362)', () => {
+    /**
+     * Rail leaf id -> the route token it commits and the screen title it renders. The titles
+     * are the prototype's, verbatim, including the lowercase `c` and the plural `Tools`.
+     */
+    const RAIL_REACHABLE_ROUTES = [
+      ['component-catalogue', 'world-components', 'Component catalogue'],
+      ['vocabulary', 'world-vocabulary', 'Tags & Categories'],
+      ['essence-catalogue', 'world-essences', 'Essence Catalogue'],
+      ['tool-catalogue', 'world-tools', 'Tools Catalogue'],
+    ];
+
+    async function settleRoute() {
+      for (let i = 0; i < 24; i += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    async function mountRail() {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store: createStore([]), services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    it('commits its own route, page hook and title from the rail — with no system selected', async () => {
+      await mountRail();
+      const seenPages = new Set();
+      for (const [leaf, token, title] of RAIL_REACHABLE_ROUTES) {
+        worldNavItem(leaf).click();
+        await settleRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          token,
+          `the ${leaf} leaf commits the ${token} route`
+        );
+        const page = target.querySelector(`[data-scoped-page="${token}"]`);
+        assert.ok(Boolean(page), `${token} renders its own page hook`);
+        assert.equal(page.getAttribute('aria-label'), title, `${token}'s main is named for it`);
+        assert.equal(
+          target.querySelector('.manager-header .manager-title').textContent.trim(),
+          title
+        );
+        assert.ok(
+          Boolean(target.querySelector(`[data-scoped-placeholder="${token}"]`)),
+          `${token} renders the shared placeholder body keyed on its own route`
+        );
+        // FULL WIDTH IS THE OTHER HALF OF THE ROUTE. A page wired into the shell but left in
+        // the aside chain renders against a permanent dead strip, which no source assertion
+        // about the exclusion set can see.
+        assert.ok(
+          !target.querySelector('.manager-inspector'),
+          `${token} is released to full width, so the shared inspector must not render`
+        );
+        seenPages.add(page.getAttribute('data-scoped-page'));
+      }
+      assert.equal(
+        seenPages.size,
+        RAIL_REACHABLE_ROUTES.length,
+        'each route rendered a DISTINCT page: a duplicated pageId would collapse this set'
+      );
+    });
+
+    it('draws a TWO-crumb trail rooted at World, with World itself clickable', async () => {
+      await mountRail();
+      worldNavItem('component-catalogue').click();
+      await settleRoute();
+      const world = target.querySelector('[data-breadcrumb-world]');
+      assert.equal(
+        world.tagName,
+        'BUTTON',
+        'World is not the leaf here, so it navigates — the rule every crumb in this trail follows'
+      );
+      const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
+      assert.equal(leaf.getAttribute('data-breadcrumb-world-scoped'), 'world-components');
+      assert.equal(leaf.textContent.trim(), 'Component catalogue');
+      assert.equal(leaf.tagName, 'SPAN', 'and the leaf does not navigate');
+      // A CATALOGUE HAS NO MIDDLE CRUMB. The intermediate catalogue crumb belongs to the ENTRY
+      // routes; drawing one here would say the catalogue sits inside itself.
+      assert.ok(
+        !target.querySelector('[data-breadcrumb-world-scoped-catalogue]'),
+        'a catalogue route draws no intermediate catalogue crumb'
+      );
+    });
+  });
+
   // ── The world scope corpus reaches the DOM, on every publish trigger (issue 1362) ─────────
   //
   // ASSERTED AT THE DOM, NEVER BY OBJECT IDENTITY. Identity is a proxy that fails in both
@@ -25683,6 +25802,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         component: scopeStore(worldEntities(3, 'comp')),
         essence: scopeStore(worldEntities(2, 'ess')),
         tool: scopeStore(worldEntities(1, 'tool')),
+        // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
+        // exists until PR 7 registers one, and the badge must read 0 rather than blank.
+        vocabulary: null,
       };
       const forge = makeSystem({ id: 'sys1', name: 'Forge' });
       const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
@@ -25696,6 +25818,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         getComponentScopeStore: () => scopeStores.component,
         getEssenceScopeStore: () => scopeStores.essence,
         getToolScopeStore: () => scopeStores.tool,
+        getVocabularyScopeStore: () => scopeStores.vocabulary,
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -25712,6 +25835,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       return ['component-catalogue', 'essence-catalogue', 'tool-catalogue'].map((leaf) =>
         target.querySelector(`#manager-world-nav-${leaf} .manager-nav-count`)?.textContent?.trim()
       );
+    }
+
+    function vocabularyCount() {
+      return target
+        .querySelector('#manager-world-nav-vocabulary .manager-nav-count')
+        ?.textContent?.trim();
     }
 
     async function settle(store) {
@@ -25769,6 +25898,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       // measurement rather than a rail that never updates.
       await settle(store);
       assert.deepEqual(railCounts(), ['9', '2', '1']);
+    });
+
+    it('reads the WORLD VOCABULARY badge through the optional fourth store leg', async () => {
+      // THE FIELD NAME IS THE POINT. The shell reads `worldScope.vocabulary.total` and
+      // `### GM World Scoped Entity Routes` requirement 7 bars PR 7 from the shell, so a
+      // producer publishing `count`, or leaving the caller to read `entries.length`, would
+      // leave this badge on 0 for good with every other assertion in this repository still
+      // green. Driving the REAL store from a registered vocabulary store is what makes the
+      // name a contract rather than a hope: nothing here restates it.
+      const store = await mountWithRealStore();
+      assert.equal(
+        vocabularyCount(),
+        '0',
+        'with no vocabulary store registered the badge reads 0 — truthful, not blank'
+      );
+      scopeStores.vocabulary = {
+        corpus: () => ({
+          componentCategories: [{ id: 'metal' }, { id: 'herb' }],
+          componentTags: [{ id: 'rare' }],
+          recipeCategories: [{ id: 'smithing' }, { id: 'alchemy' }],
+        }),
+      };
+      await settle(store);
+      assert.equal(vocabularyCount(), '5', 'and it counts all three vocabularies, summed');
+      // And it is ITS OWN corpus: lighting the vocabulary up must not disturb the three
+      // scoped-entity counts beside it.
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
     });
   });
 });

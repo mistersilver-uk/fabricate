@@ -30,9 +30,12 @@ import {
 import {
   buildWorldScopeState,
   emptyWorldScopeState,
+  emptyWorldVocabularyState,
   projectWorldScopeEntity,
+  projectWorldVocabulary,
   WORLD_SCOPE_DESCRIPTORS,
   WORLD_SCOPE_ENTITY_TYPES,
+  WORLD_VOCABULARY_KINDS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
 
 const NORMALIZERS = {
@@ -90,7 +93,10 @@ test('the descriptor states a component has exactly one section and no enabled f
 
 test('the empty state carries all three entity types with an UNKNOWN corpus', () => {
   const { worldScope } = emptyWorldScopeState();
-  assert.deepEqual(Object.keys(worldScope), [...WORLD_SCOPE_ENTITY_TYPES]);
+  // The three entity types PLUS the World Vocabulary, which is a sibling key rather than a
+  // fourth entity type: it has no sections, no membership and no per-system rows, and
+  // `WORLD_SCOPE_ENTITY_TYPES` deliberately does not name it.
+  assert.deepEqual(Object.keys(worldScope), [...WORLD_SCOPE_ENTITY_TYPES, 'vocabulary']);
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     assert.equal(worldScope[entityType].available, false);
     assert.deepEqual(worldScope[entityType].seeded, {
@@ -513,4 +519,88 @@ test('the first createEntity SEEDS the setting and flips isSeeded per sub-key', 
   assert.equal(store.isSeeded('entities'), true);
   assert.equal(store.isSeeded('membership'), true);
   assert.deepEqual(Object.keys(read()).sort(), ['defaults', 'entities', 'membership']);
+});
+
+// ── The World Vocabulary leg (issue 1362) ────────────────────────────────────────────────────
+//
+// It is the fourth leg of a projection whose other three are scoped-entity corpora, and it
+// exists NOW for a one-way-door reason: `adminStore.js` and `CraftingSystemManagerRoot.svelte`
+// are two of the five gateway files `### GM World Scoped Entity Routes` requirement 7 closes to
+// PR 7, so neither the store leg nor the badge that reads it could be added later.
+//
+// `total` IS THE ASSERTION, not a convenience. The consumer reads `worldScope.vocabulary.total`
+// and nothing else pins the name: a producer that published `count`, or left the caller to read
+// `entries.length`, would leave the badge on 0 forever with every other test in this repository
+// still green.
+
+test('the vocabulary projection sums all three vocabularies into `total`', () => {
+  const state = projectWorldVocabulary({
+    componentCategories: [{ id: 'metal' }, { id: 'herb' }],
+    componentTags: [{ id: 'rare' }],
+    recipeCategories: [{ id: 'smithing' }, { id: 'alchemy' }, { id: 'cooking' }],
+  });
+  assert.equal(state.available, true);
+  assert.equal(state.total, 6, 'the badge counts the WHOLE vocabulary, not one of its three');
+  assert.deepEqual(
+    WORLD_VOCABULARY_KINDS.map((kind) => state[kind].length),
+    [2, 1, 3],
+    'and each vocabulary is carried through under its own name'
+  );
+});
+
+test('a partial vocabulary corpus counts what is there and defaults the rest to empty', () => {
+  // The shape PR 7 ships first is unlikely to be all three at once, and a missing key must
+  // read as an empty vocabulary rather than take the publish down.
+  const state = projectWorldVocabulary({ componentTags: [{ id: 'rare' }, { id: 'cursed' }] });
+  assert.equal(state.total, 2);
+  assert.deepEqual(state.componentCategories, []);
+  assert.deepEqual(state.recipeCategories, []);
+});
+
+test('an absent vocabulary store publishes an UNAVAILABLE zero rather than an absent key', () => {
+  // `?? 0` in the consumer would absorb an absent key too, which is exactly why the producer
+  // must not rely on it: the difference between "no vocabulary" and "no projection" is what
+  // tells a later reader whether the badge is truthful or broken.
+  const empty = emptyWorldVocabularyState();
+  assert.equal(empty.available, false);
+  assert.equal(empty.total, 0);
+  assert.deepEqual(projectWorldVocabulary(null), empty);
+  assert.deepEqual(projectWorldVocabulary('nonsense'), empty);
+  assert.deepEqual(emptyWorldScopeState().worldScope.vocabulary, empty);
+});
+
+test('buildWorldScopeState reads the OPTIONAL fourth store leg and publishes vocabulary.total', () => {
+  // The producer half of requirement 7's closure. `adminStore._worldScopeStores` hands this
+  // function a `vocabulary` leg read through `services.getVocabularyScopeStore?.() ?? null`, so
+  // PR 7 registers a store and a service accessor — neither of them a gateway path — and never
+  // reopens `adminStore.js`.
+  const withoutStore = buildWorldScopeState({ stores: {}, systems: [] });
+  assert.equal(withoutStore.worldScope.vocabulary.total, 0);
+  assert.equal(withoutStore.worldScope.vocabulary.available, false);
+
+  const vocabularyStore = {
+    corpus: () => ({
+      componentCategories: [{ id: 'metal' }],
+      componentTags: [{ id: 'rare' }, { id: 'cursed' }],
+      recipeCategories: [{ id: 'smithing' }],
+    }),
+  };
+  const withStore = buildWorldScopeState({ stores: { vocabulary: vocabularyStore }, systems: [] });
+  assert.equal(withStore.worldScope.vocabulary.total, 4);
+  assert.equal(withStore.worldScope.vocabulary.available, true);
+  // And the three entity legs are untouched by it: the vocabulary is not a scoped-entity
+  // corpus and must not appear among the entity types.
+  assert.equal(WORLD_SCOPE_ENTITY_TYPES.includes('vocabulary'), false);
+});
+
+test('a THROWING vocabulary store degrades to zero rather than taking the publish down', () => {
+  const exploding = {
+    corpus() {
+      throw new Error('setting unreadable');
+    },
+  };
+  const state = buildWorldScopeState({ stores: { vocabulary: exploding }, systems: [] });
+  assert.equal(state.worldScope.vocabulary.total, 0);
+  assert.equal(state.worldScope.vocabulary.available, false);
+  assert.equal(state.worldScope.component.available, false, 'and the rest still projects');
 });
