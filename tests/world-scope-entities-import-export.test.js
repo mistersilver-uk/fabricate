@@ -1109,6 +1109,68 @@ test('19: a multi-match binds to the largest intersection, reports the losers, a
   assert.equal(tied.system.components[0].id, 'dest-narrow', 'a tie resolves to roster position');
 });
 
+test('19: a LOSING candidate is reported even when another record has already claimed it', () => {
+  // THE BRANCH NEITHER NEIGHBOUR REACHES. The ranked candidate list splits into `contested` — the
+  // prefix ABOVE the winner, every member of which is claimed by construction — and `beaten`, the
+  // suffix below it. The two are DISJOINT, so a `claimed` filter over `beaten` cannot prevent a
+  // double report; it can only SUPPRESS a real multi-match, which is what it did.
+  //
+  // Test 19 above exercises `beaten` with an EMPTY `claimed` and criterion 9a's `beaten` is always
+  // empty, so before this fixture the false path never ran in either direction.
+  //
+  // REDDENS WHEN: `beaten` is filtered on `claimed` — `first-bee` legitimately matched TWO
+  // destination entities and NOTHING at all is reported, contradicting the spec's "MUST REPORT the
+  // ambiguity" and "reports each losing candidate".
+  const worldEntityIndex = {
+    components: [
+      { id: 'dest-ay', name: 'Destination ay', registeredItemUuid: 'Item.ay' },
+      { id: 'dest-bee', name: 'Destination bee', registeredItemUuid: 'Item.bee' },
+    ],
+    essences: [],
+    tools: [],
+  };
+  const packData = prepareForImport(
+    envelope({
+      system: {
+        components: [
+          // Bound FIRST, and it has exactly ONE candidate — so it claims `dest-bee` silently.
+          { id: 'sole-bee', name: 'Sole bee', registeredItemUuid: 'Item.bee' },
+          // Bound SECOND, and it matches BOTH: `dest-ay`, which wins a size tie on roster
+          // position, and `dest-bee`, which `sole-bee` has just taken.
+          {
+            id: 'first-bee',
+            name: 'First bee',
+            registeredItemUuid: 'Item.ay',
+            aliasItemUuids: ['Item.bee'],
+          },
+        ],
+      },
+    }),
+    'copy',
+    { worldEntityIndex }
+  );
+
+  const boundIds = Object.fromEntries(
+    ['Sole bee', 'First bee'].map((name) => [
+      name,
+      packData.system.components.find((entry) => entry.name === name).id,
+    ])
+  );
+  assert.deepEqual(
+    boundIds,
+    { 'Sole bee': 'dest-bee', 'First bee': 'dest-ay' },
+    'the precondition: `dest-bee` really is CLAIMED by the time the second record is bound'
+  );
+
+  assert.deepEqual(
+    packData.worldScopeReferences
+      .filter((entry) => entry.kind === REFERENCE_KINDS.WORLD_ENTITY_COLLISION)
+      .map((entry) => [entry.ownerId, entry.referenceValue]),
+    [['first-bee', 'dest-bee']],
+    'the losing candidate is reported against the record whose references named it, once'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Criterion 9a — the copy-mode binding is INJECTIVE, through the ID-CLAIM LADDER
 // ---------------------------------------------------------------------------

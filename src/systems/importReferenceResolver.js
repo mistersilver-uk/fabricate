@@ -283,10 +283,13 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
  * that entity's id, and only an unmatched or UNLINKED component mints.
  *
  * The guarantee issue 570 needed still holds, restated accurately: two copies share an id only
- * when their source-reference sets INTERSECT - a DIRECT shared reference, which is the relation
- * the `1.30.0` grouping unions on - so the two would have resolved to ONE world entity had they
- * been grouped in one corpus. Transitivity is how each SIDE's set was built, not what the match
- * tests.
+ * when each INTERSECTS THE SAME destination world entity - so the two would have resolved to that
+ * one world entity had they been grouped in one corpus.
+ *
+ * It is deliberately NOT stated as "their own sets intersect each other". A destination entity's
+ * set may have been WIDENED by the grouping's union, so two incoming records that share no
+ * reference at all can each intersect it, and it is the INJECTIVE binding below - not the
+ * intersection relation - that keeps them apart.
  *
  * ## THE COLLECTION MATCHED OVER IS `prepared.system.components`, NEVER THE DERIVED SLICE
  *
@@ -492,6 +495,14 @@ function rankedCandidates(refs, roster) {
  * without telling them what with, and the whole point of the entry is that the second record has
  * had to take a different id (or mint one) rather than silently disappear.
  *
+ * A BEATEN candidate is reported against this record ALONE, and unconditionally. The two classes
+ * are different facts and are deliberately shaped differently: a contention says "another record
+ * took this and I had to move", while a beaten candidate says "my references also named this one".
+ * The beaten entry names no second owner because there is no second party to the ambiguity - the
+ * winner beat it on intersection size, not on who got there first - and it is emitted whether or
+ * not some unrelated record has claimed it, because a claim by a third record changes nothing
+ * about the fact that THIS record's set intersects it.
+ *
  * @param {object[]|null} report
  * @param {object} component The record being bound.
  * @param {Map<string, object>} claimed
@@ -510,7 +521,13 @@ function reportBinding(report, component, claimed, contested, beaten) {
     push(component, candidate.id);
   }
   for (const candidate of beaten) {
-    if (!claimed.has(candidate.id)) push(component, candidate.id);
+    // UNCONDITIONALLY, and the absent guard is the point. `contested` and `beaten` are disjoint by
+    // construction - one is the prefix above the winner, the other the suffix below it - so a
+    // filter on `claimed` here cannot prevent a double report, it can only SUPPRESS a real
+    // multi-match: a losing candidate some OTHER incoming record happens to have claimed is still
+    // a destination entity THIS record's references named, and dropping it can leave a
+    // two-candidate match reporting nothing at all.
+    push(component, candidate.id);
   }
 }
 
