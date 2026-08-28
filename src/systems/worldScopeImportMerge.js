@@ -45,11 +45,17 @@
  *
  * The union is deliberately CONSERVATIVE. Under a keep-mode overwrite the incoming records may in
  * fact belong to a destination system already in the union, so counting them separately can add a
- * member that is not really new and OVER-DECLINE. A world default valid in the source world and
- * valid in the destination world SEPARATELY can therefore be declined against the union. That is
- * correct rather than a defect: over-declining is lossless — every incoming membership record
- * still overrides every section with its own system's value verbatim — while under-declining hands
- * a member system a resolved value its GM never authored.
+ * member that is not really new and OVER-DECLINE. A world default valid against the DESTINATION
+ * ALONE can therefore be declined against the union. That is correct rather than a defect:
+ * over-declining is lossless — every incoming membership record still overrides every section with
+ * its own system's value verbatim — while under-declining hands a member system a resolved value
+ * its GM never authored.
+ *
+ * The claim is stated against the destination alone rather than as "valid in each world
+ * separately", and the narrowing is a correction rather than a hedge: the stronger form is
+ * UNREACHABLE here. Every predicate below is either universally quantified over the member union
+ * or a membership test on a roster that only ever grows, so validity over each half IMPLIES
+ * validity over the union and no fixture can exhibit the case.
  *
  * ## WHEN THE COMPONENT ROSTER IS UNDECIDABLE
  *
