@@ -1164,7 +1164,22 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Title, 'Crafting systems');
-    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, 'Components');
+    // `Nav.Components`, `Nav.Tools` and `Component.Title` are GONE (issue 1362). The three
+    // system screens are titled `Component Rules` / `Essence Rules` / `Tool Rules` after the
+    // prototype, and the relabel is the screen's name everywhere it names the SCREEN — the
+    // rail entry, the page title, the breadcrumb crumb and the browser's `<main>` accessible
+    // name — because a page titled `Component Rules` whose accessible name said `Components`
+    // is the WCAG 2.5.3 Label in Name hazard. The old keys had no consumer left, so they are
+    // deleted rather than left as orphans.
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.ComponentRules, 'Component Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.EssenceRules, 'Essence Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.ToolRules, 'Tool Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, undefined);
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Tools, undefined);
+    // `Nav.Essences` SURVIVES, and the difference is the point: its last consumer names the
+    // DOMAIN NOUN rather than the screen — the system inspector's essence count, which links
+    // to nothing.
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Essences, 'Essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.Manager.Breadcrumbs, 'Breadcrumbs');
     assert.equal(lang.FABRICATE.Admin.Manager.EditSystem, 'Edit system');
@@ -1228,7 +1243,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EnableNamed, 'Enable {name}');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.DisableNamed, 'Disable {name}');
-    assert.equal(lang.FABRICATE.Admin.Manager.Component.Title, 'Components');
+    assert.equal(lang.FABRICATE.Admin.Manager.Component.Title, undefined);
     assert.equal(
       lang.FABRICATE.Admin.Manager.Component.DropZoneTitle,
       'Drop items to add components'
@@ -1551,8 +1566,12 @@ describe('CraftingSystemManager source contract', () => {
 
     // The page is a full-width tabbed shell mirroring the environment editor: the
     // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
+    // Since issue 1362 the aside chain is BUILT from `FULL_WIDTH_VIEWS` rather than
+    // restated, so the question is whether the route is a MEMBER of that set — which is
+    // stronger than the old needle, which passed on a root that mentioned the token anywhere.
+    // `tests/manager-full-width-gate.test.js` asserts the whole set against the stylesheet.
     assert.ok(
-      rootSource.includes("currentView !== 'system-edit'") &&
+      /id: 'system-edit',\s*\n\s*layoutClass: 'full-width-2-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
       'the shared inspector is skipped for the full-width system-edit page'
     );
@@ -1674,8 +1693,15 @@ describe('CraftingSystemManager source contract', () => {
       'the disabled Recipes placeholder should be removed now that Crafting is always available'
     );
     assert.ok(
-      /id: 'graph',\s*icon: 'fas fa-project-diagram'/.test(rootSource),
+      /id: 'graph',[\s\S]{0,600}?icon: 'fas fa-project-diagram'/.test(rootSource),
       'the Graph placeholder should remain in the planned placeholder list'
+    );
+    // And it carries its rail id as a COMPLETE LITERAL (issue 1362), not a
+    // `manager-nav-${view.id}` template: both harnesses target every rail entry by id now, and
+    // an interpolated one is invisible to the gate that checks the id is rendered at all.
+    assert.ok(
+      rootSource.includes("navId: 'manager-nav-graph'"),
+      'the Graph placeholder declares its rail id as a complete literal'
     );
     assert.ok(
       rootSource.includes('selectSystemAndShowBrowser'),
@@ -3264,8 +3290,12 @@ describe('CraftingSystemManager source contract', () => {
     }
     // The CSS column release and this aside suppression are ONE decision expressed
     // twice; doing only the first leaves an empty 300px inspector holding the strip.
+    // Issue 1362: a MEMBER of `FULL_WIDTH_VIEWS`, and specifically of its SELF-OWNED
+    // three-track class — Knowledge suppresses the aside AND keeps three tracks, repurposing
+    // the third column for its detail pane. Asserting the class is what stops a later change
+    // releasing its column to two tracks and clipping that pane at the 1024px minimum.
     assert.ok(
-      rootSource.includes("currentView !== 'knowledge'") &&
+      /id: 'knowledge',\s*\n\s*layoutClass: 'self-owned-3-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
       'the shared inspector is suppressed for the full-width knowledge surface'
     );

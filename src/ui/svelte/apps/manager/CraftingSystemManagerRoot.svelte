@@ -4356,7 +4356,7 @@
   // and the placeholder body inside it cannot drift into saying two different things.
   //
   // COMPLETE LITERAL KEYS, never a `${...}` suffix on a shared base. An interpolated key is
-  // invisible to `ui-lang-keys-resolve` and to the orphan scan, so a missing string would ship
+  // invisible to the lang-key resolution gate and to the orphan scan, so a missing string ships
   // silently and every one of these seven would read as an unreferenced key.
   function worldScopedSubtitle() {
     if (currentView === 'world-components')
