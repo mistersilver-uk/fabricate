@@ -327,6 +327,28 @@ test('the drift detector is EMPTY on the migration own output, for every corpus 
       [],
       `${scenario.name}: the normalize-and-save round trip must PRESERVE every lifted identity field`
     );
+    // AND IT MUST BE PRESENT, not merely equal. The drift detector compares two copies, and a
+    // normalizer that stops emitting a lifted key removes it from BOTH legs together — the
+    // BEFORE corpus is normalizer output too — so they agree by ABSENCE and the comparison is
+    // blind to exactly the mutation this arm exists to catch. The raw fixtures always author a
+    // name and an image, so a POSITIVE presence assertion against them is the independent
+    // anchor.
+    for (const system of saved.systems) {
+      for (const [field, required] of [
+        ['components', ['name', 'img']],
+        ['essenceDefinitions', ['name', 'icon']],
+        ['tools', ['name']],
+      ]) {
+        for (const record of system[field] ?? []) {
+          for (const identityField of required) {
+            assert.ok(
+              typeof record[identityField] === 'string' && record[identityField].length > 0,
+              `${scenario.name}: ${system.id}.${field}[${record.id}].${identityField} did not survive the round trip`
+            );
+          }
+        }
+      }
+    }
   }
 });
 
