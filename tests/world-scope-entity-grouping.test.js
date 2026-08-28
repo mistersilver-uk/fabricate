@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { WORLD_DEFAULT_SECTIONS } from '../src/migration/worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
   identityOf,
@@ -179,6 +180,65 @@ test('the OLDEST contributing definition wins every identity field AS A UNIT', (
   assert.equal(entity.identity.img, 'a.png');
   assert.equal(entity.identity.description, 'A', 'never field-by-field — no chimera identity');
   assert.equal(entity.donorSystemId, 'sys-a');
+});
+
+test('the three SOURCE-LINK fields are UNIONED across the group, never taken from the donor', async () => {
+  // THE A-B-C CHAIN. Union-find guarantees only that the group is CONNECTED: C shares a uuid
+  // with B and nothing at all with A. Taking A's links as a unit would DELETE C's unique uuid
+  // permanently, and an owned Item sourced from it would then stop resolving at the
+  // source-reference tier - the tier this change's whole degradation story rests on.
+  const grouping = buildWorldScopeGrouping([
+    system('sys-a', { components: [component('c-a', ['Item.a'])] }),
+    system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
+    system('sys-c', { components: [component('c-c', ['Item.b'])] }),
+  ]);
+  assert.equal(grouping.entities.components.length, 1, 'the premise: one transitive group');
+  const [entity] = grouping.entities.components;
+  assert.equal(entity.donorSystemId, 'sys-a');
+  assert.equal(entity.identity.originItemUuid, 'Item.a', 'the donor keeps the PRIMARIES');
+  assert.equal(entity.identity.registeredItemUuid, 'Item.a');
+  assert.deepEqual(
+    entity.identity.aliasItemUuids,
+    ['Item.b'],
+    "and C's unique uuid survives as an alias rather than being deleted"
+  );
+
+  // DISPLAY IDENTITY IS STILL DONOR-WINS-AS-A-UNIT. Only the source links union.
+  const named = buildWorldScopeGrouping([
+    system('sys-a', { components: [component('c-a', ['Item.a'], { name: 'Ash Salt' })] }),
+    system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'], { name: 'Cinder' })] }),
+  ]);
+  assert.equal(named.entities.components[0].identity.name, 'Ash Salt');
+
+  // AND THE OWNED ITEM STILL RESOLVES. `resolveComponentForItem`'s source-reference tier
+  // intersects reference SETS, so a copy stamped from C's uuid finds the merged component.
+  const { resolveComponentForItem } = await import('../src/utils/sourceUuid.js');
+  const migrated = migrateWorldScopeEntities({
+    recipes: [],
+    systems: [
+      system('sys-a', { components: [component('c-a', ['Item.a'])] }),
+      system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
+      system('sys-c', { components: [component('c-c', ['Item.b'])] }),
+    ],
+    gatheringConfig: {},
+    componentScope: {},
+    essenceScope: {},
+    toolScope: {},
+    worldScopeRekeyMap: {},
+  });
+  const ownedFromC = { uuid: 'Item.owned', _stats: { duplicateSource: 'Item.b' } };
+  for (const migratedSystem of migrated.systems) {
+    const resolved = resolveComponentForItem(
+      ownedFromC,
+      migratedSystem.components,
+      migratedSystem.id
+    );
+    assert.ok(
+      resolved,
+      `${migratedSystem.id}: an owned Item sourced from the chain's far end must still resolve`
+    );
+    assert.equal(resolved.id, 'c-a', 'to the merged world entity');
+  }
 });
 
 test('EVERY rename is reported, and a byte-identical group produces none', () => {
@@ -402,7 +462,7 @@ test('a membership effectSource is written for EVERY essence, world-addressable 
   assert.equal(record.inherit.effectSource, false, 'and the switch is OFF, so it never inherits');
 });
 
-test('NO world default is written, on any corpus in the Inputs set', () => {
+test('a WORLD DEFAULT is elected from the donor, and NEVER the reserved `general` category', () => {
   for (const scenario of scenarioSpecs()) {
     const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
     const result = migrateWorldScopeEntities({
@@ -414,21 +474,172 @@ test('NO world default is written, on any corpus in the Inputs set', () => {
       toolScope: {},
       worldScopeRekeyMap: {},
     });
-    for (const key of ['componentScope', 'essenceScope', 'toolScope']) {
-      const payload = result[key];
-      if (!payload || !payload.defaults) continue;
-      assert.deepEqual(
-        payload.defaults,
-        {},
-        `${scenario.name}: ${key}.defaults must be WRITTEN and EMPTY — seededness keys on key PRESENCE`
-      );
+    for (const [entityType, key] of [
+      ['components', 'componentScope'],
+      ['essences', 'essenceScope'],
+      ['tools', 'toolScope'],
+    ]) {
+      const defaults = result[key]?.defaults;
+      if (!defaults) continue;
+      for (const [entityId, record] of Object.entries(defaults)) {
+        assert.equal(record.id, entityId, `${key}: the map key is DERIVED from the record`);
+        const allowed = new Set(['id', ...WORLD_DEFAULT_SECTIONS[entityType]]);
+        for (const field of Object.keys(record)) {
+          assert.ok(allowed.has(field), `${key}: a world default must not carry ${field}`);
+        }
+        // CONSTRAINT 1, on every corpus: the reserved bucket is never persisted at world scope.
+        assert.notEqual(
+          record.category,
+          'general',
+          scenario.name + ': a world general category resets every inheriting system'
+        );
+        // `tags` is deliberately NOT lifted: the merge is ADDITIVE with no inherit switch, so a
+        // world tag list is granted to EVERY member system at once.
+        assert.equal('tags' in record, false, 'component tags are never a world default');
+      }
     }
     assert.equal(
       result.toolScope?.toolBreakage,
       undefined,
-      `${scenario.name}: the migration writes NO world tool-breakage authority`
+      `${scenario.name}: the migration still writes NO world tool-breakage authority`
     );
   }
+});
+
+test('the world defaults change NOTHING at migration time, because every section is overridden', () => {
+  // The whole safety argument for electing a donor: a world default is only ever consulted for a
+  // system added LATER, or an override a GM clears later. The corpus differential is what proves
+  // it end to end; this pins the mechanism directly.
+  const before = normalizeCorpus(CraftingSystemManager, scenarioSpecs()[0].raw);
+  const result = migrateWorldScopeEntities({
+    recipes: before.recipes,
+    systems: before.systems,
+    gatheringConfig: before.gatheringConfig,
+    componentScope: {},
+    essenceScope: {},
+    toolScope: {},
+    worldScopeRekeyMap: {},
+  });
+  let checked = 0;
+  for (const [entityType, key] of [
+    ['components', 'componentScope'],
+    ['essences', 'essenceScope'],
+    ['tools', 'toolScope'],
+  ]) {
+    for (const membership of Object.values(result[key].membership)) {
+      for (const section of WORLD_DEFAULT_SECTIONS[entityType]) {
+        if (section === 'repairRequirements') continue;
+        assert.equal(
+          membership.inherit[section],
+          false,
+          `${entityType}.${section} must be OVERRIDDEN, so no world default is consulted`
+        );
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked >= 15, `the arm must actually examine sections (${checked})`);
+  assert.ok(
+    Object.keys(result.componentScope.defaults).length > 0,
+    'and the premise: this corpus really does elect some world defaults'
+  );
+});
+
+test('CONSTRAINT 1: a donor whose category is the reserved `general` elects NO world default', async () => {
+  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const elect = (category) =>
+    electWorldDefault({
+      entityType: 'components',
+      entityId: 'c1',
+      donorRecord: { id: 'c1', category },
+      worldComponentIds: new Set(['c1']),
+      isMemberOf: () => true,
+      memberSystemIds: ['sys-a'],
+    });
+  assert.deepEqual(elect('reagent').record, { id: 'c1', category: 'reagent' });
+  assert.equal(elect('general').record, null, 'the reserved bucket is never persisted');
+  assert.deepEqual(elect('general').refusedSections, ['category'], 'and the refusal is REPORTED');
+  assert.equal(elect('').record, null);
+  assert.deepEqual(elect('').refusedSections, [], 'an unauthored section is not a refusal');
+});
+
+test('CONSTRAINT 2 and 3: a non-world-addressable reference declines its section', async () => {
+  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const worldComponentIds = new Set(['world-c']);
+  const essence = (sourceComponentId) =>
+    electWorldDefault({
+      entityType: 'essences',
+      entityId: 'fire',
+      donorRecord: { id: 'fire', sourceComponentId, propertyMacroUuid: 'Macro.a' },
+      worldComponentIds,
+      isMemberOf: () => true,
+      memberSystemIds: ['sys-a'],
+    });
+  assert.deepEqual(essence('world-c').record.effectSource, { sourceComponentId: 'world-c' });
+  const declined = essence('local-only');
+  assert.equal('effectSource' in declined.record, false, 'the section is declined');
+  assert.equal(declined.record.macro, 'Macro.a', 'and its sibling still lifts');
+  assert.deepEqual(declined.refusedSections, ['effectSource']);
+  // A document UUID is globally addressable and always lifts.
+  assert.ok(essence('Item.abc').record.effectSource);
+
+  const tool = (componentId) =>
+    electWorldDefault({
+      entityType: 'tools',
+      entityId: 't1',
+      donorRecord: {
+        id: 't1',
+        breakage: { mode: 'limitedUses', maxUses: 3 },
+        onBreak: { mode: 'replaceWith', replacementTarget: { type: 'component', componentId } },
+      },
+      worldComponentIds,
+      isMemberOf: () => true,
+      memberSystemIds: ['sys-a'],
+    });
+  assert.ok(tool('world-c').record.onBreak);
+  assert.equal('onBreak' in tool('local-only').record, false);
+  assert.deepEqual(tool('local-only').refusedSections, ['onBreak']);
+  assert.ok(tool('local-only').record.breakage, 'breakage carries no references and always lifts');
+});
+
+test('CONSTRAINT 4: repairRequirements lifts only when every group system is a MEMBER', async () => {
+  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const donorRecord = {
+    id: 't1',
+    repairRequirements: [
+      {
+        id: 'rr',
+        options: [{ quantity: 1, match: { type: 'component', componentId: 'world-c' } }],
+      },
+    ],
+  };
+  const elect = (worldIds, isMemberOf, memberSystemIds) =>
+    electWorldDefault({
+      entityType: 'tools',
+      entityId: 't1',
+      donorRecord,
+      worldComponentIds: new Set(worldIds),
+      isMemberOf,
+      memberSystemIds,
+    });
+
+  assert.ok(
+    elect(['world-c'], () => true, ['sys-a', 'sys-b']).record.repairRequirements,
+    'every group system is a member, so the seed can never dangle'
+  );
+  // A component the SECOND system is not a member of: the seed would dangle there.
+  const partial = elect(['world-c'], (componentId, systemId) => systemId === 'sys-a', [
+    'sys-a',
+    'sys-b',
+  ]);
+  assert.equal(partial.record, null);
+  assert.deepEqual(partial.refusedSections, ['repairRequirements']);
+  // A component that is not a world component at all.
+  const local = elect([], () => true, ['sys-a']);
+  assert.equal(local.record, null);
+  assert.deepEqual(local.refusedSections, ['repairRequirements']);
+  // A SINGLE-member group always satisfies it, which is why the rule is not restrictive.
+  assert.ok(elect(['world-c'], () => true, ['sys-a']).record.repairRequirements);
 });
 
 test('every world entity carries ONLY identity fields, plus its id', () => {

@@ -533,7 +533,7 @@ CraftingSystem = {
     The governing rule above is unchanged and gains exactly one clause: SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.
     The per-tool control stays `checkBreakable`; the prototype's `tool` / `check` / `immune` spellings are not introduced.
     The world half is PERSISTED on `fabricate.toolScope` (issue 1359) and became REACHABLE at `1.30.0`, when this requirement's own normalizer became absence-preserving.
-    A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-UI effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver.
+    A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-UI effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver, via the one shared seam `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`).
     The FIVE UI readers are deliberately not routed yet: the `1.30.0` migration authors no world value, so their local default and the resolver agree exactly, and the divergence becomes reachable only once the world tool-breakage editor ships.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
     Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
@@ -1067,8 +1067,8 @@ EssenceDefinition = {
    That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
    At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
 10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
-11. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a registered world scope setting that nothing writes yet (`## CraftingSystem` requirement 36).
+11. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ## RecipeItemDefinition
@@ -1229,7 +1229,7 @@ Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here until the consumer
 This record PERMANENTLY retains `id`, `essences`, `difficulty`, `complications` and the whole `salvage` block: they have no destination in the scope model at all, and moving them would need an explicit amendment to `## Scoped Entity Definitions` `### Component scope` requirement 1.
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
-Requirement 9 below calls `name` and `img` "the one-hop snapshots", and requirement 9 REFRESHES that copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
 SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
 
 ### Properties
@@ -1403,8 +1403,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     Component normalization is an allowlist rebuild, so a component's persisted shape after a save is exactly what that rebuild emits and the key is absent for a component that authored none.
     This is the **omitted-when-default** doctrine of § Canonical-Write and Legacy-Read Compatibility Policy, whose in-file precedent is `salvage.checkModifierIds` and NOT `salvage.allowPlayerResultReorder` — the latter is stamped on both normalizer return paths and is therefore absent-reads-as-default but not byte-preserving.
     No earlier build ever wrote this key, so the write-side alias-retirement rule does not apply; what carries over is the AUDIT obligation at requirement 20.
-26. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a registered world scope setting that nothing writes yet (`## CraftingSystem` requirement 36).
+26. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ## Recipe
@@ -1993,10 +1993,12 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > It binds now, and the consumer sweep of epic 1357 is what will read through it.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
-> The migration writes NO WORLD DEFAULTS AT ALL — it writes the `defaults` sub-key as an EMPTY MAP, because seededness keys on key presence — so every membership record is fully overriding and no section resolves through the world layer at migration time.
+> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and four constraints can decline an individual section.
+> Every membership record is nevertheless created fully OVERRIDING, so NO section resolves through the world layer at migration time and resolved behaviour is unchanged — a world default matters only for a system added later, or an override a GM clears later.
 >
 > **STILL NOT LIVE after `1.30.0`**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
-> The shed is the CONSUMER SWEEP's (PR 8), and the vocabulary keys have no destination because `fabricate.worldVocabulary` does not exist; `## CraftingSystem` requirement 36 carries both corrections and states what is retired and what never is.
+> **What the CONSUMER SWEEP (PR 8) retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and `## CraftingSystem` requirement 36 states which and why.
+> The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
 > The READ union's no-production-consumer state likewise persists past `1.30.0` and is retired by the sweep, so `## Component`, `## EssenceDefinition` and `## Tool` still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does.
 
 ### Purpose
@@ -2255,6 +2257,7 @@ Both would otherwise be actively harmful at migration time: a world `general` wo
    The migration WRITES NO WORLD AUTHORITY and TOUCHES NO SYSTEM'S VALUE: it treats every system's existing `toolBreakage.authority` as AUTHORED rather than defaulted, because the corpus cannot distinguish the two and treating a defaulted `toolSpecific` as absent would silently hand every existing system whatever authority the world later acquires.
    The world authority therefore stays absent until a GM authors it, which means it is reachable only for a system whose override is cleared, or one created afterwards.
    **The FOUR non-UI effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
+   They reach it through ONE shared seam, `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`), which resolves the world value from the published tool scope store and delegates to this requirement's resolver; a second hand-rolled `?? "toolSpecific"` at any call site would re-create the defect the flip removes.
    The FIVE UI readers are named as the world tool-breakage editor's obligation: at `1.30.0` no world authority is authored, so their local default and the resolver agree exactly.
 
 ## Tool
@@ -2405,8 +2408,8 @@ Tool = {
     The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
     Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
     Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
-14. This section describes the LIVE per-system shape and remains authoritative until the world-scope migration lands.
-    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a registered world scope setting that nothing writes yet (`## CraftingSystem` requirement 36).
+14. This section describes the LIVE per-system shape and remains authoritative until the CONSUMER SWEEP (epic 1357, PR 8) repoints its readers.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity plus one fully-overriding membership record per system, and no world defaults) (`## CraftingSystem` requirement 36).
     Where the two disagree, this section is what the code does.
 
 ### Validation Matrix

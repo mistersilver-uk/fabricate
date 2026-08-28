@@ -54,9 +54,28 @@ function equalWorld() {
   return { systems: [system], scopeCorpus };
 }
 
-test('the ZERO case: an equal world reports NOTHING', () => {
+test('the ZERO case: an equal world reports NOTHING, and it really examined something', () => {
   const { systems, scopeCorpus } = equalWorld();
   assert.deepEqual(reportWorldIdentityDrift(systems, scopeCorpus), []);
+
+  // ANTI-VACUITY. `reportWorldIdentityDrift` returns `[]` immediately when a scope carries no
+  // entities, so an empty answer is also what a detector that read NOTHING returns. Perturbing
+  // one field at a time proves every `(entityType, field)` pair was actually compared.
+  let compared = 0;
+  for (const [entityType, fields] of Object.entries(WORLD_IDENTITY_FIELDS)) {
+    for (const field of fields) {
+      const world = equalWorld();
+      const record = world.systems[0][ENTITY_FIELDS[entityType]][0];
+      record[field] = Array.isArray(record[field]) ? ['PERTURBED'] : 'PERTURBED';
+      assert.equal(
+        reportWorldIdentityDrift(world.systems, world.scopeCorpus).length,
+        1,
+        `${entityType}.${field} was never compared, so the ZERO case says nothing about it`
+      );
+      compared += 1;
+    }
+  }
+  assert.equal(compared, 16, 'every lifted field of every entity type is in the comparison');
 });
 
 test('(b) per-lifted-field positive coverage: exactly one entry, naming the tuple and the field', () => {
@@ -116,40 +135,29 @@ test('the detector is TOTAL: a malformed corpus answers an empty list', () => {
   }
 });
 
-test('(c) an ALWAYS-EQUAL detector reddens the positive coverage', () => {
-  // The first stub mutation, run in-test rather than against a patched source file: a detector
-  // that reports nothing satisfies the ZERO case perfectly and is useless.
-  const alwaysEqual = () => [];
-  const { systems, scopeCorpus } = equalWorld();
-  systems[0].components[0].name = 'DRIFTED';
-  assert.equal(
-    reportWorldIdentityDrift(systems, scopeCorpus).length,
-    1,
-    'the real detector reports the drift'
-  );
-  assert.equal(alwaysEqual().length, 0, 'and the always-equal stub does not — so (b) would RED');
-});
-
-test('(c) an ALWAYS-UNEQUAL detector reddens the ZERO case', () => {
-  const { systems, scopeCorpus } = equalWorld();
-  const alwaysUnequal = (corpusSystems) =>
-    corpusSystems.flatMap((system) =>
-      system.components.map((record) => ({
-        systemId: system.id,
-        entityType: 'components',
-        entityId: record.id,
-        field: 'name',
-      }))
-    );
+test('(c) the detector is neither ALWAYS-EQUAL nor ALWAYS-UNEQUAL, on ONE corpus', () => {
+  // BOTH DIRECTIONS, ON THE REAL DETECTOR. An earlier form of this arm asserted
+  // `(() => [])().length === 0` and `alwaysUnequal(...).length === 1` against local arrows,
+  // which are tautologies that cannot fail - in the one criterion whose whole point is refusing
+  // exactly that. What makes the property real is that the SAME detector answers differently
+  // for two inputs that differ by a single field, so neither stub could produce both answers.
+  const clean = equalWorld();
   assert.deepEqual(
-    reportWorldIdentityDrift(systems, scopeCorpus),
+    reportWorldIdentityDrift(clean.systems, clean.scopeCorpus),
     [],
-    'the real detector is empty'
+    'an ALWAYS-UNEQUAL detector fails HERE'
   );
+
+  const drifted = equalWorld();
+  drifted.systems[0].components[0].name = 'DRIFTED';
+  const reported = reportWorldIdentityDrift(drifted.systems, drifted.scopeCorpus);
+  assert.equal(reported.length, 1, 'and an ALWAYS-EQUAL detector fails HERE');
+  assert.equal(reported[0].field, 'name');
+  assert.equal(reported[0].systemValue, 'DRIFTED');
   assert.equal(
-    alwaysUnequal(systems).length,
-    1,
-    'and the always-unequal stub is not — so (a) would RED'
+    reported[0].worldValue,
+    'Ash Salt',
+    'and it reports BOTH sides, so PR 8 can re-derive rather than guess which one is fresh'
   );
 });
 

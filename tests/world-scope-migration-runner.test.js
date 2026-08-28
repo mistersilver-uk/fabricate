@@ -149,12 +149,14 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
     );
   }
   assert.equal(store.get('migrationVersion'), '1.30.0');
-  assert.equal(
-    store.get('componentScope').defaults &&
-      typeof store.get('componentScope').defaults === 'object' &&
-      Object.keys(store.get('componentScope').defaults).length,
-    0,
-    'the `defaults` sub-key is WRITTEN, as an EMPTY map — seededness keys on key PRESENCE'
+  // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it
+  // carries one record per entity whose oldest contributing system authored a liftable section.
+  // Seededness still keys on key PRESENCE, so the key must be written either way.
+  const componentDefaults = store.get('componentScope').defaults;
+  assert.equal(typeof componentDefaults, 'object');
+  assert.ok(
+    Object.keys(componentDefaults).length > 0,
+    'the donor-elected world defaults are persisted'
   );
   assert.ok(
     'defaults' in store.get('essenceScope') && 'defaults' in store.get('toolScope'),
@@ -290,6 +292,29 @@ test('the map-clear gate uses compareSemver, so a LEXICOGRAPHIC compare cannot d
 // ---------------------------------------------------------------------------
 // Criterion 4(d) — the runner's version gate blocks re-entry
 // ---------------------------------------------------------------------------
+
+test('a persisted world tool-breakage authority SURVIVES the migration', async () => {
+  // The FOURTH `toolScope` sibling. Narrowing the payload to the three sub-keys would destroy it
+  // on any world this pass lifts — and the registry label rests `downgradeLosesData: false` on
+  // the promise that the three scope settings "survive untouched and a re-upgrade finds them
+  // intact". Nothing authors an authority at `1.30.0`, but import/export ships in this release
+  // and the catalogue editors follow it.
+  const initial = worldAt129();
+  initial.toolScope = {
+    entities: [],
+    defaults: {},
+    membership: {},
+    toolBreakage: { authority: 'checkDriven' },
+  };
+  const { runner, store } = makeRunner(initial);
+  await runner.run();
+  assert.deepEqual(
+    store.get('toolScope').toolBreakage,
+    { authority: 'checkDriven' },
+    'the authored world authority is preserved verbatim'
+  );
+  assert.ok(store.get('toolScope').entities.length > 0, 'and the lift still happened');
+});
 
 test('idempotence (d): a world already at 1.30.0 never re-enters the migration', async () => {
   const initial = worldAt129();

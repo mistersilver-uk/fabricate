@@ -94,7 +94,9 @@ import {
 } from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { resolveToolScope } from './toolScope.js';
+import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -7314,6 +7316,14 @@ export class CraftingSystemManager {
         },
       ],
       subject,
+      // The ONE mutation-time pass that prunes against COMPONENT ids, so the ONE that has to
+      // answer whether those ids are still current (issue 1363). The startup door asks the
+      // same question at `composeStartupPassList`; the two doors call the same collaborator
+      // and a kind declared on one and not the other is a gate that disagrees with itself.
+      basis: {
+        ...WHOLE_CORPUS_ID_BASIS,
+        componentIdentityRemap: !hasPendingWorldScopeRekey(getSetting),
+      },
     });
   }
 }

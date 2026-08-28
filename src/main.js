@@ -113,6 +113,7 @@ import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
 import { mayClearWorldScopeRekeyMap, remapWorldScopeIdentityFlags } from './migration/remapWorldScopeIdentityFlags.js';
+import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
@@ -1750,6 +1751,28 @@ class Fabricate {
    */
   getCraftingEngine() {
     return this.craftingEngine;
+  }
+
+  /**
+   * Re-run the `1.30.0` world-scope identity-flag repair (issue 1363).
+   *
+   * A GM-FACING RECOVERY ACTION, not a test hook. The one-shot `ready` pass WITHHOLDS itself in
+   * two states it reports rather than hides: a torn migration leaves the re-key map pending and
+   * the pass declines to consume it, and a locked-pack or refused write leaves individual
+   * documents in the source-reference tier and counts them. This is how a GM re-runs the repair
+   * once they have fixed the cause, without waiting for a boot on which the one-shot happens to
+   * be eligible.
+   *
+   * IDEMPOTENT and GM-gated by the pass itself. It performs the remap ONLY; it does not clear
+   * the map or advance the one-shot version, so the ordinary boot-time gating still decides
+   * when the decision record may be destroyed.
+   *
+   * @returns {Promise<object|null>} the pass summary, or `null` when nothing is pending.
+   */
+  async remapWorldScopeIdentityFlags() {
+    const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    if (!hasPendingWorldScopeRekey(() => rekeyMap)) return null;
+    return applyWorldScopeIdentityFlagRemap(rekeyMap);
   }
 
   /**
@@ -5071,6 +5094,12 @@ async function runRecipeItemFlagAutoStamp() {
  * metadata-refresh storm. Sources only — owned copies inherit the flag on future drags
  * and are otherwise covered by the manual "Repair item data" action. NOT a MigrationRunner
  * entry: that runner reads/writes only settings-data payloads and cannot write Item flags.
+ *
+ * ITS VERSION ADVANCE IS WITHHELD while the `1.30.0` migration has not completed (issue 1363).
+ * The target was bumped 1 -> 2 by that release so this pass repairs the source-side leaves the
+ * re-key invalidated, which makes it a one-shot that CONSUMES a migration's output — and any
+ * such pass must gate its irreversible step on migration completion rather than on a corpus
+ * predicate, because the deferred branch of the migration pass returns normally.
  */
 async function runComponentFlagAutoStamp() {
   try {
@@ -5083,6 +5112,15 @@ async function runComponentFlagAutoStamp() {
     if (!manager?.autoStampComponentSources) return;
     const summary = await manager.autoStampComponentSources();
     console.debug?.('Fabricate | component durable-flag auto-stamp complete', summary);
+    // ISSUE 1363 — WITHHOLD THE VERSION ADVANCE UNTIL THE PRODUCING MIGRATION HAS COMPLETED.
+    // This release bumps the stamp target precisely so this pass REPAIRS every source Item
+    // whose `roles[<systemId>]` leaf names an id `1.30.0` re-keyed. But a deferred migration
+    // returns NORMALLY, so this pass runs on the SAME BOOT as a torn one — against the OLD
+    // ids, changing nothing — and an unconditional advance would then gate it off FOREVER.
+    // `remapWorldScopeIdentityFlags` never touches source Items, so nothing else would ever
+    // repair them, and every later drag would copy the stale flag onto an owned item the
+    // owned-item restamp refuses because it already carries a durable identity flag.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) return;
     await setSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION, COMPONENT_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | component durable-flag auto-stamp failed', error);
@@ -5092,7 +5130,9 @@ async function runComponentFlagAutoStamp() {
 /**
  * Issue 561 — one-shot, primary-GM-gated backfill that stamps the durable per-system
  * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source Item.
- * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world, and
+ * its advance is WITHHELD until the `1.30.0` migration has completed, for the reason
+ * {@link runComponentFlagAutoStamp} states.
  * MUST run AFTER the `1.15.0` settings-data migration (`migrateToolsToFirstClass`) populates
  * each tool's source refs — the migration persists at init, this reads the live normalized
  * systems in the `ready` body — and BEFORE the `updateItem` hook registers. Sources only —
@@ -5110,6 +5150,15 @@ async function runToolFlagAutoStamp() {
     if (!manager?.autoStampToolSources) return;
     const summary = await manager.autoStampToolSources();
     console.debug?.('Fabricate | tool durable-flag auto-stamp complete', summary);
+    // ISSUE 1363 — WITHHOLD THE VERSION ADVANCE UNTIL THE PRODUCING MIGRATION HAS COMPLETED.
+    // This release bumps the stamp target precisely so this pass REPAIRS every source Item
+    // whose `roles[<systemId>]` leaf names an id `1.30.0` re-keyed. But a deferred migration
+    // returns NORMALLY, so this pass runs on the SAME BOOT as a torn one — against the OLD
+    // ids, changing nothing — and an unconditional advance would then gate it off FOREVER.
+    // `remapWorldScopeIdentityFlags` never touches source Items, so nothing else would ever
+    // repair them, and every later drag would copy the stale flag onto an owned item the
+    // owned-item restamp refuses because it already carries a durable identity flag.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) return;
     await setSetting(SETTING_KEYS.TOOL_FLAG_STAMP_VERSION, TOOL_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | tool durable-flag auto-stamp failed', error);
@@ -5204,9 +5253,46 @@ async function runWorldScopeIdentityFlagRemap() {
     ) {
       return;
     }
+    // THE RUN GATE IS CORPUS-DERIVED, and THIS is that predicate. It is equivalent-or-stronger
+    // than the `isSeeded('entities')` form the design names: a seeded scope with no pending map
+    // means the migration either re-keyed nothing or the map has already been consumed, and in
+    // both cases there is nothing here to remap. It also needs no store handle.
+    //
+    // A world with NOTHING to remap still falls through to the version advance below rather
+    // than returning here, so it stops re-checking on every boot forever. That advance is
+    // itself gated on migration completion, so a world whose migration deferred BEFORE writing
+    // the map re-runs on a later boot rather than short-circuiting.
     const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
-    if (!rekeyMap || typeof rekeyMap !== 'object' || Object.keys(rekeyMap).length === 0) return;
+    if (hasPendingWorldScopeRekey(() => rekeyMap)) {
+      await applyWorldScopeIdentityFlagRemap(rekeyMap);
+    }
 
+    // THE CLEAR, and the version advance, share ONE gate. See the docblock. The predicate lives
+    // in the pure module, on `compareSemver`, so it is unit-testable and so no reader can
+    // re-derive it as a bare JS `>=` on what is a STRING setting.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
+      console.warn(
+        'Fabricate | world-scope re-key map RETAINED: the 1.30.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    await setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
+    await setSetting(
+      SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,
+      WORLD_SCOPE_IDENTITY_FLAG_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | world-scope identity flag remap failed', error);
+  }
+}
+
+/**
+ * Apply the remap itself and post its GM notice. Split out of the gating above so the two are
+ * separately readable: everything here is WORK, everything there is a DECISION.
+ *
+ * @param {object} rekeyMap The pending `fabricate.worldScopeRekeyMap`.
+ */
+async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
     const summary = await remapWorldScopeIdentityFlags({
       actors: game.actors ?? [],
       rekeyMap,
@@ -5227,24 +5313,7 @@ async function runWorldScopeIdentityFlagRemap() {
       data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
     );
     if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
-
-    // THE CLEAR, and the version advance, share ONE gate. See the docblock. The predicate lives
-    // in the pure module, on `compareSemver`, so it is unit-testable and so no reader can
-    // re-derive it as a bare JS `>=` on what is a STRING setting.
-    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
-      console.warn(
-        'Fabricate | world-scope re-key map RETAINED: the 1.30.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
-      );
-      return;
-    }
-    await setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
-    await setSetting(
-      SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,
-      WORLD_SCOPE_IDENTITY_FLAG_TARGET
-    );
-  } catch (error) {
-    console.error('Fabricate | world-scope identity flag remap failed', error);
-  }
+    return summary;
 }
 
 /**

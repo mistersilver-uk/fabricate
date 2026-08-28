@@ -509,6 +509,135 @@ test('a system-level toolBreakage is NOT a reference site and is never rewritten
   assert.equal(after.systems[0].toolBreakage.authority, MARKER);
 });
 
+test('the DEFENSIVE list is COMPLETE: every unproducible leaf the walk touches is on it', () => {
+  // The list is the ONE escape hatch from the set-equality above, so it is pinned in BOTH
+  // directions rather than trusted. A corpus authoring every legacy and alias shape is walked,
+  // and every leaf the walk rewrites must be either an enumerated site or a listed defensive
+  // one. An earlier form of the list named `catalysts[]` as a bare array path and omitted every
+  // `systemItemId` alias, so the invariant it stated was false.
+  const ingredient = () => ({
+    quantity: 1,
+    componentId: MARKER,
+    systemItemId: MARKER,
+    match: { type: 'component', componentId: MARKER, systemItemId: MARKER },
+    alternatives: [
+      {
+        quantity: 1,
+        componentId: MARKER,
+        systemItemId: MARKER,
+        match: { type: 'component', componentId: MARKER, systemItemId: MARKER },
+      },
+    ],
+  });
+  const set = () => ({
+    id: MARKER,
+    toolIds: [MARKER],
+    ingredientGroups: [{ id: MARKER, name: MARKER, options: [ingredient()] }],
+    ingredients: [ingredient()],
+    catalysts: [ingredient()],
+  });
+  const results = () => [{ componentId: MARKER, systemItemId: MARKER, quantity: 1 }];
+  const tool = () => ({
+    id: MARKER,
+    componentId: MARKER,
+    onBreak: {
+      mode: 'replaceWith',
+      replacementComponentId: MARKER,
+      replacementTarget: { type: 'component', componentId: MARKER },
+    },
+    repairRequirements: [{ id: MARKER, name: MARKER, options: [ingredient()] }],
+  });
+  const build = () => ({
+    system: {
+      id: MARKER,
+      components: [
+        {
+          id: MARKER,
+          salvage: {
+            toolIds: [MARKER],
+            catalysts: [ingredient()],
+            resultGroups: [{ id: MARKER, results: results() }],
+          },
+        },
+      ],
+      essenceDefinitions: [
+        {
+          id: MARKER,
+          sourceComponentId: MARKER,
+          associatedSystemItemId: MARKER,
+          sourceItemUuid: MARKER,
+        },
+      ],
+      tools: [tool()],
+    },
+    recipe: {
+      id: MARKER,
+      toolIds: [MARKER],
+      ingredientSets: [set()],
+      resultGroups: [{ id: MARKER, results: results() }],
+      results: results(),
+      catalysts: [ingredient()],
+      steps: [
+        {
+          id: MARKER,
+          toolIds: [MARKER],
+          ingredientSets: [set()],
+          resultGroups: [{ id: MARKER, results: results() }],
+          catalysts: [ingredient()],
+        },
+      ],
+    },
+    slice: {
+      tasks: [
+        {
+          id: MARKER,
+          toolIds: [MARKER],
+          dropRows: [{ id: MARKER, componentId: MARKER, systemItemId: MARKER }],
+        },
+      ],
+      events: [
+        {
+          id: MARKER,
+          toolIds: [MARKER],
+          dropRows: [{ id: MARKER, componentId: MARKER, systemItemId: MARKER }],
+        },
+      ],
+      tools: [tool()],
+    },
+  });
+
+  const before = build();
+  const after = build();
+  const remappers = {
+    remapComponent: keyedRemapper({ [MARKER]: REWRITTEN }),
+    remapTool: keyedRemapper({ [MARKER]: REWRITTEN }),
+  };
+  rewriteSystemReferences(after.system, remappers);
+  rewriteRecipeReferences(after.recipe, remappers);
+  rewriteGatheringSliceReferences(after.slice, remappers);
+
+  const enumerated = new Set([...WORLD_SCOPE_REFERENCE_SITES, ...WORLD_SCOPE_DEFENSIVE_SITES]);
+  const unlisted = [];
+  for (const [prefix, beforeRoot, afterRoot] of [
+    ['systems[]', before.system, after.system],
+    ['recipes[]', before.recipe, after.recipe],
+    ['gatheringConfig.systems.*', before.slice, after.slice],
+  ]) {
+    const beforeLeaves = leafPaths(beforeRoot);
+    const afterLeaves = leafPaths(afterRoot);
+    for (const [path, value] of beforeLeaves) {
+      if (afterLeaves.get(path) === value) continue;
+      const full = `${prefix}.${path}`.replace('.[]', '[]');
+      if (!enumerated.has(full)) unlisted.push(full);
+    }
+  }
+  assert.deepEqual(
+    unlisted.sort(),
+    [],
+    'the walk rewrites a leaf that is on NEITHER the site list nor the defensive list'
+  );
+});
+
 test('every DEFENSIVE site is genuinely unproducible — the list cannot hide a real, missed site', () => {
   // The defensive list is the ONE escape hatch from the set-equality above, so it is itself
   // guarded: a path on it that the real producers DO emit is a site hiding in the exemption,

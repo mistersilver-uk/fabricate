@@ -654,8 +654,11 @@ const MIGRATIONS = [
     // orphaned `Setting` documents that a re-upgrade finds intact. The `toolSpecific`
     // re-minting is real, but it is DATA-lossless and BEHAVIOUR-relevant — the same fact
     // `1.21.0` is deliberately not marked for — so it is stated as a caveat in the label and
-    // not claimed as data loss. `tests/world-scope-downgrade-declaration.test.js` holds both
-    // arms executable rather than asserted.
+    // not claimed as data loss. `tests/world-scope-migration-runner.test.js` holds both arms
+    // executable rather than asserted: one normalizes a system through `_normalizeSystem` with
+    // POPULATED scope-store doubles carrying write spies, the other applies the shipped
+    // pre-flip normalizer body as a fixture function and shows the post-flip one leaves the
+    // re-minted token in place.
     downgradeLosesData: false,
     // Reports entities created, groups merged, every rename, refusals and the newly-prunable
     // references through the transient `_worldScopeEntityReport` field (captured and deleted

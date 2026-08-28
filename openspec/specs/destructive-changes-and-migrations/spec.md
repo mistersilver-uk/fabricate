@@ -869,7 +869,12 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    On a disagreement the OLDEST contributing definition wins every identity field AS A UNIT, never field-by-field, so no chimera identity is minted; and EVERY rename is reported by name with both systems, while a byte-identical group produces none.
 4. **The ID-CLAIM LADDER is deterministic**, so a re-run chooses identically: the oldest contributing id if unclaimed, else the next-oldest if unclaimed, else `<oldestId>-w<n>` with the smallest unclaimed `n >= 2`.
    Steps 2 and 3 exist because component and tool ids are NOT globally unique — copy-import preserves them.
-5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair is byte-identical to its input.
+5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair's own definitions are byte-identical to their input.
+   **"Byte-identical" is scoped to the refused pair's own definitions and their ids, and this qualification is load-bearing.**
+   Refusal is per `(system, entityType)`, so a system whose COMPONENTS pair is refused while its TOOLS pair is accepted still has its `component.salvage.toolIds` rewritten — those are TOOL references, and the tools pair was not refused.
+   What the refusal withholds is the component pair's own lift, re-key and membership.
+   A refusal is also not always caused by this migration: a system carrying a NATIVE duplicate definition id fails the output-uniqueness invariant on its own.
+   Because a refusal removes that system's definitions from every group they belonged to, it can change ANOTHER system's elected identity donor — which is reported by name like any other identity change, and named in the GM notice's refusal reason.
    TWO invariants decide it, and the second is a POST-condition rather than a pre-condition.
    DISJOINTNESS: the map's image must not intersect its key set, or a single simultaneous lookup is not idempotent.
    OUTPUT UNIQUENESS: the ids the pair emits must be unique, because disjointness alone does not forbid an output id colliding with an id in the same pair that was NOT re-keyed, and such a duplicate is silently last-wins in both index builders — making a definition unreachable with no error.
@@ -877,11 +882,23 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
 6. **Every membership record is created with EVERY SECTION OVERRIDDEN**, each value copied verbatim from that system's own definition, so nothing inherits at migration time and every system's resolved behaviour is unchanged.
    A component record carries `category` verbatim — `general` is a legitimate stored token on an override — and its own `tags` with no `mutedTags`.
    An essence record carries `effectSource` and `macro` and its `enabled` flag; a tool record carries `breakage`, `onBreak`, the seeded `repairRequirements` and its `enabled` flag.
-7. **NO WORLD DEFAULTS ARE WRITTEN AT ALL.**
-   There is no unambiguous source to lift a behaviour default FROM: the oldest-wins rule is scoped to IDENTITY, and extending it to behaviour would silently elect one of three systems' repair recipes, breakage modes and effect sources as the value every future member of the group inherits.
-   Writing none is SAFE because every membership record is fully overriding, so no section resolves through the world layer at migration time and resolution is bit-identical.
-   The cost is stated rather than glossed: a system created AFTER the migration, or one whose GM later clears an override, inherits NOTHING until a GM authors a world default in the catalogue editors.
-   **The `defaults` SUB-KEY IS STILL WRITTEN, as an EMPTY MAP**, because seededness keys on key PRESENCE rather than content and the persisted shape must round-trip through the store unchanged.
+7. **WORLD DEFAULTS ARE ELECTED FROM THE DONOR** - the OLDEST contributing system, the same donor that wins identity, extending the oldest-wins rule from identity to behaviour.
+   SIX sections take one: component `category`, essence `effectSource` and `macro`, and tool `breakage`, `onBreak` and the seeded `repairRequirements`.
+   **TWO are excluded, for two DIFFERENT reasons.**
+   Component `tags` is excluded because the tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once - a hazard independent of who the donor is.
+   The world tool-breakage authority is excluded because its problem is unknowable PROVENANCE rather than an ambiguous donor: the pre-flip normalizer minted a concrete `toolSpecific` on every save, so `### Tool scope` requirement 5's every-existing-value-is-AUTHORED rule applies and there is nothing to lift.
+
+   **FOUR CONSTRAINTS can decline an individual SECTION**, and a declined section simply gets no world default and is reported.
+   Nothing is lost by a refusal, which is why refusing is always the safe answer: every membership record still OVERRIDES every section with its own system's value verbatim, so resolution at migration time is unchanged either way and a world default only ever matters for a system added LATER or an override cleared later.
+   (a) `category` is NEVER the reserved `general` (`### Component scope` requirement 2), because an absence-preserving world category that mints it resets every inheriting system on the first resolve.
+   (b) `effectSource` may name only a WORLD-ADDRESSABLE referent (`### Essence scope` requirement 5) - a document UUID, or a component id in the world roster; a non-addressable donor value stays on the system side as an override with the switch off, which that requirement already mandates.
+   (c) `onBreak` carries the same addressability rule for a `replaceWith` COMPONENT target; an `itemUuid` target is globally addressable.
+   (d) `repairRequirements` is lifted ONLY when every referenced component is a world component that EVERY member system of the group is a member of.
+   It is a SEED, copied once when a tool is added to a system and never re-read, so a dangling group is baked silently into a future system's repair recipe with no reader that can report it.
+   The alternative - lift freely and validate at add-to-system time - puts the check inside an action that does not exist yet, so it would ship a world default no shipped code can validate; the chosen rule is decidable from the corpus alone and can never produce a dangling seed.
+   It is not restrictive in practice, because a single-member group always satisfies it.
+
+   **The `defaults` SUB-KEY IS WRITTEN whether or not it holds a record**, because seededness keys on key PRESENCE rather than content and the persisted shape must round-trip through the store unchanged.
 8. **THE REWRITE RUNS BEFORE THE THREE SCOPE PAYLOADS ARE BUILT**, and the order is load-bearing.
    Three lifted values contain component ids this same pass re-keys — essence `effectSource`, tool `onBreak.replacementTarget.componentId` and tool `repairRequirements` — so a payload built pre-rewrite would ship a membership record naming a retired id in every migrated world, and the per-pair lift guard is keyed on the NEW pair, so a re-run would skip it and the stale ids would persist permanently.
    The shared walk then runs over the three payloads as a FOURTH target as a belt-and-braces check; on a correctly ordered pass it finds nothing to change.

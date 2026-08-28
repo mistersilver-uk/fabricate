@@ -22,7 +22,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
-import { buildWorldScopeGrouping } from '../src/migration/worldScopeEntityGrouping.js';
+import { SCOPE_PAYLOAD_KEYS } from '../src/migration/migrateWorldScopeEntities.js';
+import {
+  buildWorldScopeGrouping,
+  ENTITY_TYPE_FIELDS,
+  WORLD_IDENTITY_FIELDS,
+} from '../src/migration/worldScopeEntityGrouping.js';
 import { COMPONENT_SCOPE } from '../src/systems/componentScope.js';
 import { ESSENCE_SCOPE } from '../src/systems/essenceScope.js';
 import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
@@ -69,6 +74,29 @@ function migrateAndSave(before) {
   };
 }
 
+/** The three fields Ruling 2 UNIONS across a group rather than taking from the donor. */
+const SOURCE_LINK_FIELDS = Object.freeze([
+  'originItemUuid',
+  'registeredItemUuid',
+  'aliasItemUuids',
+]);
+
+/**
+ * Whether a source-link difference is PURELY ADDITIVE: the record still claims every reference it
+ * claimed before, and may claim more.
+ *
+ * A reference is a CLAIM that this entity is that Item, and the resolvers intersect reference SETS
+ * rather than compare them, so gaining one strictly widens resolution and losing one narrows it.
+ * The union may only ever widen.
+ */
+function isPurelyAdditiveSourceLink(field, beforeValue, afterValue) {
+  if (!SOURCE_LINK_FIELDS.includes(field)) return false;
+  const asSet = (value) => new Set((Array.isArray(value) ? value : [value]).filter(Boolean));
+  const before = asSet(beforeValue);
+  const after = asSet(afterValue);
+  return [...before].every((ref) => after.has(ref));
+}
+
 /**
  * Assert the two projections agree, allowing exactly the two named exceptions.
  *
@@ -101,6 +129,14 @@ function assertDifferential(label, before, after, report) {
         PERMITTED_IDENTITY_FIELDS.includes(field),
         `${label}: ${afterKey}.${field} changed and is NOT an identity field`
       );
+      if (isPurelyAdditiveSourceLink(field, beforeValue[field], afterValue[field])) {
+        // THE SOURCE-LINK UNION, and it is NOT a rename. A member that GAINED a reference lost
+        // nothing and its resolution strictly widens, so there is nothing for a GM to act on.
+        // A member that LOST one still falls through to the rename requirement below, which is
+        // what makes this exception safe rather than a hole.
+        accepted.push(`union:${afterKey}.${field}`);
+        continue;
+      }
       assert.ok(
         renameIndex.has(afterKey),
         `${label}: ${afterKey}.${field} changed with NO matching rename-report entry`
@@ -153,6 +189,92 @@ function assertDifferential(label, before, after, report) {
     assert.ok(path in beforeRefs, `${label}: reference site ${path} appeared from nowhere`);
   }
   return accepted;
+}
+
+/**
+ * `flaggedForReview` must name EVERY reference the newly-decidable basis will prune, and NOTHING
+ * ELSE.
+ *
+ * IT IS THE GM'S ONLY WARNING. Once the scope settings are seeded, `_scopeEntityBasis` reports
+ * KNOWN for a system whose in-system array is empty where it previously reported `null`, so a
+ * dangling reference becomes prunable on the first save after upgrade — permanently, because the
+ * crafting-system normalizer is an allowlist rebuild. An incomplete list is silent data loss with
+ * no notice, so an `Array.isArray` check and a one-directional containment check are not enough:
+ * `flagged.slice(1)` and dropping the whole tools half both survive them.
+ *
+ * THE ORACLE IS INDEPENDENT. Projection (b) already resolves every reference in the PRE-migration
+ * corpus and records the ones that resolve to nothing as `UNRESOLVED:<path>`; those, de-duplicated
+ * to `(systemId, entityType, referenceId)`, are exactly what the report must carry.
+ */
+function assertFlaggedForReviewIsComplete(label, before, result, report) {
+  const closure = projectReferenceClosure(CraftingSystemManager, before, false);
+  const componentIds = new Map();
+  const toolIds = new Map();
+  for (const system of before.systems ?? []) {
+    componentIds.set(system.id, new Set((system.components ?? []).map((record) => record.id)));
+    toolIds.set(system.id, new Set((system.tools ?? []).map((record) => record.id)));
+  }
+  // Re-derive the reference VALUES from the pre-migration corpus, keyed the way the report keys
+  // them, using the same "looks like a definition id" rule the migration applies.
+  const expected = new Set();
+  const walk = (node, systemId) => {
+    if (Array.isArray(node)) {
+      for (const entry of node) walk(entry, systemId);
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if ((key === 'componentId' || key === 'systemItemId') && typeof value === 'string') {
+        if (value && !value.includes('.') && !componentIds.get(systemId)?.has(value)) {
+          expected.add(`${systemId}|components|${value}`);
+        }
+        continue;
+      }
+      if (key === 'toolIds' && Array.isArray(value)) {
+        for (const id of value) {
+          if (
+            typeof id === 'string' &&
+            id &&
+            !id.includes('.') &&
+            !toolIds.get(systemId)?.has(id)
+          ) {
+            expected.add(`${systemId}|tools|${id}`);
+          }
+        }
+        continue;
+      }
+      walk(value, systemId);
+    }
+  };
+  for (const system of before.systems ?? []) walk(system, system.id);
+  for (const recipe of before.recipes ?? []) walk(recipe, recipe.craftingSystemId);
+  for (const [systemId, slice] of Object.entries(before.gatheringConfig?.systems ?? {})) {
+    walk(slice, systemId);
+  }
+
+  const actual = new Set(
+    report.flaggedForReview.map(
+      (entry) => `${entry.systemId}|${entry.entityType}|${entry.referenceId}`
+    )
+  );
+  assert.deepEqual(
+    [...actual].sort(),
+    [...expected].sort(),
+    `${label}: flaggedForReview must name EVERY newly-prunable reference and nothing else`
+  );
+
+  // ANTI-VACUITY, tied to the projection that motivates the criterion: the corpora carrying
+  // dangling references must actually produce some, and projection (b) must have seen them.
+  const unresolved = Object.values(closure).filter(
+    (value) => typeof value === 'string' && value.startsWith('UNRESOLVED:')
+  );
+  if (expected.size > 0) {
+    assert.ok(
+      unresolved.length > 0,
+      `${label}: projection (b) must see the same dangling references the report names`
+    );
+  }
+  void result;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +336,53 @@ test('every crafting-system export fixture in tests/fixtures survives the differ
   // them all, so the population is pinned rather than assumed.
   assert.ok(examined >= 0, 'the fixture walk ran');
   console.log(`# world-scope differential examined ${examined} export fixture(s)`);
+});
+
+test('the ONE basis-gated prune the round-trip seam performs, and why the prune branch is a GUARD', async () => {
+  // THIS IS A CORRECTION TO THE ACCEPTANCE RECORD, not a new claim.
+  //
+  // `assertDifferential` permits a reference site to DISAPPEAR only when it resolved to nothing
+  // beforehand, so that `#### D10`'s newly-decidable prune is a visible difference rather than an
+  // absence. That branch is currently a GUARD rather than an exercised path, and measuring it
+  // rather than asserting it is the honest form: `_normalizeSystem` consumes
+  // `scopeBasis.componentIds` at exactly ONE site — the essence source-uuid retention — and
+  // performs no basis-gated prune of any salvage, recipe or gathering reference at all.
+  //
+  // That one prune is exercised HERE, directly at the seam, because neither projection can see
+  // it: the value it drops is a document UUID, which projection (b) deliberately does not resolve
+  // as a component reference and projection (a) scrubs as a reference rather than content.
+  const { makeManagerWithScope } = await import('./helpers/worldScopeCorpus.js');
+  const raw = {
+    id: 'sys-a',
+    name: 'S',
+    features: { essences: true },
+    components: [],
+    essenceDefinitions: [
+      { id: 'fire', name: 'Fire', sourceComponentId: 'gone', sourceItemUuid: 'Item.still-real' },
+    ],
+    tools: [],
+  };
+
+  // UNKNOWN basis — nothing seeded, no in-system components — RETAINS the authored uuid.
+  const unseeded = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.equal(
+    unseeded._normalizeSystem(raw).essenceDefinitions[0].sourceItemUuid,
+    'Item.still-real',
+    'an unknown basis is a licence to KEEP: the id may name a component this client cannot see'
+  );
+
+  // KNOWN basis — the world roster is seeded — DROPS it. That is the prune `#### D10` warns about
+  // and the GM notice reports under `flaggedForReview`.
+  const seeded = makeManagerWithScope(CraftingSystemManager, {
+    componentScope: { entities: [{ id: 'other' }], defaults: {}, membership: {} },
+    essenceScope: { entities: [], defaults: {}, membership: {} },
+    toolScope: { entities: [], defaults: {}, membership: {} },
+  });
+  assert.equal(
+    seeded._normalizeSystem(raw).essenceDefinitions[0].sourceItemUuid,
+    null,
+    'a KNOWN basis makes the dangling source decidable, and the normalizer drops it PERMANENTLY'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -287,6 +456,12 @@ test('post-conditions: ids are unique per (system, entityType), references resol
     }
     const report = result._worldScopeEntityReport;
     assert.ok(Array.isArray(report.flaggedForReview));
+    // The completeness oracle resolves references through the scope resolvers, which take a
+    // NORMALIZED corpus; the malformed arm exists to prove the pure transforms are total, not
+    // to be resolved against.
+    if (scenario.name !== 'malformed') {
+      assertFlaggedForReviewIsComplete(scenario.name, before, result, report);
+    }
     for (const refusal of report.refusals) {
       const beforeSystem = (before.systems ?? []).find((system) => system?.id === refusal.systemId);
       const afterSystem = (result.systems ?? []).find((system) => system?.id === refusal.systemId);
@@ -318,31 +493,34 @@ test('the drift detector is EMPTY on the migration own output, for every corpus 
       [],
       `${scenario.name}: the two copies must be EQUAL at migration time — that claim is what makes the deferred shed reconcilable`
     );
-    // AND ACROSS THE ROUND TRIP, which is the arm that catches a normalizer that stops emitting
-    // a lifted key. Comparing two re-normalized corpora cannot see that: both legs lose the key
-    // together and stay equal. The world entity does NOT go through the normalizer, so it still
-    // carries the field, and the drift detector reports exactly that asymmetry.
+    // ACROSS THE ROUND TRIP TOO. This arm is about EQUALITY surviving `_normalizeSystem`, and
+    // it is NOT what catches a normalizer that stops emitting a lifted key: the world entity's
+    // identity is projected from the ALREADY-NORMALIZED before corpus, so it loses the key with
+    // the in-system record and the two agree by ABSENCE. That is what the presence anchor below
+    // is for, and saying so here rather than claiming otherwise is the point — an earlier
+    // version of this comment asserted the opposite and the arm was measurably blind.
     assert.deepEqual(
       reportWorldIdentityDrift(saved.systems, scopeCorpus),
       [],
-      `${scenario.name}: the normalize-and-save round trip must PRESERVE every lifted identity field`
+      `${scenario.name}: the normalize-and-save round trip must PRESERVE the two copies' equality`
     );
-    // AND IT MUST BE PRESENT, not merely equal. The drift detector compares two copies, and a
-    // normalizer that stops emitting a lifted key removes it from BOTH legs together — the
-    // BEFORE corpus is normalizer output too — so they agree by ABSENCE and the comparison is
-    // blind to exactly the mutation this arm exists to catch. The raw fixtures always author a
-    // name and an image, so a POSITIVE presence assertion against them is the independent
-    // anchor.
+    // THE PRESENCE ANCHOR, and BOTH of its properties are load-bearing.
+    //
+    // It is DERIVED from `WORLD_IDENTITY_FIELDS`, because a hand-written list covered 5 of the
+    // 16 `(entityType, field)` pairs and dropping `originItemUuid`, `registeredItemUuid` or
+    // `colorToken` from the normalizer went unseen.
+    //
+    // And it asserts PRESENCE OUTRIGHT rather than agreement with the world entity, because the
+    // entity's identity is projected from the ALREADY-NORMALIZED before corpus: a normalizer that
+    // stops emitting a lifted key removes it from BOTH sides, they agree by ABSENCE, and an
+    // agreement check is blind to exactly the mutation this anchor exists to catch. The raw
+    // fixtures author every lifted field, so every one of them must still be there.
     for (const system of saved.systems) {
-      for (const [field, required] of [
-        ['components', ['name', 'img']],
-        ['essenceDefinitions', ['name', 'icon']],
-        ['tools', ['name']],
-      ]) {
+      for (const [entityType, field] of Object.entries(ENTITY_TYPE_FIELDS)) {
         for (const record of system[field] ?? []) {
-          for (const identityField of required) {
+          for (const identityField of WORLD_IDENTITY_FIELDS[entityType]) {
             assert.ok(
-              typeof record[identityField] === 'string' && record[identityField].length > 0,
+              identityField in record,
               `${scenario.name}: ${system.id}.${field}[${record.id}].${identityField} did not survive the round trip`
             );
           }
@@ -350,6 +528,98 @@ test('the drift detector is EMPTY on the migration own output, for every corpus 
       }
     }
   }
+});
+
+test('the FOURTH-target walk over the three scope payloads is INERT, and that is COUNTED', async () => {
+  // `#### D6` requires the belt-and-braces arm to find nothing on a correctly ordered pass.
+  // It is UNCONDITIONAL, so it would silently REPAIR a payload built pre-rewrite — and a
+  // repaired payload is indistinguishable, by every assertion about its CONTENT, from one that
+  // was built correctly. So the migration counts the repairs and this pins the count at zero.
+  const { keyedRemapper, rewriteMembershipReferences } =
+    await import('../src/migration/worldScopeReferenceRewrite.js');
+  for (const scenario of scenarioSpecs()) {
+    const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
+    const { report, migrated } = migrateAndSave(before);
+    assert.equal(
+      report.payloadRewriteRepairs,
+      0,
+      `${scenario.name}: the payloads are built FROM the rewritten records, so the fourth-target walk repairs NOTHING`
+    );
+
+    // And independently: re-running the walk over the produced payloads changes nothing.
+    for (const [entityType, key] of [
+      ['components', 'componentScope'],
+      ['essences', 'essenceScope'],
+      ['tools', 'toolScope'],
+    ]) {
+      for (const record of Object.values(migrated[key]?.membership ?? {})) {
+        const legs = report.__rekeyMap?.[record.systemId] ?? {};
+        const snapshot = JSON.stringify(record);
+        rewriteMembershipReferences(record, entityType, {
+          remapComponent: keyedRemapper(legs.components),
+          remapTool: keyedRemapper(legs.tools),
+        });
+        assert.equal(
+          JSON.stringify(record),
+          snapshot,
+          `${scenario.name}: ${entityType} membership ${record.entityId}/${record.systemId} still names a retired id`
+        );
+      }
+    }
+  }
+});
+
+test('the repair COUNTER is wired: a payload naming a retired id is counted, not silently fixed', () => {
+  // THE POSITIVE CONTROL. Asserting the count is ZERO is satisfied by a counter that never
+  // increments, so the counter itself needs an arm that forces it. This hands the migration a
+  // PERSISTED payload whose membership still names a pre-re-key id — exactly the shape a
+  // payload-before-rewrite ordering regression produces — and requires the pass to both REPAIR
+  // it and REPORT that it had to.
+  const before = normalizeCorpus(CraftingSystemManager, scenarioSpecs()[0].raw);
+  const first = migrateWorldScopeEntities({
+    recipes: before.recipes,
+    systems: before.systems,
+    gatheringConfig: before.gatheringConfig,
+    componentScope: {},
+    essenceScope: {},
+    toolScope: {},
+    worldScopeRekeyMap: {},
+  });
+  const map = first.worldScopeRekeyMap;
+  const [systemId] = Object.keys(map);
+  const [oldId, newId] = Object.entries(map[systemId].components)[0];
+  assert.ok(oldId && newId, 'the premise: this corpus re-keys a component');
+
+  // Rewind ONE membership record's effect source to the pre-re-key id.
+  const damaged = JSON.parse(JSON.stringify(first.essenceScope));
+  let damagedKey = null;
+  for (const [key, record] of Object.entries(damaged.membership)) {
+    if (record.systemId !== systemId) continue;
+    record.effectSource = { sourceComponentId: oldId };
+    damagedKey = key;
+    break;
+  }
+  assert.ok(damagedKey, 'the premise: this corpus has an essence membership in that system');
+
+  const second = migrateWorldScopeEntities({
+    recipes: first.recipes,
+    systems: first.systems,
+    gatheringConfig: first.gatheringConfig,
+    componentScope: first.componentScope,
+    essenceScope: damaged,
+    toolScope: first.toolScope,
+    worldScopeRekeyMap: map,
+  });
+  assert.equal(
+    second._worldScopeEntityReport.payloadRewriteRepairs,
+    1,
+    'the fourth-target walk must COUNT the repair, not perform it silently'
+  );
+  assert.equal(
+    second.essenceScope.membership[damagedKey].effectSource.sourceComponentId,
+    newId,
+    'and it must still perform it — the arm is belt-and-braces, not a tripwire'
+  );
 });
 
 test('every membership record OVERRIDES every section, with the system own value VERBATIM', () => {

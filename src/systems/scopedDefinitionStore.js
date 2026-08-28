@@ -267,6 +267,13 @@ export function unionScopedDefinitions({ corpus, systemId, systemDefinitions, re
 /**
  * The legacy in-system records of one system, keyed by trimmed id.
  *
+ * LAST-WINS ON A DUPLICATE ID, deliberately, because both shipped index builders are — the
+ * definition index and `CraftingSystemManager`'s own `itemById`. A hand-edited corpus carrying a
+ * duplicate id is already broken, but it must break the SAME WAY everywhere: a first-wins map
+ * here would make the read union answer one record while every index answered the other, which
+ * is the silent divergence the migration's own output-uniqueness post-condition exists to
+ * prevent it ever creating.
+ *
  * @param {Array<object>} legacy
  * @returns {Map<unknown, object>}
  */
@@ -274,7 +281,7 @@ function legacyById(legacy) {
   const byId = new Map();
   for (const entry of legacy) {
     const id = typeof entry?.id === 'string' ? entry.id.trim() : entry?.id;
-    if (id === undefined || id === null || byId.has(id)) continue;
+    if (id === undefined || id === null) continue;
     byId.set(id, entry);
   }
   return byId;

@@ -245,6 +245,11 @@ export function remapAlchemyDeadEnds(deadEnds, rekeyMap) {
   const next = {};
   let changed = false;
   for (const [systemId, keys] of Object.entries(deadEnds)) {
+    // DE-DUPLICATED, because a merge can collapse two distinct signatures onto one key: two dead
+    // ends that differed only in which of two now-merged components they used are the SAME dead
+    // end afterwards. The reader uses `includes`, so a duplicate is harmless to correctness — but
+    // this is a persisted actor flag that only ever grows, and the writer already refuses to
+    // append a key it already holds.
     // The `systemId` here is a VALUE-side object key, never a dotted update-path segment, so
     // `isSafeFlagKeySegment` deliberately does not apply.
     const remapComponent = legLookup(rekeyMap[systemId]?.components);
@@ -264,6 +269,9 @@ export function remapAlchemyDeadEnds(deadEnds, rekeyMap) {
       if (rebuilt !== signature) changed = true;
       return rebuilt;
     });
+    const deduped = [...new Set(next[systemId])];
+    if (deduped.length !== next[systemId].length) changed = true;
+    next[systemId] = deduped;
   }
   return { value: changed ? next : deadEnds, changed };
 }

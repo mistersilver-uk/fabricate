@@ -104,7 +104,13 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
  * only way to restore it would be to hand-author the shape — which is precisely what `#### D9`'s
  * dead-site finding forbids.
  *
- * Each entry names WHY it is unproducible, and each is retained because an IMPORTED or
+ * IT IS A LEAF-PATH LIST, exactly as {@link WORLD_SCOPE_REFERENCE_SITES} is, and it is complete
+ * rather than indicative: an earlier form listed `catalysts[]` as a bare array path and omitted
+ * every `systemItemId` alias the walk does rewrite, which made the stated invariant false.
+ * `tests/world-scope-reference-walk.test.js` now pins it in both directions - every entry must be
+ * one the producers do NOT emit, and every unproducible leaf the walk touches must be here.
+ *
+ * FIVE FAMILIES, each unproducible for a stated reason, and each retained because an IMPORTED or
  * HAND-EDITED payload can still carry it:
  *
  * - `onBreak.replacementComponentId` — `Tool.toJSON` emits `onBreak` as `{mode, replacementTarget?}`
@@ -124,19 +130,86 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
  * @type {readonly string[]}
  */
 export const WORLD_SCOPE_DEFENSIVE_SITES = Object.freeze([
-  'systems[].tools[].onBreak.replacementComponentId',
-  'systems[].components[].salvage.catalysts[]',
-  'recipes[].results[].componentId',
-  'recipes[].results[].systemItemId',
-  'recipes[].catalysts[]',
-  'recipes[].steps[].catalysts[]',
-  'recipes[].ingredientSets[].ingredients[]',
-  'recipes[].ingredientSets[].catalysts[]',
-  'gatheringConfig.systems.*.tasks[].dropRows[].systemItemId',
   'gatheringConfig.systems.*.events[].dropRows[].componentId',
   'gatheringConfig.systems.*.events[].dropRows[].systemItemId',
   'gatheringConfig.systems.*.events[].toolIds[]',
+  'gatheringConfig.systems.*.tasks[].dropRows[].systemItemId',
   'gatheringConfig.systems.*.tools[].onBreak.replacementComponentId',
+  'gatheringConfig.systems.*.tools[].repairRequirements[].options[].alternatives[].match.systemItemId',
+  'gatheringConfig.systems.*.tools[].repairRequirements[].options[].alternatives[].systemItemId',
+  'gatheringConfig.systems.*.tools[].repairRequirements[].options[].match.systemItemId',
+  'gatheringConfig.systems.*.tools[].repairRequirements[].options[].systemItemId',
+  'recipes[].catalysts[].alternatives[].componentId',
+  'recipes[].catalysts[].alternatives[].match.componentId',
+  'recipes[].catalysts[].alternatives[].match.systemItemId',
+  'recipes[].catalysts[].alternatives[].systemItemId',
+  'recipes[].catalysts[].componentId',
+  'recipes[].catalysts[].match.componentId',
+  'recipes[].catalysts[].match.systemItemId',
+  'recipes[].catalysts[].systemItemId',
+  'recipes[].ingredientSets[].catalysts[].alternatives[].componentId',
+  'recipes[].ingredientSets[].catalysts[].alternatives[].match.componentId',
+  'recipes[].ingredientSets[].catalysts[].alternatives[].match.systemItemId',
+  'recipes[].ingredientSets[].catalysts[].alternatives[].systemItemId',
+  'recipes[].ingredientSets[].catalysts[].componentId',
+  'recipes[].ingredientSets[].catalysts[].match.componentId',
+  'recipes[].ingredientSets[].catalysts[].match.systemItemId',
+  'recipes[].ingredientSets[].catalysts[].systemItemId',
+  'recipes[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.systemItemId',
+  'recipes[].ingredientSets[].ingredientGroups[].options[].alternatives[].systemItemId',
+  'recipes[].ingredientSets[].ingredientGroups[].options[].match.systemItemId',
+  'recipes[].ingredientSets[].ingredientGroups[].options[].systemItemId',
+  'recipes[].ingredientSets[].ingredients[].alternatives[].componentId',
+  'recipes[].ingredientSets[].ingredients[].alternatives[].match.componentId',
+  'recipes[].ingredientSets[].ingredients[].alternatives[].match.systemItemId',
+  'recipes[].ingredientSets[].ingredients[].alternatives[].systemItemId',
+  'recipes[].ingredientSets[].ingredients[].componentId',
+  'recipes[].ingredientSets[].ingredients[].match.componentId',
+  'recipes[].ingredientSets[].ingredients[].match.systemItemId',
+  'recipes[].ingredientSets[].ingredients[].systemItemId',
+  'recipes[].results[].componentId',
+  'recipes[].results[].systemItemId',
+  'recipes[].steps[].catalysts[].alternatives[].componentId',
+  'recipes[].steps[].catalysts[].alternatives[].match.componentId',
+  'recipes[].steps[].catalysts[].alternatives[].match.systemItemId',
+  'recipes[].steps[].catalysts[].alternatives[].systemItemId',
+  'recipes[].steps[].catalysts[].componentId',
+  'recipes[].steps[].catalysts[].match.componentId',
+  'recipes[].steps[].catalysts[].match.systemItemId',
+  'recipes[].steps[].catalysts[].systemItemId',
+  'recipes[].steps[].ingredientSets[].catalysts[].alternatives[].componentId',
+  'recipes[].steps[].ingredientSets[].catalysts[].alternatives[].match.componentId',
+  'recipes[].steps[].ingredientSets[].catalysts[].alternatives[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].catalysts[].alternatives[].systemItemId',
+  'recipes[].steps[].ingredientSets[].catalysts[].componentId',
+  'recipes[].steps[].ingredientSets[].catalysts[].match.componentId',
+  'recipes[].steps[].ingredientSets[].catalysts[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].catalysts[].systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].alternatives[].systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredients[].alternatives[].componentId',
+  'recipes[].steps[].ingredientSets[].ingredients[].alternatives[].match.componentId',
+  'recipes[].steps[].ingredientSets[].ingredients[].alternatives[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredients[].alternatives[].systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredients[].componentId',
+  'recipes[].steps[].ingredientSets[].ingredients[].match.componentId',
+  'recipes[].steps[].ingredientSets[].ingredients[].match.systemItemId',
+  'recipes[].steps[].ingredientSets[].ingredients[].systemItemId',
+  'systems[].components[].salvage.catalysts[].alternatives[].componentId',
+  'systems[].components[].salvage.catalysts[].alternatives[].match.componentId',
+  'systems[].components[].salvage.catalysts[].alternatives[].match.systemItemId',
+  'systems[].components[].salvage.catalysts[].alternatives[].systemItemId',
+  'systems[].components[].salvage.catalysts[].componentId',
+  'systems[].components[].salvage.catalysts[].match.componentId',
+  'systems[].components[].salvage.catalysts[].match.systemItemId',
+  'systems[].components[].salvage.catalysts[].systemItemId',
+  'systems[].tools[].onBreak.replacementComponentId',
+  'systems[].tools[].repairRequirements[].options[].alternatives[].match.systemItemId',
+  'systems[].tools[].repairRequirements[].options[].alternatives[].systemItemId',
+  'systems[].tools[].repairRequirements[].options[].match.systemItemId',
+  'systems[].tools[].repairRequirements[].options[].systemItemId',
 ]);
 
 function isPlainObject(value) {
@@ -230,7 +303,10 @@ export function rewriteRecipeReferences(
     rewriteIngredientSet(set, remapComponent, remapTool);
   }
   rewriteResultGroups(recipe.resultGroups, remapComponent);
-  // Flat `results[]` alias — `Recipe.toJSON` re-emits it.
+  // Flat `results[]` alias. `Recipe.toJSON` OMITS it when it holds the value the constructor
+  // rebuilds from absence, so it is unproducible in practice and sits on
+  // `WORLD_SCOPE_DEFENSIVE_SITES`. The read stays permanently: an older export or a legacy
+  // flat-authored recipe carries it, and for those it is the only result data there is.
   for (const result of arrayOf(recipe.results)) rewriteResultRef(result, remapComponent);
   for (const catalyst of arrayOf(recipe.catalysts)) rewriteIngredientRef(catalyst, remapComponent);
   rewriteToolIds(recipe, remapTool);
@@ -387,7 +463,10 @@ export function rewriteGatheringSliceReferences(
  * and the tool membership's `onBreak` section and seeded `repairRequirements` carry component
  * ids exactly as the in-system tool does. On a correctly ordered pass this finds NOTHING to
  * change, because the payloads are built from already-rewritten records — it is the
- * belt-and-braces arm `#### D6` requires, and a test asserts it changes nothing.
+ * belt-and-braces arm `#### D6` requires. The migration COUNTS what this repairs and reports it
+ * as `payloadRewriteRepairs`, and an acceptance test pins that count at ZERO — because an
+ * unconditional repair arm would otherwise silently fix, and therefore hide, the very
+ * payload-before-rewrite ordering regression it exists to back up.
  *
  * @param {unknown} record
  * @param {string} entityType `'components' | 'essences' | 'tools'`

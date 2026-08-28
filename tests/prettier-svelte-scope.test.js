@@ -108,6 +108,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundryTourSuppression.js',
   'scripts/lib/agentModelTiers.js',
   'scripts/lib/foundryDataPreparation.js',
+  'scripts/lib/worldScopeIdentitySmoke.js',
   'scripts/lib/smokeSectionFixture.js',
   'scripts/lib/svelteComponentFiles.js',
   'scripts/lib/svelteCompilerWarnings.js',

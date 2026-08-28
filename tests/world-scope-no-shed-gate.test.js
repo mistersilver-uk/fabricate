@@ -31,6 +31,11 @@ import { dirname, relative as relativePath, resolve, sep as pathSeparator } from
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  ENTITY_TYPE_FIELDS,
+  WORLD_IDENTITY_FIELDS,
+} from '../src/migration/worldScopeEntityGrouping.js';
+
 import { stripComments } from './helpers/sourceScan.js';
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';
 
@@ -101,42 +106,61 @@ test('all SIX read-union names exist, so this gate cannot pass by their absence'
 // 2. The CONTENT assertion — three entities in, length three out, verbatim
 // ---------------------------------------------------------------------------
 
+/** A record carrying every source-link identity field the world entity lifts. */
+function linked(record, uuid) {
+  return {
+    ...record,
+    originItemUuid: `Item.${uuid}`,
+    registeredItemUuid: `Item.${uuid}`,
+    aliasItemUuids: [`Item.alias-${uuid}`],
+  };
+}
+
 test('_normalizeSystem still EMITS components, essenceDefinitions and tools, with identity verbatim', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const raw = {
     id: 'sys-1',
     name: 'System',
     features: { salvage: true, essences: true },
+    // EVERY lifted identity field is authored, so the derived assertion below is not vacuous
+    // for any of the 16 `(entityType, field)` pairs.
     components: [
-      { id: 'c1', name: 'Ash Salt', img: 'a.png', description: 'A' },
-      { id: 'c2', name: 'Cinder', img: 'b.png', description: 'B' },
-      { id: 'c3', name: 'Ember', img: 'c.png', description: 'C' },
+      linked({ id: 'c1', name: 'Ash Salt', img: 'a.png', description: 'A' }, 'aaa'),
+      linked({ id: 'c2', name: 'Cinder', img: 'b.png', description: 'B' }, 'bbb'),
+      linked({ id: 'c3', name: 'Ember', img: 'c.png', description: 'C' }, 'ccc'),
     ],
     essenceDefinitions: [
-      { id: 'e1', name: 'Fire', icon: 'fas fa-fire', description: 'F' },
-      { id: 'e2', name: 'Water', icon: 'fas fa-water', description: 'W' },
-      { id: 'e3', name: 'Air', icon: 'fas fa-wind', description: 'Ai' },
+      { id: 'e1', name: 'Fire', icon: 'fas fa-fire', description: 'F', colorToken: 'rose' },
+      { id: 'e2', name: 'Water', icon: 'fas fa-water', description: 'W', colorToken: 'aqua' },
+      { id: 'e3', name: 'Air', icon: 'fas fa-wind', description: 'Ai', colorToken: 'mist' },
     ],
     tools: [
-      { id: 't1', name: 'Hammer', img: 'h.png', description: 'H' },
-      { id: 't2', name: 'Tongs', img: 'g.png', description: 'T' },
-      { id: 't3', name: 'Anvil', img: 'v.png', description: 'V' },
+      linked({ id: 't1', name: 'Hammer', img: 'h.png', description: 'H' }, 'ddd'),
+      linked({ id: 't2', name: 'Tongs', img: 'g.png', description: 'T' }, 'eee'),
+      linked({ id: 't3', name: 'Anvil', img: 'v.png', description: 'V' }, 'fff'),
     ],
   };
   const normalized = manager._normalizeSystem(raw);
-  for (const [field, source] of [
-    ['components', raw.components],
-    ['essenceDefinitions', raw.essenceDefinitions],
-    ['tools', raw.tools],
-  ]) {
+  for (const [entityType, field] of Object.entries(ENTITY_TYPE_FIELDS)) {
+    const source = raw[field];
     assert.equal(Array.isArray(normalized[field]), true, `${field} must be emitted`);
     assert.equal(normalized[field].length, 3, `${field}: three entities in, THREE out`);
     // CONTENT, not key presence: an empty-array mutation passes a presence test and fails this.
+    //
+    // THE FIELD LIST IS DERIVED FROM `WORLD_IDENTITY_FIELDS`, never hand-written. A hand-written
+    // list covered 5 of the 16 `(entityType, field)` pairs, so dropping `originItemUuid`,
+    // `registeredItemUuid` or `colorToken` from the normalizer survived this gate — the very
+    // shape of unguarded hand-maintained mirror the repository's own rules forbid, inside the
+    // gate that claims the no-shed guarantee.
     for (const [index, record] of normalized[field].entries()) {
-      assert.equal(record.id, source[index].id);
-      assert.equal(record.name, source[index].name, `${field}[${index}].name must be verbatim`);
-      assert.equal(record.description, source[index].description);
-      assert.equal(record.img ?? record.icon, source[index].img ?? source[index].icon);
+      assert.equal(record.id, source[index].id, `${field}[${index}].id must be verbatim`);
+      for (const identityField of WORLD_IDENTITY_FIELDS[entityType]) {
+        assert.deepEqual(
+          record[identityField],
+          source[index][identityField],
+          `${field}[${index}].${identityField} must be emitted VERBATIM`
+        );
+      }
     }
   }
 });

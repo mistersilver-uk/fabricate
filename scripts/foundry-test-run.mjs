@@ -51,6 +51,11 @@ import {
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
 import {
+  planWorldScopeIdentitySmoke,
+  seededFlagPaths,
+  WORLD_SCOPE_SMOKE_FLAG_NAMESPACE,
+} from './lib/worldScopeIdentitySmoke.js';
+import {
   CORE_TOUR_IDS,
   TOUR_PROGRESS_STORAGE_KEY,
   SUPPRESSED_STEP_INDEX,
@@ -4458,6 +4463,150 @@ async function installNotificationHidingCss(page) {
       }
     `
   });
+}
+
+/**
+ * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with
+ * a role flag naming the OLD id, the legacy flat scalar, one in-flight run of each kind at BOTH
+ * flag depths, one recorded alchemy dead end, and the persisted re-key map that drives the
+ * repair.
+ *
+ * The plan itself is computed by `scripts/lib/worldScopeIdentitySmoke.js` and unit-tested by
+ * `tests/world-scope-identity-smoke-plan.test.js`; nothing here decides what to write or what to
+ * expect. This function is the Foundry edge alone.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, actorId: string}} options
+ */
+async function setupWorldScopeIdentityFixture(page, { systemId, actorId }) {
+  const plan = planWorldScopeIdentitySmoke({
+    systemId,
+    oldComponentId: 'zzz-smoke-old-component',
+    newComponentId: 'aaa-smoke-new-component',
+    oldToolId: 'zzz-smoke-old-tool',
+    newToolId: 'aaa-smoke-new-tool',
+  });
+  const seeded = seededFlagPaths(plan);
+  return page.evaluate(
+    async ({ plan, seeded, actorId, namespace }) => {
+      const actor = game.actors.get(actorId);
+      if (!actor) throw new Error(`world-scope identity fixture requires actor ${actorId}`);
+      const item = actor.items.contents[0];
+      if (!item) throw new Error('world-scope identity fixture requires one owned item');
+
+      const before = {
+        rekeyMap: game.settings.get('fabricate', 'worldScopeRekeyMap'),
+        actorFlags: {},
+        itemFlags: {},
+      };
+      const readBack = (document, key, bare) =>
+        document.getFlag(namespace, bare ? key : `fabricate.${key}`) ?? null;
+      for (const entry of seeded) {
+        const target = entry.key.startsWith('roles.') || entry.key === 'componentId' ? 'itemFlags' : 'actorFlags';
+        const document = target === 'itemFlags' ? item : actor;
+        before[target][entry.key] = readBack(document, entry.key, entry.bare);
+      }
+
+      const write = (document, entry) =>
+        document.setFlag(namespace, entry.bare ? entry.key : `fabricate.${entry.key}`, entry.value);
+      await write(item, plan.componentFlag);
+      await write(item, plan.toolFlag);
+      await write(item, plan.legacyScalar);
+      await write(actor, plan.craftingRuns);
+      await write(actor, plan.salvageRuns);
+      await write(actor, plan.gatheringRuns);
+      await write(actor, plan.alchemyDeadEnds);
+      await game.settings.set('fabricate', 'worldScopeRekeyMap', plan.rekeyMap);
+
+      return { plan, seeded, actorId, itemId: item.id, before, namespace };
+    },
+    { plan, seeded, actorId, namespace: WORLD_SCOPE_SMOKE_FLAG_NAMESPACE }
+  );
+}
+
+/**
+ * Run the REAL repair and assert every FLAG VALUE it must have rewritten.
+ *
+ * THE FLAG-VALUE ASSERTION IS WHAT CARRIES FALSIFIABILITY. Every resolution outcome on this
+ * world stays green with `remapWorldScopeIdentityFlags` never written, because resolution falls
+ * through to the source-reference tier this change does not touch.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object}} options
+ */
+async function verifyWorldScopeIdentityRemap(page, { fixture }) {
+  const failures = await page.evaluate(async ({ fixture }) => {
+    const { plan, actorId, itemId, namespace } = fixture;
+    const summary = await game.fabricate.remapWorldScopeIdentityFlags();
+    if (!summary) return ['the repair reported nothing, so the re-key map was not pending'];
+
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    const read = (document, key, bare) =>
+      document?.getFlag(namespace, bare ? key : `fabricate.${key}`);
+    const expected = plan.expectations;
+    const problems = [];
+    const check = (label, actual, want) => {
+      if (JSON.stringify(actual) !== JSON.stringify(want)) {
+        problems.push(`${label}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual)}`);
+      }
+    };
+
+    check('roles.componentId', read(item, plan.componentFlag.key, false), expected.componentFlag);
+    check('roles.toolId', read(item, plan.toolFlag.key, false), expected.toolFlag);
+    check('legacy componentId scalar', read(item, 'componentId', false), expected.legacyScalar);
+
+    const crafting = read(actor, 'craftingRuns', false)?.active?.[expected.runIds.craftingRunId];
+    check('craftingRuns requirement componentId', crafting?.steps?.[0]?.requirements?.[0]?.componentId, expected.craftingRunComponentId);
+    check('craftingRuns step toolIds', crafting?.steps?.[0]?.toolIds, [expected.craftingRunToolId]);
+
+    const salvage = read(actor, 'salvageRuns', false)?.active?.[expected.runIds.salvageRunId];
+    check('salvageRuns componentId', salvage?.componentId, expected.salvageRunComponentId);
+
+    // THE OTHER DEPTH. `gatheringRuns` is written with a bare `setFlag`, so a pass that assumes
+    // the doubly-nested depth silently misses it and this assertion is the only thing that sees.
+    const gathering = read(actor, 'gatheringRuns', true)?.active?.[expected.runIds.gatheringRunId];
+    check('gatheringRuns toolIds (single-scope depth)', gathering?.toolIds, [expected.gatheringRunToolId]);
+
+    const [systemId] = Object.keys(plan.rekeyMap);
+    check('alchemyDeadEnds', read(actor, 'alchemyDeadEnds', false)?.[systemId], [
+      expected.alchemyDeadEndKey,
+    ]);
+    return problems;
+  }, { fixture });
+
+  if (failures.length > 0) {
+    throw new Error(`world-scope identity remap did not rewrite: ${failures.join('; ')}`);
+  }
+}
+
+/**
+ * Remove every flag and setting the fixture wrote, restoring what was there before.
+ *
+ * The restore runs in a `finally` and must tolerate a `null` handle, because `setup` itself can
+ * throw. The smoke world is REUSED across runs, so a skipped restore poisons every later run.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object|null}} options
+ */
+async function restoreWorldScopeIdentityFixture(page, { fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ fixture }) => {
+    const { seeded, actorId, itemId, before, namespace } = fixture;
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    for (const entry of seeded) {
+      const document = entry.key.startsWith('roles.') || entry.key === 'componentId' ? item : actor;
+      if (!document) continue;
+      const key = entry.bare ? entry.key : `fabricate.${entry.key}`;
+      const previous = (entry.key.startsWith('roles.') || entry.key === 'componentId'
+        ? before.itemFlags
+        : before.actorFlags)[entry.key];
+      if (previous === null || previous === undefined) await document.unsetFlag(namespace, key);
+      else await document.setFlag(namespace, key, previous);
+    }
+    await game.settings.set('fabricate', 'worldScopeRekeyMap', before.rekeyMap ?? {});
+  }, { fixture });
 }
 
 async function setupToolStudioFixture(page, { systemId, recipeId }) {
@@ -10525,6 +10674,33 @@ async function main() {
               recipeId: craftingSetup.healingPotionRecipeId,
               fixture,
             }),
+          });
+        }
+
+        // ── D0 section: world-scope identity-flag repair (issue 1363) ────────
+        // ACCEPTANCE CRITERION 6c, and the ONLY arm of criterion 6 that can fail on a live
+        // world. A stale `roles[<systemId>].componentId` names an id absent from the re-keyed
+        // candidate set, so tier 1 returns null and resolution falls through to the UNCHANGED
+        // source-reference tier — which means "owned copies still resolve", "a craft, a salvage
+        // and a gather succeed" and "every browser lists the same entities" are ALL TRUE with
+        // the repair never written. So this section asserts the FLAG VALUE ITSELF.
+        //
+        // Its fixture is purely ADDITIVE persisted state — one world setting and a handful of
+        // flags on ONE owned item and its actor — and the `finally` restore removes every one,
+        // so the section is net-zero even when it fails. `rethrow: false` because a behavioural
+        // failure here must be reported without costing every later section its frames; the
+        // step ledger carries the verdict into `summary.json`.
+        if (shouldRunScreenshotSection('tools')) {
+          await runFixturedScreenshotSection({
+            results,
+            step: 'world-scope-identity-remap',
+            rethrow: false,
+            setup: () => setupWorldScopeIdentityFixture(page, {
+              systemId: craftingSetup.systemId,
+              actorId: cleanup.crafterId,
+            }),
+            exercise: (fixture) => verifyWorldScopeIdentityRemap(page, { fixture }),
+            restore: (fixture) => restoreWorldScopeIdentityFixture(page, { fixture }),
           });
         }
 

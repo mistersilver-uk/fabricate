@@ -159,7 +159,15 @@ function pick(random, list) {
  * @param {object} options
  * @returns {object}
  */
-function rawComponent({ id, name, refs = [], random, essenceIds = [], toolIds = [] }) {
+function rawComponent({
+  id,
+  name,
+  refs = [],
+  random,
+  essenceIds = [],
+  toolIds = [],
+  danglingResultId = null,
+}) {
   return {
     id,
     name,
@@ -168,14 +176,30 @@ function rawComponent({ id, name, refs = [], random, essenceIds = [], toolIds = 
     originItemUuid: refs[0] ?? null,
     registeredItemUuid: refs[0] ?? null,
     aliasItemUuids: refs.slice(1),
-    category: 'general',
+    // A REAL category token, not the reserved `general` bucket: the donor-elected world default
+    // refuses `general` by constraint, so a corpus that only ever authors it would exercise the
+    // refusal path and never the lift path.
+    category: 'reagent',
     tags: [`tag-${id}`],
     essences: Object.fromEntries(essenceIds.map((essenceId) => [essenceId, 1])),
     difficulty: 2,
     salvage: {
       enabled: true,
       toolIds: [...toolIds],
-      resultGroups: [{ id: `sg-${id}`, results: [{ componentId: id, quantity: 1 }] }],
+      resultGroups: [
+        {
+          id: `sg-${id}`,
+          results: [
+            { componentId: id, quantity: 1 },
+            // A DANGLING result, when the scenario asks for one. It lives INSIDE the system, so
+            // `_normalizeSystem` prunes it on the round-trip save — which is what makes
+            // `#### D10`'s newly-decidable prune reachable end to end. A dangling reference in a
+            // RECIPE is never pruned by that seam, because the round trip re-normalizes systems
+            // alone, so a recipe-only fixture left the differential's prune branch dead code.
+            ...(danglingResultId ? [{ componentId: danglingResultId, quantity: 1 }] : []),
+          ],
+        },
+      ],
     },
   };
 }
@@ -369,7 +393,11 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
         refs: component.refs ?? [],
         random,
         essenceIds: component.essenceIds ?? essences.map((essence) => essence.id),
-        toolIds: component.toolIds ?? [],
+        // SALVAGE `toolIds` DEFAULT TO THE SYSTEM'S OWN TOOLS. An empty list left the
+        // `systems[].components[].salvage.toolIds` site unexercised by projection (b), so
+        // deleting it from the walk was RED only in the marker fixture.
+        toolIds: component.toolIds ?? (spec.tools ?? []).map((tool) => tool.id),
+        danglingResultId: component.danglingResultId ?? null,
       })
     );
     const tools = (spec.tools ?? []).map((tool) =>
@@ -379,7 +407,10 @@ export function buildRawCorpus({ seed = 1, systems: specs, legacyGatheringTools 
         refs: tool.refs ?? [],
         componentId: tool.componentId ?? null,
         replacementComponentId: tool.replacementComponentId ?? null,
-        repairComponentId: tool.repairComponentId ?? null,
+        // A REPAIR RECIPE BY DEFAULT, naming the system's first component, so the
+        // `repairRequirements[].options[]` site — one of `#### D9`'s three newly-closed gaps —
+        // is exercised by projection (b) rather than by the marker fixture alone.
+        repairComponentId: tool.repairComponentId ?? (spec.components ?? [])[0]?.id ?? null,
       })
     );
     const componentIds = components.map((component) => component.id);
@@ -514,7 +545,7 @@ export function scenarioSpecs() {
         systems: [
           {
             id: 'sys-a',
-            components: [{ id: 'comp-1', refs: [uuidA] }],
+            components: [{ id: 'comp-1', refs: [uuidA], danglingResultId: 'ghost-salvage-result' }],
             essences: [{ id: 'fire' }],
             tools: [{ id: 'tool-1', refs: [uuidC] }],
             danglingComponentIds: ['ghost-component'],
@@ -700,12 +731,29 @@ export const PERMITTED_IDENTITY_FIELDS = Object.freeze([
  * @param {unknown} value
  * @returns {unknown}
  */
+/**
+ * The leaf keys that hold a COMPONENT reference rather than content.
+ *
+ * The three essence spellings are here for the same reason `componentId` is: an essence source is
+ * a reference the migration re-keys, so comparing its literal text in projection (a) would report
+ * every successful re-key as a behaviour change while saying nothing about whether it still
+ * resolves. `sourceItemUuid` is included because `## EssenceDefinition` requirement 3 permits it
+ * to hold a legacy component id.
+ */
+const REFERENCE_LEAF_KEYS = new Set([
+  'componentId',
+  'systemItemId',
+  'sourceComponentId',
+  'associatedSystemItemId',
+  'sourceItemUuid',
+]);
+
 function scrubReferences(value) {
   if (Array.isArray(value)) return value.map((entry) => scrubReferences(entry));
   if (value === null || typeof value !== 'object') return value;
   const scrubbed = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (key === 'componentId' || key === 'systemItemId') scrubbed[key] = '<reference>';
+    if (REFERENCE_LEAF_KEYS.has(key)) scrubbed[key] = '<reference>';
     else if (key === 'toolIds' && Array.isArray(entry))
       scrubbed[key] = entry.map(() => '<reference>');
     else scrubbed[key] = scrubReferences(entry);
@@ -717,7 +765,9 @@ function project(record, entityType) {
   const projected = {};
   for (const field of PROJECTED_FIELDS[entityType]) {
     if (record?.[field] === undefined) continue;
-    projected[field] = field === 'componentId' ? '<reference>' : scrubReferences(record[field]);
+    projected[field] = REFERENCE_LEAF_KEYS.has(field)
+      ? '<reference>'
+      : scrubReferences(record[field]);
   }
   return projected;
 }
@@ -821,6 +871,21 @@ export function projectReferenceClosure(CraftingSystemManager, corpus, throughSc
       const childPath = `${path}.${key}`;
       if (key === 'componentId' || key === 'systemItemId') {
         record(childPath, systemId, 'components', value);
+        continue;
+      }
+      // THE ESSENCE SOURCE SPELLINGS. Without these, `#### D9`'s newly-closed essence gaps are
+      // green in the differential and RED only in the walk, so criterion 3's claim that
+      // projection (b) covers every reference site was false for three of them.
+      // `sourceItemUuid` legitimately holds EITHER a component id or a document UUID, so a
+      // dotted value is skipped rather than recorded as unresolved.
+      if (key === 'sourceComponentId' || key === 'associatedSystemItemId') {
+        record(childPath, systemId, 'components', value);
+        continue;
+      }
+      if (key === 'sourceItemUuid') {
+        if (typeof value === 'string' && value && !value.includes('.')) {
+          record(childPath, systemId, 'components', value);
+        }
         continue;
       }
       if (key === 'toolIds' && Array.isArray(value)) {

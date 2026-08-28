@@ -18,7 +18,9 @@
  * built pre-rewrite would ship a membership record naming a retired id in every migrated world,
  * and the per-pair LIFT guard is keyed on the NEW pair, so a re-run would skip it and the stale
  * ids would persist permanently. The shared walk then runs over the three payloads as a FOURTH
- * target as a belt-and-braces check; on a correctly ordered pass it finds nothing to change.
+ * target as a belt-and-braces check; on a correctly ordered pass it finds nothing to change, and
+ * the report's `payloadRewriteRepairs` COUNT is what makes that observable rather than assumed —
+ * an unconditional repair arm would otherwise mask the very ordering regression it backs up.
  *
  * ## THE TWO HALVES, AND WHY THEY ARE GATED DIFFERENTLY (`#### D7`, `#### D12`)
  *
@@ -39,19 +41,23 @@
  * identity is read from the PERSISTED SCOPE PAYLOADS, keyed by the mapped NEW id, because the
  * map carries old-to-new IDS and no identity VALUES.
  *
- * ## NO WORLD DEFAULTS ARE WRITTEN (`#### D1`)
+ * ## WORLD DEFAULTS ARE ELECTED FROM THE DONOR
  *
- * There is no unambiguous source to lift a behaviour default FROM: `#### D3`'s oldest-wins rule
- * is scoped to IDENTITY and wins every identity field as a unit; extending it to behaviour would
- * silently elect one of three systems' repair recipes, breakage modes and effect sources as the
- * value every future member inherits. Every membership record is created fully overriding, so no
- * section resolves through the world layer at migration time and resolution is bit-identical.
+ * The maintainer's ruling extends `#### D3`'s oldest-wins rule from IDENTITY to BEHAVIOUR: six
+ * sections take a world default from the OLDEST contributing system, the same donor that wins
+ * identity. Two are deliberately excluded for two DIFFERENT reasons, and four constraints can
+ * decline an individual section. `worldScopeDefaults.js` states all of it and owns the election.
  *
- * The `defaults` SUB-KEY is still written, as an EMPTY MAP: `carriedSubKeys` keys seededness on
- * key PRESENCE rather than content, so writing it seeds `defaults` and the persisted shape
- * round-trips through `ScopedDefinitionStore#get` / `save` unchanged.
+ * NOTHING RESOLVES THROUGH THEM AT MIGRATION TIME, which is why the corpus differential is
+ * unchanged by them: every membership record is still created fully OVERRIDING every section with
+ * its own system's value verbatim. A world default only ever matters for a system added LATER, or
+ * an override a GM clears later - which is exactly the state the catalogue editors exist to fill.
+ *
+ * A world default a CONSTRAINT declined is reported as `refusedDefaultSections`, distinct from a
+ * section the donor simply never authored: a GM can act on the first and not on the second.
  */
 
+import { electWorldDefault } from './worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
   ENTITY_TYPE_FIELDS,
@@ -157,8 +163,13 @@ function projectIdentity(record, entityType) {
  *
  * ABSENCE IS PART OF THE UNIT. A field the world entity does not carry is DELETED from the
  * record rather than left, because `#### D3`'s rule is that the oldest contributing definition
- * wins every identity field AS A UNIT — and because `reportWorldIdentityDrift`'s zero case is
+ * wins every identity field AS A UNIT - and because `reportWorldIdentityDrift`'s zero case is
  * only true if the two copies agree on absence as well as on value.
+ *
+ * THE THREE SOURCE-LINK FIELDS ARE THE EXCEPTION TO THE DONOR RULE, NOT TO THIS ONE. They are
+ * UNIONED across the group by `groupIdentity`, so what lands here is already every reference any
+ * member claimed; writing it back is what keeps the two copies equal, and it is why no member
+ * loses a reference it had.
  *
  * @param {object} record
  * @param {object} identity
@@ -242,13 +253,20 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
  */
 function readScopePayload(existing) {
   const source = isPlainObject(existing) ? existing : {};
-  const entities = arrayOf(source.entities).filter((entry) => isPlainObject(entry));
-  const defaults = isPlainObject(source.defaults) ? { ...source.defaults } : {};
-  const membership = isPlainObject(source.membership) ? { ...source.membership } : {};
+  const { entities, defaults, membership, ...extras } = source;
   return {
-    entities: cloneJson(entities),
-    defaults: cloneJson(defaults),
-    membership: cloneJson(membership),
+    entities: cloneJson(arrayOf(entities).filter((entry) => isPlainObject(entry))),
+    defaults: cloneJson(isPlainObject(defaults) ? defaults : {}),
+    membership: cloneJson(isPlainObject(membership) ? membership : {}),
+    // EVERY OTHER AUTHORED KEY IS PRESERVED, and that is not defensive style. The tool scope
+    // carries a FOURTH sibling — the WORLD tool-breakage authority — which
+    // `createToolScopeStore` normalizes as an extra and `ScopedDefinitionStore` round-trips.
+    // Narrowing the payload to the three sub-keys would DESTROY it on any world this pass
+    // lifts, and the `1.30.0` registry label rests `downgradeLosesData: false` on the promise
+    // that the three scope settings survive untouched and a re-upgrade finds them intact.
+    // Nothing authors an authority at `1.30.0`, but import/export ships in the same release
+    // and the catalogue editors follow it.
+    ...cloneJson(extras),
   };
 }
 
@@ -380,6 +398,9 @@ export function migrateWorldScopeEntities(data) {
   // -------------------------------------------------------------------------
   // 1. THE REWRITE HALF — unconditional, driven by the map alone.
   // -------------------------------------------------------------------------
+  // How many membership records the FOURTH-target walk had to repair. ZERO on a correctly
+  // ordered pass; anything else means a payload was built BEFORE the rewrite ran.
+  let payloadRewriteRepairs = 0;
   const recipesBySystem = new Map();
   for (const recipe of recipes) {
     const systemId = trimmedString(recipe?.craftingSystemId);
@@ -413,11 +434,20 @@ export function migrateWorldScopeEntities(data) {
       rewriteGatheringSliceReferences(gatheringConfig.systems[systemId], remappers);
     }
     // The three scope payloads as a FOURTH target. On a correctly ordered pass this finds
-    // nothing to change; it is the belt-and-braces arm, and a test asserts it is inert.
+    // NOTHING to change; it is the belt-and-braces arm.
+    //
+    // IT IS COUNTED, and that is not telemetry. The arm is UNCONDITIONAL, so it would silently
+    // REPAIR a payload built pre-rewrite — and a payload-before-rewrite ordering regression is
+    // exactly what `#### D6` exists to prevent. Repaired in place, that regression is invisible
+    // to every assertion about the payload's CONTENT, the membership-verbatim arm included.
+    // Counting the repairs makes the belt-and-braces arm OBSERVABLE: the report carries the
+    // count, an acceptance test pins it at zero, and the arm still repairs.
     for (const entityType of ENTITY_TYPES) {
       for (const record of Object.values(payloads[entityType].membership)) {
-        if (record?.systemId === systemId)
-          rewriteMembershipReferences(record, entityType, remappers);
+        if (record?.systemId !== systemId) continue;
+        const beforeRewrite = JSON.stringify(record);
+        rewriteMembershipReferences(record, entityType, remappers);
+        if (JSON.stringify(record) !== beforeRewrite) payloadRewriteRepairs += 1;
       }
     }
   }
@@ -501,6 +531,57 @@ export function migrateWorldScopeEntities(data) {
   }
 
   // -------------------------------------------------------------------------
+  // 3b. THE DONOR-ELECTED WORLD DEFAULTS.
+  //
+  // Elected from the OLDEST contributing system - the same donor that wins identity - which is
+  // the maintainer's ruling extending `#### D3`'s oldest-wins rule from identity to behaviour.
+  //
+  // IT RUNS AFTER THE MEMBERSHIP LOOP, and that ordering is load-bearing: the
+  // `repairRequirements` constraint asks whether every referenced component is a world component
+  // that every member system is a MEMBER of, and the membership records that answer it are
+  // written above.
+  //
+  // NOTHING RESOLVES THROUGH THESE AT MIGRATION TIME. Every membership record still overrides
+  // every section with its own system's value verbatim, so the corpus differential is unchanged
+  // by this block; a world default only ever matters for a system added LATER, or an override a
+  // GM clears later.
+  // -------------------------------------------------------------------------
+  const worldComponentIds = new Set(payloads.components.entities.map((entity) => entity.id));
+  const isMemberOf = (componentId, systemId) =>
+    Boolean(payloads.components.membership[membershipKeyOf(componentId, systemId)]);
+  const refusedDefaultSections = [];
+
+  for (const entityType of ENTITY_TYPES) {
+    const payload = payloads[entityType];
+    for (const entity of grouping.entities[entityType]) {
+      // The per-pair LIFT guard governs this too: an entity whose defaults a previous pass
+      // already wrote is not re-elected, so a re-run cannot overwrite a GM's later edit.
+      if (payload.defaults[entity.id]) continue;
+      const liveMembers = entity.members.filter(
+        (member) => !isRefusedPair(grouping.refusals, member.systemId, entityType)
+      );
+      if (liveMembers.length === 0) continue;
+      const donorSystem = systemsById.get(liveMembers[0].systemId);
+      const donorRecord = arrayOf(donorSystem?.[ENTITY_TYPE_FIELDS[entityType]]).find(
+        (candidate) => trimmedString(candidate?.id) === entity.id
+      );
+      if (!donorRecord) continue;
+      const { record, refusedSections } = electWorldDefault({
+        entityType,
+        entityId: entity.id,
+        donorRecord,
+        worldComponentIds,
+        isMemberOf,
+        memberSystemIds: liveMembers.map((member) => member.systemId),
+      });
+      if (record) payload.defaults[entity.id] = record;
+      for (const section of refusedSections) {
+        refusedDefaultSections.push({ entityType, entityId: entity.id, section });
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // 4. THE REPORT.
   // -------------------------------------------------------------------------
   const worldRoster = {
@@ -516,6 +597,11 @@ export function migrateWorldScopeEntities(data) {
     overriddenRecords,
     refusals: grouping.refusals,
     flaggedForReview: computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster),
+    // ZERO on a correctly ordered pass. See the fourth-target walk above.
+    payloadRewriteRepairs,
+    // The world-default sections a CONSTRAINT declined, distinct from the ones the donor simply
+    // did not author. A GM can act on the first and not on the second.
+    refusedDefaultSections,
   };
 
   // -------------------------------------------------------------------------

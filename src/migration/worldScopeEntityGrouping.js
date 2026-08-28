@@ -93,6 +93,28 @@ export const ENTITY_TYPE_FIELDS = Object.freeze({
  */
 export const REKEYABLE_ENTITY_TYPES = Object.freeze(['components', 'tools']);
 
+/**
+ * The SOURCE-LINK fields, which are UNIONED across the group rather than taken from the donor.
+ *
+ * DONOR-WINS-AS-A-UNIT IS RIGHT FOR DISPLAY IDENTITY AND WRONG FOR THESE. Union-find guarantees
+ * only that the group is connected, not that every member shares a reference with the DONOR: in
+ * a chain A-B-C where C shares a uuid with B and nothing with A, taking A's links as a unit
+ * DELETES C's unique uuids permanently. An owned Item sourced from one of them then stops
+ * resolving at the source-reference tier - which is precisely the tier this whole change's
+ * degradation story rests on as the safe fallback while the identity-flag remap has not run.
+ *
+ * Unioning is safe in the direction the deletion was not: a source reference is a CLAIM that this
+ * entity is that Item, every member of the group has already made its own claim, and the resolvers
+ * intersect reference SETS rather than compare them, so a longer list resolves strictly more.
+ *
+ * @type {readonly string[]}
+ */
+const SOURCE_LINK_FIELDS = Object.freeze([
+  'originItemUuid',
+  'registeredItemUuid',
+  'aliasItemUuids',
+]);
+
 /** The identity fields lifted to a world entity, per entity type (`#### D1`). */
 const IDENTITY_FIELDS = Object.freeze({
   components: Object.freeze([
@@ -298,6 +320,10 @@ function byCorpusPosition(left, right) {
  * ABSENCE-PRESERVING: a field the donor does not carry is not minted. `aliasItemUuids` is
  * copied as a fresh array so the world entity never aliases the in-system record.
  *
+ * DISPLAY IDENTITY ONLY. The three SOURCE-LINK fields are unioned across the group by
+ * {@link groupIdentity} instead; see {@link SOURCE_LINK_FIELDS} for why donor-wins deletes data
+ * there.
+ *
  * @param {object} record
  * @param {string} entityType
  * @returns {object}
@@ -310,6 +336,64 @@ export function identityOf(record, entityType) {
     identity[field] = Array.isArray(value) ? [...value] : value;
   }
   return identity;
+}
+
+/**
+ * The identity a world entity takes from a whole GROUP: display identity from the DONOR as a
+ * unit, source links UNIONED across every member.
+ *
+ * The union is emitted in the SHIPPED SHAPE rather than as one flat list, because that shape is
+ * what every reader already intersects against: the donor's own `originItemUuid` and
+ * `registeredItemUuid` are preserved as the primaries, and every other reference any member
+ * claimed - including the other members' primaries - lands in `aliasItemUuids`, de-duplicated and
+ * with the two primaries excluded exactly as `_normalizeComponent` and `_normalizeTool` emit them.
+ *
+ * @param {Array<{record: object}>} group Members in corpus order; the first is the donor.
+ * @param {string} entityType
+ * @returns {object}
+ */
+export function groupIdentity(group, entityType) {
+  const donor = group[0]?.record;
+  const identity = identityOf(donor, entityType);
+  if (!(IDENTITY_FIELDS[entityType] ?? []).includes('originItemUuid')) return identity;
+
+  const primaries = [identity.originItemUuid, identity.registeredItemUuid].filter((ref) =>
+    trimmedString(ref)
+  );
+  const aliases = [];
+  for (const member of group) {
+    for (const ref of sourceReferencesOf(member.record)) {
+      if (primaries.includes(ref) || aliases.includes(ref)) continue;
+      aliases.push(ref);
+    }
+  }
+  // ABSENCE IS STILL PRESERVED: a group in which nothing claimed an alias emits no key, exactly
+  // as the donor-only projection did, so an unlinked entity is unchanged.
+  if (aliases.length > 0) identity.aliasItemUuids = aliases;
+  else if (Array.isArray(identity.aliasItemUuids) && identity.aliasItemUuids.length === 0) {
+    identity.aliasItemUuids = [];
+  }
+  return identity;
+}
+
+/**
+ * Whether the union kept every source reference this member claimed.
+ *
+ * A member whose references are all present in the world entity's union lost nothing, so the
+ * difference in field SHAPE is not a rename a GM needs to see. A member that lost one - which
+ * only the donor's primaries can cause, when a primary is demoted - still reports.
+ *
+ * @param {object} record
+ * @param {object} identity
+ * @returns {boolean}
+ */
+function unionAbsorbed(record, identity) {
+  const kept = new Set([
+    ...(trimmedString(identity.originItemUuid) ? [identity.originItemUuid] : []),
+    ...(trimmedString(identity.registeredItemUuid) ? [identity.registeredItemUuid] : []),
+    ...(Array.isArray(identity.aliasItemUuids) ? identity.aliasItemUuids : []),
+  ]);
+  return sourceReferencesOf(record).every((ref) => kept.has(ref));
 }
 
 /** Whether two identity projections disagree, and on which fields. */
@@ -368,7 +452,8 @@ function derive(systems, refusedPairs) {
       const worldId = entityType === 'essences' ? group[0].id : claimWorldId(group, claimed);
       claimed.add(worldId);
       const donor = group[0];
-      const identity = identityOf(donor.record, entityType);
+      // Display identity from the DONOR as a unit; source links UNIONED across the group.
+      const identity = groupIdentity(group, entityType);
       entities[entityType].push({
         id: worldId,
         entityType,
@@ -399,10 +484,16 @@ function derive(systems, refusedPairs) {
       }
 
       for (const member of group) {
-        const changedFields =
-          member === donor
-            ? []
-            : identityDifferences(identityOf(member.record, entityType), identity, entityType);
+        // Compared against the SAME projection the world entity took, so a member whose source
+        // links were absorbed into the union does not read as an identity change it did not
+        // suffer - it kept every reference it claimed.
+        const changedFields = identityDifferences(
+          identityOf(member.record, entityType),
+          identity,
+          entityType
+        ).filter(
+          (field) => !SOURCE_LINK_FIELDS.includes(field) || !unionAbsorbed(member.record, identity)
+        );
         const reKeyed = member.id !== worldId;
         if (reKeyed && REKEYABLE_ENTITY_TYPES.includes(entityType)) {
           const perSystem = (rekeyMap[member.systemId] ??= {});
@@ -440,6 +531,14 @@ function derive(systems, refusedPairs) {
  *     an output id colliding with an id in the same pair that was NOT re-keyed, and such a
  *     duplicate is silently last-wins in both index builders, making a definition unreachable
  *     with no error.
+ *
+ * A REFUSAL IS NOT ALWAYS CAUSED BY THIS PASS. Output uniqueness is asserted over every pair,
+ * including one with an EMPTY map, so a system carrying a NATIVE duplicate definition id fails it
+ * on its own. That is deliberate - such a system already has an unreachable definition and must
+ * not have a lift layered on top of it - but it has a visible consequence worth naming: refusing
+ * a pair removes its definitions from every group they belonged to, which can change ANOTHER
+ * system's elected identity donor. Every such change is reported as an ordinary rename, and the
+ * refusal itself is reported with its reason.
  *
  * @param {Array<object>} systems
  * @param {object} rekeyMap

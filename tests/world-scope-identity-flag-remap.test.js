@@ -213,6 +213,54 @@ test('alchemy dead-end signature keys are PARSED, remapped, RE-SORTED and re-joi
   assert.notEqual(value['sys-a'][0], original.replace('zeta', 'alpha'));
 });
 
+test('the alchemyDeadEnds COMPOSITION edge is wired, not just the pure helper', async () => {
+  // MUTATE THE COMPOSITION, NOT ONLY THE PURE HELPER. `const deadEnds = null;` at the call site
+  // survives every assertion about `remapAlchemyDeadEnds` itself — and `#### D8` records that
+  // revision 3 missed this site ENTIRELY, so the call site is exactly the half that has been
+  // wrong before. The run containers already get this treatment; dead ends did not.
+  const map = { 'sys-a': { components: { zeta: 'alpha' } } };
+  const original = canonicalSignatureKey({ mid: 1, zeta: 2 });
+  const written = [];
+  const actor = makeDocument({
+    fabricate: { fabricate: { alchemyDeadEnds: { 'sys-a': [original] } } },
+  });
+  actor.items = [];
+
+  const summary = await remapWorldScopeIdentityFlags({
+    actors: [actor],
+    rekeyMap: map,
+    readFlag,
+    writeFabricateFlag: async (document, key, value) => written.push([key, value]),
+    writeBareFlag: async () => {},
+  });
+
+  assert.equal(summary.remappedAlchemyDeadEnds, 1, 'the pass must REPORT what it remapped');
+  assert.deepEqual(
+    written,
+    [['alchemyDeadEnds', { 'sys-a': ['alpha:2|mid:1'] }]],
+    'and must WRITE the rebuilt key back at the doubly-nested depth'
+  );
+});
+
+test('a dead-end key naming nothing re-keyed writes NOTHING at the composition edge', async () => {
+  const written = [];
+  const actor = makeDocument({
+    fabricate: {
+      fabricate: { alchemyDeadEnds: { 'sys-a': [canonicalSignatureKey({ other: 1 })] } },
+    },
+  });
+  actor.items = [];
+  const summary = await remapWorldScopeIdentityFlags({
+    actors: [actor],
+    rekeyMap: MAP,
+    readFlag,
+    writeFabricateFlag: async (document, key, value) => written.push([key, value]),
+    writeBareFlag: async () => {},
+  });
+  assert.equal(summary.remappedAlchemyDeadEnds, 0);
+  assert.deepEqual(written, [], 'an unchanged flag is never rewritten');
+});
+
 test('a dead-end key naming nothing re-keyed is left exactly as it was', () => {
   const key = canonicalSignatureKey({ other: 1 });
   const { value, changed } = remapAlchemyDeadEnds({ 'sys-a': [key] }, MAP);
