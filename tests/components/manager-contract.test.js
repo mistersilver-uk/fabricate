@@ -3210,8 +3210,17 @@ describe('CraftingSystemManager source contract', () => {
       'Overview should not offer the removed source picker'
     );
     assert.ok(
-      toolValidationSource.includes('<EditorValidationSurface'),
-      'Validation should reuse the recipe-style editor validation surface'
+      toolValidationSource.includes('<ScopedValidationTab'),
+      'Validation should reuse the shared scoped-entity validation shell'
+    );
+    // And that shell really does render the recipe-style surface. Asserting only the shell
+    // would pass on a shell that had dropped it, which is the whole point of the original.
+    assert.ok(
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte'),
+        'utf8'
+      ).includes('<EditorValidationSurface'),
+      'the shared scoped validation shell should reuse the recipe-style editor validation surface'
     );
     assert.ok(
       appSource.includes('const clipboard = game?.clipboard;') &&

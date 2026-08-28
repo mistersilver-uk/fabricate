@@ -5741,6 +5741,29 @@
           "ToggleNamed": "Toggle access for {name}",
           "RolePlayer": "Player"
         },
+        "Scoped": {
+          "Sections": {
+            "Category": "Category",
+            "EffectSource": "Effect source",
+            "Macro": "Property macro",
+            "Breakage": "Breakage",
+            "OnBreak": "On break"
+          },
+          "Inherit": {
+            "StateInherited": "Inherited",
+            "StateOverridden": "Overridden",
+            "ToggleLabel": "Fall back to the world default"
+          },
+          "Membership": {
+            "Add": "Add to this system",
+            "AddHint": "It inherits every world default until you override a section.",
+            "CopyFrom": "Copy from…",
+            "Remove": "Remove",
+            "RemoveConfirm": "Confirm?",
+            "Removing": "Removing…",
+            "RemoveConsequence": "Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched."
+          }
+        },
         "Knowledge": {
           "Actions": "Knowledge actions",
           "Delete": "Delete",

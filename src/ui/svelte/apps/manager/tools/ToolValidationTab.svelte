@@ -1,7 +1,21 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  The Tool editor's VALIDATION tab.
+
+  It renders the shared `ScopedValidationTab` (issue 1362), the generalisation of the shell
+  this file and `essences/EssenceValidationTab` were both already written as. It keeps its
+  `manager-tool-tab-stack` class, its `data-tool-validation-tab` hook and its
+  `data-tool-validation-check` row hook, so no shipped rule and no test selector stops
+  matching, and it keeps the save-failure alert below the surface as the primitive's trailing
+  snippet.
+
+  UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue stands, which is why its
+  block row reads `BLOCKS ENABLE` where the essence's reads `INCOMPLETE`. That word is the one
+  thing the two sites genuinely disagree about, and it is the only status label either passes.
+-->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
+  import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import { toolEditorValidation, toolValidationPresentation } from './toolStudio.js';
 
   let {
@@ -135,44 +149,23 @@
     }
     return result;
   });
-
-  function focusFirstFailure(node, nonce) {
-    if (nonce > 0) {
-      queueMicrotask(() =>
-        node.querySelector('.manager-recipe-val-row.is-block')?.scrollIntoView?.({
-          block: 'nearest',
-        })
-      );
-    }
-  }
 </script>
 
-<div
-  class="manager-tool-tab-stack"
-  data-tool-validation-tab
-  use:focusFirstFailure={focusValidationNonce}
+<ScopedValidationTab
+  stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
+  hookAttribute="data-tool-validation-tab"
+  focusNonce={focusValidationNonce}
+  title={text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}
+  intro={text(
+    'FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro',
+    'A Tool saves only when every blocking issue is cleared.'
+  )}
+  {summary}
+  counts={{ passing, warnings: 0, blocking }}
+  {groups}
+  rowDataAttr="data-tool-validation-check"
+  blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE')}
 >
-  <EditorValidationSurface
-    title={text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}
-    intro={text(
-      'FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro',
-      'A Tool saves only when every blocking issue is cleared.'
-    )}
-    {summary}
-    counts={{ passing, warnings: 0, blocking }}
-    countLabels={{
-      passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
-      warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
-      blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
-    }}
-    {groups}
-    rowDataAttr="data-tool-validation-check"
-    statusLabels={{
-      pass: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusPass', 'PASS'),
-      warn: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusWarn', 'WARNING'),
-      block: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE'),
-    }}
-  />
   {#if saveError && saveError !== 'invalid'}
     <p class="manager-validation-error" role="alert" data-tool-save-error>
       {text(
@@ -181,4 +174,4 @@
       )}
     </p>
   {/if}
-</div>
+</ScopedValidationTab>

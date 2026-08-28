@@ -36,6 +36,14 @@ const listSource = read('CompositionList.svelte');
 const modeControlSource = read('CompositionModeControl.svelte');
 const inspectorSource = read('RecordInspector.svelte');
 const tabsSource = read('EnvironmentEditorTabs.svelte');
+// The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362, so the
+// tablist semantics, the keyboard handling and the badge normalisation are asserted against the
+// component that RENDERS them. Left pointed at the caller they would have gone green over an
+// empty file: `EnvironmentEditorTabs.svelte` no longer contains a single one of those tokens.
+const editorTabsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/EditorTabs.svelte'),
+  'utf8'
+);
 const evidenceSource = read('MatchingEvidenceChips.svelte');
 const tasksTabSource = read('EnvironmentTasksTab.svelte');
 const eventsTabSource = read('EnvironmentEventsTab.svelte');
@@ -556,12 +564,34 @@ describe('environment composition editor structure', () => {
   });
 
   it('tabs are a keyboard-navigable tablist', () => {
-    assert.ok(tabsSource.includes('role="tablist"'), 'tabs should be a tablist');
-    assert.ok(tabsSource.includes('role="tab"'), 'each tab should have the tab role');
-    assert.ok(tabsSource.includes("'ArrowRight'"), 'tabs should handle ArrowRight');
-    assert.ok(tabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
-    assert.ok(tabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
-    assert.ok(tabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
+    assert.ok(editorTabsSource.includes('role="tablist"'), 'tabs should be a tablist');
+    assert.ok(editorTabsSource.includes('role="tab"'), 'each tab should have the tab role');
+    assert.ok(editorTabsSource.includes("'ArrowRight'"), 'tabs should handle ArrowRight');
+    assert.ok(editorTabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
+    assert.ok(editorTabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
+    assert.ok(editorTabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
+  });
+
+  it('the environment strip keeps its own DOM contract after the promotion', () => {
+    // The three externally-consumed halves a naive extraction drops. `EnvironmentEditView`
+    // renders the `environment-panel-*` ids the primitive's `aria-controls` points at, and the
+    // smoke harness plus the View Lab registry read `data-environment-tab-button`.
+    assert.ok(tabsSource.includes('hookAttribute="data-environment-tab-button"'), 'hook name');
+    assert.ok(tabsSource.includes('idStem="environment"'), 'button id and aria-controls stem');
+    assert.ok(
+      tabsSource.includes('ariaLabelKey="FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label"'),
+      'the strip keeps its own accessible name'
+    );
+    assert.ok(tabsSource.includes('containerClass="manager-environment-tabs"'), 'container class');
+    assert.ok(
+      tabsSource.includes('buttonClass="manager-environment-tab-button"'),
+      'button class, so no shipped rule in styles/fabricate.css stops matching'
+    );
+    assert.ok(editorTabsSource.includes('`${idStem}-tab-${tab.id}`'), 'the primitive builds the id');
+    assert.ok(
+      editorTabsSource.includes('`${idStem}-panel-${tab.id}`'),
+      'and points aria-controls at the panel rendered outside it'
+    );
   });
 
   it('tab badges count composition membership and split validation severities', () => {
@@ -597,10 +627,10 @@ describe('environment composition editor structure', () => {
     assert.ok(!shellSource.includes('BadgeError'), 'validation error badge should not use severity text');
     assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
     assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
-    assert.ok(tabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
+    assert.ok(editorTabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
     // The badge is a shared `Chip` since issue 883, so the tab strip hands it a tone NAME
     // rather than an `is-` class; the mapping still has to exist.
-    assert.ok(tabsSource.includes("if (tone === 'warning') return 'warning'"), 'tabs should render warning-toned badge chips');
+    assert.ok(editorTabsSource.includes("if (tone === 'warning') return 'warning'"), 'tabs should render warning-toned badge chips');
   });
 });
 

@@ -163,24 +163,30 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    43,
-    'expected 43 legitimate namespace bases to resolve to an object — ' +
+    40,
+    'expected 40 legitimate namespace bases to resolve to an object — ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
-      'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base. The 38th is ' +
+      'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base, and from 43 to 40 ' +
+      'when issue 1362 promoted `EditorTabs.svelte`: the environment, system and recipe-item ' +
+      'strips each composed their leaf key from a `${tab.key}` suffix, and each now passes a ' +
+      'COMPLETE static key per tab, so three bases stopped being referenced at all. That is a ' +
+      'strengthening rather than a loss — a complete literal is checked by this assertion, a ' +
+      'base is only checked for existing. The ordinals below are therefore NAMES rather than ' +
+      'positions: renumbering them on every count change is churn nobody can verify. One is ' +
       '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
-      '1036), the shared base the eight colour-token labels are localized under. The 39th is ' +
+      '1036), the shared base the eight colour-token labels are localized under. Another is ' +
       '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in ' +
       '`src/migration/migrateRetireCraftingModToken.js` (issue 1094), the base its four ' +
       'per-cause notice clauses are localized under — the clauses are separate keys so the ' +
-      'notice can join only the non-zero ones rather than reporting three zeros. The 40th is ' +
+      'notice can join only the non-zero ones rather than reporting three zeros. Another is ' +
       '`NAMESPACE` in `src/ui/svelte/apps/manager/checks/checkModeCallout.js` (issue 1096), ' +
       'the base every per-mode title, explanation and fact value is localized under — that ' +
-      'module is a pure data table, so the suffixes are data and the base is the literal. The ' +
-      '41st is `NAMESPACE` in ' +
+      'module is a pure data table, so the suffixes are data and the base is the literal. ' +
+      'Another is `NAMESPACE` in ' +
       '`src/ui/svelte/apps/manager/checks/checkTriggerPresets.js` (issue 1096), the base its ' +
       'two preset labels and their six per-kind effect phrases are localized under — the same ' +
-      'pure-data-table shape, for the same reason. The 42nd and 43rd are the Preview and Tabs ' +
+      'pure-data-table shape, for the same reason. Two more are the Preview and Tabs ' +
       'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
       'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time.'
   );

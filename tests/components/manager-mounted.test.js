@@ -243,6 +243,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
+  // The shared scoped-entity patterns (issue 1362): the Tool Studio's preview and both
+  // validation tabs are converted onto them, so both are in this root's static graph.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');
@@ -307,6 +311,10 @@ function compileManagerRoot() {
   // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
   // trees today, and through every other manager screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  // THE manager's editor tab strip (issue 1362). The environment, system and recipe-item
+  // strips are callers of it now, and all three are in this root's static graph, so omitting
+  // it HANGS every mounted manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorTabs.svelte');
   // THE manager's labelled push-button (issue 1096). The root reaches it through the Tool
   // Studio header and the System Overview Modifiers card, and through every other screen
   // as the conversion proceeds.
