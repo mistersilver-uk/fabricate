@@ -115,6 +115,8 @@ World:
   COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; ESSENCES group by trimmed `id` instead, and essence ids are NEVER re-keyed.
   It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE until the consumer sweep repoints their readers.
   Every membership record is created fully OVERRIDING, so resolved behaviour is unchanged and a world default matters only for a system added later.
+  All three ride along with crafting-system import/export as their own envelope slices, at schema `6` — but unlike the three world-scope slices above them they are FILTERED BY MEMBERSHIP to the exported system, because here there IS an owning relation and it is membership.
+  An import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination's three settings stay absent and it behaves exactly as the previous schema does.
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
 - `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder and the GM Manager's world `Downtime` surface (no longer the crafting authoring group, which is always available), disabled by default
