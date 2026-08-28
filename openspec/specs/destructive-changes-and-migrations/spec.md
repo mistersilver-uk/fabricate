@@ -873,6 +873,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    EVERY rename is reported by name with both systems, while a byte-identical group produces none.
 4. **The ID-CLAIM LADDER is deterministic**, so a re-run chooses identically: the oldest contributing id if unclaimed, else the next-oldest if unclaimed, else `<oldestId>-w<n>` with the smallest unclaimed `n >= 2`.
    Steps 2 and 3 exist because component and tool ids are NOT globally unique — copy-import preserves them.
+   **The SAME ladder governs COPY-MODE IMPORT's binding of an incoming entity to a destination world entity** (issue 1364), with the ranked intersecting candidates in place of the group's members: it is what makes that binding INJECTIVE, and its middle rung is what makes a re-import idempotent rather than adding one world entity per run (`import-export/spec.md` -> Copy-mode identifier rebinding).
 5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair's own definitions are byte-identical to their input.
    **"Byte-identical" is scoped to the refused pair's own definitions and their ids, and this qualification is load-bearing.**
    Refusal is per `(system, entityType)`, so a system whose COMPONENTS pair is refused while its TOOLS pair is accepted still has its `component.salvage.toolIds` rewritten — those are TOOL references, and the tools pair was not refused.
@@ -915,6 +916,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    **ALL FIVE ARE DECIDED AGAINST THE SOURCE CORPUS HERE, AND ARE RE-DECIDED AT IMPORT** (issue 1364, epic 1357, PR 4).
    A membership-filtered export cannot carry the facts three of them rest on: constraint (0)'s every-live-member test was decided over systems the export does not carry, and (b), (c) and (d) may name a component absent from the destination entirely.
    So a carried world default the import would ADD has every section re-evaluated against the DESTINATION's merged corpus, and that corpus is a LOGICAL UNION that includes membership records not yet persisted, because the membership layer is written after the defaults layer (`import-export/spec.md` -> World-default constraint re-check on import).
+   Constraint (0) there applies THIS constraint's own authored-section predicate rather than a second one, because the import's inputs include hand-authored payloads whose blank or whitespace `category` carries the key while storing as an ABSENCE — so a key-presence reading of it admits exactly the fallback the constraint forbids.
    Declining at import is lossless for the reason declining here is: every incoming membership record still overrides every section with its own system's value verbatim.
 
    **The `defaults` SUB-KEY IS WRITTEN whether or not it holds a record**, because seededness keys on key PRESENCE rather than content and the persisted shape must round-trip through the store unchanged.

@@ -2130,6 +2130,7 @@ SystemMembershipRecord = {
     Unioning is safe in the direction the deletion is not — a source reference is a CLAIM, every member has already made its own, and the resolvers intersect reference SETS rather than compare them, so a longer list resolves strictly more.
 
     **The migration WRITES THE UNION BACK onto every in-system record**, which is what keeps the two copies equal, and it has a consequence worth stating rather than discovering: after `1.30.0` a component or tool in a NON-DONOR system claims every other member system's source uuids, so `## Component`'s and `## Tool`'s own presence matching widens accordingly — AND SO DOES THE IMPORT-TIME WORLD-ENTITY MATCH, which binds an incoming entity to a destination one on an INTERSECTION of those unioned sets (`import-export/spec.md` -> Copy-mode identifier rebinding).
+    A widened destination entity can therefore be intersected by two incoming records that share NOTHING with each other, which is why that binding is required to be INJECTIVE and cannot be treated as a partition of the incoming records.
     `## EssenceDefinition` is unaffected — a world essence carries no source link at all.
     - a WORLD ESSENCE carries `id`, `name`, `icon`, `colorToken` and `description`, and no source link, because an essence has no source item.
 

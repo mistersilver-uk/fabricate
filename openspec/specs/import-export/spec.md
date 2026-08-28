@@ -237,10 +237,13 @@ The five constraints (`destructive-changes-and-migrations/spec.md` -> World-Scop
 The membership layer is written AFTER the defaults layer, so a persisted-only reading makes the every-member precondition VACUOUSLY TRUE for every entity the import mints — and the second write then lands a membership record inheriting a value no system in the destination authored, which is the exact behaviour that precondition exists to prevent.
 The incoming records MUST count as ONE system distinct from every destination system, under a SYNTHETIC token and regardless of the payload's own identifier, because that identifier names the destination's system in neither mode.
 
-That union is deliberately CONSERVATIVE and MAY decline a default that was valid in the source world and in the destination world separately, because the union has more members than either had.
+That union is deliberately CONSERVATIVE and MAY decline a default that was valid against the DESTINATION ALONE, because the union has more members than the destination had.
 Over-declining is LOSSLESS; under-declining is not.
+The claim is stated against the destination alone rather than as "valid in each world separately", because that stronger form is UNREACHABLE: every predicate here is either universally quantified over the member union or a membership test on a roster that only ever grows, so validity over each half implies validity over the union, and no fixture can exhibit the case.
 
-The every-member precondition binds the three sections a membership record cannot express an empty override for, and at import time it is the SAME predicate the migration applies, reduced to whether the merged record CARRIES the section key.
+The every-member precondition binds the three sections a membership record cannot express an empty override for, and at import time it is the SAME PREDICATE the migration applies — literally the same one, not the same rule restated.
+It does NOT reduce to whether the merged record carries the section key.
+That reduction is sound only for a record the migration's own builder produced, and a HAND-AUTHORED payload is a first-class input here: a `category` of `''` or whitespace carries the key, is coerced to ABSENCE by the store on the way in, and then falls back to the very world default the precondition was asked to decide — handing the imported system a value no GM authored, which is exactly what the precondition exists to prevent.
 The three addressability rules and the repair-requirements rule are decided against the merged world component roster and the merged membership.
 
 **When the component scope is not SEEDED in the destination, so no component roster will be written, every section carrying a component reference MUST be DECLINED**, because the roster those rules consult is undecidable.
@@ -278,7 +281,9 @@ Import MUST additionally emit four WORLD-SCOPE ENTITY kinds, each carrying the s
 - `worldEntityCollision` — an incoming entity id equals a DESTINATION world entity's id while their source-reference sets prove they are different items.
   It RESOLVES, to the wrong thing, which is why it is reported and not repaired: keep mode must not regenerate anything.
   It applies in keep mode for all three entity types and in COPY mode for tools and essences, whose identifiers copy mode preserves verbatim; components in copy mode are protected by the match-or-mint rule below.
-  It is also the kind under which a copy-mode MULTI-MATCH reports each losing candidate.
+  **The ESSENCE arm of this rule is VACUOUS in practice, and is stated rather than quietly relied on:** an essence id is a stable semantic slug that the world-scope grouping treats as the identity itself, so no world essence entity carries a source link at all and the disjointness test can never find the positive evidence it requires.
+  The rule is still stated over all three types, so a world essence that ever acquired a source link is covered without an amendment; it is not a tested arm today.
+  It is also the kind under which a copy-mode MULTI-MATCH reports each losing candidate, and under which a copy-mode CONTENTION — two incoming records wanting the same destination entity — reports the contested id against BOTH owners.
 - `worldEntityMissing` — a membership record or world default whose entity id names no entity in the MERGED roster.
   It is UNRESOLVED, the class this section already models.
 - `worldDefaultDeclined` — a world-default SECTION the destination re-check refused.
@@ -305,7 +310,20 @@ An incoming entity whose set INTERSECTS an existing destination world entity's s
 An incoming set intersecting MORE THAN ONE destination entity MUST bind to the LARGEST intersection with a deterministic first-wins tie-break and MUST REPORT the ambiguity; it MUST NOT merge the destination's entities and MUST NOT mint.
 The destination index MUST be supplied by the caller, and a copy-mode call without one MUST FAIL rather than fall back to minting.
 
-The guarantee the previous rule provided survives, restated accurately: two copies share an id only when their source-reference sets INTERSECT — a DIRECT shared reference, which is the relation the `1.30.0` grouping unions on — so the two would have resolved to ONE world entity had they been grouped in one corpus.
+**THE BINDING MUST BE INJECTIVE: one destination world entity MUST be claimed by at most ONE incoming record per import.**
+The converse of the multi-match rule is the case that loses data, and it is reachable two ways that are both ordinary: two incoming records sharing a source reference outright, and two incoming records sharing NOTHING with each other that both intersect a destination entity whose own set was WIDENED by the `1.30.0` grouping's union.
+So "intersects a destination entity" is NOT an equivalence relation over the incoming records and cannot partition them, and a binding that lets two records take one id makes the second one VANISH: a duplicate definition id is last-wins in every index builder and the read union de-duplicates by entity id, so the record disappears from the screen, from the index and from the engine with no error raised anywhere.
+The same corpus is REFUSED outright by the migration's output-uniqueness post-condition, and one release must not answer the same question two ways.
+
+The rule is therefore the ID-CLAIM LADDER (`destructive-changes-and-migrations/spec.md` -> World-Scope Entity Migration requirement 4), keyed on the destination id rather than on a group's members: the best intersecting candidate if UNCLAIMED, else the next unclaimed intersecting candidate in the same ranked order, else MINT.
+Every contested destination id MUST be REPORTED, naming BOTH the record that claimed it and the record that wanted it, because a contention the GM cannot attribute is not actionable.
+
+**The middle rung is required, not an optimisation.**
+Minting as soon as the best candidate is claimed is neither ORDER-STABLE nor IDEMPOTENT: destination roster order is the key order of a persisted setting that nothing in this pipeline sorts, and a record that mints because its preferred candidate was taken mints again on every subsequent import, adding one world entity per import forever — since the entity it minted last time is never the one it prefers this time.
+Taking the next unclaimed candidate binds to that previously minted entity instead, so a re-import adds nothing.
+
+The guarantee the previous rule provided survives, restated accurately: two copies share an id only when each INTERSECTS THE SAME destination world entity — so the two would have resolved to that one world entity had they been grouped in one corpus.
+It is deliberately NOT stated as "their own sets intersect each other": because a destination entity's set may have been widened by the grouping's union, two incoming records that share no reference at all can each intersect it, and only the injectivity rule above — not the intersection relation — is what keeps them apart.
 
 Copy-mode import MUST atomically remap every within-payload reference to a rebound or minted component id.
 The remapped references are: recipe ingredient-option and result component refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the legacy flat `ingredients`/`results` aliases; `tool.componentId` in both the system and gathering-library tool slices; tool `onBreak.replacementComponentId`; essence `sourceComponentId`/`associatedSystemItemId`; component salvage result refs; gathering task/event drop-row `componentId`; and legacy `catalysts[]` component refs when present in a legacy or hand-edited payload.
