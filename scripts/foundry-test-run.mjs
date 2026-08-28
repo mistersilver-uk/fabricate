@@ -2571,10 +2571,16 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           }]
         },
         // Player-gathering scenario library tasks. Each player environment fixture
-        // below force-includes one of these via compositionMode 'manual' +
-        // forcedTaskIds. region 'meadowlands' keeps them from matching the automatic
-        // Azure Grove / GM fixtures (northreach / no region); no weather/timeOfDay
-        // constraint keeps them available. Library tasks are d100 drop-row gathers —
+        // below picks exactly one of these via compositionMode 'manual' +
+        // enabledTaskIds (issue 1315: force add composes nothing in manual mode, so
+        // the pick has to live on the enabled list manual actually reads). None of
+        // these tasks declares a `biomes` constraint, so under automatic composition
+        // every one of them would match — and compose into — every environment at
+        // once; manual's picked-list-only rule is what keeps each fixture isolated to
+        // its one scenario. region 'meadowlands' keeps them out of the Azure Grove /
+        // GM fixtures' OWN picks (northreach / no region), which are manual too and
+        // name their own ids explicitly; no weather/timeOfDay constraint keeps them
+        // available. Library tasks are d100 drop-row gathers —
         // the per-scenario "state" (success / scene-block / tool-block / timed /
         // empty / blind) comes from the environment config or the drop-rate, since
         // progressive/check/catalyst/failure task resolution no longer exists.
@@ -3669,9 +3675,11 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
     const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-    // rc/ci gather env: MANUAL composition force-includes ONLY the guaranteed task
-    // and NO events, so the always-run inventory-delta assertion cannot be
-    // perturbed by a hazardous event flipping the outcome.
+    // rc/ci gather env: MANUAL composition picks ONLY the guaranteed task (issue
+    // 1315: manual composes exactly `enabledTaskIds`, so the id lives there rather
+    // than on a force list, which manual mode ignores) and NO events, so the
+    // always-run inventory-delta assertion cannot be perturbed by a hazardous event
+    // flipping the outcome.
     const rcGatherEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke RC Meadow',
@@ -3683,7 +3691,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       compositionMode: 'manual',
       region: 'northreach',
       biomes: ['forest'],
-      forcedTaskIds: [rcGatherTaskId]
+      enabledTaskIds: [rcGatherTaskId]
     });
     // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
     // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event.
@@ -8039,6 +8047,16 @@ async function main() {
         const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+        // MANUAL composition (issue 1315): the `enabledTaskIds`/`enabledEventIds`
+        // below are the picked lists manual mode actually reads. At the point this
+        // fixture is created, `gatheringConfig` for this system holds no library
+        // tasks yet (the settings.set that seeds `smoke-forage-library` runs further
+        // down, once the library-owning fields it depends on exist), so automatic
+        // mode's match-the-library gate has nothing to match against and the
+        // environment would fail its "must have a task before enable" validation.
+        // Manual's gate only checks that the picked list is non-empty, so it needs
+        // no library at create time; by the time a player actually browses Azure
+        // Grove, the library (and the ids named here) exists and composes as picked.
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
@@ -8046,6 +8064,7 @@ async function main() {
           img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
+          compositionMode: 'manual',
           sceneUuid: azureGroveScene.uuid,
           region: 'northreach',
           biomes: ['forest', 'ruins'],
@@ -8062,39 +8081,39 @@ async function main() {
             name: 'Verdant Meadow',
             description: 'Open grassland thick with common herbs, easy to harvest.',
             img: 'icons/consumables/plants/grass-leaves-green.webp',
-            forcedTaskIds: ['smoke-meadow-herbs']
+            enabledTaskIds: ['smoke-meadow-herbs']
           },
           {
             name: 'Sunken Ruins',
             description: 'Half-drowned ruins where forgotten reagents still linger.',
             img: 'icons/environment/wilderness/wall-ruins.webp',
             sceneUuid: 'Scene.fabricateMissingGatheringScene',
-            forcedTaskIds: ['smoke-sunken-survey']
+            enabledTaskIds: ['smoke-sunken-survey']
           },
           {
             name: 'Crystal Thicket',
             description: 'A thicket of glittering crystal fronds, perilous to harvest by hand.',
             img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
-            forcedTaskIds: ['smoke-crystal-dew']
+            enabledTaskIds: ['smoke-crystal-dew']
           },
           {
             name: 'Timed Orchard',
             description: 'An orchard whose slow blooms ripen only with patience.',
             img: 'icons/consumables/fruit/apple-red-tree-green.webp',
-            forcedTaskIds: ['smoke-slow-bloom']
+            enabledTaskIds: ['smoke-slow-bloom']
           },
           {
             name: 'Withered Patch',
             description: 'A blighted patch picked all but bare.',
             img: 'icons/magic/fire/flame-burning-tree-stump.webp',
-            forcedTaskIds: ['smoke-withered-search']
+            enabledTaskIds: ['smoke-withered-search']
           },
           {
             name: 'Moonlit Blind Grove',
             description: 'A moonlit grove where harvests reveal themselves only once attempted.',
             img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
             selectionMode: 'blind',
-            forcedTaskIds: ['smoke-moonpetal']
+            enabledTaskIds: ['smoke-moonpetal']
           }
         ];
         for (const fixture of playerFixtureDefinitions) {
@@ -8850,7 +8869,7 @@ async function main() {
                 selectionMode: 'targeted',
                 sceneUuid: '',
                 compositionMode: 'manual',
-                forcedTaskIds: ['smoke-meadow-herbs'],
+                enabledTaskIds: ['smoke-meadow-herbs'],
                 includedRealmIds: [hiddenVale.id]
               });
             }
