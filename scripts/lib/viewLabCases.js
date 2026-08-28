@@ -685,6 +685,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'system-edit',
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
+      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
+      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
+      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
+      // the source-coverage gate exists to close.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
     ],
@@ -888,6 +893,145 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
+  }),
+  // ── The world scoped-entity routes (issue 1362, epic 1357) ──────────────────────────────
+  //
+  // FRAMES FROM THIS PR PROVE THE SHELL ONLY. Every one of these routes is a PLACEHOLDER: no
+  // catalogue, no editor, no `InheritRow`. What the frames show is the shell decision that has
+  // to be right before PRs 6a/6b/6c and 7 can fill them — the four rail leaves in the
+  // prototype's authored order, a route reached with NO crafting system selected, a real
+  // breadcrumb, the released column with no dead inspector strip, and the placeholder itself.
+  //
+  // NO `system` QUERY, deliberately. These are world screens, and "reachable with no crafting
+  // system selected" is the property `normalizedActiveView`'s `if (!system) return 'systems'`
+  // fallthrough would otherwise break. A case that selected a system first could not see it.
+  managerCase({
+    id: 'world-component-catalogue',
+    label: 'Manager — World Component catalogue',
+    // BEYOND THE SMOKE, and the empty `smokeLabels` says so explicitly rather than by
+    // omission. The Foundry capture walk does not visit the world scoped-entity routes at
+    // all — they are new here — so there is no smoke frame for any of these six to pair with.
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-world-nav-component-catalogue' }],
+    expectView: 'world-components',
+    // The page's own hook, so a route that silently fell back to the systems library fails the
+    // capture rather than publishing a frame of the wrong screen.
+    expectSelector: '[data-scoped-page="world-components"]',
+    // THE FOUR LEAVES, IN THE PROTOTYPE'S AUTHORED ORDER, each proved to hold its own icon
+    // rather than merely to exist. Order is asserted by the parity oracle
+    // (`scripts/visual-parity/inventory.mjs` asserts landmark ORDER); this is the frame it
+    // reads it from.
+    expectContained: [
+      {
+        container: '#manager-world-nav-component-catalogue',
+        target: '#manager-world-nav-component-catalogue > i',
+      },
+      { container: '#manager-world-nav-vocabulary', target: '#manager-world-nav-vocabulary > i' },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-vocabulary',
+    label: 'Manager — World Tags & Categories',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The leaf whose label is CHARACTER-FOR-CHARACTER identical to the system-scope entry
+    // further up the same rail. Reached by its stable id, which is the whole reason the id
+    // exists: no text locator can tell the two apart.
+    steps: [{ selector: '#manager-world-nav-vocabulary' }],
+    expectView: 'world-vocabulary',
+    expectSelector: '[data-scoped-page="world-vocabulary"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-essence-catalogue',
+    label: 'Manager — World Essence Catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
+    expectView: 'world-essences',
+    expectSelector: '[data-scoped-page="world-essences"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue',
+    label: 'Manager — World Tools Catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `Tools Catalogue` is PLURAL where its siblings are singular, and `Tools` is a live
+    // substring of it — which is why the shipped `Tools` rail entry could no longer be reached
+    // by text either.
+    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-page="world-tools"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-scoped-rail-collapsed',
+    label: 'Manager — World scoped rail collapsed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // KEPT AND LOAD-BEARING. The prototype has NO collapsed rail state, so the parity oracle
+    // structurally cannot reach this; this frame and the full-width set-equality gate are its
+    // only evidence. What it has to show is the count badge surviving the 56px icon strip —
+    // the badge is the one thing a collapsed rail keeps, and clipping it is silent.
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-manager-rail-toggle]' },
+    ],
+    expectView: 'world-components',
+    // The badge INSIDE the collapsed rail. Asserting the button alone would pass on a rail
+    // whose badge had been clipped away entirely, which is the one thing this frame exists for.
+    expectSelector:
+      '.manager-body.is-rail-collapsed #manager-world-nav-component-catalogue .manager-nav-count',
+    expectContained: [
+      {
+        container: '#manager-world-nav-component-catalogue',
+        target: '#manager-world-nav-component-catalogue .manager-nav-count',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-scoped-narrow',
+    label: 'Manager — World scoped narrow',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-world-nav-component-catalogue' }],
+    expectView: 'world-components',
+    expectSelector: '[data-scoped-page="world-components"]',
+    // THE ABSENCE OF THE DEAD STRIP, MEASURED IN THE BROWSER rather than inferred from the
+    // stylesheet. `expectedTracks: 2` is the released column; `absentSelector` is the aside.
+    // Both halves are needed and they fail differently: release the column without suppressing
+    // the aside and the empty aside wraps to an implicit grid row, where the track count is
+    // still two and the frame still photographs a dead strip.
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-body',
+      expectedTracks: 2,
+      absentSelector: '.manager-inspector',
+    },
+    position: { width: 1024, height: 860 },
+    kinds: ['manager', 'world', 'scoped', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-recipes-normal',
@@ -1323,6 +1467,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'recipe-item-edit',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
+      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
+      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
+      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
+      // the source-coverage gate exists to close.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
@@ -1963,7 +2112,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-components-normal'],
     reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
     kinds: ['manager', 'components'],
     sourceMatches: [
@@ -1983,7 +2132,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // non-default faces (one click = add, two = remove), and one essence increment, which is what
     // arms the destructive-overwrite warning.
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
       { selector: '[data-component-bulk-category]', select: 'Refined' },
@@ -2027,7 +2176,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // one this round rewrote, with no visual evidence anywhere.
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
       { selector: '[data-component-bulk-delete-card]', scroll: true },
     ],
@@ -2061,7 +2210,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // pairing — statement plus arm — unphotographed.
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
       // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
@@ -2090,7 +2239,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The pristine face of the same panel: a selection and nothing staged, which is the only
     // evidence of the "leave unchanged" chips and the inert Apply.
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
     ],
@@ -2109,7 +2258,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: '.manager-component-toolbar input[type="search"]', fill: 'Ember Quenching Oil' },
       {
         selector:
@@ -2130,7 +2279,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector: '.manager-component-toolbar input[type="search"]',
         fill: 'Rimefrost Quenching Oil',
@@ -2154,7 +2303,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: '.manager-component-toolbar input[type="search"]', fill: 'Ashfall Reagent Case' },
       {
         selector:
@@ -2174,7 +2323,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-component-edit-normal'],
     reaches: 'exact',
     query: {},
-    steps: ['Components', { selector: '.manager-icon-button[aria-label^="Edit"]' }],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+    ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four `*-complications-*` and
@@ -2201,7 +2353,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { system: 'lab-runework' },
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="rw-slag"] .manager-icon-button[aria-label^="Edit"]',
@@ -2225,7 +2377,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="sm-chainmail"] .manager-icon-button[aria-label^="Edit"]',
@@ -2242,7 +2394,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="sm-longsword"] .manager-icon-button[aria-label^="Edit"]',
@@ -2281,7 +2433,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="hb-empty-vial"] .manager-icon-button[aria-label^="Edit"]',
@@ -2309,7 +2461,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
@@ -2341,7 +2493,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="hb-mortar-dust"] .manager-icon-button[aria-label^="Edit"]',
@@ -2376,7 +2528,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] .manager-icon-button[aria-label^="Edit"]',
@@ -2977,7 +3129,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-checks-nav-salvage' },
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
@@ -3072,7 +3224,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-components-stacked'],
     reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'components', 'responsive'],
@@ -3092,7 +3244,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: '.manager-main [data-pagination-size]', select: '10' },
       { selector: '.manager-main [data-pagination-next]' },
     ],
@@ -3109,7 +3261,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tags-categories-normal'],
     reaches: 'exact',
     query: {},
-    steps: ['Tags & Categories', { selector: '#vocabulary-tab-recipe' }],
+    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-recipe' }],
     expectView: 'tags',
     kinds: ['manager', 'tags'],
     sourceMatches: [
@@ -3123,7 +3275,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tags-categories-tags-tab'],
     reaches: 'exact',
     query: {},
-    steps: ['Tags & Categories', { selector: '#vocabulary-tab-tag' }],
+    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-tag' }],
     expectView: 'tags',
     kinds: ['manager', 'tags'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
@@ -3134,7 +3286,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tags-categories-stacked'],
     reaches: 'exact',
     query: {},
-    steps: ['Tags & Categories', { selector: '#vocabulary-tab-recipe' }],
+    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-recipe' }],
     expectView: 'tags',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'tags', 'responsive'],
@@ -3172,7 +3324,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-essences-normal'],
     reaches: 'exact',
     query: {},
-    steps: ['Essences'],
+    steps: [{ selector: '#manager-nav-essence-rules' }],
     expectView: 'essences',
     kinds: ['manager', 'essences'],
     sourceMatches: [
@@ -3197,7 +3349,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // and selection box aligned right on a second. This frame is the evidence for that behaviour.
     reaches: 'exact',
     query: {},
-    steps: ['Essences'],
+    steps: [{ selector: '#manager-nav-essence-rules' }],
     expectView: 'essences',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'essences', 'responsive'],
@@ -3225,7 +3377,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // frame beside the row's own Disabled badge and muted capability pills.
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-essence-identity' },
     ],
     expectView: 'essences',
@@ -3260,7 +3412,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     // 30s and, because one failing case fails the whole capture job, published nothing at all.
     // `:706` and `:707` in this file already click the label for exactly this control and pass.
     query: {},
-    steps: ['Essences', { selector: '[data-essence-view-option="grid"]' }],
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '[data-essence-view-option="grid"]' },
+    ],
     expectView: 'essences',
     // A click that lands but does not switch presentation would photograph the LIST under the
     // grid case's name — the "publishes an unrelated frame" failure this registry exists to
@@ -3301,7 +3456,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // No selection reachable in this world could have fixed that without a deletable essence.
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '[data-essence-select="mote"]' },
       { selector: '[data-essence-select="aether"]' },
     ],
@@ -3333,7 +3488,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // stated BEFORE arming, and an arm that is a second, separate act.
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '[data-essence-select="mote"]' },
       { selector: '[data-essence-select="aether"]' },
       // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
@@ -3369,7 +3524,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
     ],
     expectView: 'essence-edit',
@@ -3395,7 +3550,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // maintainer evidence rather than being implied here.
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
       { selector: '[data-essence-tab="oncraft"]' },
     ],
@@ -3421,13 +3576,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // an all-clear.
     query: {},
     steps: [
-      'Essences',
+      { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
       { selector: '[data-essence-tab="validation"]' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
     sourceMatches: [
+      // The shared scoped-entity validation shell (issue 1362). Both validation tabs are
+      // callers of it, so it is claimed on the two frames that photograph one.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedValidationTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
       // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
@@ -3602,6 +3760,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
+      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
+      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
+      // the source-coverage gate exists to close.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
@@ -4752,7 +4915,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tool-parity-01-library-1280x720'],
     reaches: 'exact',
     query: {},
-    steps: ['Tools'],
+    steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
@@ -4767,7 +4930,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tool-zero-state-empty-library-1280x720'],
     reaches: 'exact',
     query: { system: 'lab-jewelry' },
-    steps: ['Tools'],
+    steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
@@ -4783,7 +4946,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '.manager-icon-button[aria-label^="Edit"]' },
       { selector: '#tool-tab-overview' },
     ],
@@ -4803,7 +4966,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // A long DISPLAY LABEL, authored on the fixture rather than typed: the field is the one
     // the smoke fills, and an authored value reaches the same overflow without a keystroke.
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       {
         selector:
           '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] .manager-icon-button[aria-label^="Edit"]',
@@ -4821,7 +4984,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '.manager-icon-button[aria-label^="Edit"]' },
       { selector: '#tool-tab-breakage' },
     ],
@@ -4840,7 +5003,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     // The flag-broken tool, whose two populated repair-requirement groups are the frame.
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       {
         selector:
           '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] .manager-icon-button[aria-label^="Edit"]',
@@ -4864,7 +5027,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     // The replace-with tool, with its replacement component already chosen.
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       {
         selector:
           '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] .manager-icon-button[aria-label^="Edit"]',
@@ -4888,7 +5051,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // browser — so the segment is clicked before the tool is opened, exactly as the smoke does
     // it, rather than pinning the whole fixture system to check-driven breakage.
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-authority-segment="checkDriven"]' },
       {
         selector:
@@ -4907,7 +5070,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '.manager-icon-button[aria-label^="Edit"]' },
       { selector: '#tool-tab-requirements' },
     ],
@@ -4923,7 +5086,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '.manager-icon-button[aria-label^="Edit"]' },
       { selector: '#tool-tab-validation' },
     ],
@@ -4944,7 +5107,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // prerequisites ENABLED with nothing chosen, which persistence can never hold (the
     // normalizer clamps `enabled` off on an empty id list) and only the editor draft can.
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       {
         selector:
           '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] .manager-icon-button[aria-label^="Edit"]',
@@ -4964,7 +5127,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '.manager-icon-button[aria-label^="Edit"]' },
       { selector: '#tool-tab-breakage' },
     ],
@@ -4979,11 +5142,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-tool-stress-wrapping-680'],
     reaches: 'exact',
     query: {},
-    steps: ['Tools'],
+    steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
     position: { width: 680, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
     sourceMatches: [
+      // The shared scoped-entity preview shell (issue 1362). `ToolBehaviorPreview` renders
+      // through it on every tab of the Tool editor, so this frame shows it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
+      // The shared scoped-entity validation shell (issue 1362). Both validation tabs are
+      // callers of it, so it is claimed on the two frames that photograph one.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedValidationTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Tool/,
       /^src\/ui\/svelte\/apps\/manager\/tools\//,
     ],
@@ -5119,7 +5288,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-components-progressive'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Components'],
+    steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'components'],
@@ -5138,7 +5307,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // difficulty axis is progressive, which is why this case sits on herbalism rather than on the
     // simple-mode default system the other two bulk frames use.
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="hb-moonleaf"])' },
       { selector: 'label:has(input[data-component-select="hb-sunroot"])' },
     ],
@@ -5158,7 +5327,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: {},
     steps: [
-      'Components',
+      { selector: '#manager-nav-component-rules' },
       {
         selector:
           '.manager-component-row[data-component-id="sm-ruby"] .manager-icon-button[aria-label^="Edit"]',
@@ -5277,7 +5446,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // given an invented difference to look distinct.
     reaches: 'window',
     query: {},
-    steps: ['Components'],
+    steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
     kinds: ['manager', 'components'],
     sourceMatches: [
@@ -6973,7 +7142,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The authority is a per-system radio pair on the tools browser, so it is CLICKED rather
       // than pinned on the fixture — the same route `manager-tool-stress-immune` takes for the
       // same reason, and the same one the smoke takes.
-      'Tools',
+      { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-authority-segment="checkDriven"]' },
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
