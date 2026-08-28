@@ -111,7 +111,8 @@ World:
 - `fabricate.characterLibraries` for the world character libraries — the character-prerequisite library and the modifier library, as `{ characterPrerequisites, modifiers }` (a crafting system carries NEITHER, and no participation flag either; the libraries ride along with crafting-system import/export as their own envelope slice)
 - `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope` for the world-scope entity definitions — each `{ entities, defaults, membership }`, with the WORLD tool-breakage authority carried by `fabricate.toolScope` alone (see `## Scoped Entity Definitions` in `data-models`).
   THREE keys rather than one, because `isSeeded()` cannot be honest per entity type on a shared key: a store writes the whole object, so one entity type's first write persists the others as empty and turns an UNKNOWN Valid Id Basis into a real, empty, prunable one.
-  They are ADDITIVE until the world-scope migration: nothing writes them yet, so a crafting system's own `components`, `essenceDefinitions` and `tools` stay live and authoritative.
+  THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM: one world entity per resolved source item, holding identity alone, plus one fully-overriding membership record per original definition.
+  It writes NO world default — it writes the `defaults` sub-key as an EMPTY MAP, because seededness keys on key presence — and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE until the consumer sweep repoints their readers.
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
 - `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder and the GM Manager's world `Downtime` surface (no longer the crafting authoring group, which is always available), disabled by default
@@ -119,6 +120,9 @@ World:
 - `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.ownedItemComponentStampVersion` (one-shot flag-stamp version)
+- `fabricate.worldScopeIdentityFlagVersion` (one-shot flag-stamp version, for the `1.30.0` durable-identity remap)
+- `fabricate.worldScopeRekeyMap` — TRANSIENT.
+  The `1.30.0` migration's durable decision record, `{ [systemId]: { components: {oldId: newId}, tools: {...} } }`, written as the FIRST leg of its writeback and CLEARED by the one-shot pass that consumes it, once that migration has completed
 
 Client (per client/device):
 

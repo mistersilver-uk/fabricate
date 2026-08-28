@@ -219,8 +219,9 @@ The action's stated purpose and its confirmation prompt must name description re
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives an eight-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, and `CHARACTER_LIBRARIES` settings) and returns the transformed payload **or a subset of its keys**.
-- The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, and `1.28.0` from seven to eight.
+- Each migration receives a twelve-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries, componentScope, essenceScope, toolScope, worldScopeRekeyMap }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, `CHARACTER_LIBRARIES`, `COMPONENT_SCOPE`, `ESSENCE_SCOPE`, `TOOL_SCOPE` and `WORLD_SCOPE_REKEY_MAP` settings) and returns the transformed payload **or a subset of its keys**.
+- The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, `1.28.0` from seven to eight, and `1.30.0` from eight to twelve.
+  Threading a key is FOUR edits, not one — the raw read, the snapshot, the `data` literal and the change detection — and omitting any one of them is SILENT.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
@@ -228,6 +229,15 @@ This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ r
 `data-models/spec.md` § Destructive Pass Safety already declares corpus order non-semantic; this states the consequence for migrations.
 A migration MUST derive nothing from record position, and any cross-record reconciliation MUST produce a set-equal result under permutation.
 A migration that accumulates references into a list MAY produce a permuted list; that list is a set and no consumer may depend on its order.
+- **A migration MAY derive an ordering fact from stored corpus POSITION, but only under three conditions, all three declared.**
+  The exception exists because the corpus holds no other age fact: crafting systems carry no timestamp, `randomID()` is not time-ordered, and `createSystem` appends — so array position is the only thing a "which of these came first" rule can be built on.
+  The conditions are that the exception is DECLARED IN THAT MIGRATION'S OWN SPEC SECTION, that the migration's output is still SET-EQUAL under permutation apart from that one fact, and that every consequence of the choice is REPORTED BY NAME to the GM.
+  `1.30.0` is the first migration to take it: it groups definitions by source item, which is permutation-invariant, and then elects the OLDEST contributing system's identity for the group, reporting every rename with both systems.
+- **The writeback order encodes a PER-MIGRATION source/destination DIRECTION, and two migrations may want opposite orderings of the same pair.**
+  `0.7.0` treats `gatheringConfig` as the SOURCE and `craftingSystems` as the DESTINATION — it lifts tools off the config and then DELETES the config copy — while `1.30.0` needs the reverse.
+  Both run in one pass for a world upgrading from below `0.7.0`, so no single leg order satisfies both, and the shipped order is not reordered: `0.7.0`'s invariant wins because reordering it would destroy a pre-`0.7.0` world's tool library outright.
+  A migration whose direction the shipped order contradicts MUST therefore carry its OWN order-independent recovery record rather than reordering the legs.
+  `1.30.0`'s is the persisted `fabricate.worldScopeRekeyMap`, written as the FIRST leg of the writeback and holding the old-to-new id pairs, so a re-run can finish the rewrite whichever legs landed.
 - Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
 
 ### Startup Migration Flow
@@ -254,9 +264,14 @@ On module initialization (on the primary-GM client):
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist each of the eight settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`).
-13. Each of the eight write-on-change comparisons is independent, so an unchanged setting is never rewritten.
-    Every DESTINATION of a world-scope lift is written BEFORE the `craftingSystems` SOURCE it was lifted from, so a tear between the two legs is recoverable rather than destructive; `currencyConfig`, `travelConfig` and `characterLibraries` are all written ahead of it.
+12. Persist each of the twelve settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`, `fabricate.currencyConfig`, `fabricate.travelConfig`, `fabricate.characterLibraries`, `fabricate.componentScope`, `fabricate.essenceScope`, `fabricate.toolScope`, `fabricate.worldScopeRekeyMap`).
+13. Each of the twelve write-on-change comparisons is independent, so an unchanged setting is never rewritten.
+    Every DESTINATION of a world-scope lift is written BEFORE the `craftingSystems` SOURCE it was lifted from, so a tear between the two legs is recoverable rather than destructive; `currencyConfig`, `travelConfig`, `characterLibraries`, `componentScope`, `essenceScope` and `toolScope` are all written ahead of it.
+
+    **`fabricate.worldScopeRekeyMap` is the ONE leg written ahead of `recipes`**, and therefore ahead of every other leg.
+    It is the `1.30.0` pass's durable DECISION RECORD rather than a migrated setting, so writing it first is what makes a tear at ANY later leg recoverable — including the `craftingSystems`-then-`gatheringConfig` tear, where `craftingSystems` no longer holds the old ids and a re-derived map would answer EMPTY.
+    Writing it ahead of `recipes` is strictly safer than the ordering constraint the recipes-first rule below records, because it touches neither `recipes` nor `systems`, and a rejection there abandons everything under the same deferral disposition.
+    It carries its OWN containment: it sits outside both shipped `try` blocks, and an escaping rejection out of the async `ready` callback fires no error hook and no notification, leaves the readiness promise unsettled and the module with no managers.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
@@ -834,6 +849,85 @@ It mutates no input, throws no `FatalMigrationError`, and skips a malformed envi
     `1.28.0` filters a manual environment by match and reads an empty force list, so after the fold every non-matching record this migration rescued vanishes from its environment again — exactly the records it rescued, and with no force list left to re-express them.
     The `enabled*Ids` entries themselves survive the downgrade; what is lost is their COMPOSITION, silently, because the old engine drops a picked record that no longer matches rather than reporting it.
 11. **The `label` string is the one string a GM ever reads about this migration**, so it states the new rule in both modes, says the fold is what stops a manual environment composing nothing after the upgrade, says the clear is what keeps the manual-to-automatic guarantee, and names the downgrade cost.
+
+### World-Scope Entity Migration (`1.30.0`, `downgradeTo: '1.29.0'`, pure, non-mutating, idempotent)
+
+Issue 1363 (epic 1357, PR 3) gives the world ONE record per component, essence and tool instead of one per crafting system.
+The pass (`src/migration/migrateWorldScopeEntities.js`) creates a WORLD ENTITY per resolved source item across every system, re-keys every other member of the group to that id, rewrites every reference the re-key invalidates, and writes one fully-overriding SYSTEM MEMBERSHIP RECORD per original definition.
+It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL object for any key it did not change.
+
+1. **GROUPING: components and tools by TRANSITIVE CLOSURE over source-reference sets; essences by trimmed `id`.**
+   The key is deliberately not a single canonical field, because two systems that registered the same Item by different routes carry different ones — so the pass unions over `{originItemUuid, registeredItemUuid, ...aliasItemUuids}` and their pre-#560 aliases.
+   Union-find is permutation-invariant, so the entity PARTITION is set-equal under a shuffled corpus.
+   A tool with no source references of its own resolves through its `componentId`, applying the same derivation the crafting-system normalizer applies on load; the migration must do it itself, because it runs on raw settings before any manager load.
+   An essence has no source item and its id is a stable semantic slug, so two systems' `fire` are intended to be one essence.
+   **ESSENCE IDS ARE NEVER RE-KEYED**, so no essence reference is rewritten and the re-key map carries no essence leg.
+2. **AN UNLINKED DEFINITION BECOMES ITS OWN WORLD ENTITY AND IS NEVER MERGED** — not with another unlinked definition of the same name, and not with a linked one.
+   Two unlinked "Ash Salt"s in two systems are not provably the same thing, and merging on a name would be a silent irreversible content change made on a guess.
+3. **"OLDEST" IS STORED CORPUS POSITION, and this is a DECLARED exception** to § Migration Registry's rule that a migration MUST NOT depend on corpus order, taken under the three conditions that rule states.
+   Systems carry no timestamp and `randomID()` is not time-ordered, so array position is the only age fact the corpus holds.
+   On a disagreement the OLDEST contributing definition wins every identity field AS A UNIT, never field-by-field, so no chimera identity is minted; and EVERY rename is reported by name with both systems, while a byte-identical group produces none.
+4. **The ID-CLAIM LADDER is deterministic**, so a re-run chooses identically: the oldest contributing id if unclaimed, else the next-oldest if unclaimed, else `<oldestId>-w<n>` with the smallest unclaimed `n >= 2`.
+   Steps 2 and 3 exist because component and tool ids are NOT globally unique — copy-import preserves them.
+5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair is byte-identical to its input.
+   TWO invariants decide it, and the second is a POST-condition rather than a pre-condition.
+   DISJOINTNESS: the map's image must not intersect its key set, or a single simultaneous lookup is not idempotent.
+   OUTPUT UNIQUENESS: the ids the pair emits must be unique, because disjointness alone does not forbid an output id colliding with an id in the same pair that was NOT re-keyed, and such a duplicate is silently last-wins in both index builders — making a definition unreachable with no error.
+   Refusing a pair removes its definitions from every group they belonged to, which can change another group's identity donor, so the derivation is iterated to a FIXED POINT; the refusal set only grows and is bounded by the number of `(system, entityType)` pairs.
+6. **Every membership record is created with EVERY SECTION OVERRIDDEN**, each value copied verbatim from that system's own definition, so nothing inherits at migration time and every system's resolved behaviour is unchanged.
+   A component record carries `category` verbatim — `general` is a legitimate stored token on an override — and its own `tags` with no `mutedTags`.
+   An essence record carries `effectSource` and `macro` and its `enabled` flag; a tool record carries `breakage`, `onBreak`, the seeded `repairRequirements` and its `enabled` flag.
+7. **NO WORLD DEFAULTS ARE WRITTEN AT ALL.**
+   There is no unambiguous source to lift a behaviour default FROM: the oldest-wins rule is scoped to IDENTITY, and extending it to behaviour would silently elect one of three systems' repair recipes, breakage modes and effect sources as the value every future member of the group inherits.
+   Writing none is SAFE because every membership record is fully overriding, so no section resolves through the world layer at migration time and resolution is bit-identical.
+   The cost is stated rather than glossed: a system created AFTER the migration, or one whose GM later clears an override, inherits NOTHING until a GM authors a world default in the catalogue editors.
+   **The `defaults` SUB-KEY IS STILL WRITTEN, as an EMPTY MAP**, because seededness keys on key PRESENCE rather than content and the persisted shape must round-trip through the store unchanged.
+8. **THE REWRITE RUNS BEFORE THE THREE SCOPE PAYLOADS ARE BUILT**, and the order is load-bearing.
+   Three lifted values contain component ids this same pass re-keys — essence `effectSource`, tool `onBreak.replacementTarget.componentId` and tool `repairRequirements` — so a payload built pre-rewrite would ship a membership record naming a retired id in every migrated world, and the per-pair lift guard is keyed on the NEW pair, so a re-run would skip it and the stale ids would persist permanently.
+   The shared walk then runs over the three payloads as a FOURTH target as a belt-and-braces check; on a correctly ordered pass it finds nothing to change.
+9. **The REFERENCE WALK is ONE shared enumeration**, used by this migration and by copy-mode import alike, so the two cannot drift.
+   It covers every component-id and tool-id position across `recipes`, `craftingSystems` and `gatheringConfig`: ingredient, catalyst and repair-option refs and their `alternatives`, result refs, salvage result groups, recipe / step / ingredient-set / salvage `toolIds`, essence `sourceComponentId` / `associatedSystemItemId` / legacy `sourceItemUuid`, tool `componentId`, `onBreak.replacementTarget.componentId` and `repairRequirements[].options[]`, gathering task and event drop rows and `toolIds`, and the legacy pre-`0.7.0` gathering tools copy.
+   It is KEY-AWARE: recipe ids, outcome ids and salvage-group ids are NEVER rewritten, and a value at a non-reference position is never touched even if it coincidentally equals a component id.
+   It is IDEMPOTENT by construction, because every site performs ONE simultaneous lookup and requirement 5's disjointness makes an already-rewritten value not a key.
+10. **The pass writes SEVEN legs, and `fabricate.worldScopeRekeyMap` is the FIRST of them.**
+    The map is `{ [systemId]: { components: { [oldId]: newId }, tools: { ... } } }`, and it is the pass's durable DECISION RECORD rather than a migrated setting — see § Migration Registry for why the leg order is not reordered and why this record is what replaces reordering it.
+    The three scope keys are DESTINATIONS and are written before the `craftingSystems` SOURCE, as `currencyConfig`, `travelConfig` and `characterLibraries` already are.
+11. **The GUARDED LIFT half and the UNGUARDED REWRITE half are separated, and that separation is what makes a torn pass recoverable.**
+    The LIFT/CLAIM half is gated PER `(entityId, systemId)` on a CORPUS-DERIVED predicate — the world corpus already holds a membership record for that pair — and NEVER on `migrationVersion`.
+    `1.28.0`'s "this key has entries" disjunction is not reusable here: any GM edit seeds a key, and migrations run on the active GM alone, so key presence does not prove this pass ran.
+    The REWRITE half runs UNCONDITIONALLY, driven by the persisted map alone.
+    **The in-system identity WRITE-BACK belongs to the REWRITE half**, not the LIFT half: a tear between the three scope legs and `craftingSystems` would otherwise make the re-run skip it, leaving world entities holding merged identity while in-system records keep their original identity.
+    On a re-run its source is the PERSISTED SCOPE PAYLOADS, keyed by the mapped NEW id, because the map carries old-to-new IDS and no identity VALUES.
+12. **The residual window is named rather than glossed.**
+    Between an abandoned pass that tore at the `craftingSystems`-to-`gatheringConfig` boundary and the next boot, `gatheringConfig` holds old ids while `craftingSystems` holds new ones.
+    `migrationVersion` is unadvanced, so the next boot repairs it — but only because the map CLEAR is gated on `migrationVersion`; without that gate the same-boot `ready` pass destroys the map and the next boot cannot repair anything.
+    The window is bounded to one abandoned pass on one client, and the deferral already posts a permanent GM-facing notice instructing a reload.
+13. **The Item- and actor-FLAG remap is NOT a registry entry, and the existing restamp cannot serve.**
+    The runner reads and writes only settings payloads and has no Actor or Item handle, and `restampOwnedItemComponentIdentity`'s planner returns EARLY for any item that already carries a durable identity flag — precisely the population the re-key invalidates.
+    It is a NEW one-shot `ready`-body pass keyed by its own NUMBER setting, on the shipped `*_FLAG_STAMP_VERSION` precedent.
+    Source Items are covered by bumping the component and tool flag-stamp targets, because the source-side writer overwrites when the stored value differs.
+14. **The complete actor-flag site list**, or the reason for exclusion:
+    `roles[<systemId>].componentId` and `roles[<systemId>].toolId` on owned Items; the LEGACY FLAT SCALAR `flags.fabricate.fabricate.componentId`, remapped only when the old id is a key in exactly ONE system's component map across the whole corpus or in several that agree, and otherwise left untouched; `craftingRuns` and `salvageRuns` at their DOUBLY-nested depth and `gatheringRuns` at its SINGLE-scope depth, the two depths differing so a pass that assumes one silently misses the other; and `alchemyDeadEnds`, whose signature keys embed component ids SORTED LEXICALLY, so a re-key changes the sort order and the remap must PARSE, remap, RE-SORT and re-join rather than substitute.
+    `learnedRecipes` is EXCLUDED, because it holds recipe ids and recipe ids are never re-keyed.
+    Leaving the legacy scalar is behaviour-PRESERVING rather than lossy: a stale scalar makes tiers 1-2 miss and resolution falls through to the unchanged source-reference tier.
+15. **The dotted-`systemId` guard applies to every `roles.<systemId>` write.**
+    A role leaf is written through a flattened `Document#update` key, which Foundry expands on every dot, so a dotted `systemId` nests one level deeper than any reader indexing `roles[systemId]`.
+    An unsafe segment is SKIPPED and counted in the report.
+    The `alchemyDeadEnds` `systemId` is a VALUE-side object key rather than a dotted update-path segment, so the guard does not apply to it.
+16. **Between the settings write and the remap, resolution degrades to the SOURCE-REFERENCE tier**, which this change does not touch.
+    A source Item in a LOCKED pack is skipped and stays in that tier permanently — accepted, stated, and counted in the report.
+17. **The map CLEAR is gated on the PRODUCING MIGRATION HAVING COMPLETED, and whenever the clear is withheld the pass withholds its own version advance too.**
+    Gating for the pass to RUN is corpus-derived plus its own Number version; gating for it to DESTROY the decision record is `compareSemver(migrationVersion, '1.30.0') >= 0` and NEVER a bare JavaScript `>=`, which is a LEXICOGRAPHIC compare and is TRUE for `'1.4.0'` through `'1.9.0'` — all six registered migration versions, and the worlds running the longest multi-migration pass.
+    The version advance shares that gate because the shipped one-shot precedent writes its version unconditionally: a pass that skips the clear but advances its version short-circuits on every later boot and NEVER clears, orphaning the setting permanently.
+18. **The pass causes a NEWLY-DECIDABLE PRUNE, and reports it.**
+    Once the scope settings are seeded, the Valid Id Basis reports KNOWN for a system whose in-system array is EMPTY, where it previously reported `null`, so a genuinely dangling reference becomes prunable on the first save after upgrade — permanently, because the crafting-system normalizer is an allowlist rebuild.
+    That is CORRECT, but it is a destructive consequence this migration causes, so the pass computes those references and lists them under `flaggedForReview` and the GM notice names them.
+19. **The TRANSIENT REPORT** carries entities created per type, groups merged, every rename with its two systems, transitively-formed groups, refusals with reasons and the newly-prunable references, through a `_worldScopeEntityReport` field the runner captures and DELETES so it is never persisted.
+20. **Mutated setting keys:** `worldScopeRekeyMap`, `recipes`, `componentScope`, `essenceScope`, `toolScope`, `craftingSystems`, `gatheringConfig`.
+21. **The downgrade is LOSSLESS FOR DATA and is declared `downgradeLosesData: false`**, checked rather than copied.
+    The merged identities are a loss at MIGRATION time, not one the downgrade causes; and the three scope settings are PRESERVED as orphaned `Setting` documents that `1.29.0` neither reads nor writes, so a re-upgrade finds them intact — "stranded and unreadable there" is accurate, "lost" is not.
+    ONE real caveat is stated in the `label` without being claimed as data loss: `1.29.0`'s crafting-system normalizer RE-MINTS a concrete `toolSpecific` authority onto a system that authored none, which pins that system out of a world authority only a later release can create.
+    That is DATA-lossless and BEHAVIOUR-relevant, which this registry already treats as a different fact.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 
