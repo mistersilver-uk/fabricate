@@ -180,10 +180,18 @@ const APPROVED_RECIPE_FIELD_DOMAINS = {
   teaser: ['access-and-knowledge'],
 };
 
-/** Every top-level key `_normalizeSystem` actually emits. */
+/**
+ * Every top-level key `_normalizeSystem` actually emits.
+ *
+ * `toolBreakage` is AUTHORED in the input rather than left absent (issue 1363): since `1.30.0`
+ * that normalizer is absence-preserving and emits no key for an unauthored authority, so
+ * normalizing a bare `{}` would report a real, classified, still-producible field as PHANTOM.
+ * Authoring it keeps this helper's contract — "every key a persisted system can carry" — while
+ * still failing on a row for a field nothing can emit.
+ */
 function producedSystemKeys() {
   const manager = new CraftingSystemManager(new RecipeManager({}));
-  return new Set(Object.keys(manager._normalizeSystem({})));
+  return new Set(Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } })));
 }
 
 /**

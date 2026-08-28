@@ -51,6 +51,11 @@ import {
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
 import {
+  planWorldScopeIdentitySmoke,
+  seededFlagPaths,
+  WORLD_SCOPE_SMOKE_FLAG_NAMESPACE,
+} from './lib/worldScopeIdentitySmoke.js';
+import {
   CORE_TOUR_IDS,
   TOUR_PROGRESS_STORAGE_KEY,
   SUPPRESSED_STEP_INDEX,
@@ -2566,10 +2571,16 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           }]
         },
         // Player-gathering scenario library tasks. Each player environment fixture
-        // below force-includes one of these via compositionMode 'manual' +
-        // forcedTaskIds. region 'meadowlands' keeps them from matching the automatic
-        // Azure Grove / GM fixtures (northreach / no region); no weather/timeOfDay
-        // constraint keeps them available. Library tasks are d100 drop-row gathers —
+        // below picks exactly one of these via compositionMode 'manual' +
+        // enabledTaskIds (issue 1315: force add composes nothing in manual mode, so
+        // the pick has to live on the enabled list manual actually reads). None of
+        // these tasks declares a `biomes` constraint, so under automatic composition
+        // every one of them would match — and compose into — every environment at
+        // once; manual's picked-list-only rule is what keeps each fixture isolated to
+        // its one scenario. region 'meadowlands' keeps them out of the Azure Grove /
+        // GM fixtures' OWN picks (northreach / no region), which are manual too and
+        // name their own ids explicitly; no weather/timeOfDay constraint keeps them
+        // available. Library tasks are d100 drop-row gathers —
         // the per-scenario "state" (success / scene-block / tool-block / timed /
         // empty / blind) comes from the environment config or the drop-rate, since
         // progressive/check/catalyst/failure task resolution no longer exists.
@@ -3664,9 +3675,11 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
     const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-    // rc/ci gather env: MANUAL composition force-includes ONLY the guaranteed task
-    // and NO events, so the always-run inventory-delta assertion cannot be
-    // perturbed by a hazardous event flipping the outcome.
+    // rc/ci gather env: MANUAL composition picks ONLY the guaranteed task (issue
+    // 1315: manual composes exactly `enabledTaskIds`, so the id lives there rather
+    // than on a force list, which manual mode ignores) and NO events, so the
+    // always-run inventory-delta assertion cannot be perturbed by a hazardous event
+    // flipping the outcome.
     const rcGatherEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke RC Meadow',
@@ -3678,7 +3691,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       compositionMode: 'manual',
       region: 'northreach',
       biomes: ['forest'],
-      forcedTaskIds: [rcGatherTaskId]
+      enabledTaskIds: [rcGatherTaskId]
     });
     // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
     // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event.
@@ -4458,6 +4471,156 @@ async function installNotificationHidingCss(page) {
       }
     `
   });
+}
+
+/**
+ * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with
+ * a role flag naming the OLD id, the legacy flat scalar, one in-flight run of each kind at BOTH
+ * flag depths, one recorded alchemy dead end, and the persisted re-key map that drives the
+ * repair.
+ *
+ * The plan itself is computed by `scripts/lib/worldScopeIdentitySmoke.js` and unit-tested by
+ * `tests/world-scope-identity-smoke-plan.test.js`; nothing here decides what to write or what to
+ * expect. This function is the Foundry edge alone.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, actorId: string}} options
+ */
+async function setupWorldScopeIdentityFixture(page, { systemId, actorId }) {
+  const plan = planWorldScopeIdentitySmoke({
+    systemId,
+    oldComponentId: 'zzz-smoke-old-component',
+    newComponentId: 'aaa-smoke-new-component',
+    oldToolId: 'zzz-smoke-old-tool',
+    newToolId: 'aaa-smoke-new-tool',
+  });
+  const seeded = seededFlagPaths(plan);
+  return page.evaluate(
+    async ({ plan, seeded, actorId, namespace }) => {
+      const actor = game.actors.get(actorId);
+      if (!actor) throw new Error(`world-scope identity fixture requires actor ${actorId}`);
+      const item = actor.items.contents[0];
+      if (!item) throw new Error('world-scope identity fixture requires one owned item');
+
+      const before = {
+        rekeyMap: game.settings.get('fabricate', 'worldScopeRekeyMap'),
+        actorFlags: {},
+        itemFlags: {},
+      };
+      const readBack = (document, key, bare) =>
+        document.getFlag(namespace, bare ? key : `fabricate.${key}`) ?? null;
+      for (const entry of seeded) {
+        const target = entry.key.startsWith('roles.') || entry.key === 'componentId' ? 'itemFlags' : 'actorFlags';
+        const document = target === 'itemFlags' ? item : actor;
+        before[target][entry.key] = readBack(document, entry.key, entry.bare);
+      }
+
+      const write = (document, entry) =>
+        document.setFlag(namespace, entry.bare ? entry.key : `fabricate.${entry.key}`, entry.value);
+      await write(item, plan.componentFlag);
+      await write(item, plan.toolFlag);
+      await write(item, plan.legacyScalar);
+      await write(actor, plan.craftingRuns);
+      await write(actor, plan.salvageRuns);
+      await write(actor, plan.gatheringRuns);
+      await write(actor, plan.alchemyDeadEnds);
+      await game.settings.set('fabricate', 'worldScopeRekeyMap', plan.rekeyMap);
+
+      return { plan, seeded, actorId, itemId: item.id, before, namespace };
+    },
+    { plan, seeded, actorId, namespace: WORLD_SCOPE_SMOKE_FLAG_NAMESPACE }
+  );
+}
+
+/**
+ * Run the REAL repair and assert every FLAG VALUE it must have rewritten.
+ *
+ * THE FLAG-VALUE ASSERTION IS WHAT CARRIES FALSIFIABILITY. Every resolution outcome on this
+ * world stays green with `remapWorldScopeIdentityFlags` never written, because resolution falls
+ * through to the source-reference tier this change does not touch.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object}} options
+ */
+async function verifyWorldScopeIdentityRemap(page, { fixture }) {
+  const failures = await page.evaluate(async ({ fixture }) => {
+    const { plan, actorId, itemId, namespace } = fixture;
+    const summary = await game.fabricate.remapWorldScopeIdentityFlags();
+    if (!summary) return ['the repair reported nothing, so the re-key map was not pending'];
+
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    const read = (document, key, bare) =>
+      document?.getFlag(namespace, bare ? key : `fabricate.${key}`);
+    const expected = plan.expectations;
+    const problems = [];
+    const check = (label, actual, want) => {
+      if (JSON.stringify(actual) !== JSON.stringify(want)) {
+        problems.push(`${label}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual)}`);
+      }
+    };
+
+    check('roles.componentId', read(item, plan.componentFlag.key, false), expected.componentFlag);
+    check('roles.toolId', read(item, plan.toolFlag.key, false), expected.toolFlag);
+    check('legacy componentId scalar', read(item, 'componentId', false), expected.legacyScalar);
+
+    const crafting = read(actor, 'craftingRuns', false)?.active?.[expected.runIds.craftingRunId];
+    check('craftingRuns requirement componentId', crafting?.steps?.[0]?.requirements?.[0]?.componentId, expected.craftingRunComponentId);
+    check('craftingRuns step toolIds', crafting?.steps?.[0]?.toolIds, [expected.craftingRunToolId]);
+
+    const salvage = read(actor, 'salvageRuns', false)?.active?.[expected.runIds.salvageRunId];
+    check('salvageRuns componentId', salvage?.componentId, expected.salvageRunComponentId);
+
+    // THE OTHER DEPTH. `gatheringRuns` is written with a bare `setFlag`, so a pass that assumes
+    // the doubly-nested depth silently misses it and this assertion is the only thing that sees.
+    const gathering = read(actor, 'gatheringRuns', true)?.active?.[expected.runIds.gatheringRunId];
+    check('gatheringRuns toolIds (single-scope depth)', gathering?.toolIds, [expected.gatheringRunToolId]);
+
+    const [systemId] = Object.keys(plan.rekeyMap);
+    check('alchemyDeadEnds', read(actor, 'alchemyDeadEnds', false)?.[systemId], [
+      expected.alchemyDeadEndKey,
+    ]);
+    return problems;
+  }, { fixture });
+
+  if (failures.length > 0) {
+    throw new Error(`world-scope identity remap did not rewrite: ${failures.join('; ')}`);
+  }
+}
+
+/**
+ * Remove every flag and setting the fixture wrote, restoring what was there before.
+ *
+ * The restore runs in a `finally` and must tolerate a `null` handle, because `setup` itself can
+ * throw. The smoke world is REUSED across runs, so a skipped restore poisons every later run.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object|null}} options
+ */
+async function restoreWorldScopeIdentityFixture(page, { fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ fixture }) => {
+    const { seeded, actorId, itemId, before, namespace } = fixture;
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    for (const entry of seeded) {
+      const document = entry.key.startsWith('roles.') || entry.key === 'componentId' ? item : actor;
+      if (!document) continue;
+      const key = entry.bare ? entry.key : `fabricate.${entry.key}`;
+      const previous = (entry.key.startsWith('roles.') || entry.key === 'componentId'
+        ? before.itemFlags
+        : before.actorFlags)[entry.key];
+      // UNSET FIRST, ALWAYS. `Document#update`'s recursive merge never REMOVES a key, so writing
+      // the previous container back over a seeded one leaves every seeded run in it — and the
+      // smoke world is REUSED, so that residue outlives the run. Unsetting and then re-writing
+      // is the only sequence that leaves the world exactly as the fixture found it.
+      await document.unsetFlag(namespace, key);
+      if (previous !== null && previous !== undefined) {
+        await document.setFlag(namespace, key, previous);
+      }
+    }
+    await game.settings.set('fabricate', 'worldScopeRekeyMap', before.rekeyMap ?? {});
+  }, { fixture });
 }
 
 async function setupToolStudioFixture(page, { systemId, recipeId }) {
@@ -7884,6 +8047,16 @@ async function main() {
         const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+        // MANUAL composition (issue 1315): the `enabledTaskIds`/`enabledEventIds`
+        // below are the picked lists manual mode actually reads. At the point this
+        // fixture is created, `gatheringConfig` for this system holds no library
+        // tasks yet (the settings.set that seeds `smoke-forage-library` runs further
+        // down, once the library-owning fields it depends on exist), so automatic
+        // mode's match-the-library gate has nothing to match against and the
+        // environment would fail its "must have a task before enable" validation.
+        // Manual's gate only checks that the picked list is non-empty, so it needs
+        // no library at create time; by the time a player actually browses Azure
+        // Grove, the library (and the ids named here) exists and composes as picked.
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
@@ -7891,6 +8064,7 @@ async function main() {
           img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
+          compositionMode: 'manual',
           sceneUuid: azureGroveScene.uuid,
           region: 'northreach',
           biomes: ['forest', 'ruins'],
@@ -7907,39 +8081,39 @@ async function main() {
             name: 'Verdant Meadow',
             description: 'Open grassland thick with common herbs, easy to harvest.',
             img: 'icons/consumables/plants/grass-leaves-green.webp',
-            forcedTaskIds: ['smoke-meadow-herbs']
+            enabledTaskIds: ['smoke-meadow-herbs']
           },
           {
             name: 'Sunken Ruins',
             description: 'Half-drowned ruins where forgotten reagents still linger.',
             img: 'icons/environment/wilderness/wall-ruins.webp',
             sceneUuid: 'Scene.fabricateMissingGatheringScene',
-            forcedTaskIds: ['smoke-sunken-survey']
+            enabledTaskIds: ['smoke-sunken-survey']
           },
           {
             name: 'Crystal Thicket',
             description: 'A thicket of glittering crystal fronds, perilous to harvest by hand.',
             img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
-            forcedTaskIds: ['smoke-crystal-dew']
+            enabledTaskIds: ['smoke-crystal-dew']
           },
           {
             name: 'Timed Orchard',
             description: 'An orchard whose slow blooms ripen only with patience.',
             img: 'icons/consumables/fruit/apple-red-tree-green.webp',
-            forcedTaskIds: ['smoke-slow-bloom']
+            enabledTaskIds: ['smoke-slow-bloom']
           },
           {
             name: 'Withered Patch',
             description: 'A blighted patch picked all but bare.',
             img: 'icons/magic/fire/flame-burning-tree-stump.webp',
-            forcedTaskIds: ['smoke-withered-search']
+            enabledTaskIds: ['smoke-withered-search']
           },
           {
             name: 'Moonlit Blind Grove',
             description: 'A moonlit grove where harvests reveal themselves only once attempted.',
             img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
             selectionMode: 'blind',
-            forcedTaskIds: ['smoke-moonpetal']
+            enabledTaskIds: ['smoke-moonpetal']
           }
         ];
         for (const fixture of playerFixtureDefinitions) {
@@ -8695,7 +8869,7 @@ async function main() {
                 selectionMode: 'targeted',
                 sceneUuid: '',
                 compositionMode: 'manual',
-                forcedTaskIds: ['smoke-meadow-herbs'],
+                enabledTaskIds: ['smoke-meadow-herbs'],
                 includedRealmIds: [hiddenVale.id]
               });
             }
@@ -10525,6 +10699,49 @@ async function main() {
               recipeId: craftingSetup.healingPotionRecipeId,
               fixture,
             }),
+          });
+        }
+
+        // ── D0 section: world-scope identity-flag repair (issue 1363) ────────
+        // ACCEPTANCE CRITERION 6c, and the ONLY arm of criterion 6 that can fail on a live
+        // world. A stale `roles[<systemId>].componentId` names an id absent from the re-keyed
+        // candidate set, so tier 1 returns null and resolution falls through to the UNCHANGED
+        // source-reference tier — which means "owned copies still resolve", "a craft, a salvage
+        // and a gather succeed" and "every browser lists the same entities" are ALL TRUE with
+        // the repair never written. So this section asserts the FLAG VALUE ITSELF.
+        //
+        // Its fixture is purely ADDITIVE persisted state — one world setting and a handful of
+        // flags on ONE owned item and its actor — and the `finally` restore removes every one,
+        // so the section is net-zero even when it fails.
+        //
+        // `rethrow: true`, matching the Tool Studio section and NOT the Knowledge one. The
+        // shared scaffold reserves `false` for a purely EVIDENTIAL section, whose only cost on
+        // failure is its own frames; this section captures no frames at all and is pure
+        // behavioural assertion, so a failure here is a product regression that must abort the
+        // phase rather than be recorded and walked past.
+        // DELIBERATELY UNGATED by `shouldRunScreenshotSection`. Screenshot scoping decides which
+        // FRAMES a run captures, and this section captures none: it is acceptance criterion 6c's
+        // only runtime proof, and gating it on the `tools` token would skip the world-scope
+        // identity check in every scoped run that happens not to select a token unrelated to it.
+        //
+        // THE COST OF THAT PAIR IS STATED RATHER THAN LEFT TO BE DISCOVERED. Ungated plus
+        // `rethrow: true` means EVERY scoped screenshot run now pays this behavioural section, and
+        // a failure in it aborts the phase — costing every later section's frames, including ones
+        // the scoped run was invoked to capture. That is the deliberate trade: this is the only
+        // place the shipped flag repair is exercised against a live world, and a scoped run that
+        // silently skipped it would let a real regression reach `main` behind a green capture job.
+        // `craftingSetup` and `cleanup.crafterId` are both in scope for any run that reaches D0.
+        {
+          await runFixturedScreenshotSection({
+            results,
+            step: 'world-scope-identity-remap',
+            rethrow: true,
+            setup: () => setupWorldScopeIdentityFixture(page, {
+              systemId: craftingSetup.systemId,
+              actorId: cleanup.crafterId,
+            }),
+            exercise: (fixture) => verifyWorldScopeIdentityRemap(page, { fixture }),
+            restore: (fixture) => restoreWorldScopeIdentityFixture(page, { fixture }),
           });
         }
 

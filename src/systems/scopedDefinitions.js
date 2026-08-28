@@ -2,9 +2,14 @@
  * The generic three-layer resolution primitive behind Scoped Entity Definitions (issue 1358, part
  * of epic 1357), and the normalizers for the two records it resolves over.
  *
- * NOT YET LIVE. Nothing in the shipped runtime imports this module: the world-scope migration
- * (epic 1357, PR 3) is what makes it authoritative. Until then `## Component`,
- * `## EssenceDefinition` and `## Tool` describe what the code actually does, and
+ * NO LIVE RESOLUTION PATH REACHES THE THREE-LAYER RESOLVER YET, and the consumer sweep
+ * (epic 1357, PR 8a - the READ repointing half) is what changes that. The older claim here — "nothing in the shipped runtime
+ * imports this module" — was already false when it was written (`scopedDefinitionStore.js`
+ * imports `findWorldDefault` and `membershipKey`, and that store is reached from
+ * `CraftingSystemManager`) and `1.30.0` makes it emphatically false, because that store's read
+ * union is now correct for a migrated world and the tool scope's authority resolver is routed
+ * from four production readers. Until the sweep, `## Component`, `## EssenceDefinition` and
+ * `## Tool` still describe what the code actually resolves against, and
  * `## Scoped Entity Definitions` describes what this module implements.
  *
  * THE THREE LAYERS, in strict precedence:

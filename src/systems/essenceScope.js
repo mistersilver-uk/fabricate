@@ -9,8 +9,11 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The essence half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * NOT YET LIVE. `## EssenceDefinition` describes the shipped per-system shape and stays
- * authoritative until the world-scope migration (epic 1357, PR 3) lands.
+ * `## EssenceDefinition` describes the shipped per-system shape and stays authoritative until
+ * the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration
+ * (PR 3) seeds the world corpus this module reads and writes one fully-overriding membership
+ * record per essence; `essenceDefinitions` is the one of the three arrays the sweep can retire in
+ * full, and it is not retired here.
  *
  * TWO INDEPENDENT INHERIT SWITCHES, over `effectSource` and `macro`. They are two sections rather
  * than one because a system may reasonably take the world's active-effect source and author its
@@ -106,8 +109,10 @@ export function essenceCarriesBehaviour(resolved) {
  * THE READ UNION for an essence: what a crafting system's essences list IS (issue 1359).
  *
  * The world essences whose membership record for this system is PRESENT, each RESOLVED through the
- * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
- * an id collision.
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING
+ * FIELD BY FIELD on an id collision (issue 1363) rather than replacing the in-system record: the
+ * surviving record supplies every field no world layer owns — the in-system identity fields the consumer sweep has not yet repointed — and the world layer
+ * still wins every field it authors.
  *
  * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
  * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent

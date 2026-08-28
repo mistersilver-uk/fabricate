@@ -53,6 +53,17 @@
       },
       "UnifyModifiers": {
         "CollisionNotice": "Fabricate merged each system’s check modifiers and gathering character modifiers into one Modifiers library. {count} gathering modifier(s) in {systems} shared an id with a check modifier and were renamed with a \"-gathering\" suffix; every reference to them was updated. Review them under System settings › Modifiers."
+      },
+      "WorldScopeEntities": {
+        "Created": "Fabricate gave this world one shared record per component, essence and tool: {components} world component(s), {essences} world essence(s) and {tools} world tool(s). Every crafting system keeps exactly the behaviour it had.",
+        "Merged": "{count} of them were the same real item in more than one system and are now one record.",
+        "Renames": "{count} definition(s) took the oldest system’s identity or a new id, and every reference to them was rewritten: {renames}.",
+        "TransitiveGroups": "{count} group(s) were merged through a shared source item rather than directly. Check them in case two different things were joined.",
+        "Refusals": "{count} system(s) could not be re-keyed safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}.",
+        "FlaggedForReview": "{count} reference(s) already point at nothing, and Fabricate can now tell you which: {references}. Nothing has been removed - review them when you get a chance.",
+        "UnsafeSystemIds": "{count} crafting system id(s) contain a character Fabricate cannot use inside an item flag, so owned copies in them were left to resolve by their source item instead: {systems}.",
+        "LockedSkips": "{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by their source item.",
+        "SkippedErrors": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags()."
       }
     },
     "Canvas": {
@@ -4247,7 +4258,7 @@
           "TaskDcOverridePlaceholder": "System default"
         },
         "ListErgonomics": {
-            "CopyToPrerequisites": "Copy to prerequisites",
+          "CopyToPrerequisites": "Copy to prerequisites",
           "CopyToModifiers": "Copy to modifiers",
           "CopiedAnnouncement": "Copied {name} and icon — set the condition.",
           "MoveUp": "Move up",

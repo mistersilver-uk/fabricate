@@ -9,8 +9,11 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The tool half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * NOT YET LIVE. `## Tool` describes the shipped per-system shape and stays authoritative until the
- * world-scope migration (epic 1357, PR 3) lands.
+ * `## Tool` describes the shipped per-system shape and stays authoritative until the CONSUMER
+ * SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration (PR 3) is what
+ * makes THIS module live: `resolveToolBreakageAuthority` below is reached by the four non-UI
+ * effective-authority readers from that release onward, because the crafting-system normalizer
+ * became absence-preserving in the same change.
  *
  * THREE WORLD-DEFAULT SECTIONS, TWO OF THEM INHERITED. `breakage` and `onBreak` are ordinary
  * sections with their own inherit switches. `repairRequirements` is the third, and it is a SEED
@@ -26,7 +29,8 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * requirement 3). That is a hard block, not the essence's soft disable, and the two are
  * deliberately different meanings of one field name.
  *
- * THE BREAK MODE IS NOT A NEW FIELD. `resolveToolBreakageAuthority` resolves the SHIPPED
+ * THE BREAK MODE IS NOT A NEW FIELD, AND IT IS LIVE FROM `1.30.0`.
+ * `resolveToolBreakageAuthority` resolves the SHIPPED
  * `CraftingSystem.toolBreakage.authority` (`## CraftingSystem` requirement 21) over a world value
  * and a per-system override, carrying the same two tokens; the per-tool control under `checkDriven`
  * stays `checkBreakable`. The governing rule is unchanged and gains exactly one clause: SCOPE
@@ -74,7 +78,7 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
  * into a module whose whole point is that nothing depends on it yet, so the shipped copies are
  * held together by a drift guard in `tests/entity-scope-resolvers.test.js` that fails if the
  * literal stops matching this constant. That guard scrapes the first two files only; the Svelte
- * leaf is named here so epic 1357's consumer sweep (PR 8), which is what converges all three
+ * leaf is named here so epic 1357's consumer sweep (PR 8a), which is what converges all three
  * onto this one export, does not work from an undercount.
  *
  * @type {string}
@@ -244,8 +248,10 @@ export function toolAttemptBlockReason(resolved) {
  * THE READ UNION for a tool: what a crafting system's tools list IS (issue 1359).
  *
  * The world tools whose membership record for this system is PRESENT, each RESOLVED through the
- * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
- * an id collision.
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING
+ * FIELD BY FIELD on an id collision (issue 1363) rather than replacing the in-system record: the
+ * surviving record supplies every field no world layer owns — `componentId`, `label`, `requirement`, `prerequisites`, `bonus` and `checkBreakable` — and the world layer
+ * still wins every field it authors.
  *
  * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
  * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent

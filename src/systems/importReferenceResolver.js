@@ -22,6 +22,13 @@
  *   - `reported`  — needs GM attention (external absent, or broken internal)
  */
 
+import {
+  keyedRemapper,
+  rewriteGatheringSliceReferences,
+  rewriteRecipeReferences,
+  rewriteSystemReferences,
+} from '../migration/worldScopeReferenceRewrite.js';
+
 /** Reference kinds (also used as localization suffixes in the report). */
 export const REFERENCE_KINDS = Object.freeze({
   SOURCE_ITEM: 'sourceItem',
@@ -97,13 +104,21 @@ export function rebindCopyContainerIds(prepared, { generateId = localId } = {}) 
  * copy-import id-collision residual (two systems copy-imported from the same origin
  * export no longer share a component id).
  *
+ * THE TRAVERSAL ITSELF IS NOT HERE. Every reference site lives in the ONE shared walk
+ * `src/migration/worldScopeReferenceRewrite.js`, which this function and the `1.30.0`
+ * world-scope migration both drive (issue 1363). It was extracted because the two had
+ * already drifted: the copy-mode copy had accumulated three gaps — `onBreak.replacementTarget
+ * .componentId`, essence `sourceItemUuid` and `tool.repairRequirements[].options[]` — each of
+ * which left a dangling reference in an imported copy. This function keeps only what is
+ * copy-mode-specific: minting the new ids and rewriting the component ids themselves.
+ *
  * The rewrite is KEY-AWARE: it only rewrites a value that (a) sits at one of the
  * enumerated component-reference sites AND (b) equals an old component id. A value
  * at a non-reference position (a `recipeIds[]` entry, an outcome/salvage-group id, a
  * scene/macro UUID) is never touched even if it coincidentally equals a component id.
- * The traversal mirrors `src/migration/migrateComponentId.js` (recurses ingredient
- * `alternatives`, sweeps the flat `ingredients`/`results` aliases, and treats
- * `catalysts[]` as component-ref-bearing at four sites).
+ *
+ * TOOL IDS ARE NOT RE-KEYED BY COPY MODE, so the shared walk's tool-id sites are driven with
+ * an identity remapper and are provably inert here.
  *
  * @param {{ system: object, recipes: object[], gatheringConfig: object }} prepared
  * @param {{ generateId?: () => string }} [deps]
@@ -113,122 +128,27 @@ export function rebindCopyComponentIds(prepared, { generateId = localId } = {}) 
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes, gatheringConfig } = prepared;
 
-  // --- Old → new component-id map (built over system.components[].id only) ---
-  const idMap = new Map();
+  // --- Old -> new component-id map (built over system.components[].id only) ---
+  const idMap = {};
   const components = Array.isArray(system?.components) ? system.components : [];
   for (const component of components) {
     if (component && typeof component === 'object' && component.id) {
-      idMap.set(component.id, generateId());
+      idMap[component.id] = generateId();
     }
   }
-  if (idMap.size === 0) return prepared;
+  if (Object.keys(idMap).length === 0) return prepared;
 
   // Rewrite the component ids themselves.
   for (const component of components) {
-    if (component && typeof component === 'object' && component.id && idMap.has(component.id)) {
-      component.id = idMap.get(component.id);
+    if (component && typeof component === 'object' && component.id && idMap[component.id]) {
+      component.id = idMap[component.id];
     }
   }
 
-  const remap = (value) =>
-    typeof value === 'string' && idMap.has(value) ? idMap.get(value) : value;
-
-  // An ingredient/catalyst ref carries the component id via a `match` object OR the
-  // bare `componentId`/`systemItemId` fields, and recurses through `alternatives`.
-  const remapIngredientRef = (ref) => {
-    if (!ref || typeof ref !== 'object') return;
-    if (ref.match && typeof ref.match === 'object') {
-      if ('componentId' in ref.match) ref.match.componentId = remap(ref.match.componentId);
-      if ('systemItemId' in ref.match) ref.match.systemItemId = remap(ref.match.systemItemId);
-    }
-    if ('componentId' in ref) ref.componentId = remap(ref.componentId);
-    if ('systemItemId' in ref) ref.systemItemId = remap(ref.systemItemId);
-    for (const alt of arrayOf(ref.alternatives)) remapIngredientRef(alt);
-  };
-
-  const remapResultRef = (result) => {
-    if (!result || typeof result !== 'object') return;
-    if ('componentId' in result) result.componentId = remap(result.componentId);
-    if ('systemItemId' in result) result.systemItemId = remap(result.systemItemId);
-  };
-
-  const remapResultGroups = (resultGroups) => {
-    for (const group of arrayOf(resultGroups)) {
-      for (const result of arrayOf(group?.results)) remapResultRef(result);
-    }
-  };
-
-  const remapIngredientSet = (set) => {
-    if (!set || typeof set !== 'object') return;
-    for (const group of arrayOf(set.ingredientGroups)) {
-      for (const option of arrayOf(group?.options)) remapIngredientRef(option);
-    }
-    // Flat `ingredients[]` alias. Since issue 1135 `IngredientSet.toJSON` no longer emits it,
-    // but the read stays permanently: older exports and legacy flat-authored sets still carry
-    // it, and for those it is the set's only ingredient data. See § Write-Retired Aliases.
-    for (const ingredient of arrayOf(set.ingredients)) remapIngredientRef(ingredient);
-    // Legacy catalysts (defensive; site H).
-    for (const catalyst of arrayOf(set.catalysts)) remapIngredientRef(catalyst);
-  };
-
-  // --- Recipes: top-level and per-step ingredient / result / catalyst refs ---
-  for (const recipe of arrayOf(recipes)) {
-    if (!recipe || typeof recipe !== 'object') continue;
-    for (const set of arrayOf(recipe.ingredientSets)) remapIngredientSet(set);
-    remapResultGroups(recipe.resultGroups);
-    // Flat `results[]` alias (Recipe.toJSON re-emits it).
-    for (const result of arrayOf(recipe.results)) remapResultRef(result);
-    for (const catalyst of arrayOf(recipe.catalysts)) remapIngredientRef(catalyst);
-    for (const step of arrayOf(recipe.steps)) {
-      if (!step || typeof step !== 'object') continue;
-      for (const set of arrayOf(step.ingredientSets)) remapIngredientSet(set);
-      remapResultGroups(step.resultGroups);
-      for (const catalyst of arrayOf(step.catalysts)) remapIngredientRef(catalyst);
-    }
-  }
-
-  // --- Component salvage result refs + legacy salvage catalysts (sites F, H) ---
-  for (const component of components) {
-    const salvage = component?.salvage;
-    if (salvage && typeof salvage === 'object') {
-      remapResultGroups(salvage.resultGroups);
-      for (const catalyst of arrayOf(salvage.catalysts)) remapIngredientRef(catalyst);
-    }
-  }
-
-  // --- Essence source component (site E; canonical + legacy alias) ---
-  for (const def of arrayOf(system?.essenceDefinitions)) {
-    if (!def || typeof def !== 'object') continue;
-    if ('sourceComponentId' in def) def.sourceComponentId = remap(def.sourceComponentId);
-    if ('associatedSystemItemId' in def)
-      def.associatedSystemItemId = remap(def.associatedSystemItemId);
-  }
-
-  // --- Tool `componentId` + `onBreak.replacementComponentId` (sites C, D) ---
-  const remapTool = (tool) => {
-    if (!tool || typeof tool !== 'object') return;
-    if ('componentId' in tool) tool.componentId = remap(tool.componentId);
-    if (
-      tool.onBreak &&
-      typeof tool.onBreak === 'object' &&
-      'replacementComponentId' in tool.onBreak
-    ) {
-      tool.onBreak.replacementComponentId = remap(tool.onBreak.replacementComponentId);
-    }
-  };
-  for (const tool of arrayOf(system?.tools)) remapTool(tool);
-
-  const slice = systemSlice(gatheringConfig);
-  for (const tool of arrayOf(slice.tools)) remapTool(tool);
-
-  // --- Gathering task/event drop-row component refs (site G) ---
-  for (const record of [...arrayOf(slice.tasks), ...arrayOf(slice.events)]) {
-    for (const row of arrayOf(record?.dropRows)) {
-      if (!row || typeof row !== 'object') continue;
-      if ('componentId' in row) row.componentId = remap(row.componentId);
-      if ('systemItemId' in row) row.systemItemId = remap(row.systemItemId);
-    }
-  }
+  const remappers = { remapComponent: keyedRemapper(idMap), remapTool: (value) => value };
+  for (const recipe of arrayOf(recipes)) rewriteRecipeReferences(recipe, remappers);
+  rewriteSystemReferences(system, remappers);
+  rewriteGatheringSliceReferences(systemSlice(gatheringConfig), remappers);
 
   return prepared;
 }

@@ -571,7 +571,10 @@ test('the preference pass is omitted when the COMPONENT basis alone is incomplet
 
   const emitted = buildStartupPassList({
     candidates,
-    basis: { ...WHOLE_CORPUS_ID_BASIS, components: false },
+    // `componentIdentityRemap` is supplied TRUE so this arm isolates the `components: false`
+    // case. It is a separate kind (issue 1363) asking whether component ids are still CURRENT
+    // rather than whether the corpus is COMPLETE, and it has its own arm below.
+    basis: { ...WHOLE_CORPUS_ID_BASIS, components: false, componentIdentityRemap: true },
     declarations: MUTATION_CLEANUP_ENTITY_KINDS,
     onOmit: (omission) => omissions.push(omission),
   });
@@ -588,6 +591,47 @@ test('the preference pass is omitted when the COMPONENT basis alone is incomplet
       undeclared: false,
     },
   ]);
+});
+
+test('the preference pass is omitted when component ids are COMPLETE but not CURRENT', () => {
+  // The second, independent reason to withhold the same pass (issue 1363): the `1.30.0`
+  // migration MOVES component ids, and the pass that repairs every actor-side reference to
+  // them runs later. Completeness and CURRENCY are different questions, and the shared
+  // `WHOLE_CORPUS_ID_BASIS` only ever answered the first.
+  const omissions = [];
+  const emitted = buildStartupPassList({
+    candidates: [
+      ['orphaned learned recipes', () => {}],
+      ['orphaned crafting preferences', () => {}],
+    ],
+    basis: { ...WHOLE_CORPUS_ID_BASIS, componentIdentityRemap: false },
+    declarations: MUTATION_CLEANUP_ENTITY_KINDS,
+    onOmit: (omission) => omissions.push(omission),
+  });
+
+  assert.deepEqual(emitted.map(([label]) => label), ['orphaned learned recipes']);
+  assert.deepEqual(omissions, [
+    {
+      label: 'orphaned crafting preferences',
+      incompleteKinds: ['componentIdentityRemap'],
+      undeclared: false,
+    },
+  ]);
+});
+
+test('a caller that supplies NO basis for the new kind omits the pass, rather than running it', () => {
+  // FAIL CLOSED. `runGatedMutationCleanup` defaults to `WHOLE_CORPUS_ID_BASIS`, which does not
+  // carry `componentIdentityRemap` at all — so a caller that forgets to answer the currency
+  // question skips the sweep instead of pruning against ids that may have moved.
+  const omissions = [];
+  const emitted = buildStartupPassList({
+    candidates: [['orphaned crafting preferences', () => {}]],
+    basis: WHOLE_CORPUS_ID_BASIS,
+    declarations: MUTATION_CLEANUP_ENTITY_KINDS,
+    onOmit: (omission) => omissions.push(omission),
+  });
+  assert.deepEqual(emitted, []);
+  assert.deepEqual(omissions[0].incompleteKinds, ['componentIdentityRemap']);
 });
 
 test('a declared kind must be positively true, so a renamed key omits rather than runs', () => {
