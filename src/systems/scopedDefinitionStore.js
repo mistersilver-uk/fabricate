@@ -177,10 +177,34 @@ function membershipsForSystem(memberships, systemId) {
  * available in this change. This one answers what a system's entity list IS: the world entities
  * whose membership record for that system is PRESENT, resolved through #1358's three-layer
  * resolver, unioned with that system's surviving in-system array, WORLD WINNING on an id
- * collision. It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities — an
- * unfiltered union would give every system every world entity and delete the membership model
- * #1358 built, and a raw-entity union would hand back world defaults in place of a system's own
- * overrides, bypassing the inherit map.
+ * collision FIELD BY FIELD. It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw
+ * world entities — an unfiltered union would give every system every world entity and delete the
+ * membership model #1358 built, and a raw-entity union would hand back world defaults in place of
+ * a system's own overrides, bypassing the inherit map.
+ *
+ * ## "WORLD WINS" IS PER FIELD, AND WAS PER RECORD (issue 1363)
+ *
+ * The collision branch used to push the world-resolved entry, mark the id claimed, and then SKIP
+ * the legacy entry entirely. That was harmless only while nothing wrote the world corpus. After
+ * the `1.30.0` migration the in-system record and the world entity share an id BY CONSTRUCTION,
+ * so that skip would drop `salvage`, `essences`, `difficulty` and `complications` from EVERY
+ * component the union returns. The merge is `{ ...legacyEntry, ...entity, ...resolved }`: the
+ * in-system record supplies fields no world layer owns, and the world layer still wins every
+ * field it authors. Nothing about world precedence is weakened — it is corrected only in that a
+ * world record no longer ERASES disjoint in-system fields.
+ *
+ * TWO SPREAD HAZARDS, both real and both intended, stated here so neither is later read as a
+ * defect:
+ *
+ * - `resolveScopedDefinition` guards `undefined`, so `resolved` cannot blank a section.
+ *   `...entity` is NOT guarded that way: a world entity carrying an EMPTY-STRING `description`
+ *   or `img` overwrites a populated legacy one, because `normalizeWorldEntities` preserves every
+ *   authored field verbatim and enforces only an identity floor. That is world precedence working
+ *   as specified — an authored empty string is an authored value.
+ * - `resolveScopedDefinition` ALWAYS emits `member` and `inherited`, and for an enableable scope
+ *   ALWAYS emits `enabled`, so the merge overwrites a legacy `enabled` on essences and tools.
+ *   THAT IS INTENDED: after the migration the membership record is the only correct source of
+ *   `enabled` for a world-claimed essence or tool, and the legacy value is the pre-migration copy.
  *
  * The BASIS union (`CraftingSystemManager#_scopeBasis`) is deliberately NOT membership-filtered,
  * because #1358's membership requirement is that an absent record is a REFUSAL, never a PRUNE: a
@@ -215,11 +239,20 @@ export function unionScopedDefinitions({ corpus, systemId, systemDefinitions, re
     // `findMembership` scan per entity: the union is memoized, but a memo over an O(entities x
     // memberships) build is still an O(entities x memberships) build on every world edit.
     const bySystem = membershipsForSystem(memberships, system);
+    const byId = legacyById(legacy);
     for (const entity of entities) {
       const membership = bySystem.get(entity.id);
       if (!membership) continue;
       claimed.add(entity.id);
-      union.push({ ...entity, ...resolve(findWorldDefault(defaults, entity.id), membership) });
+      // FIELD BY FIELD, NOT RECORD BY RECORD (issue 1363). The surviving in-system record is
+      // spread FIRST, so it supplies every field no world layer owns, and the world layer still
+      // wins every field it authors. See the docblock for why this is not a weakening of
+      // "world wins".
+      union.push({
+        ...byId.get(entity.id),
+        ...entity,
+        ...resolve(findWorldDefault(defaults, entity.id), membership),
+      });
     }
   }
   for (const entry of legacy) {
@@ -229,6 +262,22 @@ export function unionScopedDefinitions({ corpus, systemId, systemDefinitions, re
     union.push(entry);
   }
   return union;
+}
+
+/**
+ * The legacy in-system records of one system, keyed by trimmed id.
+ *
+ * @param {Array<object>} legacy
+ * @returns {Map<unknown, object>}
+ */
+function legacyById(legacy) {
+  const byId = new Map();
+  for (const entry of legacy) {
+    const id = typeof entry?.id === 'string' ? entry.id.trim() : entry?.id;
+    if (id === undefined || id === null || byId.has(id)) continue;
+    byId.set(id, entry);
+  }
+  return byId;
 }
 
 /**

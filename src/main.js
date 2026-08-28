@@ -103,7 +103,7 @@ import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
@@ -112,7 +112,9 @@ import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAd
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
+import { mayClearWorldScopeRekeyMap, remapWorldScopeIdentityFlags } from './migration/remapWorldScopeIdentityFlags.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
+import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1652,6 +1654,26 @@ class Fabricate {
         entries: names,
       }) || `Fabricate merged every crafting system's character prerequisites and modifiers into one world library. ${characterLibraryCollisions.length} entr(ies) shared an id across systems but were defined differently, so only one definition survived: ${names}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources.`;
       ui.notifications?.warn?.(message, { permanent: true });
+    }
+
+    // 1.30.0 (issue 1363): what the world-scope entity migration actually did. The composition
+    // is NOT here — the counts, the rename list, the refusals and the newly-prunable references
+    // all live in `buildWorldScopeEntityNotice`, because nothing in this file can be executed by
+    // a unit test and a source-text grep can pin a DISPATCH but never a SUM. What remains here is
+    // the Foundry edge: the GM gate, the localizer, and the channel.
+    //
+    // The report is `null` unless the migration ran, and this consumer is guarded on it, so an
+    // omission anywhere in the four threading legs fails SILENT and the notice simply never
+    // appears — which is why the notice's PRESENCE is asserted by test rather than inferred.
+    const worldScopeEntityReport = summary?.worldScopeEntityReport ?? null;
+    if (worldScopeEntityReport && game.user?.isGM) {
+      const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, (key, data) =>
+        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+      );
+      if (notice.message) {
+        if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+        else ui.notifications?.info?.(notice.message);
+      }
     }
   }
 
@@ -4784,6 +4806,12 @@ Hooks.once('ready', async () => {
   // stamp so a fresh drag inherits the flag first, and reaches the copies already in
   // inventories that predate it.
   await runOwnedItemComponentIdentityRestamp();
+  // Issue 1363 (epic 1357, PR 3): remap the durable identity flags the 1.30.0 world-scope re-key
+  // invalidated. MUST run after the source-side component/tool stamps, whose targets this release
+  // bumps so a stale SOURCE leaf is rewritten by the stamp itself, and after the owned-item
+  // restamp, which never reaches this population because its planner returns early for any item
+  // already carrying a durable identity flag.
+  await runWorldScopeIdentityFlagRemap();
 
   // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
   // resolution and still show raw `@UUID[…]` text. A DETECTOR only — it scans
@@ -5133,6 +5161,89 @@ async function runOwnedItemComponentIdentityRestamp() {
     );
   } catch (error) {
     console.error('Fabricate | owned-item component identity re-stamp failed', error);
+  }
+}
+
+/**
+ * Issue 1363 (epic 1357, PR 3) — one-shot, active-GM-gated pass that remaps every durable
+ * identity flag the `1.30.0` world-scope re-key invalidated, driven by the persisted
+ * `fabricate.worldScopeRekeyMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
+ * what is here is the Foundry edge and the two gates, which are DIFFERENT gates and must stay so.
+ *
+ * WHETHER THE PASS RUNS is corpus-derived — the world scope is seeded — plus its own Number
+ * version. WHETHER IT MAY CLEAR THE MAP is gated separately, on the producing migration having
+ * COMPLETED. That separation is not defensive style; it is the only thing that keeps a torn
+ * migration recoverable. `_runMigrations()` is awaited at startup and its DEFERRED branch returns
+ * NORMALLY, so this pass runs on the SAME BOOT as a torn migration. The reachable sequence
+ * without the gate: the three scope legs land (they precede `craftingSystems`), so the corpus
+ * reads as seeded; this pass remaps, clears the map and advances its version; the next boot finds
+ * an already-re-keyed `craftingSystems`, re-derives an EMPTY map, never rewrites
+ * `gatheringConfig`'s old ids, and the newly-decidable basis prunes them permanently — and this
+ * pass will not re-run either, because its version was advanced.
+ *
+ * THE COMPARISON MUST BE `compareSemver`, NEVER A BARE JS `>=`. `migrationVersion` is a STRING
+ * setting, so `migrationVersion >= '1.30.0'` is LEXICOGRAPHIC and is TRUE for `'1.4.0'` through
+ * `'1.9.0'` — all six are registered migration versions, and they are the worlds running the
+ * longest multi-migration pass, i.e. the most tear-prone population there is. The gate would be
+ * defeated exactly where it is needed.
+ *
+ * AND WHEN THE CLEAR IS WITHHELD, THE VERSION ADVANCE IS WITHHELD WITH IT. The shipped one-shot
+ * precedent writes its version unconditionally at the end; a pass that skips the clear but
+ * advances its version short-circuits on every later boot and NEVER clears, leaving
+ * `fabricate.worldScopeRekeyMap` a permanently orphaned world setting. With both withheld the
+ * pass genuinely re-runs on a later boot and clears then, and re-running the remap is safe by the
+ * map-disjointness property the migration enforces.
+ */
+async function runWorldScopeIdentityFlagRemap() {
+  try {
+    // Active-GM only, so exactly one client performs the writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION)) >=
+      WORLD_SCOPE_IDENTITY_FLAG_TARGET
+    ) {
+      return;
+    }
+    const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    if (!rekeyMap || typeof rekeyMap !== 'object' || Object.keys(rekeyMap).length === 0) return;
+
+    const summary = await remapWorldScopeIdentityFlags({
+      actors: game.actors ?? [],
+      rekeyMap,
+      // Two depths, deliberately: the crafting and salvage containers, the roles map, the legacy
+      // scalar and `alchemyDeadEnds` are DOUBLY nested under `flags.fabricate.fabricate.<key>`,
+      // while `gatheringRuns` is written with a bare `setFlag` and lives at the SINGLE-scope
+      // `flags.fabricate.gatheringRuns`.
+      readFlag: (document, key, fallback = null, options = {}) =>
+        options.bare
+          ? (document?.getFlag?.('fabricate', key) ?? fallback)
+          : getFabricateFlag(document, key, fallback),
+      writeFabricateFlag: (document, key, value) => setFabricateFlag(document, key, value),
+      writeBareFlag: (document, key, value) => document?.setFlag?.('fabricate', key, value),
+    });
+    console.debug?.('Fabricate | world-scope identity flag remap complete', summary);
+
+    const notice = buildWorldScopeIdentityRemapNotice(summary, (key, data) =>
+      data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+    );
+    if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
+
+    // THE CLEAR, and the version advance, share ONE gate. See the docblock. The predicate lives
+    // in the pure module, on `compareSemver`, so it is unit-testable and so no reader can
+    // re-derive it as a bare JS `>=` on what is a STRING setting.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
+      console.warn(
+        'Fabricate | world-scope re-key map RETAINED: the 1.30.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    await setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
+    await setSetting(
+      SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,
+      WORLD_SCOPE_IDENTITY_FLAG_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | world-scope identity flag remap failed', error);
   }
 }
 
@@ -5601,6 +5712,7 @@ export {
   runComponentFlagAutoStamp,
   runToolFlagAutoStamp,
   runOwnedItemComponentIdentityRestamp,
+  runWorldScopeIdentityFlagRemap,
 };
 
 export default fabricate;

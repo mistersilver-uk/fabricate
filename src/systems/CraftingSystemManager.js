@@ -777,17 +777,29 @@ export class CraftingSystemManager {
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
       salvageResolutionMode,
-      // Tool-breakage authority (issue 419): `toolSpecific` (default, today's
-      // behaviour — each Tool's own mode decides, plus the legacy per-crit/per-tier
-      // `breakTools` force-break) | `checkDriven` (the active check's `checkBreakage`
-      // triggers decide whether ALL required tools break; per-tool modes are ignored
-      // except `immune`). Normalized on read (no versioned migration): unknown /
-      // missing → `toolSpecific`, mirroring the inline resolutionMode defaulters above.
-      toolBreakage: (function _normalizeToolBreakageAuthority(raw) {
-        const authority = ['toolSpecific', 'checkDriven'].includes(raw?.authority)
-          ? raw.authority
-          : 'toolSpecific';
-        return { authority };
+      // Tool-breakage authority (issue 419): `toolSpecific` (each Tool's own mode decides, plus
+      // the legacy per-crit/per-tier `breakTools` force-break) | `checkDriven` (the active
+      // check's `checkBreakage` triggers decide whether ALL required tools break; per-tool modes
+      // are ignored except `immune`).
+      //
+      // ABSENCE-PRESERVING SINCE 1.30.0 (issue 1363, epic 1357). It used to substitute
+      // `toolSpecific` for anything missing or unrecognised on EVERY normalize, which meant
+      // every persisted system carried a concrete value and the WORLD half of
+      // `resolveToolBreakageAuthority` was provably unreachable — the switch was registered and
+      // inert. Emitting NO KEY for an unauthored authority is the one flip that makes the world
+      // half reachable, and it is why `effectiveToolBreakageAuthority` exists: a reader that
+      // re-defaults locally re-creates the unreachability at its own call site.
+      //
+      // NOTHING IS DESTROYED BY THE FLIP. Every value already on disk was minted by the old
+      // normalizer, and the corpus cannot distinguish a minted `toolSpecific` from a deliberate
+      // one — so `## Scoped Entity Definitions` `### Tool scope` requirement 5 mandates treating
+      // every EXISTING value as AUTHORED. The `1.30.0` migration therefore writes no world
+      // authority and touches no system's value; the world half is reachable only for a system
+      // whose override is cleared, or one created afterwards.
+      ...(function _normalizeToolBreakageAuthority(raw) {
+        return ['toolSpecific', 'checkDriven'].includes(raw?.authority)
+          ? { toolBreakage: { authority: raw.authority } }
+          : {};
       })(system.toolBreakage),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(
         system.salvageCraftingCheck,

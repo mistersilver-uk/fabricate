@@ -69,6 +69,7 @@ import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
+import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import {
   appendToolBonusTerms,
   composeToolBonusTerms,
@@ -5023,8 +5024,10 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageBreakageDecision(system, checkResult) {
-    const authority =
-      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Routed through the world scope at issue 1363: the crafting-system normalizer is
+    // absence-preserving now, so a local `?? toolSpecific` here would silently ignore an
+    // authored world authority and make the flip inert at this reader.
+    const authority = effectiveToolBreakageAuthority(system);
     // Either-or authority (issue 419): a check can only break tools under
     // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
     // the check-driven force-break (and the routed per-tier legacy bridge) is not
@@ -5050,8 +5053,9 @@ export class CraftingEngine {
    * @private
    */
   _resolveCraftingBreakageDecision(system, recipe, checkResult) {
-    const authority =
-      system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    // Routed through the world scope at issue 1363, for the reason
+    // `_resolveSalvageBreakageDecision` states.
+    const authority = effectiveToolBreakageAuthority(system);
     // Either-or authority (issue 419): a check can only break tools under
     // `checkDriven`. Under `toolSpecific` tools break solely by their own modes, so
     // the check-driven force-break (and the routed per-tier legacy bridge) is not

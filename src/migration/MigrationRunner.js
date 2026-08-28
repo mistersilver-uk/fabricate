@@ -47,6 +47,7 @@ import { migrateTravelToWorldScope } from './migrateTravelToWorldScope.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
 import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
+import { migrateWorldScopeEntities } from './migrateWorldScopeEntities.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
 
@@ -621,6 +622,46 @@ const MIGRATIONS = [
     downgradeLosesData: true,
     migrate: (data) => migrateManualCompositionForces(data),
   },
+  {
+    version: '1.30.0',
+    label:
+      'Give the world ONE record per component, essence and tool, instead of one per crafting ' +
+      'system. The same real item registered in three systems was three unrelated records with ' +
+      'three names, three images and three descriptions; it is now one WORLD entity plus one ' +
+      'membership record per system. Records are merged by SOURCE ITEM — never by name, so two ' +
+      'unlinked entries that merely share a name are left alone — and the OLDEST contributing ' +
+      "system's identity wins the whole group, as a unit. Every rename is reported by name with " +
+      'the two systems it spans, and every other reference to a re-keyed id is rewritten across ' +
+      'your recipes, systems and gathering config in the same pass. NO SYSTEM CHANGES BEHAVIOUR: ' +
+      'every membership record is created fully OVERRIDING, so each system keeps exactly the ' +
+      'category, tags, effect source, macro, breakage, on-break and repair recipe it had, and ' +
+      'no world defaults are written at all — a system created later inherits nothing until you ' +
+      'author them. Essences are matched by id and are never re-keyed. Where a system could ' +
+      'not be re-keyed safely the pass REFUSES that system outright and reports it, rather than ' +
+      'making a definition unreachable. Owned items keep resolving throughout: their durable ' +
+      'identity flags are remapped by a one-shot pass on the next reload, and until it runs they ' +
+      'resolve by source item instead. TWO CAVEATS. Once the world scope is seeded, a reference ' +
+      'that already pointed at nothing becomes prunable on the next save — those are listed for ' +
+      'you. And DOWNGRADING IS LOSSLESS FOR DATA but pins one setting: 1.29.0 neither reads nor ' +
+      'writes the three world scope settings, so they survive untouched and a re-upgrade finds ' +
+      'them intact, but 1.29.0 re-mints a concrete "tool specific" breakage authority onto every ' +
+      'system, which pins a system out of a world authority that a later release lets you author',
+    downgradeTo: '1.29.0',
+    // DELIBERATELY NOT MARKED `downgradeLosesData`, and that is a CHECKED declaration rather
+    // than a copied one (issue 1363). The two candidate losses were each examined and each
+    // fails the test the registry applies: the merged identities are a loss at MIGRATION time
+    // rather than one the downgrade causes, and the three scope settings are PRESERVED as
+    // orphaned `Setting` documents that a re-upgrade finds intact. The `toolSpecific`
+    // re-minting is real, but it is DATA-lossless and BEHAVIOUR-relevant — the same fact
+    // `1.21.0` is deliberately not marked for — so it is stated as a caveat in the label and
+    // not claimed as data loss. `tests/world-scope-downgrade-declaration.test.js` holds both
+    // arms executable rather than asserted.
+    downgradeLosesData: false,
+    // Reports entities created, groups merged, every rename, refusals and the newly-prunable
+    // references through the transient `_worldScopeEntityReport` field (captured and deleted
+    // by the runner below for the GM notice).
+    migrate: (data) => migrateWorldScopeEntities(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -687,6 +728,7 @@ function emptyPassSummary(overrides = {}) {
     retiredCraftingModCounts: [],
     unifiedModifierCollisions: [],
     characterLibraryCollisions: [],
+    worldScopeEntityReport: null,
     ...overrides,
   };
 }
@@ -802,6 +844,10 @@ export class MigrationRunner {
     const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
     const rawTravelConfig = this._getSetting(SETTING_KEYS.TRAVEL_CONFIG) ?? {};
     const rawCharacterLibraries = this._getSetting(SETTING_KEYS.CHARACTER_LIBRARIES) ?? {};
+    const rawComponentScope = this._getSetting(SETTING_KEYS.COMPONENT_SCOPE) ?? {};
+    const rawEssenceScope = this._getSetting(SETTING_KEYS.ESSENCE_SCOPE) ?? {};
+    const rawToolScope = this._getSetting(SETTING_KEYS.TOOL_SCOPE) ?? {};
+    const rawWorldScopeRekeyMap = this._getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
@@ -811,6 +857,10 @@ export class MigrationRunner {
     const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
     const originalTravelConfigJson = JSON.stringify(rawTravelConfig);
     const originalCharacterLibrariesJson = JSON.stringify(rawCharacterLibraries);
+    const originalComponentScopeJson = JSON.stringify(rawComponentScope);
+    const originalEssenceScopeJson = JSON.stringify(rawEssenceScope);
+    const originalToolScopeJson = JSON.stringify(rawToolScope);
+    const originalWorldScopeRekeyMapJson = JSON.stringify(rawWorldScopeRekeyMap);
 
     let data = {
       recipes: rawRecipes,
@@ -821,6 +871,10 @@ export class MigrationRunner {
       currencyConfig: rawCurrencyConfig,
       travelConfig: rawTravelConfig,
       characterLibraries: rawCharacterLibraries,
+      componentScope: rawComponentScope,
+      essenceScope: rawEssenceScope,
+      toolScope: rawToolScope,
+      worldScopeRekeyMap: rawWorldScopeRekeyMap,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -961,6 +1015,18 @@ export class MigrationRunner {
     }
     delete data._characterLibraryCollisions;
 
+    // 1.30.0 reports what the world-scope entity migration did (issue 1363): entities created
+    // per type, groups merged, EVERY rename with its two systems, the `(system, entityType)`
+    // pairs it REFUSED to re-key, and the references the newly-decidable Valid Id Basis will
+    // prune on the next save. Captured for the GM notice and stripped so the transient field is
+    // never persisted — the loop above spread-merges a migration's return into the DATA payload
+    // rather than into this summary, so a report can only travel this way.
+    let worldScopeEntityReport = null;
+    if (data._worldScopeEntityReport && typeof data._worldScopeEntityReport === 'object') {
+      worldScopeEntityReport = data._worldScopeEntityReport;
+    }
+    delete data._worldScopeEntityReport;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -973,6 +1039,12 @@ export class MigrationRunner {
     const travelConfigChanged = JSON.stringify(data.travelConfig) !== originalTravelConfigJson;
     const characterLibrariesChanged =
       JSON.stringify(data.characterLibraries) !== originalCharacterLibrariesJson;
+    const componentScopeChanged =
+      JSON.stringify(data.componentScope) !== originalComponentScopeJson;
+    const essenceScopeChanged = JSON.stringify(data.essenceScope) !== originalEssenceScopeJson;
+    const toolScopeChanged = JSON.stringify(data.toolScope) !== originalToolScopeJson;
+    const worldScopeRekeyMapChanged =
+      JSON.stringify(data.worldScopeRekeyMap) !== originalWorldScopeRekeyMapJson;
 
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
@@ -985,6 +1057,30 @@ export class MigrationRunner {
     // write is a dangling reference the re-run cannot reconstruct, since the source fields
     // have already been consumed.
     // ---------------------------------------------------------------------------
+    // `worldScopeRekeyMap` is written BEFORE EVERY OTHER LEG, `recipes` included (issue 1363).
+    // It is the `1.30.0` pass's DURABLE DECISION RECORD: it carries the old-to-new id pairs, so
+    // a tear at ANY later leg leaves a re-run able to finish the rewrite whichever legs landed —
+    // in particular the `craftingSystems`-then-`gatheringConfig` tear, where `craftingSystems`
+    // no longer holds the old ids and re-deriving the map from it would answer EMPTY.
+    //
+    // Writing it ahead of `recipes` is strictly safer than the 0.6.0 ordering constraint the
+    // recipes-first comment below records, because it touches neither `recipes` nor `systems`,
+    // and a rejection here abandons everything under the same `_deferOnWriteFailure`
+    // disposition.
+    //
+    // IT CARRIES ITS OWN CONTAINMENT, and that is not decoration: this leg sits OUTSIDE both
+    // shipped try/catch blocks — the recipes leg's own and the big one below — so an escaping
+    // rejection would propagate out of `run()` past a caller with no `catch`. The hook
+    // dispatcher's try/catch is synchronous, so a rejection out of the module's async `ready`
+    // callback fires no error hook and no notification, leaves the readiness promise unsettled
+    // and the module with no managers.
+    if (worldScopeRekeyMapChanged) {
+      try {
+        await this._setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, data.worldScopeRekeyMap);
+      } catch (error) {
+        return this._deferOnWriteFailure(error);
+      }
+    }
     if (recipesChanged) {
       try {
         await this._recipeCorpus.createOrUpdateAll(data.recipes);
@@ -1028,6 +1124,22 @@ export class MigrationRunner {
       if (characterLibrariesChanged) {
         await this._setSetting(SETTING_KEYS.CHARACTER_LIBRARIES, data.characterLibraries);
       }
+      // The three world-scope entity settings are the FOURTH, FIFTH and SIXTH destinations
+      // written before their source (issue 1363), for the identical reason: `1.30.0` lifts one
+      // world entity per group out of the systems and re-keys the systems to match, so a tear
+      // after the systems write would leave every system re-keyed and the world roster empty.
+      // Unlike the three lifts above, the re-run WOULD still recover — the persisted re-key map
+      // is what makes that true — but destination-before-source keeps the recovery cheap and
+      // keeps this migration inside the ordering rule the three before it established.
+      if (componentScopeChanged) {
+        await this._setSetting(SETTING_KEYS.COMPONENT_SCOPE, data.componentScope);
+      }
+      if (essenceScopeChanged) {
+        await this._setSetting(SETTING_KEYS.ESSENCE_SCOPE, data.essenceScope);
+      }
+      if (toolScopeChanged) {
+        await this._setSetting(SETTING_KEYS.TOOL_SCOPE, data.toolScope);
+      }
       if (systemsChanged) {
         await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
@@ -1061,6 +1173,7 @@ export class MigrationRunner {
       retiredCraftingModCounts,
       unifiedModifierCollisions,
       characterLibraryCollisions,
+      worldScopeEntityReport,
     };
   }
 

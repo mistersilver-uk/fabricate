@@ -85,6 +85,7 @@ import { readStackQuantity } from './itemStackQuantity.js';
 // leaf, so it adds no transitive edge.
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
@@ -1877,7 +1878,10 @@ export class InventoryListingBuilder {
 
     // The projection. Never under checkDriven: usage still accrues there, but it
     // decides nothing.
-    if (system?.toolBreakage?.authority === 'checkDriven') return false;
+    // Routed through the world scope at issue 1363: with an absence-preserving crafting-system
+    // normalizer, re-defaulting locally would render the row "Broken" under an authored world
+    // `checkDriven` authority, which is the exact projection this gate exists to withhold.
+    if (effectiveToolBreakageAuthority(system) === 'checkDriven') return false;
     // The caller supplies the Tool. It used to be found here by `componentId`, which made
     // the exhaustion projection unreachable for an item-sourced Tool (issue 1119) — and
     // reachable for a component-linked one only by luck, since two tools may link one

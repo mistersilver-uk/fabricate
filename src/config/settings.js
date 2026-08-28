@@ -74,6 +74,12 @@ export const SETTING_KEYS = Object.freeze({
   COMPONENT_SCOPE: 'componentScope',
   ESSENCE_SCOPE: 'essenceScope',
   TOOL_SCOPE: 'toolScope',
+  // Issue 1363 (epic 1357, PR 3): the `1.30.0` migration's DURABLE DECISION RECORD — the
+  // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
+  // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
+  // the one-shot `ready` pass that restamps owned-Item identity flags consumes it and clears
+  // it. There is no essence leg, because essences group by id and their ids are never re-keyed.
+  WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -115,6 +121,13 @@ export const SETTING_KEYS = Object.freeze({
   // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
   // once the pass has run so it never repeats.
   OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
+  // Issue 1363 (epic 1357, PR 3): version stamp for the one-shot active-GM pass that remaps the
+  // durable identity flags the `1.30.0` re-key invalidates. A NUMBER, deliberately, and not a
+  // semver string: the gate is a numeric `>=` and `MigrationRunner.compareSemver` is not on this
+  // path. It gates whether the pass RUNS; whether the pass may DESTROY the re-key map is gated
+  // separately on `migrationVersion`, because a `ready`-body one-shot runs even when the
+  // migration pass DEFERRED.
+  WORLD_SCOPE_IDENTITY_FLAG_VERSION: 'worldScopeIdentityFlagVersion',
   // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
   // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
   // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
@@ -137,19 +150,34 @@ export const RECIPE_ITEM_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot component flag auto-stamp (issue 556). When the
 // stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill
-// once on `ready` and writes this value back.
-export const COMPONENT_FLAG_STAMP_TARGET = 1;
+// once on `ready` and writes this value back. Bumped 1 -> 2 by issue 1363: the `1.30.0`
+// world-scope migration RE-KEYS component ids, so every source Item stamped at v1 carries a
+// `roles[systemId].componentId` naming a retired id. The source-side writer overwrites when
+// the stored value differs, so re-running the stamp is what repairs the SOURCE half; the
+// OWNED half is the separate `remapWorldScopeIdentityFlags` pass, because the shipped
+// owned-item restamp returns early for any item that already carries a durable identity flag
+// — precisely the population the re-key invalidates.
+export const COMPONENT_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
 // `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
 // (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
-export const TOOL_FLAG_STAMP_TARGET = 1;
+// Bumped 1 -> 2 by issue 1363, for the reason `COMPONENT_FLAG_STAMP_TARGET` states: `1.30.0`
+// re-keys tool ids too.
+export const TOOL_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase
 // 2). When the stored `OWNED_ITEM_COMPONENT_STAMP_VERSION` is below this, the active GM runs
 // the name-fallback back-fill once on `ready` (AFTER the source-side component auto-stamp)
 // and writes this value back.
 export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
+
+// The target version for the one-shot world-scope identity-flag remap (issue 1363, epic 1357).
+// When the stored `WORLD_SCOPE_IDENTITY_FLAG_VERSION` is below this AND the world scope corpus is
+// seeded, the active GM runs the remap once on `ready` and writes this value back — UNLESS it
+// withheld the re-key map clear, in which case it withholds this advance too, so the pass genuinely
+// re-runs on a later boot rather than orphaning the map forever.
+export const WORLD_SCOPE_IDENTITY_FLAG_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -206,6 +234,16 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.TOOL_SCOPE]: {
     name: 'World Tool Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1363. TRANSIENT: written as the FIRST leg of the `1.30.0` migration's writeback and
+  // cleared by the one-shot `ready` pass that consumes it. `scope: 'world'` because it is the
+  // decision record of a world-scope migration and every client must see the same one.
+  [SETTING_KEYS.WORLD_SCOPE_REKEY_MAP]: {
+    name: 'World Scope Re-key Map',
     scope: 'world',
     config: false,
     type: Object,
@@ -385,6 +423,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION]: {
     name: 'Owned Item Component Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION]: {
+    name: 'World Scope Identity Flag Version',
     scope: 'world',
     config: false,
     type: Number,

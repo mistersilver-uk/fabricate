@@ -10,8 +10,11 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The component half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * NOT YET LIVE. `## Component` describes the shipped per-system shape and stays authoritative
- * until the world-scope migration (epic 1357, PR 3) lands.
+ * `## Component` describes the shipped per-system shape and stays authoritative until the
+ * CONSUMER SWEEP (epic 1357, PR 8) repoints the readers. The `1.30.0` world-scope migration
+ * (PR 3) makes this module's read union correct for a migrated world and seeds the world corpus
+ * it reads; it deliberately does NOT shed the in-system array, because every lifted field still
+ * has live production readers.
  *
  * A COMPONENT MEMBERSHIP RECORD CARRIES NO `enabled` FLAG, and that absence is STRUCTURAL rather
  * than conventional. The maintainer ruling behind epic 1357 is that essence enabling toggles
@@ -245,8 +248,10 @@ export function resolveComponent(worldDefault, membership) {
  * THE READ UNION for a component: what a crafting system's components list IS (issue 1359).
  *
  * The world components whose membership record for this system is PRESENT, each RESOLVED through the
- * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING on
- * an id collision.
+ * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING
+ * FIELD BY FIELD on an id collision (issue 1363) rather than replacing the in-system record: the
+ * surviving record supplies every field no world layer owns — `essences`, `salvage`, `difficulty` and `complications` — and the world layer
+ * still wins every field it authors.
  *
  * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
  * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
