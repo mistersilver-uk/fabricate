@@ -35,6 +35,14 @@ const { migrateExportPayload } = await import('../src/migration/migrateExportPay
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { reportWorldIdentityDrift } = await import('../src/systems/worldIdentityDrift.js');
 const { REFERENCE_KINDS } = await import('../src/systems/importReferenceResolver.js');
+const { buildWorldScopeGrouping } = await import(
+  '../src/migration/worldScopeEntityGrouping.js'
+);
+const { migrateWorldScopeEntities } = await import(
+  '../src/migration/migrateWorldScopeEntities.js'
+);
+const { resolveComponentScope } = await import('../src/systems/componentScope.js');
+const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SYSTEM_ID = 'sys-source';
@@ -460,6 +468,132 @@ test('14: the three layers merge INDEPENDENTLY, with all three destination sub-k
     persisted.defaults['dest-1'],
     { id: 'dest-1', category: 'kept' },
     'and the DESTINATION wins its own id, never re-examined'
+  );
+});
+
+test('14: the DEFAULTS and MEMBERSHIP destination-wins guards, with a COLLIDING incoming record', async () => {
+  // THE ARM THE TEST ABOVE CANNOT CARRY. Its incoming slice names ids the destination does not
+  // hold, so `defaults` and `membership` never collide and BOTH destination-wins guards are
+  // unexercised: removing either leaves it green. This is the hand-edit-destruction class the
+  // character-libraries merge already guards, on the side the world-scope merge owns — and the
+  // merge is nominated as the repair path for a TORN import, so a merge that overwrites on the
+  // second run repairs nothing and destroys the GM's own edits instead.
+  //
+  // REDDENS WHEN: the `defaults` destination-wins guard is dropped — the destination's category
+  // becomes the incoming one; and INDEPENDENTLY when the `membership` guard is dropped — the
+  // destination's hand-edited membership record is replaced by the derived one.
+  const world = await destinationWorld({
+    componentScope: {
+      entities: [{ id: 'c1', name: 'Destination c1', originItemUuid: 'Item.c1' }],
+      defaults: { c1: { id: 'c1', category: 'destination-cat' } },
+      membership: {
+        [`c1|${SOURCE_SYSTEM_ID}`]: membershipRecord('c1', SOURCE_SYSTEM_ID, {
+          inherit: { category: false },
+          category: 'destination-member',
+        }),
+      },
+    },
+    essenceScope: emptySeededScope(),
+    toolScope: emptySeededScope(),
+    // The destination already runs a system under the payload's own id, so the resolved system id
+    // equals it and the incoming membership record lands on the SAME `(entityId, systemId)` key.
+    systems: [{ id: SOURCE_SYSTEM_ID, name: 'Source System', components: [] }],
+  });
+
+  const { summary } = await runImport(
+    world,
+    envelope({
+      system: {
+        components: [
+          component('c1', { name: 'Incoming c1', category: 'incoming-cat' }),
+          component('c2', { name: 'Incoming c2', category: 'other-cat' }),
+        ],
+      },
+    })
+  );
+  assert.equal(summary.system.id, SOURCE_SYSTEM_ID, 'the import landed in the destination system');
+
+  const persisted = world.persisted('components');
+  assert.equal(
+    persisted.defaults.c1.category,
+    'destination-cat',
+    'a COLLIDING defaults record loses to the destination and is never re-examined'
+  );
+  assert.equal(
+    persisted.membership[`c1|${SOURCE_SYSTEM_ID}`].category,
+    'destination-member',
+    "a COLLIDING membership record loses to the destination, hand edits and all"
+  );
+
+  // The positive half, so neither assertion above can pass because the merge simply did nothing.
+  assert.equal(persisted.defaults.c2.category, 'other-cat', 'the NON-colliding default landed');
+  assert.ok(
+    persisted.membership[`c2|${SOURCE_SYSTEM_ID}`],
+    'and so did the non-colliding membership record'
+  );
+});
+
+test('the merge REPORTS a default and a membership record naming an absent world entity', async () => {
+  // `worldEntityMissing` at BOTH emission sites — the defaults leg and the membership leg — each
+  // of which survives being disabled on its own. The payload is HAND-AUTHORED because the shipped
+  // exporter cannot produce one: `entities` is filtered to the ids membership names. The merge
+  // must still handle it, because validation accepts any well-shaped slice.
+  //
+  // REDDENS WHEN: either emission is deleted — the count drops from two to one, and the two
+  // entries are distinguished by their `referenceValue` so neither can cover for the other.
+  const world = await seededEmptyWorld();
+  const { summary } = await runImport(
+    world,
+    envelope({
+      system: { components: [component('c1', { category: 'ore' })] },
+      componentScope: slice({
+        entities: [],
+        defaults: [{ id: 'ghost-default', category: 'x' }],
+        membership: [membershipRecord('ghost-member', SOURCE_SYSTEM_ID)],
+      }),
+    })
+  );
+
+  assert.deepEqual(
+    reported(summary, REFERENCE_KINDS.WORLD_ENTITY_MISSING)
+      .map((entry) => entry.referenceValue)
+      .sort(),
+    ['ghost-default', 'ghost-member'],
+    'both the dangling world default and the dangling membership record are reported'
+  );
+});
+
+test('the merge REPORTS a keep-mode world entity id collision on a disjoint tool', async () => {
+  // `reportWorldEntityCollision`'s output reaching the import summary. It RESOLVES, to the wrong
+  // thing: the incoming tool takes an id the destination already uses for a DIFFERENT item, so the
+  // imported system's membership record binds to an unrelated world record. Keep mode must not
+  // regenerate anything, so it is reported and not repaired.
+  //
+  // REDDENS WHEN: the reporter's output is dropped rather than pushed onto the prepared payload.
+  const world = await destinationWorld({
+    componentScope: emptySeededScope(),
+    essenceScope: emptySeededScope(),
+    toolScope: {
+      entities: [{ id: 't1', name: 'Destination hammer', registeredItemUuid: 'Item.dest' }],
+      defaults: {},
+      membership: {},
+    },
+  });
+
+  const { summary } = await runImport(
+    world,
+    envelope({
+      system: {
+        tools: [{ id: 't1', name: 'Source hammer', registeredItemUuid: 'Item.src' }],
+      },
+    })
+  );
+
+  const collisions = reported(summary, REFERENCE_KINDS.WORLD_ENTITY_COLLISION);
+  assert.deepEqual(
+    collisions.map((entry) => [entry.ownerType, entry.referenceValue]),
+    [['tool', 't1']],
+    'the colliding tool id is reported against the tool owner type'
   );
 });
 
@@ -976,6 +1110,185 @@ test('19: a multi-match binds to the largest intersection, reports the losers, a
 });
 
 // ---------------------------------------------------------------------------
+// Criterion 9a — the copy-mode binding is INJECTIVE, through the ID-CLAIM LADDER
+// ---------------------------------------------------------------------------
+
+/**
+ * A destination scope built by the SHIPPED `1.30.0` migration over an ordinary two-system corpus,
+ * NOT by hand — which is the whole point of the fixture.
+ *
+ * The two systems' components are connected through one shared alias, so ruling 3's union folds
+ * both their references onto ONE world entity, whose set is therefore WIDER than either
+ * contributor's. Nothing is contrived: this is the plain "two worlds registered the same item by
+ * different routes" shape that union exists to serve, and the corpus is accepted with ZERO
+ * refusals.
+ *
+ * @returns {object} the persisted `componentScope` value.
+ */
+function widenedDestinationScope() {
+  const systems = [
+    {
+      id: 'world-a',
+      name: 'World A',
+      components: [
+        {
+          id: 'W9',
+          name: 'Iron ingot',
+          registeredItemUuid: 'Item.iron',
+          aliasItemUuids: ['Item.bar'],
+        },
+      ],
+      essenceDefinitions: [],
+      tools: [],
+    },
+    {
+      id: 'world-b',
+      name: 'World B',
+      components: [
+        {
+          id: 'B1',
+          name: 'Steel ingot',
+          registeredItemUuid: 'Item.steel',
+          aliasItemUuids: ['Item.bar'],
+        },
+      ],
+      essenceDefinitions: [],
+      tools: [],
+    },
+  ];
+  assert.deepEqual(
+    buildWorldScopeGrouping(systems).refusals,
+    [],
+    'the destination corpus is ACCEPTED WHOLE — it is an ordinary corpus, not a refusal case'
+  );
+  const migrated = migrateWorldScopeEntities({ systems, recipes: [], gatheringConfig: {} });
+  return migrated.componentScope;
+}
+
+/** Two incoming components that share NOTHING with each other, plus a recipe that names both. */
+function disjointPairPayload() {
+  return {
+    ...envelope({
+      system: {
+        components: [
+          { id: 'c1', name: 'Iron ingot', registeredItemUuid: 'Item.iron' },
+          { id: 'c2', name: 'Steel ingot', registeredItemUuid: 'Item.steel' },
+        ],
+      },
+    }),
+    recipes: [
+      {
+        id: 'r1',
+        name: 'Alloy',
+        craftingSystemId: SOURCE_SYSTEM_ID,
+        ingredientSets: [
+          {
+            id: 'set-1',
+            ingredientGroups: [
+              { id: 'g1', options: [{ id: 'o1', componentId: 'c1', quantity: 1 }] },
+              { id: 'g2', options: [{ id: 'o2', componentId: 'c2', quantity: 1 }] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test('9a: two incoming components intersecting ONE destination entity keep TWO ids', async () => {
+  // THE BINDING MUST BE INJECTIVE. "Intersects a destination entity" is not an equivalence
+  // relation over the incoming records — `c1{Item.iron}` and `c2{Item.steel}` share nothing with
+  // each other and both intersect the entity whose set ruling 3's union WIDENED — so it cannot
+  // partition them, and a binding that lets both take one destination id loses the second WHOLE
+  // and SILENTLY: `_normalizeSystem` keeps only the last of a duplicate id and the read union
+  // de-duplicates by entity id, with no error anywhere and a toast still reporting 2 components.
+  //
+  // REDDENS WHEN: the `claimed` ladder is removed, so both records bind to the contested id —
+  // arms (i) to (iv) fail.
+  // AND INDEPENDENTLY WHEN: the ladder's middle rung is replaced by an immediate mint — arms (i)
+  // to (iv) stay green while (v) and (vi) fail, because mint-immediately is neither idempotent
+  // nor order-stable.
+  const scope = widenedDestinationScope();
+  assert.equal(scope.entities.length, 1, 'the two source systems produced ONE world entity');
+  const contestedId = scope.entities[0].id;
+
+  const world = await destinationWorld({
+    componentScope: scope,
+    essenceScope: emptySeededScope(),
+    toolScope: emptySeededScope(),
+  });
+
+  const first = await runImport(world, disjointPairPayload(), { mode: 'copy' });
+  const boundIds = first.packData.system.components.map((entry) => entry.id);
+
+  // (i) The two components keep two DISTINCT ids.
+  assert.equal(new Set(boundIds).size, 2, 'the two incoming components hold two DISTINCT ids');
+  assert.ok(boundIds.includes(contestedId), 'and one of them is the destination entity they share');
+
+  // (ii) The recipe's two ingredient groups still name two DIFFERENT components.
+  const groups = first.packData.recipes[0].ingredientSets[0].ingredientGroups;
+  assert.equal(
+    new Set(groups.map((group) => group.options[0].componentId)).size,
+    2,
+    'the recipe still distinguishes its two ingredient groups'
+  );
+
+  // (iii) The read union over the MERGED destination answers TWO records, not one.
+  const union = resolveComponentScope(
+    world.stores.components.corpus(),
+    first.summary.system.id,
+    first.packData.system.components
+  );
+  assert.equal(union.length, 2, 'the merged destination resolves TWO components for this system');
+
+  // (iv) The contention is REPORTED, naming the contested destination id and BOTH owners.
+  const contended = reported(first.summary, REFERENCE_KINDS.WORLD_ENTITY_COLLISION).filter(
+    (entry) => entry.referenceValue === contestedId
+  );
+  assert.deepEqual(
+    [...new Set(contended.map((entry) => entry.ownerId))].sort(),
+    ['c1', 'c2'],
+    'the contested destination id is reported against BOTH incoming records'
+  );
+
+  // (v) A re-run adds ZERO further world entities — the record that minted last time binds to the
+  // entity it minted, which is what the middle rung buys and an immediate mint does not.
+  const rosterAfterFirst = world.persisted('components').entities.map((entity) => entity.id);
+  assert.equal(rosterAfterFirst.length, 2, 'the first copy minted exactly one entity');
+  await runImport(world, disjointPairPayload(), { mode: 'copy' });
+  assert.deepEqual(
+    world.persisted('components').entities.map((entity) => entity.id),
+    rosterAfterFirst,
+    're-running the same copy import adds NO further world entity'
+  );
+
+  // (vi) Reversing the destination roster does not change the map. Roster order is the key order
+  // of a persisted setting that nothing in this pipeline sorts, so a rule that is order-sensitive
+  // here is a rule whose answer depends on which world wrote its setting first.
+  const naturalIndex = world.worldEntityIndex();
+  const reversedIndex = {
+    ...naturalIndex,
+    components: [...naturalIndex.components].reverse(),
+  };
+  const natural = prepareForImport(disjointPairPayload(), 'copy', {
+    worldEntityIndex: naturalIndex,
+  });
+  const reversed = prepareForImport(disjointPairPayload(), 'copy', {
+    worldEntityIndex: reversedIndex,
+  });
+  assert.deepEqual(
+    natural.system.components.map((entry) => entry.id).sort(),
+    [...rosterAfterFirst].sort(),
+    'both records bind to the merged roster rather than minting'
+  );
+  assert.deepEqual(
+    reversed.system.components.map((entry) => entry.id),
+    natural.system.components.map((entry) => entry.id),
+    'reversing the destination roster does not change the map'
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Criterion 10 — copy mode without an index FAILS rather than minting
 // ---------------------------------------------------------------------------
 
@@ -1086,6 +1399,99 @@ test('11: the index the call sites build has CONTENTS, and the contents are what
     worldEntityIndex: { components: [], essences: [], tools: [] },
   });
   assert.notEqual(minted.system.components[0].id, 'dest-1', 'an EMPTY index mints instead');
+});
+
+/** The `new CompendiumImporter(...)` seam object one production source file writes. */
+function importerConstructionSite(source) {
+  const start = source.indexOf('new CompendiumImporter(');
+  assert.ok(start >= 0, 'located the CompendiumImporter construction');
+  const end = source.indexOf('});', start);
+  assert.ok(end > start, 'located the end of its seam object');
+  return source.slice(start, end);
+}
+
+test('11: both CompendiumImporter call sites INJECT the three world-scope store seams', () => {
+  // THE MERGE'S ONLY PRODUCTION WIRING, and it fails CLOSED: an absent seam SKIPS the merge and
+  // reports nothing, so a call site that never injected them would leave every world-scope import
+  // silently doing nothing while the toast still said "Imported <system> with N components".
+  //
+  // The seam names are read out of the importer's own declaration rather than written down twice,
+  // so RENAMING one reddens this test instead of quietly unwiring both call sites.
+  //
+  // REDDENS WHEN: a seam is deleted from either call site, or renamed on one side only.
+  const importerSource = readFileSync(resolve(ROOT, 'src/systems/CompendiumImporter.js'), 'utf8');
+  const seamBlock = /_scopeStoreSeams = \{([\s\S]*?)\};/.exec(importerSource);
+  assert.ok(seamBlock, "located the importer's world-scope seam block");
+  const seamNames = [...seamBlock[1].matchAll(/seams\.(\w+)/g)].map((match) => match[1]);
+  assert.deepEqual(
+    seamNames,
+    ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore'],
+    'the importer gained or lost a world-scope seam — pin it in both call-site guards below first'
+  );
+
+  const sites = {
+    'src/main.js': readFileSync(resolve(ROOT, 'src/main.js'), 'utf8'),
+    'src/ui/SvelteCraftingSystemManagerApp.svelte.js': readFileSync(
+      resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
+      'utf8'
+    ),
+  };
+  for (const [path, source] of Object.entries(sites)) {
+    const site = importerConstructionSite(source);
+    for (const seam of seamNames) {
+      assert.ok(site.includes(`${seam}:`), `${path} must inject ${seam}`);
+    }
+  }
+});
+
+test('11: an importer WITHOUT the scope seams merges nothing, and the seamed one merges', async () => {
+  // THE BEHAVIOURAL ARM, and it exists because the source contract above is satisfied by a seam
+  // wired to something inert. It is also the proof that the seam is load-bearing at all: the
+  // lazy `game.fabricate` accessor lookup this replaces was green under BOTH a renamed accessor
+  // string and an outright `return null`, because a fail-closed merge and a merge that never ran
+  // are indistinguishable from the outside.
+  //
+  // `game.fabricate` IS GIVEN THE THREE WORKING ACCESSORS BELOW, and that is the whole arm: the
+  // unseamed importer must merge NOTHING even though a lazy lookup would find real, seeded stores
+  // right there. Without that the arm proves only that an empty environment resolves nothing.
+  //
+  // REDDENS WHEN: `_scopeStore` reacquires a `game.fabricate` fallback — the unseamed import then
+  // merges through it, and the roster is no longer empty.
+  const world = await seededEmptyWorld();
+  const payload = () => envelope({ system: { components: [component('c1')] } });
+  const prepare = () =>
+    prepareForImport(payload(), 'keep', { worldEntityIndex: world.worldEntityIndex() });
+
+  const unseamed = new CompendiumImporter(world.systemManager, world.recipeManager, {
+    getSetting: world.getSetting,
+    setSetting: world.setSetting,
+    isGM: () => true,
+    reportProgress: () => {},
+  });
+  const priorFabricate = globalThis.game.fabricate;
+  globalThis.game.fabricate = {
+    ...priorFabricate,
+    getComponentScopeStore: () => world.stores.components,
+    getEssenceScopeStore: () => world.stores.essences,
+    getToolScopeStore: () => world.stores.tools,
+  };
+  try {
+    await unseamed.importFromPackData(prepare(), { overwriteExisting: true });
+  } finally {
+    globalThis.game.fabricate = priorFabricate;
+  }
+  assert.deepEqual(
+    world.persisted('components').entities,
+    [],
+    'no seam, no merge — the importer fails CLOSED and never reaches around its caller for a store'
+  );
+
+  await world.importer.importFromPackData(prepare(), { overwriteExisting: true });
+  assert.deepEqual(
+    world.persisted('components').entities.map((entity) => entity.id),
+    ['c1'],
+    'and the SAME import through the seamed importer lands the world entity'
+  );
 });
 
 // ---------------------------------------------------------------------------
