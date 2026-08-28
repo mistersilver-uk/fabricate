@@ -20,6 +20,14 @@
   other `ArmedDangerButton` call site, so `armedToken` / `onArm` / `onDisarm` are threaded
   through rather than held here.
 
+  THE ENABLED SWITCH IS HAND-ROLLED, AND ITS FOLLOW-UP IS ISSUE 1040. Like the inherit switch in
+  `InheritRow.svelte`, it emits `.manager-status-toggle` and its `-track` / `-knob` / `-label`
+  children directly, because this repository ships no `StatusToggle` primitive to call. Issue
+  1040 already tracks extracting one and converting the Manager's existing sites, so one more
+  hand-rolled copy is a known and bounded cost rather than an oversight; extracting the
+  primitive here instead would drag every one of those unrelated sites into a change whose
+  whole premise is that four later lanes need not reopen the files it owns.
+
   Props:
    - entityType: `component`, `essence` or `tool`.
    - entityId / systemId: the pair these actions address, and the arm token's two halves.

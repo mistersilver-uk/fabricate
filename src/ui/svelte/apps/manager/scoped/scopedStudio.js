@@ -46,6 +46,13 @@ import { WORLD_SCOPE_DESCRIPTORS } from '../../../stores/worldScopeProjection.js
  * assertion satisfied by an EMPTY filter, so the suite proves it against this constant
  * directly rather than against the rendered row set alone.
  *
+ * BE CLEAR ABOUT WHAT THAT LEAVES UNCOVERED: the SUBTRACTION IN `inheritableSections` IS
+ * UNEXERCISED. Replacing its body with `return [...descriptor.sections]` leaves every suite in
+ * this repository green, because no entity type today declares a section that is also seeded.
+ * The constant is pinned and the intent is written down; the filter itself is guarded by
+ * nothing, and the first entity type whose seeded list intersects its sections is what will
+ * exercise it. Recorded rather than left for a later reader to mistake for coverage.
+ *
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const SCOPED_SEEDED_SECTIONS = Object.freeze({

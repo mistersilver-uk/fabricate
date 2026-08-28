@@ -19,6 +19,16 @@
   override when a switch goes back on, so nothing is lost and no confirmation is required. The
   note therefore states what the section WILL resolve to, never what would be thrown away.
 
+  THE INHERIT SWITCH IS HAND-ROLLED, AND ITS FOLLOW-UP IS ISSUE 1040. There is no shared
+  `StatusToggle` primitive in this repository: every Manager on/off control emits
+  `.manager-status-toggle` with its `-track`, `-knob` and `-label` children by hand, and issue
+  1040 — "extract a shared StatusToggle primitive and convert the manager sites" — already
+  tracks fixing that across the whole Manager. This row joins that backlog rather than
+  pre-empting it, because extracting a primitive obliges converting every existing site, and
+  that is two dozen components in files whose whole premise here is that four later lanes need
+  not reopen them. Recorded at the site so the debt is visible where it was incurred; the count
+  deliberately is not restated here, because issue 1040 owns the roster.
+
   Props:
    - entityType: `component`, `essence` or `tool`; the row set is derived from it.
    - inherited: the membership record's `inherit` map. An ABSENT key reads as inheriting,

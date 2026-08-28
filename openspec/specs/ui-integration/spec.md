@@ -1858,12 +1858,20 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    Each is UNGATED and reachable with no crafting system selected, like `Parties`, `Travel` and `Rules & Resources` and unlike experimental-gated `Downtime`, because the world catalogue must be authorable before any system opts into anything.
    **The labels are exactly as authored, and three of them read as typos while none is:** `Component catalogue` carries a lowercase `c`, `Tools Catalogue` is PLURAL where its siblings are singular, and `Tags & Categories` is character-for-character identical to the system-scope entry higher in the same rail.
    The prototype is the authority for rail labels and order, and the parity oracle asserts landmark ORDER, so "correcting" any of the three reds that gate.
-   Each leaf carries a stable id — `manager-world-nav-component-catalogue`, `manager-world-nav-vocabulary`, `manager-world-nav-essence-catalogue`, `manager-world-nav-tool-catalogue` — and the hook `data-world-nav-item`, and the three entity leaves surface the world corpus count on `.manager-nav-count`.
+   Each leaf carries a stable id — `manager-world-nav-component-catalogue`, `manager-world-nav-vocabulary`, `manager-world-nav-essence-catalogue`, `manager-world-nav-tool-catalogue` — and the hook `data-world-nav-item`, and ALL FOUR surface a world corpus count on `.manager-nav-count`.
+   The three entity leaves count their own corpus; the vocabulary leaf's count is defined by `### GM World Vocabulary Route`, which owns that badge because the World Vocabulary is not a scoped-entity corpus.
+   The badge is hidden at the 56px collapsed rail width, where every leaf is reduced to its glyph, so the count is not the collapsed rail's accessible name — see requirement 8.
 2. **SEVEN route tokens** — `world-components`, `world-component-entry`, `world-essences`, `world-essence-entry`, `world-tools`, `world-tool-entry`, and the vocabulary token that requirement's own section names.
    Each passes `normalizedActiveView` through the world pass-through and ABOVE its `if (!system) return 'systems'` fallthrough, because a world screen's normal state is that no crafting system is selected and that fallthrough would otherwise bounce every one of them.
    Each is absent from `setView`'s `!selectedSystem` refusal and from `SCOPE_BROWSER_BY_VIEW`: a world route has no per-system record to be stranded on when the rail's scope select changes.
    Each participates in the Manager confirm-discard route-exit chain.
 3. Each route renders its own `<main class="manager-main">` carrying a per-page hook, `data-scoped-page="<token>"`.
+   **A CATALOGUE'S TRAIL IS TWO CRUMBS AND AN ENTRY'S IS THREE.**
+   A catalogue is `World > <screen>`, because it IS a world screen rather than a destination inside a group.
+   An entry is `World > <catalogue> > <entity>`, with the MIDDLE crumb a button back to its catalogue: an entry editor is released to full width by requirement 4 and therefore renders no inspector, so that crumb is the only affordance out of it, and the same "a button wherever it is not the leaf" rule the `World` crumb follows applies to it.
+   The leaf names the ENTITY when the published corpus can supply a name and falls back to the screen's own title otherwise, because an entry route with no subject chosen and one whose subject the corpus no longer holds are the same thing to a breadcrumb: there is nothing to name, and an empty crumb is not an answer.
+   The shell owns the trail, so the subject a later lane chooses reaches it through props the pages already have: a catalogue page takes `onOpenEntry(entityId)` and an entry page takes `entityId` and `onBackToCatalogue()`.
+   That seam is what keeps requirement 7 true for an entry editor, which cannot render its own crumb.
 4. **Full width is ONE mechanically checked decision over a THREE-state classification.**
    Suppressing the shell's shared `.manager-inspector` aside in the component and releasing the `.manager-body` grid column in the stylesheet — in BOTH the normal and the `.is-rail-collapsed` rule — are one decision expressed twice, and each half alone is wrong in its own way; this has shipped half-done twice already (the Checks family, and `world-currency`).
    The decision is recorded ONCE, as a set of `{id, predicate, selector, layoutClass}` entries, and the aside chain is BUILT from that set rather than restating any clause.
@@ -1885,6 +1893,12 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
 7. **No later PR in epic 1357 reopens the five gateway files.**
    `CraftingSystemManagerRoot.svelte`, `adminStore.js`, `styles/fabricate.css`, `scripts/lib/viewLabCases.js` and `scripts/foundry-test-run.mjs` carry every route token, rail entry, aside clause, store action and capture case the three entity lanes and the vocabulary lane need, so each of those lanes changes only its own screens.
    The obligation is evaluated on THOSE PRs, as `git diff --name-only origin/main...HEAD` containing none of the five paths.
+   **It binds the PRODUCER side of a published key as well as the consumer side**, which is where it was first got wrong: a rail badge wired to read `worldScope.vocabulary.total` is closed, but a projection that could only ever be handed the three entity stores is not, so `adminStore` reads an OPTIONAL fourth `vocabulary` store leg through the same `services.getXScopeStore?.() ?? null` idiom as its siblings.
+   The leg answers `null` and the projection answers `{available: false, total: 0}` until PR 7 registers the store, and the store, its service accessor and its projection all live outside the five paths.
+   The same rule is why the entry routes' `onOpenEntry` / `entityId` / `onBackToCatalogue` props are wired in requirement 3 rather than left to the lane that first renders a catalogue row.
+8. **At the collapsed 56px rail width no leaf renders its count badge.**
+   `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
+   Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
 
 ### GM World Vocabulary Route
 
@@ -1896,6 +1910,10 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
 1. The route token is `world-vocabulary`, and the rail leaf carries the id `manager-world-nav-vocabulary` and the hook `data-world-nav-item="vocabulary"`.
 2. Its label is character-for-character identical to the system-scope `Tags & Categories` entry, which is why no harness may reach either by text; see `### GM World Scoped Entity Routes` requirement 6.
 3. It renders its own `<main class="manager-main">` with the page hook `data-scoped-page="world-vocabulary"`, is released to full width by the one mechanically checked decision of that requirement 4, and participates in the confirm-discard route-exit chain.
+4. **The leaf carries a count badge, and it counts the WHOLE vocabulary** — component categories plus component tags plus recipe categories, summed rather than deduplicated across the three, because a category and a tag that share a label are two entries in the world's vocabulary.
+   It is the fourth of the four badges `### GM World Scoped Entity Routes` requirement 1 names, and it is the only one that is not a corpus of scoped entities.
+   **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
+   It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
 
 ### Scoped entity editor patterns
 
