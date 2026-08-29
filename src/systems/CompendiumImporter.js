@@ -5,7 +5,20 @@
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
 import { normalizeTravelConfig } from './gatheringRealms.js';
-import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResolver.js';
+import {
+  resolveImportReferences,
+  REFERENCE_KINDS,
+  WORLD_SCOPE_ENTITY_TYPES,
+  WORLD_SCOPE_SLICE_KEYS,
+} from './importReferenceResolver.js';
+import { membershipKey } from './scopedDefinitions.js';
+import {
+  membershipKeySet,
+  mergedEntityIds,
+  mergedMembershipUnion,
+  recheckWorldDefault,
+  sliceRecords,
+} from './worldScopeImportMerge.js';
 
 /** World-setting key for the per-system gathering config (mirrors SETTING_KEYS.GATHERING_CONFIG). */
 const GATHERING_CONFIG_KEY = 'gatheringConfig';
@@ -17,6 +30,13 @@ const CURRENCY_CONFIG_KEY = 'currencyConfig';
 const TRAVEL_CONFIG_KEY = 'travelConfig';
 const CHARACTER_LIBRARIES_KEY = 'characterLibraries';
 
+/** The report owner type each world-scope entity type reuses. */
+const SCOPE_OWNER_TYPES = Object.freeze({
+  components: 'component',
+  essences: 'essence',
+  tools: 'tool',
+});
+
 /** How often (in recipes processed) Phase 4 emits an interim progress tick. */
 const RECIPE_PROGRESS_INTERVAL = 10;
 
@@ -25,6 +45,11 @@ const RECIPE_PROGRESS_INTERVAL = 10;
  * skipped once per import run rather than retried for every unresolved component.
  */
 const PACK_LOOKUP_SKIP = Symbol('pack-lookup-skip');
+
+/** The records of a payload-supplied report array, or none. */
+function arrayOfRecords(value) {
+  return Array.isArray(value) ? value.filter((entry) => entry && typeof entry === 'object') : [];
+}
 
 /** Clamp a progress fraction into the Foundry-required `[0, 1]` range. */
 function clampProgressFraction(pct) {
@@ -180,6 +205,41 @@ function upcastComponentSourceFields(component) {
   return next;
 }
 
+/**
+ * A thin delegating view of ONE world-scope entity store, resolved on every call (issue 1364).
+ *
+ * IT LIVES BESIDE THE IMPORTER RATHER THAN AT THE WIRING SITE, because the rule it encodes is
+ * this importer's: the world-scope merge FAILS CLOSED, so an absent store is skipped silently and
+ * a seam that answered anything optimistic would turn "merged nothing" into "reported success".
+ * Keeping the adapter next to `_scopeStore` is what stops the two halves of that contract drifting
+ * apart, and it is what lets a test exercise the SHIPPED delegator instead of a copy of it.
+ *
+ * It exists at all for the reason the importer's `environmentStore` delegator does: the seam is
+ * built while the field it names may not be assigned yet, so it closes over a READ rather than
+ * over a value. Closing over the FIELD rather than an accessor NAME is also what distinguishes it
+ * from the `game.fabricate` accessor mirror it replaced — a rename here is a rename of a property
+ * the wiring site reads, not of a string in a hand-maintained table.
+ *
+ * `isSeeded` answers a strict `true` only when a real store says so, so an unassigned field is
+ * indistinguishable from an unmigrated world and the merge is skipped — which also means `save` is
+ * unreachable without a real store behind it.
+ *
+ * The three methods are exactly what the world-scope merge calls. It is a shared factory rather
+ * than three inline literals at the wiring site because three near-identical blocks are what the
+ * duplication gate counts.
+ *
+ * @param {() => object|null|undefined} resolve Reads the owning field at call time.
+ * @returns {{isSeeded: (subKey: string) => boolean, get: () => object|null,
+ *   save: (value: object) => Promise<unknown>|undefined}}
+ */
+export function scopeStoreDelegate(resolve) {
+  return {
+    isSeeded: (subKey) => resolve()?.isSeeded?.(subKey) === true,
+    get: () => resolve()?.get?.() ?? null,
+    save: (value) => resolve()?.save?.(value),
+  };
+}
+
 export class CompendiumImporter {
   /**
    * @param {object} craftingSystemManager
@@ -193,6 +253,9 @@ export class CompendiumImporter {
    * @param {(update: { pct?: number, message?: string, phase?: string }) => void} [seams.reportProgress]
    *   Live-progress sink called at phase boundaries, every N recipes, and on completion.
    *   Defaults to the Foundry V13 progress-notification factory so the caller wires nothing.
+   * @param {object} [seams.componentScopeStore] World COMPONENT scope store (issue 1364)
+   * @param {object} [seams.essenceScopeStore] World ESSENCE scope store (issue 1364)
+   * @param {object} [seams.toolScopeStore] World TOOL scope store (issue 1364)
    */
   constructor(craftingSystemManager, recipeManager, seams = {}) {
     this._craftingSystemManager = craftingSystemManager;
@@ -217,6 +280,36 @@ export class CompendiumImporter {
     // is reused as-is.
     this._reportProgress = seams.reportProgress ?? null;
     this._activeProgressReporter = null;
+    // The three world-scope entity stores (issue 1364), injected exactly as `environmentStore` is.
+    this._scopeStoreSeams = {
+      components: seams.componentScopeStore ?? null,
+      essences: seams.essenceScopeStore ?? null,
+      tools: seams.toolScopeStore ?? null,
+    };
+  }
+
+  /**
+   * One world-scope entity store, or `null`.
+   *
+   * IT FAILS CLOSED and never constructs one of its own. Synthesizing a store would hand the merge
+   * a fabricated, UNSEEDED destination — and an unseeded destination is exactly the state whose
+   * first write flips a whole world's Valid Id Basis from UNKNOWN to KNOWN. `_persistCharacterLibraries`
+   * returns early on an absent seam for the same reason.
+   *
+   * **IT IS THE INJECTED SEAM ALONE, WITH NO `game.fabricate` FALLBACK, AND THE ABSENCE IS
+   * DELIBERATE.** A lazy accessor lookup keyed on a hand-maintained mirror of `game.fabricate`'s
+   * method names looks like belt-and-braces and is the opposite: because the merge fails closed,
+   * a mirror that drifts — a renamed accessor, a moved store — makes every world-scope import
+   * silently merge NOTHING and still report success, and no test can see the difference between
+   * that and a correct fallback. Both production call sites inject the three stores explicitly and
+   * are pinned by a source contract, which is a guard that can fail.
+   *
+   * @param {'components'|'essences'|'tools'} entityType
+   * @returns {object|null}
+   * @private
+   */
+  _scopeStore(entityType) {
+    return this._scopeStoreSeams[entityType] ?? null;
   }
 
   /**
@@ -343,6 +436,16 @@ export class CompendiumImporter {
       // import of a bundle authored in another world land with its references intact.
       await this._persistCharacterLibraries(packData.characterLibraries);
 
+      // The world-scope entity ROSTERS and DEFAULTS (issue 1364), merged in the same slot and for
+      // the same reason: `_normalizeSystem` derives its Valid Id Basis from the `entities` sub-key
+      // on every normalize, so a system created while the incoming world entities are still only
+      // in the payload would have every essence quantity pruned against a basis that cannot yet
+      // see them. The MEMBERSHIP layer cannot be merged here — the destination's system id does
+      // not exist until `createSystem` runs below — so it lands immediately after, which is why
+      // this merge is split rather than atomic.
+      summary.unresolvedReferences.push(...arrayOfRecords(packData.worldScopeReferences));
+      await this._persistScopedEntityRosters(packData, summary);
+
       let system;
       if (existingSystem && overwriteExisting) {
         system = await this._craftingSystemManager.updateSystem(existingSystem.id, systemInput);
@@ -361,6 +464,12 @@ export class CompendiumImporter {
         summary.system.name = system.name;
         summary.system.created = true;
       }
+
+      // The MEMBERSHIP layer, now that the destination's system id exists. Every incoming record's
+      // `systemId` is rewritten to it, in BOTH modes: copy-mode import removed the payload's id,
+      // and a keep-mode overwrite may have resolved an existing system by NAME under a different
+      // one, so the payload's id is the destination's in neither.
+      await this._persistScopedEntityMemberships(packData, system.id, summary);
 
       // Provenance key for recipe import stamping (issue 775): the pack's own stable
       // identity when the payload carries one (keep-mode — preserved across reinstalls of
@@ -649,6 +758,213 @@ export class CompendiumImporter {
     await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistCurrencyConfig(packData.currencyConfig);
     await this._persistTravelConfig(resolved.travelConfig);
+  }
+
+  /**
+   * Merge the incoming world entity ROSTER and world DEFAULTS into this world's own, per entity
+   * type and per layer, BEFORE the crafting system is created or updated (issue 1364).
+   *
+   * ## THE SEEDING GATE — the safety rule the whole merge rests on
+   *
+   * `ScopedDefinitionStore._persist` sets ALL THREE `seeded` flags and persists all three sub-keys
+   * on any write, so a FIRST write would flip this world's Valid Id Basis from UNKNOWN to KNOWN
+   * for that entity type across every system in the world — including systems the import never
+   * touched. So the merge writes only into a scope the destination has ALREADY seeded, judged with
+   * the PER-SUB-KEY form on `entities` and never the no-argument form, which ORs across sub-keys
+   * and would report seeded on the strength of a sibling.
+   *
+   * An unmigrated destination is therefore NEVER seeded by an import: its three settings stay
+   * absent and the created system behaves exactly as it does under schema 5. Nothing is lost — when
+   * that world later migrates, the `1.30.0` pass derives the world entities for the imported system
+   * from the in-system arrays the import DID land. Because the destination is already seeded
+   * whenever a write happens, this merge only ever WIDENS a KNOWN basis, and widening a basis can
+   * never prune anything that was surviving.
+   *
+   * ## THE MERGE BASE IS `store.get()`, NOT THE THREE SUB-KEYS
+   *
+   * `save(raw)` normalizes the RAW argument and rebuilds its extras from that argument alone, and
+   * `normalizeWorldToolBreakage(undefined)` answers `{}`. So a merge written as
+   * `save({ entities, defaults, membership })` would silently ERASE a world tool-breakage authority
+   * a destination GM authored. The store's own persisted projection carries the extras, so the base
+   * is that, mutated across the three sub-keys and handed back.
+   *
+   * It goes through `store.save()` rather than a direct `_setSetting`, because `save()` normalizes
+   * on write AND publishes the cache in one step by contract, while the hand-rolled pair
+   * `_persistCharacterLibraries` uses has two halves either of which is forgettable.
+   *
+   * @param {object} packData
+   * @param {object} summary
+   * @private
+   */
+  async _persistScopedEntityRosters(packData, summary) {
+    const legs = this._readScopeMergeLegs(packData);
+    // The merged COMPONENT roster, or `null` when the component scope will not be written and the
+    // roster the addressability constraints consult is therefore UNDECIDABLE.
+    const componentLeg = legs.components;
+    const worldComponentIds = componentLeg.writable
+      ? mergedEntityIds(componentLeg.base, componentLeg.incoming)
+      : null;
+    const componentMembers = membershipKeySet(
+      mergedMembershipUnion(componentLeg.base, componentLeg.incoming)
+    );
+
+    for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
+      const leg = legs[entityType];
+      if (!leg.writable) continue;
+
+      const merged = leg.base;
+      const entityIds = new Set(sliceRecords(merged, 'entities').map((entity) => entity.id));
+      let added = 0;
+
+      // LAYER 1 — the world entity roster, by `id`, DESTINATION WINS.
+      for (const entity of sliceRecords(leg.incoming, 'entities')) {
+        const id = typeof entity.id === 'string' ? entity.id.trim() : '';
+        if (!id || entityIds.has(id)) continue;
+        entityIds.add(id);
+        merged.entities.push(structuredClone(entity));
+        added += 1;
+      }
+
+      // LAYER 2 — the world defaults, by `id`, DESTINATION WINS and is never re-examined. A record
+      // the merge would ADD has every section re-decided against the destination's merged corpus.
+      const membershipUnion = mergedMembershipUnion(leg.base, leg.incoming);
+      for (const incoming of sliceRecords(leg.incoming, 'defaults')) {
+        const id = typeof incoming.id === 'string' ? incoming.id.trim() : '';
+        if (!id || merged.defaults[id]) continue;
+        if (!entityIds.has(id)) {
+          summary.unresolvedReferences.push(
+            this._scopeReference(REFERENCE_KINDS.WORLD_ENTITY_MISSING, entityType, incoming, id)
+          );
+        }
+        const { record, declined } = recheckWorldDefault({
+          entityType,
+          record: incoming,
+          worldComponentIds,
+          membershipUnion,
+          componentMembers,
+        });
+        for (const decline of declined) {
+          summary.unresolvedReferences.push(
+            this._scopeReference(
+              REFERENCE_KINDS.WORLD_DEFAULT_DECLINED,
+              entityType,
+              incoming,
+              decline.referenceValue
+            )
+          );
+        }
+        // A record left carrying only its `id` is not written at all, applying the election's own
+        // rule; the world ENTITY and every membership record are untouched either way.
+        if (!record) continue;
+        merged.defaults[id] = record;
+        added += 1;
+      }
+
+      // NO RECORD, NO WRITE — evaluated independently for each of the two writes the split
+      // produces, exactly as every sibling world-scope merge does.
+      if (added === 0) continue;
+      await leg.store.save(merged);
+    }
+  }
+
+  /**
+   * Merge the incoming MEMBERSHIP records, AFTER the destination's system id exists (issue 1364).
+   *
+   * THE TWO WRITES ARE NOT ATOMIC, and that is stated rather than hidden. A failure between them
+   * leaves the destination holding world entities with no membership record for the imported
+   * system. That state is INERT: an absent membership record is a REFUSAL and never a prune, and
+   * the basis union is deliberately not membership-filtered. Re-running the import repairs it under
+   * KEEP mode, where the destination-wins merge makes the second run additive. A COPY-mode re-run
+   * does NOT repair it — it mints a second destination system, and the torn one keeps its memberless
+   * world entities until a GM deletes it.
+   *
+   * @param {object} packData
+   * @param {string} systemId The RESOLVED destination system id.
+   * @param {object} summary
+   * @private
+   */
+  async _persistScopedEntityMemberships(packData, systemId, summary) {
+    if (!systemId) return;
+    const legs = this._readScopeMergeLegs(packData);
+
+    for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
+      const leg = legs[entityType];
+      if (!leg.writable) continue;
+
+      const merged = leg.base;
+      const entityIds = new Set(sliceRecords(merged, 'entities').map((entity) => entity.id));
+      let added = 0;
+
+      for (const incoming of sliceRecords(leg.incoming, 'membership')) {
+        const entityId = typeof incoming.entityId === 'string' ? incoming.entityId.trim() : '';
+        if (!entityId) continue;
+        // THE `systemId` REWRITE. Without it every record names a phantom system and the created
+        // copy has zero members.
+        const record = { ...structuredClone(incoming), entityId, systemId };
+        const key = membershipKey(entityId, systemId);
+        if (merged.membership[key]) continue;
+        if (!entityIds.has(entityId)) {
+          summary.unresolvedReferences.push(
+            this._scopeReference(
+              REFERENCE_KINDS.WORLD_ENTITY_MISSING,
+              entityType,
+              incoming,
+              entityId
+            )
+          );
+        }
+        merged.membership[key] = record;
+        added += 1;
+      }
+
+      if (added === 0) continue;
+      await leg.store.save(merged);
+    }
+  }
+
+  /**
+   * Resolve the three merge legs: the store, the incoming slice, the seeding verdict and a FRESH
+   * copy of the destination's persisted projection.
+   *
+   * Read fresh on each of the two writes, deliberately: the first write publishes a new corpus, and
+   * a base captured before it would silently drop whatever that write added.
+   *
+   * @param {object} packData
+   * @returns {Record<string, {store: object|null, incoming: object|null, writable: boolean, base: object|null}>}
+   * @private
+   */
+  _readScopeMergeLegs(packData) {
+    const legs = {};
+    for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
+      const store = this._scopeStore(entityType);
+      const raw = packData?.[WORLD_SCOPE_SLICE_KEYS[entityType]];
+      const incoming = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+      const writable = Boolean(store && incoming && store.isSeeded?.('entities') === true);
+      legs[entityType] = {
+        store,
+        incoming,
+        writable,
+        base: writable ? store.get() : null,
+      };
+    }
+    return legs;
+  }
+
+  /**
+   * One world-scope report entry. The three record-owned kinds reuse the shipped entity-specific
+   * owner types, so no new `OwnerType` is introduced.
+   *
+   * @private
+   */
+  _scopeReference(kind, entityType, owner, referenceValue) {
+    return {
+      kind,
+      ownerType: SCOPE_OWNER_TYPES[entityType],
+      ownerId: owner?.id ?? owner?.entityId ?? null,
+      ownerName: owner?.name ?? '',
+      referenceValue,
+      disposition: 'reported',
+    };
   }
 
   /**

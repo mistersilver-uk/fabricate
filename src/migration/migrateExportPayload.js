@@ -19,6 +19,8 @@
  */
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
+import { membershipKey } from '../systems/scopedDefinitions.js';
+import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
 
 import {
   buildWorldCharacterLibraries,
@@ -36,6 +38,7 @@ import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierC
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 import { buildWorldTravelConfig, stripSystemTravelConfig } from './migrateTravelToWorldScope.js';
 import { applyUnifiedModifierLibrary } from './migrateUnifyModifierLibraries.js';
+import { migrateWorldScopeEntities, SCOPE_PAYLOAD_KEYS } from './migrateWorldScopeEntities.js';
 
 /**
  * Upcast every legacy componentId-only Tool in an export payload's system to a first-class
@@ -347,6 +350,229 @@ function foldManualCompositionForces(migrated, { clearAutomaticForces }) {
   }).environments;
 }
 
+/** The three entity types the world-scope entity slices carry, in the shipped order. */
+const SCOPE_ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
+
+/**
+ * The transient diagnostics key the upcast stamps for `prepareForImport` to read.
+ *
+ * NOT PAYLOAD DATA. It carries the refusals a one-system corpus produced and the world
+ * tool-breakage authority a hand-edited payload arrived with, both of which are one-time facts
+ * about THIS upcast rather than fields of the bundle. It is therefore the one key on which
+ * `migrate(migrate(x))` may legitimately differ from `migrate(x)`: the second pass has no
+ * authority left to drop, exactly as every strip-and-report transform behaves.
+ *
+ * @type {string}
+ */
+export const WORLD_SCOPE_UPCAST_REPORT_KEY = '_worldScopeEntityReport';
+
+function isPlainObject(value) {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function trimmedString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * STEP 2 of the 5 -> 6 upcast: re-key ONE envelope slice into the PERSISTED MAP SHAPE the shared
+ * transform reads. It exists because the failure it prevents is a SILENT DISCARD, not an error.
+ *
+ * `readScopePayload` accepts `defaults` and `membership` ONLY through `isPlainObject`, which
+ * EXCLUDES arrays - and the envelope carries the ARRAY projection, because the persisted map key
+ * embeds a system id no destination shares. Hand an array in and BOTH layers are silently dropped:
+ * the per-`(entityId, systemId)` lift guard never sees the incoming records, and every membership
+ * record - including one a GM hand-edited - is rebuilt from the in-system definition.
+ *
+ * THE KEY IS DERIVED FROM THE RECORD, never carried, because a key that disagrees with its record
+ * is not an error anywhere on this path: it is a DUPLICATE. Nothing validates a map key against
+ * the record it addresses on the way in, so a doubled separator would produce two surviving
+ * records for one pair. `defaults` keys by `record.id` and `membership` by
+ * `membershipKey(entityId, systemId)` - the shipped separator, imported rather than respelled.
+ *
+ * A record that cannot be keyed - a missing or blank `id`, `entityId` or `systemId` - is DROPPED
+ * before the call, matching the world store's own floor.
+ *
+ * Every OTHER authored key on the slice is passed through, because `readScopePayload` preserves
+ * extras and step 5 is where the world tool-breakage authority is dropped.
+ *
+ * @param {unknown} slice An envelope slice, in either sub-key shape.
+ * @returns {object} The persisted-shape payload.
+ * @private
+ */
+function scopeSliceToPersistedShape(slice) {
+  const source = isPlainObject(slice) ? slice : {};
+  const { entities, defaults, membership, ...extras } = source;
+
+  const keyedDefaults = {};
+  for (const record of subKeyEntries(defaults)) {
+    if (!isPlainObject(record)) continue;
+    const id = trimmedString(record.id);
+    if (!id) continue;
+    keyedDefaults[id] = record;
+  }
+
+  const keyedMembership = {};
+  for (const record of subKeyEntries(membership)) {
+    if (!isPlainObject(record)) continue;
+    const entityId = trimmedString(record.entityId);
+    const systemId = trimmedString(record.systemId);
+    if (!entityId || !systemId) continue;
+    keyedMembership[membershipKey(entityId, systemId)] = record;
+  }
+
+  return {
+    entities: subKeyEntries(entities).filter((entry) => isPlainObject(entry)),
+    defaults: keyedDefaults,
+    membership: keyedMembership,
+    ...extras,
+  };
+}
+
+/**
+ * STEP 4 of the 5 -> 6 upcast: project one returned scope payload back to the envelope ARRAY form.
+ *
+ * `subKeyEntries` is what makes this TOTAL. The shared transform answers the ORIGINAL object for a
+ * key it did not change and the freshly built payload for one it did, so the value in hand is a
+ * map on one path and could be either on the other.
+ *
+ * @param {unknown} payload
+ * @returns {{entities: object[], defaults: object[], membership: object[]}}
+ * @private
+ */
+function scopeSliceToEnvelopeShape(payload) {
+  const source = isPlainObject(payload) ? payload : {};
+  return {
+    entities: cloneJson(subKeyEntries(source.entities).filter((entry) => isPlainObject(entry))),
+    defaults: cloneJson(subKeyEntries(source.defaults).filter((entry) => isPlainObject(entry))),
+    membership: cloneJson(subKeyEntries(source.membership).filter((entry) => isPlainObject(entry))),
+  };
+}
+
+/**
+ * Schema 5 -> 6: DERIVE the three world-scope entity slices (issue 1364, epic 1357), through the
+ * `1.30.0` world-side migration itself rather than a second implementation of it.
+ *
+ * ## It is NOT a lift, and writing a hoist would enact the shed the migration deferred
+ *
+ * Every prior bump moved data OFF the system and paired a `buildWorldX` with a `stripSystemX`.
+ * Schema 6 has NO strip half, because the source data has not left the system: the in-system
+ * `components` / `essenceDefinitions` / `tools` arrays survive and the in-system record stays
+ * AUTHORITATIVE until the consumer sweep. A lift that stripped identity off `system.components`
+ * would perform, through the import door, exactly the shed that blanks every screen in the
+ * destination world on the first save.
+ *
+ * The invariant is therefore ONE-DIRECTIONAL, stated in the only form that is TRUE of the whole
+ * function: after `migrateExportPayload`, no KEY has been REMOVED from any record of
+ * `system.components`, `system.essenceDefinitions` or `system.tools`, and no value of a key
+ * present in the input has changed. "Deep-equal to the input" is FALSE for a schema-1 payload
+ * independently of this change, because `upcastLegacyTools` already ADDS keys to a
+ * component-linked tool.
+ *
+ * ## BRANCH-INDEPENDENT, and LAST on each branch
+ *
+ * Last, because it must run AFTER `upcastLegacyTools`: a schema-1 payload's tools are not
+ * first-class until that runs, and the grouping reads a tool's own source references first.
+ *
+ * ## Composition, and the four consequences of it
+ *
+ * An export bundle IS a one-system corpus, so `migrateWorldScopeEntities` is called with a
+ * synthesized one, exactly as `buildWorldCurrencyConfig([system])` and its two siblings are.
+ * Extracting a per-system builder would add a second entry point into `src/migration/` that could
+ * drift from the whole-world one, which is the failure the shared-transform rule exists to
+ * prevent. Four things follow, each handled rather than absorbed:
+ *
+ * 1. It reads and answers `defaults` and `membership` as MAPS only - steps 2 and 4 own both
+ *    directions.
+ * 2. It answers REWRITTEN `systems` / `recipes` / `gatheringConfig`, all three DISCARDED. That
+ *    discard is LOAD-BEARING rather than defensive: `groupIdentity` folds `sourceUuid` /
+ *    `sourceItemUuid` / `fallbackItemIds` into `aliasItemUuids` EVEN FOR A SINGLETON GROUP and the
+ *    identity write-back applies it to every in-system record, so a schema-1..5 bundle's
+ *    `system.components` would come back carrying an `aliasItemUuids` key it never had. Adopting
+ *    it would rewrite in-system identity through the import door.
+ * 3. Its per-`(entityId, systemId)` lift guard is what makes the derivation idempotent, replacing
+ *    any slice-level presence check entirely - CONDITIONAL on step 2, without which the guard
+ *    never sees the incoming records at all. There is no presence check to get wrong, because
+ *    there IS no presence check.
+ * 4. It computes a report, whose `refusals` are carried so a REFUSED pair never surfaces as a
+ *    silently empty slice, and it PRESERVES an incoming `toolBreakage` through the extras spread,
+ *    which step 5 drops.
+ *
+ * ## Step 5 - the deep copy, and the dropped authority
+ *
+ * The shared transform answers the ORIGINAL object for an unchanged key, so an adopted slice could
+ * alias the very object handed in. A fresh deep copy is assigned instead, so copy mode's in-place
+ * slice rewrite cannot reach anything a caller still holds.
+ *
+ * The WORLD TOOL-BREAKAGE AUTHORITY is dropped HERE rather than by the export assembler, and that
+ * distinction is the whole point: a HAND-EDITED payload never reaches the assembler, and
+ * `readScopePayload` PRESERVES every other authored key through its extras spread. The `1.30.0`
+ * migration writes no world authority at all, so seeding one into an unconfigured destination -
+ * the currency and travel precedent - would fire on essentially every import and hand a
+ * destination world an authority no GM there authored.
+ *
+ * @param {object} migrated The working payload, mutated in place.
+ * @private
+ */
+function deriveWorldScopeEntitySlices(migrated) {
+  const system = migrated?.system;
+  if (!isPlainObject(system)) return;
+
+  // STEP 1 - default each absent slice FIRST, because the shared transform answers the ORIGINAL
+  // object for an unchanged key: a slice that was never synthesized would come back `undefined`
+  // and every later step would have to guard for it.
+  const input = {};
+  const carried = {};
+  for (const entityType of SCOPE_ENTITY_TYPES) {
+    const key = SCOPE_PAYLOAD_KEYS[entityType];
+    const slice = isPlainObject(migrated[key]) ? migrated[key] : {};
+    carried[key] = slice;
+    // STEP 2 - the map/array conversion. See `scopeSliceToPersistedShape`.
+    input[key] = scopeSliceToPersistedShape(slice);
+  }
+
+  const systemId = trimmedString(system.id);
+  const gatheringSlice = isPlainObject(migrated.gatheringConfig?.system)
+    ? migrated.gatheringConfig.system
+    : {};
+
+  // STEP 3 - compose the shipped `1.30.0` transform over a synthesized ONE-SYSTEM corpus, taking
+  // ONLY the three scope keys out of the result.
+  const result = migrateWorldScopeEntities({
+    systems: [system],
+    recipes: Array.isArray(migrated.recipes) ? migrated.recipes : [],
+    gatheringConfig: systemId ? { systems: { [systemId]: gatheringSlice } } : { systems: {} },
+    ...input,
+  });
+
+  let droppedToolBreakage = null;
+  for (const entityType of SCOPE_ENTITY_TYPES) {
+    const key = SCOPE_PAYLOAD_KEYS[entityType];
+    const payload = isPlainObject(result?.[key]) ? result[key] : carried[key];
+    // STEP 5, first half - the DROP. It is a drop of the whole extras spread rather than of one
+    // named key, because the three sub-keys are the entire travelling contract; the authority is
+    // recorded so the import can report it rather than losing it silently.
+    if (entityType === 'tools' && isPlainObject(payload?.toolBreakage)) {
+      droppedToolBreakage = cloneJson(payload.toolBreakage);
+    }
+    // STEP 4, plus STEP 5's second half - array projection through a fresh deep copy.
+    migrated[key] = scopeSliceToEnvelopeShape(payload);
+  }
+
+  migrated[WORLD_SCOPE_UPCAST_REPORT_KEY] = {
+    refusals: cloneJson(
+      Array.isArray(result?._worldScopeEntityReport?.refusals)
+        ? result._worldScopeEntityReport.refusals
+        : []
+    ),
+    droppedToolBreakage,
+  };
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -378,6 +604,7 @@ export function migrateExportPayload(payload) {
     liftTravelToWorldScope(current);
     liftCharacterLibrariesToWorldScope(current);
     foldManualCompositionForces(current, { clearAutomaticForces: false });
+    deriveWorldScopeEntitySlices(current);
     return current;
   }
 
@@ -417,6 +644,7 @@ export function migrateExportPayload(payload) {
   liftTravelToWorldScope(migrated);
   liftCharacterLibrariesToWorldScope(migrated);
   foldManualCompositionForces(migrated, { clearAutomaticForces: true });
+  deriveWorldScopeEntitySlices(migrated);
 
   return migrated;
 }

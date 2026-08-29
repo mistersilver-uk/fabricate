@@ -873,6 +873,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    EVERY rename is reported by name with both systems, while a byte-identical group produces none.
 4. **The ID-CLAIM LADDER is deterministic**, so a re-run chooses identically: the oldest contributing id if unclaimed, else the next-oldest if unclaimed, else `<oldestId>-w<n>` with the smallest unclaimed `n >= 2`.
    Steps 2 and 3 exist because component and tool ids are NOT globally unique — copy-import preserves them.
+   **The SAME ladder governs COPY-MODE IMPORT's binding of an incoming entity to a destination world entity** (issue 1364), with the ranked intersecting candidates in place of the group's members: it is what makes that binding INJECTIVE, and its middle rung is what makes a re-import idempotent rather than adding one world entity per run (`import-export/spec.md` -> Copy-mode identifier rebinding).
 5. **The map is built and applied PER SYSTEM, and a pair that cannot be re-keyed safely is REFUSED ENTIRELY**: no lift, no re-key, no membership, and the pair's own definitions are byte-identical to their input.
    **"Byte-identical" is scoped to the refused pair's own definitions and their ids, and this qualification is load-bearing.**
    Refusal is per `(system, entityType)`, so a system whose COMPONENTS pair is refused while its TOOLS pair is accepted still has its `component.salvage.toolIds` rewritten — those are TOOL references, and the tools pair was not refused.
@@ -912,6 +913,12 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    The alternative - lift freely and validate at add-to-system time - puts the check inside an action that does not exist yet, so it would ship a world default no shipped code can validate; the chosen rule is decidable from the corpus alone and can never produce a dangling seed.
    It is not restrictive in practice, because a single-member group always satisfies it.
 
+   **ALL FIVE ARE DECIDED AGAINST THE SOURCE CORPUS HERE, AND ARE RE-DECIDED AT IMPORT** (issue 1364, epic 1357, PR 4).
+   A membership-filtered export cannot carry the facts three of them rest on: constraint (0)'s every-live-member test was decided over systems the export does not carry, and (b), (c) and (d) may name a component absent from the destination entirely.
+   So a carried world default the import would ADD has every section re-evaluated against the DESTINATION's merged corpus, and that corpus is a LOGICAL UNION that includes membership records not yet persisted, because the membership layer is written after the defaults layer (`import-export/spec.md` -> World-default constraint re-check on import).
+   Constraint (0) there applies THIS constraint's own authored-section predicate rather than a second one, because the import's inputs include hand-authored payloads whose blank or whitespace `category` carries the key while storing as an ABSENCE — so a key-presence reading of it admits exactly the fallback the constraint forbids.
+   Declining at import is lossless for the reason declining here is: every incoming membership record still overrides every section with its own system's value verbatim.
+
    **The `defaults` SUB-KEY IS WRITTEN whether or not it holds a record**, because seededness keys on key PRESENCE rather than content and the persisted shape must round-trip through the store unchanged.
 8. **THE REWRITE RUNS BEFORE THE THREE SCOPE PAYLOADS ARE BUILT**, and the order is load-bearing.
    Three lifted values contain component ids this same pass re-keys — essence `effectSource`, tool `onBreak.replacementTarget.componentId` and tool `repairRequirements` — so a payload built pre-rewrite would ship a membership record naming a retired id in every migrated world, and the per-pair lift guard is keyed on the NEW pair, so a re-run would skip it and the stale ids would persist permanently.
@@ -920,6 +927,8 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    It covers every component-id and tool-id position across `recipes`, `craftingSystems` and `gatheringConfig`: ingredient, catalyst and repair-option refs and their `alternatives`, result refs, salvage result groups, recipe / step / ingredient-set / salvage `toolIds`, essence `sourceComponentId` / `associatedSystemItemId` / legacy `sourceItemUuid`, tool `componentId`, `onBreak.replacementTarget.componentId` and `repairRequirements[].options[]`, gathering task and event drop rows and `toolIds`, and the legacy pre-`0.7.0` gathering tools copy.
    It is KEY-AWARE: recipe ids, outcome ids and salvage-group ids are NEVER rewritten, and a value at a non-reference position is never touched even if it coincidentally equals a component id.
    It is IDEMPOTENT by construction, because every site performs ONE simultaneous lookup and requirement 5's disjointness makes an already-rewritten value not a key.
+   **Under COPY-MODE IMPORT it additionally covers the three scope payloads' `defaults` records, on the same SECTION SHAPE it already walks for a `membership` record, and the world entity roster's own identifiers** (issue 1364).
+   A world default carries component references exactly as a membership record does, so driving the walk over `membership` alone — which is all this migration needs, because it elects defaults from records the walk has already rewritten — would leave a copy-imported world default naming a pre-import component id.
 10. **The pass writes SEVEN legs, and `fabricate.worldScopeRekeyMap` is the FIRST of them.**
     The map is `{ [systemId]: { components: { [oldId]: newId }, tools: { ... } } }`, and it is the pass's durable DECISION RECORD rather than a migrated setting — see § Migration Registry for why the leg order is not reordered and why this record is what replaces reordering it.
     The three scope keys are DESTINATIONS and are written before the `craftingSystems` SOURCE, as `currencyConfig`, `travelConfig` and `characterLibraries` already are.
@@ -968,8 +977,16 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
 19. **The TRANSIENT REPORT** carries entities created per type, groups merged, every rename with its two systems, transitively-formed groups, refusals with reasons, the references that ALREADY RESOLVE TO NOTHING, and the world-default sections a constraint declined, through a `_worldScopeEntityReport` field the runner captures and DELETES so it is never persisted.
     The reference list is `flaggedForReview` and it is NOT a list of newly-prunable references: requirement 18 establishes that nothing is pruned at this release and that they become prunable only at the CONSUMER SWEEP.
     `refusedDefaultSections` is a DIAGNOSTIC and is deliberately NOT in the GM notice, because requirement 7's constraint (0) makes decline the DOMINANT class - a notice enumerating it would fire on nearly every migrated world - and because a declined section has no observable consequence until a reader resolves through the world layer.
-20. **Mutated setting keys:** `worldScopeRekeyMap`, `recipes`, `componentScope`, `essenceScope`, `toolScope`, `craftingSystems`, `gatheringConfig`.
-21. **The downgrade is LOSSLESS FOR DATA and is declared `downgradeLosesData: false`**, checked rather than copied.
+20. **`migrateWorldScopeEntities` ITSELF is SHARED with the export-payload upcast**, not reimplemented; `migrateExportPayload` applies it branch-independently to a synthesized ONE-SYSTEM corpus, exactly as the four world-scope lifts before it apply theirs.
+    An export bundle IS a one-system corpus, so the union across systems degenerates there to that system's own definitions — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a world entity is derived.
+
+    **This one differs from all four predecessors in three ways, each of which is a rule the upcast has to keep.**
+    First, the upcast DERIVES and never STRIPS: there is no `stripSystemScopedEntities` half, because the shed is deferred to the consumer sweep and the in-system arrays stay authoritative, so writing one would perform that shed through the import door.
+    Second, the upcast adopts ONLY the three scope keys and DISCARDS the returned `systems`, `recipes` and `gatheringConfig`; that discard is load-bearing rather than defensive, because requirement 1's source-link union is written back onto every in-system record and adopting it would rewrite in-system identity on every import.
+    Third, this function reads `defaults` and `membership` ONLY in their PERSISTED MAP shape and IGNORES an array rather than rejecting one, so ANY caller holding the export envelope's array form must RE-KEY BEFORE CALLING IT (`data-models/spec.md` -> Scoped Entity Definitions requirement 13).
+
+21. **Mutated setting keys:** `worldScopeRekeyMap`, `recipes`, `componentScope`, `essenceScope`, `toolScope`, `craftingSystems`, `gatheringConfig`.
+22. **The downgrade is LOSSLESS FOR DATA and is declared `downgradeLosesData: false`**, checked rather than copied.
     The merged identities are a loss at MIGRATION time, not one the downgrade causes; and the three scope settings are PRESERVED as orphaned `Setting` documents that `1.29.0` neither reads nor writes, so a re-upgrade finds them intact — "stranded and unreadable there" is accurate, "lost" is not.
     ONE real caveat is stated in the `label` without being claimed as data loss: `1.29.0`'s crafting-system normalizer RE-MINTS a concrete `toolSpecific` authority onto a system that authored none, which pins that system out of a world authority only a later release can create.
     That is DATA-lossless and BEHAVIOUR-relevant, which this registry already treats as a different fact.

@@ -97,7 +97,7 @@ export const WORLD_DEFAULT_SECTIONS = Object.freeze({
 });
 
 /** The reserved component category that must NEVER be persisted at world scope. */
-const RESERVED_CATEGORY = 'general';
+export const RESERVED_CATEGORY = 'general';
 
 /**
  * The sections a membership record CANNOT express an empty override for, and which therefore fall
@@ -108,19 +108,27 @@ const RESERVED_CATEGORY = 'general';
  *
  * @type {ReadonlySet<string>}
  */
-const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBreak']);
+export const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBreak']);
 
 /**
  * Whether ONE member record authored a section at all, judged exactly as
  * `buildMembershipRecord` judges it — because the question is precisely "will the membership
  * record this member produces carry an override for this section".
  *
+ * EXPORTED since issue 1364, so the import-time re-check applies THIS predicate rather than a
+ * second one, over the membership records in hand at that point. The reduction to a bare
+ * key-presence test does NOT hold there: it is sound only for a record `buildMembershipRecord`
+ * produced, and a hand-authored payload is a first-class input to the import. A `category` of
+ * `''` or `'  '` carries the key while `coerceComponentSection` coerces it to ABSENCE on the way
+ * into the store, so a key-presence reading admits the world default and the imported system then
+ * RESOLVES a value no GM authored — the exact outcome CONSTRAINT 0 exists to prevent.
+ *
  * @param {object} record
  * @param {string} entityType
  * @param {string} section
  * @returns {boolean}
  */
-function sectionIsAuthoredBy(record, entityType, section) {
+export function sectionIsAuthoredBy(record, entityType, section) {
   if (entityType === 'components') return Boolean(trimmedString(record.category));
   if (section === 'breakage') return record.breakage !== undefined;
   if (section === 'onBreak') return record.onBreak !== undefined;
@@ -153,15 +161,24 @@ function trimmedString(value) {
  * @param {ReadonlySet<string>} worldComponentIds
  * @returns {boolean}
  */
-function isWorldAddressable(reference, worldComponentIds) {
+export function isWorldAddressable(reference, worldComponentIds) {
   const value = trimmedString(reference);
   if (!value) return true;
   if (value.includes('.')) return true;
   return worldComponentIds.has(value);
 }
 
-/** Every component id an ingredient-group list references, including through `alternatives`. */
-function referencedComponentIds(groups, collected = new Set()) {
+/**
+ * Every component id an ingredient-group list references, including through `alternatives`.
+ *
+ * EXPORTED since issue 1364, so the import-time re-check decides constraint 4 with the SAME
+ * enumeration the election used rather than a hand-written second walk of the same shape.
+ *
+ * @param {unknown} groups
+ * @param {Set<string>} [collected]
+ * @returns {Set<string>}
+ */
+export function referencedComponentIds(groups, collected = new Set()) {
   for (const group of arrayOf(groups)) {
     for (const option of arrayOf(group?.options)) collectOptionComponentIds(option, collected);
   }

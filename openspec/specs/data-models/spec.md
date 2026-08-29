@@ -1997,6 +1997,9 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The first of the five is the every-live-member precondition on `category`, `breakage` and `onBreak` — the three sections a membership record cannot express an empty override for — and `### Component scope` and `### Tool scope` each state it for their own.
 > Every membership record is nevertheless created fully OVERRIDING, so NO section resolves through the world layer at migration time and resolved behaviour is unchanged — a world default matters only for a system added later, or an override a GM clears later.
 >
+> **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
+> The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
+>
 > **STILL NOT LIVE after `1.30.0`**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
 > **What the CONSUMER SWEEP (PR 8a, the READ repointing half) retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and `## CraftingSystem` requirement 36 states which and why.
 > The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
@@ -2106,6 +2109,14 @@ SystemMembershipRecord = {
     A persisted map key is DISCARDED on read — normalization keeps the records and not the keys — and RE-DERIVED FROM ITS RECORD on write, never carried over, so a hand-edited or imported payload whose key and record disagree cannot survive a round trip in that state or produce a lookup that finds the wrong record.
     Both sub-keys additionally accept an ARRAY on read, because an import or a hand edit may legitimately deliver either and the requirement 1-12 normalizers have always taken one.
 
+    **THERE IS A THIRD PROJECTION — THE EXPORT ONE — AND IT CARRIES THE ARRAY FORM** (issue 1364).
+    Each of the three settings additionally has an export projection, membership-filtered to one crafting system, which `import-export/spec.md` -> Export completeness owns.
+    It carries `defaults` and `membership` as ARRAYS, for three reasons: every other envelope slice is a list, every requirement 1-12 normalizer takes one, and the persisted map key EMBEDS THE SOURCE SYSTEM ID, which neither import mode's destination shares — so every carried key would be stale on arrival.
+    Dropping the key costs nothing on its own, precisely because it is re-derived from the record on write.
+
+    The reciprocal obligation binds the other direction and MUST be stated, because the failure is silent rather than loud: **a consumer that hands an envelope's `defaults` or `membership` to a transform expecting the PERSISTED shape MUST RE-KEY IT FIRST.**
+    The map form is what that shape means, and an array is NOT tolerated there — it is IGNORED, not rejected — so an unconverted array reaches such a transform as an absent layer.
+
     **The `entities` roster enforces an IDENTITY FLOOR, and `1.30.0` states the SCHEMA the floor tolerates.**
     The floor is unchanged and stays where it is: a non-object or id-less entry is DROPPED rather than repaired, ids are trimmed and de-duplicated first-wins, and EVERY OTHER AUTHORED FIELD IS PRESERVED VERBATIM — so a hand-edited or imported roster is still tolerated rather than rejected.
     What the migration adds is the schema it WRITES, which a reader may now rely on for any entity the migration created:
@@ -2118,7 +2129,8 @@ SystemMembershipRecord = {
     Donor-wins is wrong for them because union-find guarantees only that a group is CONNECTED, not that every member shares a reference with the donor: in a chain A-B-C where C shares a uuid with B and nothing with A, taking A's links as a unit DELETES the uuids only C claimed, and an owned Item sourced from one of them stops resolving at the source-reference tier.
     Unioning is safe in the direction the deletion is not — a source reference is a CLAIM, every member has already made its own, and the resolvers intersect reference SETS rather than compare them, so a longer list resolves strictly more.
 
-    **The migration WRITES THE UNION BACK onto every in-system record**, which is what keeps the two copies equal, and it has a consequence worth stating rather than discovering: after `1.30.0` a component or tool in a NON-DONOR system claims every other member system's source uuids, so `## Component`'s and `## Tool`'s own presence matching widens accordingly.
+    **The migration WRITES THE UNION BACK onto every in-system record**, which is what keeps the two copies equal, and it has a consequence worth stating rather than discovering: after `1.30.0` a component or tool in a NON-DONOR system claims every other member system's source uuids, so `## Component`'s and `## Tool`'s own presence matching widens accordingly — AND SO DOES THE IMPORT-TIME WORLD-ENTITY MATCH, which binds an incoming entity to a destination one on an INTERSECTION of those unioned sets (`import-export/spec.md` -> Copy-mode identifier rebinding).
+    A widened destination entity can therefore be intersected by two incoming records that share NOTHING with each other, which is why that binding is required to be INJECTIVE and cannot be treated as a partition of the incoming records.
     `## EssenceDefinition` is unaffected — a world essence carries no source link at all.
     - a WORLD ESSENCE carries `id`, `name`, `icon`, `colorToken` and `description`, and no source link, because an essence has no source item.
 
@@ -2215,6 +2227,7 @@ That hazard is independent of which system authored the list, which is why no do
    The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
    The failure this rule prevents is a RESET to `general` in every inheriting system on the first resolve, not a blank — a blank is unreachable, because an absent world category falls through to the local value.
    A world category the GM later deletes reaches the resolver as absence and takes that same path; `## CraftingSystem` requirement 6d governs the system-scope deletion case today.
+   **The `general` prohibition binds an IMPORT-TIME write of a carried world default as well as the migration's election**, because since issue 1364 the migration is no longer the only writer: an import carries world defaults elected in another world, and every constraint on them is RE-DECIDED against the DESTINATION's merged corpus rather than the corpus the value was elected in (`import-export/spec.md` -> World-default constraint re-check on import).
    An authored category is a token matched against `CraftingSystem.componentCategories`, so BOTH normalizers trim it and coerce a whitespace-only or non-string one to ABSENCE (requirement 11's shape-rule clause).
    That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
 3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
@@ -2265,6 +2278,9 @@ That hazard is independent of which system authored the list, which is why no do
    An essence whose shipped `sourceComponentId` names a component that did not itself become a world component therefore migrates its source onto the SYSTEM side, as an override with the switch off, and never onto the world default.
    Nothing further is needed for the membership case: a member system that is not a member of the referenced world component resolves the source, fails to resolve the component, and lands in `## EssenceDefinition` requirement 4's retained-evidence state — the REFUSAL requirement 15's basis union exists to preserve, never a prune.
 
+   **The constraint binds an IMPORT-TIME write of a carried world default too, and is RE-DECIDED at the destination** (issue 1364).
+   The migration is no longer the only writer of a world `effectSource`: an import carries one elected in ANOTHER world, whose component roster the destination does not share, so world-addressability is re-evaluated against the DESTINATION's MERGED roster rather than the corpus the value was elected in, and a section that fails is DECLINED and reported (`import-export/spec.md` -> World-default constraint re-check on import).
+
 ### Tool scope
 
 **What the `1.30.0` migration writes here, and the precondition on the two inherited sections.**
@@ -2305,6 +2321,13 @@ An override of `{}` would therefore ERASE a live in-system block rather than mea
    **The FOUR non-UI effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
    They reach it through ONE shared seam, `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`), which resolves the world value from the published tool scope store and delegates to this requirement's resolver; a second hand-rolled `?? "toolSpecific"` at any call site would re-create the defect the flip removes.
    The FIVE UI readers are named as the world tool-breakage editor's obligation: at `1.30.0` no world authority is authored, so their local default and the resolver agree exactly.
+
+   **THE WORLD AUTHORITY DOES NOT TRAVEL WITH AN IMPORT, IN EITHER DIRECTION** (issue 1364).
+   An incoming one is DROPPED by the payload upcast and reported, rather than seeded into an unconfigured destination on the currency and travel precedent: because the migration writes none at all, that precedent would fire on essentially every import and hand a destination world an authority no GM there authored.
+   The DESTINATION's own authority survives an import VERBATIM, which the merge secures by building from the store's persisted projection rather than from the three sub-keys — normalization rebuilds a scope's unrecognised keys from its raw argument, so the narrower base would erase it.
+   The two halves are stated as a PAIR because forbidding the write says nothing about forbidding the erasure.
+
+   The two inherited sections' every-member precondition, and the addressability rule the third rests on, likewise bind an IMPORT-TIME write of a carried world default and are RE-DECIDED against the destination's merged corpus (`import-export/spec.md` -> World-default constraint re-check on import).
 
 ## Tool
 

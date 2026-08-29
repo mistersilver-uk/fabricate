@@ -988,3 +988,162 @@ export function projectReferenceClosure(CraftingSystemManager, corpus, throughSc
   }
   return closure;
 }
+
+// ---------------------------------------------------------------------------
+// The THIRD projection, and the id-canonicalising key rewriter (issue 1364)
+// ---------------------------------------------------------------------------
+
+/**
+ * PROJECTION (c) — the three WORLD-SCOPE SLICES, per layer.
+ *
+ * The two projections above answer what a system's entities ARE and what every reference DENOTES.
+ * Neither can see the world corpus itself: `projectReferenceClosure` records only the hard-coded
+ * leaf names its walk enumerates and never walks `defaults` or `membership` at all. So an import
+ * that landed the system perfectly while dropping every membership record would pass both of them,
+ * which is precisely the failure a membership-filtered export makes reachable.
+ *
+ * THE KEY EMBEDS THE IDS, deliberately, so {@link canonicaliseProjection} can rewrite it: a
+ * copy-mode import re-keys both the entity ids and the system id, and comparing raw keys would
+ * report every successful re-key as a loss.
+ *
+ * @param {{components?: unknown, essences?: unknown, tools?: unknown}} scopeCorpus Each value is
+ *   either the persisted scope payload or a store's published corpus; both sub-key shapes are read.
+ * @returns {Record<string, unknown>}
+ */
+export function projectScopeSlices(scopeCorpus) {
+  const corpus = scopeCorpus && typeof scopeCorpus === 'object' ? scopeCorpus : {};
+  const projection = {};
+  for (const entityType of ['components', 'essences', 'tools']) {
+    const payload = corpus[entityType] ?? {};
+    for (const entity of subKeyEntries(payload?.entities)) {
+      if (entity?.id) projection[`${entityType}|entities|${entity.id}`] = entity;
+    }
+    for (const record of subKeyEntries(payload?.defaults)) {
+      if (record?.id) projection[`${entityType}|defaults|${record.id}`] = record;
+    }
+    for (const record of subKeyEntries(payload?.membership)) {
+      if (!record?.entityId || !record?.systemId) continue;
+      projection[`${entityType}|membership|${record.systemId}|${record.entityId}`] = record;
+    }
+  }
+  return projection;
+}
+
+/** The entries of a scope sub-key, whether it arrived as a map or as an array. */
+function subKeyEntries(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') return Object.values(raw);
+  return [];
+}
+
+/**
+ * Rewrite every id a projection embeds, through the ACTUAL map an import produced.
+ *
+ * DRIVEN BY THE REAL MAP, never by a re-derived one, and that is the whole discipline: a
+ * canonicaliser that re-computed the mapping from the two corpora would agree with a WRONG import
+ * by construction, because it would derive the same wrong answer. The map here is read off the
+ * prepared pack data — the exact ids the import went on to persist.
+ *
+ * Three shapes carry an id and all three are rewritten:
+ *
+ * 1. `projectEntities`'s `` `${system.id}|${entityType}|${record.id}` `` keys, and
+ *    `projectScopeSlices`'s four-segment keys;
+ * 2. the `id` entry of every `PROJECTED_FIELDS` list, which is compared as literal text;
+ * 3. `projectReferenceClosure`'s `systems.<systemId>` / `recipes.<recipeId>` /
+ *    `gatheringConfig.<systemId>` PATH PREFIXES, which name the record the path descends from.
+ *
+ * Reference LEAVES are already scrubbed to `<reference>` by `project`, so they need no rewriting —
+ * that is exactly the division of labour the two projections were built with.
+ *
+ * @param {Record<string, unknown>} projection
+ * @param {object} maps
+ * @param {Map<string, string>} maps.ids Old entity/recipe id to new.
+ * @param {Map<string, string>} maps.systemIds Old system id to new.
+ * @returns {Record<string, unknown>}
+ */
+export function canonicaliseProjection(projection, { ids, systemIds }) {
+  const mapId = (value) => ids.get(value) ?? systemIds.get(value) ?? value;
+  const rewritten = {};
+  for (const [key, value] of Object.entries(projection)) {
+    rewritten[canonicaliseKey(key, mapId)] = canonicaliseValue(value, mapId);
+  }
+  return rewritten;
+}
+
+/** Rewrite the ids a projection KEY embeds — both the pipe form and the dotted path form. */
+function canonicaliseKey(key, mapId) {
+  if (key.includes('|')) return key.split('|').map((segment) => mapId(segment)).join('|');
+  const dotted = /^(systems|recipes|gatheringConfig)\.([^.[]+)(.*)$/.exec(key);
+  return dotted ? `${dotted[1]}.${mapId(dotted[2])}${dotted[3]}` : key;
+}
+
+/**
+ * The keys whose value a projected record carries as an IDENTIFIER: its own identity, and the
+ * component-reference leaves the shared walk rewrites.
+ *
+ * KEY-AWARE, never a blanket string replace, for the reason the copy-mode rebind itself is: a
+ * salvage-group id or a `recipeIds[]` entry that happens to equal a component id must survive
+ * verbatim, and a canonicaliser that rewrote it would hide exactly the defect that discipline
+ * exists to catch.
+ */
+const CANONICALISED_ID_KEYS = new Set([
+  'id',
+  'entityId',
+  'systemId',
+  'componentId',
+  'systemItemId',
+  'sourceComponentId',
+  'associatedSystemItemId',
+  'sourceItemUuid',
+]);
+
+/**
+ * Rewrite the ids a projected record carries. Every other field is compared verbatim.
+ *
+ * Reference leaves are rewritten rather than SCRUBBED here, which is the opposite of what
+ * projection (a) does to the same key names — deliberately. Projection (a) hands the question
+ * "does it still resolve" to projection (b), which resolves it; projection (c) has no resolver, so
+ * scrubbing would leave a slice record whose component reference was never re-keyed indistinguishable
+ * from one that was.
+ */
+function canonicaliseValue(value, mapId) {
+  if (Array.isArray(value)) return value.map((entry) => canonicaliseValue(entry, mapId));
+  if (value === null || typeof value !== 'object') return value;
+  const rewritten = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (CANONICALISED_ID_KEYS.has(key) && typeof entry === 'string') rewritten[key] = mapId(entry);
+    else rewritten[key] = canonicaliseValue(entry, mapId);
+  }
+  return rewritten;
+}
+
+/**
+ * The ACTUAL copy-mode id map, read off the prepared pack data by POSITION against the envelope it
+ * was prepared from.
+ *
+ * Position is sound here and nowhere else: `prepareForImport` rewrites ids in place and never
+ * reorders, adds or drops a record, so index `i` of the pack is index `i` of the envelope. Reading
+ * the map any other way — re-deriving it from source references, say — would agree with a wrong
+ * import by construction.
+ *
+ * @param {object} envelope The payload handed to `prepareForImport`.
+ * @param {object} packData Its result.
+ * @param {string} destinationSystemId The id the import actually resolved.
+ * @returns {{ids: Map<string, string>, systemIds: Map<string, string>}}
+ */
+export function actualImportIdMap(envelope, packData, destinationSystemId) {
+  const ids = new Map();
+  const pairs = [
+    [envelope.system?.components, packData.system?.components],
+    [envelope.recipes, packData.recipes],
+  ];
+  for (const [before, after] of pairs) {
+    for (const [index, record] of (before ?? []).entries()) {
+      const next = (after ?? [])[index];
+      if (record?.id && next?.id) ids.set(record.id, next.id);
+    }
+  }
+  const systemIds = new Map();
+  if (envelope.system?.id) systemIds.set(envelope.system.id, destinationSystemId);
+  return { ids, systemIds };
+}

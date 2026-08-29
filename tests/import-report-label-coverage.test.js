@@ -152,6 +152,40 @@ function everyReferencePayload() {
   };
 }
 
+/**
+ * The four world-scope entity kinds (issue 1364). No pure payload can reach them: they are
+ * emitted by `prepareForImport` and `CompendiumImporter` rather than by `resolveImportReferences`,
+ * exactly as `sourceItem` is, so the behavioural view below excludes them and the
+ * enum-completeness assertion is what covers them instead.
+ */
+const IMPORTER_ONLY_KINDS = new Set([
+  REFERENCE_KINDS.SOURCE_ITEM,
+  REFERENCE_KINDS.WORLD_ENTITY_COLLISION,
+  REFERENCE_KINDS.WORLD_ENTITY_MISSING,
+  REFERENCE_KINDS.WORLD_DEFAULT_DECLINED,
+  REFERENCE_KINDS.WORLD_TOOL_BREAKAGE_DROPPED,
+]);
+
+/**
+ * The owner types `lang/en.json` declares, pinned as a LITERAL so introducing a scope-level owner
+ * type such as `worldEntity` or `worldScope` fails here rather than passing on the strength of
+ * having added its own label. The four world-scope kinds reuse the shipped entity-specific owner
+ * types, and the one ownerless entry takes the shipped `unknown`.
+ */
+const DECLARED_OWNER_TYPES = [
+  'component',
+  'dropRow',
+  'environment',
+  'essence',
+  'event',
+  'realm',
+  'recipe',
+  'recipeItem',
+  'task',
+  'tool',
+  'unknown',
+];
+
 async function emittedReferences() {
   const { unresolvedReferences } = await resolveImportReferences(everyReferencePayload(), {
     resolveUuid: async () => null,
@@ -180,10 +214,11 @@ function literalOwnerTypesInSystems() {
 test('the resolver payload trips every declared reference kind except the importer-only one', async () => {
   const kinds = new Set((await emittedReferences()).map((reference) => reference.kind));
   // `sourceItem` is folded in by CompendiumImporter._foldComponentReferences from the
-  // component source-item resolution, which no pure payload can reach; it is covered by
-  // the enum-completeness assertion below instead.
+  // component source-item resolution, which no pure payload can reach, and the four world-scope
+  // entity kinds are emitted by the exporter/importer rather than the resolver; all five are
+  // covered by the enum-completeness assertion below instead.
   const expected = Object.values(REFERENCE_KINDS)
-    .filter((kind) => kind !== REFERENCE_KINDS.SOURCE_ITEM)
+    .filter((kind) => !IMPORTER_ONLY_KINDS.has(kind))
     .sort();
   assert.deepEqual(
     [...kinds].sort(),
@@ -214,6 +249,34 @@ test('every owner type the import can emit has an OwnerType label', async () => 
     [],
     `FABRICATE.Admin.ImportReport.OwnerType is missing: ${missing.join(', ')}`
   );
+});
+
+test('no NEW ownerType is introduced — the declared set is exactly the shipped one', () => {
+  // The second arm of issue 1364's label criterion, and it points the OPPOSITE way to the guard
+  // above. That one fails when an emitted owner type has no label; this one fails when a label is
+  // ADDED for a scope-level owner type such as `worldEntity` or `worldScope`. A generic owner type
+  // is the unsearchable noun the epic's naming ruling rejects, and it would lose the entity type
+  // in a report already grouped by kind — so the four world-scope kinds reuse `component` /
+  // `tool` / `essence`, and the one entry whose subject is a SETTING rather than a record takes
+  // the shipped `unknown`.
+  assert.deepEqual(
+    Object.keys(REPORT_STRINGS.OwnerType).sort(),
+    [...DECLARED_OWNER_TYPES].sort(),
+    'FABRICATE.Admin.ImportReport.OwnerType gained or lost a key'
+  );
+});
+
+test('every world-scope reference kind has a Kind label', () => {
+  // Stated separately from the enum sweep above so the criterion it serves names itself in the
+  // failure output: adding a kind to REFERENCE_KINDS without its `lang/en.json` entry reddens here.
+  for (const kind of [
+    REFERENCE_KINDS.WORLD_ENTITY_COLLISION,
+    REFERENCE_KINDS.WORLD_ENTITY_MISSING,
+    REFERENCE_KINDS.WORLD_DEFAULT_DECLINED,
+    REFERENCE_KINDS.WORLD_TOOL_BREAKAGE_DROPPED,
+  ]) {
+    assert.equal(typeof REPORT_STRINGS.Kind[kind], 'string', `Kind.${kind} has no label`);
+  }
 });
 
 test('the assembled report renders no raw localization key', async () => {

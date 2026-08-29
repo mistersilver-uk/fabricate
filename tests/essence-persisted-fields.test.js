@@ -26,6 +26,7 @@ installFoundryEnv();
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
+const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 const { resolveImportReferences, REFERENCE_KINDS } = await import(
   '../src/systems/importReferenceResolver.js'
 );
@@ -249,7 +250,7 @@ test('1036/1: prepareForImport carries both new fields, in keep AND copy mode', 
   };
 
   for (const mode of ['keep', 'copy']) {
-    const prepared = prepareForImport(structuredClone(payload), mode);
+    const prepared = prepareForImport(structuredClone(payload), mode, emptyCopyOptions());
     const [definition] = prepared.system.essenceDefinitions;
     assert.equal(definition.enabled, false, `${mode}-mode import preserves the disable`);
     assert.equal(definition.propertyMacroUuid, 'Macro.fire', `${mode}-mode import preserves the macro`);
@@ -269,7 +270,8 @@ test('1036/1: a copy-imported disabled essence still normalizes to a carrying co
       },
       recipes: [],
     },
-    'copy'
+    'copy',
+    emptyCopyOptions()
   );
 
   const normalized = manager._normalizeSystem({ ...prepared.system, id: 'sys-copy' });

@@ -3,19 +3,27 @@
  * Pure functions — no Foundry globals required (testable in isolation).
  */
 
-import { migrateExportPayload } from '../migration/migrateExportPayload.js';
+import {
+  migrateExportPayload,
+  WORLD_SCOPE_UPCAST_REPORT_KEY,
+} from '../migration/migrateExportPayload.js';
 
 import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
   assembleCharacterLibrariesAuthoringBundle,
   assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
+  assembleScopedEntityBundle,
   assembleTravelAuthoringBundle,
 } from './authoringExport.js';
 import {
   rebindCopyContainerIds,
   rebindCopyComponentIds,
   rebindCopyRecipeIds,
+  reportWorldEntityCollisions,
+  REFERENCE_KINDS,
+  WORLD_SCOPE_ENTITY_TYPES,
+  WORLD_SCOPE_SLICE_KEYS,
 } from './importReferenceResolver.js';
 
 const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
@@ -37,6 +45,9 @@ const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
  * @param {object} [currencyConfig={}] - FULL `currencyConfig` world setting
  * @param {object} [travelConfig={}] - FULL `travelConfig` world setting
  * @param {object} [characterLibraries={}] - FULL `characterLibraries` world setting
+ * @param {object} [componentScope={}] - FULL `componentScope` world setting
+ * @param {object} [essenceScope={}] - FULL `essenceScope` world setting
+ * @param {object} [toolScope={}] - FULL `toolScope` world setting
  * @returns {object} Export envelope ready for JSON.stringify
  */
 export function buildExportPayload(
@@ -56,7 +67,15 @@ export function buildExportPayload(
   // modifier library. Defaulted for the same reason as the two above, with the same consequence —
   // an export produced without it carries empty libraries, so every learning gate, tool
   // requirement and check modifier in the bundle lands unresolvable.
-  characterLibraries = {}
+  characterLibraries = {},
+  // The three WORLD-SCOPE ENTITY settings (issue 1364): the world entity roster, the world
+  // defaults and the per-(entity, system) membership records. Defaulted for the reason the three
+  // slices above are, but with a DIFFERENT consequence, because unlike them these are FILTERED BY
+  // MEMBERSHIP to the exported system: an export produced without them carries three empty slices,
+  // so the destination's world corpus learns nothing about the system it just imported.
+  componentScope = {},
+  essenceScope = {},
+  toolScope = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -93,6 +112,9 @@ export function buildExportPayload(
     currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
     travelConfig: assembleTravelAuthoringBundle(travelConfig),
     characterLibraries: assembleCharacterLibrariesAuthoringBundle(characterLibraries),
+    componentScope: assembleScopedEntityBundle(componentScope, systemId),
+    essenceScope: assembleScopedEntityBundle(essenceScope, systemId),
+    toolScope: assembleScopedEntityBundle(toolScope, systemId),
   };
 }
 
@@ -138,6 +160,31 @@ export function validateImportData(rawData) {
     (typeof data.travelConfig !== 'object' || Array.isArray(data.travelConfig))
   ) {
     errors.push('"travelConfig" field must be an object');
+  }
+
+  // The three WORLD-SCOPE ENTITY slices (issue 1364), checked against the RAW payload rather
+  // than the migrated one — and that is not a stylistic choice. The 5→6 upcast REPLACES a slice
+  // it cannot read with a freshly derived one, so by the time we look at `data` a malformed slice
+  // has already become a well-formed one and this check would never fire. A dropped slice is an
+  // import that quietly creates no memberships, which is indistinguishable from success until the
+  // consumer sweep makes the read union visible.
+  for (const key of Object.values(WORLD_SCOPE_SLICE_KEYS)) {
+    const slice = rawData[key];
+    if (slice === undefined) continue;
+    if (typeof slice !== 'object' || slice === null || Array.isArray(slice)) {
+      errors.push(`"${key}" field must be an object`);
+      continue;
+    }
+    for (const subKey of ['entities', 'defaults', 'membership']) {
+      const value = slice[subKey];
+      if (value === undefined) continue;
+      // EITHER SHAPE IS VALID. `## Scoped Entity Definitions` requirement 13 makes the map and the
+      // array both normative for `defaults` and `membership`, and `entities` is an array on both
+      // sides; a scalar is the only thing that cannot be one.
+      if (typeof value !== 'object' || value === null) {
+        errors.push(`"${key}.${subKey}" field must be an object or an array`);
+      }
+    }
   }
 
   // System checks
@@ -195,10 +242,18 @@ export function validateImportData(rawData) {
  * @param {object} data - Validated export payload
  * @param {'keep'|'copy'} mode
  *   - 'keep': retain original IDs (for overwrite or skip scenarios)
- *   - 'copy': strip IDs so CompendiumImporter creates fresh ones
+ *   - 'copy': bind an incoming entity to the destination's existing world entity where their
+ *     source references match, and mint a fresh id only where they do not
+ * @param {object} [options]
+ * @param {{components?: object[], essences?: object[], tools?: object[]}} [options.worldEntityIndex]
+ *   The DESTINATION world's entity roster, read from the three world-scope entity stores. REQUIRED
+ *   under copy mode and never defaulted: falling back to minting a fresh id for every entity is
+ *   precisely the duplication epic 1357 exists to end, and a silent default is the defect class
+ *   this repository has already documented against itself. In keep mode it is optional and is used
+ *   only to REPORT an id collision, which keep mode must not repair.
  * @returns {object} Pack data shaped for CompendiumImporter
  */
-export function prepareForImport(rawData, mode = 'keep') {
+export function prepareForImport(rawData, mode = 'keep', options = null) {
   // Upcast legacy payloads so downstream import always sees the v2 fields.
   const data = migrateExportPayload(rawData);
 
@@ -248,6 +303,43 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.characterLibraries)
       : {};
 
+  // The three WORLD-SCOPE ENTITY slices (issue 1364). Unlike the three world slices above, these
+  // are always present after the upcast — it DERIVES them from the bundle's own system rather
+  // than defaulting them empty — so there is no "dropped here" failure mode to guard. They are
+  // cloned because the copy-mode rewrite below edits them in place.
+  const scopeSlices = {};
+  for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
+    const key = WORLD_SCOPE_SLICE_KEYS[entityType];
+    scopeSlices[key] =
+      data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])
+        ? structuredClone(data[key])
+        : { entities: [], defaults: [], membership: [] };
+  }
+
+  const upcastReport = data[WORLD_SCOPE_UPCAST_REPORT_KEY];
+  // Every `(system, entityType)` pair the shared transform REFUSED. A refused pair yields an
+  // EMPTY slice, so carrying the refusal is what stops a refusal presenting as a system that
+  // simply has no world members.
+  const worldScopeRefusals = Array.isArray(upcastReport?.refusals)
+    ? structuredClone(upcastReport.refusals)
+    : [];
+  const worldScopeReferences = [];
+  if (upcastReport?.droppedToolBreakage) {
+    // KIND 4, and it is a separate kind because the authority is NOT a world default: it is the
+    // FOURTH sub-key of `toolScope`, world scope rather than entity scope. It is the one entry
+    // with no record owner, and every entry must carry an owner, so it takes the shipped `unknown`
+    // owner type — which already reads "Record" — naming the SETTING rather than inventing a
+    // scope-level owner type for one entry.
+    worldScopeReferences.push({
+      kind: REFERENCE_KINDS.WORLD_TOOL_BREAKAGE_DROPPED,
+      ownerType: 'unknown',
+      ownerId: 'toolScope',
+      ownerName: 'World tool scope',
+      referenceValue: String(upcastReport.droppedToolBreakage.authority ?? ''),
+      disposition: 'reported',
+    });
+  }
+
   const prepared = {
     system,
     recipes,
@@ -256,9 +348,26 @@ export function prepareForImport(rawData, mode = 'keep') {
     currencyConfig,
     travelConfig,
     characterLibraries,
+    ...scopeSlices,
+    worldScopeRefusals,
+    worldScopeReferences,
   };
 
+  // ORDERING IS LOAD-BEARING. `migrateExportPayload` has already DERIVED the three slices above,
+  // keyed to the bundle's OWN ids, so the copy-mode map below rewrites them along with every other
+  // reference. Deriving after rebinding would strand every membership and defaults record at a
+  // pre-rebind id.
+  const worldEntityIndex = options?.worldEntityIndex ?? null;
+  worldScopeReferences.push(...reportWorldEntityCollisions(prepared, worldEntityIndex, mode));
+
   if (mode === 'copy') {
+    if (!worldEntityIndex || typeof worldEntityIndex !== 'object') {
+      throw new Error(
+        'prepareForImport: copy mode requires a `worldEntityIndex` naming the destination ' +
+          "world's entities. Defaulting it would silently mint a fresh id for every component, " +
+          'creating a second world record for every item the destination already holds.'
+      );
+    }
     delete system.id;
     // Append "(Copy)" to the name so the user can distinguish it
     system.name = `${system.name || 'Crafting System'} (Copy)`;
@@ -278,12 +387,11 @@ export function prepareForImport(rawData, mode = 'keep') {
     // once createSystem has generated the fresh system id.
     rebindCopyContainerIds(prepared);
 
-    // Regenerate every component id and atomically remap every within-payload
-    // component reference (issue 570). This closes #556's copy-import id-collision
-    // residual: two systems copy-imported from the same origin export no longer
-    // share a component id. Possible only after #561 relieved `componentId` of its
-    // cross-system Tool-reference duty.
-    rebindCopyComponentIds(prepared);
+    // Bind every incoming component to the destination's existing world entity where their
+    // source references say they are the same Item, mint where they do not, and atomically remap
+    // every within-payload component reference — including the ones inside the three world-scope
+    // slices (issue 1364, retracting issue 570's mint-everything rule).
+    rebindCopyComponentIds(prepared, { worldEntityIndex, report: worldScopeReferences });
   }
 
   return prepared;

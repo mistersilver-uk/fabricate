@@ -31,6 +31,7 @@ const {
   makeExportFilename
 } = await import('../src/systems/CraftingSystemExporter.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
+const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -301,7 +302,7 @@ test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and re
     recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }]
   };
 
-  const prepared = prepareForImport(data, 'copy');
+  const prepared = prepareForImport(data, 'copy', emptyCopyOptions());
 
   assert.equal(prepared.system.id, undefined, 'System ID should be stripped');
   assert.equal(prepared.system.name, 'Test System (Copy)');
@@ -317,7 +318,7 @@ test('prepareForImport: does not mutate original data', () => {
     recipes: [{ id: 'r1', name: 'Recipe' }]
   };
 
-  prepareForImport(data, 'copy');
+  prepareForImport(data, 'copy', emptyCopyOptions());
 
   assert.equal(data.system.id, 'sys-1', 'Original system ID should remain');
   assert.equal(data.recipes[0].id, 'r1', 'Original recipe ID should remain');
@@ -414,12 +415,20 @@ test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1
 
 test('buildExportPayload: writes the explicit schemaVersion + runtimeStateIncluded markers', () => {
   const payload = buildExportPayload(makeSystem(), [], '1.0.0');
-  // 4 since issue 1282 added the world `travelConfig` slice to the envelope (3 was #1278's
-  // `currencyConfig`).
-  assert.equal(payload.schemaVersion, 5);
+  // 6 since issue 1364 added the three world-scope entity slices to the envelope (5 was #1308's
+  // `characterLibraries`, 4 was #1282's `travelConfig`, 3 was #1278's `currencyConfig`).
+  assert.equal(payload.schemaVersion, 6);
   assert.ok(payload.currencyConfig && typeof payload.currencyConfig === 'object');
   assert.ok(payload.travelConfig && typeof payload.travelConfig === 'object');
   assert.ok(Array.isArray(payload.travelConfig.realms));
+  // The three world-scope entity slices ride the envelope in the ARRAY projection, one sub-key
+  // per layer, even when the exporting world has never seeded them.
+  for (const key of ['componentScope', 'essenceScope', 'toolScope']) {
+    assert.ok(payload[key] && typeof payload[key] === 'object', `${key} rides the envelope`);
+    for (const subKey of ['entities', 'defaults', 'membership']) {
+      assert.ok(Array.isArray(payload[key][subKey]), `${key}.${subKey} is an array`);
+    }
+  }
   assert.equal(payload.runtimeStateIncluded, false);
   assert.ok(Array.isArray(payload.gatheringEnvironments));
   assert.ok(payload.gatheringConfig && typeof payload.gatheringConfig === 'object');

@@ -11,7 +11,7 @@ import {
 } from './models/toolDisplay.js';
 import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
-import { CompendiumImporter } from './systems/CompendiumImporter.js';
+import { CompendiumImporter, scopeStoreDelegate } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
@@ -1176,7 +1176,17 @@ class Fabricate {
       },
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
-      isGM: () => game.user?.isGM === true
+      isGM: () => game.user?.isGM === true,
+      // The three world-scope entity stores (issue 1364) resolve lazily through thin delegating
+      // objects, for the environment store's reason above and one of its own. The merge fails
+      // CLOSED on an absent store, so a seam that captured a still-undefined field would make
+      // every world-scope import merge NOTHING and still report success — which is exactly the
+      // failure deleting the `game.fabricate` accessor mirror was meant to end. A delegator closes
+      // over the FIELD rather than an accessor name, so it needs no ordering comment to stay true
+      // and a rename cannot slip past it.
+      componentScopeStore: scopeStoreDelegate(() => this.componentScopeStore),
+      essenceScopeStore: scopeStoreDelegate(() => this.essenceScopeStore),
+      toolScopeStore: scopeStoreDelegate(() => this.toolScopeStore)
     });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
@@ -4705,6 +4715,13 @@ function bindFabricateGlobal() {
     // consequence: omit them and the export carries empty libraries, so every learning gate,
     // tool requirement and check modifier in the payload lands unresolvable.
     const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
+    // And the three WORLD-SCOPE ENTITY settings (issue 1364), for the same reason and with a
+    // sharper consequence: these slices are membership-filtered to this system, so omitting them
+    // exports a system whose world roster, world defaults and membership records are all empty —
+    // and the destination's world corpus learns nothing about the system it just imported.
+    const componentScope = fabricate.getComponentScopeStore?.()?.get?.() ?? {};
+    const essenceScope = fabricate.getEssenceScopeStore?.()?.get?.() ?? {};
+    const toolScope = fabricate.getToolScopeStore?.()?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
@@ -4713,7 +4730,10 @@ function bindFabricateGlobal() {
       gatheringConfig,
       currencyConfig,
       travelConfig,
-      characterLibraries
+      characterLibraries,
+      componentScope,
+      essenceScope,
+      toolScope
     );
   };
 
@@ -4723,7 +4743,11 @@ function bindFabricateGlobal() {
     const validation = CraftingSystemExporter.validateImportData(data);
     if (!validation.valid) throw new Error(`Invalid import data: ${validation.errors.join('; ')}`);
     const mode = options.copyMode ? 'copy' : 'keep';
-    const packData = CraftingSystemExporter.prepareForImport(data, mode);
+    // The DESTINATION world's entity roster (issue 1364). Copy mode REQUIRES it and never defaults
+    // it: without it every incoming component would mint a fresh id, creating a second world
+    // record for every item this world already holds.
+    const worldEntityIndex = buildWorldEntityIndex(fabricate);
+    const packData = CraftingSystemExporter.prepareForImport(data, mode, { worldEntityIndex });
     return fabricate.compendiumImporter.importFromPackData(packData, {
       overwriteExisting: options.overwriteExisting || false
     });
@@ -4739,6 +4763,27 @@ function bindFabricateGlobal() {
   // Exposed as a plain API method (no rendered UI control) so a GM can run it from a
   // macro/console; see docs/canvas-interactables.md "Uninstalling Fabricate cleanly".
   game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
+}
+
+/**
+ * The DESTINATION world's entity roster, read from the three world-scope entity stores
+ * (issue 1364).
+ *
+ * A copy-mode import matches every incoming entity's SOURCE REFERENCES against this, binding to
+ * the world entity the destination already holds rather than minting a duplicate for the same
+ * item. An absent or unseeded store answers an empty list, which simply means every incoming
+ * entity mints — the correct behaviour for an unmigrated world, whose scope settings an import
+ * never seeds.
+ *
+ * @param {object} fabricate
+ * @returns {{components: object[], essences: object[], tools: object[]}}
+ */
+function buildWorldEntityIndex(fabricate) {
+  return {
+    components: fabricate?.getComponentScopeStore?.()?.listEntities?.() ?? [],
+    essences: fabricate?.getEssenceScopeStore?.()?.listEntities?.() ?? [],
+    tools: fabricate?.getToolScopeStore?.()?.listEntities?.() ?? [],
+  };
 }
 
 /**

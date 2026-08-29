@@ -24,6 +24,7 @@ globalThis.fromUuid = async () => null;
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
 const { resolveImportReferences } = await import('../src/systems/importReferenceResolver.js');
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
+const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
 /**
  * Build a payload whose single book (`recipeItemDefinitions[0]`) is a member of two
@@ -90,7 +91,7 @@ function makeMockRecipeManager() {
 }
 
 test('#701 copy-mode regenerates recipe ids and remaps book membership to them', () => {
-  const prepared = prepareForImport(buildMembershipPayload(), 'copy');
+  const prepared = prepareForImport(buildMembershipPayload(), 'copy', emptyCopyOptions());
 
   const newIds = prepared.recipes.map((r) => r.id);
   // Every recipe id is fresh (regenerated, not stripped).
@@ -114,7 +115,7 @@ test('#701 copy-mode regenerates recipe ids and remaps book membership to them',
 });
 
 test('#701 a faithful copy import reports zero broken RECIPE_ITEM references', async () => {
-  const prepared = prepareForImport(buildMembershipPayload(), 'copy');
+  const prepared = prepareForImport(buildMembershipPayload(), 'copy', emptyCopyOptions());
   const { unresolvedReferences } = await resolveImportReferences(
     {
       system: prepared.system,
@@ -131,7 +132,7 @@ test('#701 a faithful copy import reports zero broken RECIPE_ITEM references', a
 });
 
 test('#701 end-to-end: an imported copy persists books whose recipeIds resolve to the copy', async () => {
-  const prepared = prepareForImport(buildMembershipPayload(), 'copy');
+  const prepared = prepareForImport(buildMembershipPayload(), 'copy', emptyCopyOptions());
   const systemManager = makeMockSystemManager();
   const recipeManager = makeMockRecipeManager();
   const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
@@ -153,7 +154,7 @@ test('#701 end-to-end: an imported copy persists books whose recipeIds resolve t
 });
 
 test('#701 a genuinely dangling membership entry is preserved verbatim and reported', async () => {
-  const prepared = prepareForImport(buildMembershipPayload({ danglingId: 'recipe-ghost' }), 'copy');
+  const prepared = prepareForImport(buildMembershipPayload({ danglingId: 'recipe-ghost' }), 'copy', emptyCopyOptions());
 
   const membership = prepared.system.recipeItemDefinitions[0].recipeIds;
   assert.ok(
