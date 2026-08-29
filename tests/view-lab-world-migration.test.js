@@ -20,13 +20,17 @@
  * — where a capture run needs harvested Foundry chrome and does not run on a fork PR at all.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { buildWorldScopeEntityNotice } from '../src/migration/worldScopeEntityNotice.js';
 import {
   policyDefersSelection,
   resolveMaxModifierPicks,
 } from '../src/systems/checkModifierResolver.js';
+import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 
 /**
@@ -37,7 +41,8 @@ import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js'
  * without booting anything. `migrationVersion` is deliberately NOT seeded, because that is the fact
  * under test — seeding it here would make every assertion below vacuous.
  *
- * @returns {Promise<{ before: object, after: object }>} The seeded and migrated worlds.
+ * @returns {Promise<{ before: object, after: object, summary: object }>} The seeded and
+ *   migrated worlds, plus the runner summary carrying the transient world-scope report.
  */
 async function migrateLabWorld() {
   const content = buildLabContent();
@@ -57,7 +62,7 @@ async function migrateLabWorld() {
   const summary = await runner.run();
   assert.equal(summary.aborted, false, 'the lab world must not abort the migration pass');
   assert.ok(summary.ran > 0, 'no migration ran, so this file is asserting against nothing');
-  return { before, after: Object.fromEntries(store) };
+  return { before, after: Object.fromEntries(store), summary };
 }
 
 const labSystem = (systems, id) => systems.find((system) => system.id === id);
@@ -208,4 +213,189 @@ test('the lab’s check-modifier system still defers the selection with an unbou
     `the pick cap (${String(check?.maxModifierPicks)}) bounds the eligible set of ${eligible}, so ` +
       '`player-crafting-roll-prompt` photographs a narrower control than the case describes'
   );
+});
+
+/**
+ * THE CAPTURE DRIVER'S WARNING TOLERANCE, held against the messages this world really emits.
+ *
+ * `scripts/view-lab-screenshots.mjs` treats an untolerated `Fabricate |` WARNING as fatal, which is
+ * what makes a fixture-shaped defect fail a frame rather than publish one. `TOLERATED_WARNINGS` is
+ * the only hole in that gate, so it is the one list where a pattern that is too broad is worse than
+ * the bug it was added for: it excuses a real defect silently, on every case, forever.
+ *
+ * The two entries the `1.30.0` migration made necessary are pinned here, and the messages are
+ * DERIVED rather than copied. A copied literal rots the moment the message is reworded: the pattern
+ * stops matching, the copy goes on agreeing with itself, and the guard stays green while all 268
+ * cases fail. So the notice is rebuilt from the report this lab world's own migration produces, and
+ * the omission warning is emitted by the real composition site reading the re-key map that same
+ * migration wrote.
+ */
+const DRIVER_PATH = resolve(import.meta.dirname, '../scripts/view-lab-screenshots.mjs');
+
+const LANG = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
+
+/**
+ * The localizer `src/main.js` hands the notice builder: `format` when the clause takes data,
+ * `localize` when it does not. Token substitution is by name over the supplied data, exactly as
+ * `toI18nStub` does it for the lab itself, so an absent token survives rather than blanking.
+ *
+ * @param {string} key Dotted `FABRICATE.…` key.
+ * @param {object} [data] Clause data, when the clause takes any.
+ * @returns {string|undefined} The localized string, or `undefined` when the key does not resolve.
+ */
+function localizeLang(key, data) {
+  const template = key.split('.').reduce((node, part) => node?.[part], LANG);
+  if (typeof template !== 'string') return undefined;
+  if (!data) return template;
+  return Object.entries(data).reduce(
+    (text, [token, value]) => text.replaceAll(`{${token}}`, String(value)),
+    template
+  );
+}
+
+/**
+ * The regex literals the capture driver declares, read out of its own source.
+ *
+ * The driver cannot be IMPORTED — it dispatches a command off `process.argv` at module scope, so
+ * importing it launches a capture — which is why the list is read as text. Parsed without a regex
+ * of its own, because a parser that silently matched nothing would report an EMPTY tolerance list
+ * and every assertion below would then pass vacuously.
+ *
+ * @returns {RegExp[]} every declared pattern, in source order.
+ */
+function toleratedWarningPatterns() {
+  const source = readFileSync(DRIVER_PATH, 'utf8');
+  const start = source.indexOf('const TOLERATED_WARNINGS = [');
+  assert.ok(
+    start !== -1,
+    '`scripts/view-lab-screenshots.mjs` no longer declares TOLERATED_WARNINGS'
+  );
+  const end = source.indexOf('\n];', start);
+  assert.ok(end > start, 'the TOLERATED_WARNINGS declaration is no longer a closed array literal');
+  const patterns = source
+    .slice(start, end)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('/') && !line.startsWith('//') && line.endsWith(','))
+    .map((line) => {
+      const literal = line.slice(0, -1);
+      const lastSlash = literal.lastIndexOf('/');
+      assert.ok(lastSlash > 0, `not a regex literal: ${line}`);
+      return new RegExp(literal.slice(1, lastSlash), literal.slice(lastSlash + 1));
+    });
+  assert.ok(
+    patterns.length > 0,
+    'no pattern was parsed out of TOLERATED_WARNINGS, so everything below would pass vacuously'
+  );
+  return patterns;
+}
+
+/**
+ * The omission warning a lab build emits, from the REAL composition site.
+ *
+ * The corpora are empty on purpose: `composeStartupPassList` decides omissions from the id BASIS
+ * alone, and every thunk it returns is left uninvoked, so the collaborators only have to answer.
+ * The one input that decides anything is `getSetting`, which reads the migrated world — including
+ * the `worldScopeRekeyMap` the `1.30.0` pass just wrote, which is what makes the basis incomplete.
+ *
+ * @param {object} after The migrated setting store.
+ * @returns {string[]} every message the composition warned with.
+ */
+function labStartupOmissionWarnings(after) {
+  const answered = async () => {};
+  const inert = {
+    cleanupInvalidRuns: answered,
+    pruneInstantaneousActiveRuns: answered,
+    cleanupLearnedRecipes: answered,
+  };
+  const warnings = [];
+  composeStartupPassList({
+    recipeManager: { getRecipes: () => [], getRecipe: () => null },
+    craftingSystemManager: { getSystems: () => [] },
+    craftingRunManager: inert,
+    salvageRunManager: inert,
+    recipeVisibilityService: inert,
+    getSetting: (key) => after[key],
+    setSetting: answered,
+    resolveGatheringActor: () => null,
+    isSelectableGatheringActor: () => false,
+    warn: (message) => {
+      warnings.push(message);
+    },
+  });
+  return warnings;
+}
+
+test('the capture driver tolerates the two warnings a lab build really emits', async () => {
+  const { after, summary } = await migrateLabWorld();
+  const patterns = toleratedWarningPatterns();
+
+  const notice = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, localizeLang);
+  // The severity is DERIVED — `warn` only when the pass produced a rename, a refusal or a flagged
+  // reference — so this fixture reaches the gate at all because it produces one rename. If that
+  // stops being true the notice never reaches the driver and its tolerance entry is DEAD, which is
+  // worth failing on: a dead entry is an unexplained hole that outlives its reason.
+  assert.equal(
+    notice.severity,
+    'warn',
+    'the world-scope notice no longer reaches the capture gate, so its entry in ' +
+      '`TOLERATED_WARNINGS` is now dead and should be deleted rather than left standing'
+  );
+  const omissions = labStartupOmissionWarnings(after);
+  assert.equal(
+    omissions.length,
+    1,
+    'the lab world no longer withholds a startup pass, so the second entry in ' +
+      '`TOLERATED_WARNINGS` is now dead and should be deleted rather than left standing'
+  );
+
+  // ONE pattern per message, not "at least one". Zero means the entry was deleted or has drifted
+  // from the message it excuses; two means a pattern has been widened far enough to swallow a
+  // message it was never argued for.
+  for (const message of [notice.message, omissions[0]]) {
+    const matched = patterns.filter((pattern) => pattern.test(message));
+    assert.equal(
+      matched.length,
+      1,
+      `exactly one tolerated pattern must match this warning, ${matched.length} did:\n  ` +
+        `${message}\n  matched by: ${matched.map(String).join(', ') || 'nothing'}`
+    );
+  }
+});
+
+test('no tolerated pattern matches a warning the capture gate exists to catch', async () => {
+  const { summary } = await migrateLabWorld();
+  const patterns = toleratedWarningPatterns();
+  const unlocalized = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, () => undefined);
+
+  const controls = [
+    // Real product warnings, prefixed exactly as the driver sees them. These are the defect class
+    // the gate was built for — a resolver degrading to a default and saying so at `warn` while the
+    // frame renders cleanly and publishes.
+    'Fabricate | Ignoring invalid situational bonus',
+    'Fabricate | Gathering hook failed: fabricate.gatheringComplete',
+    // A routed notification, which is the channel the first tolerated entry travels on. The gate
+    // exists to fail on THIS one: the import path's validation notice published a clean systems
+    // browser under the name "Import report" for a whole increment.
+    'Fabricate | notification: Invalid file: the payload declares no crafting system',
+    // THE SAME NOTICE WITH ITS STRING TABLE MISSING, derived rather than written: `localizeWith`
+    // falls back to a literal when the key does not resolve. A lab that lost `lang/en.json` renders
+    // fallback copy everywhere and must FAIL a capture, so the tolerated pattern has to be specific
+    // to the localized wording rather than to the notice's subject.
+    `Fabricate | notification: ${unlocalized.message}`,
+    // A constructed near miss for the second entry, sharing its subject and its first two words and
+    // differing exactly where the pattern anchors. `runStartupMaintenance` reports a pass that THREW
+    // on `console.error`, so there is no real warn-level neighbour to use in its place.
+    'Fabricate | Startup cleanup FAILED: salvage runs threw and the world may be inconsistent',
+  ];
+
+  for (const control of controls) {
+    const matched = patterns.filter((pattern) => pattern.test(control));
+    assert.deepEqual(
+      matched.map(String),
+      [],
+      'a tolerated pattern is broad enough to excuse a warning the gate exists to catch, so that ' +
+        `warning would publish a frame instead of failing it:\n  ${control}`
+    );
+  }
 });
