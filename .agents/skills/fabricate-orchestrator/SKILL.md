@@ -15,6 +15,7 @@ Make behavior changes here, not in the bindings.
 - `openspec/README.md` for the issue-based change-delta format and managed-block rules
 - the work's GitHub issue context supplied by the workflow driver, including any existing `openspec-delta` block
 - relevant canonical specs under `openspec/specs/`
+- `openspec/specs/design-system/spec.md` when planning any UI-touching change, so the plan names the primitives it reuses and states explicitly which, if any, it extends or adds
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
 - the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
