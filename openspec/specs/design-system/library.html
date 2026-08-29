@@ -127,8 +127,8 @@ a{color:var(--fab-accent)}
 .k-step .rail{padding:0 8px;height:28px;display:grid;place-items:center;font-family:var(--fab-font-mono);font-size:9.5px;color:var(--fab-text-subtle);border-left:1px solid var(--fab-border)}
 .k-pair{display:inline-flex;align-items:center;gap:var(--fab-space-chip)}
 .k-unit{font-size:10px;font-weight:500;color:var(--fab-text-subtle)}
-.k-tog{width:38px;height:22px;border-radius:999px;padding:2px;border:1px solid var(--fab-border);background:var(--fab-surface-soft);display:flex;cursor:pointer;transition:background 140ms ease}
-.k-tog i{width:18px;height:18px;border-radius:999px;background:var(--fab-bg-3);display:block;transition:margin-left 140ms ease}
+.k-tog{width:38px;height:22px;border-radius:999px;padding:1px;border:1px solid var(--fab-border);background:var(--fab-surface-soft);display:flex;align-items:center;cursor:pointer;transition:background 140ms ease}
+.k-tog i{width:18px;height:18px;border-radius:999px;background:var(--fab-bg-3);display:block;flex:none;transition:margin-left 140ms ease}
 .k-tog.on{background:var(--fab-accent);border-color:var(--fab-accent)}
 .k-tog.on i{margin-left:16px;background:var(--fab-bg-1)}
 .k-tog.on.success{background:var(--fab-success);border-color:var(--fab-success)}
@@ -164,8 +164,8 @@ a{color:var(--fab-accent)}
 .k-chip:hover{background:var(--fab-surface-raised)}
 .k-chip.sel{background:var(--fab-accent-soft);color:var(--fab-accent-text);border-color:var(--fab-accent-border)}
 .k-chip .i{width:9px;height:9px}
-.k-token{display:inline-flex;align-items:center;gap:var(--fab-space-chip);height:30px;padding:0 4px;border-radius:999px;background:var(--fab-bg-2);border:1px solid var(--fab-border);font-size:11.5px;font-weight:500;color:var(--fab-text)}
-.k-token .x{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;background:var(--fab-surface-soft);color:var(--fab-text-subtle);border:0;cursor:pointer}
+.k-token{display:inline-flex;align-items:center;gap:var(--fab-space-chip);height:30px;padding:0 4px;border-radius:7px;background:var(--fab-bg-2);border:1px solid var(--fab-border);font-size:11.5px;font-weight:500;color:var(--fab-text)}
+.k-token .x{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;background:var(--fab-surface-soft);color:var(--fab-text-subtle);border:0;cursor:pointer}
 .k-token .x .i{width:9px;height:9px}
 .k-count{font-family:var(--fab-font-mono);font-size:10.5px;font-weight:500;color:var(--fab-text-subtle);font-variant-numeric:tabular-nums}
 .k-dot{width:6px;height:6px;border-radius:999px;background:var(--fab-accent);display:inline-block}
@@ -255,7 +255,7 @@ a{color:var(--fab-accent)}
 <div class="shell">
 <nav class="rail">
   <div class="brand">Fabricate<br>Build Reference</div>
-  <div class="ver">Rev 2 · every entry rendered</div>
+  <div class="ver">Every primitive, rendered</div>
   <ol>
     <li><a href="#use"><span class="num">00</span> How to use this</a></li>
     <div class="grp">Foundations</div>
@@ -276,13 +276,13 @@ a{color:var(--fab-accent)}
     <li><a href="#routing"><span class="num">13</span> Which one do I use?</a></li>
     <div class="grp">Record</div>
     <li><a href="#ruledout"><span class="num">14</span> Ruled out</a></li>
-    <li><a href="#log"><span class="num">15</span> Decision log</a></li>
+    <li><a href="#log"><span class="num">15</span> Planned migrations</a></li>
   </ol>
 </nav>
 
 <main>
 
-<div class="eyebrow">Design reference · revision 2</div>
+<div class="eyebrow">Design reference</div>
 <h1>Building Fabricate screens</h1>
 <p class="standfirst">Every primitive rendered at its canonical geometry, in the shipped palette, with the API it needs to be built — then the recipes that assemble them into the three screens this app actually has.</p>
 
@@ -295,19 +295,19 @@ a{color:var(--fab-accent)}
     <div class="stage col">
       <div class="k-well" style="display:grid;gap:10px">
         <div><span class="k-kicker accent">1 · One component per job</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Where two surfaces do the same thing, they import the same component. If you are about to write a second version, the answer is a prop on the first.</p></div>
-        <div><span class="k-kicker accent">2 · Geometry comes from the ladder</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Five control heights, five radii, one 4px spacing scale. A value off the ladder is a bug, not a decision.</p></div>
+        <div><span class="k-kicker accent">2 · Geometry comes from the ladder</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Six control heights, five radii, one 4px spacing scale. A value off the ladder is a bug, not a decision.</p></div>
         <div><span class="k-kicker accent">3 · Colour is data, not decoration</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">A tint identifies an entity; a semantic family reports state. Never a literal — a raw <code>rgba()</code> fails the colour gate.</p></div>
         <div><span class="k-kicker accent">4 · Every control declares its states</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Rest, hover, focus-visible, disabled — and where they apply, readonly, invalid, loading, empty. Naming is a required prop, not an optional one.</p></div>
         <div><span class="k-kicker accent">5 · Foundry owns the window</span><p style="margin:4px 0 0;font-size:12.5px;color:var(--fab-text-muted)">Container queries, not viewport. Portalled popovers, not CSS offsets. No URL, no router, no toast. Section 05 is not advice.</p></div>
       </div>
     </div>
-    <div class="delta ok"><b>What changed in this revision.</b> The corpus is now Core only — the Economy module and the Downtime companion are separate products, and revision 1's headline counts were weighted by them. Thirteen parts added, ten removed, seventeen APIs rewritten, and six new foundations covering focus, motion, naming, spacing, elevation and responsiveness. Where a component already ships, <b>its props are the specification and this page is the proposal</b>.</div>
+    
   </div>
 </section>
 
 <section id="colour">
   <div class="sec-head"><span class="num">01</span><h2>Colour</h2></div>
-  <p class="lede">Four background levels carry all depth. Every name below is the shipped token — revision 1 wrote <code>--bg0</code> and <code>--accent</code>, which do not exist.</p>
+  <p class="lede">Four background levels carry all depth. Every name below is the shipped token; there is no unprefixed alias.</p>
 
   <div class="spec">
     <div class="spec-head"><h4>Depth &amp; interaction</h4><p class="why">Backgrounds nest downward: a page is bg-0, a card on it is bg-2, a well inside that card is bg-1. Interaction surfaces are translucent overlays, so they read correctly on any of the four.</p></div>
@@ -334,7 +334,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>Entity tints</h4><span class="tag t-rev">Corrected</span><p class="why">Eight pickable tag tokens, in declared order. The tint colours a glyph, a badge ink and a bar fill — never a chip background, which would double-code kind against state.</p></div>
+    <div class="spec-head"><h4>Entity tints</h4><p class="why">Thirteen tag tokens are declared in every theme. The eight above are offered in the picker; the five below are declared but not offered. The tint colours a glyph, a badge ink and a bar fill — never a chip background, which would double-code kind against state.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">sage</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-sage)"></div></div>
       <div class="unit"><span class="cap">mist</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-mist)"></div></div>
@@ -345,11 +345,18 @@ a{color:var(--fab-accent)}
       <div class="unit"><span class="cap">aqua</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-aqua)"></div></div>
       <div class="unit"><span class="cap">mauve</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-mauve)"></div></div>
     </div>
-    <div class="delta"><b>Revision 1 said five.</b> Thirteen <code>--fab-tag-*</code> are declared and <b>eight</b> are pickable; the extra five are decorative tints Core uses at fixed sites. Adding a token to the stylesheet does not add it to a picker. Store the <b>token name, never a hex</b>, so a theme swap re-tints every entity.<span class="cite"><b>managerColorTokens.js:24-31</b></span></div>
+    <div class="stage" style="border-top:1px solid var(--fab-border)">
+      <div class="unit"><span class="cap">ember</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-ember);opacity:.85"></div></div>
+      <div class="unit"><span class="cap">verdant</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-verdant);opacity:.85"></div></div>
+      <div class="unit"><span class="cap">azure</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-azure);opacity:.85"></div></div>
+      <div class="unit"><span class="cap">bone</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-bone);opacity:.85"></div></div>
+      <div class="unit"><span class="cap">slate</span><div style="width:64px;height:36px;border-radius:7px;background:var(--fab-tag-slate);opacity:.85"></div></div>
+    </div>
+    <div class="delta warn"><b>Open decision: the split between the eight and the five is undocumented and, as written, unjustified.</b> The stylesheet says the other five are &ldquo;decorative tints Core uses at fixed sites&rdquo;. That is true of <code>ember</code> only, which one file binds to the Downtime companion tint. <b><code>verdant</code>, <code>azure</code>, <code>bone</code> and <code>slate</code> have zero consumers anywhere</b> &mdash; declared in all seven themes, referenced nowhere.<br><br>Nor does collision with a reserved colour explain it: <code>verdant</code> is byte-identical to <code>--fab-success</code> and <code>azure</code> to <code>--fab-drop-rate-uncommon</code>, but three <em>pickable</em> tints already collide the same way &mdash; <code>mist</code> with <code>--fab-info</code>, <code>lavender</code> with <code>--fab-purple</code>, <code>butter</code> with <code>--fab-warning</code>. Any rule that excludes verdant and azure on collision grounds would have to retire those three too.<br><br><b>Recommendation:</b> replace the count with a rule. A tint is pickable unless it is a NEUTRAL that would read as text or as a disabled state (<code>bone</code> is near-white, <code>slate</code> is grey) or is BOUND to a fixed brand site (<code>ember</code>). That makes <b>ten</b> pickable by adding <code>verdant</code> and <code>azure</code>. Widening the picker is a runtime change with new localized labels, so it is recorded here as a decision for the maintainer rather than made in this change.<span class="cite">Evidence: <b>styles/fabricate.css</b> declares all 13 in 7 blocks with 0 <code>var()</code> references; <b>managerColorTokens.js:24-31</b> enumerates the 8; the only consumer of the five is <b>WorldDowntimePreview.svelte:371</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>The drop-rate ramp</h4><span class="tag t-car">Carried</span><p class="why">Seven fixed hues, byte-identical in all seven themes. Wherever colour carries a reading it is banded: a value range maps to one of these, and the whole fill takes that colour. Nothing is interpolated, so a bar at 57% and one at 58% never land in a hue the ramp does not contain.</p></div>
+    <div class="spec-head"><h4>The drop-rate ramp</h4><p class="why">Seven fixed hues, byte-identical in all seven themes. Wherever colour carries a reading it is banded: a value range maps to one of these, and the whole fill takes that colour. Nothing is interpolated, so a bar at 57% and one at 58% never land in a hue the ramp does not contain.</p></div>
     <div class="stage" style="gap:10px">
       <div class="unit"><span class="cap">guaranteed</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-guaranteed)"></div></div>
       <div class="unit"><span class="cap">common</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-common)"></div></div>
@@ -359,7 +366,7 @@ a{color:var(--fab-accent)}
       <div class="unit"><span class="cap">legendary</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-legendary)"></div></div>
       <div class="unit"><span class="cap">none</span><div style="width:80px;height:30px;border-radius:6px;background:var(--fab-drop-none)"></div></div>
     </div>
-    <div class="delta warn"><b>One migration this implies.</b> Tool breakage currently interpolates across theme tokens at 0/33/66/100. The banded rule stands, but this is a real change to a shipped scale rather than a no-op, and belongs in the log.<span class="cite"><b>chanceColorScale.js:3-8</b> · <b>ToolBreakageTab.svelte:299</b></span></div>
+    <div class="delta warn"><b>Planned migration.</b> Tool breakage still interpolates across theme tokens at 0/33/66/100 and moves to the banded ramp. It is the one shipped scale this rule changes.<span class="cite"><b>chanceColorScale.js:3-8</b> · <b>ToolBreakageTab.svelte:299</b></span></div>
   </div>
 </section>
 
@@ -368,7 +375,7 @@ a{color:var(--fab-accent)}
   <p class="lede">Spectral names things. The host UI face carries interface text. JetBrains Mono carries every number a GM will compare or tune.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>The ladder</h4><span class="tag t-rev">Two corrections</span></div>
+    <div class="spec-head"><h4>The ladder</h4></div>
     <div class="stage col" style="gap:0;padding:0">
       <div style="padding:12px 16px;border-bottom:1px solid var(--fab-border);display:flex;justify-content:space-between;gap:20px;align-items:baseline;flex-wrap:wrap"><span style="font-family:var(--fab-font-serif);font-size:22px;font-weight:600">Page title</span><span class="k-count">Spectral 600 · 22px</span></div>
       <div style="padding:12px 16px;border-bottom:1px solid var(--fab-border);display:flex;justify-content:space-between;gap:20px;align-items:baseline;flex-wrap:wrap"><span style="font-family:var(--fab-font-serif);font-size:19px;font-weight:600">Section heading</span><span class="k-count">Spectral 600 · 19px</span></div>
@@ -387,7 +394,7 @@ a{color:var(--fab-accent)}
       <div style="padding:12px 16px;display:flex;justify-content:space-between;gap:20px;align-items:baseline;flex-wrap:wrap"><span class="k-mono" style="font-size:9.5px;color:var(--fab-text-subtle)">+12 · 3 ticks ago</span><span class="k-count">Mono 400 · 9.5px — log line</span></div>
     </div>
     <div class="notes">
-      <div><h5>Mono ships 400 and 500 only</h5><ul><li>Revision 1's ladder asked for <b>600</b> at three steps and <b>700</b> at one. <code>assets/fonts/</code> holds exactly <code>-400-</code> and <code>-500-</code>.</li><li>Those steps would synthesize as faux-bold. Emphasis in mono comes from <b>size and ink</b>.</li><li>Every mono numeric sets <b>tabular-nums</b>, so 9 to 10 cannot shift the control beside it.</li></ul></div>
+      <div><h5>Mono ships 400 and 500 only</h5><ul><li><code>assets/fonts/</code> ships exactly <code>jetbrains-mono-latin-400</code> and <code>-500</code>, and canon says ship only the weights the product uses.</li><li>Those steps would synthesize as faux-bold. Emphasis in mono comes from <b>size and ink</b>.</li><li>Every mono numeric sets <b>tabular-nums</b>, so 9 to 10 cannot shift the control beside it.</li></ul></div>
       <div><h5>The UI face is host-owned</h5><ul><li>Canon leaves it as Foundry's <code>--font-primary</code>, deliberately <b>untokenized</b>.</li><li>So the ladder gives sizes, weights and roles and never names the family. A theme changing that face is a supported outcome.</li><li>Only serif and mono are Fabricate tokens.</li></ul></div>
     </div>
     <div class="delta"><span class="cite"><b>ui-integration/spec.md:57, 60</b> · verified in <b>assets/fonts/</b></span></div>
@@ -396,10 +403,10 @@ a{color:var(--fab-accent)}
 
 <section id="space">
   <div class="sec-head"><span class="num">03</span><h2>Space &amp; geometry</h2></div>
-  <p class="lede">Revision 1 had no spacing section and specified padding as raw literals in almost every entry. Canon requires a 4px scale.</p>
+  <p class="lede">Padding, margin and gap come from a 4px scale. Radius and height are separate ladders and are not scale members.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>Spacing scale</h4><span class="tag t-new">New foundation</span><p class="why">Padding, margin and gap come from here. Radius, width, height, border widths, font sizes, grid tracks and breakpoints are not spacing members and stay literal.</p></div>
+    <div class="spec-head"><h4>Spacing scale</h4><p class="why">Padding, margin and gap come from here. Radius, width, height, border widths, font sizes, grid tracks and breakpoints are not spacing members and stay literal.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:7px">
         <div style="display:flex;align-items:center;gap:12px"><span class="k-count" style="width:132px">--fab-space-2xs</span><div style="height:14px;width:2px;background:var(--fab-accent)"></div><span class="k-hint">2 · hairline</span></div>
@@ -412,7 +419,7 @@ a{color:var(--fab-accent)}
         <div style="display:flex;align-items:center;gap:12px"><span class="k-count" style="width:132px">--fab-space-6 / xl</span><div style="height:14px;width:24px;background:var(--fab-accent)"></div><span class="k-hint">24 · between page regions</span></div>
       </div>
     </div>
-    <div class="delta warn"><b>What this retires.</b> Revision 1's paddings were mostly off-scale — 14/15, 11/13, 12/13, 9/11, 8/10, 16/18, with gaps of 5, 7, 9, 11 and 13. Each snaps to the nearest token. The only exempt literals are <b>1px hairlines</b> and one-off fixed <b>34&ndash;42px</b> dimensions that reserve space for a fixed element.<span class="cite"><b>ui-integration/spec.md:70-76</b></span></div>
+    <div class="delta warn"><b>The exempt literals.</b> Only two values stay outside the scale: <b>1px</b> hairlines, and one-off fixed dimensions in the <b>34&ndash;42px</b> range that reserve space for a fixed element rather than expressing spacing rhythm. Everything else snaps, and a geometry that genuinely cannot snap mints a scale member.<span class="cite"><b>ui-integration/spec.md:70-76</b></span></div>
   </div>
 
   <div class="spec">
@@ -432,26 +439,26 @@ a{color:var(--fab-accent)}
       <div class="unit"><span class="cap">38</span><div style="width:56px;height:38px;border-radius:9px;background:var(--fab-surface-active)"></div><span class="k-hint">page action, primary field</span></div>
       <div class="unit"><span class="cap">44 · new</span><div style="width:56px;height:44px;border-radius:9px;background:var(--fab-accent-soft);border:1px solid var(--fab-accent-border)"></div><span class="k-hint">comfortable density</span></div>
     </div>
-    <div class="delta"><b>Why 44 was added.</b> Revision 1 retired 32, 36 and 40 — correctly, they were drift — but left no rung above 38, and several primitives cannot meet the 24&times;24 target minimum with real padding without one. The shipped stepper already carries a <code>density</code> prop for exactly this. <b>Open call for the maintainer:</b> if you would rather solve it per-component through that prop than add a ladder rung, this is the one line to delete.</div>
+    <div class="delta"><b>Why 44 exists.</b> The five smaller rungs cannot meet the 24&times;24 target minimum with real padding once a control carries a border and an icon, so the ladder needs one comfortable rung; the shipped stepper already exposes a <code>density</code> prop that selects it. <b>Open call for the maintainer:</b> if you would rather solve hit targets per component through that prop than carry a sixth rung, this is the one line to delete.</div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>Elevation</h4><span class="tag t-new">New foundation</span><p class="why">Elevation is for things that float over content. A card that merely sits on the page uses a border.</p></div>
+    <div class="spec-head"><h4>Elevation</h4><p class="why">Elevation is for things that float over content. A card that merely sits on the page uses a border.</p></div>
     <div class="stage b0" style="gap:26px">
       <div class="unit"><span class="cap">shadow-md</span><div style="width:150px;height:56px;border-radius:11px;background:var(--fab-bg-2);border:1px solid var(--fab-border);box-shadow:var(--fab-shadow-md)"></div><span class="k-hint">anchored menu</span></div>
       <div class="unit"><span class="cap">shadow-lg</span><div style="width:150px;height:56px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg)"></div><span class="k-hint">popover, picker</span></div>
       <div class="unit"><span class="cap">no shadow</span><div style="width:150px;height:56px;border-radius:11px;background:var(--fab-bg-2);border:1px solid var(--fab-border)"></div><span class="k-hint">card, well, row</span></div>
     </div>
-    <div class="delta warn"><b>Correcting the record.</b> Revision 1 asserted twice that the app has no shadows, then specified one anyway as a raw literal. The shipped app uses <code>--fab-shadow-sm/md/lg</code> at 8 call sites, and all 21 audited prototypes use shadows across 12 distinct values — none of them revision 1's canonical value, which appeared in zero files.<span class="cite"><b>styles/fabricate.css:345-347</b></span></div>
+    <div class="delta warn"><b>Use the token, never a literal.</b> The three elevation tokens are authored per theme over that theme’s own ground, and a raw <code>rgba()</code> shadow fails the colour-contract gate.<span class="cite"><b>styles/fabricate.css:345-347</b></span></div>
   </div>
 </section>
 
 <section id="states">
   <div class="sec-head"><span class="num">04</span><h2>States &amp; targets</h2></div>
-  <p class="lede">The words <em>aria</em>, <em>role</em> and <em>tabindex</em> did not appear once in revision 1. These rules are cross-cutting — defined here so 40 components do not each invent one.</p>
+  <p class="lede">These rules are cross-cutting, and are defined once here so that forty components do not each invent one.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>The state set</h4><span class="tag t-new">New foundation</span></div>
+    <div class="spec-head"><h4>The state set</h4></div>
     <div class="stage">
       <div class="unit"><span class="cap">rest</span><button class="k-btn">Apply to all</button></div>
       <div class="unit"><span class="cap">hover</span><button class="k-btn" style="background:var(--fab-surface-raised);color:var(--fab-text)">Apply to all</button></div>
@@ -472,7 +479,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>Hit targets, naming, announcement</h4><span class="tag t-new">New foundation</span></div>
+    <div class="spec-head"><h4>Hit targets, naming, announcement</h4></div>
     <div class="stage">
       <div class="unit"><span class="cap">24&times;24 minimum</span>
         <div style="display:flex;gap:16px;align-items:center">
@@ -486,7 +493,7 @@ a{color:var(--fab-accent)}
       <div><h5>Announcement</h5><ul><li>A change with no visible focus consequence is announced. Reorder says <em>&ldquo;Moved {name} to position {n} of {total}&rdquo;</em>.</li><li>Order matters: <b>move focus first, then announce</b> &mdash; polite speech is cancelled by a focus change.</li></ul></div>
       <div><h5>Motion</h5><ul><li><b>140ms ease</b> for a control state change. Nothing else animates.</li><li>Under reduced motion every transition is removed &mdash; canonical, implemented, and <b>gated by a mount test</b>.</li></ul></div>
     </div>
-    <div class="delta warn"><b>What this fixes.</b> Revision 1's 22&times;13 chevrons, 20&times;20 clear, 20&times;20 gate check, 14px handle and 16px grip each fail WCAG 2.2 &sect;2.5.8 &mdash; a standard two shipped components cite by name as the reason they have a density prop at all.<span class="cite"><b>stepperLabels.js</b> (1050) · <b>listReorderAnnouncement.js</b> (1311) · <b>announceAfterFocus.js</b> (1157) · <b>ui-integration/spec.md:3188</b></span></div>
+    <div class="delta warn"><b>The minimum is 24&times;24, and the hit area may exceed the paint.</b> Two shipped components cite WCAG 2.2 §2.5.8 by name as the reason they carry a density prop at all, so a control that cannot meet it in a dense row offers a comfortable density its caller selects.<span class="cite"><b>stepperLabels.js</b> (1050) · <b>listReorderAnnouncement.js</b> (1311) · <b>announceAfterFocus.js</b> (1157) · <b>ui-integration/spec.md:3188</b></span></div>
   </div>
 </section>
 
@@ -504,10 +511,10 @@ a{color:var(--fab-accent)}
 </section>
 <section id="controls">
   <div class="sec-head"><span class="num">06</span><h2>Controls</h2></div>
-  <p class="lede">Every API below carries its event contract, its accessible naming and its states. Revision 1 named three callbacks in the entire document and no aria wiring at all.</p>
+  <p class="lede">Every API below carries its event contract, its accessible naming and its states.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Stepper&gt;</h4><span class="tag t-rev">API rewritten</span><p class="why">The most-used control in the app. The value is always an editable input inside the group — a click-only stepper is a keyboard regression.</p></div>
+    <div class="spec-head"><h4>&lt;Stepper&gt;</h4><p class="why">The most-used control in the app. The value is always an editable input inside the group — a click-only stepper is a keyboard regression.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">integer</span><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="spec-step-1" aria-label="Quantity" value="2" readonly><button><svg class="i"><use href="#i-plus"/></svg></button></div></div>
       <div class="unit"><span class="cap">with unit</span><div class="k-pair"><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="spec-step-2" aria-label="Amount in gold pieces" value="250" readonly><button><svg class="i"><use href="#i-plus"/></svg></button></div><span class="k-unit">gp</span></div></div>
@@ -522,11 +529,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>group</b> 1px border · radius 7 · surface-soft</li><li><b>button</b> 26&times;28, or 32&times;44 comfortable · icon 9px</li><li><b>value</b> input, centred, mono 500 11.5px, tabular-nums</li><li><b>unit</b> outside the group · 500 10px</li><li><b>bounds</b> at a limit the button dims; no background change</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>value</b> number | null <span class="req">bindable</span></li><li><b>onChange</b> (value) <span class="req">required</span></li><li><b>min · max · step</b></li><li><b>allowUnset</b> — clearing commits <code>null</code>; adjuncts step from <code>min ?? 0</code></li><li><b>ariaLabel · decrementLabel · incrementLabel</b> <span class="req">required, derived</span></li><li><b>orientation</b> horizontal | vertical</li><li><b>density</b> default | comfortable</li><li><b>unit · signed · coarse · width · placeholder · inputProps</b></li><li><b>disabled · readonly · invalid</b></li></ul></div>
     </div>
-    <div class="delta warn"><b>Corrections.</b> Revision 1 logged this as &ldquo;reverses the click-only pass just shipped&rdquo; — but the editable value already ships, in the direction asked for, and the module it named as the holdout is out of corpus. Its API also dropped <code>onChange</code> entirely, renamed <code>allowUnset</code> (31 call sites) to a display-only label, omitted the three aria names and their derivation helper, and listed an <code>editable</code> flag contradicting its own rule. All restored; <code>editable</code> deleted.<span class="cite"><b>Stepper.svelte:3-6, 151-157</b> · <b>stepperLabels.js</b></span></div>
+    <div class="delta warn"><b>The value is always editable.</b> A click-only stepper is a documented keyboard regression, which is why the shipped component states the rule in its own docblock. The API above is the shipped prop set: <code>allowUnset</code> carries the semantics that clearing commits <code>null</code> and that adjuncts step from <code>min ?? 0</code>, and the three aria names are derived by a shared helper because 23 call sites drifted when they were not.<span class="cite"><b>Stepper.svelte:3-6, 151-157</b> · <b>stepperLabels.js</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><span class="tag t-rev">Absorbs AddButton</span><p class="why">One component, six roles, two sizes. Save is always success-green; a primary create action is accent. The dashed adder is a role here, not a separate primitive.</p></div>
+    <div class="spec-head"><h4>&lt;Button&gt; &lt;IconButton&gt;</h4><p class="why">One component, six roles, two sizes. Save is always success-green; a primary create action is accent. The dashed adder is a role here, not a separate primitive.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">page 38 · the header pair only</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="k-btn page primary">Save recipe</button><button class="k-btn page accent">New template</button><button class="k-btn page"><svg class="i"><use href="#i-cl"/></svg>Back</button><button class="k-btn page ghost">Cancel</button><button class="k-btn page danger"><svg class="i"><use href="#i-trash"/></svg>Delete</button></div></div>
     </div>
@@ -547,11 +554,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>page</b> 38 · radius 9 · padding 0 16 · icon 11</li><li><b>row</b> 30 · radius 7 · padding 0 11 · icon 9</li><li><b>icon</b> 28&times;28 · radius 7</li><li>Sets its own <code>height</code> <b>and</b> <code>min-height</code> — core's button height crops it otherwise</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>role</b> primary | accent | quiet | ghost | warning | danger | <b>dashed</b></li><li><b>size</b> page | row = row</li><li><b>onClick</b> <span class="req">required</span> · <b>type</b> button | submit</li><li><b>icon · iconOnly · ariaLabel</b> <span class="req">required when iconOnly</span></li><li><b>fullWidth · disabled · loading</b></li></ul></div>
     </div>
-    <div class="delta"><b>Absorbs &lt;AddButton&gt;.</b> Revision 1 made the dashed adder its own primitive because it &ldquo;always sits in flow with the collection it extends&rdquo; — a usage rule, not a component boundary. <code>dashed</code> is already one of six closed roles on the shipped button, and canon prefers extending the primitive that owns the meaning. <code>warning</code> is restored; <code>fullWidth</code> returns, which revision 1 ruled out as &ldquo;a layout decision&rdquo; while its own rail card needed it.<span class="cite"><b>ui-integration/spec.md:83, 100-107</b> · <b>ArmedDangerButton.svelte:14-18</b></span></div>
+    <div class="delta"><b>The dashed adder is a role, not a component.</b> It is one of six closed roles on the button that owns the meaning, and canon prefers extending that primitive over introducing a second one that owns half of it. <code>fullWidth</code> is a prop rather than a role, because spanning the container is a statement about the container and not about the verb.<span class="cite"><b>ui-integration/spec.md:83, 100-107</b> · <b>ArmedDangerButton.svelte:14-18</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><span class="tag t-rev">Revised</span><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
+    <div class="spec-head"><h4>&lt;Toggle&gt;</h4><p class="why">Binary state that takes effect immediately. Never for a choice between two named things — that is a segmented control. The tint carries meaning: accent for &ldquo;this is on&rdquo;, success for &ldquo;this is enabled&rdquo;.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">on · accent</span><div class="k-tog on"><i></i></div></div>
       <div class="unit"><span class="cap">off</span><div class="k-tog off"><i></i></div></div>
@@ -562,14 +569,14 @@ a{color:var(--fab-accent)}
       </div>
     </div>
     <div class="notes">
-      <div><h5>Canonical spec</h5><ul><li><b>track</b> 38&times;22 · radius 999 · padding 2 · 1px border</li><li><b>knob</b> 18&times;18 · bg-1 on, bg-3 off</li><li><b>motion</b> knob margin-left 140ms ease</li></ul></div>
+      <div><h5>Canonical spec</h5><ul><li><b>track</b> 38&times;22 · radius 999 · padding 1 · 1px border</li><li><b>knob</b> 18&times;18 · bg-1 on, bg-3 off</li><li><b>motion</b> knob margin-left 140ms ease</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>checked</b> boolean <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span></li><li><b>tone</b> accent | success = accent</li><li><b>ariaLabel</b> <span class="req">required</span> · <b>label · hint</b></li><li><b>disabled · readonly</b></li></ul></div>
     </div>
-    <div class="delta"><b>The rule revision 1 got backwards.</b> It said &ldquo;records get a status button, settings get a Toggle&rdquo;. That breaks immediately: a recipe is a record by its own test, and its Enabled state ships as a toggle card with ten callers. The real rule is <b>a list row gets a status button; the record's own editor gets a toggle</b>.<span class="cite"><b>ToggleCard.svelte</b> — 10 callers, all record editors</span></div>
+    <div class="delta"><b>The rule is the surface, not the subject.</b> A list row gets a status button; the record’s own editor gets a toggle. A recipe is a record in both places, and its Enabled state ships as a toggle card across ten record editors.<span class="cite"><b>ToggleCard.svelte</b> — 10 callers</span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Segmented&gt;</h4><span class="tag t-rev">Revised</span><p class="why">Two to four named options, exactly one chosen. Renders as a radio group, so the pseudo-element removal in section 05 applies.</p></div>
+    <div class="spec-head"><h4>&lt;Segmented&gt;</h4><p class="why">Two to four named options, exactly one chosen. Renders as a radio group, so the pseudo-element removal in section 05 applies.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">default · in a well</span><div class="k-seg"><button>Flat</button><button class="sel">Full market</button><button>Deep sim</button></div></div>
       <div class="unit"><span class="cap">bare · no well</span><div class="k-seg bare"><button class="sel">Any of</button><button>All of</button></div></div>
@@ -582,7 +589,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;OptionCards&gt;</h4><span class="tag t-rev">Revised</span><p class="why">A radio group with room to explain itself. Use it instead of a segmented control when the options need a sentence each, or when choosing one changes what else is on the page — the chosen card reveals its own configuration directly beneath the set.</p></div>
+    <div class="spec-head"><h4>&lt;OptionCards&gt;</h4><p class="why">A radio group with room to explain itself. Use it instead of a segmented control when the options need a sentence each, or when choosing one changes what else is on the page — the chosen card reveals its own configuration directly beneath the set.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">stacked &mdash; three or more, with the reveal</span>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -598,11 +605,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>stacked</b> for three or more · <b>row</b> for two — a two-up stacked pair leaves the descriptions swimming</li><li><b>chosen</b> surface-soft + 1px accent-border</li><li><b>icon</b> 30&times;30 chip, accent-soft when chosen</li><li><b>desc</b> one sentence, always present</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>value</b> <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span></li><li><b>options</b> {value, title, icon, desc}[]</li><li><b>layout</b> stacked | row · <b>columns</b></li><li><b>groupName · legend</b> <span class="req">required</span></li><li><b>disabled</b> whole group · <b>disabledOptions</b> {value, reason}[]</li></ul></div>
     </div>
-    <div class="delta"><b>A disabled option now carries its reason.</b> Revision 1 offered <code>disabledValues</code> at .45 opacity with no way to say why, while its own <code>&lt;Locked&gt;</code> entry made <code>reason</code> a required prop — the same lock, two entries, opposite rules. Disabled options route through Locked.<span class="cite"><b>ResolutionModeCard.svelte:11-14</b></span></div>
+    <div class="delta"><b>A disabled option states why.</b> Opacity alone is not a reason, so a disabled option routes through <code>&lt;Locked&gt;</code> and carries its required <code>reason</code> — the shipped resolution-mode card proves the domain needs it, showing a visible “Coming soon” badge rather than a dimmed card.<span class="cite"><b>ResolutionModeCard.svelte:11-14</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Field&gt; &lt;Select&gt; &lt;Search&gt;</h4><span class="tag t-rev">Revised</span><p class="why">Text, number, mono expression, select and search share one shell. The kicker label above the field is part of the primitive, not something each screen re-invents.</p></div>
+    <div class="spec-head"><h4>&lt;Field&gt; &lt;Select&gt; &lt;Search&gt;</h4><p class="why">Text, number, mono expression, select and search share one shell. The kicker label above the field is part of the primitive, not something each screen re-invents.</p></div>
     <div class="stage col">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
         <div class="k-lbl"><span class="k-kicker">Template name</span><div class="k-field">Frontier Outpost</div><span class="k-hint">Shown to players on arrival.</span></div>
@@ -612,6 +619,28 @@ a{color:var(--fab-accent)}
         <div class="k-lbl"><span class="k-kicker">Focused</span><div class="k-field focus">Ironvale</div></div>
         <div class="k-lbl"><span class="k-kicker">Invalid</span><div class="k-field invalid">Ironvale</div><span class="k-err">A template name must be unique.</span></div>
       </div>
+      <div class="unit"><span class="cap">the option list a select opens</span>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+          <div style="width:250px">
+            <div class="k-field focus">Routed by check<svg class="i chev"><use href="#i-cu"/></svg></div>
+            <div style="margin-top:6px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:5px;display:grid;gap:2px">
+              <div style="padding:8px 10px;border-radius:7px;font-size:12px;font-weight:500;color:var(--fab-text-secondary);display:flex;gap:8px;align-items:center"><svg class="i" style="width:11px;height:11px;opacity:0"><use href="#i-check"/></svg>Simple</div>
+              <div style="padding:8px 10px;border-radius:7px;font-size:12px;font-weight:500;background:var(--fab-surface-active);color:var(--fab-text);display:flex;gap:8px;align-items:center"><svg class="i" style="width:11px;height:11px;color:var(--fab-accent)"><use href="#i-check"/></svg>Routed by check</div>
+              <div style="padding:8px 10px;border-radius:7px;font-size:12px;font-weight:500;color:var(--fab-text-secondary);display:flex;gap:8px;align-items:center"><svg class="i" style="width:11px;height:11px;opacity:0"><use href="#i-check"/></svg>Progressive</div>
+              <div style="height:1px;background:var(--fab-border);margin:3px 6px"></div>
+              <div style="padding:8px 10px;border-radius:7px;font-size:12px;font-weight:500;color:var(--fab-text-disabled);display:flex;gap:8px;align-items:center"><svg class="i" style="width:11px;height:11px;opacity:0"><use href="#i-check"/></svg>Downtime<span class="k-badge" style="margin-left:auto;font-size:8px">Premium</span></div>
+            </div>
+          </div>
+          <div style="width:250px">
+            <span class="k-hint" style="display:block;margin-bottom:6px">Grouped, with a description per option</span>
+            <div style="border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:5px;display:grid;gap:2px">
+              <div class="k-kicker" style="padding:6px 10px 3px">Per tier</div>
+              <div style="padding:8px 10px;border-radius:7px;background:var(--fab-surface-active)"><div style="font-size:12px;font-weight:600">Highest eligible</div><div class="k-hint">Takes the best tier the roll reaches.</div></div>
+              <div style="padding:8px 10px;border-radius:7px"><div style="font-size:12px;font-weight:500;color:var(--fab-text-secondary)">All reached</div><div class="k-hint">Produces every tier at or below the roll.</div></div>
+            </div>
+          </div>
+        </div>
+        <span class="k-hint">A native <code>&lt;select&gt;</code> popup is drawn by the OS and is styled only by <code>color-scheme: dark</code>. Wherever the options need a tick, a group heading, a description, a badge or a disabled reason, the control renders <b>this</b> list instead &mdash; the popover panel geometry with option rows.</span></div>
       <div class="unit"><span class="cap">inline 30 &mdash; a field that is one cell of a row</span>
         <div class="k-row" style="gap:10px"><div class="k-ic"><svg class="i"><use href="#i-leaf"/></svg></div><div class="k-field inline grow">Oak Haft</div><div class="k-step"><button><svg class="i"><use href="#i-minus"/></svg></button><input id="spec-step-10" aria-label="Ingredient quantity" value="2" readonly><button><svg class="i"><use href="#i-plus"/></svg></button></div></div>
         <span class="k-hint">A row is an editable record in a list. The field drops to 30px and takes a bg-2 fill to read as nested inside the row's bg-1.</span></div>
@@ -623,7 +652,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Checkbox&gt;</h4><span class="tag t-new">New</span><p class="why">Promoted out of revision 1's gate list, where it existed only as a geometry line. The tri-state is what a &ldquo;some rows selected&rdquo; header needs — and revision 1 had no checkbox primitive at all.</p></div>
+    <div class="spec-head"><h4>&lt;Checkbox&gt;</h4><p class="why">The box a gate list and a selection header both use. The tri-state is what a &ldquo;some rows selected&rdquo; header needs, and it is the state most hand-rolled checkboxes omit.</p></div>
     <div class="stage">
       <div class="unit"><span class="cap">off</span><div class="k-cb"><i><svg class="i"><use href="#i-check"/></svg></i></div></div>
       <div class="unit"><span class="cap">on</span><div class="k-cb on"><i><svg class="i"><use href="#i-check"/></svg></i></div></div>
@@ -640,7 +669,7 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>hit area</b> 24&times;24 around a painted 20&times;20 · radius 6</li><li><b>on</b> accent fill, on-accent glyph</li><li><b>indeterminate</b> a bar, not a tick</li><li>Core draws both boxes from pseudo-elements: <code>appearance:none</code> <b>and</b> <code>display:none</code> on <code>::before</code>/<code>::after</code></li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>checked</b> <span class="req">bindable</span> · <b>indeterminate</b></li><li><b>onChange</b> <span class="req">required</span></li><li><b>ariaLabel</b> <span class="req">required</span> · <b>disabled</b></li></ul></div>
     </div>
-    <div class="delta">Four competing signatures across the corpus — 22&times;22/r6 twice, 16&times;16/r5, and revision 1's own 20&times;20/r6. Eight shipped callers already.<span class="cite"><b>SelectionCheckbox.svelte</b></span></div>
+    <div class="delta">Four competing signatures across the corpus — 22&times;22/r6 twice, 16&times;16/r5 and 20&times;20/r6. Eight shipped callers already.<span class="cite"><b>SelectionCheckbox.svelte</b></span></div>
   </div>
 </section>
 
@@ -648,7 +677,7 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">07</span><h2>Pickers &amp; bars</h2></div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;RangeBar&gt;</h4><span class="tag t-rev">Open question closed</span><p class="why">A tiled strip of spans whose dividers are dragged — outcome tiers against a DC, or the hours of the day. Spans tile the axis end to end, so dragging a divider moves the span that ends and the span that begins there together. They can never overlap or leave a gap.</p></div>
+    <div class="spec-head"><h4>&lt;RangeBar&gt;</h4><p class="why">A tiled strip of spans whose dividers are dragged — outcome tiers against a DC, or the hours of the day. Spans tile the axis end to end, so dragging a divider moves the span that ends and the span that begins there together. They can never overlap or leave a gap.</p></div>
     <div class="stage b0 col">
       <div class="unit"><span class="cap">outcome bands &mdash; 46px, fixed</span>
         <div style="position:relative;height:46px;border-radius:9px;background:var(--fab-bg-0);border:1px solid var(--fab-border);overflow:hidden;display:flex">
@@ -669,7 +698,7 @@ a{color:var(--fab-accent)}
           <div style="width:17%;background:color-mix(in oklab,var(--fab-tag-peach) 24%,var(--fab-bg-0));display:grid;place-items:center;border-right:1px solid var(--fab-bg-0)"><div style="text-align:center"><div style="font-size:10px;font-weight:700">Dusk</div><div class="k-count" style="font-size:8.5px">17&ndash;21</div></div></div>
           <div style="width:28%;background:color-mix(in oklab,var(--fab-tag-lavender) 24%,var(--fab-bg-0));display:grid;place-items:center"><div style="text-align:center"><div style="font-size:10px;font-weight:700">Night</div><div class="k-count" style="font-size:8.5px">21&ndash;04</div></div></div>
           <div style="position:absolute;left:44%;top:0;bottom:0;width:1px;background:var(--fab-text);opacity:.25"></div>
-          <div style="position:absolute;left:44%;top:4px;width:9px;height:9px;border-radius:999px;background:var(--fab-accent);transform:translateX(-50%)"></div>
+          <div style="position:absolute;left:44%;top:50%;width:9px;height:9px;border-radius:999px;background:var(--fab-accent);transform:translate(-50%,-50%)"></div>
         </div>
         <span class="k-hint">A fixed marker is the world clock; a draggable marker is &ldquo;now&rdquo;. The sublabel fits <b>inside</b> 46px &mdash; the height never grows.</span></div>
     </div>
@@ -677,11 +706,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>track</b> 46 · radius 9 · bg-0 · 1px border — fixed, never content-dependent</li><li><b>handle</b> 24&times;24 hit area over a 2&times;16 grip</li><li><b>keyboard</b> <code>role="slider"</code>, arrows / Page / Home / End — <b>and the keyboard-focus opt-out</b></li><li><b>a11y</b> both <code>aria-valuenow</code> and <code>aria-valuetext</code>, because the numeric and the named reading differ</li><li><b>rules</b> spans tile · min span enforced · ends clamp</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>domain</b> [min, max]</li><li><b>spans</b> {id, label, from, to, colour, ink, index}[]</li><li><b>onChange</b> (patch) <span class="req">required</span></li><li><b>binding</b> relative | fixed | simple</li><li><b>readonly</b> — the strip is a visualisation, not the authority</li><li><b>minSpan · markers · axis · addable</b></li></ul></div>
     </div>
-    <div class="delta ok"><b>The open question, answered: 46, and Gathering moves.</b> Not a coin-flip. The shipped strip records that 46 / 9 / bg-0 was measured from the prototype and pinned by a parity fixture, and that the previous 44 / 8 / raised-surface values were <em>chosen</em> — the translucent raised surface let whatever the strip was stacked on show through an unfilled gap. Gathering's 50 / r8 / bg-1 is that same mistake. The proposed grow-to-50 compromise is worse than either fixed option: a strip whose height varies with content shoves the tier rows' steppers down the page.<br><br><b>API restored.</b> Revision 1 had no write contract at all — no <code>onChange</code>, no binding mode, no authored per-band colour, no display-order-versus-authored-index distinction, no readonly.<span class="cite"><b>ThresholdBandStrip.svelte:5-9, 51-60, 459-468, 504</b></span></div>
+    <div class="delta ok"><b>Planned migration: Gathering’s strip moves to 46 / r9 / bg-0.</b> The shipped strip records that those values were measured from the prototype and pinned by a parity fixture, and that the earlier 44 / 8 / raised-surface values were chosen rather than measured — a translucent raised surface let whatever the strip was stacked on show through an unfilled gap. Gathering’s 50 / r8 / bg-1 is that same mistake.<br><br>The height is <b>fixed</b> and never grows with content: a strip whose height varies shoves the tier rows’ steppers down the page, so a sublabel fits inside 46.<span class="cite"><b>ThresholdBandStrip.svelte:5-9, 51-60, 459-468, 504</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;LinkField&gt;</h4><span class="tag t-rev">API rewritten</span><p class="why">How a Fabricate record points at a game-world document. Three states in one component.</p></div>
+    <div class="spec-head"><h4>&lt;LinkField&gt;</h4><p class="why">How a Fabricate record points at a game-world document. Three states in one component.</p></div>
     <div class="stage">
       <div class="unit" style="width:280px"><span class="cap">empty</span>
         <div style="height:104px;border-radius:11px;border:1px dashed var(--fab-border-strong);background:var(--fab-surface-soft);display:grid;place-items:center;text-align:center;gap:4px;padding:12px"><svg class="i" style="width:18px;height:18px;color:var(--fab-text-subtle)"><use href="#i-link"/></svg><div style="font-size:12px;font-weight:600;color:var(--fab-text-secondary)">Drop a game-world item here</div><div class="k-hint">or click to search the catalogue</div></div></div>
@@ -694,11 +723,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>all states</b> height 104 · radius 11</li><li><b>empty</b> 1px dashed border-strong · hover and dragover tint accent</li><li><b>filled</b> icon chip 38 · name serif 600 14px · uuid mono 10px</li><li><b>missing</b> keeps the stored uuid visible and offers relink — never silently blanks</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>value</b> {uuid, name, img} | null — <b>a uuid, not an id</b></li><li><b>documentType</b> Item | Macro | … — matched against <code>data.type</code></li><li><b>state</b> empty | linked | missing</li><li><b>onDrop · onUnlink · onCopy</b> — copy puts the uuid on the clipboard</li><li><b>disabled · searchable · subline</b></li></ul></div>
     </div>
-    <div class="delta warn"><b>Three corrections.</b> The discriminator is <code>data.type</code>, a document name — not &ldquo;drag payload kinds&rdquo;. A <b>compendium drag emits <code>{pack, id}</code> with no uuid</b>, so the drop path must resolve rather than read <code>data.uuid</code>; the naive guard rejected module-shipped documents. And storing a bare <code>id</code> is unresolvable without its collection — the shipped model stores a uuid. Revision 1's specimen id <code>itm_a17f3c92</code> is not a Foundry id shape.<span class="cite"><b>dropUtils.js:1-19</b> · <b>ItemDropZone.svelte:11-24, 91-103</b></span></div>
+    <div class="delta warn"><b>Match on <code>data.type</code>, store a uuid.</b> The drop discriminator is the document name Foundry puts in <code>data.type</code>. A <b>compendium drag emits <code>{pack, id}</code> with no uuid</b>, so the drop path resolves rather than reading <code>data.uuid</code> — a naive guard rejects module-shipped documents. A bare <code>id</code> is unresolvable without its collection, so the stored value is a uuid.<span class="cite"><b>dropUtils.js:1-19</b> · <b>ItemDropZone.svelte:11-24, 91-103</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;SearchPopover&gt;</h4><span class="tag t-rev">API rewritten</span><p class="why">One panel for picking anything from a catalogue — icons, components, characters, essences, tags, scenes. Four existing pickers collapse into this.</p></div>
+    <div class="spec-head"><h4>&lt;SearchPopover&gt;</h4><p class="why">One panel for picking anything from a catalogue — icons, components, characters, essences, tags, scenes. Four existing pickers collapse into this.</p></div>
     <div class="stage b0" style="gap:26px;align-items:flex-start">
       <div class="unit" style="width:300px"><span class="cap">list form</span>
         <div style="border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:10px;display:grid;gap:8px">
@@ -731,7 +760,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;TintPicker&gt; &lt;ArtPathPicker&gt; &lt;Menu&gt;</h4><span class="tag t-new">One new, one revised</span></div>
+    <div class="spec-head"><h4>&lt;TintPicker&gt; &lt;ArtPathPicker&gt; &lt;Menu&gt;</h4></div>
     <div class="stage">
       <div class="unit"><span class="cap">tint &mdash; eight tokens, never a free hex by default</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -745,9 +774,9 @@ a{color:var(--fab-accent)}
           <div style="width:30px;height:30px;border-radius:7px;background:var(--fab-tag-mauve)"></div>
         </div>
         <span class="k-hint">Selected is a 2px accent outline at 2px offset &mdash; never a tick, which would fight the swatch. Each carries a localized label as its accessible name.</span></div>
-      <div class="unit" style="width:260px"><span class="cap">art path &mdash; resolves through Foundry&rsquo;s FilePicker</span>
-        <div style="display:flex;gap:8px;align-items:center"><div class="k-ic s38"><svg class="i"><use href="#i-image"/></svg></div><div class="k-field inline grow mono" style="font-size:10px">icons/commodities/metal/ingot.webp</div><button class="k-btn icon"><svg class="i"><use href="#i-search"/></svg></button></div>
-        <span class="k-hint">Never invent an asset path &mdash; an unvalidated <code>img</code> 404s silently.</span></div>
+      <div class="unit" style="width:260px"><span class="cap">art path &mdash; the image, never the path</span>
+        <div style="display:flex;gap:8px;align-items:center"><div class="k-ic s38" style="background:var(--fab-bg-3);color:var(--fab-tag-mist)"><svg class="i"><use href="#i-image"/></svg></div><button class="k-btn grow" style="justify-content:flex-start"><svg class="i"><use href="#i-image"/></svg>Choose image</button><button class="k-btn icon" style="color:var(--fab-danger-text)"><svg class="i"><use href="#i-x"/></svg></button></div>
+        <span class="k-hint">The control shows the <b>image</b> and a browse action. It never renders the stored path: Foundry owns the picker, the string is an implementation detail, and a long path wrecks the row it sits in. Never invent an asset path &mdash; an unvalidated <code>img</code> 404s silently.</span></div>
       <div class="unit" style="width:180px"><span class="cap">anchored menu</span>
         <div style="border-radius:9px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-md);padding:5px;display:grid;gap:2px">
           <div style="padding:7px 9px;border-radius:6px;font-size:11.5px;background:var(--fab-surface-active)">Alternative component</div>
@@ -755,15 +784,15 @@ a{color:var(--fab-accent)}
           <div style="padding:7px 9px;border-radius:6px;font-size:11.5px;color:var(--fab-text-secondary)">Alternative currency</div>
         </div></div>
     </div>
-    <div class="delta"><b>Two additions, one correction.</b> <code>&lt;ArtPathPicker&gt;</code> is new: the set had a token picker and a glyph grid and nothing for a world art path, which is what <code>&lt;Avatar art&gt;</code> and <code>&lt;LinkField&gt;</code> both need — eight shipped callers. <code>&lt;Menu&gt;</code> is new: it is what <code>&lt;PickerRow&gt;</code>'s own <code>allowAny</code> prop opens, exposed by revision 1 but never specced — eight callers across three studios. And <code>&lt;TintPicker&gt;</code> keeps <code>allowCustom</code>, which ships <b>true by default</b>; revision 1 said free colour entry was &ldquo;offered nowhere&rdquo;.<span class="cite"><b>ImagePathPicker.svelte</b> · <b>ManagerColorPicker.svelte</b> · <b>managerColorTokens.js:24-31</b></span></div>
+    <div class="delta"><b>Two controls the set needs.</b> <code>&lt;ArtPathPicker&gt;</code> covers a world art path, which <code>&lt;Avatar art&gt;</code> and <code>&lt;LinkField&gt;</code> both need and neither the token picker nor the glyph grid provides — eight shipped callers. <code>&lt;Menu&gt;</code> is what <code>&lt;PickerRow&gt;</code>’s <code>allowAny</code> opens — eight callers across three studios. <code>&lt;TintPicker&gt;</code> ships <code>allowCustom</code> <b>true by default</b>; only one screen opts out.<span class="cite"><b>ImagePathPicker.svelte</b> · <b>ManagerColorPicker.svelte</b> · <b>managerColorTokens.js:24-31</b></span></div>
   </div>
 </section>
 <section id="marks">
   <div class="sec-head"><span class="num">08</span><h2>Marks &amp; atoms</h2></div>
-  <p class="lede">Revision 1 proposed five pill-shaped things and left no rule that could route a new case. The domain model already defines a Rail Marker Family; that vocabulary wins, and the rest resolve by job.</p>
+  <p class="lede">Five pill-shaped marks, routed by job rather than by eye. The domain model defines the Rail Marker Family; that vocabulary is canon and the rest resolve against it.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>The mark vocabulary</h4><span class="tag t-rev">Reconciled with canon</span></div>
+    <div class="spec-head"><h4>The mark vocabulary</h4></div>
     <div class="stage col">
       <div class="unit"><span class="cap">rail markers &mdash; canon, four marks</span>
         <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
@@ -782,11 +811,11 @@ a{color:var(--fab-accent)}
         <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="k-status on"><svg class="i"><use href="#i-check"/></svg>Enabled</button><button class="k-status">Disabled</button><button class="k-status incomplete"><svg class="i"><use href="#i-alert"/></svg>Incomplete</button><button class="k-status blocked"><svg class="i"><use href="#i-x"/></svg>Blocked</button><button class="k-status on locked"><svg class="i"><use href="#i-lock"/></svg>Enabled</button></div>
         <span class="k-hint">Incomplete and Blocked are the states a plain toggle could never express, and they are why this is not a styled switch. Locked states its reason in place, not in a tooltip.</span></div>
     </div>
-    <div class="delta warn"><b>Two rules revision 1 was missing.</b> First, <b>a list row gets a status button; the record&rsquo;s own editor gets a toggle</b> — its rule broke immediately on the recipe editor, where Enabled ships as a toggle card with ten callers. Second, <b>unsaved is a Chip, not a Notice</b> — revision 1 showed it as a specimen of both, with no rule to choose, and the smoke harness already pins the chip. Its filled <code>&lt;Badge&gt;</code> and 15px accent rail badge also collided head-on with the canon vocabulary above, where a record count is a <b>bare mono numeral</b>.<span class="cite"><b>DOMAIN.md:76</b> · <b>styles/fabricate.css:12816</b> (643) · <b>ToggleCard.svelte</b></span></div>
+    <div class="delta warn"><b>Two rules that keep the marks apart.</b> A list row gets a status button and the record’s own editor gets a toggle. And <b>unsaved is a Chip, not a Notice</b> — the smoke harness pins the chip, and a notice would claim the one blocking position for a state that blocks nothing. A record count is a <b>bare mono numeral</b>, never a filled pill.<span class="cite"><b>DOMAIN.md:76</b> · <b>styles/fabricate.css:12816</b> (643) · <b>ToggleCard.svelte</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Kicker&gt; &lt;IconChip&gt; &lt;StatBox&gt;</h4><span class="tag t-car">Carried</span></div>
+    <div class="spec-head"><h4>&lt;Kicker&gt; &lt;IconChip&gt; &lt;StatBox&gt;</h4></div>
     <div class="stage">
       <div class="unit"><span class="cap">kicker &mdash; one size, one tracking</span><div style="display:grid;gap:8px"><span class="k-kicker">Free floor</span><span class="k-kicker accent">Rewards</span><div style="display:flex;gap:9px;align-items:center"><span class="k-kicker">Businesses at this tier</span><span style="flex:1;height:1px;background:var(--fab-border);min-width:40px"></span><span class="k-count">4</span></div></div>
         <span class="k-hint">Roughly 400 instances across the corpus, in 55 versions. Accent only when it names a whole section.</span></div>
@@ -800,7 +829,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Meter&gt; &lt;BandedBar&gt; &lt;StageBars&gt;</h4><span class="tag t-rev">Split into three</span><p class="why">Revision 1 merged four instruments the shipped app deliberately separated, which left one component unable to carry one correct accessible role.</p></div>
+    <div class="spec-head"><h4>&lt;Meter&gt; &lt;BandedBar&gt; &lt;StageBars&gt;</h4><p class="why">Four instruments, three components. Merging them leaves one component unable to carry one correct accessible role, which is why the shipped fill leaf renders none.</p></div>
     <div class="stage col">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px">
         <div class="unit"><span class="cap">meter &mdash; a value against a maximum</span>
@@ -836,10 +865,10 @@ a{color:var(--fab-accent)}
 
 <section id="surfaces">
   <div class="sec-head"><span class="num">09</span><h2>Surfaces</h2></div>
-  <p class="lede">Four ways of telling the reader something, and the rule that separates them. Revision 1 had these overlapping with no decidable boundary.</p>
+  <p class="lede">Four ways of telling the reader something, and the rule that separates them.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4><span class="tag t-rev">Boundary stated</span></div>
+    <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4></div>
     <div class="stage col">
       <div class="unit"><span class="cap">callout &mdash; explains a rule that is always true, and stays put</span>
         <div class="k-callout"><svg class="i"><use href="#i-info"/></svg><div>Time only &mdash; nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state.</div></div></div>
@@ -865,11 +894,11 @@ a{color:var(--fab-accent)}
       <div><h5>The routing rule</h5><ul><li><b>Callout</b> — documentation. Always true, stays put.</li><li><b>Notice</b> — state. Just happened, goes away.</li><li><b>InfoStrip</b> — current values. Read-only facts in mono.</li><li><b>Empty</b> — nothing to show, and why.</li></ul></div>
       <div><h5>Notice API</h5><ul><li><b>tone</b> danger | warning | info | success</li><li><b>title · detail</b> — detail says what to do next</li><li><b>action</b> {label, onClick} · <b>dismissable</b></li><li><b>blocking</b> boolean — a blocking notice replaces; the rest stack</li><li>Announced through a live region when it appears without a focus change</li></ul></div>
     </div>
-    <div class="delta warn"><b>&ldquo;No precedent to reconcile&rdquo; was wrong, and so was &ldquo;never stack&rdquo;.</b> A shared validation surface already ships with three callers, carrying <code>passing</code>, <code>warnings</code> and <code>blocking</code> counts <em>simultaneously</em> — which is both the counter-example to the stacking rule and the reason validation is now its own primitive. And Fabricate ships <b>no toast</b>: transient feedback is <code>ui.notifications</code>, which core renders over the module window anyway.<span class="cite"><b>EditorValidationSurface.svelte:9-13</b></span></div>
+    <div class="delta warn"><b>Validation is not a notice.</b> A shared validation surface ships with three callers and carries <code>passing</code>, <code>warnings</code> and <code>blocking</code> counts <em>simultaneously</em> — which is why it is its own primitive, and why non-blocking notices stack instead of replacing one another. Fabricate ships <b>no toast</b>: transient feedback is <code>ui.notifications</code>, which core renders over the module window anyway.<span class="cite"><b>EditorValidationSurface.svelte:9-13</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Card&gt; &lt;Well&gt; &lt;RowDisclosure&gt;</h4><span class="tag t-rev">Well promoted</span><p class="why">Two container levels only. A card sits on the page; a well nests inside a card.</p></div>
+    <div class="spec-head"><h4>&lt;Card&gt; &lt;Well&gt; &lt;RowDisclosure&gt;</h4><p class="why">Two container levels only. A card sits on the page; a well nests inside a card.</p></div>
     <div class="stage b0">
       <div class="unit" style="width:280px"><span class="cap">card &mdash; radius 11, padding 16, bg-2</span>
         <div class="k-card"><div style="display:flex;gap:10px;align-items:center"><div class="k-ic s30" style="color:var(--fab-tag-butter)"><svg class="i"><use href="#i-star"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Wages &amp; upkeep</div></div><span class="k-badge">per tick</span></div></div></div>
@@ -885,10 +914,10 @@ a{color:var(--fab-accent)}
 
 <section id="structures">
   <div class="sec-head"><span class="num">10</span><h2>Structures</h2></div>
-  <p class="lede">Where revision 1 was thinnest. Its sweep covered controls thoroughly and skipped chrome and workflow almost entirely — five of the six additions here come from prototypes it did not audit.</p>
+  <p class="lede">The chrome and workflow surfaces. These are the parts most often rebuilt per screen, and the ones a new studio is most likely to hand-roll.</p>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;AppTitleBar&gt;</h4><span class="tag t-new">New</span><p class="why">The strip above both the page header and the nav rail. Byte-identical in 16 of 21 audited prototypes, and the documented home of the world clock.</p></div>
+    <div class="spec-head"><h4>&lt;AppTitleBar&gt;</h4><p class="why">The strip above both the page header and the nav rail. Byte-identical in 16 of 21 audited prototypes, and the documented home of the world clock.</p></div>
     <div class="stage b0 col">
       <div style="display:flex;align-items:center;gap:9px;padding:12px 16px;background:var(--fab-bg-0);border:1px solid var(--fab-border);border-radius:9px">
         <div class="k-ic" style="color:var(--fab-accent)"><svg class="i"><use href="#i-hammer"/></svg></div>
@@ -904,11 +933,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>bar</b> padding 12 · bg-0 · 1px bottom border · gap 8</li><li><b>scope</b> a real Badge tone — <b>not a hard-coded hex</b>, which is what every prototype did</li><li><b>trailing</b> world clock, mode summary, window controls</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>brand · scope</b> {label, tone}</li><li><b>trailing</b> snippet</li></ul></div>
     </div>
-    <div class="delta">Revision 1 specced the page header inside the studio body and the nav rail beside it, and nothing for the strip above both — so its Badge entry never saw the hard-coded scope pills, which is the one place that divergence lives.</div>
+    <div class="delta"><b>The scope pill is a Badge tone.</b> Every prototype paints it as a hard-coded hex, which is the one place the title bar’s divergence lives; it takes a real tone like every other mark.</div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;NavSidebar&gt; &lt;AppRail&gt;</h4><span class="tag t-rev">Revised</span><p class="why">The player app's icon rail and the GM sidebar are one component with a variant — they share the item model and the active treatment. Nesting stops at one level; a third becomes a tab bar inside the destination.</p></div>
+    <div class="spec-head"><h4>&lt;NavSidebar&gt; &lt;AppRail&gt;</h4><p class="why">The player app's icon rail and the GM sidebar are one component with a variant — they share the item model and the active treatment. Nesting stops at one level; a third becomes a tab bar inside the destination.</p></div>
     <div class="stage b0" style="gap:20px;align-items:flex-start">
       <div class="unit"><span class="cap">app rail 64</span>
         <div style="width:64px;background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;padding:6px;display:grid;gap:3px">
@@ -939,11 +968,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>rail</b> 64 · <b>sidebar</b> 234 expanded / 52 collapsed</li><li><b>A parent is both</b> a destination and a group: the row navigates and carries <code>aria-current</code>; a <b>separate chevron</b> expands</li><li>The chevron <b>disables with a stated reason</b> when collapsing would hide the current screen</li><li><b>child indent</b> +15px, max one level</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>groups</b> {label, scope?, items}[]</li><li><b>items</b> {icon, label, count?, children?, <b>id</b>}[] — an id, <b>not an href</b></li><li><b>activeId · onNavigate</b></li><li><b>expandedIds</b> <span class="req">bindable</span> · <b>onToggleExpand</b></li><li><b>collapsed</b>, persisted per user</li></ul></div>
     </div>
-    <div class="delta warn">Revision 1's &ldquo;a parent with children is never itself a destination&rdquo; is false today, and building it would undo a shipped fix. Its <code>href</code> + <code>activePath</code> model cannot work in a router-less client — an in-app <code>href</code> navigates the game away and disconnects.<span class="cite"><b>CraftingSystemManagerRoot.svelte:9366-9394</b> (1185)</span></div>
+    <div class="delta warn"><b>A parent is both a destination and a group.</b> The row navigates and carries <code>aria-current</code>; a separate chevron expands, and that chevron disables with a stated reason when collapsing would hide the current screen. Items carry an <b>id, not an href</b> — in a router-less client an in-app href navigates the game away and disconnects.<span class="cite"><b>CraftingSystemManagerRoot.svelte:9366-9394</b> (1185)</span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;PageHeader&gt; &lt;TabBar&gt;</h4><span class="tag t-rev">Revised</span><p class="why">Breadcrumb, title block, action pair, then a full-width tab bar. A studio never puts its tabs in a side rail.</p></div>
+    <div class="spec-head"><h4>&lt;PageHeader&gt; &lt;TabBar&gt;</h4><p class="why">Breadcrumb, title block, action pair, then a full-width tab bar. A studio never puts its tabs in a side rail.</p></div>
     <div class="stage b0 col">
       <div style="background:var(--fab-bg-0);border:1px solid var(--fab-border);border-radius:9px;overflow:hidden">
         <div style="padding:16px">
@@ -964,11 +993,11 @@ a{color:var(--fab-accent)}
         </div>
       </div>
     </div>
-    <div class="delta"><b>TabBar gains per-tab <code>count</code> and <code>tone</code>.</b> Validation drives a warn-toned count on its own tab, and revision 1's tab spec had no prop for it. The section-nav style settles the two competing tab treatments: padding 12/13, 12.5px, active label <em>and</em> 2px underline in accent.</div>
+    <div class="delta"><b>A tab carries a <code>count</code> and a <code>tone</code>.</b> Validation drives a warn-toned count on its own tab. The settled tab treatment is the section-nav style: padding 12/13, 12.5px, active label <em>and</em> 2px underline in accent.</div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;ListRow&gt; &lt;BrowseCard&gt; &lt;ViewToggle&gt; &lt;XrefList&gt;</h4><span class="tag t-rev">One revised, three new</span><p class="why">Every browse list in the app is this row. It now carries a size and a layout, which is what absorbs the card grid, the cross-reference list and two ruled-out candidates.</p></div>
+    <div class="spec-head"><h4>&lt;ListRow&gt; &lt;BrowseCard&gt; &lt;ViewToggle&gt; &lt;XrefList&gt;</h4><p class="why">Every browse list in the app is this row. It now carries a size and a layout, which is what absorbs the card grid, the cross-reference list and two ruled-out candidates.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">default &mdash; 38px chip, serif name</span>
         <div style="display:grid;gap:8px">
@@ -993,7 +1022,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;SelectionBar&gt; &lt;BulkEditPanel&gt;</h4><span class="tag t-new">New</span><p class="why">The largest uncovered surface in the corpus. Six independent editors ship it; revision 1 named the bulk-edit bar twice inside <code>&lt;TintPicker&gt;</code> — as a dense swatch size and a &ldquo;leave unchanged&rdquo; prop — and never specced it.</p></div>
+    <div class="spec-head"><h4>&lt;SelectionBar&gt; &lt;BulkEditPanel&gt;</h4><p class="why">The largest uncovered surface in the corpus. Six independent editors ship it, and two other entries depend on it: <code>&lt;TintPicker&gt;</code>&rsquo;s dense swatch size and its &ldquo;leave unchanged&rdquo; clear state both exist only for this surface.</p></div>
     <div class="stage col">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:9px;background:var(--fab-accent-soft);border:1px solid var(--fab-accent-border);flex-wrap:wrap">
         <div class="k-cb ind"><i><svg class="i"><use href="#i-minus"/></svg></i></div>
@@ -1019,7 +1048,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><span class="tag t-new">New</span><p class="why">Present in 11 of 21 prototypes and shipped with three callers, yet revision 1 mentioned it only as a content type a rail section might hold.</p></div>
+    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped with three callers. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:12px;align-items:center"><div class="k-ic s38" style="color:var(--fab-warning-text);background:var(--fab-warning-soft)"><svg class="i"><use href="#i-alert"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Nearly ready</div><div class="k-hint">Three warnings, one blocking issue. Players cannot craft this until the blocker clears.</div></div>
@@ -1039,7 +1068,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Pagination&gt; &lt;FilterBar&gt;</h4><span class="tag t-rev">APIs rewritten</span></div>
+    <div class="spec-head"><h4>&lt;Pagination&gt; &lt;FilterBar&gt;</h4></div>
     <div class="stage col">
       <div class="unit"><span class="cap">pagination &mdash; count left, pager centred, size right</span>
         <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--fab-border);background:var(--fab-bg-1);border-radius:0 0 9px 9px;flex-wrap:wrap">
@@ -1063,11 +1092,11 @@ a{color:var(--fab-accent)}
       <div><h5>Pagination API</h5><ul><li><b>total · page · perPage</b></li><li><b>onPageChange · onPageSizeChange</b> <span class="req">required</span></li><li><b>sizes</b> = [10, 25, 50]</li><li><b>persistent</b> = false — whether the bar survives a single page</li><li>Count and pager are localized <b>whole sentences</b>, never a plural noun injected into a template</li></ul></div>
       <div><h5>FilterBar API</h5><ul><li><b>query · onQueryChange</b></li><li><b>toggles</b> {key, label, icon, active}[] — independent</li><li><b>selects</b> {key, label, options, value}[]</li><li><b>sort</b> {key, dir, options} <span class="req">new</span></li><li><b>layout</b> rail | inline · <b>result</b> {shown, total} · <b>onClear</b></li></ul></div>
     </div>
-    <div class="delta warn"><b>Four corrections.</b> Neither API had callbacks. &ldquo;Page state lives in the URL&rdquo; and &ldquo;filter state belongs in the URL&rdquo; are unimplementable — there is no URL. The <code>unit</code> prop, injecting a bare plural into &ldquo;Showing 1&ndash;12 of 27&rdquo;, reintroduces a bug canon forbids by name: it requires &ldquo;1 recipe&rdquo; and &ldquo;1 of 282 recipes&rdquo;, never &ldquo;1 recipes&rdquo;. And FilterBar's specimen showed &ldquo;Sort &middot; Name&rdquo; while its API had no sort at all — eight files pair a sort select with a direction toggle.<span class="cite"><b>ui-integration/spec.md:1350</b> · <b>Pagination.svelte</b> (675)</span></div>
+    <div class="delta warn"><b>Both bars own their state through callbacks, not a URL.</b> There is no URL and no router, so page, size, filter and sort state live in an app-level store. The count and pager are <b>localized whole sentences</b> rather than a plural noun injected into a template — canon requires “1 recipe” and “1 of 282 recipes”, never “1 recipes”.<span class="cite"><b>ui-integration/spec.md:1350</b> · <b>Pagination.svelte</b> (675)</span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;Rail&gt; &lt;LogList&gt; &lt;TierTrack&gt; &lt;Avatar&gt;</h4><span class="tag t-new">Two new</span></div>
+    <div class="spec-head"><h4>&lt;Rail&gt; &lt;LogList&gt; &lt;TierTrack&gt; &lt;Avatar&gt;</h4></div>
     <div class="stage" style="align-items:flex-start;gap:20px">
       <div class="unit" style="width:290px"><span class="cap">inspector rail section</span>
         <div style="background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;padding:12px;display:grid;gap:12px">
@@ -1080,7 +1109,7 @@ a{color:var(--fab-accent)}
           <div style="background:var(--fab-bg-1);padding:9px 12px;display:flex;gap:10px;align-items:baseline"><span class="k-count" style="width:74px;flex:none">3 ticks ago</span><span class="grow" style="font-size:11.5px">Mine reopened</span><span class="k-count" style="color:var(--fab-success-text)">+12</span></div>
           <div style="background:var(--fab-bg-1);padding:9px 12px;display:flex;gap:10px;align-items:baseline"><span class="k-count" style="width:74px;flex:none">6 ticks ago</span><div class="grow"><div style="font-size:11.5px">Tier declined</div><div class="k-hint">upkeep unpaid for 3 ticks</div></div><span class="k-count" style="color:var(--fab-danger-text)">&minus;4</span></div>
         </div>
-        <span class="k-hint">Revision 1&rsquo;s type scale defined a mono style labelled &ldquo;log line&rdquo; and gave it no owner. Five prototypes render one, in five geometries.</span></div>
+        <span class="k-hint">The type ladder defines a mono style for a log line; this is the component that owns it. Five prototypes render one, in five geometries.</span></div>
       <div class="unit" style="width:250px"><span class="cap">tier track</span>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
           <span class="k-badge success">Thorpe</span><svg class="i" style="width:9px;height:9px;color:var(--fab-text-subtle)"><use href="#i-cr"/></svg>
@@ -1105,7 +1134,7 @@ a{color:var(--fab-accent)}
   <div class="sec-head"><span class="num">11</span><h2>Composites</h2></div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;PickerRow&gt; &lt;ChoiceGroup&gt;</h4><span class="tag t-car">Highest-value part in the set</span><p class="why">One row serves recipe ingredients and results, downtime rewards and requirements, gathering yields, faction tier rewards and trade-route goods. Build this once and five editors stop drifting.</p></div>
+    <div class="spec-head"><h4>&lt;PickerRow&gt; &lt;ChoiceGroup&gt;</h4><p class="why">One row serves recipe ingredients and results, downtime rewards and requirements, gathering yields, faction tier rewards and trade-route goods. Build this once and five editors stop drifting.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">anatomy &mdash; left to right</span>
         <div style="display:grid;gap:6px">
@@ -1137,12 +1166,12 @@ a{color:var(--fab-accent)}
     </div>
     <div class="notes">
       <div><h5>Svelte API</h5><ul><li><b>kinds</b> (component | tag | essence | currency | item | resource)[]</li><li><b>value</b> {kind, id, name, icon, tint, qty, qtyMode} <span class="req">bindable</span></li><li><b>onChange</b> <span class="req">required</span></li><li><b>qty</b> false | {min, max, step, unit, signed}</li><li><b>allowAny</b> — shows &ldquo;or&hellip;&rdquo; and opens the Menu</li><li><b>catalogue</b> async search source per kind</li><li><b>removable</b> = true</li></ul></div>
-      <div><h5>ChoiceGroup is a documented composition</h5><ul><li>A bordered set of picker rows, a header pill, and a Segmented — <b>not its own component</b>.</li><li>Revision 1 specced it as a primitive while ruling out five candidates for exactly this shape.</li><li>The two-tint rule survives as guidance on PickerRow.</li></ul></div>
+      <div><h5>ChoiceGroup is a documented composition</h5><ul><li>A bordered set of picker rows, a header pill, and a Segmented — <b>not its own component</b>.</li><li>The two-tint rule survives as guidance on PickerRow.</li></ul></div>
     </div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;RuleRow&gt; &lt;RuleSentence&gt;</h4><span class="tag t-rev">API rewritten</span><p class="why">The condition editor behind triggers, gates and modifiers. The sentence is not decoration — it is how a GM checks they built what they meant.</p></div>
+    <div class="spec-head"><h4>&lt;RuleRow&gt; &lt;RuleSentence&gt;</h4><p class="why">The condition editor behind triggers, gates and modifiers. The sentence is not decoration — it is how a GM checks they built what they meant.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:10px;align-items:center"><div class="k-ic" style="color:var(--fab-tag-butter)"><svg class="i"><use href="#i-star"/></svg></div><span style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Natural 20</span><span class="grow"></span><button class="k-btn" style="height:28px;min-height:28px">Step up 1</button><button class="k-btn icon"><svg class="i"><use href="#i-cu"/></svg></button><button class="k-btn icon" style="color:var(--fab-danger-text)"><svg class="i"><use href="#i-trash"/></svg></button></div>
@@ -1161,11 +1190,11 @@ a{color:var(--fab-accent)}
       <div><h5>Canonical spec</h5><ul><li><b>field</b> kicker above · select 30 · radius 7</li><li><b>wrap</b> the row wraps rather than scrolls; kickers keep it readable</li><li><b>sentence</b> 2px accent left rule on surface-soft</li><li><b>unfinished</b> says what is missing — never renders half a rule</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>schema</b> the field chain — each step narrows the next</li><li><b>value</b> <span class="req">bindable</span> · <b>onChange</b> <span class="req">required</span></li><li><b>sentence</b> {frameKey, clauseKeys, joinKey, params} — <b>never a string</b></li><li><b>presets · collapsible</b></li></ul></div>
     </div>
-    <div class="delta warn"><b>The sentence cannot be a callback returning a string.</b> Revision 1 specified <code>sentence: (value) &rArr; string</code> and told new surfaces to reuse the prototype's generator. A sentence assembled from fragments cannot be translated. The shipped app already solved this twice, independently: whole-clause keys plus a translator-controlled frame and join — <em>&ldquo;When {condition}, {effect}.&rdquo;</em> with its own join string.<span class="cite"><b>lang/en.json:5495-5511</b> and <b>2809-2822</b></span></div>
+    <div class="delta warn"><b>The sentence is assembled from localized keys, never concatenated.</b> A sentence built from fragments cannot be translated. The shipped app solves this twice, independently: whole-clause keys plus a translator-controlled frame and join — <em>“When {condition}, {effect}.”</em> with its own join string.<span class="cite"><b>lang/en.json:5495-5511</b> and <b>2809-2822</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><span class="tag t-rev">Revised</span><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag.</p></div>
+    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:6px">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)">
@@ -1191,20 +1220,20 @@ a{color:var(--fab-accent)}
       <span class="k-hint">At the ends the unavailable chevron dims &mdash; it never hides. The numbered badge is what makes order legible once the list scrolls.</span>
     </div>
     <div class="notes">
-      <div><h5>Canonical spec</h5><ul><li><b>row</b> padding 12 · radius 9 · bg-1 · gap 12</li><li><b>chevron pair</b> 24&times;24 hit area each — revision 1's 22&times;13 fails the target minimum</li><li><b>keyboard</b> focus the grip, &uarr;&darr; moves — <b>and the keyboard-focus opt-out</b>, or the arrows also pan the canvas</li><li><b>announce</b> &ldquo;Moved {name} to position {n} of {total}&rdquo;, after focus lands</li></ul></div>
+      <div><h5>Canonical spec</h5><ul><li><b>row</b> padding 12 · radius 9 · bg-1 · gap 12</li><li><b>chevron pair</b> 24&times;24 hit area each, so each meets the target minimum</li><li><b>keyboard</b> focus the grip, &uarr;&darr; moves — <b>and the keyboard-focus opt-out</b>, or the arrows also pan the canvas</li><li><b>announce</b> &ldquo;Moved {name} to position {n} of {total}&rdquo;, after focus lands</li></ul></div>
       <div><h5>Svelte API</h5><ul><li><b>items</b> any[] — order is the array order</li><li><b>onReorder</b> (from, to) <span class="req">required</span></li><li><b>itemLabel</b> (item) <span class="req">required</span> — the announcement needs a name</li><li><b>numbered · handles · removable</b></li></ul></div>
     </div>
     <div class="delta warn"><b>Live defect found while reviewing this.</b> The shipped band strip is a <code>&lt;span role="slider" tabindex="0"&gt;</code> handling arrows and Page keys, and the keyboard-focus opt-out appears <b>nowhere in the tree</b> — zero occurrences across <code>src/</code> and <code>styles/</code>. Every band nudge currently also pans the canvas, and every Page key also zooms. Worth its own issue, independent of this reference.<span class="cite"><b>ThresholdBandStrip.svelte:412-433</b></span></div>
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;ExprInput&gt; &lt;RequirementChooser&gt;</h4><span class="tag t-car">Kept, one reconciled</span></div>
+    <div class="spec-head"><h4>&lt;ExprInput&gt; &lt;RequirementChooser&gt;</h4></div>
     <div class="stage" style="align-items:flex-start;gap:22px">
       <div class="unit" style="width:300px"><span class="cap">expression &mdash; resolves against the previewed actor</span>
         <div class="k-lbl"><div class="k-field mono">1d20 + @prof + @abilities.dex.mod</div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="k-badge info">= 23</span><button class="k-btn dashed" style="height:24px;min-height:24px;font-size:10px">@prof</button><button class="k-btn dashed" style="height:24px;min-height:24px;font-size:10px">@abilities.dex.mod</button><button class="k-btn dashed" style="height:24px;min-height:24px;font-size:10px">@skills.cra.rank</button></div>
           <span class="k-hint">Tokens insert at the cursor. Shows the resolved value, or says it does not reduce to a number.</span></div>
-        <span class="k-hint">Kept from revision 1&rsquo;s four compound inputs &mdash; cursor insertion and an actor resolver are real behaviour nothing else owns. <b>Bounds</b> and <b>Currency</b> were dropped: both are compositions their own specs concede.</span></div>
+        <span class="k-hint">Cursor insertion and an actor resolver are real behaviour nothing else owns, which is why this is a primitive where <b>Bounds</b> and <b>Currency</b> are compositions.</span></div>
       <div class="unit" style="width:330px"><span class="cap">requirement chooser &mdash; the player side</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <div style="width:56px;display:grid;gap:4px;justify-items:center"><div style="width:56px;height:56px;border-radius:11px;background:var(--fab-bg-3);display:grid;place-items:center;position:relative;outline:2px solid var(--fab-accent);outline-offset:2px"><svg class="i" style="width:21px;height:21px;color:var(--fab-tag-sage)"><use href="#i-leaf"/></svg><span style="position:absolute;top:-7px;left:50%;transform:translateX(-50%);background:var(--fab-success-soft);color:var(--fab-success-text);font-family:var(--fab-font-mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px">12/2</span></div><span style="font-size:9.5px;text-align:center;line-height:1.3">Oak Haft</span></div>
@@ -1216,7 +1245,7 @@ a{color:var(--fab-accent)}
           <div style="display:flex;gap:8px;align-items:center;color:var(--fab-danger-text)"><span style="font-size:11.5px;font-weight:600">Moonsilver</span><span class="k-hint grow" style="color:var(--fab-danger-text)">You own none.</span><span class="k-count" style="color:var(--fab-danger-text)">&times;1</span></div></div></div>
         <span class="k-hint">Read-only mirror of the GM&rsquo;s choice group: the player can never add an option, only pick one. The count pill is the only element the player side adds.</span></div>
     </div>
-    <div class="delta"><b>RequirementChooser is a family, not one component.</b> Canon already names the player crafting app's <em>requirement rail, requirement tile, essence pool, consumption-plan panel and essence-contribution chip</em> as five distinct primitives. Revision 1's justification — &ldquo;a read-only mirror of PickerRow&rdquo; — is a claim about shared <em>data</em>; nothing in its spec (56px tiles, held/needed pill, resolve well) appears in PickerRow's. Reconcile against the spec rather than collapsing the family.<span class="cite"><b>ui-integration/spec.md:88</b></span></div>
+    <div class="delta"><b>RequirementChooser is a family, not one component.</b> Canon names the player crafting app’s requirement rail, requirement tile, essence pool, consumption-plan panel and essence-contribution chip as five distinct primitives. It shares <em>data</em> with PickerRow and no geometry: 56px tiles, a held/needed pill and a resolve well appear in neither of PickerRow’s parts.<span class="cite"><b>ui-integration/spec.md:88</b></span></div>
   </div>
 </section>
 
@@ -1354,9 +1383,9 @@ a{color:var(--fab-accent)}
 
 <section id="ruledout">
   <div class="sec-head"><span class="num">14</span><h2>Ruled out</h2></div>
-  <p class="lede">Revision 1 declined five candidates as compositions or one-screen furniture. Applying that same test to what it kept disqualifies eight more, and two describe surfaces Foundry already owns. Kept so the reasoning survives and nobody re-proposes them.</p>
+  <p class="lede">Candidates reviewed and declined. Each is either a composition of parts already in the set, one-screen furniture, or a surface Foundry already owns. Kept so the reasoning survives and nobody re-proposes them.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:18px">
-    <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;MemberRow&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Specced in revision 1&rsquo;s own words as List row geometry with a portrait — structurally identical to the inline-title row it declined. <b>Compose:</b> ListRow + <code>leading</code>.</p></div>
+    <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;MemberRow&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">List row geometry with a portrait in the leading cell &mdash; structurally identical to the inline-title row already declined. <b>Compose:</b> ListRow + <code>leading</code>.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;ActorPicker&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">A pill trigger that opens the popover — which already counted it as one of its four callers. <b>Compose:</b> trigger + SearchPopover.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;AddButton&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Dashed is a role on the button that owns the meaning. &ldquo;Sits in flow with its collection&rdquo; is a usage rule, not a boundary. <b>Compose:</b> Button role=dashed.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;RailCard&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">A composition that also smuggled back the 34px button size the set retires by name. <b>Compose:</b> Well + Kicker + Button.</p></div>
@@ -1366,44 +1395,31 @@ a{color:var(--fab-accent)}
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;CurrencyInput&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">A composition, and wrong about the domain: it assumed a flat world-scoped coin ladder where the model defines a <b>per-system acyclic denomination DAG</b>. <b>Compose:</b> Stepper + Select.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">&lt;Toast&gt;</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Foundry owns transient feedback and renders its own toasts over the module window regardless. <b>Use:</b> <code>ui.notifications</code>.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-out">Out</span><span class="k-mono" style="font-size:12px;font-weight:700">Destructive panel</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Canon makes the dialog the default for manager confirmations; the arm is the carve-out. <b>Use:</b> <code>confirmDialog</code>.</p></div>
-    <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-car">Upheld</span><span class="k-mono" style="font-size:12px;font-weight:700">Revision 1&rsquo;s five</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Inline-title row, thumbnail tile, full-width CTA, locked preview list, studio footer bar — all still out. But the thumbnail tile is now <code>art</code> on IconChip and the CTA is <code>fullWidth</code> on Button, so both are expressible.</p></div>
+    <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-car">Composition</span><span class="k-mono" style="font-size:12px;font-weight:700">Five more</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">Inline-title row, thumbnail tile, full-width CTA, locked preview list, studio footer bar. The thumbnail tile is <code>art</code> on IconChip and the CTA is <code>fullWidth</code> on Button, so both are expressible without a component.</p></div>
     <div class="k-well"><div style="display:flex;gap:8px;align-items:center"><span class="tag t-car">Single-caller</span><span class="k-mono" style="font-size:12px;font-weight:700">Modal · Graph canvas</span></div><p class="k-hint" style="margin:6px 0 0;max-width:none">One caller each. Recorded so the app&rsquo;s near-absence of modals is a decision rather than an accident of scope.</p></div>
   </div>
 </section>
 
 <section id="log">
-  <div class="sec-head"><span class="num">15</span><h2>Decision log</h2></div>
-  <p class="lede">What changed between revisions, and what each change costs. Revision 1 recorded 29 settled and 1 open; the open one is closed and eleven settled entries are corrected or retired.</p>
-  <div style="overflow-x:auto;margin-top:18px"><table style="border-collapse:collapse;width:100%;min-width:560px">
-    <thead><tr>
-      <th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Decision</th>
-      <th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Revision 2</th>
-      <th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 0 8px 0;border-bottom:1px solid var(--fab-border-strong)">Consequence</th>
-    </tr></thead>
+  <div class="sec-head"><span class="num">15</span><h2>Planned migrations</h2></div>
+  <p class="lede">Shipped code that does not yet match this reference, and what it moves to. Everything not listed here already conforms.</p>
+  <div style="overflow-x:auto;margin-top:18px"><table style="border-collapse:collapse;width:100%;min-width:660px">
+    <thead><tr><th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Subject</th><th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Today</th><th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Moves to</th><th style="font-family:var(--fab-font-mono);font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fab-text-subtle);text-align:left;padding:0 14px 8px 0;border-bottom:1px solid var(--fab-border-strong)">Evidence</th></tr></thead>
     <tbody style="font-size:12.5px">
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Corpus</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Core repository only</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Every collapse count re-derived; three consequences retired as out-of-scope</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Token names</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><code>--fab-*</code> throughout</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Mechanical, and every spec line was uncopyable until done</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Mono weights</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">400 and 500 only</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Four ladder steps re-weighted; emphasis moves to size and ink</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">UI face</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Host-owned, untokenized</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">The ladder gives sizes and roles, never the family</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Spacing</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">All padding and gap on the 4px scale</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Every container geometry restated; off-scale literals retired</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Elevation</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Three shadow tokens</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Reverses &ldquo;nothing uses a shadow&rdquo; — twice asserted, false both ways</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Focus, motion, naming, targets</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Four new foundations</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Prevents 40 components each inventing a convention</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Breakpoints</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><code>@container</code>, never viewport</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Every breakpoint restated; the rails gain a floor</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Stepper</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Editable value confirmed; full API restored</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Not a reversal — it already shipped. Seven props returned</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Badge</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Reconciled with the Rail Marker Family</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Record counts stay a bare mono numeral, not a filled pill</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Toggle vs StatusButton</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">List row → status button; the record&rsquo;s editor → toggle</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Corrects a rule that broke on the recipe editor&rsquo;s ten callers</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Notice</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">One blocking bar; non-blocking notices stack</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">&ldquo;Never stack&rdquo; contradicted its own specimens</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Meter</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Split into Meter, BandedBar, StageBars</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">One component could not carry one correct role</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">RangeBar height</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>46 / r9 / bg-0</b> — closed</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Gathering moves; the grow-to-50 compromise is rejected outright</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Premium surfaces</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">Removed from the set</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">The player window carries no premium signal in any state</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">URL state</td><td style="padding:10px 14px 10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top">App-level store</td><td style="padding:10px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-muted);vertical-align:top">Pagination, FilterBar, NavSidebar and InfoStrip all restated</td></tr>
-      <tr><td style="padding:10px 14px 10px 0;color:var(--fab-text);font-weight:600;vertical-align:top">Set membership</td><td style="padding:10px 14px 10px 0;color:var(--fab-text-secondary);vertical-align:top">Thirteen in, ten out</td><td style="padding:10px 0;color:var(--fab-text-muted);vertical-align:top">The top five additions each outrank several entries the set already carried</td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Gathering time-of-day strip</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">50 / r8 / bg-1</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">46 / r9 / bg-0</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>ThresholdBandStrip.svelte:459-468</b></span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Tool breakage scale</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">interpolated at 0/33/66/100</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">banded, one hue from the ramp</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>chanceColorScale.js:3-8</b></span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Control heights 32, 36, 40</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">in use</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">nearest rung of 26/28/30/34/38</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0">&mdash;</span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Card action buttons at 34px</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">in use</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">30px row size</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0">&mdash;</span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Off-scale padding and gap</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">14/15, 11/13, 9/11, 8/10, gaps 5/7/9/11/13</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">nearest 4px scale token</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>ui-integration/spec.md:70-76</b></span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Mono type at weight 600 or 700</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">faux-bold synthesis</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">400 or 500, emphasis by size and ink</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>assets/fonts/</b></span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Band strip arrow keys</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">also pan and zoom the canvas</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">carry the keyboard-focus opt-out</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>ThresholdBandStrip.svelte:412-433</b></span></td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text);font-weight:600">Entity tint picker</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)">eight offered, five declared and unused</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><b style="color:var(--fab-text)">a stated rule &mdash; see Colour</b></td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);vertical-align:top;color:var(--fab-text-secondary)"><span class="cite" style="margin:0"><b>managerColorTokens.js:24-31</b></span></td></tr>
     </tbody>
   </table></div>
 </section>
 
 <footer style="margin-top:64px;padding-top:20px;border-top:1px solid var(--fab-border);font-family:var(--fab-font-mono);font-size:10px;color:var(--fab-text-subtle);line-height:1.85">
-  Revision 2 folds in a five-lane review: prototype coverage, shipped-app regression, set boundaries, behavioural completeness, and Foundry integration.<br>
+  Derived from a review of 21 prototypes against the shipped app, covering set boundaries, behavioural completeness and Foundry integration.<br>
   Sources: 21 prototype bundles, the shipped Svelte app under <code>src/ui/</code>, <code>openspec/specs/ui-integration/spec.md</code>, <code>DOMAIN.md</code>, <code>AGENTS.md</code>, <code>styles/fabricate.css</code>, <code>lang/en.json</code>, and the harvested Foundry client.<br>
   Every specimen on this page is rendered from the same token values the app ships, at the geometry each entry specifies. Single-theme by intent — all seven shipped themes are dark.
 </footer>

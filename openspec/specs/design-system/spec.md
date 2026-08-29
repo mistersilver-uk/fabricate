@@ -50,7 +50,11 @@ Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-rai
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 
 Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one.
-The pickable palette is the eight `--fab-tag-*` tokens enumerated in `src/ui/svelte/util/managerColorTokens.js`; the wider declared family includes decorative tints Core uses at fixed sites, and adding a token to the stylesheet does not add it to a picker.
+Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
+Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
+By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
+Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
+Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
 
 Elevation is for surfaces that float OVER content and MUST come from `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`.
 A card that merely sits on the page uses a border and no shadow.
@@ -65,6 +69,8 @@ A card that merely sits on the page uses a border and no shadow.
 Control height MUST be one of 26, 28, 30, 34, 38, or 44 for a control a spec marks touch-reachable.
 The values 32, 36 and 40 are RETIRED and MUST NOT be reintroduced.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for cards and panels, and 999 for pills and tracks.
+A fully rounded radius is for a shape whose contents are text alone.
+A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-integration`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
 Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and remain literal.
@@ -137,6 +143,12 @@ Transient feedback is `ui.notifications` and Fabricate ships NO toast primitive.
 Destructive confirmation defaults to `confirmDialog`; arm-then-confirm is a carve-out for a high-frequency row action and for a bulk action that states its impact in-panel.
 
 There is no URL and no router, so page state, filter state and navigation MUST live in an app-level store and a primitive MUST NOT expose an in-app `href`.
+
+A control that selects a world asset path MUST render the ASSET and a browse action, never the stored path string.
+Foundry owns the picker dialog, the path is an implementation detail, and a long path destroys the row it sits in.
+
+A native `select` renders its option popup through the operating system, where the only styling available is `color-scheme: dark`.
+Whenever the options need a selected tick, a group heading, a per-option description, a badge, or a reason for being unavailable, the control MUST render its own option list using the floating-surface geometry instead of a native popup.
 
 #### Scenario: A primitive handles arrow keys on a non-input element
 
