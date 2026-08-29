@@ -1846,6 +1846,102 @@ Every control live-applies through the admin store and stages no draft.
 Each store action addresses the ONE world configuration and takes no `systemId`; persistence goes through `CurrencyConfigStore`, which normalizes and always saves (`data-models/spec.md` -> CurrencyConfig requirement 4), rather than through `updateSystem`.
 The projection reads the world config straight from its store on every publish, so another GM's edit to the ladder is picked up without a per-system cache to invalidate.
 
+### GM World Scoped Entity Routes
+
+World exposes the component, essence and tool CATALOGUES and their entry editors, each reachable with no crafting system selected.
+They render the `## Scoped Entity Definitions` model (`data-models/spec.md`): a world record's identity, its world defaults, and a row per crafting system that has a System Membership Record for it.
+
+The World Vocabulary is deliberately NOT part of this requirement — see `### GM World Vocabulary Route`.
+It holds the category and tag vocabularies these entities draw FROM, and folding the two together would be the first place in this corpus to lose the boundary `data-models` draws in terms.
+
+1. **FOUR world rail leaves, ABOVE `Parties`, in the prototype's authored order:** `Component catalogue`, `Tags & Categories`, `Essence Catalogue`, `Tools Catalogue`.
+   Each is UNGATED and reachable with no crafting system selected, like `Parties`, `Travel` and `Rules & Resources` and unlike experimental-gated `Downtime`, because the world catalogue must be authorable before any system opts into anything.
+   **The labels are exactly as authored, and three of them read as typos while none is:** `Component catalogue` carries a lowercase `c`, `Tools Catalogue` is PLURAL where its siblings are singular, and `Tags & Categories` is character-for-character identical to the system-scope entry higher in the same rail.
+   The prototype is the authority for rail labels and order, and the parity oracle asserts landmark ORDER, so "correcting" any of the three reds that gate.
+   Each leaf carries a stable id — `manager-world-nav-component-catalogue`, `manager-world-nav-vocabulary`, `manager-world-nav-essence-catalogue`, `manager-world-nav-tool-catalogue` — and the hook `data-world-nav-item`, and ALL FOUR surface a world corpus count on `.manager-nav-count`.
+   The three entity leaves count their own corpus; the vocabulary leaf's count is defined by `### GM World Vocabulary Route`, which owns that badge because the World Vocabulary is not a scoped-entity corpus.
+   The badge is hidden at the 56px collapsed rail width, where every leaf is reduced to its glyph, so the count is not the collapsed rail's accessible name — see requirement 8.
+2. **SEVEN route tokens** — `world-components`, `world-component-entry`, `world-essences`, `world-essence-entry`, `world-tools`, `world-tool-entry`, and the vocabulary token that requirement's own section names.
+   Each passes `normalizedActiveView` through the world pass-through and ABOVE its `if (!system) return 'systems'` fallthrough, because a world screen's normal state is that no crafting system is selected and that fallthrough would otherwise bounce every one of them.
+   Each is absent from `setView`'s `!selectedSystem` refusal and from `SCOPE_BROWSER_BY_VIEW`: a world route has no per-system record to be stranded on when the rail's scope select changes.
+   Each participates in the Manager confirm-discard route-exit chain.
+3. Each route renders its own `<main class="manager-main">` carrying a per-page hook, `data-scoped-page="<token>"`.
+   **A CATALOGUE'S TRAIL IS TWO CRUMBS AND AN ENTRY'S IS THREE.**
+   A catalogue is `World > <screen>`, because it IS a world screen rather than a destination inside a group.
+   An entry is `World > <catalogue> > <entity>`, with the MIDDLE crumb a button back to its catalogue: an entry editor is released to full width by requirement 4 and therefore renders no inspector, so that crumb is the only affordance out of it, and the same "a button wherever it is not the leaf" rule the `World` crumb follows applies to it.
+   The leaf names the ENTITY when the published corpus can supply a name and falls back to the screen's own title otherwise, because an entry route with no subject chosen and one whose subject the corpus no longer holds are the same thing to a breadcrumb: there is nothing to name, and an empty crumb is not an answer.
+   The shell owns the trail, so the subject a later lane chooses reaches it through props the pages already have: a catalogue page takes `onOpenEntry(entityId)` and an entry page takes `entityId` and `onBackToCatalogue()`.
+   That seam is what keeps requirement 7 true for an entry editor, which cannot render its own crumb.
+4. **Full width is ONE mechanically checked decision over a THREE-state classification.**
+   Suppressing the shell's shared `.manager-inspector` aside in the component and releasing the `.manager-body` grid column in the stylesheet — in BOTH the normal and the `.is-rail-collapsed` rule — are one decision expressed twice, and each half alone is wrong in its own way; this has shipped half-done twice already (the Checks family, and `world-currency`).
+   The decision is recorded ONCE, as a set of `{id, predicate, selector, layoutClass}` entries, and the aside chain is BUILT from that set rather than restating any clause.
+   `predicate` rather than a route token, because three of the shipped exclusions are not tokens: `checks` is a FAMILY matched by a prefix selector, World > Parties is a route+SUBSTATE matched by a compound attribute selector, and the world-rules clause spans three tokens.
+   `layoutClass` because the stylesheet holds THREE layout states and not two: `tool-edit` and `knowledge` suppress the aside AND keep three tracks, repurposing the third column, so a gate asserting "aside excluded equals column released" is unsatisfiable and every loosening of it is vacuous.
+   The classes are `shared-3-track`, `full-width-2-track` and `self-owned-3-track`; the aside chain reads the UNION of the last two, and the Tool Studio library is the route-scoped member of the first — it re-widths its third column and KEEPS its inspector.
+   The gate asserts SELECTOR-STRING equality between the set and the stylesheet's own classification, parses AT-RULE-AWARE (`.manager-body` is re-declared inside an `@container` block, which a flat scan reads as "every route released"), and asserts both parsed sets NON-EMPTY and carrying three named baseline members BEFORE the equality — because the house helper for reading a rule out of that stylesheet answers `''` on no match, so the cheapest green available to a broken parse is two empty sets comparing equal.
+   The rows override sits on `.manager-main`; `.manager-body` declares no `grid-template-rows` at all, so writing one there would invent a row model for every route sharing the base rule.
+5. **The three SYSTEM-scope entries render the authored screen titles `Component Rules`, `Essence Rules` and `Tool Rules`.**
+   These are SCREEN TITLES AND NOT DOMAIN NOUNS: the relation each edits is a System Membership Record, and no route token, setting key, code identifier or persisted field takes the spelling `rules` for it.
+   The route tokens are PRESERVED unrenamed, so every deep link, every capture-case `expectView` and every stored `activeView` keeps resolving.
+   The relabel IS the screen's name everywhere it names the SCREEN — the rail entry, the page title, the breadcrumb crumb and the browser's `<main>` accessible name — because a page titled `Component Rules` whose accessible name said `Components` is the WCAG 2.5.3 Label in Name hazard.
+   Where the same lang key named the DOMAIN NOUN rather than the screen, it is left alone; the system inspector's essence count is the one such use.
+6. **NEITHER HARNESS MAY MATCH A RAIL ENTRY BY VISIBLE TEXT.**
+   Both scopes now carry a `Component`-prefixed entry, `Tools` is a live substring of `Tools Catalogue`, and `Tags & Categories` is an exact duplicate across the two scopes — a substring collision is recoverable by DOM order, and an exact duplicate is not.
+   Every rail button therefore carries a stable `id`, both harnesses target the id, and the id is a COMPLETE LITERAL rather than a stem-built template, because an interpolated id is invisible to the source gate that checks it is rendered at all.
+   A `node --test` gate asserts, on every commit, that no `:has-text(` locator reaches a manager rail button anywhere in the Foundry harness, that every rail id the harness targets is rendered by a component that renders the rail, and that every label in its membership loop is authored beside its own id.
+   The Foundry smoke is the CONFIRMING run and is never the only evidence the label and id sets agree.
+7. **No later PR in epic 1357 reopens the five gateway files.**
+   `CraftingSystemManagerRoot.svelte`, `adminStore.js`, `styles/fabricate.css`, `scripts/lib/viewLabCases.js` and `scripts/foundry-test-run.mjs` carry every route token, rail entry, aside clause, store action and capture case the three entity lanes and the vocabulary lane need, so each of those lanes changes only its own screens.
+   The obligation is evaluated on THOSE PRs, as `git diff --name-only origin/main...HEAD` containing none of the five paths.
+   **It binds the PRODUCER side of a published key as well as the consumer side**, which is where it was first got wrong: a rail badge wired to read `worldScope.vocabulary.total` is closed, but a projection that could only ever be handed the three entity stores is not, so `adminStore` reads an OPTIONAL fourth `vocabulary` store leg through the same `services.getXScopeStore?.() ?? null` idiom as its siblings.
+   The leg answers `null` and the projection answers `{available: false, total: 0}` until PR 7 registers the store, and the store, its service accessor and its projection all live outside the five paths.
+   The same rule is why the entry routes' `onOpenEntry` / `entityId` / `onBackToCatalogue` props are wired in requirement 3 rather than left to the lane that first renders a catalogue row.
+8. **At the collapsed 56px rail width no leaf renders its count badge.**
+   `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
+   Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
+
+### GM World Vocabulary Route
+
+World exposes `Tags & Categories` as a world rail leaf, matching the shipped `### GM Travel Route` shape: one route token, ungated, reachable with no crafting system selected.
+It is the authoring surface for the World Vocabulary — component categories, component tags and recipe categories — each with a usage count and a deletion warning naming how many inheriting rule sets are affected.
+
+It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the separation is a decision rather than an accident of drafting: a spec heading is a corpus noun rather than a screen title, there is no authored label covering all four world leaves, and the World Vocabulary is NOT a scoped-entity layer — it holds the vocabularies those entities draw from, which is the boundary `data-models/spec.md` draws in terms.
+
+1. The route token is `world-vocabulary`, and the rail leaf carries the id `manager-world-nav-vocabulary` and the hook `data-world-nav-item="vocabulary"`.
+2. Its label is character-for-character identical to the system-scope `Tags & Categories` entry, which is why no harness may reach either by text; see `### GM World Scoped Entity Routes` requirement 6.
+3. It renders its own `<main class="manager-main">` with the page hook `data-scoped-page="world-vocabulary"`, is released to full width by the one mechanically checked decision of that requirement 4, and participates in the confirm-discard route-exit chain.
+4. **The leaf carries a count badge, and it counts the WHOLE vocabulary** — component categories plus component tags plus recipe categories, summed rather than deduplicated across the three, because a category and a tag that share a label are two entries in the world's vocabulary.
+   It is the fourth of the four badges `### GM World Scoped Entity Routes` requirement 1 names, and it is the only one that is not a corpus of scoped entities.
+   **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
+   It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
+
+### Scoped entity editor patterns
+
+The six scoped-entity editors — a catalogue and an entry editor for each of components, essences and tools — share one set of patterns, built once.
+Each is stated here because the shape of each is decided by the `## Scoped Entity Definitions` MODEL rather than by any one screen, so a screen that reinvented one would be writing a value the normalizer discards.
+
+1. **The inherit row set is read from the SCOPE DESCRIPTOR, never listed per screen.**
+   A component draws exactly ONE row (`category`), an essence two and a tool two.
+   A component's essence quantities, salvage, complications and difficulty are NOT sections and NOT membership fields; they stay on the in-system record, and `normalizeMembership` is an allowlist rebuild that silently DISCARDS any other key on the next `load()` — so a screen that offered a switch for one would write a value that survives the session and vanishes at reload.
+2. **A SEEDED section renders no inherit row.**
+   A tool's `repairRequirements` is copied once and then diverges, so there is no live parent to fall back to and a switch over it would be a claim the resolver does not honour.
+3. **A ONE-SECTION entity renders exactly one row and NO GROUP CHROME** — no header, no divider, no empty state around a single control, because that chrome costs more vertical space than the control it frames and says nothing the row does not.
+4. **The re-inherit copy is "fall back", never "discard", and there is no confirmation**, because re-inheriting RETAINS the dormant local override: the switch flips, the local block stays on disk, and re-overriding restores it rather than re-seeding from the world.
+   Turning a switch OFF seeds the local block from the current world value as a STRUCTURAL COPY, so neither scope can reach into the other through a shared reference.
+5. **`tags` is not a section and renders no inherit row.**
+   It is additive with per-tag muting, so it has its own two write paths and no single switch, which per-tag muting cannot be expressed by.
+6. **The membership action cluster reads `enableable` from the descriptor**, so the COMPONENT path structurally cannot render an enabled switch: a component membership record carries no such field, and the write path does not offer the action at all rather than offering one that refuses.
+   Adding an entity to a system creates a record that inherits every section, and the copy says so; removing deletes only that record and its overrides, and arms through the shared `ArmedDangerButton` keyed on the DOCUMENT ID pair rather than a row index.
+7. **A WORLD-DEFAULTS EDITOR MAY OFFER ONLY WORLD-ADDRESSABLE REFERENTS.**
+   `data-models/spec.md` `### Essence scope` requirement 5 binds a world essence default's `effectSource` to a world-addressable referent and never a system-local component id.
+   The store writes section values OPAQUELY and the normalizer coerces shape rather than addressability, so neither can enforce it: the PICKER is the enforcement point.
+8. **The validation tab and the player preview are shared shells**, and the six editors are callers rather than authors of them.
+   The validation shell renders the shipped editor-validation surface and owns the count and pass/warn status labels both existing sites already agreed on; only the BLOCK label differs, because an essence always saves while a Tool refuses to.
+9. **Requirement rows introduce NO new component:** the shipped tool repair-requirement editor is the recipe-free ingredient editor, already rendered chromeless.
+10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
+11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
+    A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
+
 ### GM Travel Route
 
 World always exposes `Parties` for global party management and `Travel` for the world's realm

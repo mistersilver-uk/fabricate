@@ -79,6 +79,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
+    // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
+    'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
+    'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
@@ -187,7 +190,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-tool-editor-header]').length, 1);
     assert.match(
       root.querySelector('[data-tool-editor-header] .manager-breadcrumbs').textContent,
-      /Crafting Systems.*The Herbalist.*Tools.*Smith's Hammer/
+      /Crafting Systems.*The Herbalist.*Tool Rules.*Smith's Hammer/
     );
     root.querySelector('[data-tool-editor-open-systems]').click();
     root.querySelector('[data-tool-editor-open-system]').click();

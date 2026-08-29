@@ -66,6 +66,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
+    // The shared scoped validation shell (issue 1362).
+    'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceValidationTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     // The REAL player essence/component tile the behaviour preview now mounts (issue 1036,
