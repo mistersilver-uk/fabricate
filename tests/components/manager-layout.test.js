@@ -1459,7 +1459,13 @@ test('every explainer and fact-row site renders through the primitive, not by ha
   // And the converted sites really do import it — an assertion that only deleted the old
   // class names would pass on a screen that had simply dropped the card.
   for (const [componentPath, imports] of [
-    ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
+    // The Tool preview renders through the shared scoped-entity shell since issue 1362, so
+    // the chain is asserted rather than the leaf: the site must still render A preview shell,
+    // and that shell must still render both primitives. Asserting only the site's own imports
+    // would have gone red on a faithful conversion; asserting only the shell's would pass on a
+    // site that had dropped the card entirely, which is what this test exists to catch.
+    ['tools/ToolBehaviorPreview.svelte', ['ScopedEntityPreview']],
+    ['scoped/ScopedEntityPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
     // `checks/ChecksRightMenu.svelte` is NOT on this list any more (issue 1096). The

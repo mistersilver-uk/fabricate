@@ -141,6 +141,14 @@
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
+  import WorldComponentCataloguePage from './scoped/WorldComponentCataloguePage.svelte';
+  import WorldComponentEntryPage from './scoped/WorldComponentEntryPage.svelte';
+  import WorldEssenceCataloguePage from './scoped/WorldEssenceCataloguePage.svelte';
+  import WorldEssenceEntryPage from './scoped/WorldEssenceEntryPage.svelte';
+  import WorldToolCataloguePage from './scoped/WorldToolCataloguePage.svelte';
+  import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
+  import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
+  import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -804,6 +812,11 @@
   const placeholderViews = [
     {
       id: 'graph',
+      // The rail id, as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
+      // Both harnesses target every rail entry by id since issue 1362, and an interpolated one
+      // is invisible to the source gate that checks the id is rendered at all — the same
+      // weakening the View Lab's own hook scan records for a stem-built selector.
+      navId: 'manager-nav-graph',
       icon: 'fas fa-project-diagram',
       labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
       fallback: 'Graph',
@@ -2707,7 +2720,6 @@
     visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
   );
   const isWorldRoute = $derived(currentView === 'world');
-  const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
   // World > Currency (issue 1278). UNGATED, like Parties and unlike experimental-gated Downtime:
   // a GM has to be able to configure the world's coins BEFORE any crafting system opts in, so
@@ -2723,6 +2735,260 @@
   const isWorldModifiersRoute = $derived(currentView === 'world-modifiers');
   const isWorldRulesRoute = $derived(
     isWorldCurrencyRoute || isWorldPrerequisitesRoute || isWorldModifiersRoute
+  );
+  // -- World scoped-entity routes (issue 1362, epic 1357) --------------------------------
+  //
+  // SEVEN NEW TOKENS, and the system tokens (`components`, `essences`, `tools`, `tags`) are
+  // PRESERVED unrenamed: those screens get new TITLES in this change, not new routes, so
+  // every deep link, every `expectView` and every stored `activeView` keeps resolving.
+  //
+  // Six of the seven are the component / essence / tool pairs -- a catalogue and an entry
+  // editor each. The seventh, `world-vocabulary`, is the World Vocabulary and is deliberately
+  // NOT a scoped-entity layer: it holds the category and tag vocabularies those entities draw
+  // FROM, which is why it carries its own spec requirement rather than sharing theirs.
+  //
+  // EVERY ONE IS REACHABLE WITH NO CRAFTING SYSTEM SELECTED, which is the normal state for a
+  // world screen. That is why they join the world pass-through in `normalizedActiveView`
+  // AHEAD of its `if (!system) return 'systems'` fallthrough, are absent from `setView`'s
+  // `!selectedSystem` refusal, and are absent from `SCOPE_BROWSER_BY_VIEW` -- a world route
+  // has no per-system record to be stranded on when the scope select changes.
+  const WORLD_SCOPED_VIEWS = Object.freeze([
+    'world-components',
+    'world-component-entry',
+    'world-essences',
+    'world-essence-entry',
+    'world-tools',
+    'world-tool-entry',
+    'world-vocabulary',
+  ]);
+  const isWorldScopedRoute = $derived(WORLD_SCOPED_VIEWS.includes(currentView));
+  // The world corpus behind the rail leaves' count badges. Read from the store's TOP-LEVEL
+  // `worldScope` key rather than from `selectedSystem`, because on these routes there may be
+  // no selected system at all.
+  const worldScopeState = $derived($viewState.worldScope || {});
+  const worldScopedCounts = $derived({
+    components: worldScopeState.component?.entities?.length ?? 0,
+    essences: worldScopeState.essence?.entities?.length ?? 0,
+    tools: worldScopeState.tool?.entities?.length ?? 0,
+    // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
+    // reason is a one-way door: `### GM World Scoped Entity Routes` requirement 7 bars every
+    // later PR in this epic from touching this file, so a badge omitted here could never be
+    // added.
+    //
+    // BOTH HALVES ARE WIRED, not just this one. `worldScopeProjection.js` publishes
+    // `worldScope.vocabulary.total` today — 0 until a vocabulary store exists — and
+    // `adminStore`'s `_worldScopeStores` already reads an optional fourth `vocabulary` leg, so
+    // PR 7 registers its store and its projection without reopening either gateway file. The
+    // field name `total` is the contract between the two; `### GM World Vocabulary Route`
+    // names it and `tests/world-scope-projection.test.js` pins it.
+    vocabulary: worldScopeState.vocabulary?.total ?? 0,
+  });
+
+  // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
+  //
+  // The three entry routes are the only World screens whose trail is THREE crumbs — the
+  // prototype's `crumbFor` maps an entry to `[World, <catalogue>, <entity name>]`, with the
+  // middle crumb clickable back to the catalogue. That middle crumb is the only way back out
+  // of an entry editor, which is released to full width and so has no inspector to carry one.
+  //
+  // IT IS ROOT STATE BECAUSE THE BREADCRUMB IS SHELL CHROME. A page cannot render a crumb, and
+  // requirement 7 of `### GM World Scoped Entity Routes` closes this file to PRs 6a, 6b and 6c
+  // — so the subject a later lane will choose has to be expressible through a prop it already
+  // has. `onOpenEntry` is that prop: a catalogue row calls it with the entity id, this shell
+  // performs the navigation, and the third crumb follows from the published corpus with no
+  // further edit here.
+  let worldScopedEntryId = $state('');
+  const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
+  const worldScopedEntryCrumb = $derived(
+    scopedEntryName(
+      worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
+      worldScopedEntryId
+    )
+  );
+
+  // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
+  // other navigation passes, and the subject is recorded only once that gate has allowed the
+  // move — a refused exit must not leave the shell naming a record it did not navigate to.
+  function openWorldScopedEntry(view, entityId) {
+    const nextEntryId = typeof entityId === 'string' ? entityId : String(entityId ?? '');
+    return afterTruthyResult(confirmRouteExit(view), () => {
+      worldScopedEntryId = nextEntryId;
+      activeView = view;
+    });
+  }
+
+  // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
+  //
+  // Suppressing the `<aside class="manager-inspector">` here and releasing the grid column in
+  // `styles/fabricate.css` are ONE decision expressed twice: do only the first and a ~300px
+  // empty box still holds the strip open; do only the second and the (empty) aside wraps to
+  // an implicit grid row underneath the editor. This set IS that one decision, and the aside
+  // chain below is BUILT from it rather than restating any clause.
+  //
+  // THREE THINGS MAKE THE OBVIOUS SHAPE -- a set of route tokens -- WRONG:
+  //
+  //  1. Three of the twelve shipped clauses are not route tokens at all. `checks` is a FAMILY
+  //     matched by a PREFIX selector, World > Parties is a route+substate matched by a
+  //     COMPOUND attribute selector, and the world-rules clause spans THREE tokens.
+  //  2. There are THREE layout states in the shipped stylesheet, not two. `tool-edit` and
+  //     `knowledge` suppress the aside AND keep three tracks, repurposing the third column
+  //     for their own content. A gate asserting "aside excluded equals column released" is
+  //     therefore unsatisfiable on `main`, and every loosening of it is vacuous.
+  //  3. So each entry says WHICH class it is. The aside chain is built from the UNION of the
+  //     two aside-suppressing classes; the third class is `shared-3-track`, whose members --
+  //     the base rule, its collapsed sibling, and the route-scoped `tools` widths -- KEEP
+  //     their inspector and are deliberately absent from this set.
+  //
+  // `selector` is the BASE stylesheet selector, verbatim.
+  // `tests/manager-full-width-gate.test.js` asserts set equality between these and the
+  // stylesheet's own, so a route released here and not there (or the reverse) fails at test
+  // time rather than as a dead 300px strip.
+  const FULL_WIDTH_VIEWS = Object.freeze([
+    {
+      id: 'environment-edit',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="environment-edit"] .manager-body',
+      predicate: (view) => view === 'environment-edit',
+    },
+    {
+      // A FAMILY, not a token: `checks` became four child routes plus a retained redirect
+      // (issue 1096), which is why the stylesheet matches it by prefix.
+      id: 'checks',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view^="checks"] .manager-body',
+      predicate: (view) => isChecksView(view),
+    },
+    {
+      id: 'component-edit',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="component-edit"] .manager-body',
+      predicate: (view) => view === 'component-edit',
+    },
+    {
+      id: 'recipe-edit',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="recipe-edit"] .manager-body',
+      predicate: (view) => view === 'recipe-edit',
+    },
+    {
+      id: 'crafting-settings',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="crafting-settings"] .manager-body',
+      predicate: (view) => view === 'crafting-settings',
+    },
+    {
+      id: 'recipe-item-edit',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body',
+      predicate: (view) => view === 'recipe-item-edit',
+    },
+    {
+      id: 'system-edit',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="system-edit"] .manager-body',
+      predicate: (view) => view === 'system-edit',
+    },
+    {
+      id: 'world-currency',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-currency"] .manager-body',
+      predicate: (view) => view === 'world-currency',
+    },
+    {
+      id: 'world-prerequisites',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-prerequisites"] .manager-body',
+      predicate: (view) => view === 'world-prerequisites',
+    },
+    {
+      id: 'world-modifiers',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-modifiers"] .manager-body',
+      predicate: (view) => view === 'world-modifiers',
+    },
+    {
+      id: 'world-downtime',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-downtime"] .manager-body',
+      predicate: (view) => view === 'world-downtime',
+    },
+    {
+      // ROUTE + SUBSTATE. World owns the whole content column only on its Parties tab, so the
+      // stylesheet matches a compound of two attributes and this predicate reads both.
+      id: 'world-parties',
+      layoutClass: 'full-width-2-track',
+      selector:
+        '.fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body',
+      predicate: (view, context) => view === 'world' && context.travelTab === 'parties',
+    },
+    {
+      // SELF-OWNED THREE-TRACK: the aside is suppressed AND the third track is kept, because
+      // the Tool editor owns its own third column.
+      id: 'tool-edit',
+      layoutClass: 'self-owned-3-track',
+      selector: '.fabricate-manager[data-manager-view="tool-edit"] .manager-body',
+      predicate: (view) => view === 'tool-edit',
+    },
+    {
+      // Likewise: the Knowledge surface owns roster + detail, and a fourth column would clip
+      // the detail pane's action cluster at the 1024px minimum (issue 785).
+      id: 'knowledge',
+      layoutClass: 'self-owned-3-track',
+      selector: '.fabricate-manager[data-manager-view="knowledge"] .manager-body',
+      predicate: (view) => view === 'knowledge',
+    },
+    // The seven world scoped-entity routes. Written OUT rather than mapped from
+    // `WORLD_SCOPED_VIEWS`: the gate parses this file's SOURCE for literal selector strings,
+    // and an interpolated one would yield nothing to compare against the stylesheet -- the
+    // same weakening an interpolated id inflicts on the View Lab source-hook check.
+    {
+      id: 'world-components',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-components"] .manager-body',
+      predicate: (view) => view === 'world-components',
+    },
+    {
+      id: 'world-component-entry',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-component-entry"] .manager-body',
+      predicate: (view) => view === 'world-component-entry',
+    },
+    {
+      id: 'world-essences',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-essences"] .manager-body',
+      predicate: (view) => view === 'world-essences',
+    },
+    {
+      id: 'world-essence-entry',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-essence-entry"] .manager-body',
+      predicate: (view) => view === 'world-essence-entry',
+    },
+    {
+      id: 'world-tools',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-tools"] .manager-body',
+      predicate: (view) => view === 'world-tools',
+    },
+    {
+      id: 'world-tool-entry',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-tool-entry"] .manager-body',
+      predicate: (view) => view === 'world-tool-entry',
+    },
+    {
+      id: 'world-vocabulary',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="world-vocabulary"] .manager-body',
+      predicate: (view) => view === 'world-vocabulary',
+    },
+  ]);
+  // The ONE read of the set. `null` means the route keeps its inspector.
+  const fullWidthLayout = $derived(
+    FULL_WIDTH_VIEWS.find((entry) =>
+      entry.predicate(currentView, { travelTab: activeTravelTab })
+    ) ?? null
   );
   // Which sub-item the rail marks as current, and the `data-world-rules-tab` marker the CSS and
   // the View Lab read.
@@ -3999,7 +4265,12 @@
       view === 'world-currency' ||
       view === 'world-prerequisites' ||
       view === 'world-modifiers' ||
-      view === 'world-travel'
+      view === 'world-travel' ||
+      // The seven scoped-entity routes join the world pass-through (issue 1362) and MUST be
+      // above the fallthrough below: a world screen's normal state is that no crafting
+      // system is selected, so `if (!system) return 'systems'` would bounce every one of
+      // them the moment the GM had not picked a system first.
+      WORLD_SCOPED_VIEWS.includes(view)
     )
       return view;
     if (!system) return 'systems';
@@ -4055,13 +4326,13 @@
     if (currentView === 'recipe-item-edit')
       return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
     if (currentView === 'components')
-      return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
+      return text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules');
     if (currentView === 'component-edit')
       return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
     if (currentView === 'tags')
       return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
     if (currentView === 'essences')
-      return text('FABRICATE.Admin.Manager.Essence.Title', 'Essences');
+      return text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules');
     if (currentView === 'essence-edit')
       return isCreatingEssenceDraft
         ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
@@ -4073,6 +4344,22 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    // The seven world scoped-entity routes (issue 1362). Titles are the PROTOTYPE'S, verbatim
+    // — including the lowercase `c` in `Component catalogue` and the plural `Tools Catalogue`.
+    if (currentView === 'world-components')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle', 'Component catalogue');
+    if (currentView === 'world-component-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentEntryTitle', 'Component entry');
+    if (currentView === 'world-essences')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue');
+    if (currentView === 'world-essence-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceEntryTitle', 'Essence entry');
+    if (currentView === 'world-tools')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue');
+    if (currentView === 'world-tool-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolEntryTitle', 'Tool entry');
+    if (currentView === 'world-vocabulary')
+      return text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories');
     if (isWorldRulesRoute) return worldRulesPageTitle;
     if (currentView === 'world-travel') {
       if (worldTravelTab === 'map')
@@ -4111,7 +4398,35 @@
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
+  // ONE derivation for each world scoped-entity route's subtitle, keyed by route, so a page
+  // and the placeholder body inside it cannot drift into saying two different things.
+  //
+  // COMPLETE LITERAL KEYS, never a `${...}` suffix on a shared base. An interpolated key is
+  // invisible to the lang-key resolution gate and to the orphan scan, so a missing string ships
+  // silently and every one of these seven would read as an unreferenced key.
+  function worldScopedSubtitle() {
+    if (currentView === 'world-components')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle', '');
+    if (currentView === 'world-component-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ComponentEntrySubtitle', '');
+    if (currentView === 'world-essences')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueSubtitle', '');
+    if (currentView === 'world-essence-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.EssenceEntrySubtitle', '');
+    if (currentView === 'world-tools')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle', '');
+    if (currentView === 'world-tool-entry')
+      return text('FABRICATE.Admin.Manager.Scoped.ToolEntrySubtitle', '');
+    if (currentView === 'world-vocabulary')
+      return text('FABRICATE.Admin.Manager.Scoped.VocabularySubtitle', '');
+    return '';
+  }
+
   function viewSubtitle() {
+    // The seven world scoped-entity routes (issue 1362). Without a branch of its own a route
+    // falls through to the generic system-library subtitle, which describes crafting systems
+    // — the one thing these screens deliberately do not have.
+    if (isWorldScopedRoute) return worldScopedSubtitle();
     if (currentView === 'recipes')
       return text(
         'FABRICATE.Admin.Manager.Recipe.Subtitle',
@@ -8336,7 +8651,7 @@
             is rooted at `World`; everything else is rooted at `Crafting Systems`. Neither is
             nested under the other.
           -->
-          {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute}
+          {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute || isWorldScopedRoute}
             <!--
               `World.Heading` is the RAIL's micro-label and is authored in caps for the
               letter-spaced treatment there. A breadcrumb carries no `text-transform`, so
@@ -8355,6 +8670,41 @@
               <button type="button" data-breadcrumb-world onclick={() => openWorldParties()}
                 >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</button
               >
+            {/if}
+            {#if isWorldScopedRoute}
+              <!--
+                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE, which is the prototype's own
+                `crumbFor` shape: a catalogue is `World > <screen>` because it IS a world screen
+                rather than a destination inside a group, and an entry is
+                `World > <catalogue> > <entity>` with the catalogue crumb CLICKABLE.
+
+                The middle crumb is not decoration. An entry editor is released to full width
+                and therefore renders no inspector, so this crumb is the only affordance that
+                takes the GM back to the list they came from — the same "a button wherever it is
+                not the leaf" rule the World crumb above follows.
+              -->
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              {#if worldScopedEntryRoute}
+                <button
+                  type="button"
+                  data-breadcrumb-world-scoped-catalogue={worldScopedEntryRoute.catalogueView}
+                  onclick={() => setView(worldScopedEntryRoute.catalogueView)}
+                  >{text(
+                    worldScopedEntryRoute.catalogueTitleKey,
+                    worldScopedEntryRoute.catalogueTitleFallback
+                  )}</button
+                >
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                <!-- The entity's OWN name when the corpus can supply one, falling back to the
+                     screen's title: an entry route with no subject chosen yet, or a subject the
+                     corpus no longer holds, has nothing to name and must not print an empty
+                     crumb. -->
+                <span data-breadcrumb-world-scoped={currentView} title={worldScopedEntryCrumb}
+                  >{worldScopedEntryCrumb || viewTitle()}</span
+                >
+              {:else}
+                <span data-breadcrumb-world-scoped={currentView}>{viewTitle()}</span>
+              {/if}
             {/if}
             {#if isWorldRulesRoute}
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -8484,7 +8834,7 @@
           {/if}
           {#if currentView === 'components'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</span>
           {/if}
           {#if currentView === 'tags'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -8492,12 +8842,12 @@
           {/if}
           {#if currentView === 'essences'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</span>
           {/if}
           {#if currentView === 'essence-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={backToEssencesBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</button
+              >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <span
@@ -8525,7 +8875,7 @@
           {#if currentView === 'component-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={backToComponentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button
+              >{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <!-- Name the component, not the generic "Edit component" — the same rule the
@@ -8705,7 +9055,14 @@
         system and "Export" would sit disabled against a selected-system id the route does not
         even have.
       -->
-      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute}
+      <!--
+        The world scoped-entity routes join that exclusion (issue 1362), for the identical
+        reason and with the identical consequence: they have no selected crafting system by
+        design, so the fallthrough's Create would create a crafting system and its Export would
+        sit permanently disabled against an id the route does not have. Each screen's own
+        actions belong on the surface that owns them, which PRs 6a-c and 7 build.
+      -->
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
@@ -9206,7 +9563,7 @@
             >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
           >
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
         </nav>
         <h1 class="manager-title">
           {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
@@ -9337,6 +9694,7 @@
           <button
             type="button"
             class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`}
+            id="manager-nav-system-overview"
             aria-current={currentView === 'system-edit' ? 'page' : undefined}
             data-nav-system-edit
             onclick={() => editSystem(selectedSystem.id)}
@@ -9434,9 +9792,19 @@
               </div>
             {/if}
           </div>
+          <!--
+            SCREEN TITLE, NOT A DOMAIN NOUN (issue 1362). The three system entries are relabelled
+            `Component Rules` / `Essence Rules` / `Tool Rules` after the prototype, because the
+            world scope now owns a `Component catalogue` and a `Tools Catalogue` and an
+            unqualified `Components` no longer says which scope it means. The relation these
+            screens edit is a System Membership Record: no route token, setting key, code
+            identifier or persisted field takes the spelling `rules` for it, and the ROUTE
+            TOKENS are preserved unrenamed.
+          -->
           <button
             type="button"
             class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`}
+            id="manager-nav-component-rules"
             aria-current={currentView === 'components' || currentView === 'component-edit'
               ? 'page'
               : undefined}
@@ -9444,13 +9812,14 @@
           >
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span
+              >{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</span
             >
             <span class="manager-nav-count">{selectedCounts.components}</span>
           </button>
           <button
             type="button"
             class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`}
+            id="manager-nav-tags"
             aria-current={currentView === 'tags' ? 'page' : undefined}
             onclick={() => setView('tags')}
           >
@@ -9475,6 +9844,7 @@
             <button
               type="button"
               class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`}
+              id="manager-nav-essence-rules"
               aria-current={currentView === 'essences' || currentView === 'essence-edit'
                 ? 'page'
                 : undefined}
@@ -9482,7 +9852,7 @@
             >
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
               <span class="manager-nav-label"
-                >{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span
+                >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</span
               >
               <span class="manager-nav-count">{selectedCounts.essences}</span>
             </button>
@@ -9490,6 +9860,7 @@
           <button
             type="button"
             class={`manager-nav-button ${currentView === 'tools' || currentView === 'tool-edit' ? 'is-active' : ''}`}
+            id="manager-nav-tool-rules"
             aria-current={currentView === 'tools' || currentView === 'tool-edit'
               ? 'page'
               : undefined}
@@ -9497,7 +9868,7 @@
           >
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span
+              >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
@@ -9662,9 +10033,13 @@
           {/if}
         {/if}
         {#each visiblePlaceholderViews as view (view.labelKey)}
+          <!-- A stable id here too (issue 1362). Both harnesses target every rail entry by id,
+               and a planned-view placeholder is still a rail entry the smoke's membership loop
+               names. -->
           <button
             type="button"
             class="manager-nav-button"
+            id={view.navId}
             disabled
             title={text(
               'FABRICATE.Admin.Manager.PlannedView',
@@ -9689,6 +10064,114 @@
               {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
             </span>
           </div>
+          <!--
+            The four world scoped-entity leaves (issue 1362, epic 1357), ABOVE Parties and in
+            the PROTOTYPE'S AUTHORED ORDER — Component catalogue, Tags & Categories, Essence
+            Catalogue, Tools Catalogue.
+
+            THREE ODDITIES IN THESE LABELS READ AS TYPOS AND NONE IS. `Component catalogue`
+            carries a lowercase `c` (authored three times in the prototype, including in its
+            breadcrumb map); `Tools Catalogue` is PLURAL where its siblings are singular; and
+            `Tags & Categories` is CHARACTER-FOR-CHARACTER IDENTICAL to the system-scope entry
+            further up this rail. The prototype is the authority for rail labels and order, and
+            `scripts/visual-parity/inventory.mjs` asserts landmark ORDER, so "correcting" any
+            of the three reds the parity gate this epic exists to establish.
+
+            The exact duplicate is also why NEITHER HARNESS may match a rail entry by visible
+            text any more: `:has-text("Tags")` now matches two buttons, `:has-text("Tools")`
+            matches `Tools Catalogue` as a substring, and `Components` has become
+            `Component Rules` while a `Component`-prefixed entry exists in both scopes. Every
+            rail button therefore carries a stable `id`, and both harnesses target those.
+
+            UNGATED and reachable with NO crafting system selected, like Parties, Travel and
+            Rules & Resources: the world catalogue has to be authorable before any system opts
+            into anything.
+
+            EVERY LEAF CARRIES AN EXPLICIT `aria-label`, which is not belt-and-braces here. The
+            collapsed rail hides BOTH `.manager-nav-label` and `.manager-nav-count`
+            (`styles/fabricate.css`), leaving only an `aria-hidden` glyph — so without one the
+            button's accessible name is EMPTY at 56px, which is a state this PR ships a frame
+            of. Parties, Travel, Rules & Resources and Downtime all do the same.
+          -->
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-components' || currentView === 'world-component-entry' ? 'is-active' : ''}`}
+            id="manager-world-nav-component-catalogue"
+            data-world-nav-item="component-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
+              'Component catalogue'
+            )}
+            aria-current={currentView === 'world-components' ||
+            currentView === 'world-component-entry'
+              ? 'page'
+              : undefined}
+            onclick={() => setView('world-components')}
+          >
+            <i class="fas fa-cubes-stacked" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text(
+                'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
+                'Component catalogue'
+              )}
+            </span>
+            <span class="manager-nav-count">{worldScopedCounts.components}</span>
+          </button>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-vocabulary' ? 'is-active' : ''}`}
+            id="manager-world-nav-vocabulary"
+            data-world-nav-item="vocabulary"
+            aria-label={text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
+            aria-current={currentView === 'world-vocabulary' ? 'page' : undefined}
+            onclick={() => setView('world-vocabulary')}
+          >
+            <i class="fas fa-tags" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
+            </span>
+            <span class="manager-nav-count">{worldScopedCounts.vocabulary}</span>
+          </button>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-essences' || currentView === 'world-essence-entry' ? 'is-active' : ''}`}
+            id="manager-world-nav-essence-catalogue"
+            data-world-nav-item="essence-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle',
+              'Essence Catalogue'
+            )}
+            aria-current={currentView === 'world-essences' || currentView === 'world-essence-entry'
+              ? 'page'
+              : undefined}
+            onclick={() => setView('world-essences')}
+          >
+            <i class="fas fa-flask-vial" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue')}
+            </span>
+            <span class="manager-nav-count">{worldScopedCounts.essences}</span>
+          </button>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-tools' || currentView === 'world-tool-entry' ? 'is-active' : ''}`}
+            id="manager-world-nav-tool-catalogue"
+            data-world-nav-item="tool-catalogue"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle',
+              'Tools Catalogue'
+            )}
+            aria-current={currentView === 'world-tools' || currentView === 'world-tool-entry'
+              ? 'page'
+              : undefined}
+            onclick={() => setView('world-tools')}
+          >
+            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')}
+            </span>
+            <span class="manager-nav-count">{worldScopedCounts.tools}</span>
+          </button>
           <button
             type="button"
             class={`manager-nav-button manager-world-nav-item ${isWorldRoute ? 'is-active' : ''}`}
@@ -10108,7 +10591,49 @@
       </nav>
     </aside>
 
-    {#if currentView === 'world-downtime'}
+    {#if currentView === 'world-components'}
+      <!--
+        The seven world scoped-entity routes (issue 1362). Each renders its own
+        `<main class="manager-main">` through the shared `ScopedPlaceholderPage`, carrying a
+        per-page `data-scoped-page` hook. These SEVEN FILES are what PRs 6a, 6b, 6c and 7
+        replace, which is the whole reason they are separate components rather than seven
+        branches of markup here: no later lane in this epic needs to reopen this file.
+
+        AND THE ROUTE SEAM THOSE LANES CONSUME. A catalogue takes `onOpenEntry(entityId)` and an
+        entry takes the `entityId` it was opened on plus the way back to its catalogue. The
+        placeholder bodies use none of the four — they render an empty state — but the wiring is
+        here rather than in 6a/6b/6c because it is the SHELL that owns routing, the breadcrumb
+        and the confirm-discard gate, and requirement 7 closes this file to all three.
+      -->
+      <WorldComponentCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
+      />
+    {:else if currentView === 'world-component-entry'}
+      <WorldComponentEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-components')}
+      />
+    {:else if currentView === 'world-essences'}
+      <WorldEssenceCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
+      />
+    {:else if currentView === 'world-essence-entry'}
+      <WorldEssenceEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-essences')}
+      />
+    {:else if currentView === 'world-tools'}
+      <WorldToolCataloguePage
+        onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+      />
+    {:else if currentView === 'world-tool-entry'}
+      <WorldToolEntryPage
+        entityId={worldScopedEntryId}
+        onBackToCatalogue={() => setView('world-tools')}
+      />
+    {:else if currentView === 'world-vocabulary'}
+      <WorldVocabularyPage />
+    {:else if currentView === 'world-downtime'}
       <main
         class="manager-main"
         aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}
@@ -10849,17 +11374,20 @@
     <!-- Suppressing the aside here and releasing the column in `styles/fabricate.css`
          are ONE decision expressed twice — do only the first and a 300px empty box still
          holds the strip open; do only the second and this (empty) aside wraps to an
-         implicit grid row underneath the editor. Keep the two lists in step.
+         implicit grid row underneath the editor.
 
-         `recipe-edit` joined this list in issue 676, the same route `component-edit`
-         took in decision 4: its context rail is deleted and its content became real
-         tabs (Access, Books & Scrolls) and an Overview control (Step mode), so the
-         editor has nothing to put in a third column and the tabs take the width back.
+         THE TWO LISTS ARE NO LONGER KEPT IN STEP BY HAND. This condition is BUILT from
+         `FULL_WIDTH_VIEWS` above, which is the one place the decision is recorded, and
+         `tests/manager-full-width-gate.test.js` asserts that set against the stylesheet's
+         own. A twelve-clause chain restated here is exactly how the two drifted twice:
+         `checks` was released in the root and matched nothing in the sheet (issue 1096),
+         and `world-currency` the same way (issue 1311), each rendering against a ~300px
+         dead strip.
 
-         `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
-         its third column (roster · detail), so a fourth would clip the detail pane's
-         action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute && !isWorldRulesRoute}
+         It reads the UNION of both aside-suppressing classes rather than the full-width
+         subset alone: `tool-edit` and `knowledge` suppress the aside AND keep three
+         tracks, so a full-width-only test would put their inspector back. -->
+    {#if !fullWidthLayout}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">

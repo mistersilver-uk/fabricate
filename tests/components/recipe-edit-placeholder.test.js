@@ -1,4 +1,7 @@
 import { describe, it } from 'node:test';
+// Shared with recipe-edit-editor.test.js: the aside/column pairing is ONE question, and
+// two copies of it are two things to let drift (issue 1362).
+import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -236,28 +239,18 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
       false,
       'no conditional-hide gate: the aside is unconditionally absent on this route'
     );
-    const asideGuard = rootSource.slice(
-      // The Checks half of this guard became the route PREDICATE when issue 1096 split
-      // `checks` into four child routes, so the anchor moved with it. Retargeted rather
-      // than relaxed: a stale `indexOf` returns -1, the slice below then reads from the end
-      // of the file, and the guard assertion passes over an EMPTY string — green, and
-      // checking nothing at all.
-      rootSource.indexOf("{#if currentView !== 'environment-edit' && !isChecksRoute"),
-      rootSource.indexOf('<aside class="manager-inspector"')
-    );
-    assert.ok(
-      asideGuard.includes("currentView !== 'recipe-edit'"),
-      'the aside is suppressed on recipe-edit'
-    );
-    const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-    assert.ok(
-      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body'),
-      'and the grid column is released, or the suppressed aside leaves a dead 300px strip'
-    );
-    assert.ok(
-      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed'),
-      'the collapsed-rail variant is released too'
-    );
+    // ASKED AS SET MEMBERSHIP since issue 1362, which replaced the twelve-clause boolean
+    // guard this used to slice with a single read of `FULL_WIDTH_VIEWS`. The helper asserts
+    // every index before it slices: a stale `indexOf` returns -1, `slice(-1, n)` then reads
+    // from the END of the file, and an assertion over that empty string is green while
+    // checking nothing at all — the failure this test's own comment named and did not defend
+    // against. It pins both stylesheet rules too, because
+    // `.manager-body.is-rail-collapsed` out-specifies a single-class rule.
+    assertFullWidthRoute({
+      rootSource,
+      css: readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'),
+      routeId: 'recipe-edit',
+    });
   });
 
   it('renders a recipe-edit breadcrumb crumb back to Recipes', () => {

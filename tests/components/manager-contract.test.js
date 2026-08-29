@@ -1164,7 +1164,22 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Title, 'Crafting systems');
-    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, 'Components');
+    // `Nav.Components`, `Nav.Tools` and `Component.Title` are GONE (issue 1362). The three
+    // system screens are titled `Component Rules` / `Essence Rules` / `Tool Rules` after the
+    // prototype, and the relabel is the screen's name everywhere it names the SCREEN — the
+    // rail entry, the page title, the breadcrumb crumb and the browser's `<main>` accessible
+    // name — because a page titled `Component Rules` whose accessible name said `Components`
+    // is the WCAG 2.5.3 Label in Name hazard. The old keys had no consumer left, so they are
+    // deleted rather than left as orphans.
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.ComponentRules, 'Component Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.EssenceRules, 'Essence Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.ToolRules, 'Tool Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, undefined);
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Tools, undefined);
+    // `Nav.Essences` SURVIVES, and the difference is the point: its last consumer names the
+    // DOMAIN NOUN rather than the screen — the system inspector's essence count, which links
+    // to nothing.
+    assert.equal(lang.FABRICATE.Admin.Manager.Nav.Essences, 'Essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.Manager.Breadcrumbs, 'Breadcrumbs');
     assert.equal(lang.FABRICATE.Admin.Manager.EditSystem, 'Edit system');
@@ -1228,7 +1243,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EnableNamed, 'Enable {name}');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.DisableNamed, 'Disable {name}');
-    assert.equal(lang.FABRICATE.Admin.Manager.Component.Title, 'Components');
+    assert.equal(lang.FABRICATE.Admin.Manager.Component.Title, undefined);
     assert.equal(
       lang.FABRICATE.Admin.Manager.Component.DropZoneTitle,
       'Drop items to add components'
@@ -1551,8 +1566,12 @@ describe('CraftingSystemManager source contract', () => {
 
     // The page is a full-width tabbed shell mirroring the environment editor: the
     // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
+    // Since issue 1362 the aside chain is BUILT from `FULL_WIDTH_VIEWS` rather than
+    // restated, so the question is whether the route is a MEMBER of that set — which is
+    // stronger than the old needle, which passed on a root that mentioned the token anywhere.
+    // `tests/manager-full-width-gate.test.js` asserts the whole set against the stylesheet.
     assert.ok(
-      rootSource.includes("currentView !== 'system-edit'") &&
+      /id: 'system-edit',\s*\n\s*layoutClass: 'full-width-2-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
       'the shared inspector is skipped for the full-width system-edit page'
     );
@@ -1674,8 +1693,15 @@ describe('CraftingSystemManager source contract', () => {
       'the disabled Recipes placeholder should be removed now that Crafting is always available'
     );
     assert.ok(
-      /id: 'graph',\s*icon: 'fas fa-project-diagram'/.test(rootSource),
+      /id: 'graph',[\s\S]{0,600}?icon: 'fas fa-project-diagram'/.test(rootSource),
       'the Graph placeholder should remain in the planned placeholder list'
+    );
+    // And it carries its rail id as a COMPLETE LITERAL (issue 1362), not a
+    // `manager-nav-${view.id}` template: both harnesses target every rail entry by id now, and
+    // an interpolated one is invisible to the gate that checks the id is rendered at all.
+    assert.ok(
+      rootSource.includes("navId: 'manager-nav-graph'"),
+      'the Graph placeholder declares its rail id as a complete literal'
     );
     assert.ok(
       rootSource.includes('selectSystemAndShowBrowser'),
@@ -3210,8 +3236,17 @@ describe('CraftingSystemManager source contract', () => {
       'Overview should not offer the removed source picker'
     );
     assert.ok(
-      toolValidationSource.includes('<EditorValidationSurface'),
-      'Validation should reuse the recipe-style editor validation surface'
+      toolValidationSource.includes('<ScopedValidationTab'),
+      'Validation should reuse the shared scoped-entity validation shell'
+    );
+    // And that shell really does render the recipe-style surface. Asserting only the shell
+    // would pass on a shell that had dropped it, which is the whole point of the original.
+    assert.ok(
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte'),
+        'utf8'
+      ).includes('<EditorValidationSurface'),
+      'the shared scoped validation shell should reuse the recipe-style editor validation surface'
     );
     assert.ok(
       appSource.includes('const clipboard = game?.clipboard;') &&
@@ -3255,8 +3290,12 @@ describe('CraftingSystemManager source contract', () => {
     }
     // The CSS column release and this aside suppression are ONE decision expressed
     // twice; doing only the first leaves an empty 300px inspector holding the strip.
+    // Issue 1362: a MEMBER of `FULL_WIDTH_VIEWS`, and specifically of its SELF-OWNED
+    // three-track class — Knowledge suppresses the aside AND keeps three tracks, repurposing
+    // the third column for its detail pane. Asserting the class is what stops a later change
+    // releasing its column to two tracks and clipping that pane at the 1024px minimum.
     assert.ok(
-      rootSource.includes("currentView !== 'knowledge'") &&
+      /id: 'knowledge',\s*\n\s*layoutClass: 'self-owned-3-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
       'the shared inspector is suppressed for the full-width knowledge surface'
     );
@@ -3650,6 +3689,233 @@ describe('CraftingSystemManager source contract', () => {
       appSource.includes('getSetting: this._services.getSetting,') &&
         appSource.includes('setSetting: this._services.setSetting,'),
       'manager app should expose the setting seam to the Svelte component services'
+    );
+  });
+});
+
+/**
+ * The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357).
+ *
+ * Every assertion here guards a mirror between two files that no compiler and no mounted test
+ * can see, and each one has already been wrong once:
+ *
+ *  - `ScopedEntityPreview`'s class stem is a PROP, so the five class names it renders are built
+ *    at runtime and Svelte cannot check them against a stylesheet. Its docblock asserted both
+ *    stems were declared in `styles/fabricate.css` while the DEFAULT stem had no rules at all,
+ *    and nothing failed - the only shipped caller passes the tool stem.
+ *  - the seven placeholder pages are four-value mirrors of a route token, and `npm test` renders
+ *    none of them: `data-scoped-page` appears only in the View Lab registry, which is a capture
+ *    gate rather than a unit gate. A swapped `titleKey` between two pages ships green.
+ *  - the entry routes' breadcrumb carries its catalogue's own lang key, which is a second copy
+ *    of the key `viewTitle` resolves that catalogue's header with.
+ */
+describe('world scoped-entity source contract (issue 1362)', () => {
+  const scopedDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped');
+  const previewSource = readFileSync(resolve(scopedDir, 'ScopedEntityPreview.svelte'), 'utf8');
+  const toolPreviewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte'),
+    'utf8'
+  );
+  const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+  const viewTitleSource = classMemberSource(
+    rootSource,
+    'function viewTitle() {',
+    'the manager root'
+  );
+
+  // Every class the manager stylesheet declares a rule for, as a `.fabricate-manager .<class>`
+  // subject. Built FROM the sheet rather than grepped per name, so the non-vacuity control below
+  // can prove the lookup is capable of answering "no".
+  const declaredManagerClasses = new Set(
+    [...fabricateCss.matchAll(/\.fabricate-manager\s+\.([a-z0-9-]+)/g)].map((match) => match[1])
+  );
+
+  /**
+   * The five class names `ScopedEntityPreview` renders for a given stem, derived from the
+   * component's own markup rather than restated here: a list restated in this file would be a
+   * third copy of the mirror it exists to guard.
+   *
+   * @param {string} stem
+   * @returns {string[]}
+   */
+  function renderedPreviewClasses(stem) {
+    const suffixes = [...previewSource.matchAll(/\$\{classPrefix\}-([a-z-]+)/g)].map(
+      (match) => match[1]
+    );
+    return [stem, ...new Set(suffixes.map((suffix) => `${stem}-${suffix}`))];
+  }
+
+  it('declares a rule for every class the preview shell renders, for BOTH stems', () => {
+    assert.ok(
+      previewSource.includes('<aside class={classPrefix}'),
+      'the shell renders the bare stem as a class, which the derivation below depends on'
+    );
+    const defaultStem = previewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
+    const toolStem = toolPreviewSource.match(/classPrefix="([a-z-]+)"/)?.[1];
+    assert.equal(defaultStem, 'manager-scoped-preview');
+    assert.equal(toolStem, 'manager-tool-preview');
+
+    // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet, and a
+    // regex that stopped matching would make every assertion below pass against an empty
+    // question. So the set has to be large, and it has to be able to answer no.
+    assert.ok(
+      declaredManagerClasses.size > 200,
+      'the stylesheet scan found almost nothing, so it cannot be trusted to find an omission'
+    );
+    assert.equal(
+      declaredManagerClasses.has('manager-scoped-preview-not-a-real-region'),
+      false,
+      'the lookup can answer no, so the assertions below are measurements'
+    );
+
+    for (const stem of [defaultStem, toolStem]) {
+      const classes = renderedPreviewClasses(stem);
+      assert.equal(
+        classes.length,
+        5,
+        `the shell renders five classes per stem; the derivation found ${classes.length}`
+      );
+      for (const className of classes) {
+        assert.ok(
+          declaredManagerClasses.has(className),
+          `\`styles/fabricate.css\` declares no rule for \`.${className}\`. The shell's docblock ` +
+            'says both stems are declared there and this is the only thing that checks it: a ' +
+            'renamed region leaves the six editors PRs 6a-c and 7 build rendering unstyled, and ' +
+            'requirement 7 closes that stylesheet to all four of those lanes.'
+        );
+      }
+    }
+  });
+
+  /**
+   * The `{key, fallback}` pair `viewTitle` declares for each world scoped-entity route, keyed by
+   * route token.
+   *
+   * @returns {Map<string, {key: string, fallback: string}>}
+   */
+  function scopedTitlesFromRoot() {
+    const titles = new Map();
+    const pattern =
+      /if \(currentView === '(world-[a-z-]+)'\)\s*\n\s*return text\('([^']+)', '([^']*)'\);/g;
+    for (const match of viewTitleSource.matchAll(pattern)) {
+      titles.set(match[1], { key: match[2], fallback: match[3] });
+    }
+    return titles;
+  }
+
+  it('gives each of the seven placeholder pages a DISTINCT triple that matches its route', () => {
+    const titles = scopedTitlesFromRoot();
+    assert.equal(
+      titles.size,
+      7,
+      'the parse of `viewTitle` found the wrong number of world scoped-entity titles, so every ' +
+        'cross-check below would be against the wrong set'
+    );
+
+    const pages = readdirSync(scopedDir)
+      .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
+      .map((entry) => {
+        const source = readFileSync(resolve(scopedDir, entry), 'utf8');
+        return {
+          file: entry,
+          pageId: source.match(/pageId="([^"]+)"/)?.[1],
+          icon: source.match(/icon="([^"]+)"/)?.[1],
+          titleKey: source.match(/titleKey="([^"]+)"/)?.[1],
+          titleFallback: source.match(/titleFallback="([^"]+)"/)?.[1],
+        };
+      });
+    assert.equal(pages.length, 7, 'seven world scoped-entity pages');
+
+    for (const field of ['pageId', 'icon', 'titleKey']) {
+      assert.equal(
+        new Set(pages.map((page) => page[field])).size,
+        7,
+        `two pages share a ${field}: one of the seven routes is wearing another identity`
+      );
+    }
+
+    for (const page of pages) {
+      const declared = titles.get(page.pageId);
+      assert.ok(
+        Boolean(declared),
+        `${page.file} claims the route \`${page.pageId}\`, which \`viewTitle\` does not title`
+      );
+      // THE SWAP DETECTOR. The page resolves the screen's name for its `<main>` accessible name
+      // and the header resolves it again for the `<h1>`, out of two different files. A swapped
+      // key renders a page titled after its sibling - which nothing in `npm test` renders, and
+      // which the View Lab would publish as a frame before anything failed.
+      assert.equal(
+        page.titleKey,
+        declared.key,
+        `${page.file} must carry the title key the header uses for \`${page.pageId}\``
+      );
+      assert.equal(page.titleFallback, declared.fallback, `${page.file} fallback must match`);
+      assert.equal(
+        typeof catalogValue(page.titleKey),
+        'string',
+        `${page.titleKey} must resolve to a string in \`lang/en.json\``
+      );
+    }
+  });
+
+  it('roots each entry route at its own catalogue, under that catalogue title key', () => {
+    const titles = scopedTitlesFromRoot();
+    const entryRoutesSource = readFileSync(resolve(scopedDir, 'scopedEntryRoutes.js'), 'utf8');
+    const declared = [
+      ...entryRoutesSource.matchAll(
+        /'(world-[a-z-]+-entry)': Object\.freeze\(\{\s*entityType: '([a-z]+)',\s*catalogueView: '([a-z-]+)',\s*catalogueTitleKey: '([^']+)',\s*catalogueTitleFallback: '([^']+)',/g
+      ),
+    ];
+    assert.deepEqual(
+      declared.map((match) => match[1]),
+      ['world-component-entry', 'world-essence-entry', 'world-tool-entry'],
+      'three entry routes, one per scoped entity type'
+    );
+    for (const match of declared) {
+      const [, entryView, entityType, catalogueView, catalogueKey, catalogueFallback] = match;
+      assert.ok(titles.has(entryView), `${entryView} is one of the seven titled routes`);
+      const catalogue = titles.get(catalogueView);
+      assert.ok(Boolean(catalogue), `${entryView} returns to \`${catalogueView}\`, a real route`);
+      // The middle crumb names the catalogue with the SAME string the catalogue own header
+      // uses. Two copies of one lang key is exactly the mirror this suite exists to hold.
+      assert.equal(catalogueKey, catalogue.key, `${entryView} catalogue crumb key`);
+      assert.equal(catalogueFallback, catalogue.fallback, `${entryView} catalogue crumb copy`);
+      assert.ok(
+        catalogueView.startsWith(`world-${entityType.slice(0, 4)}`),
+        `${entryView} must return to the catalogue of its OWN entity type`
+      );
+    }
+  });
+
+  it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
+    // The crumb is shell chrome, and `### GM World Scoped Entity Routes` requirement 7 closes
+    // the shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
+    // rendering no inspector, would have had no way back at all if this were left to them.
+    assert.match(
+      rootSource,
+      /\{#if worldScopedEntryRoute\}[\s\S]{0,900}?data-breadcrumb-world-scoped-catalogue=\{worldScopedEntryRoute\.catalogueView\}[\s\S]{0,400}?onclick=\{\(\) => setView\(worldScopedEntryRoute\.catalogueView\)\}/,
+      'the entry trail draws an intermediate catalogue crumb, and it navigates'
+    );
+    // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
+    // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through
+    // the confirm-discard gate, and resolves the name out of the published world corpus.
+    for (const [catalogue, entry] of [
+      ['WorldComponentCataloguePage', 'world-component-entry'],
+      ['WorldEssenceCataloguePage', 'world-essence-entry'],
+      ['WorldToolCataloguePage', 'world-tool-entry'],
+    ]) {
+      assert.match(
+        rootSource,
+        new RegExp(
+          `<${catalogue}\\s*\\n\\s*onOpenEntry=\\{\\(entityId\\) => openWorldScopedEntry\\('${entry}', entityId\\)\\}`
+        ),
+        `${catalogue} is wired with the seam PR 6a opens an entry through`
+      );
+    }
+    assert.match(
+      rootSource,
+      /function openWorldScopedEntry\(view, entityId\) \{[\s\S]{0,500}?confirmRouteExit\(view\)/,
+      'and it routes through the same confirm-discard gate every other navigation passes'
     );
   });
 });

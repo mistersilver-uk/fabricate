@@ -88,7 +88,7 @@
       >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>
       <button type="button" data-tool-editor-open-tools onclick={onOpenTools}
-        >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button
+        >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</button
       >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>
       <span title={displayName}>{displayName}</span>

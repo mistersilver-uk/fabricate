@@ -10,7 +10,7 @@ import {
   symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from 'svelte';
@@ -45,6 +45,12 @@ import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
 // leaf with no `.svelte` and no Foundry globals in its graph, and this is the test file's own
 // module scope rather than the compiled mount closure.
 import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComponentRowProjection.js';
+// The REAL manager store and its shipped service fixtures (issue 1362). The world-scope
+// propagation block at the foot of this file drives the actual publish path rather than a
+// hand-written `viewState`, because what it has to prove is that `adminStore` publishes the
+// world corpus on every trigger — which a fake store would assert about itself.
+import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -243,6 +249,45 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
+  // The seven world scoped-entity routes and the shared placeholder body they all call
+  // (issue 1362). Adding the routes to the root puts this WHOLE subtree into the compiled
+  // root's STATIC module graph regardless of `{#if}`, so every child is enumerated: omitting
+  // one HANGS every mounted manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedPlaceholderPage.svelte');
+  for (const scopedPage of [
+    'WorldComponentCataloguePage',
+    'WorldComponentEntryPage',
+    'WorldEssenceCataloguePage',
+    'WorldEssenceEntryPage',
+    'WorldToolCataloguePage',
+    'WorldToolEntryPage',
+    'WorldVocabularyPage',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/scoped/${scopedPage}.svelte`);
+  }
+  // The entry routes' breadcrumb seam (issue 1362) — a plain module, copied raw rather than
+  // compiled, the same way `crafting/craftingNav.js` is. The ROOT imports it statically for the
+  // three-crumb entry trail, and this suite hand-rolls its temp tree with no dependency
+  // validator for `.js`, so omitting it does not fail one test: it HANGS the whole file behind
+  // one ERR_MODULE_NOT_FOUND and `node --test` reports every blocked test as `# cancelled`.
+  {
+    const moduleDestination = join(
+      tempRoot,
+      'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'
+    );
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'),
+        'utf8'
+      )
+    );
+  }
+  // The shared scoped-entity patterns (issue 1362): the Tool Studio's preview and both
+  // validation tabs are converted onto them, so both are in this root's static graph.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');
@@ -307,6 +352,10 @@ function compileManagerRoot() {
   // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
   // trees today, and through every other manager screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  // THE manager's editor tab strip (issue 1362). The environment, system and recipe-item
+  // strips are callers of it now, and all three are in this root's static graph, so omitting
+  // it HANGS every mounted manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorTabs.svelte');
   // THE manager's labelled push-button (issue 1096). The root reaches it through the Tool
   // Studio header and the System Overview Modifiers card, and through every other screen
   // as the conversion proceeds.
@@ -841,10 +890,36 @@ function compileManagerRoot() {
   }
 }
 
-function navButton(labelText) {
-  return Array.from(target.querySelectorAll('.manager-nav-button')).find((button) =>
-    button.textContent.includes(labelText)
+// AN EXACT LABEL MATCH, SCOPED TO ONE RAIL SECTION (issue 1362). This resolved a rail button
+// by `textContent.includes(...)` over EVERY `.manager-nav-button`, which the world scoped-entity
+// leaves broke three separate ways: `Tools` became a substring of `Tools Catalogue`,
+// `Tags & Categories` became an EXACT DUPLICATE across the two rail scopes, and the count badge
+// inside the button means `textContent` carries digits as well as the label.
+//
+// Scoping is by CLASS rather than by DOM order, because `.first()`-style order resolution is
+// precisely what makes an exact duplicate unrecoverable: the world leaves sit after the system
+// entries today and nothing says they must.
+function railButton(labelText, { world }) {
+  const selector = world
+    ? '.manager-nav-button.manager-world-nav-item'
+    : '.manager-nav-button:not(.manager-world-nav-item)';
+  const matches = Array.from(target.querySelectorAll(selector)).filter(
+    (button) => button.querySelector('.manager-nav-label')?.textContent.trim() === labelText
   );
+  assert.ok(
+    matches.length <= 1,
+    `${matches.length} rail buttons are labelled "${labelText}" in the ` +
+      `${world ? 'world' : 'system'} scope; the lookup is ambiguous`
+  );
+  return matches[0];
+}
+
+function navButton(labelText) {
+  return railButton(labelText, { world: false });
+}
+
+function worldNavButton(labelText) {
+  return railButton(labelText, { world: true });
 }
 
 // ── Checks Studio navigation (issue 1096) ────────────────────────────────────────────
@@ -1255,6 +1330,10 @@ function editRecipeName(target, value) {
   nameInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
 }
 
+// EVERY `.svelte` THIS SUITE HAS COMPILED, recorded as it goes, so the closure walk below has
+// something to compare the module graph against.
+const compiledSveltePaths = new Set();
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
@@ -1266,6 +1345,59 @@ function writeCompiledSvelte(sourcePath) {
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
+  compiledSveltePaths.add(sourcePath.replaceAll('\\', '/'));
+}
+
+/**
+ * THE CLOSURE WALK THIS SUITE NEVER HAD (issue 1362).
+ *
+ * `createMountedComponentHarness` validates its declared dependency closure and THROWS naming
+ * the missing module and its importer chain. This suite predates it, drives its own compile,
+ * and had no such validation — so a `.svelte` the mounted root's module graph reaches but the
+ * hand-written list above omits does NOT fail: the import hangs, and `node --test` reports
+ * every blocked test as `# cancelled`, never `# fail`. Four separate comments in the list above
+ * warn a reader about it; none of them could detect it.
+ *
+ * The walk is the STATIC graph, not the rendered one, because that is what actually hangs: a
+ * compiled `.svelte.js` imports its children unconditionally, so an `{#if}` that never runs
+ * does not keep a child out of the graph.
+ *
+ * @param {string} rootPath The mounted root, repo-relative.
+ * @throws {Error} naming every reached-but-uncompiled component and who imports it.
+ */
+function assertCompiledSvelteClosure(rootPath) {
+  const seen = new Set();
+  const queue = [rootPath];
+  const missing = [];
+  while (queue.length > 0) {
+    const current = queue.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const absolute = resolve(repoRoot, current);
+    if (!existsSync(absolute)) continue;
+    const source = readFileSync(absolute, 'utf8');
+    for (const match of source.matchAll(/from\s+['"](\.[^'"]+\.svelte)['"]/g)) {
+      const child = relative(repoRoot, resolve(dirname(absolute), match[1])).replaceAll('\\', '/');
+      if (!compiledSveltePaths.has(child)) missing.push(`${child}  (imported by ${current})`);
+      queue.push(child);
+    }
+  }
+  // NON-VACUITY. A walk that silently found nothing would make the assertion below pass over an
+  // empty graph, which is the failure this whole function exists to convert into a loud one.
+  if (seen.size < 50) {
+    throw new Error(
+      `the compiled-closure walk reached only ${seen.size} components from ${rootPath}; the walk ` +
+        'is broken, so it cannot be trusted to find an omission'
+    );
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      "this suite hand-rolls its compile list, and these components are in the mounted root's " +
+        'STATIC module graph but were never compiled into the temp tree. Left alone they do not ' +
+        'fail — they HANG, and `node --test` reports every blocked test as `# cancelled`. Add a ' +
+        `writeCompiledSvelte(...) call for each:\n  ${missing.join('\n  ')}`
+    );
+  }
 }
 
 // Inject a recipe knowledge mode onto a selected system so tests can exercise the
@@ -3239,6 +3371,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       : resolve(repoRoot, '../../..', 'node_modules');
     symlinkSync(dependencyRoot, join(tempRoot, 'node_modules'), 'junction');
     compileManagerRoot();
+    // BEFORE the first import, so an omission is a thrown error naming the file rather than a
+    // hang reported as `# cancelled`.
+    assertCompiledSvelteClosure('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
     Component = (
       await import(
         pathToFileURL(
@@ -3369,12 +3504,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       [
         'System Overview',
         'Crafting',
-        'Components',
+        'Component Rules',
         'Tags & Categories',
-        'Essences',
-        'Tools',
+        'Essence Rules',
+        'Tool Rules',
         'Checks',
         'Gathering',
+        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
+        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
+        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        'Component catalogue',
+        'Tags & Categories',
+        'Essence Catalogue',
+        'Tools Catalogue',
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
@@ -3407,9 +3549,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       0,
       'the standalone Overview nav item should be removed'
     );
-    const toolsNav = Array.from(target.querySelectorAll('.manager-nav-button')).find(
-      (button) => button.querySelector('.manager-nav-label')?.textContent.trim() === 'Tools'
-    );
+    const toolsNav = navButton('Tool Rules');
     assert.equal(toolsNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
@@ -3596,9 +3736,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target
         .querySelector('[data-checks-help="gathering"]')
-        ?.querySelector(
-          'a[href="https://mistersilver-uk.github.io/fabricate/checks/gathering"]'
-        ),
+        ?.querySelector('a[href="https://mistersilver-uk.github.io/fabricate/checks/gathering"]'),
       'gathering help card links to the gathering checks docs page'
     );
 
@@ -6878,7 +7016,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     // realms are world geography and have to be authorable before any system opts in (issue
     // 1282). The Downtime group is experimental-gated (issue 1257) and this fixture leaves
     // `fabricate.experimentalFeatures` at its default off.
-    assert.deepEqual(navLabels, ['Parties', 'Travel', 'Rules & Resources']);
+    // The four world scoped-entity leaves (issue 1362) are ungated for the same reason and
+    // sit ABOVE Parties in the prototype's authored order. This case is the one that proves
+    // they are reachable with NO crafting system selected at all — the normal state for a
+    // world screen, and the state the router's `if (!system) return 'systems'` fallthrough
+    // would otherwise bounce every one of them out of.
+    assert.deepEqual(navLabels, [
+      'Component catalogue',
+      'Tags & Categories',
+      'Essence Catalogue',
+      'Tools Catalogue',
+      'Parties',
+      'Travel',
+      'Rules & Resources',
+    ]);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6976,10 +7127,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       [
         'System Overview',
         'Crafting',
-        'Components',
+        'Component Rules',
         'Tags & Categories',
-        'Tools',
+        'Tool Rules',
         'Checks',
+        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
+        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
+        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        'Component catalogue',
+        'Tags & Categories',
+        'Essence Catalogue',
+        'Tools Catalogue',
         // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
         // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
@@ -7108,13 +7266,20 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Books & Scrolls',
         'Knowledge',
         'Settings',
-        'Components',
+        'Component Rules',
         'Tags & Categories',
-        'Essences',
-        'Tools',
+        'Essence Rules',
+        'Tool Rules',
         'Checks',
         'Gathering',
         'Graph',
+        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
+        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
+        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        'Component catalogue',
+        'Tags & Categories',
+        'Essence Catalogue',
+        'Tools Catalogue',
         'Parties',
         'Travel',
         'Rules & Resources',
@@ -8490,7 +8655,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -8672,8 +8837,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'component-edit',
       'row Edit action should route into the manager component-edit view'
     );
+    // 'Component Rules' since issue 1362: the crumb takes the screen's own title, so the
+    // trail's leaf and the heading below it read the same.
     Array.from(target.querySelectorAll('.manager-breadcrumbs button'))
-      .find((button) => button.textContent.trim() === 'Components')
+      .find((button) => button.textContent.trim() === 'Component Rules')
       .click();
     flushSync();
     await tick();
@@ -8681,7 +8848,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
       'components',
-      'breadcrumb Components button should return to the components browser'
+      'the breadcrumb button should return to the components browser'
     );
     // Delete now fires from the INSPECTOR, not the row: the row carries one action.
     assert.equal(
@@ -8726,7 +8893,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -8790,7 +8957,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
     return target;
@@ -9915,7 +10082,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -10124,7 +10291,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -10323,7 +10490,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -10420,7 +10587,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
@@ -11195,7 +11362,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const essenceButton = navButton('Essences');
+    const essenceButton = navButton('Essence Rules');
     assert.ok(essenceButton, 'essence nav button should render when the feature is enabled');
     assert.equal(essenceButton.disabled, false);
     essenceButton.click();
@@ -11272,7 +11439,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       [],
       'essence usage thumbnail should no longer launch the legacy services.onEditComponent'
     );
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     flushSync();
     await tick();
     flushSync();
@@ -11664,7 +11831,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
 
@@ -11728,7 +11895,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
 
@@ -11829,7 +11996,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         props: { store: createStore(calls, options), services: { openCurrentAdmin: () => {} } },
       });
       flushSync();
-      navButton('Essences').click();
+      navButton('Essence Rules').click();
       await tick();
       flushSync();
       for (const id of ids) {
@@ -11930,7 +12097,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-select="water"]').click();
@@ -11983,7 +12150,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
 
@@ -12055,7 +12222,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
@@ -12093,7 +12260,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
@@ -12138,7 +12305,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
@@ -12178,7 +12345,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
@@ -12213,7 +12380,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
@@ -12248,7 +12415,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
@@ -12415,7 +12582,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // On Components (a non-crafting route), manually expand the collapsed Crafting
     // group via its toggle.
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
@@ -14585,6 +14752,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       // entry — it is the first destination inside the Rules & Resources group, beside the two
       // character libraries.
       [
+        // The four scoped-entity leaves (issue 1362), above Parties in the prototype's order.
+        'manager-world-nav-component-catalogue',
+        'manager-world-nav-vocabulary',
+        'manager-world-nav-essence-catalogue',
+        'manager-world-nav-tool-catalogue',
         'manager-world-nav-parties',
         'manager-world-nav-travel',
         'manager-world-nav-rules',
@@ -14600,6 +14772,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
     assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    // EVERY WORLD LEAF CARRIES AN EXPLICIT ACCESSIBLE NAME AND ITS OWN COUNT (issue 1362).
+    //
+    // Both halves are about the COLLAPSED rail, and both are invisible at full width.
+    // `styles/fabricate.css` hides `.manager-nav-label` AND `.manager-nav-count` at 56px,
+    // leaving only an `aria-hidden` glyph — so a leaf without an `aria-label` has an EMPTY
+    // accessible name in exactly the state this epic ships a frame of. The four scoped-entity
+    // leaves shipped without one, and without the count its system sibling and every other
+    // World entry carries.
+    //
+    // The count is pinned here rather than left to a later PR because it is a ONE-WAY DOOR:
+    // `openspec/specs/ui-integration/spec.md` `### GM World Scoped Entity Routes` requirement 7
+    // bars every later PR in this epic from touching `CraftingSystemManagerRoot.svelte`, so a
+    // badge omitted now could never be added. They read 0 until a corpus exists, which is
+    // truthful — and PR 7 fills the vocabulary one from `worldScopeProjection.js`, which is not
+    // a gateway path.
+    for (const [item, label] of [
+      ['component-catalogue', 'Component catalogue'],
+      ['vocabulary', 'Tags & Categories'],
+      ['essence-catalogue', 'Essence Catalogue'],
+      ['tool-catalogue', 'Tools Catalogue'],
+    ]) {
+      const leaf = worldNavItem(item);
+      assert.ok(Boolean(leaf), `the world rail renders the ${item} leaf`);
+      assert.equal(
+        leaf.getAttribute('aria-label'),
+        label,
+        `${item} needs an explicit accessible name: the collapsed rail hides its label and its ` +
+          'count, so without one the button is unnamed at 56px'
+      );
+      assert.ok(
+        Boolean(leaf.querySelector('.manager-nav-count')),
+        `${item} needs its own count badge, as every other World entry has — and it cannot be ` +
+          'added later, because spec requirement 7 closes this file to every later PR'
+      );
+    }
     assert.equal(
       worldTravelItem('travel').querySelector('.manager-nav-label').textContent.trim(),
       'Travel'
@@ -14610,10 +14817,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldTravelItem('travel').querySelector('.manager-nav-count').textContent.trim(),
       '1'
     );
-    assert.equal(
-      worldTravelItem('travel').getAttribute('aria-controls'),
-      'manager-travel-submenu'
-    );
+    assert.equal(worldTravelItem('travel').getAttribute('aria-controls'), 'manager-travel-submenu');
     assert.equal(worldTravelItem('travel').getAttribute('aria-expanded'), 'false');
     assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
 
@@ -14755,11 +14959,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-downtime-tablist]').getAttribute('aria-label'),
       'Localized downtime sections'
     );
-    assert.match(target.querySelector('.downtime-premium').textContent, /Localized Fabricate Premium/);
-    assert.equal(
-      tabs[0].getAttribute('aria-describedby'),
-      'world-downtime-tooltip-tracking'
+    assert.match(
+      target.querySelector('.downtime-premium').textContent,
+      /Localized Fabricate Premium/
     );
+    assert.equal(tabs[0].getAttribute('aria-describedby'), 'world-downtime-tooltip-tracking');
     assert.equal(
       target.querySelector('#world-downtime-tooltip-tracking').textContent.trim(),
       'Localized tracking tooltip'
@@ -15145,7 +15349,11 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
     mountedPanel.focus();
-    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    assert.equal(
+      document.activeElement,
+      mountedPanel,
+      'the companion panel owns focus before removal'
+    );
     unregister();
     await settleDowntimeProvider();
     assert.deepEqual(cleanups, ['tracking', 'activities']);
@@ -15573,7 +15781,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const cleanupConnections = [];
     registry.publicApi.registerWorldNavProvider(
       downtimeProvider({
-        mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
+        mount:
+          ({ target: mountTarget }) =>
+          () =>
+            cleanupConnections.push(mountTarget.isConnected),
       })
     );
     mountDowntimeManager([], {}, {}, { managerExtensions: registry });
@@ -16280,7 +16491,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     stop();
     target.querySelector('#manager-downtime-nav-crew').click();
     await settleRouteExit();
-    assert.deepEqual(asked, [], 'an unsubscribed guard is not consulted, and stopping twice is safe');
+    assert.deepEqual(
+      asked,
+      [],
+      'an unsubscribed guard is not consulted, and stopping twice is safe'
+    );
     assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
 
     // The retired mount's context cannot register a new guard over the mount that replaced it.
@@ -16648,7 +16863,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.deepEqual(downtimeRailIds(), ['ledger', 'crew']);
-    assert.deepEqual(downtimeTabIds(), [], 'the companion holds the surface, so Core draws no strip');
+    assert.deepEqual(
+      downtimeTabIds(),
+      [],
+      'the companion holds the surface, so Core draws no strip'
+    );
 
     unregisterProvider();
     await settleDowntimeProvider();
@@ -16778,7 +16997,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     worldNavItem('downtime').click();
     await settleRouteExit();
 
-    assert.deepEqual(hooks.map(([name]) => name), [MANAGER_HOOKS.SURFACE_MOUNTED]);
+    assert.deepEqual(
+      hooks.map(([name]) => name),
+      [MANAGER_HOOKS.SURFACE_MOUNTED]
+    );
     assert.deepEqual(hooks[0][1], {
       schemaVersion: 1,
       surfaceId: 'downtime',
@@ -17458,7 +17680,11 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     await setExperimentalFeatures(false);
 
-    assert.equal(managerRoute(), 'world-downtime', 'the open route is not yanked out from under it');
+    assert.equal(
+      managerRoute(),
+      'world-downtime',
+      'the open route is not yanked out from under it'
+    );
     assert.ok(Boolean(activeCompanionPanel()), 'the companion panel is still on screen');
     assert.deepEqual(cleanups, [], 'nothing was torn down, so no unsaved work was discarded');
     assert.deepEqual(asked, [], 'and nothing prompted either — this is not a navigation at all');
@@ -17486,7 +17712,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     assert.equal(managerRoute(), 'world', 'the GM leaves through the exit they chose');
-    assert.deepEqual(cleanups, ['ledger'], 'and the companion is disposed exactly once, on the way');
+    assert.deepEqual(
+      cleanups,
+      ['ledger'],
+      'and the companion is disposed exactly once, on the way'
+    );
     assertDowntimeRailAbsent();
 
     // AND CANNOT RETURN. The rail entry is gone and both entries refuse, which is what makes the
@@ -19081,7 +19311,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    navButton('Tools').click();
+    navButton('Tool Rules').click();
     await tick();
     flushSync();
     return calls;
@@ -19119,7 +19349,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(contextHeader.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
         .map((node) => node.textContent.trim()),
-      ['Crafting Systems', 'Alchemy', 'Crafting', 'Tools']
+      // 'Tool Rules' is the Tool Studio's screen title since issue 1362 (see the rail
+      // relabel). The crumb takes it too: a trail whose leaf disagrees with the heading
+      // below it is the WCAG 2.5.3 "Label in Name" hazard the relabel had to avoid.
+      ['Crafting Systems', 'Alchemy', 'Crafting', 'Tool Rules']
     );
     assert.equal(contextHeader.querySelector('.manager-title').textContent, 'Tool Studio');
     assert.match(
@@ -19311,7 +19544,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.match(
       editorHeader.querySelector('.manager-breadcrumbs').textContent,
-      /Crafting Systems.*Alchemy.*Tools.*Artisan Catalyst/
+      /Crafting Systems.*Alchemy.*Tool Rules.*Artisan Catalyst/
     );
     assert.ok(editorHeader.querySelector('[data-tool-editor-open-systems]'));
     assert.ok(editorHeader.querySelector('[data-tool-editor-open-system]'));
@@ -19468,7 +19701,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     input.value = 'Changed';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -19487,7 +19720,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     input.value = 'Changed';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -19812,7 +20045,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -19842,7 +20075,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Essences').click();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
 
@@ -19961,13 +20194,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
         .map((node) => node.textContent.trim()),
-      [
-        'Crafting Systems',
-        'Alchemy',
-        'Gathering',
-        'Environments',
-        'New Gathering Environment',
-      ]
+      ['Crafting Systems', 'Alchemy', 'Gathering', 'Environments', 'New Gathering Environment']
     );
     assert.equal(
       target.querySelector('.manager-subtitle').textContent.trim(),
@@ -21060,7 +21287,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await tick();
     flushSync();
 
@@ -21321,7 +21548,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('does not prompt when navigating away from a clean system details form', async () => {
     const { calls } = await mountSystemEditForDirtyGuard();
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settle();
     assert.ok(
       !calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
@@ -21339,7 +21566,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       confirmDiscardSystemDetailsResult: 'cancel',
     });
     typeSystemName('Greater Alchemy');
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settle();
     assert.ok(
       calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
@@ -21357,7 +21584,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       confirmDiscardSystemDetailsResult: 'save',
     });
     typeSystemName('Greater Alchemy');
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settle();
     assert.ok(
       calls.some(
@@ -21381,7 +21608,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       saveSystemDetailsResult: false,
     });
     typeSystemName('Greater Alchemy');
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settle();
     assert.ok(
       calls.some((call) => call[0] === 'saveSystemDetails'),
@@ -21398,7 +21625,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       confirmDiscardSystemDetailsResult: 'discard',
     });
     typeSystemName('Greater Alchemy');
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settle();
     assert.ok(
       calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
@@ -21975,9 +22202,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Expand the gp unit's editor.
     const card = target.querySelector('.manager-currency-unit-card');
-    card
-      .querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]')
-      .click();
+    card.querySelector('[data-world-currency-unit="gp"] [aria-label="Edit currency unit"]').click();
     await tick();
     flushSync();
 
@@ -23846,7 +24071,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a sibling Checks route preserves the draft silently'
     );
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settleRouteExit();
     const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
     assert.ok(prompt, 'leaving the studio with an unsaved edit prompts');
@@ -23913,7 +24138,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the route previews the staged OFF state'
     );
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settleRouteExit();
     const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
     assert.ok(prompt, 'a staged mode change is dirty enough to prompt on the way out');
@@ -23963,7 +24188,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the route previews the staged OFF state'
     );
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settleRouteExit();
     const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
     assert.ok(prompt, 'and it is dirty enough to prompt on the way out');
@@ -24015,7 +24240,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settleRouteExit();
     assert.ok(
       calls.some((call) => call[0] === 'saveCraftingCheckSimple'),
@@ -24044,7 +24269,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    navButton('Components').click();
+    navButton('Component Rules').click();
     await settleRouteExit();
     const written = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
     assert.ok(written, 'the save is attempted');
@@ -24255,7 +24480,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const BULK_STUDIOS = [
       {
         name: 'Essence',
-        route: () => navButton('Essences'),
+        route: () => navButton('Essence Rules'),
         rows: ['water', 'earth'],
         rowAttr: 'data-essence-select',
         toolbar: 'data-essence-toolbar',
@@ -24273,7 +24498,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
       {
         name: 'Component',
-        route: () => navButton('Components'),
+        route: () => navButton('Component Rules'),
         rows: ['c1', 'c2'],
         rowAttr: 'data-component-select',
         toolbar: 'data-component-toolbar',
@@ -24779,7 +25004,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       await settleRail();
       assert.ok(!isExpanded(crafting), 'pre-condition: Crafting is collapsed before Tools opens');
 
-      navButton('Tools').click();
+      navButton('Tool Rules').click();
       await settleRail();
       assert.equal(currentManagerView(), 'tools');
       assert.ok(isExpanded(crafting), 'the Tool Studio opens the Crafting group it sits under');
@@ -24839,7 +25064,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(currentManagerView(), 'checks-crafting');
       assert.ok(isExpanded(checks));
 
-      navButton('Components').click();
+      navButton('Component Rules').click();
       await settleRail();
       assert.equal(currentManagerView(), 'components');
       assert.ok(isExpanded(checks), 'leaving a group does not slam it shut behind the GM');
@@ -24896,7 +25121,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.equal(currentManagerView(), 'recipes');
       assert.ok(isExpanded(crafting), 'entering a sub-item keeps its group open');
 
-      navButton('Components').click();
+      navButton('Component Rules').click();
       await settleRail();
       assert.equal(currentManagerView(), 'components');
       assert.ok(
@@ -25004,7 +25229,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         extraComponentItems: AETHER_LIBRARY,
         componentHydrationRequests: requests,
       });
-      navButton('Components').click();
+      navButton('Component Rules').click();
       await tick();
       flushSync();
 
@@ -25025,11 +25250,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       // The negative half, in the same fixture against the same spy: an off-page card that is
       // NOT the selection costs nothing. Without it, a cohort-wide hydrate would satisfy the
       // assertion above and defeat the page scoping entirely.
-      assert.equal(
-        requests.has('c2'),
-        false,
-        'an off-page card that is not selected is not asked'
-      );
+      assert.equal(requests.has('c2'), false, 'an off-page card that is not selected is not asked');
       for (const id of rendered) {
         assert.equal(requests.has(id), true, `the rendered row ${id} was asked`);
       }
@@ -25041,7 +25262,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
       // The essence-usage thumbnail routes straight into `component-edit`, so the components
       // browser — the application's only other ask — is never mounted on this path at all.
-      navButton('Essences').click();
+      navButton('Essence Rules').click();
       await tick();
       flushSync();
       assert.equal(
@@ -25093,7 +25314,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       await tick();
       flushSync();
       target
-        .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+        .querySelector(
+          '[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]'
+        )
         .click();
       await tick();
       flushSync();
@@ -25108,18 +25331,14 @@ describe('CraftingSystemManager mounted behavior', () => {
         0,
         'pre-condition: the components browser is not mounted on this route'
       );
-      const picked = Array.from(
-        target.querySelectorAll('[data-gathering-component-card]')
-      ).map((node) => node.dataset.gatheringComponentCard);
+      const picked = Array.from(target.querySelectorAll('[data-gathering-component-card]')).map(
+        (node) => node.dataset.gatheringComponentCard
+      );
       assert.ok(picked.includes('c2'), 'pre-condition: the picker rendered the second component');
 
       // `c2` is never the inspector's selection and never the editor's subject, so the picker
       // is the only thing in this tree that can have asked for it.
-      assert.equal(
-        requests.has('c2'),
-        true,
-        'the picker asked its own rendered page to hydrate'
-      );
+      assert.equal(requests.has('c2'), true, 'the picker asked its own rendered page to hydrate');
     });
   });
 
@@ -25227,14 +25446,15 @@ describe('CraftingSystemManager mounted behavior', () => {
         props: { store, services: { openCurrentAdmin: () => {}, onDropItem: () => {} } },
       });
       flushSync();
-      navButton('Components').click();
+      navButton('Component Rules').click();
       await tick();
       flushSync();
       return { fill };
     }
 
     const inspectorDescription = () =>
-      target.querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
+      target
+        .querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
         .textContent.trim();
     const inspectorPillTone = () =>
       target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
@@ -25420,11 +25640,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         !herbRow.querySelector('.manager-vocabulary-chip-unused'),
         'a tag used only as a recipe ingredient placeholder is NOT unused'
       );
-      assert.match(
-        herbRow.textContent,
-        /1 reference/,
-        'and the row reports that one reference'
-      );
+      assert.match(herbRow.textContent, /1 reference/, 'and the row reports that one reference');
       assert.deepEqual(
         reads,
         { ingredientSets: 0, steps: 0 },
@@ -25440,6 +25656,275 @@ describe('CraftingSystemManager mounted behavior', () => {
         { ingredientSets: 1, steps: 1 },
         'the counters CAN go up — reading either field is what does it'
       );
+    });
+  });
+
+  // ── The four rail-reachable world scoped-entity routes actually render (issue 1362) ───────
+  //
+  // NOTHING ELSE IN `npm test` RENDERS A PLACEHOLDER PAGE. `data-scoped-page` appears only in
+  // the View Lab registry, which is a capture gate rather than a unit gate, so a swapped
+  // `titleKey`, a duplicated `pageId` or a route wired to the wrong page shipped green here and
+  // failed only at capture. `tests/components/manager-contract.test.js` covers all SEVEN pages
+  // from source; this covers the four a GM can actually reach, through the rail, in the DOM.
+  describe('world scoped-entity routes (issue 1362)', () => {
+    /**
+     * Rail leaf id -> the route token it commits and the screen title it renders. The titles
+     * are the prototype's, verbatim, including the lowercase `c` and the plural `Tools`.
+     */
+    const RAIL_REACHABLE_ROUTES = [
+      ['component-catalogue', 'world-components', 'Component catalogue'],
+      ['vocabulary', 'world-vocabulary', 'Tags & Categories'],
+      ['essence-catalogue', 'world-essences', 'Essence Catalogue'],
+      ['tool-catalogue', 'world-tools', 'Tools Catalogue'],
+    ];
+
+    async function settleRoute() {
+      for (let i = 0; i < 24; i += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    async function mountRail() {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store: createStore([]), services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    it('commits its own route, page hook and title from the rail — with no system selected', async () => {
+      await mountRail();
+      const seenPages = new Set();
+      for (const [leaf, token, title] of RAIL_REACHABLE_ROUTES) {
+        worldNavItem(leaf).click();
+        await settleRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          token,
+          `the ${leaf} leaf commits the ${token} route`
+        );
+        const page = target.querySelector(`[data-scoped-page="${token}"]`);
+        assert.ok(Boolean(page), `${token} renders its own page hook`);
+        assert.equal(page.getAttribute('aria-label'), title, `${token}'s main is named for it`);
+        assert.equal(
+          target.querySelector('.manager-header .manager-title').textContent.trim(),
+          title
+        );
+        assert.ok(
+          Boolean(target.querySelector(`[data-scoped-placeholder="${token}"]`)),
+          `${token} renders the shared placeholder body keyed on its own route`
+        );
+        // FULL WIDTH IS THE OTHER HALF OF THE ROUTE. A page wired into the shell but left in
+        // the aside chain renders against a permanent dead strip, which no source assertion
+        // about the exclusion set can see.
+        assert.ok(
+          !target.querySelector('.manager-inspector'),
+          `${token} is released to full width, so the shared inspector must not render`
+        );
+        seenPages.add(page.getAttribute('data-scoped-page'));
+      }
+      assert.equal(
+        seenPages.size,
+        RAIL_REACHABLE_ROUTES.length,
+        'each route rendered a DISTINCT page: a duplicated pageId would collapse this set'
+      );
+    });
+
+    it('draws a TWO-crumb trail rooted at World, with World itself clickable', async () => {
+      await mountRail();
+      worldNavItem('component-catalogue').click();
+      await settleRoute();
+      const world = target.querySelector('[data-breadcrumb-world]');
+      assert.equal(
+        world.tagName,
+        'BUTTON',
+        'World is not the leaf here, so it navigates — the rule every crumb in this trail follows'
+      );
+      const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
+      assert.equal(leaf.getAttribute('data-breadcrumb-world-scoped'), 'world-components');
+      assert.equal(leaf.textContent.trim(), 'Component catalogue');
+      assert.equal(leaf.tagName, 'SPAN', 'and the leaf does not navigate');
+      // A CATALOGUE HAS NO MIDDLE CRUMB. The intermediate catalogue crumb belongs to the ENTRY
+      // routes; drawing one here would say the catalogue sits inside itself.
+      assert.ok(
+        !target.querySelector('[data-breadcrumb-world-scoped-catalogue]'),
+        'a catalogue route draws no intermediate catalogue crumb'
+      );
+    });
+  });
+
+  // ── The world scope corpus reaches the DOM, on every publish trigger (issue 1362) ─────────
+  //
+  // ASSERTED AT THE DOM, NEVER BY OBJECT IDENTITY. Identity is a proxy that fails in both
+  // directions here: the projection legitimately republishes an equal corpus on a no-op, and a
+  // bare `{...corpus}` would satisfy an identity check while reaching no rendered element at
+  // all. The rail's own count badge is the assertion target, because it is the one thing on
+  // screen this PR actually derives from the world corpus.
+  describe('world scope publication (issue 1362)', () => {
+    let scopeStores;
+
+    /**
+     * A minimal scope store with the two methods the projection reads. Deliberately NOT the
+     * real `ScopedDefinitionStore`: this block is about the publish path, and a fake whose
+     * corpus a test can swap under it is how the settings-bridge reload is modelled.
+     *
+     * @param {Array<object>} entities
+     * @returns {object}
+     */
+    function scopeStore(entities) {
+      let corpus = { entities, defaults: [], membership: [] };
+      return {
+        corpus: () => corpus,
+        isSeeded: () => true,
+        replace(next) {
+          corpus = { entities: next, defaults: [], membership: [] };
+        },
+        mutateInPlace(next) {
+          // The negative control's seam: edit the SAME object rather than replacing it.
+          corpus.entities.length = 0;
+          corpus.entities.push(...next);
+        },
+      };
+    }
+
+    function worldEntities(count, prefix) {
+      return Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index + 1}` }));
+    }
+
+    async function mountWithRealStore() {
+      scopeStores = {
+        component: scopeStore(worldEntities(3, 'comp')),
+        essence: scopeStore(worldEntities(2, 'ess')),
+        tool: scopeStore(worldEntities(1, 'tool')),
+        // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
+        // exists until PR 7 registers one, and the badge must read 0 rather than blank.
+        vocabulary: null,
+      };
+      const forge = makeSystem({ id: 'sys1', name: 'Forge' });
+      const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
+      const systems = [forge, alchemy];
+      const services = createServices(forge, [], [], {
+        getCraftingSystemManager: () => ({
+          getSystems: () => systems,
+          getSystem: (id) => systems.find((system) => system.id === id) || null,
+          getItems: () => [],
+        }),
+        getComponentScopeStore: () => scopeStores.component,
+        getEssenceScopeStore: () => scopeStores.essence,
+        getToolScopeStore: () => scopeStores.tool,
+        getVocabularyScopeStore: () => scopeStores.vocabulary,
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, { target, props: { store, services: {} } });
+      flushSync();
+      await tick();
+      flushSync();
+      return store;
+    }
+
+    function railCounts() {
+      return ['component-catalogue', 'essence-catalogue', 'tool-catalogue'].map((leaf) =>
+        target.querySelector(`#manager-world-nav-${leaf} .manager-nav-count`)?.textContent?.trim()
+      );
+    }
+
+    function vocabularyCount() {
+      return target
+        .querySelector('#manager-world-nav-vocabulary .manager-nav-count')
+        ?.textContent?.trim();
+    }
+
+    async function settle(store) {
+      await store.refresh();
+      flushSync();
+      await tick();
+      flushSync();
+    }
+
+    it('publishes the world corpus to the rail on LOAD', async () => {
+      await mountWithRealStore();
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    it('republishes it on the SETTINGS-BRIDGE reload, and the DOM moves', async () => {
+      // The bridge reloads the store and re-emits `craftingSystemsChanged`, which the manager
+      // app answers with `refresh()`. Modelled by replacing the corpus wholesale, exactly as
+      // `ScopedDefinitionStore#load` does.
+      const store = await mountWithRealStore();
+      scopeStores.component.replace(worldEntities(7, 'comp'));
+      await settle(store);
+      assert.deepEqual(railCounts(), ['7', '2', '1']);
+    });
+
+    it('republishes it on a CRAFTING SYSTEM CHANGE, unchanged', async () => {
+      const store = await mountWithRealStore();
+      const before = JSON.parse(JSON.stringify(get(store.viewState).worldScope));
+      await store.selectSystem('sys2');
+      await settle(store);
+      // The world corpus is world scope: a system change must republish it and must not alter
+      // it. Deep-equal rather than identity, because the projection answers a NEW object every
+      // publish by design.
+      assert.deepEqual(get(store.viewState).worldScope, before);
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    it('MUTATION PROOF: an in-place corpus edit does not reach the DOM', async () => {
+      // The negative control for the three assertions above. `ScopedDefinitionStore` replaces
+      // its corpus WHOLESALE for exactly this reason — the resolved-union memo keys on the
+      // object's identity — and a projection that read a mutated-in-place corpus would publish
+      // a stale count. Proving the DOM assertion CAN red is what stops the three tests above
+      // from being satisfied by any republish at all.
+      const store = await mountWithRealStore();
+      scopeStores.component.mutateInPlace(worldEntities(9, 'comp'));
+      // No refresh: nothing told the store anything happened, which is the whole point.
+      flushSync();
+      await tick();
+      flushSync();
+      assert.deepEqual(
+        railCounts(),
+        ['3', '2', '1'],
+        'an in-place edit with no publish must not reach the DOM'
+      );
+      // And the same edit DOES reach it once a publish runs, so the assertion above is a
+      // measurement rather than a rail that never updates.
+      await settle(store);
+      assert.deepEqual(railCounts(), ['9', '2', '1']);
+    });
+
+    it('reads the WORLD VOCABULARY badge through the optional fourth store leg', async () => {
+      // THE FIELD NAME IS THE POINT. The shell reads `worldScope.vocabulary.total` and
+      // `### GM World Scoped Entity Routes` requirement 7 bars PR 7 from the shell, so a
+      // producer publishing `count`, or leaving the caller to read `entries.length`, would
+      // leave this badge on 0 for good with every other assertion in this repository still
+      // green. Driving the REAL store from a registered vocabulary store is what makes the
+      // name a contract rather than a hope: nothing here restates it.
+      const store = await mountWithRealStore();
+      assert.equal(
+        vocabularyCount(),
+        '0',
+        'with no vocabulary store registered the badge reads 0 — truthful, not blank'
+      );
+      scopeStores.vocabulary = {
+        corpus: () => ({
+          componentCategories: [{ id: 'metal' }, { id: 'herb' }],
+          componentTags: [{ id: 'rare' }],
+          recipeCategories: [{ id: 'smithing' }, { id: 'alchemy' }],
+        }),
+      };
+      await settle(store);
+      assert.equal(vocabularyCount(), '5', 'and it counts all three vocabularies, summed');
+      // And it is ITS OWN corpus: lighting the vocabulary up must not disturb the three
+      // scoped-entity counts beside it.
+      assert.deepEqual(railCounts(), ['3', '2', '1']);
     });
   });
 });

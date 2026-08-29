@@ -490,7 +490,7 @@
 -->
 <main
   class="manager-main"
-  aria-label={text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}
+  aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
   <section
     class="manager-component-drop-zone"

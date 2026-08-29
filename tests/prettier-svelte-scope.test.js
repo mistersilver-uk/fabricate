@@ -101,6 +101,7 @@ const GATE_TARGETS = [
   'scripts/lib/hotfixPreflight.js',
   'scripts/lib/foundrySmokeSignal.js',
   'scripts/lib/managerLayoutGuards.js',
+  'scripts/lib/managerRailEntries.js',
   'scripts/lib/screenshotCaptureMap.js',
   'scripts/lib/foundryCanvasReadiness.js',
   'scripts/lib/foundryRunIdentity.js',

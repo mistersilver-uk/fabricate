@@ -152,6 +152,11 @@ import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
+import { createWorldScopeActions } from './worldScopeActions.js';
+import {
+  buildWorldScopeState as _buildWorldScopeState,
+  emptyWorldScopeState as _emptyWorldScopeState,
+} from './worldScopeProjection.js';
 
 // `DERIVED_RECIPE_PROJECTION_FIELDS` and `withoutDerivedRecipeProjectionFields` moved to
 // the row projection alongside the derivation they describe, and are re-exported here so
@@ -1886,6 +1891,10 @@ export function createAdminStore(services) {
     ..._emptyTravelState(),
     ..._emptyWorldCurrencyState(),
     ..._emptyCharacterLibrariesState(),
+    // The three world-scope entity corpora (issue 1362). Seeded EMPTY rather than absent so a
+    // world screen mounted before the first publish reads a shape rather than `undefined`, and
+    // so `seeded` reads all-false — an UNKNOWN corpus, never an empty one.
+    ..._emptyWorldScopeState(),
   });
 
   function _setEnvironmentDraftState(
@@ -4747,6 +4756,7 @@ export function createAdminStore(services) {
       ...travel.buildState(),
       ...buildWorldCurrencyState(),
       ...buildCharacterLibrariesState(),
+      ...buildWorldScopeState(),
     }));
   }
 
@@ -4759,6 +4769,55 @@ export function createAdminStore(services) {
     if (!store) return _emptyWorldCurrencyState();
     return { worldCurrency: normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID }) };
   }
+
+  // The three world-scope entity corpora (issue 1362, epic 1357), read straight from their
+  // stores on every publish for the same reasons the two blocks above are: cheap, and honest
+  // when another GM edits the world corpus, with no per-system cache to invalidate.
+  //
+  // A TOP-LEVEL SIBLING KEY. It is world scope, so hanging it off `selectedSystem` would
+  // republish it as `null` the moment no system is selected — the NORMAL state for a world
+  // screen. The projection ALWAYS answers a new object, so a `$derived` over it re-propagates
+  // on every publish rather than only when the corpus identity moves.
+  function buildWorldScopeState() {
+    return _buildWorldScopeState({ stores: _worldScopeStores(), systems: _allSystems() });
+  }
+
+  // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
+  // with PR 7 of epic 1357, but this file is one of the five gateway paths requirement 7 of
+  // `### GM World Scoped Entity Routes` closes to that PR — so a producer leg added later could
+  // only be added by reopening the file this change promises no later lane needs to touch. It
+  // reads through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings,
+  // which answers `null` until the service is registered; `projectWorldVocabulary` then
+  // publishes `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful,
+  // because a world with no vocabulary store has no world vocabulary.
+  function _worldScopeStores() {
+    return {
+      component: services.getComponentScopeStore?.() ?? null,
+      essence: services.getEssenceScopeStore?.() ?? null,
+      tool: services.getToolScopeStore?.() ?? null,
+      vocabulary: services.getVocabularyScopeStore?.() ?? null,
+    };
+  }
+
+  function _allSystems() {
+    try {
+      return services.getCraftingSystemManager?.()?.getSystems?.() || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
+  // by nothing in `src/` yet: every Phase 8 world route is a placeholder, so no screen calls
+  // one of these. That is a deliberate, stated state rather than dead code — PRs 6a/6b/6c and
+  // 7 wire the screens without reopening this file.
+  const worldScope = createWorldScopeActions({
+    getStores: {
+      component: () => services.getComponentScopeStore?.() ?? null,
+      essence: () => services.getEssenceScopeStore?.() ?? null,
+      tool: () => services.getToolScopeStore?.() ?? null,
+    },
+  });
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
@@ -9768,6 +9827,12 @@ export function createAdminStore(services) {
     eraseLearnedRecipe,
     resetActorSystemKnowledge,
     resetActorAllKnowledge,
+    // --- World scope: components, essences and tools (issue 1362, epic 1357) ---
+    //
+    // EXPOSED BUT UNREACHABLE. Every world route this PR ships is a placeholder, so nothing
+    // in `src/` calls one of these yet. The key set is part of the contract: `setEnabled` is
+    // absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only there.
+    worldScope,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

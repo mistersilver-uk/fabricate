@@ -1,9 +1,13 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  The Tool editor's player preview. A caller of the shared `ScopedEntityPreview` shell
+  (issue 1362): the five regions and their order come from there, while every value, every
+  class (`manager-tool-preview*`) and every `data-tool-*` hook stays here. Nothing rendered
+  changed in the conversion.
+-->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
-  import ExplainerCard from '../ExplainerCard.svelte';
-  import IconFactRow from '../IconFactRow.svelte';
+  import ScopedEntityPreview from '../scoped/ScopedEntityPreview.svelte';
   import {
     projectToolBehaviorFacts,
     toolDisplayImage,
@@ -53,6 +57,11 @@
       : text('FABRICATE.Admin.Manager.Tools.Editor.HeaderUnlinked', 'Unlinked Tool')
   );
   const rules = $derived(projectToolBehaviorFacts(tool, authority, text, formattedText));
+  // The per-fact title hook is attached HERE rather than inside the shared shell, so no other
+  // consumer of that shell inherits four dead attributes.
+  const previewRules = $derived(
+    rules.map((rule) => ({ ...rule, titleAttr: RULE_TITLE_HOOKS[rule.id] || '' }))
+  );
   const breakageLabel = $derived(rules.find((rule) => rule.id === 'breakage')?.title || '');
   const bonusValue = $derived(rules.find((rule) => rule.id === 'bonus')?.title || '');
   // The standing explanation of what a Tool is. Each row is a glyph, a bold lead-in and
@@ -118,69 +127,50 @@
   ]);
 </script>
 
-<aside
-  class="manager-tool-preview"
-  data-tool-behavior-preview
-  aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}
->
-  <p class="manager-kicker">
-    {text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
-  </p>
-  <div class="manager-tool-preview-identity" data-tool-preview-identity>
-    <img src={image} alt="" />
-    <div>
-      <h3 title={name}>{name}</h3>
-      <p>{sourceContext}</p>
-    </div>
-    <Chip
-      tone={tool?.enabled === false ? 'neutral' : 'positive'}
-      icon={tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
-    >
-      {tool?.enabled === false
+<ScopedEntityPreview
+  classPrefix="manager-tool-preview"
+  hookAttribute="data-tool-behavior-preview"
+  ariaLabel={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}
+  kicker={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
+  identity={{
+    name,
+    image,
+    context: sourceContext,
+    hookAttribute: 'data-tool-preview-identity',
+  }}
+  statusChip={{
+    tone: tool?.enabled === false ? 'neutral' : 'positive',
+    icon: tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check',
+    label:
+      tool?.enabled === false
         ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-        : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-    </Chip>
-    <div class="manager-tool-preview-chips">
-      <Chip tone="neutral" icon="fas fa-heart-crack">{breakageLabel}</Chip>
-      <Chip tone="neutral" icon="fas fa-plus-minus">{bonusValue}</Chip>
-    </div>
-  </div>
-  <aside class="manager-tool-preview-live" data-tool-preview-live-update>
-    <i class="fas fa-circle-check" aria-hidden="true"></i><span
-      >{text(
-        'FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate',
-        'This preview updates live as you change the controls on the left.'
-      )}</span
-    >
-  </aside>
-  <p class="manager-kicker">
-    {text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}
-  </p>
-  <ul class="manager-tool-preview-rules">
-    {#each rules as rule (rule.id)}
-      <li data-tool-preview-rule={rule.id}>
-        <IconFactRow
-          icon={rule.icon}
-          title={rule.title}
-          subtitle={rule.subtitle}
-          titleAttr={RULE_TITLE_HOOKS[rule.id] || ''}
-        />
-      </li>
-    {/each}
-  </ul>
-  <ExplainerCard
-    icon="fas fa-circle-question"
-    title={text(
+        : text('FABRICATE.Admin.Manager.StatusOn', 'On'),
+  }}
+  chips={[
+    { tone: 'neutral', icon: 'fas fa-heart-crack', label: breakageLabel },
+    { tone: 'neutral', icon: 'fas fa-plus-minus', label: bonusValue },
+  ]}
+  liveNote={text(
+    'FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate',
+    'This preview updates live as you change the controls on the left.'
+  )}
+  liveNoteHook="data-tool-preview-live-update"
+  rulesKicker={text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}
+  rules={previewRules}
+  ruleHookAttribute="data-tool-preview-rule"
+  explainer={{
+    icon: 'fas fa-circle-question',
+    title: text(
       'FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle',
       'How Tools work in Fabricate'
-    )}
-    items={howToolsWorkItems}
-    links={[
+    ),
+    items: howToolsWorkItems,
+    links: [
       {
         href: 'https://mistersilver-uk.github.io/fabricate/tools',
         label: text('FABRICATE.Admin.Manager.Tools.Editor.ReadDocs', 'Read the docs'),
       },
-    ]}
-    dataAttr="data-tool-how-it-works"
-  />
-</aside>
+    ],
+    dataAttr: 'data-tool-how-it-works',
+  }}
+/>

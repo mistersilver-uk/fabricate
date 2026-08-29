@@ -73,6 +73,14 @@ import {
   joinWorldSession as joinWorldSessionShared,
   launchWorld as launchWorldShared
 } from './lib/foundryBrowserBoot.js';
+// The rail's (id, label) pairs (issue 1362). Both this harness and
+// `tests/foundry-manager-rail-hooks.test.js` read them from one place, so a relabel
+// cannot update the harness and leave the component behind, or the reverse.
+import {
+  MANAGER_SYSTEM_RAIL_ENTRIES,
+  MANAGER_WORLD_SCOPED_RAIL_ENTRIES,
+  railSelector
+} from './lib/managerRailEntries.js';
 import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
@@ -500,7 +508,7 @@ async function captureManagerThemes(page) {
 // the group; from a crafting child route (e.g. recipe-edit) it only expands, so
 // always follow with the Recipes sub-item to land on the recipes browser.
 async function openManagerCraftingSection(page, subitemId, managerView) {
-  await page.locator('.fabricate-manager .manager-nav-parent:has-text("Crafting")').first().click();
+  await page.locator(railSelector('manager-nav-crafting')).click();
   const subitem = page.locator(`.fabricate-manager #manager-crafting-nav-${subitemId}`).first();
   await subitem.waitFor({ state: 'visible', timeout: 5_000 });
   await subitem.click();
@@ -562,7 +570,7 @@ async function openChecksSection(page, section) {
  * @param {string} [section]
  */
 async function openChecksActivity(page, activity, section = '') {
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  await page.locator(railSelector('manager-nav-checks')).click();
   const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
   await navItem.waitFor({ state: 'visible', timeout: 5_000 });
   await navItem.click();
@@ -4408,7 +4416,7 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
  * @param {import('playwright').Page} page
  */
 async function exerciseManagerEnvironmentPointerTargets(page) {
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Gathering")').first().click();
+  await page.locator(railSelector('manager-nav-gathering')).click();
   await page.locator('.fabricate-manager .manager-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
   const search = page.locator('.fabricate-manager input[aria-label="Search environments"]').first();
@@ -5673,7 +5681,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     height: 724,
     sourceViewport: { width: 1280, height: 720 },
   });
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
+  await page.locator(railSelector('manager-nav-tool-rules')).click();
   await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
   const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
@@ -8695,9 +8703,20 @@ async function main() {
         if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System Overview', 'Components', 'Crafting', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
-          if (!navLabels.includes(expected)) {
-            throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
+        // THE MEMBERSHIP LOOP, BY ID AND THEN BY LABEL (issue 1362). It used to walk nine
+        // LABELS and test `navLabels.includes(...)`, which the world scoped-entity leaves
+        // broke twice over: `Components` stopped appearing at all, and `Tags & Categories`
+        // became an exact duplicate across the two rail scopes, so `includes` could no longer
+        // say WHICH one it had found. Resolving the entry by its stable id fixes identity;
+        // asserting its rendered label afterwards keeps the check on what a GM actually reads.
+        for (const entry of [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES]) {
+          const button = page.locator(railSelector(entry.id));
+          if (await button.count() === 0) {
+            throw new Error(`Manager selected nav is missing rail entry #${entry.id} (${entry.label}). Saw: ${navLabels.join(', ')}`);
+          }
+          const rendered = (await button.locator('.manager-nav-label').first().innerText()).trim();
+          if (rendered !== entry.label) {
+            throw new Error(`Manager rail entry #${entry.id} should read "${entry.label}"; it reads "${rendered}".`);
           }
         }
         // The rail's crafting-system card SELECTS (issue 643): it names the current system
@@ -9710,7 +9729,7 @@ async function main() {
         // above may have visited another system and intentionally own their cleanup.
         await returnToSystemLibrary(page);
         await selectSmokeSystemInManager(page, craftingSetup.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
         if (await page.locator('.fabricate-manager .manager-component-drop-zone').count() === 0) {
@@ -10059,7 +10078,7 @@ async function main() {
         process.stdout.write('  D0: component edit salvage screenshotted\n');
 
         // Return to the components browser for the remaining navigation.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await componentSearch().fill('Iron Sword');
 
@@ -10084,7 +10103,7 @@ async function main() {
         await screenshot(page, 'manager-component-edit-salvage-off');
         process.stdout.write('  D0: component edit salvage (off) screenshotted\n');
 
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Issue 764: the Simple-mode salvage editor at its one-success-group CAP. The two
@@ -10095,7 +10114,7 @@ async function main() {
         // Fails loudly by design (no guard): a missing hint means the cap regressed.
         await softClick(page.locator('.fabricate-manager .manager-scope-return'));
         await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await componentSearch().fill('Smoke Relic');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)')
@@ -10117,7 +10136,7 @@ async function main() {
         // the fully-seeded routed system they expect.
         await softClick(page.locator('.fabricate-manager .manager-scope-return'));
         await selectSmokeSystemInManager(page, craftingSetup.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Checks → Gathering check editor (#437). The gathering check editor is
@@ -10258,7 +10277,7 @@ async function main() {
           process.stderr.write(`Checks crafting modifiers capture failed: ${err.message}\n`);
         }
 
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Components → stacked. Earlier CI runs hung silently between this
@@ -10281,7 +10300,7 @@ async function main() {
         // pages 1→2 under a shrunk page, then capture the continuation page. Placed AFTER the
         // stacked frame so the shrunk page size can never leak into an earlier capture.
         const openComponentsBrowser = async () => {
-          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator(railSelector('manager-nav-component-rules')).click();
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
         };
@@ -10332,7 +10351,7 @@ async function main() {
         // ── D0 section: tags & categories + essences (issue #826 skip guard) ──
         if (shouldRunScreenshotSection('tags-essences')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();
+        await page.locator(railSelector('manager-nav-tags')).click();
         await page.locator('.fabricate-manager[data-manager-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
         if (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count() === 0) {
@@ -10382,7 +10401,7 @@ async function main() {
         });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        const essenceNav = page.locator('.fabricate-manager .manager-nav-button:has-text("Essences")');
+        const essenceNav = page.locator(railSelector('manager-nav-essence-rules'));
         if (await essenceNav.count() > 0 && !(await essenceNav.first().isDisabled())) {
           await essenceNav.first().click();
           await page.locator('.fabricate-manager[data-manager-view="essences"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -10911,7 +10930,7 @@ async function main() {
           // Guarded independently so a hiccup here does not fail the overview step.
           try {
             const blockedNames = craftingSetup.blockedComponentNames || [];
-            await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+            await page.locator(railSelector('manager-nav-component-rules')).click();
             await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
             await page.locator('.fabricate-manager [data-component-difficulty]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
@@ -11525,7 +11544,7 @@ async function main() {
           await setManagerWindowSize(page, { width: 1280, height: 820 });
           await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
           await settleManagerNav(page);
-          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator(railSelector('manager-nav-component-rules')).click();
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
 

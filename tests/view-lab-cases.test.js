@@ -132,6 +132,21 @@ function renderSources() {
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
+/**
+ * The components that RENDER the manager rail.
+ *
+ * Shared by the string-label branch and the rail-HOOK branch below, because the two guard the
+ * same thing and a second copy of the rule is a second thing to weaken. An unscoped search is
+ * what makes either branch vacuous: `Tools` is a common English word, and
+ * `manager-world-nav-parties` would resolve out of a test fixture or a comment.
+ *
+ * @param {Map<string, string>} sources
+ * @returns {Array<[string, string]>}
+ */
+function railRenderingFiles(sources) {
+  return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+}
+
 function navDeclarationScope(sources, template) {
   const builders = [...sources].filter(([, text]) => text.includes(template));
   const scope = new Map(builders);
@@ -365,6 +380,36 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     }
     return;
   }
+  // A RAIL HOOK, scoped to the components that render the rail (issue 1362).
+  //
+  // The label steps this replaced were checked against `railRenderingFiles`, and the generic
+  // token branch at the bottom of this function is WEAKER than that in two different ways —
+  // which is exactly why the string branch was kept alive for the eight labels this relabel
+  // does not touch rather than being deleted wholesale:
+  //
+  //  - it searches the WHOLE `src/` tree, so `manager-nav-tool-rules` would resolve out of a
+  //    comment or an unrelated component;
+  //  - and it STRIPS ATTRIBUTE VALUES before tokenizing, so an attribute-shaped hook such as
+  //    `[data-manager-nav="component-catalogue"]` would verify only that the ATTRIBUTE NAME
+  //    exists somewhere — every one of the nine rail values could be wrong and stay green.
+  //
+  // The branch is therefore conditioned on the hook SHAPE rather than on whether the id is
+  // interpolated: an attribute-value hook is weakened exactly as badly as an interpolated id.
+  const railHook =
+    /^#(manager-(?:world-)?nav-[a-z0-9-]+)$/.exec(selector) ??
+    /^\[data-(?:manager|world)-nav-item="([^"]+)"\]$/.exec(selector);
+  if (railHook) {
+    const railFiles = railRenderingFiles(sources);
+    if (railFiles.length === 0) {
+      missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
+    } else if (!railFiles.some(([, text]) => text.includes(railHook[1]))) {
+      missing.push(
+        `${viewCase.id}: rail hook "${railHook[1]}" appears in no component that renders ` +
+          `"${RAIL_BUTTON_CLASS}" (${railFiles.map(([file]) => file).join(', ')})`
+      );
+    }
+    return;
+  }
   const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(selector);
   if (navId) {
     const [, group, id] = navId;
@@ -451,7 +496,7 @@ test('every interaction step names text that exists in the manager UI', () => {
         // English words that occur all over a 300-file haystack, so an unscoped `includes` could
         // never fail. Demonstrated: deleting the entire manager rail still resolved all eight, out
         // of `lang/en.json` and unrelated components, leaving 92 steps across ~60 cases unguarded.
-        const railFiles = [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+        const railFiles = railRenderingFiles(sources);
         if (railFiles.length === 0) {
           missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
         } else if (!railFiles.some(([, text]) => text.includes(step))) {
@@ -528,6 +573,61 @@ test('every interaction step names text that exists in the manager UI', () => {
   );
 });
 
+/**
+ * The four rail labels that BECAME AMBIGUOUS when the world scoped-entity leaves landed
+ * (issue 1362), as an enumerated DENY-LIST rather than a blanket ban on string steps.
+ *
+ * Only these four collide. `Components`, `Essences` and `Tools` were relabelled to
+ * `Component Rules` / `Essence Rules` / `Tool Rules`, and `Tools` is additionally a live
+ * SUBSTRING of the new `Tools Catalogue`; `Tags & Categories` was not relabelled at all and is
+ * now CHARACTER-FOR-CHARACTER IDENTICAL across the two rail scopes. A substring collision is
+ * recoverable by DOM order; an exact duplicate is not.
+ *
+ * The other four labels — `Crafting`, `Checks`, `Gathering`, `System Overview`, 109 steps —
+ * keep the string branch, and that is deliberate rather than laziness. The string branch
+ * validates a label against the components that actually RENDER the rail button class; the
+ * selector branch that would replace it strips attribute VALUES before tokenizing. Deleting
+ * the branch outright would have forced all 158 migrations AND removed a STRONGER check than
+ * what replaced it.
+ *
+ * @type {readonly string[]}
+ */
+const MIGRATED_RAIL_LABELS = Object.freeze([
+  'Components',
+  'Essences',
+  'Tools',
+  'Tags & Categories',
+]);
+
+test('no case reaches a rail entry by one of the four ambiguous labels', () => {
+  const offending = [];
+  let stringSteps = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const step of viewCase.steps ?? []) {
+      if (typeof step !== 'string') continue;
+      stringSteps += 1;
+      if (MIGRATED_RAIL_LABELS.includes(step)) offending.push(`${viewCase.id}: "${step}"`);
+    }
+  }
+  // NON-VACUITY. The string branch stays ALIVE for the labels this relabel does not touch, so
+  // a registry that had quietly lost every string step would satisfy the deny-list while also
+  // having discarded the stronger check it protects.
+  assert.ok(
+    stringSteps > 100,
+    `only ${stringSteps} string steps remain; the string branch and its scoped rail check are ` +
+      'supposed to stay alive for the 109 steps this relabel does not touch'
+  );
+  assert.deepEqual(
+    offending,
+    [],
+    'these steps click a rail entry by a label that now names TWO buttons (or is a ' +
+      'substring of another). Use the stable id instead: `#manager-nav-component-rules`, ' +
+      '`#manager-nav-essence-rules`, `#manager-nav-tool-rules`, `#manager-nav-tags`, or ' +
+      'the matching `#manager-world-nav-*` leaf.\n  ' +
+      offending.join('\n  ')
+  );
+});
+
 test('every expectSelector names UI that still exists', () => {
   // The step sweep above never looked at `expectSelector`, so a hook named only there — which
   // is the normal shape for a case whose whole job is to assert a state — was guarded by
@@ -575,6 +675,8 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
+// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
   'player-gathering-stacked',
@@ -582,19 +684,38 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-alchemy-stacked',
   'player-journal-stacked',
 ];
+
+// And the manager case that asserts the OPPOSITE shape (issue 1362): a released third column
+// — exactly TWO resolved tracks — with the inspector aside genuinely ABSENT. Both halves are
+// measured in the browser, because they are two separate edits and doing only the stylesheet
+// one leaves the empty aside wrapped to an implicit grid row, where the track count is still
+// two and the frame still photographs a dead strip.
+const FULL_WIDTH_LAYOUT_CASE_IDS = ['world-scoped-narrow'];
+const LAYOUT_CASE_IDS = [...RESPONSIVE_LAYOUT_CASE_IDS, ...FULL_WIDTH_LAYOUT_CASE_IDS];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
-test('exactly the five 1024px player responsive cases declare complete layout expectations', () => {
+test('exactly the declared 1024px cases carry complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
-  assert.deepEqual(
-    declared.map((viewCase) => viewCase.id),
-    RESPONSIVE_LAYOUT_CASE_IDS
-  );
+  assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
     assert.deepEqual(viewCase.position, { width: 1024, height: 860 });
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    RESPONSIVE_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, 960);
+    assert.equal(viewCase.expectLayout.expectedTracks ?? 1, 1, 'a stacked case is one track');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
+    // NO width bound: a full-width case is not asserting a breakpoint, and a default would
+    // silently bound it at the responsive cases' 960px.
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.expectedTracks, 2);
+    assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
   }
 });
 
@@ -631,7 +752,7 @@ test('a layout assertion helper change selects every case whose layout it valida
     true,
     'a helper-only change must require screenshot evidence'
   );
-  assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]), RESPONSIVE_LAYOUT_CASE_IDS);
+  assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]).sort(), [...LAYOUT_CASE_IDS].sort());
 });
 
 test('the capture runner threads and asserts declared layouts before taking a screenshot', () => {
