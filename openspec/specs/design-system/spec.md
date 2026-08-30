@@ -248,6 +248,40 @@ The commit action names the number of records it writes to.
 - **THEN** each entry offers add, remove and leave unchanged
 - **AND** entries left unchanged are not written to any selected record
 
+### Requirement: One requirement row serves both sides of a recipe
+
+The row that authors what a craft CONSUMES and the row that authors what it PRODUCES are one primitive, and the choice group built from them is one component.
+There is no "result" kind and no "ingredient" kind: the row does not name which side it is on.
+The CONTEXT the row is rendered in decides which kinds its select offers, and that is the only difference between the two sides.
+
+The kind vocabulary is closed:
+
+- `component` — both sides.
+- `currency` — both sides.
+- `activity` — a completed activity, both sides.
+- `knowledge` — recipe knowledge, RESULT only.
+- `tag` — INGREDIENT only.
+- `essence` — INGREDIENT only.
+
+`tag` and `essence` are ingredient-only because each describes a CLASS of thing to consume rather than a record, and a craft cannot produce a class.
+`knowledge` is result-only because knowing a recipe is something a craft grants and never something it consumes.
+
+Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
+`tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
+A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list; `tag` renders no subject cell, because the tag is the value itself.
+
+#### Scenario: The same authoring surface is used for results
+
+- **WHEN** the row is rendered in a result context
+- **THEN** its kind select offers component, currency, activity and knowledge
+- **AND** it offers neither tag nor essence
+
+#### Scenario: A reader scans a list of mixed requirement kinds
+
+- **WHEN** a step lists requirements of several kinds
+- **THEN** each row leads with its kind-tinted chip
+- **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
+
 ### Requirement: One blocking notice, and non-blocking notices stack
 
 A page MUST show at most one BLOCKING notice at a time, and a second blocking notice replaces the first.
