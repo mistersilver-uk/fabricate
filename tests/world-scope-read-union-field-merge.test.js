@@ -121,6 +121,85 @@ describe('the read union merges FIELD BY FIELD on an id collision', () => {
   });
 });
 
+describe('an unrecognised entityType is REFUSED, never defaulted', () => {
+  // THE THROW IS THE POINT, and it is new in this change. The DELETE half of the key rule reads
+  // its field list per entity type, and the retired spelling was `WORLD_IDENTITY_FIELDS[type] ??
+  // []` - which fails OPEN. A typo in one of the three call sites would delete nothing, leaving a
+  // stale world `name`, `icon` or `img` on a record the GM has since cleared, on every read, with
+  // every suite in the repository green: measured, two such typos kept 943 tests across 23 files
+  // passing. A key that silently disables a correctness rule has to be loud, and a documented
+  // contract with no test is how it stops being loud again.
+  const corpus = collidingCorpus(
+    { id: 'comp-1', name: 'Ash Salt', description: 'the snapshot blurb' },
+    { entityId: 'comp-1', systemId: 'sys-a', inherit: {} }
+  );
+  const call = (entityType) =>
+    unionScopedDefinitions({
+      corpus,
+      systemId: 'sys-a',
+      systemDefinitions: [{ id: 'comp-1', name: 'Ash Salt' }],
+      resolve: resolveComponent,
+      entityType,
+    });
+
+  it('throws when the entityType is OMITTED', () => {
+    assert.throws(() => call(undefined), {
+      name: 'TypeError',
+      message:
+        'unionScopedDefinitions: unknown entityType undefined; expected one of components, essences, tools',
+    });
+  });
+
+  it('throws when the entityType is MISSPELLED', () => {
+    assert.throws(() => call('widgets'), {
+      name: 'TypeError',
+      message:
+        'unionScopedDefinitions: unknown entityType "widgets"; expected one of components, essences, tools',
+    });
+    // The message names the accepted set, because the failure it exists to catch is a typo and the
+    // fix is always one of three literals.
+    assert.throws(() => call('essenceDefinitions'), /expected one of components, essences, tools/);
+  });
+
+  it('accepts each of the three, and DELETES against the right list for each', () => {
+    // Non-vacuity: if the throw fired for a legitimate value the arms above would pass anyway.
+    assert.equal('description' in call('components')[0], false);
+    assert.doesNotThrow(() =>
+      unionScopedDefinitions({
+        corpus: collidingCorpus({ id: 'fire' }, { entityId: 'fire', systemId: 'sys-a', inherit: {} }),
+        systemId: 'sys-a',
+        systemDefinitions: [{ id: 'fire' }],
+        resolve: resolveEssence,
+        entityType: 'essences',
+      })
+    );
+    assert.doesNotThrow(() =>
+      unionScopedDefinitions({
+        corpus: collidingCorpus({ id: 't1' }, { entityId: 't1', systemId: 'sys-a', inherit: {} }),
+        systemId: 'sys-a',
+        systemDefinitions: [{ id: 't1' }],
+        resolve: resolveTool,
+        entityType: 'tools',
+      })
+    );
+  });
+
+  it('does NOT throw on the blank-systemId path, which returns before the check', () => {
+    // A PRECISION FOOTNOTE, so a later reader does not widen the contract past what it says. The
+    // early return for a blank `systemId` answers the in-system rows before any field list is
+    // resolved. That is not a fail-open hole: with no system there is no membership, so no row
+    // merges and the DELETE half has nothing to disable.
+    const legacy = [{ id: 'comp-1', name: 'Ash Salt', description: 'kept' }];
+    const answer = unionScopedDefinitions({
+      corpus,
+      systemId: '   ',
+      systemDefinitions: legacy,
+      resolve: resolveComponent,
+    });
+    assert.deepEqual(answer, legacy);
+  });
+});
+
 describe('the two spread hazards are RETIRED while requirement 36 holds', () => {
   it('an authored EMPTY-STRING world description no longer overwrites a populated legacy one', () => {
     // RETIRED. It was defended as "an authored empty string is an authored value", and that is

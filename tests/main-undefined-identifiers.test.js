@@ -46,10 +46,11 @@
  * **NOTHING IS EXCLUDED, AND AN EARLIER FORM OF THIS FILE WAS WRONG TO EXCLUDE ANYTHING.** It
  * dropped the fourteen `*.svelte.js` rune modules on the claim that including them "would force
  * a suppression that would swallow a real one". That was assumed, not measured, and the
- * measurement refutes it: the 148 baseline reports come from THREE distinct names, and declaring
- * the seven rune names readonly in `eslint.config.js` - the technique `foundryGlobals` there
- * already uses, whose own comment notes that over-declaring a readonly global is harmless -
- * takes them to ZERO. The cost was eight global declarations, not a suppression.
+ * measurement refutes it: of the 148 baseline reports, 147 come from TWO rune names (`$state`
+ * 80, `$derived` 67) and the 148th is `saveDataToFile`, a deprecated Foundry global. Declaring
+ * the seven rune names in a block scoped to rune modules alone, and `saveDataToFile` alongside the
+ * other Foundry globals, takes them to ZERO. The cost was eight readonly declarations, not a
+ * suppression.
  *
  * That exclusion was the SAME DEFECT this file exists to catch, one level up: deleting an
  * imported name from `SvelteCraftingSystemManagerApp.svelte.js` while leaving its three call
@@ -115,6 +116,15 @@ async function undefinedIdentifiers(files) {
     .filter((result) => result.messages.some((m) => /File ignored/i.test(m.message ?? '')))
     .map((result) => posix(result.filePath).split('/src/').pop());
   assert.deepEqual(ignored, [], 'these files were IGNORED rather than linted, so they are unchecked');
+  // A PARSE FAILURE IS NOT A CLEAN FILE. ESLint reports one as `{ ruleId: null, fatal: true }`,
+  // which the `ruleId === 'no-undef'` filter below drops - so a file with broken syntax AND an
+  // undefined call read as clean, having been checked for nothing at all.
+  const fatal = results.flatMap((result) =>
+    result.messages
+      .filter((message) => message.fatal)
+      .map((message) => `${posix(result.filePath).split('/src/').pop()}: ${message.message}`)
+  );
+  assert.deepEqual(fatal, [], 'these files could not be parsed, so no rule ran over them');
   return results.flatMap((result) =>
     result.messages
       .filter((message) => message.ruleId === 'no-undef')
@@ -165,11 +175,38 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
     );
   });
 
+  it('has no-undef ENABLED for every file in the population, not merely linted', async () => {
+    // A SCOPED DISABLE IS THE REALISTIC WAY THIS GOES BLIND. `eslint.config.js` introduces rules
+    // staged by path, so a later lane meeting `src/ui/**` findings would reach for exactly
+    // `{ files: ['src/ui/**\/*.js'], rules: { 'no-undef': 'off' } }` - and every assertion in
+    // this file would stay green while the coverage it buys was erased. `results.length` still
+    // matches, nothing is 'File ignored', and a synthetic probe placed at `src/` root is outside
+    // the disabled subtree and so still reports.
+    //
+    // Asking the resolved config per file is what closes that, because it is the same question
+    // the linter asks, one layer earlier.
+    const eslint = new ESLint({ errorOnUnmatchedPattern: false });
+    const disabled = [];
+    for (const file of unlintedSources()) {
+      const config = await eslint.calculateConfigForFile(file);
+      const severity = config?.rules?.['no-undef'];
+      const level = Array.isArray(severity) ? severity[0] : severity;
+      if (level === 'off' || level === 0 || level === undefined) disabled.push(file);
+    }
+    assert.deepEqual(
+      disabled,
+      [],
+      'no-undef is OFF for these files, so they are in the population but checked by nothing'
+    );
+  });
+
   it('the rule really is armed — it reports a synthetic undefined identifier', async () => {
     // A "must print nothing" gate is worthless until you have watched it print something.
     const eslint = new ESLint({ errorOnUnmatchedPattern: false });
     const [result] = await eslint.lintText('export const a = () => definitelyNotDefined(1);\n', {
-      filePath: `${repoRoot}/src/__synthetic-no-undef-probe.js`,
+      // INSIDE the newly covered subtree, not at `src/` root: a probe at the root sits outside
+      // any `src/ui/**` scoped disable and would stay green while the population went unchecked.
+      filePath: `${repoRoot}/src/ui/svelte/stores/__synthetic-no-undef-probe.js`,
     });
     assert.deepEqual(
       result.messages.filter((message) => message.ruleId === 'no-undef').map((m) => m.message),

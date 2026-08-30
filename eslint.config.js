@@ -56,8 +56,9 @@ const foundryGlobals = {
 };
 
 // Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
-// identifiers and reports `no-undef` on every one - measured, 148 of them across the fourteen
-// rune modules, from three distinct names. Without declaring them the whole `.svelte.js` class -
+// identifiers and reports `no-undef` on every one - measured, 147 of them across the fourteen
+// rune modules, from TWO names (`$state` 80, `$derived` 67); the 148th report in that baseline
+// is `saveDataToFile` above, not a rune. Without declaring them the whole `.svelte.js` class -
 // including the 1577-line GM manager app and the base mixin of every V2 application - is
 // checked by NOTHING, which is the gap `tests/main-undefined-identifiers.test.js` exists to
 // close.
