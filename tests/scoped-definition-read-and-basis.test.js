@@ -389,6 +389,11 @@ describe('the READ union and the BASIS union', () => {
       components: [
         { id: 'legacy-only', name: 'Legacy Only', category: 'reagent' },
         { id: 'shared', name: 'Legacy Shared', category: 'general' },
+        // A member whose in-system record carries identity but authors no `category`, so the
+        // world default is still observable through it (issue 1370). It has to exist in the
+        // in-system array at all: the read union's ROW SET is that array's row set while
+        // `## CraftingSystem` requirement 36 holds.
+        { id: 'w-member', name: 'Legacy Member' },
       ],
     };
     return { manager, store, system };
@@ -402,6 +407,11 @@ describe('the READ union and the BASIS union', () => {
       read.map((entry) => entry.id).sort(),
       ['legacy-only', 'shared', 'w-member'],
       'membership-FILTERED: `w-stranger` is a member of sys-b, so sys-a never sees it'
+    );
+    assert.deepEqual(
+      read.map((entry) => entry.id),
+      system.components.map((entry) => entry.id),
+      'and the ROW SET and ORDER are the in-system array’s, not the world roster’s'
     );
 
     const { componentIds } = manager._scopeBasis(system);
@@ -430,12 +440,34 @@ describe('the READ union and the BASIS union', () => {
     assert.equal('enabled' in member, false, 'a component carries no enabled flag at all');
   });
 
-  it('lets the WORLD win on an id collision', () => {
+  it('lets the IN-SYSTEM record win an id collision while requirement 36 holds', () => {
+    // INVERTED at issue 1370. `1363` had the world entity win `name` and the resolved section win
+    // `category`, which reverts the GM's own edit: every shipped identity writer writes the
+    // in-system copy and nothing writes the world entity.
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).filter((e) => e.id === 'shared');
     assert.equal(shared.length, 1, 'one entry, not two');
-    assert.equal(shared[0].name, 'World Shared');
-    assert.equal(shared[0].category, 'ingot');
+    assert.equal(shared[0].name, 'Legacy Shared');
+    assert.equal(shared[0].category, 'general');
+    assert.equal(shared[0].member, true, 'and the membership facts the record cannot carry remain');
+  });
+
+  it('does not RESURRECT a world entity the in-system array no longer carries', () => {
+    // `_deleteComponentSet` removes the in-system record and leaves the world entity and its
+    // membership behind, so a row-set rule taken from the world roster would hand the component
+    // back beside the recipes that same delete disabled.
+    const { manager, system } = pairFixture();
+    system.components = system.components.filter((entry) => entry.id !== 'w-member');
+    advanceDefinitionRevision(system.components);
+    const read = manager.resolveScopedComponents(system);
+    assert.equal(
+      read.some((entry) => entry.id === 'w-member'),
+      false
+    );
+    assert.deepEqual(
+      read.map((entry) => entry.id),
+      ['legacy-only', 'shared']
+    );
   });
 
   it('answers the surviving legacy array alone when no world corpus exists', () => {
@@ -470,7 +502,11 @@ describe('the READ union and the BASIS union', () => {
         toolScopeStore: createToolScopeStore(seam),
       }
     );
-    const system = { id: SYSTEM_ID, essenceDefinitions: [], tools: [] };
+    const system = {
+      id: SYSTEM_ID,
+      essenceDefinitions: [{ id: 'w-ess', name: 'Legacy Essence' }],
+      tools: [{ id: 'w-tool', name: 'Legacy Tool' }],
+    };
     const [essence] = manager.resolveScopedEssences(system);
     assert.equal(essence.macro, 'Macro.world');
     assert.equal(essence.enabled, true, 'a record that authored none defaults to on');
@@ -498,7 +534,13 @@ describe('the resolved-union memo', () => {
       { getRecipes: () => [] },
       { componentScopeStore: store }
     );
-    const system = { id: 'sys-a', components: [{ id: 'l1', name: 'Legacy Before' }] };
+    const system = {
+      id: 'sys-a',
+      components: [
+        { id: 'l1', name: 'Legacy Before' },
+        { id: 'w1', name: 'System W1' },
+      ],
+    };
     return { manager, store, system };
   }
 
@@ -510,8 +552,11 @@ describe('the resolved-union memo', () => {
   // Asserted on CONTENT rather than on index-build counts, because a caching bug that skips a
   // rebuild looks like an IMPROVEMENT to a count-based assertion while serving wrong data.
   it('is invalidated by a WORLD-scope edit', async () => {
+    // Asserted on `category` rather than on `name`: `name` is a LIFTED IDENTITY field, so the
+    // in-system record decides it outright while requirement 36 holds, and a world edit to it is
+    // (correctly) invisible. `category` is resolved behaviour and is the world half's to move.
     const { manager, store, system } = memoFixture();
-    assert.equal(manager.resolveScopedComponents(system).find((e) => e.id === 'w1').name, 'Before');
+    assert.equal(manager.resolveScopedComponents(system).find((e) => e.id === 'w1').category, 'ore');
 
     await store.save({
       entities: [{ id: 'w1', name: 'After' }],
@@ -520,7 +565,7 @@ describe('the resolved-union memo', () => {
     });
 
     const resolved = manager.resolveScopedComponents(system).find((e) => e.id === 'w1');
-    assert.equal(resolved.name, 'After');
+    assert.equal(resolved.name, 'System W1', 'the in-system identity is unmoved by a world edit');
     assert.equal(resolved.category, 'ingot');
   });
 

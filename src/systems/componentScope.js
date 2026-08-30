@@ -271,5 +271,6 @@ export function resolveComponentScope(worldCorpus, systemId, systemComponents) {
     systemId,
     systemDefinitions: systemComponents,
     resolve: resolveComponent,
+    entityType: 'components',
   });
 }

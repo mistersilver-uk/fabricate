@@ -271,5 +271,6 @@ export function resolveToolScope(worldCorpus, systemId, systemTools) {
     systemId,
     systemDefinitions: systemTools,
     resolve: resolveTool,
+    entityType: 'tools',
   });
 }

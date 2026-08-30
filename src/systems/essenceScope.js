@@ -132,5 +132,6 @@ export function resolveEssenceScope(worldCorpus, systemId, systemEssences) {
     systemId,
     systemDefinitions: systemEssences,
     resolve: resolveEssence,
+    entityType: 'essences',
   });
 }

@@ -1,9 +1,20 @@
 /**
- * THE NO-SHED GUARANTEE, AS A GATE (issue 1363, criterion 7).
+ * THE NO-SHED GUARANTEE, AS A GATE (issue 1363, criterion 7; third test REPLACED at issue 1370).
  *
  * The triad's unanimous ruling is that `1.30.0` DEFERS the shed: every lifted field still has live
  * production readers, and shedding `Component.name` while they read it blanks every screen in the
  * world on the first save, permanently, because `_normalizeSystem` is an allowlist rebuild.
+ *
+ * ## THREE CLOCKS, AND ONLY ONE OF THEM HAS RUN
+ *
+ * PR 8a runs the READ ENTRY clock: production readers now enter through the read union, so the
+ * third test's original claim - "no production reader anywhere under src is repointed" - is what
+ * that PR exists to make false. It is REPLACED below rather than deleted, by a gate on WHERE the
+ * union may be entered from. The AUTHORITY clock has NOT run: `## CraftingSystem` requirement 36
+ * keeps the in-system arrays authoritative, and the union answers every key, every row and the row
+ * order from them. The SHED clock has NOT run either, and the second test below is still the whole
+ * of that guarantee - a repointed reader does not shed a field, and `_normalizeSystem` must keep
+ * emitting all three arrays with every lifted identity field verbatim.
  *
  * AN EARLIER FORM OF THIS GUARANTEE WAS VACUOUS FOUR WAYS, and each is fixed here:
  *
@@ -169,28 +180,62 @@ test('_normalizeSystem still EMITS components, essenceDefinitions and tools, wit
 // 3. The recursive walk, rooted at `src/` alone
 // ---------------------------------------------------------------------------
 
-test('no production reader anywhere under src is repointed at a scoped read union', () => {
-  const offenders = [];
+/** The manager method a line belongs to, by the one-method-per-two-space-indent convention. */
+function enclosingMethod(lines, index) {
+  for (let cursor = index; cursor >= 0; cursor -= 1) {
+    const declaration = /^ {2}(?:static )?(?:async )?([A-Za-z_][\w$]*)\(/.exec(lines[cursor]);
+    if (declaration) return declaration[1];
+  }
+  return null;
+}
+
+/** Every non-definition call of one of the six union names, as `file :: enclosing method`. */
+function unionCallSites() {
+  const sites = [];
   for (const full of everySourceFile()) {
     const rel = toPosix(relativePath(ROOT, full));
-    // Comments are BLANKED before the scan, never filtered after it: five matches under `src/`
+    // Comments are BLANKED before the scan, never filtered after it: several matches under `src/`
     // are comment text, and a trailing-comment filter cannot see a marker that is not at the
     // start of the line.
     const lines = stripComments(readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, index) => {
-      if (!CALL.test(line)) return;
-      if (DEFINITION.test(line)) return;
-      // The manager's three read-union methods DELEGATE to the module functions; the marker is
-      // tested on the matching line or the one before, because prettier wraps the arrow.
+      if (!CALL.test(line) || DEFINITION.test(line)) return;
       if (CALL_SITE_MARKER.test(line) || CALL_SITE_MARKER.test(lines[index - 1] ?? '')) return;
-      offenders.push(`${rel}:${index + 1} ${line.trim()}`);
+      sites.push(`${rel} :: ${enclosingMethod(lines, index)}`);
     });
   }
-  assert.deepEqual(
-    offenders,
-    [],
-    'the consumer sweep (epic 1357, PR 8) is what repoints readers at the read union. Doing it ' +
-      'here would blank every screen in the world on the first save, permanently'
+  return [...new Set(sites)].sort();
+}
+
+test('the read union is entered from EXACTLY the manager read accessors', () => {
+  // REPLACES issue 1363's "no production reader is repointed". PR 8a repoints the reader set, and
+  // it does so through ONE door: `scopedEntityReads.js` for the readers that hold a system record,
+  // and these four manager accessors for the readers that hold a manager. A fifth entry point
+  // appearing here means some path is building its own union instead of sharing the memoized one.
+  assert.deepEqual(unionCallSites(), [
+    'src/systems/CraftingSystemManager.js :: getComponentsForSystem',
+    'src/systems/CraftingSystemManager.js :: getEssenceDefinition',
+    'src/systems/CraftingSystemManager.js :: getEssenceDefinitions',
+    'src/systems/CraftingSystemManager.js :: getToolsForSystem',
+  ]);
+});
+
+test('that call-site scan is NOT vacuous - it reds when a repoint is reverted', () => {
+  // The list above is also what a scan matching nothing would produce if it were empty, so the
+  // scan is proved against a synthetic repoint and its reverted twin rather than trusted.
+  const repointed = [
+    '  getComponentsForSystem(systemId) {',
+    '    return this.resolveScopedComponents(this.getSystem(systemId));',
+    '  }',
+  ];
+  const matched = repointed.filter((line) => CALL.test(line) && !DEFINITION.test(line));
+  assert.equal(matched.length, 1, 'the premise: a delegating call really is matchable');
+  assert.equal(enclosingMethod(repointed, 1), 'getComponentsForSystem');
+  const reverted = '    return Array.isArray(system?.components) ? system.components : [];';
+  assert.equal(
+    CALL.test(reverted),
+    false,
+    'and a REVERTED repoint stops matching, so the list above would lose an entry'
   );
 });
 
