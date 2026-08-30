@@ -366,8 +366,12 @@ function _toolBreakageAuthoritySource(worldToolBreakage, systemToolBreakage) {
  * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
  *
  * `worldToolBreakage` is the world scope's `toolBreakage` block, passed EXPLICITLY by the
- * caller (issue 1374) rather than probed from a Foundry global here: this module is a leaf
- * under `stores/`, and `adminStore`'s whole neighbourhood reads no `game.*` at all.
+ * caller (issue 1374) rather than probed from a Foundry global here. The reason is the CALLER's
+ * rather than this module's: `adminStore.js` holds no executable `game.*` at all — all eight
+ * occurrences are comments and five of them promise it stays that way — so a probe reached from
+ * its refresh path would have been the first. This module is not itself `game.*`-free, and the
+ * one probe it does hold (`globalThis.game?.actors`, for the learned-knowledge index) is
+ * documented where it happens.
  */
 export function buildSelectedSystemViewData(
   selectedSystem,

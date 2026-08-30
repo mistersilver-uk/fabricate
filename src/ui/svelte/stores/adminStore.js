@@ -4632,8 +4632,8 @@ export function createAdminStore(services) {
       // passed EXPLICITLY (issue 1374). The projection resolves the effective authority from
       // it, so the manager surfaces that draw or gate on the authority stop re-defaulting the
       // system's own token. It is threaded rather than probed through a lazy global read
-      // because every `game.*` occurrence in this module is a comment, three of which promise
-      // it stays that way.
+      // because all eight `game.*` occurrences in this module are comments, five of which
+      // promise it stays that way.
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,

@@ -19,8 +19,10 @@
  * `### GM World Scoped Entity Routes` requirement 7 closes to the lane that builds it. The fifth
  * IS the projection the other four read, so the manager's selected-system projection
  * (`adminSystemInspectorProjection.js`) calls the pure resolver directly, with the world block
- * passed to it EXPLICITLY by `adminStore` rather than probed — every `game.*` occurrence in that
- * module is a comment, and three of them promise it stays that way. Publishing the resolved
+ * passed to it EXPLICITLY by `adminStore` rather than probed. That is `adminStore`'s constraint
+ * rather than the projection's — all eight `game.*` occurrences in `adminStore.js` are comments
+ * and five of them promise it stays that way, while the projection does hold one real probe, for
+ * the learned-knowledge actor index. A probe here would have been the store's first. Publishing
  * value there routes all five manager surfaces at once and keeps the reader count from growing
  * with the screens. A manager surface that re-defaults locally is therefore a DEFECT rather than
  * a duplicate of this seam, and `tests/world-scope-tool-breakage-authority.test.js` gates it.
