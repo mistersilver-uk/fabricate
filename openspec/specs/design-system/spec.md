@@ -346,35 +346,46 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 
 ### Requirement: Simple and alchemy carry a reserved failure group
 
-`simple` and alchemy-simple do not route: one ingredient set, one success result group, and nothing to assign.
+`simple` and alchemy-simple do not route: one ingredient set, one success result set, and nothing to assign.
 They MAY carry a second group selected BY ROLE — the results a failed check awards — and that group is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
 
 A role-selected group carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
 Validation counts only the non-failure group toward the exactly-one-success-group rule, so carrying a failure group never makes a simple recipe invalid.
 
-A result group name MUST NOT be a reserved failure keyword, because the routed modes match an outcome against those words and a group borrowing one would be selected by the failure path rather than by its tier.
+A result set name MUST NOT be a reserved failure keyword, because the routed modes match an outcome against those words and a group borrowing one would be selected by the failure path rather than by its tier.
 `progressive` has no reserved failure group at all.
 
 #### Scenario: A GM allows results on a failed craft
 
 - **WHEN** a simple or alchemy recipe is set to award results on failure
-- **THEN** a second result group appears, marked as filled by role rather than by assignment
+- **THEN** a second result set appears, marked as filled by role rather than by assignment
 - **AND** it offers no source list, because nothing routes to it
 
 ### Requirement: Sets and groups are the container layer above the row
 
-An INGREDIENT SET holds what a craft consumes and a RESULT GROUP holds what it produces.
-Both are containers for the same requirement rows and the same choice groups, and the authoring surface MUST render them as the same shape so that the two sides of a recipe read as one model.
+A SET is the parent container: an INGREDIENT SET holds what a craft consumes and a RESULT SET holds what it produces.
+
+The vocabulary is stated because the model and the interface differ, and the difference has already produced drift.
+`DOMAIN.md` names the parent on the ingredient side an **Ingredient Set** and the OR-alternative bundle inside it an **Ingredient Group**, so on that side `group` is the CHILD level.
+The result-side parent carries the model identifier `ResultGroup`, which reuses `group` at the PARENT level and is the source of the confusion.
+The interface therefore says **result set** for the parent, matching its ingredient-side twin, and reserves **choice group** for the OR-alternative bundle on either side.
+User-facing strings already use both terms today; unifying them is recorded as a migration.
+The persisted identifier is out of scope for this capability and does not change.
+Both hold the SAME TWO ELEMENTS — picker rows and choice groups — and the authoring surface MUST render them as the same shape so the two sides of a recipe read as one model.
+There is no separate result row: what differs between the two sets is the ROLE the set carries, which restricts the kinds a row may offer, and nothing else about the row changes.
+
+A set MUST be renameable in the surface that shows it, because every other surface refers to a set by its name — a routing select, a validation message, a tier assignment.
+A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
 Where the two documents are read together, they name one thing.
 A choice group is valid in BOTH containers and means something different in each, which the surface MUST make legible.
 In an ingredient set it is the crafter deciding what to spend.
-In a result group it is the player choosing which reward to take.
+In a result set it is the player choosing which reward to take.
 A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
 
-The ROUTED modes select exactly one result group per craft attempt, which is what makes the group and not the individual result row their unit of routing.
-That is a property of those modes and not of the model: `progressive` awards EVERY result group whose difficulty threshold the roll meets or exceeds, which is the stated distinction between it and the routed modes.
+The ROUTED modes select exactly one result set per craft attempt, which is what makes the group and not the individual result row their unit of routing.
+That is a property of those modes and not of the model: `progressive` awards EVERY result set whose difficulty threshold the roll meets or exceeds, which is the stated distinction between it and the routed modes.
 A surface that assumes single selection everywhere renders progressive wrongly.
 
 Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
@@ -382,7 +393,7 @@ A set MUST NOT name more than one group: the engine would have no basis to choos
 Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
 Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
 
-A result group is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
+A result set is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
 Wherever a group appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
 Assignment is possible from EITHER end — the set or tier names its group, or the group takes a source — because a GM arrives at the relation from both directions.
 
@@ -398,7 +409,7 @@ The routing surface MUST surface two authoring hazards rather than leaving them 
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
 A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
 
-The mapping is authored ON the thing that routes — the ingredient set, or the outcome tier — as a select naming its result group, so the whole routing reads as one column rather than as a field buried inside each set’s own editor.
+The mapping is authored ON the thing that routes — the ingredient set, or the outcome tier — as a select naming its result set, so the whole routing reads as one column rather than as a field buried inside each set’s own editor.
 Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
 Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves elsewhere.
 
@@ -406,26 +417,26 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 #### Scenario: A recipe offers the player a choice of reward
 
-- **WHEN** a GM authors alternatives inside a result group
+- **WHEN** a GM authors alternatives inside a result set
 - **THEN** the group renders the same choice group used on the ingredient side
 - **AND** the player picks one of those alternatives when the craft resolves
 
-#### Scenario: A GM opens a result group two tiers share
+#### Scenario: A GM opens a result set two tiers share
 
-- **WHEN** a GM opens a result group that two outcome tiers route to
+- **WHEN** a GM opens a result set that two outcome tiers route to
 - **THEN** the group names both tiers as its sources
 - **AND** each of those tiers states that its target is shared
 
-#### Scenario: A result group has no inbound route
+#### Scenario: A result set has no inbound route
 
-- **WHEN** a result group is named by no ingredient set and no outcome tier
+- **WHEN** a result set is named by no ingredient set and no outcome tier
 - **THEN** the group states that it is unreachable, in place
 - **AND** it offers the action that routes something to it
 
 #### Scenario: Two outcome tiers award the same thing
 
 - **WHEN** two check outcome tiers should produce the same reward
-- **THEN** both tiers name the same result group
+- **THEN** both tiers name the same result set
 - **AND** the group is not duplicated to serve them
 
 ### Requirement: Every select renders the app’s own option list
