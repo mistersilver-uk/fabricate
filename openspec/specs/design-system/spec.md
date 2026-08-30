@@ -281,6 +281,10 @@ The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather th
 A unit renders to the RIGHT of the stepper it qualifies and never beneath the value’s name.
 A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
 
+A RESULT amount is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
+The rolled form is the shared expression control — dice plus optional actor data paths — showing the value resolved against the previewed actor, or stating that it does not reduce to a number.
+The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
+
 A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
 The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
 When a value is picked the search is replaced by the subject cell at its fixed width, so the row stops moving once it is complete.
@@ -311,6 +315,41 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **WHEN** a step lists requirements of several kinds
 - **THEN** each row leads with its kind-tinted chip
 - **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
+
+### Requirement: Sets and groups are the container layer above the row
+
+An INGREDIENT SET holds what a craft consumes and a RESULT GROUP holds what it produces.
+Both are containers for the same requirement rows and the same choice groups, and the authoring surface MUST render them as the same shape so that the two sides of a recipe read as one model.
+
+A choice group is valid in BOTH containers and means something different in each, which the surface MUST make legible.
+In an ingredient set it is the crafter deciding what to spend.
+In a result group it is the player choosing which reward to take.
+A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
+
+Exactly ONE result group is produced per craft attempt in every mode, so the result group and not the individual result row is the unit of routing.
+
+Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
+A set MUST NOT name more than one group: the engine would have no basis to choose between them.
+Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
+Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
+
+The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
+A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
+A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
+
+A mode change that would reduce the permitted cardinality MUST state what it will delete before the switch rather than reporting it afterwards.
+
+#### Scenario: A recipe offers the player a choice of reward
+
+- **WHEN** a GM authors alternatives inside a result group
+- **THEN** the group renders the same choice group used on the ingredient side
+- **AND** the player picks one of those alternatives when the craft resolves
+
+#### Scenario: Two outcome tiers award the same thing
+
+- **WHEN** two check outcome tiers should produce the same reward
+- **THEN** both tiers name the same result group
+- **AND** the group is not duplicated to serve them
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 
