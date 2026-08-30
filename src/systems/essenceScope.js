@@ -9,11 +9,13 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The essence half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * `## EssenceDefinition` describes the shipped per-system shape and stays authoritative until
- * the CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration
+ * `## EssenceDefinition` describes the shipped per-system shape and stays authoritative while `## CraftingSystem` requirement 36 holds. Issue 1370
+ * repointed every non-UI reader at the read union, and READING IS NOT AUTHORITY: while that
+ * requirement holds the in-system record decides every key it carries, the row order and the
+ * row set, so the arrays did not lose authority when the readers moved. The `1.30.0` world-scope migration
  * (PR 3) seeds the world corpus this module reads and writes one fully-overriding membership
- * record per essence; `essenceDefinitions` is the one of the three arrays the sweep can retire in
- * full, and it is not retired here.
+ * record per essence; `essenceDefinitions` is the one of the three arrays that
+ * requirement 36's OWN RETIREMENT can retire in full, and it is not retired here.
  *
  * TWO INDEPENDENT INHERIT SWITCHES, over `effectSource` and `macro`. They are two sections rather
  * than one because a system may reasonably take the world's active-effect source and author its

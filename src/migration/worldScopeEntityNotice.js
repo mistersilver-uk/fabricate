@@ -198,8 +198,13 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
  * viewport and swallows pointer events over the canvas and the sidebar for five seconds, and the
  * GM cannot clear the underlying drift because no world scoped-entity editor exists yet.
  *
- * NOTHING IS LOST BY CAPPING. `ui.notifications.info` defaults `console: true`, so the composed
- * message already reaches the console, and the count and field total stay exact in the sentence.
+ * NOTHING IS LOST BY CAPPING, BUT ONLY BECAUSE FABRICATE LOGS THE FULL LIST ITSELF. An earlier
+ * form of this note reasoned that `ui.notifications.info` defaults `console: true` and therefore
+ * the whole enumeration reached the console anyway. THAT IS FALSE: core logs `el.textContent`,
+ * which is the message it was handed - the CAPPED one - so the withheld records would have been
+ * unrecoverable from a running client. {@link describeWorldIdentityDrift} is the uncapped list,
+ * and the call site logs it BEFORE the toast. The count and field total stay exact in the sentence
+ * either way.
  * The cap is on the ENUMERATION only - the notice still NAMES records rather than counting them,
  * because a bare count tells a GM something is stale and gives them no way to find it.
  */
@@ -232,7 +237,7 @@ const IDENTITY_DRIFT_NOTICE_RECORD_CAP = 5;
  * @param {(key: string, data?: object) => string|undefined} localize
  * @returns {string} the message, or `''` when there is nothing to say.
  */
-export function buildWorldIdentityDriftNotice(driftEntries, localize) {
+function groupWorldIdentityDrift(driftEntries) {
   const byRecord = new Map();
   let fieldCount = 0;
   for (const entry of arrayOf(driftEntries)) {
@@ -252,16 +257,36 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
       fieldCount += 1;
     }
   }
-  if (byRecord.size === 0) return '';
-  const records = [...byRecord.values()];
+  return { records: [...byRecord.values()], fieldCount };
+}
+
+/** One drifted record, as the toast and the console both name it. */
+function describeDriftRecord(record) {
+  return `${record.entityId} (${record.entityType}: ${record.fields.join(', ')}) in ${record.systemId}`;
+}
+
+/**
+ * EVERY drifted record, uncapped - the list the notice's own copy points the GM at.
+ *
+ * THE NOTIFICATION CANNOT PROVIDE THIS. `ui.notifications.info` defaults `console: true`, but what
+ * core logs is `el.textContent` - the message it was HANDED, which is the CAPPED one. So a notice
+ * that says "the full list is in the console" is false unless Fabricate logs the full list itself,
+ * which is what this exists for. Verified against V14.365.0.
+ *
+ * @param {Array<{systemId: string, entityType: string, entityId: string, field: string}>}
+ *   driftEntries The detector's report.
+ * @returns {string} the full enumeration, or `''` when there is nothing to say.
+ */
+export function describeWorldIdentityDrift(driftEntries) {
+  return groupWorldIdentityDrift(driftEntries).records.map(describeDriftRecord).join('; ');
+}
+
+export function buildWorldIdentityDriftNotice(driftEntries, localize) {
+  const { records, fieldCount } = groupWorldIdentityDrift(driftEntries);
+  if (records.length === 0) return '';
   const shown = records.slice(0, IDENTITY_DRIFT_NOTICE_RECORD_CAP);
   const withheld = records.length - shown.length;
-  let named = shown
-    .map(
-      (record) =>
-        `${record.entityId} (${record.entityType}: ${record.fields.join(', ')}) in ${record.systemId}`
-    )
-    .join('; ');
+  let named = shown.map(describeDriftRecord).join('; ');
   if (withheld > 0) {
     named += ` ${localizeWith(
       localize,
@@ -273,7 +298,7 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
   return localizeWith(
     localize,
     'FABRICATE.Migration.WorldScopeEntities.IdentityDrift',
-    { records: byRecord.size, fields: fieldCount, entities: named },
-    `Fabricate's world catalogue snapshot is out of date for ${byRecord.size} record(s) across ${fieldCount} field(s): ${named}. Each crafting system's own copy is what every reader answers from, so nothing is wrong and nothing has been changed - this is identity only (names, images, descriptions and source links), not behaviour.`
+    { records: records.length, fields: fieldCount, entities: named },
+    `Fabricate's world catalogue snapshot is out of date for ${records.length} record(s) across ${fieldCount} field(s): ${named}. Each crafting system's own copy is what every reader answers from, so nothing is wrong and nothing has been changed - this is identity only (names, images, descriptions and source links), not behaviour.`
   );
 }

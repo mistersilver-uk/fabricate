@@ -127,6 +127,15 @@ const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
  * @param {object|(() => object|null)|null|undefined} seam
  * @returns {object|null}
  */
+function _resolveStoreSeam(seam) {
+  if (!seam) return null;
+  try {
+    return typeof seam === 'function' ? (seam() ?? null) : seam;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * One scope store's published corpus, or `null` when there is no readable world half.
  *
@@ -142,15 +151,6 @@ const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
 function _resolveStoreCorpus(seam) {
   try {
     return _resolveStoreSeam(seam)?.corpus?.() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function _resolveStoreSeam(seam) {
-  if (!seam) return null;
-  try {
-    return typeof seam === 'function' ? (seam() ?? null) : seam;
   } catch {
     return null;
   }

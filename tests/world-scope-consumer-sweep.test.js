@@ -34,7 +34,10 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { getMatchHandler } from '../src/models/match/matchTypes.js';
-import { buildWorldIdentityDriftNotice } from '../src/migration/worldScopeEntityNotice.js';
+import {
+  buildWorldIdentityDriftNotice,
+  describeWorldIdentityDrift,
+} from '../src/migration/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 import {
   resolvedComponentsFor,
@@ -49,6 +52,9 @@ import {
 } from './helpers/worldScopeCorpus.js';
 
 installFoundryStubs();
+
+/** `src/main.js` statically imports CSS and cannot load under `node --test`. */
+const MAIN_SOURCE = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 const SYSTEM_ID = 'sys-a';
@@ -685,7 +691,11 @@ describe('the world identity drift report', () => {
     // A notification is not a report surface: core's `.notification` has no `max-height` and no
     // `overflow` and carries `pointer-events: all`, so an uncapped join over a bulk edit to a
     // 200-component library overflows the viewport and swallows pointer events for five seconds.
-    // `ui.notifications.info` defaults `console: true`, so the full list still reaches the console.
+    //
+    // NOT "the full list still reaches the console because `notify` defaults `console: true`".
+    // It does default that, and what it logs is the notification's own `textContent` - the CAPPED
+    // message. The full list reaches the console only because `describeWorldIdentityDrift` exists
+    // and `src/main.js` logs it, which the two arms below pin.
     const drift = [];
     for (let index = 0; index < 12; index += 1) {
       drift.push({
@@ -703,6 +713,39 @@ describe('the world identity drift report', () => {
     assert.equal(message.includes('comp-4'), true, 'the first five records are NAMED');
     assert.equal(message.includes('comp-5'), false, 'the sixth is not');
     assert.ok(message.length < 1000, `the toast stays bounded; got ${message.length} characters`);
+  });
+
+  it('hands the UNCAPPED list to the console dump the toast points at', () => {
+    // The copy says "the full list is in the console". This is the half that makes it true.
+    const drift = [];
+    for (let index = 0; index < 12; index += 1) {
+      drift.push({
+        systemId: SYSTEM_ID,
+        entityType: 'components',
+        entityId: `comp-${index}`,
+        field: 'name',
+      });
+    }
+
+    const detail = describeWorldIdentityDrift(drift);
+
+    assert.equal(detail.split('; ').length, 12, 'every record, uncapped');
+    for (let index = 0; index < 12; index += 1) {
+      assert.ok(detail.includes(`comp-${index}`), `comp-${index} must be named`);
+    }
+    assert.equal(describeWorldIdentityDrift([]), '', 'and nothing to say when there is no drift');
+  });
+
+  it('LOGS that list in src/main.js, before the toast and from Fabricate’s own call', () => {
+    // Core logs the notification's `textContent`, so a dump has to be Fabricate's own call or the
+    // withheld records never reach the console at all. `src/main.js` is not executable by a unit
+    // test, so this is a source-order assertion, the same idiom the audit's siting uses.
+    const dump = MAIN_SOURCE.indexOf('describeWorldIdentityDrift(worldIdentityDrift)');
+    const dispatch = MAIN_SOURCE.indexOf('ui.notifications?.info?.(driftNotice)');
+    assert.notEqual(dump, -1, 'src/main.js must compose the uncapped list');
+    assert.ok(dump < dispatch, 'and log it BEFORE the toast that points at it');
+    const between = MAIN_SOURCE.slice(dump, dispatch);
+    assert.match(between, /console\.(?:debug|info|log)\(/, 'through a console call of its own');
   });
 
   it('says nothing at all when there is no drift', () => {

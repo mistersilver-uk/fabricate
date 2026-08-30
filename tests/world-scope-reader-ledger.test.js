@@ -81,7 +81,9 @@ import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js
  * The bracket form is the one place a receiver IS required, and only to tell
  * `system['components']` from an ARRAY LITERAL. Measured: without the receiver the pattern also
  * matches `domainsForSystemFields(['components'])` and `Object.freeze(['components', …])`,
- * adding eleven false sites across three files. The receiver must abut the bracket, because
+ * adding eleven false sites across FIVE files — `repairItemData.js`, `settingChangeBridge.js`,
+ * `CraftingSystemManager.js`, `importReferenceResolver.js` and `worldIdentityDrift.js`, three of
+ * which the scan does not otherwise reach at all. The receiver must abut the bracket, because
  * `of ['components', …]` puts a word character before a SPACE and a bracket. Adding this form
  * moved no total: 162 / 146 / 19 / 118 / 17 / 45 before and after.
  */

@@ -31,8 +31,9 @@
  *
  * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME
  *
- * PR 8a - the READ repointing half of the split consumer sweep - must run this detector before repointing any reader, and must REPORT every divergence
- * rather than silently resolve it. These are the writers that make divergence reachable:
+ * Issue 1370 repointed the readers and wired this detector into `initialize()`, where it REPORTS
+ * every divergence rather than silently resolving it. These are the writers that make divergence
+ * reachable, and the list is kept because they are what keeps it reachable SESSION AFTER SESSION:
  *
  *   - `CraftingSystemManager#createItem`
  *   - `CraftingSystemManager#addItemFromUuid`

@@ -129,7 +129,7 @@ import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityR
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
+import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1146,6 +1146,15 @@ class Fabricate {
         essences: this.essenceScopeStore.corpus(),
         tools: this.toolScopeStore.corpus()
       });
+      // THE FULL LEDGER GOES TO THE CONSOLE, AND FABRICATE HAS TO PUT IT THERE ITSELF.
+      // `ui.notifications.info` defaults `console: true`, but what core logs is the
+      // notification element's own `textContent` - i.e. the CAPPED message it was handed. So
+      // the toast's "the full list is in the console" clause is only true because of this
+      // line; without it a GM with 200 drifted components opens the console and finds the
+      // same truncated sentence, with the withheld records unrecoverable from a running
+      // client. Verified against V14.365.0.
+      const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
+      if (driftDetail) console.debug(`Fabricate | world identity drift: ${driftDetail}`);
       const driftNotice = buildWorldIdentityDriftNotice(worldIdentityDrift, (key, data) =>
         data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
       );

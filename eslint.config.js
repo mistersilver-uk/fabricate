@@ -50,6 +50,26 @@ const foundryGlobals = {
   jQuery: 'readonly',
   $: 'readonly',
   socketlib: 'readonly',
+  // Deprecated but still reachable, and reached under a `typeof` guard in the manager app's
+  // export path. Declaring it is exactly what this map is for.
+  saveDataToFile: 'readonly',
+};
+
+// Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
+// identifiers and reports `no-undef` on every one - measured, 148 of them across the fourteen
+// rune modules, from three distinct names. Declaring them readonly is the same technique and
+// the same trade as `foundryGlobals` above: over-declaring a readonly global is harmless, and
+// under-declaring costs a real check. Without this the whole `.svelte.js` class - including the
+// 1577-line GM manager app and the base mixin of every V2 application - is checked by NOTHING,
+// which is the gap `tests/main-undefined-identifiers.test.js` exists to close.
+const svelteRuneGlobals = {
+  $state: 'readonly',
+  $derived: 'readonly',
+  $effect: 'readonly',
+  $props: 'readonly',
+  $bindable: 'readonly',
+  $inspect: 'readonly',
+  $host: 'readonly',
 };
 
 export default [
@@ -217,7 +237,7 @@ export default [
   {
     files: ['src/**/*.js', 'main.js'],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals },
+      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
     },
   },
 
@@ -339,7 +359,7 @@ export default [
       'scripts/foundry-perf-run.mjs',
     ],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals },
+      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
     },
   },
 
@@ -349,7 +369,7 @@ export default [
   {
     files: ['tests/**/*.js'],
     languageOptions: {
-      globals: { ...globals.node, ...globals.browser, ...foundryGlobals },
+      globals: { ...globals.node, ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
@@ -424,7 +444,7 @@ export default [
     // drop it with no test announcing the loss.
     linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals },
+      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
     },
     rules: {
       'no-unused-vars': [

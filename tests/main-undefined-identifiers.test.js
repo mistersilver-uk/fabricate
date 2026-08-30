@@ -16,6 +16,14 @@
  *     succeeded and `dist/main.js` shipped the bare names while every binding beside them was
  *     mangled.
  *
+ * **HOW TO CHECK THE BUNDLE, AND ONE WAY NOT TO.** The absence of the bare names in `dist/` is
+ * necessary but not sufficient — a module that was tree-shaken away is also absent. Proving the
+ * module is PRESENT by grepping for a property-name string it uses only works if that string is
+ * UNIQUE to it: `getComponentScopeStore` appears four times in `dist/main.js` and not one of
+ * them is this seam's dispatch table, so that check proves nothing. Use the region marker the
+ * bundler emits — `//#region src/systems/scopedEntityReads.js`, in the shared chunk rather than
+ * in `dist/main.js` — or the source map's `sources`.
+ *
  * Module code is strict, so each site was a hard `ReferenceError` the moment its enclosing
  * function ran — reachable from the Alchemy craft button, the Run Journal, and three published
  * companion API members.
@@ -35,9 +43,20 @@
  * silent direction: a file dropped from CI's glob and absent from a hand-written list here is
  * checked by nothing at all.
  *
- * `*.svelte.js` rune modules are excluded, with a measured reason: they carry 148 pre-existing
- * `no-undef` reports because `$state`, `$derived` and `$effect` are compiler-provided and ESLint
- * cannot see them. Including them would force a suppression that would swallow a real one.
+ * **NOTHING IS EXCLUDED, AND AN EARLIER FORM OF THIS FILE WAS WRONG TO EXCLUDE ANYTHING.** It
+ * dropped the fourteen `*.svelte.js` rune modules on the claim that including them "would force
+ * a suppression that would swallow a real one". That was assumed, not measured, and the
+ * measurement refutes it: the 148 baseline reports come from THREE distinct names, and declaring
+ * the seven rune names readonly in `eslint.config.js` - the technique `foundryGlobals` there
+ * already uses, whose own comment notes that over-declaring a readonly global is harmless -
+ * takes them to ZERO. The cost was eight global declarations, not a suppression.
+ *
+ * That exclusion was the SAME DEFECT this file exists to catch, one level up: deleting an
+ * imported name from `SvelteCraftingSystemManagerApp.svelte.js` while leaving its three call
+ * sites intact produced three hard `ReferenceError`s in the 1577-line GM manager app, with this
+ * guard, `lint`, `lint:svelte`, `build` and all 454 referencing tests green. The excluded set
+ * also held `SvelteApplicationMixin.svelte.js`, the base of every V2 application, which no test
+ * references at all.
  */
 
 import assert from 'node:assert/strict';
@@ -75,8 +94,6 @@ function unlintedSources() {
   return Object.keys(collectSources(repoRoot + '/src', { extensions: ['.js'] }))
     .filter((file) => !prefixes.some((prefix) => file.startsWith(prefix)))
     .filter((file) => !files.has(file))
-    // See the module note: rune modules carry compiler-provided globals ESLint cannot see.
-    .filter((file) => !file.endsWith('.svelte.js'))
     .sort();
 }
 
@@ -86,6 +103,18 @@ function unlintedSources() {
 async function undefinedIdentifiers(files) {
   const eslint = new ESLint({ errorOnUnmatchedPattern: false });
   const results = await eslint.lintFiles(files);
+  // A GUARD THAT CANNOT TELL "CLEAN" FROM "NEVER RAN" IS THE FAILURE THIS FILE IS ABOUT.
+  // `errorOnUnmatchedPattern: false` turns a skip into silence, and an `ignores` entry covering
+  // `src/` makes every assertion below pass with zero files linted. Both are checked here.
+  assert.equal(
+    results.length,
+    files.length,
+    `ESLint returned ${results.length} result(s) for ${files.length} file(s); some were skipped`
+  );
+  const ignored = results
+    .filter((result) => result.messages.some((m) => /File ignored/i.test(m.message ?? '')))
+    .map((result) => posix(result.filePath).split('/src/').pop());
+  assert.deepEqual(ignored, [], 'these files were IGNORED rather than linted, so they are unchecked');
   return results.flatMap((result) =>
     result.messages
       .filter((message) => message.ruleId === 'no-undef')
@@ -103,6 +132,20 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
     assert.ok(population.length > 50, `expected a real population, got ${population.length}`);
     assert.ok(population.includes('src/main.js'), 'src/main.js must be in the population');
     assert.ok(population.includes('src/gatheringResultCreation.js'));
+    // The rune modules an earlier form of this file excluded. `SvelteApplicationMixin` is the
+    // base of every V2 application and no test references it; the manager app is 1577 lines and
+    // is dynamically imported from `src/main.js`.
+    for (const rune of [
+      'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+      'src/ui/svelte/SvelteApplicationMixin.svelte.js',
+      'src/ui/svelte/stores/craftingStore.svelte.js',
+    ]) {
+      assert.ok(population.includes(rune), `${rune} must be in the population`);
+    }
+    assert.ok(
+      population.filter((file) => file.endsWith('.svelte.js')).length >= 14,
+      'every rune module is in the population'
+    );
     for (const covered of ['src/systems/CraftingEngine.js', 'src/toolBreakageRuntime.js']) {
       assert.equal(
         population.includes(covered),

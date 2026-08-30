@@ -288,10 +288,11 @@ function membershipsForSystem(memberships, systemId) {
  * @param {unknown} options.systemDefinitions The system's surviving in-system array.
  * @param {(worldDefault: object|null, membership: object|null) => object} options.resolve The
  *   per-entity resolver from `componentScope.js` / `essenceScope.js` / `toolScope.js`.
- * @param {'components'|'essences'|'tools'} [options.entityType] Selects the lifted identity field
- *   list the DELETE half re-derives against. Omitting it disables that half — every production
- *   caller passes it, and `resolveComponentScope` / `resolveEssenceScope` / `resolveToolScope`
- *   are the only production callers there are.
+ * @param {'components'|'essences'|'tools'} options.entityType Selects the lifted identity field
+ *   list the DELETE half re-derives against. REQUIRED: an omitted or unrecognised value THROWS,
+ *   because defaulting it would silently disable a correctness rule — see
+ *   {@link liftedIdentityFields}. `resolveComponentScope` / `resolveEssenceScope` /
+ *   `resolveToolScope` are the only production callers, and each passes a literal.
  * @returns {Array<object>}
  */
 export function unionScopedDefinitions({

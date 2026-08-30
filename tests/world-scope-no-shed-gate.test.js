@@ -88,8 +88,9 @@ const CALL = new RegExp(`(?:${NAMES})\\(`);
  * A DEFINITION, ANCHORED. The precedent's unanchored line-start form silently EXEMPTS a
  * prettier-wrapped repoint whose call name lands at the start of a continuation line, leaving the
  * gate green against the defect it exists to catch. With the trailing `\\)\\s*\\{` anchor,
- * `resolveScopedTools`'s own header falls to the call-site marker instead, which is what makes
- * this description literally true.
+ * `resolveScopedTools`'s own header falls to `DEFINITION` itself, which is what makes this
+ * description literally true. (It used to fall to a line-local call-site marker; that constant
+ * was retired at issue 1370 along with the delegating closures it exempted.)
  */
 const DEFINITION = new RegExp(
   `^\\s*(?:export\\s+)?(?:async\\s+)?(?:function\\s+)?(?:${NAMES})\\([^)]*\\)\\s*\\{`

@@ -9,8 +9,10 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The tool half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * `## Tool` describes the shipped per-system shape and stays authoritative until the CONSUMER
- * SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration (PR 3) is what
+ * `## Tool` describes the shipped per-system shape and stays authoritative while `## CraftingSystem` requirement 36 holds. Issue 1370
+ * repointed every non-UI reader at the read union, and READING IS NOT AUTHORITY: while that
+ * requirement holds the in-system record decides every key it carries, the row order and the
+ * row set, so the arrays did not lose authority when the readers moved. The `1.30.0` world-scope migration (PR 3) is what
  * makes THIS module live: `resolveToolBreakageAuthority` below is reached by the four non-UI
  * effective-authority readers from that release onward, because the crafting-system normalizer
  * became absence-preserving in the same change.
@@ -78,8 +80,9 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
  * into a module whose whole point is that nothing depends on it yet, so the shipped copies are
  * held together by a drift guard in `tests/entity-scope-resolvers.test.js` that fails if the
  * literal stops matching this constant. That guard scrapes the first two files only; the Svelte
- * leaf is named here so epic 1357's consumer sweep (PR 8a), which is what converges all three
- * onto this one export, does not work from an undercount.
+ * leaf is named here so the count is honest. Issue 1370's READ repointing did NOT converge the
+ * three onto this export - it repointed readers of the ENTITY ARRAYS, which is a different set -
+ * so the convergence is still owed, and the lane that takes it must not work from an undercount.
  *
  * @type {string}
  */
