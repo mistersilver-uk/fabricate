@@ -913,11 +913,28 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
 
-### Reference-led redesign and design-system migration
+### The design system is consulted before any UI work
 
-Non-trivial UI work follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
+`openspec/specs/design-system/spec.md` is the canonical record of the shared primitive set: which primitives exist, their canonical geometry, their Svelte APIs, the rules that route a near-neighbour case to the right one, and the recipes that compose them into the browse, editor and player screen archetypes.
+Its visual companion, `openspec/specs/design-system/library.html`, renders every primitive at that geometry and is opened in a browser when a written value needs to be seen rather than read.
+
+Every agent that plans, implements, reviews, or documents a change touching `src/ui/`, `styles/`, or a UI requirement in `openspec/specs/` MUST read that capability first and MUST cite the entry it relied on.
+The order is fixed: **reuse, then extend, then add.**
+
+- **Reuse.** If the set already contains a primitive whose meaning covers the case, import it.
+A surface that hand-rolls markup a primitive already owns is a defect, not a variant.
+- **Extend.** If the case needs behaviour the primitive lacks, add a prop to the primitive that owns the meaning.
+Adding flexibility there takes precedence over a second component that owns half of it.
+- **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
+That change adds its entry to `openspec/specs/design-system/spec.md` AND its specimen to `openspec/specs/design-system/library.html` in the same change — an entry with no specimen is a geometry nobody can see, and a component under `src/ui/svelte/components/` with no entry is an undocumented primitive.
+
+A candidate that decomposes entirely into existing members is a composition and does not enter the set; it goes to the capability's ruled-out register with the composition that replaces it, so it is not re-proposed.
+Where a proposal conflicts with a shipped component, the shipped props are the specification — adopt them, or state in the same change why they are being replaced.
+Geometry, colour, spacing and elevation come from the ladders and tokens that capability names; a value off a ladder or a raw colour literal is a gate failure rather than a style choice.
+
+Non-trivial UI work also follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 Open every supplied artifact, assign authority per control and state, record dimensions and expected deviations, inventory shipped siblings and primitives before plan approval, and compare rendered output rather than source declarations.
-The shipped primitive catalog and semantic-slider geometry live in `.agents/skills/fabricate-ux-designer/references/design-system.md`.
+`.agents/skills/fabricate-ux-designer/references/design-system.md` remains the working reference for theming architecture, the token layers and the shipped inventory; where it and the `design-system` capability disagree, the capability wins.
 
 ## Markdown & Prose Conventions
 
@@ -1041,6 +1058,8 @@ Plan-review, implementation-review, and docs-loop reviewers return their verdict
 - Delete test files.
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
+- Add a component under `src/ui/svelte/components/` without adding its entry to `openspec/specs/design-system/spec.md` and its specimen to `openspec/specs/design-system/library.html` in the same change.
+Equally, do not hand-roll markup for a control the primitive set already owns, and do not introduce a second component that owns half a meaning an existing primitive owns — extend that primitive instead.
 - Patch dead UI / config / code branches as a workaround.
 When a control has nothing useful to configure or a code path has no remaining purpose, propose wholesale removal first.
 - Add static cloud credentials (e.g. AWS access keys) to CI.

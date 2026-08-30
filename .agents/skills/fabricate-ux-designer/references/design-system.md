@@ -6,6 +6,15 @@ Colour is never hard-coded: everything is driven by `--fab-*` custom properties,
 attribute chooses which of the six themes is live.
 Build to this reference and the output drops into either app and reskins with every theme.
 
+> **The `design-system` capability is the authority on the primitive set.**
+> `openspec/specs/design-system/spec.md` is the canonical, versioned record of WHICH shared
+> primitives exist, their geometry ladders, their Svelte APIs, the rules that route a
+> near-neighbour case, and the screen recipes; `openspec/specs/design-system/library.html`
+> renders every one of them.
+> Where this document and that capability disagree, the capability wins.
+> This file remains the working reference for theming architecture, the two token layers, and
+> the shipped inventory as it stands.
+>
 > **Ground truth wins.**
 > `styles/fabricate.css` (the token and theme blocks) and `src/ui/theme.js`
 > (`applyFabricateTheme`) are the source of truth.
