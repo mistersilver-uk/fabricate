@@ -365,6 +365,12 @@ A set MUST NOT name more than one group: the engine would have no basis to choos
 Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
 Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
 
+The routing relation MUST be stated in BOTH directions.
+The thing that routes names its group, and the GROUP names its sources: the ingredient sets that select it, or the outcome tiers that do.
+Without the inbound direction a GM editing a group cannot tell what reaches it, and cannot tell that editing it changes what two sets or two tiers award.
+Where several sources share a group, each source says the target is shared and how many sources hold it.
+A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
+
 The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
 A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
@@ -380,6 +386,18 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** a GM authors alternatives inside a result group
 - **THEN** the group renders the same choice group used on the ingredient side
 - **AND** the player picks one of those alternatives when the craft resolves
+
+#### Scenario: A GM opens a result group two tiers share
+
+- **WHEN** a GM opens a result group that two outcome tiers route to
+- **THEN** the group names both tiers as its sources
+- **AND** each of those tiers states that its target is shared
+
+#### Scenario: A result group has no inbound route
+
+- **WHEN** a result group is named by no ingredient set and no outcome tier
+- **THEN** the group states that it is unreachable, in place
+- **AND** it offers the action that routes something to it
 
 #### Scenario: Two outcome tiers award the same thing
 
