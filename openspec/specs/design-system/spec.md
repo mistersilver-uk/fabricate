@@ -268,7 +268,10 @@ The kind vocabulary is closed:
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
-A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list; `tag` renders no subject cell, because the tag is the value itself.
+A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list.
+`tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
+The catalogue lists each tag with the number of components already carrying it, which is what distinguishes a real tag from a typo of one, and offers creating an absent tag from its own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
+The any-of / all-of control MUST appear only when the row holds two or more tags: against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
 
 Every STANDALONE row ends with the control that converts it into a choice group, because any requirement can acquire an alternative.
 A row already inside a group MUST NOT render that control: the group carries the adder for its own alternatives, and a second one inside a member row would offer to nest a group inside a group.
@@ -297,6 +300,12 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **WHEN** the row is rendered in a result context
 - **THEN** its kind select offers component, currency, activity and knowledge
 - **AND** it offers neither tag nor essence
+
+#### Scenario: A tag requirement matches on more than one tag
+
+- **WHEN** a GM adds a second tag to a tag row
+- **THEN** the row renders both as removable chips followed by the adder
+- **AND** the any-of / all-of control appears, having been absent while one tag was held
 
 #### Scenario: A GM adds a requirement before choosing what it is
 
