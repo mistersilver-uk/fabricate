@@ -738,7 +738,7 @@ describe('src/main.js construction order', () => {
   // -------------------------------------------------------------------------------------------
 
   it('runs the world identity drift audit after the three loads and before either manager', () => {
-    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
     assert.ok(
       audit < at('this.recipeManager = new RecipeManager('),
@@ -750,7 +750,7 @@ describe('src/main.js construction order', () => {
   it('gates the audit on the ACTIVE GM, not on isGM', () => {
     // `User#isGM` is `hasRole(ASSISTANT)` and `SETTINGS_MODIFY.defaultRole` is ASSISTANT, so an
     // `isGM` gate posts this notice once for the full GM AND once per assistant.
-    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     const gate = MAIN_SOURCE.lastIndexOf(
       'game.users?.activeGM?.id === game.user?.id',
       audit
@@ -772,7 +772,7 @@ describe('src/main.js construction order', () => {
   // -------------------------------------------------------------------------------------------
 
   it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
-    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     assert.ok(
       audit < at('  async _runMigrations() {'),
       'the audit is inside initialize(), which is declared before _runMigrations()'
@@ -790,7 +790,7 @@ describe('src/main.js construction order', () => {
     // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went
     // INSIDE the detector — the least likely placement. A repair would land HERE, at the call
     // site, which no unit test can execute. So the absence is asserted by source text.
-    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     const dispatch = at('ui.notifications?.info?.(driftNotice)');
     assert.ok(audit < dispatch, 'the notice is dispatched after the audit');
     const between = MAIN_SOURCE.slice(audit, dispatch);

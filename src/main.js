@@ -122,6 +122,7 @@ import {
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
 } from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
+import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
@@ -1136,7 +1137,7 @@ class Fabricate {
     // file can be executed by a unit test, and a source-text grep can pin a DISPATCH but never
     // a SUM.
     if (game.users?.activeGM?.id === game.user?.id) {
-      const worldIdentityDrift = reportWorldIdentityDrift(getSetting(SETTING_KEYS.CRAFTING_SYSTEMS), {
+      const worldIdentityDrift = reportWorldIdentityDrift(readPersistedCraftingSystems(), {
         components: this.componentScopeStore.corpus(),
         essences: this.essenceScopeStore.corpus(),
         tools: this.toolScopeStore.corpus()
