@@ -344,22 +344,25 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **THEN** each row leads with its kind-tinted chip
 - **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
 
-### Requirement: Simple and alchemy carry a reserved failure group
+### Requirement: Simple and alchemy carry a reserved failure set
 
 `simple` and alchemy-simple do not route: one ingredient set, one success result set, and nothing to assign.
-They MAY carry a second group selected BY ROLE — the results a failed check awards — and that group is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
+They MAY carry a second result set selected BY ROLE — the results a failed check awards — and it is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
 
-A role-selected group carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
-Validation counts only the non-failure group toward the exactly-one-success-group rule, so carrying a failure group never makes a simple recipe invalid.
+A role-selected set carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
+It is also NOT RENAMEABLE: nothing refers to it by name, so a rename would change nothing, and offering the control would imply a reference that does not exist.
+The surface marks which sets those are — rather than shipping a name field that silently does nothing — so a GM can tell a role-selected set from an authored one at a glance.
 
-A result set name MUST NOT be a reserved failure keyword, because the routed modes match an outcome against those words and a group borrowing one would be selected by the failure path rather than by its tier.
-`progressive` has no reserved failure group at all.
+Validation counts only the non-failure set toward the exactly-one-success-set rule, so carrying a failure set never makes a simple recipe invalid.
+
+An AUTHORED result set name MUST NOT be a reserved failure keyword, because the routed modes match an outcome against those words and a set borrowing one would be selected by the failure path rather than by its tier.
+`progressive` has no reserved failure set at all.
 
 #### Scenario: A GM allows results on a failed craft
 
 - **WHEN** a simple or alchemy recipe is set to award results on failure
 - **THEN** a second result set appears, marked as filled by role rather than by assignment
-- **AND** it offers no source list, because nothing routes to it
+- **AND** it offers no source list and no rename, because nothing routes to it and nothing refers to it by name
 
 ### Requirement: Sets and groups are the container layer above the row
 
@@ -403,13 +406,17 @@ Without the inbound direction a GM editing a group cannot tell what reaches it, 
 Where several sources share a group, each source says the target is shared and how many sources hold it.
 A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
 
-An assignment list MUST reserve a fixed trailing column for its shared-target marker, so that the control naming the group sits at one position down the list and a marker appearing on one row does not move the control on it.
-
 The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
 A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
 
-The mapping is authored ON the thing that routes — the ingredient set, or the outcome tier — as a select naming its result set, so the whole routing reads as one column rather than as a field buried inside each set’s own editor.
+The routing is authored in TWO surfaces, and neither is a copy of the other.
+
+A ROUTING OVERVIEW lists every source with the set it produces, one row each, and belongs on the record’s overview: it answers what the recipe does in one screen and lets a GM re-point routing without opening a set, which is the common edit.
+The SET CARD holds the set’s own contents and states what routes into it, which is where the rarer edit happens.
+Both write the same field, and assignment therefore works from either end.
+
+An overview row reserves a fixed trailing column for its shared-target marker, so the control naming the set sits at one position down the list and a marker on one row does not move the control on another.
 Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
 Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves elsewhere.
 
@@ -460,6 +467,7 @@ The selected tick is CONFIGURABLE and is a property of the list rather than of a
 ### Requirement: Art that is an identity is picked as a picture
 
 Where art IS the identity of a record — a component, an essence, a recipe — the control MUST render the picture itself at a size worth looking at and MUST NOT render the stored path.
+The filled state MUST carry an explicit edit affordance — a pencil — because a picture with nothing on it does not read as a control, and the empty slot is legible as actionable while the filled one is not.
 Empty is a dashed square that reads as a slot; filled is the art carrying an edit affordance revealed on hover and on focus.
 The path-bearing variant exists only where the record’s identity is something else and the art is an attribute of it.
 
