@@ -113,6 +113,10 @@ import {
   normalizeFailureResultPolicy,
 } from '../../../utils/failureResultPolicy.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
+// The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
+// write path treats ANY third value as a CLEAR of the per-system override, so the set that
+// decides which arguments are tokens must be the same set the resolver and the normalizer use.
+import { TOOL_BREAKAGE_AUTHORITIES } from '../../../systems/toolScope.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -4612,15 +4616,21 @@ export function createAdminStore(services) {
         systemRecipes
       );
 
+      // The WORLD tool-breakage block, read from the store seam this module already holds and
+      // passed EXPLICITLY (issue 1374). The projection resolves the effective authority from
+      // it, so the manager surfaces that draw or gate on the authority stop re-defaulting the
+      // system's own token. It is threaded rather than probed through a lazy global read
+      // because every `game.*` occurrence in this module is a comment, three of which promise
+      // it stays that way.
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions
+        sceneOptions,
+        services.getToolScopeStore?.()?.corpus?.()?.toolBreakage ?? null
       );
-
       recipeListData = _buildRecipeList(
         systemManager,
         recipeManager,
@@ -6098,14 +6108,29 @@ export function createAdminStore(services) {
 
   // Tool-breakage authority (issue 419): "toolSpecific" (each tool's own mode +
   // legacy breakTools) | "checkDriven" (the active check's checkBreakage decides
-  // breakage for all required tools). Persisted as a system-level field; the engine
-  // normalizer coerces unknown/missing to "toolSpecific".
+  // breakage for all required tools). Persisted as a system-level field.
+  //
+  // THE THIRD ARGUMENT IS A CLEAR (issue 1374). Anything that is neither token writes
+  // `{ toolBreakage: {} }`, which REMOVES the per-system override and lets the world value
+  // through `resolveToolBreakageAuthority`. This action used to coerce every other argument
+  // to `toolSpecific`, which made "inherit the world break mode" a one-way door: a GM could
+  // author an override and never take it back.
+  //
+  // THE CLEAR WORKS BECAUSE NOTHING ON THE PATH MERGES. `CraftingSystemManager#updateSystem`
+  // builds `{...current, ...updates}`, a SHALLOW merge, so an empty block REPLACES the stored
+  // one rather than merging into it; and since 1.30.0 the normalizer is ABSENCE-PRESERVING —
+  // it emits `toolBreakage` only for a recognized token, and its enclosing literal carries no
+  // `...system` spread — so the absence survives the round trip to disk and back. This is the
+  // structural opposite of the `setFlag` merge trap, and it is asserted end to end in
+  // `tests/crafting-system-tool-normalization.test.js` against the REAL manager, because a
+  // store double whose `updateSystem` ends in `Object.assign` cannot delete a key and so
+  // cannot see the property at all.
   async function setToolBreakageAuthority(authority) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return false;
-    const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
-    await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    const toolBreakage = TOOL_BREAKAGE_AUTHORITIES.includes(authority) ? { authority } : {};
+    await systemManager.updateSystem(sysId, { toolBreakage });
     await refresh();
     return true;
   }

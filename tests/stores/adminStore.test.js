@@ -419,8 +419,10 @@ describe('createAdminStore', () => {
       await store.refresh();
       const selected = get(store.viewState).selectedSystem;
 
-      // Authority is now visible in the projection (was previously unprojected).
-      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven' });
+      // Authority is now visible in the projection (was previously unprojected), and since
+      // issue 1374 it is RESOLVED against the world scope and carries the scope that authored
+      // it. This system authored `checkDriven` itself, so the source is `system`.
+      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven', source: 'system' });
 
       // The checkBreakage block survives the _clonePlain projection for every mode.
       for (const mode of ['simple', 'routed', 'progressive']) {
@@ -909,8 +911,9 @@ describe('createAdminStore', () => {
       const selected = get(store.viewState).selectedSystem;
       assert.deepEqual(
         selected.toolBreakage,
-        { authority: 'toolSpecific' },
-        'a system with no toolBreakage projects the toolSpecific default'
+        { authority: 'toolSpecific', source: 'default' },
+        'a system with no toolBreakage, in a world with none either, projects the default — and ' +
+          'says which scope produced it (issue 1374), because the token alone cannot'
       );
     });
 

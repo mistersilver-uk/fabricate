@@ -25777,13 +25777,13 @@ describe('CraftingSystemManager mounted behavior', () => {
      * @param {Array<object>} entities
      * @returns {object}
      */
-    function scopeStore(entities) {
-      let corpus = { entities, defaults: [], membership: [] };
+    function scopeStore(entities, extraCorpus = {}) {
+      let corpus = { entities, defaults: [], membership: [], ...extraCorpus };
       return {
         corpus: () => corpus,
         isSeeded: () => true,
         replace(next) {
-          corpus = { entities: next, defaults: [], membership: [] };
+          corpus = { entities: next, defaults: [], membership: [], ...extraCorpus };
         },
         mutateInPlace(next) {
           // The negative control's seam: edit the SAME object rather than replacing it.
@@ -25797,16 +25797,37 @@ describe('CraftingSystemManager mounted behavior', () => {
       return Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index + 1}` }));
     }
 
-    async function mountWithRealStore() {
+    /**
+     * Mount the manager over a REAL admin store driven by the fakes above.
+     *
+     * PARAMETERIZED RATHER THAN COPIED (issue 1374) in exactly the two places the tool-breakage
+     * block needs: the world tool corpus, which carried no `toolBreakage` at all, and the
+     * SELECTED system, which authored none. A second copy of this harness would be the
+     * near-identical block SonarCloud's new-code duplication gate counts, and both defaults
+     * leave every existing caller reading exactly what it read before.
+     *
+     * @param {object} [options]
+     * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
+     * @param {object|null} [options.systemToolBreakage] The selected system's own block.
+     * @returns {Promise<object>} the store
+     */
+    async function mountWithRealStore({ worldToolBreakage, systemToolBreakage } = {}) {
       scopeStores = {
         component: scopeStore(worldEntities(3, 'comp')),
         essence: scopeStore(worldEntities(2, 'ess')),
-        tool: scopeStore(worldEntities(1, 'tool')),
+        tool: scopeStore(
+          worldEntities(1, 'tool'),
+          worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
+        ),
         // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
         // exists until PR 7 registers one, and the badge must read 0 rather than blank.
         vocabulary: null,
       };
-      const forge = makeSystem({ id: 'sys1', name: 'Forge' });
+      const forge = makeSystem({
+        id: 'sys1',
+        name: 'Forge',
+        ...(systemToolBreakage ? { toolBreakage: systemToolBreakage } : {}),
+      });
       const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
       const systems = [forge, alchemy];
       const services = createServices(forge, [], [], {
@@ -25925,6 +25946,98 @@ describe('CraftingSystemManager mounted behavior', () => {
       // And it is ITS OWN corpus: lighting the vocabulary up must not disturb the three
       // scoped-entity counts beside it.
       assert.deepEqual(railCounts(), ['3', '2', '1']);
+    });
+
+    // ── THE RESOLVED TOOL-BREAKAGE AUTHORITY REACHES THE CARD (issue 1374) ──────────────
+    //
+    // NESTED HERE, not appended at the file foot, because `mountWithRealStore` is declared
+    // inside this describe and a sibling block cannot see it. The two things this needed from
+    // that harness — a world `toolBreakage` on the tool corpus and an authored override on the
+    // selected system — are PARAMETERS on it now rather than a second copy of it.
+    //
+    // WHY ALL THREE CASES ARE MANDATORY. `resolveToolBreakageAuthority` has exactly three
+    // return paths, and each of the two plausible wrong implementations passes one of the first
+    // two cases: a projection that always answered the world value passes case 1 and fails case
+    // 2, while the local coercion this change replaced fails case 1 and passes case 2. Case 3
+    // is the branch neither of the other two can reach, and without it a `source` that never
+    // answers `default` is green.
+    //
+    // `source` IS READ OFF THE PUBLISHED PROJECTION, not off the DOM, and that is the honest
+    // place for it: `ToolsBrowserView` does not declare `breakageSource` yet — the lane that
+    // draws the tri-state control declares it — so the prop is inert and renders nothing. What
+    // is asserted is that the value exists, is carried, and distinguishes the two states the
+    // resolved token cannot tell apart.
+    describe('tool-breakage authority resolution (issue 1374)', () => {
+      async function openToolStudio() {
+        navButton('Tool Rules').click();
+        await tick();
+        flushSync();
+        const segments = target.querySelectorAll('[data-tool-authority-segment]');
+        assert.equal(segments.length, 2, 'the Tool Studio authority radiogroup is rendered');
+        return [...segments].map((segment) => ({
+          authority: segment.dataset.toolAuthoritySegment,
+          selected: segment.classList.contains('is-selected'),
+          checked: segment.querySelector('input[type="radio"]').checked,
+        }));
+      }
+
+      function selectedAuthority(segments) {
+        const selected = segments.filter((segment) => segment.selected);
+        assert.equal(selected.length, 1, 'exactly one segment is drawn as current');
+        assert.equal(
+          selected[0].checked,
+          true,
+          'and the radio agrees with the class: both are read, because either alone can drift'
+        );
+        return selected[0].authority;
+      }
+
+      function publishedToolBreakage(store) {
+        return get(store.viewState).selectedSystem.toolBreakage;
+      }
+
+      it('a WORLD authority reaches the card when the system authored none', async () => {
+        const store = await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+        });
+        assert.equal(
+          selectedAuthority(await openToolStudio()),
+          'checkDriven',
+          'a system that authored nothing INHERITS the world break mode; re-defaulting locally ' +
+            'is what made the world half unreachable before'
+        );
+        assert.deepEqual(publishedToolBreakage(store), {
+          authority: 'checkDriven',
+          source: 'world',
+        });
+      });
+
+      it('a system OVERRIDE still wins over the same world authority', async () => {
+        const store = await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+          systemToolBreakage: { authority: 'toolSpecific' },
+        });
+        assert.equal(
+          selectedAuthority(await openToolStudio()),
+          'toolSpecific',
+          'the per-system override is the winning scope'
+        );
+        assert.deepEqual(publishedToolBreakage(store), {
+          authority: 'toolSpecific',
+          source: 'system',
+        });
+      });
+
+      it('neither scope authoring a token falls to the default, and says so', async () => {
+        const store = await mountWithRealStore();
+        assert.equal(selectedAuthority(await openToolStudio()), 'toolSpecific');
+        assert.deepEqual(
+          publishedToolBreakage(store),
+          { authority: 'toolSpecific', source: 'default' },
+          'the third branch of the resolver: the same TOKEN as an authored toolSpecific, and a ' +
+            'different source — which is the whole reason source exists'
+        );
+      });
     });
   });
 });

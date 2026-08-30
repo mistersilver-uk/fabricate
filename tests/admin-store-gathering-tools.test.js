@@ -868,5 +868,56 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(await store.setToolBreakageAuthority('checkDriven'), true);
       assert.equal(services._systemManager.getSystem('sys1').toolBreakage.authority, 'checkDriven');
     });
+
+    // ── CLEARING THE OVERRIDE IS REACHABLE (issue 1374) ─────────────────────────────────
+    //
+    // `setToolBreakageAuthority` used to coerce every argument that was not `checkDriven`
+    // into `toolSpecific`, so a GM could author a per-system break mode and never take it
+    // back: "inherit the world value" was a one-way door with no door. Anything that is
+    // neither token is now a CLEAR, written as `{ toolBreakage: {} }`.
+    //
+    // ASSERTED ON THE FORWARDED PATCH, NEVER ON A POST-STATE. This suite's system-manager
+    // double ends its `updateSystem` in `Object.assign`, which cannot DELETE a key — so a
+    // correct clear leaves `Object.hasOwn(sys, 'toolBreakage')` TRUE here, and a post-state
+    // assertion would be false against correct code. The absence half of the property needs
+    // the REAL manager and lives in `tests/crafting-system-tool-normalization.test.js`,
+    // beside the normalizer clause it depends on.
+    it('forwards a CLEAR for anything that is neither authority token', async () => {
+      const services = createMockServices({
+        systems: [makeSystem({ id: 'sys1', toolBreakage: { authority: 'checkDriven' } })],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const forwarded = () =>
+        services._calls.filter((call) => call[0] === 'updateSystem').map((call) => call[2]);
+      const before = forwarded().length;
+
+      assert.equal(await store.setToolBreakageAuthority(null), true);
+      assert.deepEqual(
+        forwarded().slice(before),
+        [{ toolBreakage: {} }],
+        'a null authority clears the per-system override rather than minting toolSpecific'
+      );
+    });
+
+    it('forwards each recognized authority token unchanged', async () => {
+      // The other half of the same clause, so the clear above cannot be satisfied by an
+      // action that writes an empty block for EVERYTHING.
+      const services = createMockServices({ systems: [makeSystem({ id: 'sys1' })] });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const forwarded = () =>
+        services._calls.filter((call) => call[0] === 'updateSystem').map((call) => call[2]);
+      const before = forwarded().length;
+
+      assert.equal(await store.setToolBreakageAuthority('checkDriven'), true);
+      assert.equal(await store.setToolBreakageAuthority('toolSpecific'), true);
+      assert.deepEqual(forwarded().slice(before), [
+        { toolBreakage: { authority: 'checkDriven' } },
+        { toolBreakage: { authority: 'toolSpecific' } },
+      ]);
+    });
   });
 });

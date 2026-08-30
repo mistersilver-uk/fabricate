@@ -8,9 +8,11 @@
  * `toolSpecific` locally, so making the world half reachable in the resolver changed nothing
  * until the readers went through it.
  *
- * The FIVE UI sites are deliberately out of scope. At `1.30.0` no world authority is authored, so
- * their local default and the resolver agree exactly, and the divergence becomes reachable only
- * once the world tool-breakage editor ships.
+ * THE UI SITES ARE ROUTED TOO NOW, at ONE point rather than five (issue 1374). Issue 1363
+ * deferred them to the world tool-breakage editor, and that editor cannot discharge the
+ * obligation: four of the five are in `CraftingSystemManagerRoot.svelte`, which
+ * `### GM World Scoped Entity Routes` requirement 7 closes to that lane. The fifth IS the
+ * projection the other four read, so resolving there routes all five and costs no root edit.
  */
 
 import assert from 'node:assert/strict';
@@ -30,12 +32,6 @@ const ROUTED_READERS = Object.freeze([
   'src/toolBreakageRuntime.js',
   'src/systems/CraftingEngine.js',
   'src/systems/InventoryListingBuilder.js',
-]);
-
-/** The FIVE UI readers `#### D14` defers to the world tool-breakage editor. */
-const DEFERRED_UI_READERS = Object.freeze([
-  'src/ui/svelte/stores/adminSystemInspectorProjection.js',
-  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
 ]);
 
 function readSource(relative) {
@@ -128,24 +124,55 @@ test('all FOUR non-UI readers route through the resolver, and NONE re-defaults l
       'and the inventory listing builder exhaustion projection'
   );
 });
-
-test('the FIVE UI readers are deliberately NOT routed, and are named as a later obligation', () => {
-  // A POSITIVE assertion, not an absence: the deferral is a decision with a stated reason, and a
-  // test that merely failed to find them would also pass if they had been silently deleted.
-  let uiRedefaults = 0;
-  for (const relative of DEFERRED_UI_READERS) {
-    const source = readSource(relative);
-    uiRedefaults += (source.match(/toolBreakage\?\.authority/g) ?? []).length;
-  }
-  assert.equal(
-    uiRedefaults,
-    5,
-    'the five UI sites still re-default locally. At 1.30.0 no world authority is authored, so ' +
-      'their local default and the resolver agree exactly; routing them would have pulled ' +
-      'src/ui/** into this change for no reachable visual consequence'
+test('the UI readers are routed at ONE point: the selected-system projection (issue 1374)', () => {
+  // THE STATE THIS REPLACES. Issue 1363 routed the four non-UI readers and deferred the five UI
+  // ones, and this test asserted the deferral positively — five local re-defaults, counted. The
+  // deferral named the world tool-breakage editor as the obligation holder, and that editor
+  // cannot discharge it: four of the five sites are in `CraftingSystemManagerRoot.svelte`, a
+  // file `### GM World Scoped Entity Routes` requirement 7 closes to that lane.
+  //
+  // SO IT IS DISCHARGED AT THE PROJECTION INSTEAD, and the count stops growing with the screens.
+  // The projection resolves once and publishes the resolved authority; the four root sites read
+  // that published field through `selectedSystem`, which IS the projection, so they needed no
+  // edit and gained no second re-default.
+  //
+  // BOTH HALVES ARE ASSERTED POSITIVELY. An absence check alone would also pass if the readers
+  // had been deleted, which is the same trap the version of this test it replaces named.
+  const projection = readSource('src/ui/svelte/stores/adminSystemInspectorProjection.js');
+  assert.doesNotMatch(
+    projection,
+    /toolBreakage\?\.authority === 'checkDriven'/,
+    'the projection must not re-default locally: that is the re-created unreachability'
   );
-});
+  assert.equal(
+    (projection.match(/resolveToolBreakageAuthority\(/g) ?? []).length,
+    1,
+    'it resolves the authority exactly once, through this requirement resolver'
+  );
+  assert.match(
+    projection,
+    /source:\s*_toolBreakageAuthoritySource\(/,
+    'and publishes the AUTHORING SCOPE beside it, which a resolved token cannot carry'
+  );
 
+  // The four carrier sites, all reading the PUBLISHED field off `selectedSystem`. A fifth
+  // `.authority` read rooted anywhere else would be a screen re-defaulting on a raw system.
+  const root = readSource('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+  const authorityReads = root.match(/[A-Za-z?.]*toolBreakage\?\.authority/g) ?? [];
+  assert.equal(
+    authorityReads.length,
+    4,
+    'four manager surfaces draw or gate on the authority: the Tool library radiogroup, the Tool ' +
+      'editor, and the two check editors'
+  );
+  for (const read of authorityReads) {
+    assert.equal(
+      read,
+      'selectedSystem?.toolBreakage?.authority',
+      'every one reads the PUBLISHED projection field, never a raw crafting system'
+    );
+  }
+});
 test('the normalizer flip is absence-preserving and keeps a recognised token', async () => {
   const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
