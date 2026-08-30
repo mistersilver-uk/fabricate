@@ -63,7 +63,8 @@
         "FlaggedForReview": "{count} reference(s) already point at nothing, and Fabricate can now tell you which: {references}. Nothing has been removed - review them when you get a chance.",
         "UnsafeSystemIds": "{count} crafting system id(s) contain a character Fabricate cannot use inside an item flag, so owned copies in them were left to resolve by their source item instead: {systems}.",
         "LockedSkips": "{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by their source item.",
-        "SkippedErrors": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags()."
+        "SkippedErrors": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().",
+        "IdentityDrift": "Fabricate’s shared world record is out of date for {records} entry(ies) across {fields} field(s): {entities}. Each crafting system’s own copy is what everything reads, so nothing is wrong and nothing has been changed — this covers names, images, descriptions and source links only."
       }
     },
     "Canvas": {

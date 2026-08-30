@@ -122,8 +122,9 @@ import {
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
 } from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
+import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
+import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1114,6 +1115,37 @@ class Fabricate {
     this.essenceScopeStore.load();
     this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
     this.toolScopeStore.load();
+    // 1.30.0 (issue 1370, epic 1357): THE WORLD IDENTITY DRIFT AUDIT, run once per session.
+    //
+    // HERE, AND NOT IN THE MIGRATION'S NOTICE SLOT. That slot sits inside `_runMigrations()`,
+    // which has already returned by the time these three stores load, returns early on a
+    // non-active-GM client, and is guarded on a report that is `null` unless the migration ran
+    // this session. Drift is not a migration event: it appears on the GM's FIRST identity edit
+    // after the migration and every session thereafter, so the audit belongs after the loads and
+    // before either manager — which is also the last point at which nothing has read the union.
+    //
+    // ACTIVE GM, NOT `isGM`. `User#isGM` is `hasRole(ASSISTANT)`, so an `isGM` gate posts this
+    // notice once per assistant as well as once for the full GM.
+    //
+    // INFO, NEVER WARN. Nothing is wrong: the read union re-derives identity from the in-system
+    // record, so this discloses which of the GM's edits the shared world record has not caught up
+    // with. A permanent warning would also redden every View Lab capture, which runs this path on
+    // every build.
+    //
+    // The COMPOSITION is not here, for the same reason the migration's is not: nothing in this
+    // file can be executed by a unit test, and a source-text grep can pin a DISPATCH but never
+    // a SUM.
+    if (game.users?.activeGM?.id === game.user?.id) {
+      const worldIdentityDrift = reportWorldIdentityDrift(getSetting(SETTING_KEYS.CRAFTING_SYSTEMS), {
+        components: this.componentScopeStore.corpus(),
+        essences: this.essenceScopeStore.corpus(),
+        tools: this.toolScopeStore.corpus()
+      });
+      const driftNotice = buildWorldIdentityDriftNotice(worldIdentityDrift, (key, data) =>
+        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+      );
+      if (driftNotice) ui.notifications?.info?.(driftNotice);
+    }
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,

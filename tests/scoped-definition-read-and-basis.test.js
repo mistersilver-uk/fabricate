@@ -670,6 +670,13 @@ describe('the _scopeBasis call sites', () => {
 
 // ---------------------------------------------------------------------------------------------
 // Criterion 7 — construction order in src/main.js
+//
+// THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO PRs. Issue 1363's criterion 7 is the three
+// world-scope stores' position; issue 1370's criterion 7(a) is the world identity drift audit's
+// position and its active-GM gate, and its 8(b) is the absence of a repair write between the
+// audit and its notice. They share this describe because they share one fact — the exact point in
+// `initialize()` at which the three stores are loaded and nothing has yet read the union — and
+// splitting them across two files would let the two halves of that fact drift apart.
 // ---------------------------------------------------------------------------------------------
 
 describe('src/main.js construction order', () => {
@@ -724,5 +731,76 @@ describe('src/main.js construction order', () => {
     for (const store of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
       assert.match(MAIN_SOURCE, new RegExp(`${store}: fabricate\\.${store},`));
     }
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Issue 1370 criterion 7(a) — the world identity drift audit's position and its gate
+  // -------------------------------------------------------------------------------------------
+
+  it('runs the world identity drift audit after the three loads and before either manager', () => {
+    const audit = at('reportWorldIdentityDrift(getSetting(');
+    assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
+    assert.ok(
+      audit < at('this.recipeManager = new RecipeManager('),
+      'and before the recipe manager, which is the first thing that can read the union'
+    );
+    assert.ok(audit < at('this.craftingSystemManager = new CraftingSystemManager('));
+  });
+
+  it('gates the audit on the ACTIVE GM, not on isGM', () => {
+    // `User#isGM` is `hasRole(ASSISTANT)` and `SETTINGS_MODIFY.defaultRole` is ASSISTANT, so an
+    // `isGM` gate posts this notice once for the full GM AND once per assistant.
+    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const gate = MAIN_SOURCE.lastIndexOf(
+      'game.users?.activeGM?.id === game.user?.id',
+      audit
+    );
+    assert.notEqual(gate, -1, 'the audit must sit under an active-GM gate');
+    assert.ok(
+      MAIN_SOURCE.slice(gate, audit).includes('{'),
+      'and the gate must OPEN a block the audit is inside, not merely precede it'
+    );
+    assert.equal(
+      MAIN_SOURCE.slice(gate, audit).includes('game.user?.isGM'),
+      false,
+      'an isGM gate would run the audit on every assistant GM as well'
+    );
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Issue 1370 criterion 8(b) — the audit REPORTS, and repairs nothing
+  // -------------------------------------------------------------------------------------------
+
+  it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
+    const audit = at('reportWorldIdentityDrift(getSetting(');
+    assert.ok(
+      audit < at('  async _runMigrations() {'),
+      'the audit is inside initialize(), which is declared before _runMigrations()'
+    );
+    const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
+    assert.equal(
+      line.includes('worldScopeEntityReport'),
+      false,
+      'drift is not a migration event: guarding on the migration report would silence the audit ' +
+        'on every session after the one the migration ran in'
+    );
+  });
+
+  it('writes NOTHING between the audit and its notice dispatch', () => {
+    // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went
+    // INSIDE the detector — the least likely placement. A repair would land HERE, at the call
+    // site, which no unit test can execute. So the absence is asserted by source text.
+    const audit = at('reportWorldIdentityDrift(getSetting(');
+    const dispatch = at('ui.notifications?.info?.(driftNotice)');
+    assert.ok(audit < dispatch, 'the notice is dispatched after the audit');
+    const between = MAIN_SOURCE.slice(audit, dispatch);
+    assert.equal(between.includes('setSetting'), false, 'the audit must not write a setting');
+    assert.equal(between.includes('.save('), false, 'nor persist a store');
+    assert.equal(
+      between.includes('ui.notifications?.warn'),
+      false,
+      'and the notice is INFO: nothing is wrong, and a permanent warning would redden every ' +
+        'View Lab capture, which runs this path on every build'
+    );
   });
 });

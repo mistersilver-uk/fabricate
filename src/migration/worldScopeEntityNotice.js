@@ -6,10 +6,11 @@
  * semantic mutations to the `1.21.0` notice's arithmetic survived a green suite while it lived
  * inline. What stays at the Foundry edge is the GM gate, the localizer and the channel.
  *
- * TWO notices, because the two facts arrive at different moments and on different clients'
- * timelines: the migration's own report is available the moment `run()` returns, while the
+ * THREE notices, because the facts arrive at different moments and on different clients'
+ * timelines: the migration's own report is available the moment `run()` returns, the
  * identity-flag remap runs later in the same `ready` body and can only report what it found once
- * it has walked every actor.
+ * it has walked every actor, and the world identity DRIFT audit (issue 1370) runs on EVERY
+ * session, long after any migration, once the three world-scope stores have loaded.
  */
 
 function arrayOf(value) {
@@ -185,4 +186,64 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
     );
   }
   return clauses.join(' ');
+}
+
+/**
+ * The per-session notice naming the entities whose world identity snapshot has gone stale.
+ *
+ * A DISCLOSURE OBLIGATION, NOT A CORRECTION. The read union re-derives identity from the
+ * in-system record on every read, so the divergence is already resolved safely by the time this
+ * runs; what the GM cannot see without being told is WHICH of their own edits the world snapshot
+ * no longer reflects, before the world catalogue editors arrive and start writing that snapshot.
+ * Nothing here changes any data, and the copy says so.
+ *
+ * IT NAMES THE RECORDS AND THE FIELDS, never a bare count. A count tells a GM that something is
+ * stale and gives them no way to find it; the detector already reports one row per
+ * `(entityId, field)`, and collapsing that to a number throws the whole answer away. Rows are
+ * grouped per `(system, entity)` so one record with three stale fields reads as one clause with
+ * three fields rather than as three unrelated records.
+ *
+ * IDENTITY ONLY, AND IT SAYS SO. `WORLD_IDENTITY_FIELDS` covers names, images, descriptions and
+ * source links; the detector is BLIND to `tags`, `category`, `breakage`, `onBreak`,
+ * `repairRequirements` and `enabled`, so a notice implying it had checked behaviour would be
+ * making a claim the detector cannot support.
+ *
+ * @param {Array<{systemId: string, entityType: string, entityId: string, field: string}>}
+ *   driftEntries The detector's report.
+ * @param {(key: string, data?: object) => string|undefined} localize
+ * @returns {string} the message, or `''` when there is nothing to say.
+ */
+export function buildWorldIdentityDriftNotice(driftEntries, localize) {
+  const byRecord = new Map();
+  let fieldCount = 0;
+  for (const entry of arrayOf(driftEntries)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const key = `${entry.systemId}\u0000${entry.entityType}\u0000${entry.entityId}`;
+    if (!byRecord.has(key)) {
+      byRecord.set(key, {
+        systemId: entry.systemId,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        fields: [],
+      });
+    }
+    const record = byRecord.get(key);
+    if (typeof entry.field === 'string' && !record.fields.includes(entry.field)) {
+      record.fields.push(entry.field);
+      fieldCount += 1;
+    }
+  }
+  if (byRecord.size === 0) return '';
+  const named = [...byRecord.values()]
+    .map(
+      (record) =>
+        `${record.entityId} (${record.entityType}: ${record.fields.join(', ')}) in ${record.systemId}`
+    )
+    .join('; ');
+  return localizeWith(
+    localize,
+    'FABRICATE.Migration.WorldScopeEntities.IdentityDrift',
+    { records: byRecord.size, fields: fieldCount, entities: named },
+    `Fabricate's world catalogue snapshot is out of date for ${byRecord.size} record(s) across ${fieldCount} field(s): ${named}. Each crafting system's own copy is what every reader answers from, so nothing is wrong and nothing has been changed - this is identity only (names, images, descriptions and source links), not behaviour.`
+  );
 }
