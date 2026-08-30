@@ -493,6 +493,79 @@ function simpleCorpusCases() {
         availableRecipes: listing.counts.available,
       }),
     })),
+    // APPENDED, never inserted ahead of the cases above. A profile's FIRST case absorbs a
+    // one-off index build over the fixture's shared arrays, and several committed counts here
+    // depend on which case warmed which array first.
+    {
+      id: 'craftingSystemManager.getComponentsForSystem.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'THE REPOINTED READ ACCESSOR (issue 1370). `getComponentsForSystem` is the door every ' +
+        'manager-holding reader now enters through, and this reads it ' +
+        `${SCOPED_UNION_READS} times against a SEEDED 2,500-entity world corpus unioned with ` +
+        'the 5,000-component in-system library. identityIndexBuilds must stay at 1: the ' +
+        'accessor is called once per read and a memo rebuilt per call would be 25 builds, each ' +
+        'O(world entities + memberships), on a path the crafting UI opens on.',
+      setup: (context) => {
+        const world = worldFor(context);
+        return { world, ...scopedManager(world) };
+      },
+      run: ({ manager, world }) => {
+        let components = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          components = manager.getComponentsForSystem(world.system.id);
+        }
+        return components;
+      },
+      counts: ({ world }, components) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: components.length,
+        // THE ROW COUNT ALONE IS BLIND, exactly as in `scopedUnionRead`: this roster overlaps
+        // the in-system array, so the row count is 5,000 whether or not the world half
+        // participated. Only a merged row carries `member`.
+        scopedUnionWorldWins: components.filter((entry) => entry.member === true).length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        // The harness shares ONE settings map across a profile, so a case that left this key
+        // behind would change what every later case measures.
+        world.settings.delete('componentScope');
+      },
+    },
+    {
+      id: 'scopedEntityReads.resolvedComponentsFor.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'THE OTHER SPELLING of the same door (issue 1370): the shared read seam, taken by the ' +
+        'readers that hold a system RECORD and no manager. Same corpus, same read count, and ' +
+        'the same committed identityIndexBuilds of 1 — the two spellings share ONE body, so a ' +
+        'change that memoized only the manager path would move this number and not the other.',
+      setup: (context) => {
+        const world = worldFor(context);
+        world.settings.set('componentScope', worldComponentScope(world));
+        const store = world.modules.worldScopeStores.createComponentScopeStore();
+        store.load();
+        return { world, corpus: store.corpus() };
+      },
+      run: ({ world, corpus }) => {
+        let components = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          components = world.modules.scopedEntityReads.resolvedComponentsFor(world.system, corpus);
+        }
+        return components;
+      },
+      counts: ({ world }, components) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: components.length,
+        scopedUnionWorldWins: components.filter((entry) => entry.member === true).length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        world.settings.delete('componentScope');
+      },
+    },
   ];
 }
 
