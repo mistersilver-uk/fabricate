@@ -75,7 +75,7 @@ A card that merely sits on the page uses a border and no shadow.
 
 Control height MUST be one of 26, 28, 30, 34, 38, or 44 for a control a spec marks touch-reachable.
 The values 32, 36 and 40 are RETIRED and MUST NOT be reintroduced.
-Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for cards and panels, and 999 for pills and tracks.
+Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
 
@@ -95,6 +95,7 @@ Emphasis in mono comes from size and ink.
 ### Requirement: Every interactive primitive declares its full state set
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
+Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 
@@ -139,8 +140,10 @@ Every primitive renders inside a Foundry ApplicationV2 window, inside Foundry's 
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
 A container query adds no specificity, so the narrow case is declared after the wide one.
-The shipped container breakpoints are the ladder, and a new surface uses them rather than inventing one: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
+The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
+A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be.
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
+The shipped manager grid is `220px minmax(0, 1fr) 300px` with fixed outer tracks; giving those tracks a `minmax(0, …)` upper bound is a proposed change recorded in the migrations, not a description of what ships.
 
 A focusable element that is not a form control, contentEditable, or a button with a form MUST carry `data-keyboard-focus="true"` when it handles arrow, Page, or Home and End keys, or the keypress ALSO reaches Foundry's bindings and pans or zooms the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
@@ -163,13 +166,13 @@ There is no URL and no router, so page state, filter state and navigation MUST l
 A control that selects a world asset path MUST render the ASSET and a browse action, never the stored path string.
 Foundry owns the picker dialog, the path is an implementation detail, and a long path destroys the row it sits in.
 
-A native `select` renders its option popup through the operating system, where the only styling available is `color-scheme: dark`.
+A native `select` renders its option popup through the operating system, which reaches it only through the control’s own computed background and `color-scheme`, and differs by browser and platform even then.
 Whenever the options need a selected tick, a group heading, a per-option description, a badge, or a reason for being unavailable, the control MUST render its own option list using the floating-surface geometry instead of a native popup.
 
 #### Scenario: A primitive handles arrow keys on a non-input element
 
 - **WHEN** a focusable element that is not a form control handles arrow, Page, or Home and End keys
-- **THEN** it carries the keyboard-focus opt-out attribute
+- **THEN** it carries `data-keyboard-focus="true"`
 - **AND** the keypress does not also reach Foundry's canvas bindings
 
 ### Requirement: Near-neighbour primitives are routed by a stated rule
@@ -300,7 +303,7 @@ A unit is a property of the amount, not of the thing: `currency` has one, and an
 A RESULT amount is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
 Authoring has no previewed actor, so the rolled form shows NO resolved value: a number there would be fiction.
 The same expression control resolves against an actor wherever a real one is in scope, such as a player-side preview, and the presence of a resolved value is therefore a property of the surface rather than of the control.
-The rolled form is the shared expression control — dice plus optional actor data paths — showing the value resolved against the previewed actor, or stating that it does not reduce to a number.
+The rolled form is the shared expression control: dice plus optional actor data paths.
 The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
 
 A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
@@ -412,7 +415,8 @@ The path-bearing variant exists only where the record’s identity is something 
 A headed, paged table is the right shape only where a reader compares the same field DOWN a column, such as a date, an amount or a name.
 A record carrying art, a status and actions is a list row, and forcing it into columns costs those affordances and buys nothing; the test is whether the columns would be worth sorting.
 
-A table states its record count in its heading rather than leaving it to be inferred from the pager, closes with the standard pagination bar at full container width, and scrolls horizontally inside its own container so the page never does.
+A table states its record count in its heading rather than leaving it to be inferred from the pager, and scrolls horizontally inside its own container so the page never does.
+It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — an outcome-tier table, a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
 A column header MUST NOT appear sortable unless sorting it is meaningful.
 An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
 
@@ -446,6 +450,22 @@ A held-versus-needed count renders on a SOLID ground rather than a soft wash: it
 - **WHEN** a player resolves a tag requirement and holds four items carrying it
 - **THEN** all four render as candidates
 - **AND** the ones that cannot meet the count are dimmed rather than omitted
+
+### Requirement: A multi-step flow inside the manager uses the shared modal
+
+A flow that must finish before anything else continues, and that carries its own state across more than one step, renders in the manager’s shared modal chrome rather than in a bespoke overlay.
+The import flow — mapping folders, then reading the reference report — is the shipped case.
+
+This is distinct from a one-shot confirmation, which stays `confirmDialog`, and from a Foundry-owned dialog, whose body is a cleaned HTML string rather than a mounted component.
+
+The modal portals into the application root so it stacks above the window rather than beneath it, and its close control takes an accessible name as a REQUIRED prop, because it renders as an icon alone.
+It dismisses on an outside click; a step that would lose work confirms first.
+
+#### Scenario: An import needs two steps
+
+- **WHEN** a flow spans more than one step and must complete before the manager continues
+- **THEN** it renders in the shared modal chrome
+- **AND** its close control carries an accessible name
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 
