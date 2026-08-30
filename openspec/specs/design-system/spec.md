@@ -281,11 +281,24 @@ The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather th
 A unit renders to the RIGHT of the stepper it qualifies and never beneath the value’s name.
 A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
 
+A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
+The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
+When a value is picked the search is replaced by the subject cell at its fixed width, so the row stops moving once it is complete.
+
+The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
+That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.
+
 #### Scenario: The same authoring surface is used for results
 
 - **WHEN** the row is rendered in a result context
 - **THEN** its kind select offers component, currency, activity and knowledge
 - **AND** it offers neither tag nor essence
+
+#### Scenario: A GM adds a requirement before choosing what it is
+
+- **WHEN** a new requirement row is added
+- **THEN** the catalogue search occupies the subject cell and stretches
+- **AND** the quantity control is usable before a value is chosen
 
 #### Scenario: A requirement gains an alternative
 
