@@ -370,9 +370,11 @@ function readCorpus(store) {
  * THE FOURTH LEG IS THE WORLD VOCABULARY, and it is optional. `adminStore`'s `_worldScopeStores`
  * reads it through the same `services.getVocabularyScopeStore?.() ?? null` idiom as the other
  * three, so it degrades to `null` - and to a `total: 0` projection - until PR 7 registers the
- * store. That leg exists NOW because `adminStore.js` is one of the five gateway files
- * requirement 7 of `### GM World Scoped Entity Routes` closes to PR 7: a producer wired later
- * could only be wired by reopening the file this PR promises no later lane needs to touch.
+ * store. That leg exists NOW because `adminStore.js` is a gateway file requirement 7 of
+ * `### GM World Scoped Entity Routes` closes to PR 7: a producer wired later could only be
+ * wired by reopening a file that lane may not open. Its WRITE-path sibling was added by issue
+ * 1374 for the same reason, so the vocabulary lane declares its action family in
+ * `worldScopeActions.js` — a file it owns — and finds the store leg already there.
  *
  * @param {object} [options]
  * @param {Record<string, object|null>} [options.stores] `{component, essence, tool, vocabulary}`

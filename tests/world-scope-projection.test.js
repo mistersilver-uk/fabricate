@@ -495,6 +495,34 @@ test('the composition preserves each type\'s KEY SET, which is part of the contr
   );
 });
 
+// ── THE FOURTH LEG MINTS NOTHING, AND THAT IS THE POINT (issue 1374) ─────────────────────────
+//
+// `adminStore` supplies `getStores` with four legs now, matching the read path's four. The
+// vocabulary lane needs the LEG because it lives in a gateway file it may not open; it declares
+// the FAMILY itself, in `worldScopeActions.js`, which it owns.
+//
+// So the leg has to be INERT until that family is declared, and this is the guard that says so:
+// a composition that minted a family per supplied leg rather than per declared descriptor would
+// hand every consumer a `worldScope.vocabulary` whose actions write into a store whose corpus
+// shape nothing has defined yet.
+
+test('a supplied vocabulary leg mints NO family until a descriptor declares one', () => {
+  const actions = createWorldScopeActions({
+    getStores: {
+      component: () => null,
+      essence: () => null,
+      tool: () => null,
+      vocabulary: () => ({ corpus: () => ({}) }),
+    },
+  });
+  assert.deepEqual(
+    Object.keys(actions).sort(),
+    ['component', 'essence', 'tool'],
+    'families come from WRITE_DESCRIPTORS, never from the legs the caller happened to supply'
+  );
+  assert.equal('vocabulary' in actions, false);
+});
+
 test('the composition tolerates an absent getStores map without throwing', async () => {
   // `adminStore` builds this at construction time, before `services` can resolve anything, so
   // a missing seam must degrade to a refusing action family rather than take the store down.
@@ -525,7 +553,7 @@ test('the first createEntity SEEDS the setting and flips isSeeded per sub-key', 
 //
 // It is the fourth leg of a projection whose other three are scoped-entity corpora, and it
 // exists NOW for a one-way-door reason: `adminStore.js` and `CraftingSystemManagerRoot.svelte`
-// are two of the five gateway files `### GM World Scoped Entity Routes` requirement 7 closes to
+// are two of the gateway files `### GM World Scoped Entity Routes` requirement 7 closes to
 // PR 7, so neither the store leg nor the badge that reads it could be added later.
 //
 // `total` IS THE ASSERTION, not a convenience. The consumer reads `worldScope.vocabulary.total`

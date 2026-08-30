@@ -4793,13 +4793,11 @@ export function createAdminStore(services) {
   }
 
   // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
-  // with PR 7 of epic 1357, but this file is one of the five gateway paths requirement 7 of
-  // `### GM World Scoped Entity Routes` closes to that PR — so a producer leg added later could
-  // only be added by reopening the file this change promises no later lane needs to touch. It
-  // reads through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings,
-  // which answers `null` until the service is registered; `projectWorldVocabulary` then
-  // publishes `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful,
-  // because a world with no vocabulary store has no world vocabulary.
+  // with PR 7 of epic 1357, and this file carries the producer leg ahead of it: it reads
+  // through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings, which
+  // answers `null` until the service is registered; `projectWorldVocabulary` then publishes
+  // `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful, because a
+  // world with no vocabulary store has no world vocabulary.
   function _worldScopeStores() {
     return {
       component: services.getComponentScopeStore?.() ?? null,
@@ -4819,13 +4817,23 @@ export function createAdminStore(services) {
 
   // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
   // by nothing in `src/` yet: every Phase 8 world route is a placeholder, so no screen calls
-  // one of these. That is a deliberate, stated state rather than dead code — PRs 6a/6b/6c and
-  // 7 wire the screens without reopening this file.
+  // one of these. That is a deliberate, stated state rather than dead code — issue 1374 opened
+  // the prop seam that carries these families to the pages, and PRs 6a/6b/6c and 7 wire their
+  // screens to them.
+  //
+  // THE FOURTH LEG MATCHES THE READ PATH'S (issue 1374). The read path has had an optional
+  // `vocabulary` leg since issue 1362 and this one had three, so PR 7 could see its corpus
+  // projected and had no route to a write path at all. `createWorldScopeActions` mints a family
+  // per key of its OWN `WRITE_DESCRIPTORS`, which declares no `vocabulary`, so this leg is
+  // INERT until the vocabulary lane declares that family in `worldScopeActions.js` — a file it
+  // owns. Supplied here because the store leg is the one half of the pair that lives in a
+  // gateway file.
   const worldScope = createWorldScopeActions({
     getStores: {
       component: () => services.getComponentScopeStore?.() ?? null,
       essence: () => services.getEssenceScopeStore?.() ?? null,
       tool: () => services.getToolScopeStore?.() ?? null,
+      vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
     },
   });
 
