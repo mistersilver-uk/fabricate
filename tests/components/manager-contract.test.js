@@ -3899,6 +3899,11 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through
     // the confirm-discard gate, and resolves the name out of the published world corpus.
+    //
+    // THE DATA SEAM SITS BETWEEN THE TAG AND THE ROUTE SEAM (issue 1374), so it is matched
+    // rather than skipped over: a catalogue reached through `onOpenEntry` and handed no world
+    // corpus has no rows to open an entry FROM, which is the gap this pairing now records.
+    // WHICH bundle each site takes is `manager-scoped-prop-contract.test.js`'s subject.
     for (const [catalogue, entry] of [
       ['WorldComponentCataloguePage', 'world-component-entry'],
       ['WorldEssenceCataloguePage', 'world-essence-entry'],
@@ -3907,9 +3912,9 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       assert.match(
         rootSource,
         new RegExp(
-          `<${catalogue}\\s*\\n\\s*onOpenEntry=\\{\\(entityId\\) => openWorldScopedEntry\\('${entry}', entityId\\)\\}`
+          `<${catalogue}\\s*\\n\\s*\\{\\.\\.\\.[a-zA-Z]+ScopeProps\\}\\s*\\n\\s*onOpenEntry=\\{\\(entityId\\) => openWorldScopedEntry\\('${entry}', entityId\\)\\}`
         ),
-        `${catalogue} is wired with the seam PR 6a opens an entry through`
+        `${catalogue} is wired with both seams PR 6a builds its catalogue on`
       );
     }
     assert.match(
