@@ -197,6 +197,15 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
   // A second pattern is the cheap close, and it is narrower than forbidding the bare name
   // outright: that would red on the comment prose the scan below deliberately permits.
   //
+  // THE LOOKAHEAD ADMITS `=`, AND THAT CHARACTER IS THE WHOLE POINT. The first version of
+  // this guard accepted only `}`, `,` and `:` after the binding, so a DEFAULT VALUE —
+  // `const { toolBreakage = {} } = selectedSystem ?? {};` — put an `=` there and matched
+  // nothing, while the read scan stayed blind for the usual reason. Three spellings of it
+  // were measured green. That is the most on-target spelling in the whole class rather than
+  // an exotic one: a default value IS a local re-default, it is the dominant `$props()`
+  // idiom in this neighbourhood (`AccessTabView.svelte` uses it seven times consecutively),
+  // and the version that gets it wrong is the one a Svelte component is most likely to grow.
+  //
   // KNOWN LIMITATION, ACCEPTED RATHER THAN UNNOTICED. This also reds on an object LITERAL
   // that carries the key — `{ toolBreakage }` or `{ toolBreakage: … }` — because the two are
   // not distinguishable by text. That is acceptable HERE and would not be everywhere: the
@@ -205,7 +214,7 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
   // ever becomes legitimate here, this guard is the wrong shape and should be replaced rather
   // than exempted.
   assert.deepEqual(
-    root.match(/[{,]\s*toolBreakage\s*(?=[},:])/g) ?? [],
+    root.match(/[{,]\s*toolBreakage\s*(?=[},:=])/g) ?? [],
     [],
     'the shell must not DESTRUCTURE the tool-breakage block: a binding has no leading dot, so ' +
       'the read scan below cannot see it or any re-default taken off it'
