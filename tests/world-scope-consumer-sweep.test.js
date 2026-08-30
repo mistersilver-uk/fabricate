@@ -30,6 +30,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, it } from 'node:test';
 
 import { getMatchHandler } from '../src/models/match/matchTypes.js';
@@ -257,8 +258,7 @@ describe('an unknown world half returns the in-system array ITSELF', () => {
 describe('a repointed reader never narrows a Valid Id Basis', () => {
   const MANAGER_SOURCE = new URL('../src/systems/CraftingSystemManager.js', import.meta.url);
 
-  it('leaves _scopeBasis reading the RAW arrays', async () => {
-    const { readFileSync } = await import('node:fs');
+  it('leaves _scopeBasis reading the RAW arrays', () => {
     const source = readFileSync(MANAGER_SOURCE, 'utf8');
     const start = source.indexOf('  _scopeBasis(system) {');
     assert.notEqual(start, -1, 'src/systems/CraftingSystemManager.js still declares _scopeBasis');
@@ -592,6 +592,85 @@ describe('the world identity drift report', () => {
       manager.resolveScopedComponents(craftingSystems[0])[0].name,
       'Ashen Salt',
       'the union still answers the in-system value it just reported as diverged'
+    );
+  });
+});
+
+// -----------------------------------------------------------------------------------------------
+// Criterion 10 — the deliberate exclusions, asserted by SOURCE CONTRACT
+// -----------------------------------------------------------------------------------------------
+
+/**
+ * The five reads PR 8a deliberately did NOT repoint, each pinned so a later lane "finishing the
+ * sweep" has to argue with a test rather than with a comment.
+ *
+ * THE LAST ONE IS THE ONE THAT CANNOT BE PINNED ANYWHERE ELSE. `reportWorldIdentityDrift` reads
+ * the entity arrays through a COMPUTED key (`system[ENTITY_FIELDS[entityType]]`), which the reader
+ * ledger's matcher cannot see — so the ledger would neither red it as unledgered nor pin it.
+ * Repointing it would make the detector compare the union against the world corpus, report zero
+ * drift every session, and silently void the whole disclosure obligation.
+ */
+describe('the deliberate exclusions are unchanged', () => {
+  const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+  const SEAM_NAMES = [
+    'resolvedComponentsFor',
+    'resolvedEssencesFor',
+    'resolvedToolsFor',
+    'resolveScopedEntityRead',
+  ];
+
+  /** The lines of `source` between `open` and the next line that closes at `closeIndent`. */
+  function bodyAfter(source, open, closeIndent = '  ') {
+    const start = source.indexOf(open);
+    assert.notEqual(start, -1, `the anchor \`${open}\` is gone`);
+    const end = source.indexOf(`\n${closeIndent}}`, start);
+    assert.notEqual(end, -1, `the anchor \`${open}\` has no closing brace`);
+    return source.slice(start, end);
+  }
+
+  it('getItems still answers the PERSISTED record, because it is the authoring accessor', () => {
+    const body = bodyAfter(read('src/systems/CraftingSystemManager.js'), "  getItems(systemId, search = '') {");
+    assert.ok(body.includes('const managedItems = system.components || [];'));
+    for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
+  });
+
+  it('the durable-identity restamp still reads the in-system arrays', () => {
+    const source = read('src/systems/CraftingSystemManager.js');
+    assert.ok(source.includes("bucket: 'components',"), 'non-vacuity: the restamp kinds exist');
+    assert.ok(source.includes('definitions: system.components || [],'));
+    assert.ok(source.includes('definitions: (system.tools || []).filter('));
+  });
+
+  it('the pre-persist alchemy injector still validates the PROPOSED record', () => {
+    const body = bodyAfter(
+      read('src/systems/CraftingSystemManager.js'),
+      '  _assertNoAlchemySignatureCollisions(system) {'
+    );
+    assert.ok(body.includes('const components = Array.isArray(system.components) ? system.components : [];'));
+    for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
+  });
+
+  it('resolvePresentIds still decides presence by comparing SYSTEM IDS', () => {
+    // Re-expressed as membership it must DENY on an unknown corpus - widening presence would let
+    // a station satisfy a tool gate the GM never granted - so it is 8b's change, not 8a's.
+    const source = read('src/gatheringToolRuntime.js');
+    const body = bodyAfter(source, 'function resolvePresentIds({ presentTools, systemId, key }) {', '');
+    assert.ok(body.includes('toolSystemId !== scopeSystemId'), 'the scope guard is still an id compare');
+    assert.equal(body.includes('.tools'), false, 'and it still reads no entity array at all');
+    assert.equal(source.includes('scopedEntityReads'), false);
+  });
+
+  it('the drift detector still reads the RAW setting through its computed key', () => {
+    const source = read('src/systems/worldIdentityDrift.js');
+    assert.ok(
+      source.includes('for (const record of arrayOf(system[ENTITY_FIELDS[entityType]])) {'),
+      'a migration-class reader reads the RAW corpus by construction'
+    );
+    assert.equal(
+      source.includes('scopedEntityReads'),
+      false,
+      'repointing it would have the detector compare the union against the world corpus, report ' +
+        'zero drift every session, and void the disclosure obligation entirely'
     );
   });
 });
