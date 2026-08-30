@@ -2813,23 +2813,34 @@
   // EVERY FIELD TOLERATES ABSENCE. `adminStore` seeds the full `worldScope` shape on its very
   // first publish, so in production none of these fallbacks fires; the case they exist for is
   // a mounted test driving a hand-written `viewState`.
-  const worldScopeSystems = $derived(allSystems);
+  //
+  // THESE BUNDLES ARE NOT EVALUATED TODAY, AND THAT IS A PROPERTY OF THE CALL SITES RATHER
+  // THAN OF THIS DECLARATION. Svelte resolves a spread by walking its prop sources in reverse
+  // and stopping at the first that owns the key, so while a child declares NONE of these four
+  // names the bundle behind it is never read at all — measured at eleven of the twelve sites.
+  //
+  // THE HAZARD IS THE REVERSE. A later lane that declares a prop on one of these children which
+  // its call site does NOT pass makes the lookup fall THROUGH to the spread, and every reader
+  // of that prop becomes a live subscriber to the whole bundle — including `scope`, which is a
+  // new object on every publish. That is fine for a value read imperatively from a handler, and
+  // it is a re-render on every world-corpus change for a value read in a reactive scope. Declare
+  // what the site passes, or pass what you declare.
   const componentScopeProps = $derived({
     scope: worldScopeState.component ?? null,
     actions: store?.worldScope?.component ?? null,
-    systems: worldScopeSystems,
+    systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const essenceScopeProps = $derived({
     scope: worldScopeState.essence ?? null,
     actions: store?.worldScope?.essence ?? null,
-    systems: worldScopeSystems,
+    systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const toolScopeProps = $derived({
     scope: worldScopeState.tool ?? null,
     actions: store?.worldScope?.tool ?? null,
-    systems: worldScopeSystems,
+    systems: allSystems,
     systemId: selectedSystemId || '',
   });
 
@@ -10703,7 +10714,7 @@
       <WorldVocabularyPage
         vocabulary={worldScopeState.vocabulary ?? null}
         actions={store?.worldScope?.vocabulary ?? null}
-        systems={worldScopeSystems}
+        systems={allSystems}
       />
     {:else if currentView === 'world-downtime'}
       <main
