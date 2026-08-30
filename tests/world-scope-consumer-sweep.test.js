@@ -745,7 +745,18 @@ describe('the world identity drift report', () => {
     assert.notEqual(dump, -1, 'src/main.js must compose the uncapped list');
     assert.ok(dump < dispatch, 'and log it BEFORE the toast that points at it');
     const between = MAIN_SOURCE.slice(dump, dispatch);
-    assert.match(between, /console\.(?:debug|info|log)\(/, 'through a console call of its own');
+    // THE LEVEL IS PART OF THE PROMISE, so this pins it rather than accepting any console call.
+    // `console.debug` maps to DevTools' VERBOSE level, which Chromium's default filter excludes:
+    // a GM who presses F12 as the copy instructs would not see the dump at all, which is the
+    // same failure the cap's remainder clause exists to avoid, one level down. An earlier form
+    // of this assertion allowed `debug|info|log` and so could not defend the copy it guards.
+    assert.match(
+      between,
+      /console\.info\(/,
+      'the dump must be console.info: debug is hidden at Chromium’s default log level, so the ' +
+        'notice’s "the full list is in the console (F12)" clause would be false again'
+    );
+    assert.doesNotMatch(between, /console\.debug\(/, 'debug is specifically not acceptable');
   });
 
   it('says nothing at all when there is no drift', () => {

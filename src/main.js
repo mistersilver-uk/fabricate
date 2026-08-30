@@ -1153,8 +1153,18 @@ class Fabricate {
       // line; without it a GM with 200 drifted components opens the console and finds the
       // same truncated sentence, with the withheld records unrecoverable from a running
       // client. Verified against V14.365.0.
+      //
+      // `info`, NOT `debug`, and that is the difference between a working pointer and a dead
+      // one. `console.debug` maps to DevTools' VERBOSE level, which Chromium's default level
+      // filter EXCLUDES - so a GM who follows the copy literally, presses F12 and reads the
+      // console would see core's own `console.info` line for the toast (the CAPPED message) and
+      // not this one. `info` is also the level core's notification logger uses for an info
+      // notice, so the two lines sit at the same level in the same place.
+      //
+      // It costs nothing elsewhere: the View Lab's console gate is fatal on `error` and on
+      // `Fabricate |`-prefixed `warning` only, and does not collect `info`.
       const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
-      if (driftDetail) console.debug(`Fabricate | world identity drift: ${driftDetail}`);
+      if (driftDetail) console.info(`Fabricate | world identity drift: ${driftDetail}`);
       const driftNotice = buildWorldIdentityDriftNotice(worldIdentityDrift, (key, data) =>
         data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
       );

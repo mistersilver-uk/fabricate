@@ -57,11 +57,17 @@ const foundryGlobals = {
 
 // Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
 // identifiers and reports `no-undef` on every one - measured, 148 of them across the fourteen
-// rune modules, from three distinct names. Declaring them readonly is the same technique and
-// the same trade as `foundryGlobals` above: over-declaring a readonly global is harmless, and
-// under-declaring costs a real check. Without this the whole `.svelte.js` class - including the
-// 1577-line GM manager app and the base mixin of every V2 application - is checked by NOTHING,
-// which is the gap `tests/main-undefined-identifiers.test.js` exists to close.
+// rune modules, from three distinct names. Without declaring them the whole `.svelte.js` class -
+// including the 1577-line GM manager app and the base mixin of every V2 application - is
+// checked by NOTHING, which is the gap `tests/main-undefined-identifiers.test.js` exists to
+// close.
+//
+// SCOPED TO `**/*.svelte.js` ALONE, and unlike `foundryGlobals` above the scope is load-bearing
+// rather than tidy. "Over-declaring a readonly global is harmless" holds for a Foundry global,
+// which really is present at runtime everywhere the code runs. A rune is NOT: outside a rune
+// module `$state(...)` is a genuine defect - it compiles to nothing and fails silently at
+// runtime - and `no-undef` is what catches it today. Declaring these repo-wide would retire
+// that check to buy a convenience.
 const svelteRuneGlobals = {
   $state: 'readonly',
   $derived: 'readonly',
@@ -233,11 +239,21 @@ export default [
     },
   },
 
+  // 4b. Svelte 5 rune globals, for rune modules ONLY. A separate block rather than a wider
+  //     spread because ESLint MERGES `globals` across every block whose `files` match, so a
+  //     `.svelte.js` file gets browser + Foundry + runes while a plain `.js` file keeps
+  //     `no-undef` on a rune used where no compiler will process it.
+  {
+    files: ['**/*.svelte.js'],
+    languageOptions: {
+      globals: { ...svelteRuneGlobals },
+    },
+  },
   // 5. Browser + Foundry runtime globals for shipped module code.
   {
     files: ['src/**/*.js', 'main.js'],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
+      globals: { ...globals.browser, ...foundryGlobals },
     },
   },
 
@@ -359,7 +375,7 @@ export default [
       'scripts/foundry-perf-run.mjs',
     ],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
+      globals: { ...globals.browser, ...foundryGlobals },
     },
   },
 
@@ -369,7 +385,7 @@ export default [
   {
     files: ['tests/**/*.js'],
     languageOptions: {
-      globals: { ...globals.node, ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
+      globals: { ...globals.node, ...globals.browser, ...foundryGlobals },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
@@ -444,7 +460,7 @@ export default [
     // drop it with no test announcing the loss.
     linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals, ...svelteRuneGlobals },
+      globals: { ...globals.browser, ...foundryGlobals },
     },
     rules: {
       'no-unused-vars': [
