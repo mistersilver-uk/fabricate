@@ -957,7 +957,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-scoped-page="world-vocabulary"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/],
+    // THE SHARED PLACEHOLDER BODY IS CLAIMED BY EVERY CASE THAT RENDERS IT (issue 1374), which
+    // is this one and the four other world scoped cases, not by one nominated case.
+    //
+    // A SINGLE CLAIM CANNOT BE PLACED SAFELY, because neither coverage test can see a claim
+    // whose case no longer renders the component: the shared body stays inside the lab
+    // closure through the remaining pages and stays claimed by SOME case whatever happens, so a
+    // claim on a route whose body has been replaced goes stale in silence and publishes that
+    // route's real screen as evidence of a placeholder-body change. Nominating the
+    // longest-lived route only works if the four lanes land in a predicted order, and nothing
+    // enforces one — PR 7 may ship before 6c.
+    //
+    // Claiming it everywhere it renders removes the ordering assumption entirely: whichever
+    // route is replaced last, a case that still renders the component still claims it, and the
+    // lane that replaces that last route deletes the component and every claim together. The
+    // three entry routes hold no case at all — a case cannot assert a route that no shipped
+    // screen can reach — so "every case that renders it" is the honest form of "all seven
+    // routes". The cost is a handful of frames per edit to a component the epic deletes.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'world-essence-catalogue',
@@ -969,7 +989,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-scoped-page="world-essences"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'world-tool-catalogue',
@@ -984,7 +1007,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-scoped-page="world-tools"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'world-scoped-rail-collapsed',
@@ -1058,6 +1084,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
   managerCase({

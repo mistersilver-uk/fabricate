@@ -33,6 +33,10 @@ import {
 } from '../../../systems/checkModifierResolver.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 import {
+  TOOL_BREAKAGE_AUTHORITIES,
+  resolveToolBreakageAuthority,
+} from '../../../systems/toolScope.js';
+import {
   recipeItemLabelFromUuid as _recipeItemLabelFromUuid,
   recipeItemTypeFromRecipeCount as _recipeItemTypeFromRecipeCount,
 } from '../apps/manager/knowledge/knowledgeStudio.js';
@@ -340,8 +344,34 @@ function _buildCheckModifierSelectionView(check, system, activity) {
 }
 
 /**
+ * Which SCOPE authored the resolved tool-breakage authority (issue 1374).
+ *
+ * A 1:1 image of `resolveToolBreakageAuthority`'s three return paths: the system's own
+ * recognized token, then the world's, then the default. It is a separate derivation rather
+ * than a second return value from the resolver because the resolver is engine code with four
+ * non-UI callers that want the token alone; this is the UI's question.
+ *
+ * @param {object|null} worldToolBreakage The world `toolBreakage` block.
+ * @param {object|null} systemToolBreakage The crafting system's own `toolBreakage` block.
+ * @returns {'system'|'world'|'default'}
+ */
+function _toolBreakageAuthoritySource(worldToolBreakage, systemToolBreakage) {
+  if (TOOL_BREAKAGE_AUTHORITIES.includes(systemToolBreakage?.authority)) return 'system';
+  if (TOOL_BREAKAGE_AUTHORITIES.includes(worldToolBreakage?.authority)) return 'world';
+  return 'default';
+}
+
+/**
  * Build the full selectedSystem view data object.
  * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
+ *
+ * `worldToolBreakage` is the world scope's `toolBreakage` block, passed EXPLICITLY by the
+ * caller (issue 1374) rather than probed from a Foundry global here. The reason is the CALLER's
+ * rather than this module's: `adminStore.js` holds no executable `game.*` at all — all eight
+ * occurrences are comments and five of them promise it stays that way — so a probe reached from
+ * its refresh path would have been the first. This module is not itself `game.*`-free, and the
+ * one probe it does hold (`globalThis.game?.actors`, for the learned-knowledge index) is
+ * documented where it happens.
  */
 export function buildSelectedSystemViewData(
   selectedSystem,
@@ -349,7 +379,8 @@ export function buildSelectedSystemViewData(
   componentTagOptions,
   essenceDefinitions,
   availableScriptMacros,
-  sceneOptions
+  sceneOptions,
+  worldToolBreakage = null
 ) {
   if (!selectedSystem) return null;
 
@@ -499,10 +530,29 @@ export function buildSelectedSystemViewData(
     // governs it there.
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
-    // The engine normalizer defaults unknown/missing to "toolSpecific".
+    //
+    // RESOLVED HERE, ONCE, FOR ALL FIVE UI READERS (issue 1374). This used to re-default the
+    // system's own token locally, which re-created at this call site exactly the
+    // unreachability that 1.30.0's absence-preserving normalizer removed: a system that
+    // authored nothing read `toolSpecific` however the world was configured.
+    //
+    // FOUR MANAGER SURFACES READ THIS FIELD, and they are named exactly because this is the
+    // map a lane forbidden to reopen the shell has to navigate by: `ChecksView`, which GATES on
+    // it and fans out internally to the crafting, salvage and gathering editors rather than
+    // being three of them; `ToolsBrowserView`, which AUTHORS it through the segmented control;
+    // `ToolEditView`; and `tools/ToolBrowserInspector`, the Tools right rail, which DRAWS it —
+    // `projectToolBehaviorFacts` turns the authority into the per-tool "Immune" / "Roll to
+    // break" / "{n}% break" copy. Routing here routes all four, and keeps the count of readers
+    // from growing with the screens.
+    //
+    // AND THE AUTHORING SCOPE BESIDE IT. A control that offers "inherit" as a third choice
+    // cannot recover from a RESOLVED token which scope produced it: `checkDriven` looks the
+    // same whether this system authored it or the world did. `source` answers one value per
+    // branch of `resolveToolBreakageAuthority` — `system`, `world`, `default` — so the screen
+    // that authors the layer can show what it is currently inheriting.
     toolBreakage: {
-      authority:
-        selectedSystem.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific',
+      authority: resolveToolBreakageAuthority(worldToolBreakage, selectedSystem.toolBreakage),
+      source: _toolBreakageAuthoritySource(worldToolBreakage, selectedSystem.toolBreakage),
     },
     salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
     salvageCraftingCheck: {

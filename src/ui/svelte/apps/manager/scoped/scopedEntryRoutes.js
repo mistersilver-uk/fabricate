@@ -12,7 +12,7 @@
  *
  * ## Why it lives here rather than inline in the shell
  *
- * `CraftingSystemManagerRoot.svelte` is one of the five gateway files requirement 7 of
+ * `CraftingSystemManagerRoot.svelte` is one of the gateway files requirement 7 of
  * `### GM World Scoped Entity Routes` closes to the four later lanes of this epic, and the
  * breadcrumb is shell chrome those lanes cannot reach. So the shell owns the trail and this
  * module owns the two facts a later lane has to be able to supply without reopening it: which

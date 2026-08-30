@@ -113,6 +113,10 @@ import {
   normalizeFailureResultPolicy,
 } from '../../../utils/failureResultPolicy.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
+// The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
+// write path treats ANY third value as a CLEAR of the per-system override, so the set that
+// decides which arguments are tokens must be the same set the resolver and the normalizer use.
+import { TOOL_BREAKAGE_AUTHORITIES } from '../../../systems/toolScope.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -4553,6 +4557,18 @@ export function createAdminStore(services) {
     // rail resolves granted character ids over this, NOT the PC-filtered roster.
     const accessCharacters = services.getAccessCharacterActors?.() || [];
 
+    // ONE READ OF THE WORLD CORPUS PER PUBLISH (issue 1374), hoisted here so the selected-system
+    // projection and the published `worldScope` key are computed from the SAME snapshot.
+    //
+    // It was two reads: this projection took `getToolScopeStore().corpus().toolBreakage` for
+    // itself while `buildWorldScopeState()` took the same value again at publish time, on the
+    // far side of four `await`s. Two reads of one seam can disagree, and the direct one skipped
+    // the `readCorpus` try/catch its two siblings both carry and both call mandatory — a store
+    // that threw would have aborted this whole branch and left the GM a Manager whose entire
+    // selected-system half never populated. Reading the PROJECTED value inherits that guard
+    // instead of restating it.
+    const worldScopeState = buildWorldScopeState();
+
     let selectedSystemData = null;
     let essenceCards = [];
     let recipeListData = {
@@ -4612,15 +4628,21 @@ export function createAdminStore(services) {
         systemRecipes
       );
 
+      // The WORLD tool-breakage block, taken off the corpus this publish already projected and
+      // passed EXPLICITLY (issue 1374). The projection resolves the effective authority from
+      // it, so the manager surfaces that draw or gate on the authority stop re-defaulting the
+      // system's own token. It is threaded rather than probed through a lazy global read
+      // because all eight `game.*` occurrences in this module are comments, five of which
+      // promise it stays that way.
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions
+        sceneOptions,
+        worldScopeState.worldScope?.tool?.toolBreakage ?? null
       );
-
       recipeListData = _buildRecipeList(
         systemManager,
         recipeManager,
@@ -4756,7 +4778,7 @@ export function createAdminStore(services) {
       ...travel.buildState(),
       ...buildWorldCurrencyState(),
       ...buildCharacterLibrariesState(),
-      ...buildWorldScopeState(),
+      ...worldScopeState,
     }));
   }
 
@@ -4783,13 +4805,11 @@ export function createAdminStore(services) {
   }
 
   // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
-  // with PR 7 of epic 1357, but this file is one of the five gateway paths requirement 7 of
-  // `### GM World Scoped Entity Routes` closes to that PR — so a producer leg added later could
-  // only be added by reopening the file this change promises no later lane needs to touch. It
-  // reads through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings,
-  // which answers `null` until the service is registered; `projectWorldVocabulary` then
-  // publishes `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful,
-  // because a world with no vocabulary store has no world vocabulary.
+  // with PR 7 of epic 1357, and this file carries the producer leg ahead of it: it reads
+  // through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings, which
+  // answers `null` until the service is registered; `projectWorldVocabulary` then publishes
+  // `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful, because a
+  // world with no vocabulary store has no world vocabulary.
   function _worldScopeStores() {
     return {
       component: services.getComponentScopeStore?.() ?? null,
@@ -4809,13 +4829,23 @@ export function createAdminStore(services) {
 
   // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
   // by nothing in `src/` yet: every Phase 8 world route is a placeholder, so no screen calls
-  // one of these. That is a deliberate, stated state rather than dead code — PRs 6a/6b/6c and
-  // 7 wire the screens without reopening this file.
+  // one of these. That is a deliberate, stated state rather than dead code — issue 1374 opened
+  // the prop seam that carries these families to the pages, and PRs 6a/6b/6c and 7 wire their
+  // screens to them.
+  //
+  // THE FOURTH LEG MATCHES THE READ PATH'S (issue 1374). The read path has had an optional
+  // `vocabulary` leg since issue 1362 and this one had three, so PR 7 could see its corpus
+  // projected and had no route to a write path at all. `createWorldScopeActions` mints a family
+  // per key of its OWN `WRITE_DESCRIPTORS`, which declares no `vocabulary`, so this leg is
+  // INERT until the vocabulary lane declares that family in `worldScopeActions.js` — a file it
+  // owns. Supplied here because the store leg is the one half of the pair that lives in a
+  // gateway file.
   const worldScope = createWorldScopeActions({
     getStores: {
       component: () => services.getComponentScopeStore?.() ?? null,
       essence: () => services.getEssenceScopeStore?.() ?? null,
       tool: () => services.getToolScopeStore?.() ?? null,
+      vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
     },
   });
 
@@ -6098,14 +6128,29 @@ export function createAdminStore(services) {
 
   // Tool-breakage authority (issue 419): "toolSpecific" (each tool's own mode +
   // legacy breakTools) | "checkDriven" (the active check's checkBreakage decides
-  // breakage for all required tools). Persisted as a system-level field; the engine
-  // normalizer coerces unknown/missing to "toolSpecific".
+  // breakage for all required tools). Persisted as a system-level field.
+  //
+  // THE THIRD ARGUMENT IS A CLEAR (issue 1374). Anything that is neither token writes
+  // `{ toolBreakage: {} }`, which REMOVES the per-system override and lets the world value
+  // through `resolveToolBreakageAuthority`. This action used to coerce every other argument
+  // to `toolSpecific`, which made "inherit the world break mode" a one-way door: a GM could
+  // author an override and never take it back.
+  //
+  // THE CLEAR WORKS BECAUSE NOTHING ON THE PATH MERGES. `CraftingSystemManager#updateSystem`
+  // builds `{...current, ...updates}`, a SHALLOW merge, so an empty block REPLACES the stored
+  // one rather than merging into it; and since 1.30.0 the normalizer is ABSENCE-PRESERVING —
+  // it emits `toolBreakage` only for a recognized token, and its enclosing literal carries no
+  // `...system` spread — so the absence survives the round trip to disk and back. This is the
+  // structural opposite of the `setFlag` merge trap, and it is asserted end to end in
+  // `tests/crafting-system-tool-normalization.test.js` against the REAL manager, because a
+  // store double whose `updateSystem` ends in `Object.assign` cannot delete a key and so
+  // cannot see the property at all.
   async function setToolBreakageAuthority(authority) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return false;
-    const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
-    await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    const toolBreakage = TOOL_BREAKAGE_AUTHORITIES.includes(authority) ? { authority } : {};
+    await systemManager.updateSystem(sysId, { toolBreakage });
     await refresh();
     return true;
   }

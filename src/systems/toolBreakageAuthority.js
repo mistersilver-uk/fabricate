@@ -11,10 +11,21 @@
  * THE FLIP IS INERT WITHOUT THIS MODULE. Nine sites re-defaulted to `toolSpecific` locally, so
  * making the world half reachable in the resolver changed nothing until the readers went through
  * it. This is the seam the FOUR non-UI readers — the shared breakage evaluator, the two crafting
- * engine decisions and the inventory listing builder's exhaustion projection — now share. The
- * FIVE UI sites are deliberately out of scope: at `1.30.0` no world authority is authored, so
- * their local default and the resolver agree exactly, and the divergence only becomes reachable
- * once the world tool-breakage editor ships.
+ * engine decisions and the inventory listing builder's exhaustion projection — now share.
+ *
+ * THE UI SITES ARE ROUTED TOO, AT ONE POINT, AND NOT THROUGH THIS SEAM (issue 1374). They were
+ * deferred here to the world tool-breakage editor, and that editor cannot discharge the
+ * obligation: four of the five sit in `CraftingSystemManagerRoot.svelte`, which
+ * `### GM World Scoped Entity Routes` requirement 7 closes to the lane that builds it. The fifth
+ * IS the projection the other four read, so the manager's selected-system projection
+ * (`adminSystemInspectorProjection.js`) calls the pure resolver directly, with the world block
+ * passed to it EXPLICITLY by `adminStore` rather than probed. That is `adminStore`'s constraint
+ * rather than the projection's — all eight `game.*` occurrences in `adminStore.js` are comments
+ * and five of them promise it stays that way, while the projection does hold one real probe, for
+ * the learned-knowledge actor index. A probe here would have been the store's first. Publishing
+ * value there routes all five manager surfaces at once and keeps the reader count from growing
+ * with the screens. A manager surface that re-defaults locally is therefore a DEFECT rather than
+ * a duplicate of this seam, and `tests/world-scope-tool-breakage-authority.test.js` gates it.
  *
  * THE WORLD VALUE IS READ THROUGH A LAZY GLOBAL PROBE, not imported. The three consumers are
  * pure-ish domain modules, and `toolScope.js` is a deliberate leaf with no Foundry and no UI in

@@ -33,9 +33,12 @@ CraftingSystem = {
   // "checkDriven": the active check's checkBreakage triggers decide whether ALL
   // required tools break; each Tool's own mode is ignored and each Tool's
   // separate checkBreakable flag decides whether it participates.
-  // Normalized on read (no versioned migration): unknown/missing -> "toolSpecific".
+  // Normalized on read (no versioned migration) and ABSENCE-PRESERVING since 1.30.0: an
+  // unauthored or unrecognized authority persists NO key at all rather than a minted
+  // "toolSpecific", so the world value stays reachable. The read shape is unchanged - the
+  // resolver answers "toolSpecific" when neither scope authored a token.
   toolBreakage: {
-    authority: "toolSpecific" | "checkDriven", // default "toolSpecific"
+    authority: "toolSpecific" | "checkDriven", // whole block ABSENT when unauthored
   },
 
   features: {
@@ -534,7 +537,9 @@ CraftingSystem = {
     The per-tool control stays `checkBreakable`; the prototype's `tool` / `check` / `immune` spellings are not introduced.
     The world half is PERSISTED on `fabricate.toolScope` (issue 1359) and became REACHABLE at `1.30.0`, when this requirement's own normalizer became absence-preserving.
     A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-UI effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver, via the one shared seam `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`).
-    The FIVE UI readers are deliberately not routed yet: the `1.30.0` migration authors no world value, so their local default and the resolver agree exactly, and the divergence becomes reachable only once the world tool-breakage editor ships.
+    The UI readers are routed at ONE point rather than five: the manager's selected-system projection publishes the RESOLVED authority, and every manager surface that draws or gates on it reads that published value.
+    It publishes the AUTHORING SCOPE beside it — one value per branch of the resolver — because a screen that offers "inherit" as a third choice cannot recover that from the resolved token.
+    Routing them at the projection rather than at each reader is what keeps the count from growing with the screens, and it is why a screen that re-defaults locally is a defect rather than a duplicate.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
     Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
     A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
@@ -2320,7 +2325,8 @@ An override of `{}` would therefore ERASE a live in-system block rather than mea
    The world authority therefore stays absent until a GM authors it, which means it is reachable only for a system whose override is cleared, or one created afterwards.
    **The FOUR non-UI effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
    They reach it through ONE shared seam, `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`), which resolves the world value from the published tool scope store and delegates to this requirement's resolver; a second hand-rolled `?? "toolSpecific"` at any call site would re-create the defect the flip removes.
-   The FIVE UI readers are named as the world tool-breakage editor's obligation: at `1.30.0` no world authority is authored, so their local default and the resolver agree exactly.
+   The UI readers are NOT a pending obligation on the world tool-breakage editor: the manager's selected-system projection resolves the authority once and publishes it, so every manager surface that draws or gates on the authority reads that resolved value and none re-defaults locally.
+   This is the same routing `## CraftingSystem` requirement 21a records; it is restated here only because this requirement previously assigned it forward, and the two must not disagree about the same readers.
 
    **THE WORLD AUTHORITY DOES NOT TRAVEL WITH AN IMPORT, IN EITHER DIRECTION** (issue 1364).
    An incoming one is DROPPED by the payload upcast and reported, rather than seeded into an unconfigured destination on the currency and travel precedent: because the migration writes none at all, that precedent would fire on essentially every import and hand a destination world an authority no GM there authored.

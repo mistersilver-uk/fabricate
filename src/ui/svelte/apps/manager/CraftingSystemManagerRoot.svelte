@@ -2784,6 +2784,66 @@
     vocabulary: worldScopeState.vocabulary?.total ?? 0,
   });
 
+  // ── THE WORLD-SCOPE DATA SEAM (issue 1374) ─────────────────────────────────────────────
+  //
+  // Everything a scoped-entity screen needs to draw itself against the world corpus, bundled
+  // once per entity type and spread at each of the TWELVE call sites that take one: the six
+  // world entity pages and the six system-scope entity views.
+  //
+  // IT IS HERE BECAUSE THERE IS NOWHERE ELSE. This corpus registers no component context and
+  // exports no store singleton, and no manager component imports a store module, so a DECLARED
+  // PROP is the only route a value has into a child. Requirement 7 of
+  // `### GM World Scoped Entity Routes` closes this file to the lanes that draw those screens,
+  // which is exactly why the seam they read is wired once, here, ahead of them.
+  //
+  // THREE BUNDLES, NOT THIRTEEN LITERAL BLOCKS. Thirteen near-identical four-line prop blocks
+  // in one file is the shape SonarCloud's new-code duplication gate counts, and `.svelte` IS
+  // duplication-analysed.
+  //
+  // PER ENTITY TYPE, NEVER THE WHOLE FAMILY. Handing a page `store.worldScope` would let a
+  // component screen address `worldScope.tool.setEnabled`. A family's KEY SET is part of its
+  // contract — only the component family has `setWorldTags`, and none of them has a
+  // `setEnabled` the component path must not offer — so each screen gets its own family and
+  // `'setEnabled' in actions` stays false where a screen tests it.
+  //
+  // `systemId` ON A WORLD PAGE IS NOT A LEAK. The bundle is ONE concept, and a world ENTRY
+  // editor legitimately marks the row for the system the GM is working in. A page that does
+  // not need it ignores it, exactly as today's placeholders ignore `onOpenEntry`.
+  //
+  // EVERY FIELD TOLERATES ABSENCE. `adminStore` seeds the full `worldScope` shape on its very
+  // first publish, so in production none of these fallbacks fires; the case they exist for is
+  // a mounted test driving a hand-written `viewState`.
+  //
+  // THESE BUNDLES ARE NOT EVALUATED TODAY, AND THAT IS A PROPERTY OF THE CALL SITES RATHER
+  // THAN OF THIS DECLARATION. Svelte resolves a spread by walking its prop sources in reverse
+  // and stopping at the first that owns the key, so while a child declares NONE of these four
+  // names the bundle behind it is never read at all — measured at eleven of the twelve sites.
+  //
+  // THE HAZARD IS THE REVERSE. A later lane that declares a prop on one of these children which
+  // its call site does NOT pass makes the lookup fall THROUGH to the spread, and every reader
+  // of that prop becomes a live subscriber to the whole bundle — including `scope`, which is a
+  // new object on every publish. That is fine for a value read imperatively from a handler, and
+  // it is a re-render on every world-corpus change for a value read in a reactive scope. Declare
+  // what the site passes, or pass what you declare.
+  const componentScopeProps = $derived({
+    scope: worldScopeState.component ?? null,
+    actions: store?.worldScope?.component ?? null,
+    systems: allSystems,
+    systemId: selectedSystemId || '',
+  });
+  const essenceScopeProps = $derived({
+    scope: worldScopeState.essence ?? null,
+    actions: store?.worldScope?.essence ?? null,
+    systems: allSystems,
+    systemId: selectedSystemId || '',
+  });
+  const toolScopeProps = $derived({
+    scope: worldScopeState.tool ?? null,
+    actions: store?.worldScope?.tool ?? null,
+    systems: allSystems,
+    systemId: selectedSystemId || '',
+  });
+
   // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
   //
   // The three entry routes are the only World screens whose trail is THREE crumbs — the
@@ -10597,42 +10657,65 @@
         `<main class="manager-main">` through the shared `ScopedPlaceholderPage`, carrying a
         per-page `data-scoped-page` hook. These SEVEN FILES are what PRs 6a, 6b, 6c and 7
         replace, which is the whole reason they are separate components rather than seven
-        branches of markup here: no later lane in this epic needs to reopen this file.
+        branches of markup here.
 
         AND THE ROUTE SEAM THOSE LANES CONSUME. A catalogue takes `onOpenEntry(entityId)` and an
         entry takes the `entityId` it was opened on plus the way back to its catalogue. The
         placeholder bodies use none of the four — they render an empty state — but the wiring is
         here rather than in 6a/6b/6c because it is the SHELL that owns routing, the breadcrumb
-        and the confirm-discard gate, and requirement 7 closes this file to all three.
+        and the confirm-discard gate.
+
+        AND THE DATA SEAM, ADDED HERE (issue 1374) FOR THE SAME REASON THE ROUTE SEAM WAS.
+        Issue 1362 wired the routes and handed the pages nothing to read: this corpus registers
+        no component context and exports no store singleton, so a declared prop is the only way
+        a page reaches the published world corpus or the world-scope write path. Six of the
+        seven take one of the three bundles declared above; the seventh, World Vocabulary, is
+        NOT a scoped entity — `### GM World Vocabulary Route` says so — so it takes its own
+        published state under its own name rather than a `scope`.
+
+        THE PLACEHOLDER BODIES DECLARE NO PROPS AT ALL, so every one of these values is inert
+        until the lane that replaces a body declares the ones it wants. That is the point: the
+        seam is open before the screens arrive, and no later lane has to reopen this file to
+        open it.
       -->
       <WorldComponentCataloguePage
+        {...componentScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
       />
     {:else if currentView === 'world-component-entry'}
       <WorldComponentEntryPage
+        {...componentScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-components')}
       />
     {:else if currentView === 'world-essences'}
       <WorldEssenceCataloguePage
+        {...essenceScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
       />
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage
+        {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage
+        {...toolScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
       />
     {:else if currentView === 'world-tool-entry'}
       <WorldToolEntryPage
+        {...toolScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-tools')}
       />
     {:else if currentView === 'world-vocabulary'}
-      <WorldVocabularyPage />
+      <WorldVocabularyPage
+        vocabulary={worldScopeState.vocabulary ?? null}
+        actions={store?.worldScope?.vocabulary ?? null}
+        systems={allSystems}
+      />
     {:else if currentView === 'world-downtime'}
       <main
         class="manager-main"
@@ -11012,10 +11095,12 @@
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
+        {...toolScopeProps}
         tools={libraryToolsList}
         selectedToolId={focusedToolDraft?.id || ''}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+        breakageSource={selectedSystem?.toolBreakage?.source || 'default'}
         onSelectTool={selectLibraryTool}
         onEditTool={openToolEditor}
         onCreateToolDrop={addToolFromDrop}
@@ -11025,6 +11110,7 @@
       />
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
       <ToolEditView
+        {...toolScopeProps}
         tool={focusedToolDraft}
         systemName={selectedSystem.name}
         validation={focusedToolValidation}
@@ -11061,6 +11147,7 @@
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
+        {...essenceScopeProps}
         {essenceCards}
         showSourceUi={showEssenceSourceUi}
         showPropertyMacroUi={showEssencePropertyMacroUi}
@@ -11075,6 +11162,7 @@
       />
     {:else if currentView === 'essence-edit' && selectedSystem}
       <EssenceEditView
+        {...essenceScopeProps}
         essence={selectedEssenceId ? selectedEssenceStrict : null}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         showSourceUi={showEssenceSourceUi}
@@ -11108,6 +11196,7 @@
     {:else if currentView === 'component-edit' && selectedSystem}
       {#if componentForEdit}
         <ComponentEditView
+          {...componentScopeProps}
           component={componentForEdit}
           tagOptions={componentEditTagOptions}
           essenceOptions={componentEditEssenceOptions}
@@ -11163,6 +11252,7 @@
       {/if}
     {:else if currentView === 'components'}
       <ComponentsBrowserView
+        {...componentScopeProps}
         {itemCards}
         itemSearchTerm={$viewState.itemSearchTerm || ''}
         selectedComponentId={selectedComponent?.id || ''}
