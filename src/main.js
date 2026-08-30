@@ -3055,7 +3055,7 @@ class Fabricate {
   _componentAwardSeams() {
     return {
       resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
       findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? [],
       resolveSourceItem: (uuid) => fromUuid(uuid),
       isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
@@ -3115,7 +3115,7 @@ class Fabricate {
       ...this._worldCurrencySeams(),
       isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
       resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
       findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
     };
   }
@@ -3437,7 +3437,7 @@ class Fabricate {
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',
@@ -3743,7 +3743,7 @@ class Fabricate {
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
     const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const submittedItems = resolveAlchemySubmissions(
       sources,
       components,
@@ -4286,9 +4286,9 @@ class Fabricate {
   _resolveJournalTool(systemId, toolId) {
     const system = this.craftingSystemManager?.getSystem(systemId);
     if (!system || !toolId) return null;
-    const tool = (system.tools || []).find((entry) => entry?.id === toolId);
+    const tool = resolvedToolsFor(system).find((entry) => entry?.id === toolId);
     if (!tool) return null;
-    const component = linkedComponentFor(tool, system.components || []);
+    const component = linkedComponentFor(tool, resolvedComponentsFor(system));
     const img = resolveToolDisplayImage(tool, component);
     return {
       id: tool.id,
@@ -4344,7 +4344,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = findById(getDefinitionIndex(system?.components), componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 

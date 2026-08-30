@@ -84,6 +84,11 @@ import { readStackQuantity } from './itemStackQuantity.js';
 // player's panel and the engine that rolls for it cannot disagree. A pure, Foundry-free
 // leaf, so it adds no transitive edge.
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
@@ -350,8 +355,8 @@ export class InventoryListingBuilder {
    * @private
    */
   _buildSystemParticipations(system, sources, allowedRecipeIds = null, isGM = true, order = 0) {
-    const components = Array.isArray(system?.components) ? system.components : [];
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const components = resolvedComponentsFor(system);
+    const tools = resolvedToolsFor(system);
     // A system with tools and ZERO components must still project its owned tools (issue
     // 1119), so the cheap bail-out is the union of both libraries, not components alone.
     if (components.length === 0 && tools.length === 0) {
@@ -852,8 +857,7 @@ export class InventoryListingBuilder {
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
     const essencesEnabled = system?.enableEssences === true;
-    const essenceDefs =
-      essencesEnabled && Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const essenceDefs = essencesEnabled ? resolvedEssencesFor(system) : [];
     const essenceDefById = new Map(essenceDefs.map((def) => [def.id, def]));
 
     // The system's recipes, fetched ONCE per owned system and shared by the used-by
@@ -883,7 +887,7 @@ export class InventoryListingBuilder {
     // it is additive and never wrong, and it still badges a component-linked tool whose
     // owned document resolves to the component but not to the tool.
     const toolComponentIds = new Set(
-      (Array.isArray(system?.tools) ? system.tools : [])
+      resolvedToolsFor(system)
         .filter((tool) => tool?.componentId)
         .map((tool) => tool.componentId)
     );
@@ -947,7 +951,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _toolLookup(system, components) {
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const tools = resolvedToolsFor(system);
     const systemId = stringOrNull(system?.id);
     // A tool's OWN snapshot name first, then its linked component's, mirroring
     // `RecipeManager.toolMatchesItem`'s fallback ordering.
@@ -1434,7 +1438,7 @@ export class InventoryListingBuilder {
     if (!system?.id) return NO_HIDDEN_ENTITIES;
     const { hiddenEntityIds } = computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     return hiddenEntityIds;
   }
@@ -1631,7 +1635,7 @@ export class InventoryListingBuilder {
   _salvageToolStates({ system, salvage, componentById, targetActor }) {
     const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
     if (ids.length === 0) return [];
-    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const library = resolvedToolsFor(system);
     const seen = new Set();
     const tools = [];
     for (const rawId of ids) {
@@ -1904,7 +1908,7 @@ export class InventoryListingBuilder {
    */
   _toolForComponentId(system, componentId) {
     if (!componentId) return null;
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const tools = resolvedToolsFor(system);
     return tools.find((entry) => entry?.componentId === componentId) ?? null;
   }
 
@@ -2222,7 +2226,7 @@ export class InventoryListingBuilder {
    */
   _toolComponentByIdMap(system) {
     const toolComponentById = new Map();
-    for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
+    for (const tool of resolvedToolsFor(system)) {
       if (tool?.id && tool.componentId) toolComponentById.set(tool.id, tool.componentId);
     }
     return toolComponentById;
@@ -2334,7 +2338,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _indexIngredientOptions(group, { componentUsedBy, recipeEntry, seen, system }) {
-    const systemComponents = Array.isArray(system?.components) ? system.components : [];
+    const systemComponents = resolvedComponentsFor(system);
     for (const option of Array.isArray(group?.options) ? group.options : []) {
       for (const componentId of this._optionConsumedComponentIds(option, systemComponents)) {
         pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'ingredient' }, seen);
@@ -2374,7 +2378,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _indexSalvageProducers(system, addProduced) {
-    for (const source of Array.isArray(system?.components) ? system.components : []) {
+    for (const source of resolvedComponentsFor(system)) {
       if (source?.salvage?.enabled !== true) continue;
       const value = {
         kind: 'salvage',

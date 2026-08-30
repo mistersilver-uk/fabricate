@@ -1,4 +1,5 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -863,7 +864,7 @@ export class ResolutionModeService {
     const allGroups = this._allResultGroups({ recipe, step });
     const group = allGroups[0];
     if (!group) return [];
-    const index = getDefinitionIndex(system?.components);
+    const index = getDefinitionIndex(resolvedComponentsFor(system));
     return this._orderProgressiveResults(recipe, group.results || []).map((result) => {
       const componentId = result?.componentId || result?.systemItemId || null;
       return {
@@ -1027,7 +1028,7 @@ export class ResolutionModeService {
 
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
-    const item = findById(getDefinitionIndex(system?.components), componentId);
+    const item = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;
   }

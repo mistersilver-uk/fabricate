@@ -12,6 +12,7 @@ import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import {
   buildFlagMapFromEntries,
   isDirectlyDeletableId,
@@ -1384,7 +1385,7 @@ export class RecipeVisibilityService {
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) || [];
     return computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
   }
 

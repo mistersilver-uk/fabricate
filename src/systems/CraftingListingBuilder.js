@@ -55,6 +55,7 @@ import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipe
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
@@ -1207,7 +1208,7 @@ export class CraftingListingBuilder {
     const results = Array.isArray(group?.results) ? group.results : [];
     if (results.length === 0) return [];
 
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const byId = new Map(components.map((component) => [component.id, component]));
     // The ENGINE'S difficulty lookup, not a local re-implementation — see
     // `ResolutionModeService.getDifficulty`. Parity here is what keeps the displayed
@@ -1271,7 +1272,7 @@ export class CraftingListingBuilder {
    */
   _resultItemsFromGroups(groups, system) {
     if (!Array.isArray(groups) || groups.length === 0) return [];
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const byId = new Map(components.map((component) => [component.id, component]));
     const items = [];
     for (const group of groups) {

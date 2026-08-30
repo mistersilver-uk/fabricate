@@ -68,6 +68,7 @@ import {
   buildLinkedVisualFlags,
 } from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
+import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 
 /** Fallback tile image when no tool/task icon can be resolved. */
 const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
@@ -1078,7 +1079,7 @@ class InteractableManager {
       const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem?.(classification.systemId);
       const componentId = entry?.componentId;
-      const component = (system?.components ?? []).find(
+      const component = resolvedComponentsFor(system).find(
         (c) => String(c?.id ?? '') === String(componentId)
       );
       const img = component?.img;
@@ -1107,7 +1108,7 @@ class InteractableManager {
     return {
       getTool: ({ systemId, toolId }) => {
         const system = systemManager?.getSystem?.(systemId);
-        return (system?.tools ?? []).find((tool) => tool?.id === toolId) ?? null;
+        return resolvedToolsFor(system).find((tool) => tool?.id === toolId) ?? null;
       },
       getTask: ({ systemId, taskId }) => {
         const tasks = this._readLibraryTasks(systemId);

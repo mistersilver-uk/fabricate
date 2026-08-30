@@ -9,6 +9,7 @@ import {
   resolveGatheringCompositionMode,
 } from './gatheringComposition.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import {
   DANGER_LEVELS,
   evaluateEnvironmentMatch,
@@ -504,12 +505,20 @@ export class GatheringEnvironmentStore {
 
   _getSystemItem(systemId, componentId) {
     if (!systemId || !componentId) return null;
+    // Repointed at issue 1370 onto the READ accessor, with `getItems` kept as the fallback for
+    // a manager double that stubs only the older name.
+    if (this.systemManager?.getComponentsForSystem) {
+      return (
+        this.systemManager
+          .getComponentsForSystem(systemId)
+          .find((item) => item?.id === componentId) || null
+      );
+    }
     if (this.systemManager?.getItems) {
       return this.systemManager.getItems(systemId).find((item) => item?.id === componentId) || null;
     }
     const system = this._getSystem(systemId);
-    const items = Array.isArray(system?.components) ? system.components : [];
-    return items.find((item) => item?.id === componentId) || null;
+    return resolvedComponentsFor(system).find((item) => item?.id === componentId) || null;
   }
 
   async _removeRunsForSystem(systemId) {

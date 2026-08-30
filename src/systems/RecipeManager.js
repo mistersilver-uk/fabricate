@@ -33,6 +33,11 @@ import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
+import {
   corpusDelta,
   patchCorpusInPlace,
   REVISION_SCOPES,
@@ -280,7 +285,7 @@ export class RecipeManager {
       getComponentsForSystem: (id) =>
         typeof systemManager.getComponentsForSystem === 'function'
           ? systemManager.getComponentsForSystem(id)
-          : systemManager.getSystem(id)?.components || [],
+          : resolvedComponentsFor(systemManager.getSystem(id)),
     };
   }
 
@@ -1168,7 +1173,7 @@ export class RecipeManager {
     const components =
       typeof systemManager.getComponentsForSystem === 'function'
         ? systemManager.getComponentsForSystem(systemId)
-        : system?.components;
+        : resolvedComponentsFor(system);
     return {
       recipesToken: this._revisions.read(REVISION_SCOPES.recipesOfSystem(systemId)),
       systemToken:
@@ -1339,7 +1344,7 @@ export class RecipeManager {
 
     const { blocksSystem } = computeSystemVisibility(system, {
       recipes: this.getRecipes({ craftingSystemId: systemId }),
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     cache.set(systemId, blocksSystem === true);
     return blocksSystem === true;
@@ -2504,7 +2509,7 @@ export class RecipeManager {
   _resolveEssenceDefinition(recipe, type) {
     const systemId = recipe?.craftingSystemId;
     const system = systemId ? this._systemManager()?.getSystem(systemId) : null;
-    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     return definitions.find((def) => def?.id === type) ?? null;
   }
 
@@ -2653,7 +2658,7 @@ export class RecipeManager {
       const id = String(rawId ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      const tool = (system.tools || []).find((entry) => entry?.id === id) || null;
+      const tool = resolvedToolsFor(system).find((entry) => entry?.id === id) || null;
       if (tool) tools.push(tool);
     }
     return tools;
@@ -2668,7 +2673,7 @@ export class RecipeManager {
     if (!systemId || !toolId) return null;
     const system = this._resolveCraftingSystem(systemId);
     if (!system) return null;
-    return (system.tools || []).find((tool) => tool?.id === toolId) || null;
+    return resolvedToolsFor(system).find((tool) => tool?.id === toolId) || null;
   }
 
   /**
@@ -2874,7 +2879,7 @@ export class RecipeManager {
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return findById(getDefinitionIndex(system.components), componentId);
+    return findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
   }
 
   /**
@@ -3050,7 +3055,7 @@ export class RecipeManager {
     if (!systemId) return [];
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
-    return Array.isArray(system?.components) ? system.components : [];
+    return resolvedComponentsFor(system);
   }
 
   /**
@@ -3064,7 +3069,7 @@ export class RecipeManager {
     if (!systemId) return [];
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
-    return Array.isArray(system?.tools) ? system.tools : [];
+    return resolvedToolsFor(system);
   }
 
   /**
@@ -3507,7 +3512,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     const validEssenceIds = new Set(definitions.map((def) => def.id));
     const essenceNames = this._essenceNameMap(definitions);
 
@@ -3575,7 +3580,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     // Only a DEFINED essence can be disabled; an unknown id is `_validateEssenceReferences`'s
     // business and is already reported there, so it is not reported twice here.
     const disabled = new Map(
