@@ -4557,6 +4557,18 @@ export function createAdminStore(services) {
     // rail resolves granted character ids over this, NOT the PC-filtered roster.
     const accessCharacters = services.getAccessCharacterActors?.() || [];
 
+    // ONE READ OF THE WORLD CORPUS PER PUBLISH (issue 1374), hoisted here so the selected-system
+    // projection and the published `worldScope` key are computed from the SAME snapshot.
+    //
+    // It was two reads: this projection took `getToolScopeStore().corpus().toolBreakage` for
+    // itself while `buildWorldScopeState()` took the same value again at publish time, on the
+    // far side of four `await`s. Two reads of one seam can disagree, and the direct one skipped
+    // the `readCorpus` try/catch its two siblings both carry and both call mandatory — a store
+    // that threw would have aborted this whole branch and left the GM a Manager whose entire
+    // selected-system half never populated. Reading the PROJECTED value inherits that guard
+    // instead of restating it.
+    const worldScopeState = buildWorldScopeState();
+
     let selectedSystemData = null;
     let essenceCards = [];
     let recipeListData = {
@@ -4616,7 +4628,7 @@ export function createAdminStore(services) {
         systemRecipes
       );
 
-      // The WORLD tool-breakage block, read from the store seam this module already holds and
+      // The WORLD tool-breakage block, taken off the corpus this publish already projected and
       // passed EXPLICITLY (issue 1374). The projection resolves the effective authority from
       // it, so the manager surfaces that draw or gate on the authority stop re-defaulting the
       // system's own token. It is threaded rather than probed through a lazy global read
@@ -4629,7 +4641,7 @@ export function createAdminStore(services) {
         essenceDefinitions,
         availableScriptMacros,
         sceneOptions,
-        services.getToolScopeStore?.()?.corpus?.()?.toolBreakage ?? null
+        worldScopeState.worldScope?.tool?.toolBreakage ?? null
       );
       recipeListData = _buildRecipeList(
         systemManager,
@@ -4766,7 +4778,7 @@ export function createAdminStore(services) {
       ...travel.buildState(),
       ...buildWorldCurrencyState(),
       ...buildCharacterLibrariesState(),
-      ...buildWorldScopeState(),
+      ...worldScopeState,
     }));
   }
 
