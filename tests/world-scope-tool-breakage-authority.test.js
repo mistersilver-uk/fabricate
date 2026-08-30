@@ -124,6 +124,7 @@ test('all FOUR non-UI readers route through the resolver, and NONE re-defaults l
       'and the inventory listing builder exhaustion projection'
   );
 });
+
 test('the UI readers are routed at ONE point: the selected-system projection (issue 1374)', () => {
   // THE STATE THIS REPLACES. Issue 1363 routed the four non-UI readers and deferred the five UI
   // ones, and this test asserted the deferral positively — five local re-defaults, counted. The
@@ -155,24 +156,57 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
     'and publishes the AUTHORING SCOPE beside it, which a resolved token cannot carry'
   );
 
-  // The four carrier sites, all reading the PUBLISHED field off `selectedSystem`. A fifth
-  // `.authority` read rooted anywhere else would be a screen re-defaulting on a raw system.
+  // ── EVERY `toolBreakage` READ IN THE SHELL, NOT JUST TODAY'S SPELLING OF ONE ───────────
+  //
+  // The version of this that shipped in the first round matched the literal
+  // `toolBreakage?.authority`, and three separate re-default spellings walked straight past it
+  // — each measured, each leaving the suite green:
+  //
+  //   1. `selectedSystem.toolBreakage.authority === 'checkDriven' ? … : 'toolSpecific'`
+  //   2. `const rawTb = $derived(allSystems[0]?.toolBreakage);` then `rawTb?.authority === …`
+  //   3. `allSystems[0]?.toolBreakage?.['authority'] ?? 'toolSpecific'`
+  //
+  // The SECOND is the one that matters, and no widening of an `…authority` pattern can ever
+  // see it: an alias binds the BLOCK and re-defaults off the alias, so the word `authority`
+  // never appears next to the word `toolBreakage` at all. So this does not scan for authority
+  // reads. It scans for every property access named `toolBreakage` and requires each one to be
+  // a member of a closed set.
+  //
+  // WHY THAT IS THE LOAD-BEARING GUARD RATHER THAN A TIDIER ONE. Of the four manager surfaces
+  // that read this field, exactly ONE has behavioural coverage — the Tool Studio radiogroup, in
+  // `manager-mounted.test.js`. A projection mutated to ignore the world scope entirely leaves
+  // this file green, `stores/adminStore.test.js` green, and reds only that one mounted case.
+  // The other three reads have no behavioural gate anywhere, and this assertion is all they
+  // have. A row taken from `$viewState.systems` is a RAW crafting system that, after the
+  // 1.30.0 flip, carries no `toolBreakage` key at all when nothing was authored — so
+  // `systemRow.toolBreakage.authority || 'toolSpecific'` answers `toolSpecific` while the world
+  // says `checkDriven`, silently, at a surface nothing photographs.
+  //
+  // PROSE IS NOT A READ. The pattern requires a `.` or `?.` immediately before the name, so a
+  // comment discussing `toolBreakage`, and the unrelated `toolBreakagePolicy` on the gathering
+  // realm rules, are both outside it — the latter by the word boundary.
   const root = readSource('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-  const authorityReads = root.match(/[A-Za-z?.]*toolBreakage\?\.authority/g) ?? [];
-  assert.equal(
-    authorityReads.length,
-    4,
-    'four manager surfaces draw or gate on the authority: the Tool library radiogroup, the Tool ' +
-      'editor, and the two check editors'
+  const TOOL_BREAKAGE_READ = /[A-Za-z0-9_$?.[\]'"]*\??\.toolBreakage\b[A-Za-z0-9_$?.[\]'"]*/g;
+  const reads = root.match(TOOL_BREAKAGE_READ) ?? [];
+  assert.ok(reads.length > 0, 'the shell reads this field somewhere; a zero count is a broken scan');
+  const tally = new Map();
+  for (const read of reads) tally.set(read, (tally.get(read) ?? 0) + 1);
+  assert.deepEqual(
+    [...tally.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    [
+      ['selectedSystem?.toolBreakage?.authority', 4],
+      ['selectedSystem?.toolBreakage?.source', 1],
+    ],
+    'every `toolBreakage` access in the shell reads the PUBLISHED projection off ' +
+      '`selectedSystem`. FOUR read the resolved authority — `ChecksView` gates on it (and fans ' +
+      'out internally to crafting, salvage and gathering rather than being three editors), ' +
+      '`ToolsBrowserView` authors it, `ToolEditView` reads it, and `tools/ToolBrowserInspector` ' +
+      'draws the per-tool behaviour copy from it — and ONE carries the authoring scope to the ' +
+      'control. Anything else, including an alias bound to the block itself, is a screen ' +
+      're-defaulting on a raw crafting system'
   );
-  for (const read of authorityReads) {
-    assert.equal(
-      read,
-      'selectedSystem?.toolBreakage?.authority',
-      'every one reads the PUBLISHED projection field, never a raw crafting system'
-    );
-  }
 });
+
 test('the normalizer flip is absence-preserving and keeps a recognised token', async () => {
   const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
   const manager = new CraftingSystemManager({ getRecipes: () => [] });

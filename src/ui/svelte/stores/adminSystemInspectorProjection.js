@@ -530,10 +530,16 @@ export function buildSelectedSystemViewData(
     // RESOLVED HERE, ONCE, FOR ALL FIVE UI READERS (issue 1374). This used to re-default the
     // system's own token locally, which re-created at this call site exactly the
     // unreachability that 1.30.0's absence-preserving normalizer removed: a system that
-    // authored nothing read `toolSpecific` however the world was configured. Every manager
-    // surface that draws or gates on the authority reads THIS field — the Tools page's
-    // radiogroup, the Tool editor, and the two check editors — so routing it here routes all
-    // of them, and keeps the count of readers from growing with the screens.
+    // authored nothing read `toolSpecific` however the world was configured.
+    //
+    // FOUR MANAGER SURFACES READ THIS FIELD, and they are named exactly because this is the
+    // map a lane forbidden to reopen the shell has to navigate by: `ChecksView`, which GATES on
+    // it and fans out internally to the crafting, salvage and gathering editors rather than
+    // being three of them; `ToolsBrowserView`, which AUTHORS it through the segmented control;
+    // `ToolEditView`; and `tools/ToolBrowserInspector`, the Tools right rail, which DRAWS it —
+    // `projectToolBehaviorFacts` turns the authority into the per-tool "Immune" / "Roll to
+    // break" / "{n}% break" copy. Routing here routes all four, and keeps the count of readers
+    // from growing with the screens.
     //
     // AND THE AUTHORING SCOPE BESIDE IT. A control that offers "inherit" as a third choice
     // cannot recover from a RESOLVED token which scope produced it: `checkDriven` looks the
