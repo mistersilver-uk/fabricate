@@ -321,6 +321,23 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/progressiveStageComplications.js',
   'src/utils/complicationPlan.js',
   'src/utils/componentComplications.js',
+  // Same rule, issue 1370: `CraftingListingBuilder` and `inventorySnapshot` no longer read
+  // `system.components` directly. They enter through the SHARED READ SEAM, which is the one
+  // door onto the world-scope read union. These SEVEN entries are that seam's whole closure —
+  // scopedEntityReads -> componentScope + essenceScope + toolScope (+ definitionIndex, already
+  // listed above), each of those -> scopedDefinitionStore + scopedDefinitions, and
+  // scopedDefinitionStore -> worldScopeEntityGrouping, which imports nothing.
+  //
+  // The migration module is here for its LIFTED IDENTITY FIELD LIST alone: the union deletes
+  // every identity field the in-system record does not carry, and that list has exactly one
+  // definition in the tree.
+  'src/systems/scopedEntityReads.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/systems/scopedDefinitions.js',
+  'src/migration/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 

@@ -41,6 +41,17 @@ const harness = createMountedComponentHarness({
     'src/systems/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
+    // Issue 1370 (epic 1357, PR 8a): the listing builder and the inventory snapshot enter
+    // through the SHARED READ SEAM rather than reading `system.components` directly, and
+    // these seven are that seam's whole closure. Same mechanical rule as everything else in
+    // this list: drop one and this suite HANGS (`# cancelled`) rather than fails.
+    'src/systems/scopedEntityReads.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/systems/toolScope.js',
+    'src/systems/scopedDefinitions.js',
+    'src/systems/scopedDefinitionStore.js',
+    'src/migration/worldScopeEntityGrouping.js',
     'src/systems/invalidationDomains.js',
     'src/systems/itemStackQuantity.js',
     'src/systems/passInventorySnapshot.js',
