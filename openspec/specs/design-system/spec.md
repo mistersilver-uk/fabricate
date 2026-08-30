@@ -344,6 +344,23 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **THEN** each row leads with its kind-tinted chip
 - **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
 
+### Requirement: Simple and alchemy carry a reserved failure group
+
+`simple` and alchemy-simple do not route: one ingredient set, one success result group, and nothing to assign.
+They MAY carry a second group selected BY ROLE — the results a failed check awards — and that group is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
+
+A role-selected group carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
+Validation counts only the non-failure group toward the exactly-one-success-group rule, so carrying a failure group never makes a simple recipe invalid.
+
+A result group name MUST NOT be a reserved failure keyword, because the routed modes match an outcome against those words and a group borrowing one would be selected by the failure path rather than by its tier.
+`progressive` has no reserved failure group at all.
+
+#### Scenario: A GM allows results on a failed craft
+
+- **WHEN** a simple or alchemy recipe is set to award results on failure
+- **THEN** a second result group appears, marked as filled by role rather than by assignment
+- **AND** it offers no source list, because nothing routes to it
+
 ### Requirement: Sets and groups are the container layer above the row
 
 An INGREDIENT SET holds what a craft consumes and a RESULT GROUP holds what it produces.
@@ -365,11 +382,17 @@ A set MUST NOT name more than one group: the engine would have no basis to choos
 Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
 Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
 
+A result group is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
+Wherever a group appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
+Assignment is possible from EITHER end — the set or tier names its group, or the group takes a source — because a GM arrives at the relation from both directions.
+
 The routing relation MUST be stated in BOTH directions.
 The thing that routes names its group, and the GROUP names its sources: the ingredient sets that select it, or the outcome tiers that do.
 Without the inbound direction a GM editing a group cannot tell what reaches it, and cannot tell that editing it changes what two sets or two tiers award.
 Where several sources share a group, each source says the target is shared and how many sources hold it.
 A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
+
+An assignment list MUST reserve a fixed trailing column for its shared-target marker, so that the control naming the group sits at one position down the list and a marker appearing on one row does not move the control on it.
 
 The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
