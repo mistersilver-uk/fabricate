@@ -186,6 +186,33 @@ A continuous scale cut into named regions is a range bar whose spans tile; an or
 - **THEN** the list row renders a status button
 - **AND** the editor renders a toggle
 
+### Requirement: An ordered row opens in place to its editing body
+
+Where a record is authored inside the list that orders it — recipe steps, component complications, result tiers, settlement tiers — the row MUST expand in place rather than opening a separate editor.
+The list owns three disclosure modes: a single-open accordion, an always-open mode that renders every body and drops the disclosure control, and the plain collapsed list where rows carry no body at all.
+The always-open mode is REQUIRED wherever the body is the entire subject of the surface, because a single-expand accordion on such a surface defaults to showing nothing and ships unseen.
+
+The row itself MUST remain a non-interactive element and the disclosure MUST be the only button in it.
+A whole-row button nests the row's own delete and menu controls, which is invalid DOM that `createElement` accepts and no mounted test detects.
+The disclosure carries `aria-expanded` and an `aria-controls` pointing at the body region, and its accessible name is the record it opens.
+
+Disclosure state and drag state MUST live in the list and be keyed by record id, not lifted into the store the list renders from.
+Every persisted edit refreshes that store, and state held there collapses the row the GM is editing.
+
+An adder for the collection MUST render as the list's own footer rather than as a sibling of the list, so it stays in flow with the collection it extends.
+
+#### Scenario: A GM edits a field inside an expanded row
+
+- **WHEN** a GM changes a field in an expanded row and the edit persists
+- **THEN** the store refreshes
+- **AND** the row stays open, because the disclosure state is keyed by record id in the list
+
+#### Scenario: A surface exists only to show the row bodies
+
+- **WHEN** a tab's entire subject is the content of each row body
+- **THEN** the list renders in always-open mode
+- **AND** it drops the disclosure control rather than defaulting every row to collapsed
+
 ### Requirement: One blocking notice, and non-blocking notices stack
 
 A page MUST show at most one BLOCKING notice at a time, and a second blocking notice replaces the first.

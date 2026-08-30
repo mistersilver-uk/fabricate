@@ -1196,7 +1196,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag.</p></div>
+    <div class="spec-head"><h4>&lt;SortableList&gt;</h4><p class="why">Where order is the meaning. Both affordances always: drag the grip, or step the row with the chevrons — a single-position nudge is faster than a drag. A row also <b>opens in place</b> to its editing body, which is how recipe steps, component complications and result tiers are all authored.</p></div>
     <div class="stage col">
       <div style="display:grid;gap:6px">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)">
@@ -1221,10 +1221,58 @@ a{color:var(--fab-accent)}
       </div>
       <span class="k-hint">At the ends the unavailable chevron dims &mdash; it never hides. The numbered badge is what makes order legible once the list scrolls.</span>
     </div>
+    <div class="stage col" style="border-top:1px solid var(--fab-border)">
+      <div class="unit"><span class="cap">expanded &mdash; the row opens to its editing body</span>
+        <div style="display:grid;gap:6px">
+          <div style="border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-accent-border)">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px">
+              <svg class="i" style="width:14px;height:14px;color:var(--fab-text-subtle);cursor:grab"><use href="#i-grip"/></svg>
+              <span style="width:22px;height:22px;border-radius:6px;background:var(--fab-surface-raised);display:grid;place-items:center;font-family:var(--fab-font-mono);font-size:10px;font-weight:700">2</span>
+              <div class="grow"><div style="font-family:var(--fab-font-serif);font-size:12.5px;font-weight:600">Brittle temper</div><div class="k-hint">When the award is missed or 1d20 = 1 &middot; rolls 2d6</div></div>
+              <span class="k-badge warning">Major</span>
+              <button class="k-btn icon" aria-expanded="true"><svg class="i"><use href="#i-cu"/></svg></button>
+              <button class="k-btn bare"><svg class="i" style="width:9px;height:9px"><use href="#i-trash"/></svg></button>
+            </div>
+            <div style="padding:0 12px 12px">
+              <div class="k-well" style="display:grid;gap:12px">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+                  <div class="k-lbl grow" style="min-width:180px"><span class="k-kicker">Name</span><div class="k-field inline">Brittle temper</div></div>
+                  <div class="k-lbl"><span class="k-kicker">Severity</span><div class="k-seg"><button>Minor</button><button class="sel">Major</button><button>Severe</button></div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px"><div class="grow"><div style="font-size:12.5px;font-weight:600">Shown to the player</div><div class="k-hint">They see the complication when it fires.</div></div><div class="k-tog on"><i></i></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border)">
+            <svg class="i" style="width:14px;height:14px;color:var(--fab-text-subtle);cursor:grab"><use href="#i-grip"/></svg>
+            <span style="width:22px;height:22px;border-radius:6px;background:var(--fab-surface-raised);display:grid;place-items:center;font-family:var(--fab-font-mono);font-size:10px;font-weight:700">3</span>
+            <div class="grow"><div style="font-family:var(--fab-font-serif);font-size:12.5px;font-weight:600">Shattered edge</div><div class="k-hint">When the check is a critical failure</div></div>
+            <span class="k-badge danger">Severe</span>
+            <button class="k-btn icon" aria-expanded="false"><svg class="i"><use href="#i-cd"/></svg></button>
+            <button class="k-btn bare"><svg class="i" style="width:9px;height:9px"><use href="#i-trash"/></svg></button>
+          </div>
+        </div>
+        <button class="k-btn dashed full" style="margin-top:6px"><svg class="i"><use href="#i-plus"/></svg>Add complication</button>
+        <span class="k-hint">One row open at a time. The chevron is the <b>only</b> disclosure trigger &mdash; the row itself stays a <code>&lt;div&gt;</code>, because a whole-row button would nest the delete button inside it. The adder is the list&rsquo;s <code>footer</code>, not a sibling of the list.</span></div>
+      <div class="unit"><span class="cap">always-open &mdash; no disclosure, every row rendered</span>
+        <div style="display:grid;gap:6px">
+          <div style="border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);padding:12px;display:grid;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-surface-raised);display:grid;place-items:center;font-family:var(--fab-font-mono);font-size:10px;font-weight:700">1</span><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:12.5px;font-weight:600">Draw the billet</div></div><span class="k-badge">4 h</span></div>
+            <div class="k-well"><span class="k-kicker">Results</span></div>
+          </div>
+          <div style="border-radius:9px;background:var(--fab-bg-1);border:1px solid var(--fab-border);padding:12px;display:grid;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px"><span style="width:22px;height:22px;border-radius:6px;background:var(--fab-surface-raised);display:grid;place-items:center;font-family:var(--fab-font-mono);font-size:10px;font-weight:700">2</span><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:12.5px;font-weight:600">Fold &amp; quench</div></div><span class="k-badge">6 h</span></div>
+            <div class="k-well"><span class="k-kicker">Results</span></div>
+          </div>
+        </div>
+        <span class="k-hint">A tab whose whole subject is the body content renders every row open and drops the chevron. A single-expand accordion on those tabs showed <b>nothing</b> by default, so the most mode-dependent surfaces shipped unseen.</span></div>
+    </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul><li><b>row</b> padding 12 · radius 9 · bg-1 · gap 12</li><li><b>chevron pair</b> 24&times;24 hit area each, so each meets the target minimum</li><li><b>keyboard</b> focus the grip, &uarr;&darr; moves — <b>and the keyboard-focus opt-out</b>, or the arrows also pan the canvas</li><li><b>announce</b> &ldquo;Moved {name} to position {n} of {total}&rdquo;, after focus lands</li></ul></div>
-      <div><h5>Svelte API</h5><ul><li><b>items</b> any[] — order is the array order</li><li><b>onReorder</b> (from, to) <span class="req">required</span></li><li><b>itemLabel</b> (item) <span class="req">required</span> — the announcement needs a name</li><li><b>numbered · handles · removable</b></li></ul></div>
+      <div><h5>Svelte API</h5><ul><li><b>items</b> any[] — order is the array order</li><li><b>onReorder</b> (from, to) <span class="req">required</span></li><li><b>itemLabel</b> (item) <span class="req">required</span> — the announcement needs a name</li><li><b>numbered · handles · removable</b></li><li><b>expandable</b> boolean · <b>expandedId</b> <span class="req">bindable</span> · <b>onToggle</b></li><li><b>alwaysOpen</b> boolean — renders every row open and drops the disclosure</li><li><b>body</b> (item, index) snippet · <b>footer</b> snippet — the adder belongs to the list</li></ul></div>
     </div>
+    <div class="delta"><b>Three rules the expanded row depends on.</b> The row is a <code>&lt;div&gt;</code> and the disclosure is the sole <code>&lt;button&gt;</code>: a whole-row button nests the delete control, which is invalid DOM that <code>createElement</code> accepts and no mounted test notices. Disclosure and drag state are <b>local to the list and keyed by record id</b>, so they survive the store refresh that follows every persisted edit — lift them to the store and a row collapses under the GM mid-edit. And <code>alwaysOpen</code> is a real mode rather than a caller convenience: on a tab whose entire subject is the body, a single-expand accordion defaults to showing nothing.<span class="cite"><b>RecipeStepAccordion.svelte:9-16, 48-52</b> · <b>ComplicationSummaryRow.svelte</b> (6 call sites) · <b>RowDisclosure.svelte</b></span></div>
+    <div class="delta warn"><b>Open decision: what happens to a collapsed body.</b> Two shipped accordions <em>unmount</em> it — the step accordion and the complication row both render the body only while open. The Checks Studio trigger card instead <b>keeps it in the DOM under <code>display:none</code></b>, and canon states its reason: one markup tree rather than a second rendering path, with the controls still out of the tab order. Both are defensible and they are not interchangeable — unmounting discards uncommitted field state, retention holds it. The set must pick one and say which, or callers will keep choosing by accident.<span class="cite"><b>ui-integration/spec.md</b> (row-disclosure requirement) · <b>RecipeStepAccordion.svelte:198</b> · <b>ComplicationSummaryRow.svelte:233</b></span></div>
     <div class="delta warn"><b>Live defect found while reviewing this.</b> The shipped band strip is a <code>&lt;span role="slider" tabindex="0"&gt;</code> handling arrows and Page keys, and the keyboard-focus opt-out appears <b>nowhere in the tree</b> — zero occurrences across <code>src/</code> and <code>styles/</code>. Every band nudge currently also pans the canvas, and every Page key also zooms. Worth its own issue, independent of this reference.<span class="cite"><b>ThresholdBandStrip.svelte:412-433</b></span></div>
   </div>
 
@@ -1376,6 +1424,7 @@ a{color:var(--fab-accent)}
       <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Show a number the GM can change</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>Stepper</b></td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">StatBox</td></tr>
       <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Cut a continuous scale into named regions</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>RangeBar</b> — spans tile, dividers drag</td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">TierTrack</td></tr>
       <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Show position along an ordered set of named tiers</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>TierTrack</b> — discrete, with a you-are-here marker</td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">RangeBar or Meter</td></tr>
+      <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Author a record inside the list that orders it</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>SortableList</b> with <code>expandable</code> — the row opens in place</td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">A separate editor screen</td></tr>
       <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Add a row to the collection below</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b>Button role=&ldquo;dashed&rdquo;</b>, in flow with the collection</td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">A separate AddButton</td></tr>
       <tr><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text);font-weight:600;vertical-align:top">Confirm a destructive action</td><td style="padding:11px 14px 11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-secondary);vertical-align:top"><b><code>confirmDialog</code></b> by default; arm-then-confirm only for a high-frequency row action or a bulk action that states impact in-panel</td><td style="padding:11px 0;border-bottom:1px solid var(--fab-border);color:var(--fab-text-subtle);vertical-align:top">A bespoke panel</td></tr>
       <tr><td style="padding:11px 14px 11px 0;color:var(--fab-text);font-weight:600;vertical-align:top">Point a record at a game-world document</td><td style="padding:11px 14px 11px 0;color:var(--fab-text-secondary);vertical-align:top"><b>LinkField</b>, storing a <b>uuid</b></td><td style="padding:11px 0;color:var(--fab-text-subtle);vertical-align:top">A bare id</td></tr>
