@@ -52,7 +52,7 @@
  * bundle declarations of four keys each. Break the parse and this file reds on the counts.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -381,8 +381,8 @@ test('(d) the root gains no import: its script specifier set is unchanged', () =
   );
 });
 
-test('every case that RENDERS the shared placeholder body also CLAIMS it, and only those', () => {
-  // Criterion 4, as a biconditional rather than as two named cases.
+test('every case whose PAGE renders the shared placeholder body also claims it, and only those', () => {
+  // Criterion 4, as a biconditional over what the PAGE SOURCE actually renders.
   //
   // NEITHER VIEW-LAB COVERAGE TEST CAN SEE THIS. `ScopedPlaceholderPage` is inside the lab
   // closure through seven routes and is claimed by SOME case whatever happens, so a claim on a
@@ -395,23 +395,70 @@ test('every case that RENDERS the shared placeholder body also CLAIMS it, and on
   // before 6c. Requiring the claim to track RENDERING removes the ordering assumption — a lane
   // that replaces a body deletes that route's claim in the same change, and this reds if it
   // forgets, in either direction.
+  //
+  // ── AND WHY "RENDERS" IS READ OFF THE PAGE AND NOT OFF `expectSelector` ────────────────
+  //
+  // The first version of this asked whether a case's `expectSelector` names `data-scoped-page`.
+  // That is the predicate "is a world scoped route", which is not the same question and never
+  // becomes it: `ScopedPlaceholderPage` documents that hook as "what a later lane replaces
+  // rather than RENAMES", and `### GM World Scoped Entity Routes` requirement 3 obliges every
+  // one of these routes to carry it. So the proxy stays true forever while its subject goes
+  // away — and the inversion is total. A lane that replaced a body and correctly deleted the
+  // stale claim would have been RED, told to put the claim back; a lane that left the stale
+  // claim would have been GREEN. Worse than no guard, because it instructs four later lanes to
+  // restore exactly the state this exists to prevent.
+  //
+  // Reading the page source has none of that: a body that no longer calls the shared component
+  // no longer imports it, and the question is answered by the thing it is about.
   const PLACEHOLDER = 'src/ui/svelte/apps/manager/scoped/ScopedPlaceholderPage.svelte';
-  const rendersPlaceholder = (viewCase) =>
-    typeof viewCase.expectSelector === 'string' &&
-    viewCase.expectSelector.includes('data-scoped-page');
+  const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
+
+  // Route token → the page that owns it. Both spellings are accepted deliberately: a page that
+  // delegates its body declares `pageId="<token>"` on the shared component, and a page with its
+  // own body carries `data-scoped-page="<token>"` on its own `<main>`. The map therefore keeps
+  // resolving across exactly the transition this guard has to survive.
+  const pageByRoute = new Map();
+  for (const file of readdirSync(resolve(repoRoot, SCOPED_DIR)).filter((n) => n.endsWith('.svelte'))) {
+    if (file === 'ScopedPlaceholderPage.svelte') continue;
+    const source = readFileSync(resolve(repoRoot, SCOPED_DIR, file), 'utf8');
+    for (const [, token] of source.matchAll(/(?:pageId|data-scoped-page)="([a-z][a-z-]*)"/g)) {
+      assert.ok(!pageByRoute.has(token), `route ${token} is owned by two pages; the map is ambiguous`);
+      pageByRoute.set(token, { file, source });
+    }
+  }
+  assert.equal(pageByRoute.size, 7, 'the seven world scoped routes each resolve to exactly one page');
+
+  const routeOf = (viewCase) => /data-scoped-page="([a-z][a-z-]*)"/.exec(viewCase.expectSelector || '')?.[1];
+  const rendersPlaceholder = (viewCase) => {
+    const route = routeOf(viewCase);
+    if (!route) return false;
+    const page = pageByRoute.get(route);
+    assert.ok(page, `case ${viewCase.id} asserts route ${route}, which no page under ${SCOPED_DIR} owns`);
+    return /import ScopedPlaceholderPage/.test(page.source);
+  };
   const claimsPlaceholder = (viewCase) =>
     (viewCase.sourceMatches || []).some((pattern) => pattern.test(PLACEHOLDER));
 
   const rendering = VIEW_LAB_CASES.filter(rendersPlaceholder).map((entry) => entry.id);
   const claiming = VIEW_LAB_CASES.filter(claimsPlaceholder).map((entry) => entry.id);
+
+  // NON-VACUITY IS ASSERTED ON THE SCAN, NOT ON THE ANSWER. A floor on how many cases still
+  // RENDER the shared body would be a floor that legitimately falls as the four screen lanes
+  // land — and it would red on a lane that did everything right, which is the same shape of
+  // inversion this test was just fixed for. What must not silently become empty is the input:
+  // the seven-route map above, and the set of cases that resolve one.
+  const scopedCases = VIEW_LAB_CASES.filter((entry) => routeOf(entry));
   assert.ok(
-    rendering.length >= 4,
-    `only ${rendering.length} cases render the shared placeholder; the scan is broken`
+    scopedCases.length >= 4,
+    `only ${scopedCases.length} cases assert a world scoped route; the scan is broken`
   );
   assert.deepEqual(
     claiming.slice().sort(),
     rendering.slice().sort(),
-    'the set of cases claiming the shared placeholder body is exactly the set that renders it'
+    'the set of cases claiming the shared placeholder body is exactly the set whose PAGE still ' +
+      'imports it. A body replaced without dropping its claim publishes that route\u2019s real ' +
+      'screen as evidence of a placeholder change; a claim dropped while the body still ' +
+      'delegates leaves the component unclaimed by that route'
   );
 });
 
