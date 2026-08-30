@@ -19,12 +19,41 @@
  * derives its broad-signal routing from the `evidence: 'broad'` rows, and the integrity properties
  * in `tests/design-system-primitives.test.js`.
  *
- * It is a `.js` module rather than JSON because every registry in this repository carries its
- * reason in prose beside the entry, and a reason is the whole value of a row like `FillBar` or
- * `ImagePathPicker` below.
+ * ── WHERE THE ROWS LIVE, AND WHY THEY ARE NOT WRITTEN OUT HERE ─────────────────────────────────
  *
- * Pure and dependency-free — no imports at all, no I/O, no autorun — so it is safe to import from
- * `node --test` and from any script.
+ * The rows are in `designSystemPrimitives.json` beside this file. Everything ELSE is here: the
+ * taxonomy, the membership bar, what each column means, and the two derivations. Prose that belongs
+ * to a ROW travels with it, in its `why` string — a field, not a comment — so no reasoning was lost
+ * by the move, and none of it should migrate back into a comment here where it would sit away from
+ * the row it judges.
+ *
+ * This is not a filing preference, and INLINING THESE ROWS BACK INTO THIS FILE REINTRODUCES A
+ * FAILING QUALITY GATE. Written out as frozen object literals, the manifest failed SonarCloud on
+ * its own: 23.0% new-code duplicated lines against a threshold of 3, from 17 copy-paste groups
+ * EVERY ONE of which matched this file against itself, in blocks of 26 to 47 lines. The detector
+ * normalises string literals, so two rows whose prose could not be more different reduce to the
+ * same token sequence, and a run of them is one long repetition. Compacting the row shape does not
+ * help — a positional one-line form is still about eleven identical normalised tokens per row
+ * against a ~100-token minimum block, so ten consecutive rows still match. Any uniform table
+ * expressed as code trips this; the fix is for the table to stop being code.
+ *
+ * Neither escape hatch was available. `sonar-project.properties` already lists `scripts/**` in
+ * `sonar.cpd.exclusions` and records at length that the property is INERT under Automatic Analysis,
+ * and `AGENTS.md` records that the only durable path-level exemption is a Duplication Exclusion a
+ * MAINTAINER sets in the SonarCloud UI, which an agent must not assume. What made the data file the
+ * answer rather than a dodge is measured against this project: SonarCloud does not index `.json`
+ * here at all — `lang/en.json`, which is large and far more repetitive than this, is not a known
+ * component to either the duplications or the measures API. `benchmarks/baselines/*.json`, read by
+ * `scripts/lib/benchmarkBaselines.js`, is the repository's precedent for committed data beside a
+ * `scripts/lib/` loader.
+ *
+ * The load is a synchronous read at import time resolved from `import.meta.url`, so it does not
+ * depend on a working directory. This module still imports NO repository module — only Node
+ * builtins — so it remains the leaf `scripts/ui-pr-screenshot-evidence.mjs` relies on to close no
+ * import cycle, and it is still safe to import from `node --test` and from any script. An
+ * `import ... with { type: 'json' }` attribute would be terser and is deliberately not used: the
+ * `readFileSync` form is already proven against this repository's ESLint, Prettier and Node by the
+ * sibling loaders in this directory, and a manifest is not the place to find out about the other.
  *
  * ── ROW SHAPE ──────────────────────────────────────────────────────────────────────────────────
  *
@@ -33,14 +62,14 @@
  * `path`    Repository-relative POSIX path of the shipped implementation, exactly as a diff names
  *           it. Asserted to exist on disk.
  * `library` The name of this primitive's entry in `openspec/specs/design-system/library.html`,
- *           written as it appears there (`'<Stepper>'`), or `null`.
+ *           written as it appears there (`'<Stepper>'`), or JSON `null`.
  * `evidence` `'broad'` or `'targeted'`. See below — this is the field with consequences, and the
  *           integrity test asserts that EVERY row carries one of the two, so no row can be exempt
  *           from both clauses by a typo.
  * `why`     The judgement, in prose. For a `null` library, why the correspondence is not made; for
  *           a non-member, its callers named, or the fact that it has none.
  *
- * There is deliberately no `status` field. Membership is which ARRAY holds the row —
+ * There is deliberately no `status` field. Membership is which TABLE holds the row —
  * {@link DESIGN_SYSTEM_PRIMITIVES} or {@link NOT_A_PRIMITIVE} — and a field restating that is
  * hand-typed data no consumer reads, so it can only ever be wrong. This module exists because
  * configuration nothing consults looks identical to configuration something does; a redundant
@@ -116,6 +145,7 @@
  * would silently drop those three, and a missing entry there does not fail a suite: it hangs it
  * and reports `# cancelled`.
  */
+import { readFileSync } from 'node:fs';
 
 /**
  * The manager's own primitive directory, as a diff names it. Primitives sit DIRECTLY under it,
@@ -125,6 +155,36 @@
  * ask where a primitive lives is a way for two callers to disagree.
  */
 const MANAGER_PRIMITIVE_DIRECTORY = 'src/ui/svelte/apps/manager/';
+
+/**
+ * The three tables, read from the sibling data file. See the docblock above for why they are not
+ * written out in this module.
+ *
+ * Resolved against `import.meta.url` rather than `process.cwd()`: this module is imported by
+ * `node --test` from the repository root, by `scripts/*.mjs` run from anywhere, and by the
+ * screenshot evidence gate under `gh`, and only one of those three has a predictable cwd. A
+ * missing or malformed file throws here, at import, naming the path — which is the loud direction.
+ */
+const MANIFEST = JSON.parse(
+  readFileSync(new URL('designSystemPrimitives.json', import.meta.url), 'utf8')
+);
+
+/**
+ * Freeze a table read from JSON, rows and all.
+ *
+ * `JSON.parse` hands back fresh MUTABLE objects, where the literals this replaced were frozen at
+ * both levels. That is not decoration: these tables are module-level singletons shared by every
+ * importer in one process — `viewLabCases.js` derives routing from them at ITS import time, and a
+ * test that mutated a row in place would change what a later suite in the same run routes. Freezing
+ * both levels makes such a write throw in strict mode instead of silently succeeding.
+ *
+ * @template {object} Row
+ * @param {Row[]} rows
+ * @returns {readonly Row[]}
+ */
+function frozenTable(rows) {
+  return Object.freeze(rows.map((row) => Object.freeze(row)));
+}
 
 /**
  * Order two strings by code point, ascending.
@@ -162,236 +222,7 @@ function byCodePoint(left, right) {
  *
  * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
  */
-export const DESIGN_SYSTEM_PRIMITIVES = Object.freeze([
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The two-step arm-then-confirm destructive control (4 callers). `library.html:570` specifies `danger` as one of six ROLES on the single button primitive and `library.html:1815` records a bespoke destructive panel as a surface Foundry already owns, so the arm is a carve-out neither entry claims by name.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'The shared bulk-DELETE card (3 callers, issue 1132). `library.html:1058` specifies `<SelectionBar>` and `<BulkEditPanel>` for this surface and names no delete card. Targeted because it renders in all three studios but is photographed only by the four `*-bulk-delete-*` frames, which `ui-pr-screenshot-evidence.mjs` routes it to; the bulk-EDIT frames do not contain it.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
-    library: '<BulkEditPanel>',
-    evidence: 'targeted',
-    why: 'The bulk panel shell (3 callers, issue 1010). `library.html:1058` names it and calls this "the largest uncovered surface in the corpus". Targeted: exactly two studios consume it and both claim it by `sourceMatches`.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'A section inside the bulk panel (3 callers, issue 1010). `library.html:1058` specifies the PANEL, not its internal sectioning. Targeted for the same reason as its shell.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: "The bulk panel's leave-unchanged select (2 callers, issue 1010). `library.html:646` specifies `<Select>` as one shell shared with text, number and search, and records the leave-unchanged clear state on `<TintPicker>` rather than on the field shell. Targeted for the same reason as its shell.",
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-    library: '<SelectionBar>',
-    evidence: 'targeted',
-    why: 'The bulk selection toolbar (3 callers, issue 1010). Named at `library.html:1058`. Targeted for the same reason as its shell.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/Callout.svelte',
-    library: '<Callout>',
-    evidence: 'broad',
-    why: 'Named at `library.html:911`. 7 callers across the manager, so no frame is a non-arbitrary choice.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/Chip.svelte',
-    library: '<IconChip>',
-    evidence: 'broad',
-    why: 'The highest-traffic primitive in the codebase at 67 callers. `library.html:858` groups `<Kicker> <IconChip> <StatBox>` as the mark vocabulary and this is the icon chip. Broad by an enormous margin — attributing a chip change to one window would be a lie about where it lands.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'The complication summary row (5 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1429` names component complications among the rows `<SortableList>` "opens in place", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/EditorTabs.svelte',
-    library: '<TabBar>',
-    evidence: 'targeted',
-    why: 'The editor tab strip (3 callers — the system, environment and recipe-item editors each wrap it). `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Targeted: one frame per wrapping editor claims it.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The editor validation surface (2 callers). `library.html:1084` splits validation into `<ValidationList>` and `<ValidationSummary>` and records the shipped component as having three callers; this one component covers both roles and has two, so the correspondence is not established and is left for the conformance change to adjudicate rather than guessed at here.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/EmptyState.svelte',
-    library: '<Empty>',
-    evidence: 'broad',
-    why: 'Named at `library.html:911`. 43 callers, second only to `Chip`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because both representative frames are POPULATED states, so the dashed panel it draws appears in neither.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The explainer card (3 callers). `library.html:911` groups `<Callout> <Notice> <InfoStrip> <Empty>` under one head and carries no prose distinguishing `<Notice>` from `<InfoStrip>`, so which of the two this card is cannot be read off the library.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The labelled icon-and-fact row (5 callers). `<StatBox>` (`library.html:858`) is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so the correspondence is not made.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'The inline vocabulary add field (2 callers, `VocabularyPanel.svelte` and `ImportFolderMappingModal.svelte`). No `library.html` entry names it. Targeted: `manager-tags-categories-normal` claims it.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    library: '<LinkField>',
-    evidence: 'broad',
-    why: '`library.html:747` — "How a Fabricate record points at a game-world document. Three states in one component." 6 callers spread across the checks, component, essence, recipe-item and tool editors, which is why no single frame is the honest evidence.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ManagerModal.svelte',
-    library: '<Modal>',
-    evidence: 'broad',
-    why: '`library.html:1104` and `:1137` name it and its two callers — the import folder-mapping step and the import report — and `:1137` records that ruling it out as single-caller was wrong.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    library: '<OptionCards>',
-    evidence: 'broad',
-    why: '`library.html:626` — "A radio group with room to explain itself." 9 callers.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'The resolution-mode chooser card (2 callers, `CraftingSettingsView.svelte` and `GatheringEconomyView.svelte`). `library.html:1606` defers the modes themselves to the resolution-modes capability and specifies no card for choosing one. Targeted: `manager-system-edit-normal` claims it.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
-    library: '<ExprInput>',
-    evidence: 'broad',
-    why: '`library.html:1510` and `:1516` — cursor insertion and an actor resolver are behaviour nothing else owns, which is why it is a primitive where `<Bounds>` and `<Currency>` are compositions.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SearchablePopover.svelte',
-    library: '<SearchPopover>',
-    evidence: 'broad',
-    why: '`library.html:764` — "One panel for picking anything from a catalogue". 16 callers. Carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its two modes render different chrome and neither representative frame opens a popover at all.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    library: '<Segmented>',
-    evidence: 'broad',
-    why: '`library.html:613` — two to four named options, exactly one chosen, rendered as a radio group. 11 callers.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: 'The subject-and-modifier picker (2 callers, `ComponentEditView.svelte` and `GatheringTaskEditView.svelte`). `library.html:1406` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind "triggers, gates and modifiers", so this picker is specified as part of that editor rather than as an entry of its own. Targeted: one modifier-pick frame per caller claims it.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/ToggleCard.svelte',
-    library: null,
-    evidence: 'broad',
-    why: "A titled card wrapping a binary control (7 callers). `<Toggle>` (`library.html:595`) is the bare control and `<Card>` (`:941`) is the container, so a card-plus-toggle is a COMPOSITION of two entries under `spec.md:28` rather than an entry itself. Recorded here because it SHIPS with seven callers; whether the set should contain it is the conformance change's question.",
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ChanceSlider.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'A single-value percentage slider (4 callers). `<RangeBar>` (`library.html:714`) specifies a TILED strip of spans whose dividers are dragged, which is `ThresholdBandStrip`, not this.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The category-group header of a grouped browser list (2 callers). `<ListRow>` (`library.html:1033`) specifies the ROW; the group header above a run of rows is not one of the four entries under that head.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/EssenceSourceSelector.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The essence source picker (2 callers). `library.html:764` names essences among the catalogues its four existing pickers COLLAPSE INTO `<SearchPopover>`; this file is one of those pickers and is not that panel today, so recording the name would fill the conformant quadrant with work not done.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/FillBar.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The product\'s one horizontal fill bar (2 callers). `library.html:872` splits the instrument into `<Meter>`, `<BandedBar>` and `<StageBars>` and states that merging them leaves one component unable to carry a correct accessible role, "which is why the shipped fill leaf renders none" — this is that leaf, so it corresponds to no single entry by the library\'s own account.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/IconPicker.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ManagerButton.svelte',
-    library: '<Button>',
-    evidence: 'broad',
-    why: '`library.html:570` — one component, six roles, two sizes, each role naming a VERB. The shipped `role` prop is that closed set, made required-shaped precisely because the CSS-convention version drifted. 50 callers, the most of anything under `components/`.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ManagerColorPopover.svelte',
-    library: '<TintPicker>',
-    evidence: 'broad',
-    why: '`library.html:797`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/Medallion.svelte',
-    library: null,
-    evidence: 'broad',
-    why: "The flat identity tile for recipe rows and inspectors (13 callers). `<Avatar>` (`library.html:1225`) is a person mark in a rail; this renders a record's linked image with a glyph fallback, so the correspondence is not made.",
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ModifierPillSelect.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'A dropdown-plus-removable-pills multi-select (2 callers, issue 770). `<SetPicker>` (`library.html:1333`) specifies editing membership of a set too large to render inline, and states it never dumps the whole set into its panel — this control renders every unselected option in a listbox, so it is not that primitive.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/Pagination.svelte',
-    library: '<Pagination>',
-    evidence: 'broad',
-    why: 'Named at `library.html:1196`. 22 callers across every browse surface in the manager.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/SelectionCheckbox.svelte',
-    library: '<Checkbox>',
-    evidence: 'broad',
-    why: '`library.html:689` — "The box a gate list and a selection header both use", including the tri-state a some-rows-selected header needs. 8 callers.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/StatusPill.svelte',
-    library: null,
-    evidence: 'broad',
-    why: "The row and inspector state pill, six tones (13 callers). The library's mark vocabulary (`library.html:835`, `:858`) specifies marks that carry KIND; this pill carries STATE, and `library.html:348` states that colouring a chip background by kind would double-code kind against state — so it is deliberately not one of those marks.",
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/Stepper.svelte',
-    library: '<Stepper>',
-    evidence: 'broad',
-    why: '`library.html:551` — "The most-used control in the app", and 23 callers here agree. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming the gathering economy actor frame, which is the only published frame that renders filled steppers, disabled steppers and a rolled-max placeholder at once.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ThresholdBandStrip.svelte',
-    library: '<RangeBar>',
-    evidence: 'broad',
-    why: '`library.html:714` — a tiled strip of spans whose dividers are dragged, "outcome tiers against a DC", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not.',
-  }),
-]);
+export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimitives);
 
 /**
  * ADJUDICATED candidates that sit in a primitive directory and are NOT members of the set.
@@ -430,44 +261,7 @@ export const DESIGN_SYSTEM_PRIMITIVES = Object.freeze([
  *
  * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
  */
-export const NOT_A_PRIMITIVE = Object.freeze([
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-    library: null,
-    evidence: 'targeted',
-    why: "ONE caller, `src/ui/svelte/apps/manager/EssenceBrowserInspector.svelte` (issue 1036's Duplicate / Edit / Delete / Copy source UUID / Unlink extraction). No `library.html` entry names a right-inspector action button. Adjudicated twice already, which is what puts it here rather than among the other 47 sub-bar manager files: `viewLabCases.js` records why it is excluded from the broad-signal set and names the recipe, component and gathering inspectors as its planned remaining consumers, and `tests/components/mounted-harness-primitive-allowlist.test.js` carries it because each of those conversions drops it into another mounted tree. Targeted, and the four `manager-essences-*` frames that put an essence in the inspector claim it by `sourceMatches` — so this row moves to {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector adopts it, and its `evidence` becomes a judgement to make rather than a fact about a directory.",
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ActorSelectTopBar.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'ONE caller, `src/ui/svelte/apps/FabricateAppRoot.svelte`. At 594 lines it is a screen region rather than a primitive; `<AppTitleBar>` (`library.html:960`) specifies the strip above the page header and nav rail, and whether this is an implementation of it has not been adjudicated.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/DropZone.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'ZERO callers — dead code. Nothing under `src/` imports it. (`ItemDropZone.svelte` under `apps/manager/` is a different file with six callers and is the shipped link field; a basename search that does not anchor on the path separator will conflate the two and report six callers here.)',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ImagePathPicker.svelte',
-    library: '<ArtPathPicker>',
-    evidence: 'broad',
-    why: 'ZERO callers — dead code, and the one row where the library and the tree disagree in the interesting direction: `library.html:797` specifies `<ArtPathPicker>`, and a file implementing it ships, and nothing imports it. Specified and built is not the same as shipped.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/ManagerColorPicker.svelte',
-    library: null,
-    evidence: 'broad',
-    why: 'ONE caller, `src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte`. The `<TintPicker>` entry is carried by its sibling `ManagerColorPopover.svelte`, which has four.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/components/RowDisclosure.svelte',
-    library: '<RowDisclosure>',
-    evidence: 'broad',
-    why: 'ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:941`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js:83` for a reason the caller count cannot express — omitting it there HANGS a mounted tree — which is why that list is not derived from this manifest.',
-  }),
-]);
+export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 
 /**
  * The ruled-out register, mirroring `spec.md:586-597` and `library.html:1802-1818`.
@@ -498,68 +292,7 @@ export const NOT_A_PRIMITIVE = Object.freeze([
  *
  * @type {readonly {name: string, verdict: string, replacement: string|null, why: string}[]}
  */
-export const RULED_OUT = Object.freeze([
-  Object.freeze({
-    name: '<MemberRow>',
-    verdict: 'composition',
-    replacement: 'ListRow + `leading`',
-    why: 'List row geometry with a portrait in the leading cell — structurally identical to the inline-title row already declined.',
-  }),
-  Object.freeze({
-    name: '<ActorPicker>',
-    verdict: 'composition',
-    replacement: 'trigger + SearchPopover',
-    why: 'A pill trigger that opens the popover — which already counted it as one of its four callers.',
-  }),
-  Object.freeze({
-    name: '<AddButton>',
-    verdict: 'composition',
-    replacement: 'Button role=dashed',
-    why: 'Dashed is a role on the button that owns the meaning. "Sits in flow with its collection" is a usage rule, not a boundary.',
-  }),
-  Object.freeze({
-    name: '<RailCard>',
-    verdict: 'composition',
-    replacement: 'Well + Kicker + Button',
-    why: 'A composition that also smuggled back the 34px button size the set retires by name.',
-  }),
-  Object.freeze({
-    name: '<FeatureCard>',
-    verdict: 'composition',
-    replacement: 'OptionCards, non-interactive',
-    why: 'Two ABSENT props on an identical shape is a props difference, not a distinction.',
-  }),
-  Object.freeze({
-    name: '<BoundsInput>',
-    verdict: 'composition',
-    replacement: 'two Steppers',
-    why: '"Two steppers with a rule between", by its own spec.',
-  }),
-  Object.freeze({
-    name: '<CurrencyInput>',
-    verdict: 'composition',
-    replacement: 'Stepper + Select',
-    why: 'A composition, and wrong about the domain: it assumed a flat world-scoped coin ladder where the model defines a per-system acyclic denomination DAG.',
-  }),
-  Object.freeze({
-    name: '<PremiumPanel>',
-    verdict: 'out-of-scope',
-    replacement: null,
-    why: 'A screen, not a primitive. Its one original claim is copy — a product decision — and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings. Canon also forbids any premium signal in the player window.',
-  }),
-  Object.freeze({
-    name: '<Toast>',
-    verdict: 'foundry-owns',
-    replacement: 'ui.notifications',
-    why: 'Foundry owns transient feedback and renders its own toasts over the module window regardless.',
-  }),
-  Object.freeze({
-    name: 'Destructive panel',
-    verdict: 'foundry-owns',
-    replacement: 'confirmDialog',
-    why: 'Canon makes the dialog the default for manager confirmations; the arm is the carve-out.',
-  }),
-]);
+export const RULED_OUT = frozenTable(MANIFEST.ruledOut);
 
 /**
  * The shipped primitive paths carrying a given evidence judgement, in code-point order.
