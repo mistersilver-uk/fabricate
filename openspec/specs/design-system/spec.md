@@ -120,6 +120,8 @@ Reorder announces the moved item, its new position and the total.
 Every pointer target MUST offer at least a 24 by 24 pixel hit area, per WCAG 2.2 section 2.5.8.
 The hit area MAY exceed the painted area, so a 2px divider still carries a 24px handle and a chromeless remove action is 24px around a 9px glyph.
 A control that cannot meet the minimum in a dense row MUST offer a comfortable density its caller can select.
+A primary navigation destination is not a dense row and MUST be sized generously: the player app rail gives each item a 44 by 44 pixel icon well.
+A count pip on such an item sits on the OUTER CORNER of that well with a ground-coloured ring, never over the glyph — a pip that overlaps the icon destroys the one thing the item is recognised by.
 
 #### Scenario: A primitive renders an icon-only control
 
@@ -218,6 +220,33 @@ An adder for the collection MUST render as the list's own footer rather than as 
 - **WHEN** a tab's entire subject is the content of each row body
 - **THEN** the list renders in always-open mode
 - **AND** it drops the disclosure control rather than defaulting every row to collapsed
+
+### Requirement: Set membership is edited through a bounded, staged picker
+
+Where a record belongs to a set too large to render inline — its tags, the books it appears in, the recipes a book carries — the control MUST be searchable, MUST bound what it renders in place, and MUST stage its selections rather than writing on click.
+
+The trigger renders a FIXED maximum number of selected tokens and then an overflow count.
+It MUST NOT grow with the size of the set: a record in forty books renders a few tokens and a count, because a control that renders every member pushes the editor that contains it off the screen.
+The picker panel scrolls internally at a fixed maximum height and states how many entries the query matched against the total, so a GM can tell when to refine the search rather than keep scrolling.
+
+Every selection MUST be reversible before it is committed.
+The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
+
+In BULK mode the per-entry control MUST carry three states — add, remove, and leave unchanged — and MUST NOT be a two-state checkbox.
+An unchecked two-state box cannot distinguish "remove this from every selected record" from "do not touch this one", so the two-state form silently strips membership from records the GM never intended to change.
+The commit action names the number of records it writes to.
+
+#### Scenario: A record belongs to many members of the set
+
+- **WHEN** a record belongs to more members than the trigger renders inline
+- **THEN** the trigger shows its bounded token run followed by an overflow count
+- **AND** the host editor does not grow with the size of the set
+
+#### Scenario: A GM bulk-edits membership across selected records
+
+- **WHEN** a GM opens the picker over a multi-record selection
+- **THEN** each entry offers add, remove and leave unchanged
+- **AND** entries left unchanged are not written to any selected record
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 
