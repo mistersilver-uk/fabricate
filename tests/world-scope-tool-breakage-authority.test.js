@@ -186,6 +186,41 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
   // comment discussing `toolBreakage`, and the unrelated `toolBreakagePolicy` on the gathering
   // realm rules, are both outside it — the latter by the word boundary.
   const root = readSource('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+
+  // ── THE DESTRUCTURE HOLE, CLOSED SEPARATELY ───────────────────────────────────────────
+  //
+  // `const { toolBreakage } = allSystems[0] ?? {};` has no leading dot on the binding OR on
+  // the use, so the read scan below cannot see either half — measured green while a surface
+  // re-defaulted off the binding. It is not a contrived spelling: `const { valid, errors } =`
+  // is a live idiom in this very file, twice.
+  //
+  // A second pattern is the cheap close, and it is narrower than forbidding the bare name
+  // outright: that would red on the comment prose the scan below deliberately permits.
+  //
+  // KNOWN LIMITATION, ACCEPTED RATHER THAN UNNOTICED. This also reds on an object LITERAL
+  // that carries the key — `{ toolBreakage }` or `{ toolBreakage: … }` — because the two are
+  // not distinguishable by text. That is acceptable HERE and would not be everywhere: the
+  // shell consumes the published projection and never constructs a crafting system, so it has
+  // no reason to build such a literal; the write path that does lives in `adminStore`. If one
+  // ever becomes legitimate here, this guard is the wrong shape and should be replaced rather
+  // than exempted.
+  assert.deepEqual(
+    root.match(/[{,]\s*toolBreakage\s*(?=[},:])/g) ?? [],
+    [],
+    'the shell must not DESTRUCTURE the tool-breakage block: a binding has no leading dot, so ' +
+      'the read scan below cannot see it or any re-default taken off it'
+  );
+
+  // ── TWO RESIDUALS NO TEXT SCAN CLOSES, RECORDED RATHER THAN CHASED ────────────────────
+  //
+  // 1. A bracket-string ROOT — `selectedSystem['toolBreakage'].authority` — puts the name
+  //    inside a string, where neither pattern above looks for it.
+  // 2. A COMPENSATED SWAP: delete one legitimate read and add a hostile one, and the tally
+  //    still totals four.
+  //
+  // Both need an AST, and an AST parse of a `.svelte` file is a compiler dependency this
+  // suite does not have. They are named so the next reader knows the boundary of this guard
+  // rather than inferring a completeness it does not have.
   const TOOL_BREAKAGE_READ = /[A-Za-z0-9_$?.[\]'"]*\??\.toolBreakage\b[A-Za-z0-9_$?.[\]'"]*/g;
   const reads = root.match(TOOL_BREAKAGE_READ) ?? [];
   assert.ok(reads.length > 0, 'the shell reads this field somewhere; a zero count is a broken scan');
@@ -202,7 +237,9 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
       'out internally to crafting, salvage and gathering rather than being three editors), ' +
       '`ToolsBrowserView` authors it, `ToolEditView` reads it, and `tools/ToolBrowserInspector` ' +
       'draws the per-tool behaviour copy from it — and ONE carries the authoring scope to the ' +
-      'control. Anything else, including an alias bound to the block itself, is a screen ' +
+      'control. If your change adds a LEGITIMATE fifth read off `selectedSystem`, this pin is ' +
+      'not a verdict on it: bump the expected count and say so. What it is a verdict on is a ' +
+      'read rooted anywhere ELSE, including an alias bound to the block — that is a screen ' +
       're-defaulting on a raw crafting system'
   );
 });
