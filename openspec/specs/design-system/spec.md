@@ -74,7 +74,8 @@ A card that merely sits on the page uses a border and no shadow.
 ### Requirement: Geometry comes from the published ladders
 
 Control height MUST be one of 26, 28, 30, 34, 38, or 44 for a control a spec marks touch-reachable.
-The values 32, 36 and 40 are RETIRED and MUST NOT be reintroduced.
+The values 32, 36 and 40 are RETIRED as CONTROL heights and MUST NOT be reintroduced as such.
+Art and portraits carry their own size ladder and are not controls; the avatar sizes below are not governed by this one.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
