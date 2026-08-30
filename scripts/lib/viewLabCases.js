@@ -941,7 +941,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
   managerCase({
@@ -957,7 +956,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-scoped-page="world-vocabulary"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/],
+    // THE CLAIM ON THE SHARED PLACEHOLDER BODY LIVES HERE (issue 1374), moved off
+    // `world-component-catalogue` because that route's page is the FIRST of the seven to be
+    // replaced with a real body. Neither coverage test can see a claim whose case no longer
+    // renders the component — `ScopedPlaceholderPage` stays inside the closure through the
+    // other six pages either way — so a stale claim would silently publish the component
+    // catalogue frame as evidence of a placeholder-body change. This route's page is the LAST
+    // of the four to be replaced, and the lane that replaces it deletes the component and this
+    // claim together.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'world-essence-catalogue',
