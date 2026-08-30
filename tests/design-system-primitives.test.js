@@ -252,7 +252,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // A guard that stopped looking at anything must not keep reporting success. The nested-file
   // check is what a walk that lost its recursion would fail; a named path is deliberately not
   // used, because deleting that one file would then read as broken recursion and invite a repoint.
-  assert.ok(RENDER_FILES.length > 100, `expected a populated render-file walk, got ${RENDER_FILES.length}`);
+  assert.ok(
+    RENDER_FILES.length > 100,
+    `expected a populated render-file walk, got ${RENDER_FILES.length}`
+  );
   assert.ok(
     RENDER_FILES.some((file) => file.split('/').length > 4),
     'the render-file walk reached no nested file, so it is not recursing'
@@ -261,7 +264,10 @@ test('the inputs every property below quantifies over are alive', () => {
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 38, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 6, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
-  assert.ok(PUBLISHING_CASE_IDS.size > 0, 'no case publishes, so override values cannot be checked');
+  assert.ok(
+    PUBLISHING_CASE_IDS.size > 0,
+    'no case publishes, so override values cannot be checked'
+  );
 });
 
 test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
@@ -269,7 +275,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
     BROAD_SIGNAL_PATTERN.source,
     EXPECTED_BROAD_SIGNAL_SOURCE,
     'the broad-signal set changed. That is a routing change for every UI PR: widening it takes ' +
-      'frames away from the cases that claim a file, narrowing it hands a primitive\'s evidence ' +
+      "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
   assert.equal(BROAD_SIGNAL_PATTERN.source.length, 308);
@@ -435,10 +441,17 @@ test('(c) the two evidence clauses between them claim every manifest row', () =>
     'a manifest row carries an evidence value that is neither broad nor targeted, so both clauses ' +
       'of property (c) skip it and nothing checks the routing its judgement claims.'
   );
-  assert.equal(
-    rowsWithEvidence('broad').length + rowsWithEvidence('targeted').length,
-    MANIFEST_ROWS.length,
-    'the two clauses no longer partition the manifest'
+  // The sibling clauses below each carry their own non-vacuity guard; this one delegated its to
+  // the row-count pin in the first test, which means a hollowed manifest reddens there and never
+  // mentions the partition. It carries its own now. What stood here before was an equality
+  // between the two filter lengths and the row count, which CANNOT fire: an empty `unclaimed`
+  // already means every row carries one of the two values, so the filters partition by
+  // construction and the assertion restates its own premise. An assertion that can never fail is
+  // the exact thing this file exists to report, so it went rather than sat here looking like a
+  // check.
+  assert.ok(
+    MANIFEST_ROWS.length > 0,
+    'the manifest is empty, so this property has no domain and partitions nothing'
   );
 });
 
@@ -460,7 +473,10 @@ test("(c) every 'broad' row is matched by BROAD_SIGNAL_PATTERN", () => {
 
 test("(c) no 'targeted' row is matched by BROAD_SIGNAL_PATTERN", () => {
   const targetedRows = rowsWithEvidence('targeted');
-  assert.ok(targetedRows.length > 0, "no row carries evidence 'targeted', so this property is vacuous");
+  assert.ok(
+    targetedRows.length > 0,
+    "no row carries evidence 'targeted', so this property is vacuous"
+  );
   for (const row of targetedRows) {
     assert.ok(
       !BROAD_SIGNAL_PATTERN.test(row.path),
@@ -495,14 +511,18 @@ test('the two studio recipes share one bulk-surface pattern, and it names only t
 
   const sharedPattern = new RegExp(shared[0]);
   const claimed = RENDER_FILES.filter((file) => sharedPattern.test(file));
-  assert.equal(claimed.length, 5, `expected the five shared bulk surfaces, got ${JSON.stringify(claimed)}`);
+  assert.equal(
+    claimed.length,
+    5,
+    `expected the five shared bulk surfaces, got ${JSON.stringify(claimed)}`
+  );
 
   const targetedPaths = new Set(primitivePathsByEvidence('targeted'));
   for (const file of claimed) {
     assert.ok(
       targetedPaths.has(file),
       `${file} is routed to the bulk frames by scripts/ui-pr-screenshot-evidence.mjs but is not ` +
-        'an evidence: \'targeted\' row in the manifest. The two registries now disagree about ' +
+        "an evidence: 'targeted' row in the manifest. The two registries now disagree about " +
         'what evidence a change to it requires: one sends it to named frames, the other to the ' +
         'representative pair.'
     );
