@@ -270,11 +270,28 @@ Every row leads with a kind-tinted chip, and the tint is what makes a list of ei
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
 A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list; `tag` renders no subject cell, because the tag is the value itself.
 
+Every STANDALONE row ends with the control that converts it into a choice group, because any requirement can acquire an alternative.
+A row already inside a group MUST NOT render that control: the group carries the adder for its own alternatives, and a second one inside a member row would offer to nest a group inside a group.
+
+The purple treatment of `tag` is the whole row and not just its chip: the lead chip, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
+The group’s own accent border and header pill name the STATE — that this value is one of several the crafter may choose — so the two tints stay readable as two different facts.
+
+The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather than trailing its value, so that a column of mixed rows keeps its controls in one place.
+
+A unit renders to the RIGHT of the stepper it qualifies and never beneath the value’s name.
+A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
+
 #### Scenario: The same authoring surface is used for results
 
 - **WHEN** the row is rendered in a result context
 - **THEN** its kind select offers component, currency, activity and knowledge
 - **AND** it offers neither tag nor essence
+
+#### Scenario: A requirement gains an alternative
+
+- **WHEN** a GM uses a standalone row’s convert control
+- **THEN** the row becomes the first member of a choice group
+- **AND** neither that row nor any sibling member renders the convert control again
 
 #### Scenario: A reader scans a list of mixed requirement kinds
 
