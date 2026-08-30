@@ -30,6 +30,7 @@
  */
 
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
+import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
 
 import { promptDropEnvironment } from './environmentDialog.js';
@@ -68,7 +69,6 @@ import {
   buildLinkedVisualFlags,
 } from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
-import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 
 /** Fallback tile image when no tool/task icon can be resolved. */
 const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';

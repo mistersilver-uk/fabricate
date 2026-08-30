@@ -1,5 +1,4 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
-import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -14,6 +13,8 @@ import {
   routedOutcomeTierNames,
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
+
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
  * The progressive `meta` for a resolution that awarded nothing because the recipe

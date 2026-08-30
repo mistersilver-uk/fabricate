@@ -218,7 +218,7 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
   let fieldCount = 0;
   for (const entry of arrayOf(driftEntries)) {
     if (!entry || typeof entry !== 'object') continue;
-    const key = `${entry.systemId}\u0000${entry.entityType}\u0000${entry.entityId}`;
+    const key = `${entry.systemId}\u{0}${entry.entityType}\u{0}${entry.entityId}`;
     if (!byRecord.has(key)) {
       byRecord.set(key, {
         systemId: entry.systemId,

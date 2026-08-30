@@ -12,13 +12,13 @@ import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
-import { resolvedComponentsFor } from './scopedEntityReads.js';
 import {
   buildFlagMapFromEntries,
   isDirectlyDeletableId,
   readDiscoveryProgressEntries,
   readLearnedRecipeEntries,
 } from './recipeKeyedFlagEntries.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { selectWritableActors } from './writableActors.js';
 

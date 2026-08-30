@@ -33,16 +33,16 @@ import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import {
-  resolvedComponentsFor,
-  resolvedEssencesFor,
-  resolvedToolsFor,
-} from './scopedEntityReads.js';
-import {
   corpusDelta,
   patchCorpusInPlace,
   REVISION_SCOPES,
   RevisionRegistry,
 } from './revisionTokens.js';
+import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';

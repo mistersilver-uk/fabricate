@@ -9,13 +9,13 @@ import {
   resolveGatheringCompositionMode,
 } from './gatheringComposition.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
-import { resolvedComponentsFor } from './scopedEntityReads.js';
 import {
   DANGER_LEVELS,
   evaluateEnvironmentMatch,
   resolveEnvironmentDangerLevel,
 } from './gatheringMatch.js';
 import { normalizeNodeRuntime } from './gatheringNodeConfig.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
 const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
