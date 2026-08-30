@@ -38,6 +38,15 @@
  * an adjudicated gap. A property that reddened there would invite an implementer to "fix" it by
  * deleting the adjudication, and there is no non-fragile way to tell a cited case id from a
  * fixture id by shape.
+ *
+ * NOT ASSERTED YET, AND DELIBERATELY DEFERRED
+ * -------------------------------------------
+ * That every `evidence: 'targeted'` row is claimed by at least one case's `sourceMatches`. It is a
+ * follow-up rather than an omission, and the measured consequence is recorded here so it survives
+ * the wait: an unclaimed targeted row does not publish NOTHING. `mapChangedFilesToCases` falls back
+ * to `FALLBACK_CASE_ID`, which is `fabricate-app-shell` — the PLAYER window. So a manager
+ * primitive whose claim was deleted in a rename would publish a frame that structurally cannot
+ * contain it, and `check-screenshots` would go green on it.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -64,8 +73,13 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * The roots a diff can name that `BROAD_SIGNAL_PATTERN` can match. `styles/` is included because
  * `styles/fabricate.css` is a broad signal and is the most commonly touched UI file in the
- * repository, so a walk that missed it would make property (b)'s baseline collapse from 21 to 8
- * while still reporting success.
+ * repository: 13 of property (b)'s 21 baseline entries are patterns claiming it, so a walk that
+ * missed this root would compute 8 where the baseline says 21.
+ *
+ * That fails the `deepEqual` loudly rather than silently — the reason to walk every root the
+ * pattern can match is that the baseline only MEANS what it says if it was measured over the whole
+ * domain. A narrowed walk would red as an unexplained baseline change, and the tempting repair is
+ * to re-paste the smaller list.
  */
 const RENDER_ROOTS = ['src', 'styles'];
 
@@ -98,7 +112,15 @@ const BROAD_SIGNAL_FILES = RENDER_FILES.filter((file) => BROAD_SIGNAL_PATTERN.te
 /** Every manifest row, members and recorded non-members alike. See {@link NOT_A_PRIMITIVE}. */
 const MANIFEST_ROWS = [...DESIGN_SYSTEM_PRIMITIVES, ...NOT_A_PRIMITIVE];
 
-/** Rows carrying a given evidence judgement, across BOTH manifest arrays. */
+/**
+ * Rows carrying a given evidence judgement, across BOTH manifest arrays.
+ *
+ * SELECTS BY EQUALITY, which is why the partition property below exists. A row whose `evidence` is
+ * neither of the two values is filtered out of both clauses of property (c) and asserted by
+ * nothing — and under `src/ui/svelte/components/` nothing else would notice, because a row there
+ * reaches `BROAD_SIGNAL_PATTERN` through the DIRECTORY leg, which never consults the manifest, so
+ * that row's `evidence` has no other reader in the repository.
+ */
 const rowsWithEvidence = (evidence) => MANIFEST_ROWS.filter((row) => row.evidence === evidence);
 
 /** Case ids that actually publish a frame. An override naming anything else is inert. */
@@ -237,7 +259,7 @@ test('the inputs every property below quantifies over are alive', () => {
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 38, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 5, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 6, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(PUBLISHING_CASE_IDS.size > 0, 'no case publishes, so override values cannot be checked');
 });
@@ -313,6 +335,45 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
   );
 });
 
+test('(a) the two older overrides still name the frame that renders their state', () => {
+  // The DOMAIN is pinned above and the VALUES have to be pinned too, one primitive at a time,
+  // because a value is only ever wrong in a way no other assertion can see: repoint an override at
+  // a case id that is already in the representative pair and the selection is unchanged, the
+  // entry still resolves, and the primitive silently goes back to publishing frames that do not
+  // contain it. Measured — repointing `IconPicker` that way survived the whole suite.
+  //
+  // `Stepper` and `ThresholdBandStrip` are pinned by the test above, and `SearchablePopover`'s two
+  // picker ids by `tests/view-lab-cases.test.js` ('the broad SearchablePopover signal captures
+  // BOTH of its deliberate picker states'). These two were pinned nowhere. Each expectation names
+  // WHY that frame and not another, because that is the fact a future repoint has to argue with.
+  const expectations = [
+    [
+      'src/ui/svelte/components/IconPicker.svelte',
+      'manager-system-edit-lists',
+      'the one case whose steps click an icon-picker trigger — everything this primitive presents ' +
+        'exists only in the open popover, and neither representative frame opens one',
+    ],
+    [
+      'src/ui/svelte/apps/manager/EmptyState.svelte',
+      'manager-systems-empty',
+      'the frame that draws the dashed empty panel, and the one `docs/help/quickstart.md` Step 1 ' +
+        'embeds — both representative frames are POPULATED states',
+    ],
+  ];
+  for (const [file, caseId, because] of expectations) {
+    assert.deepEqual(
+      BROAD_SIGNAL_CASE_OVERRIDES[file],
+      [caseId],
+      `${file} no longer overrides to '${caseId}', ${because}`
+    );
+    const selected = mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+    assert.ok(
+      selected.includes(caseId),
+      `a ${file} change selected ${JSON.stringify(selected)}, which does not include '${caseId}'`
+    );
+  }
+});
+
 test('(a) the representative pair survives an override, additively', () => {
   // The override mechanism is ADDITIVE by contract (`viewLabCases.js`: "Broad signals still select
   // REPRESENTATIVE_CASE_IDS; these are additive, narrowly named exceptions"). Issue 1116's
@@ -355,6 +416,32 @@ test('(c) every manifest row names a file that exists', () => {
   }
 });
 
+test('(c) the two evidence clauses between them claim every manifest row', () => {
+  // WITHOUT THIS, THE TWO CLAUSES BELOW ARE OPT-IN. They select by equality against a literal, so
+  // a row reading `evidence: 'targetted'` is in neither and is asserted by nothing — measured, not
+  // supposed: that typo on the `RowDisclosure` row, and on the `StatusPill` row, each left the
+  // whole suite green. The hole is worst exactly where issue 1378 points, under
+  // `src/ui/svelte/components/`, because a row there reaches `BROAD_SIGNAL_PATTERN` through the
+  // directory leg and its `evidence` therefore has no other reader anywhere. The manifest is built
+  // to grow and every future row hand-types this field, so the partition is asserted rather than
+  // trusted. The row counts themselves are pinned in the first test, so this needs no second pin.
+  const claimed = new Set([...rowsWithEvidence('broad'), ...rowsWithEvidence('targeted')]);
+  const unclaimed = MANIFEST_ROWS.filter((row) => !claimed.has(row)).map(
+    (row) => `${row.path} :: evidence ${JSON.stringify(row.evidence)}`
+  );
+  assert.deepEqual(
+    unclaimed,
+    [],
+    'a manifest row carries an evidence value that is neither broad nor targeted, so both clauses ' +
+      'of property (c) skip it and nothing checks the routing its judgement claims.'
+  );
+  assert.equal(
+    rowsWithEvidence('broad').length + rowsWithEvidence('targeted').length,
+    MANIFEST_ROWS.length,
+    'the two clauses no longer partition the manifest'
+  );
+});
+
 test("(c) every 'broad' row is matched by BROAD_SIGNAL_PATTERN", () => {
   const broadRows = rowsWithEvidence('broad');
   assert.ok(broadRows.length > 0, "no row carries evidence 'broad', so this property is vacuous");
@@ -362,8 +449,11 @@ test("(c) every 'broad' row is matched by BROAD_SIGNAL_PATTERN", () => {
     assert.ok(
       BROAD_SIGNAL_PATTERN.test(row.path),
       `${row.path} is recorded as a broad signal and the pattern does not match it, so a change ` +
-        'to it routes through case sourceMatches instead of the representative pair. A manager ' +
-        'row reaches the pattern only by being on the derived name list; a nested path never does.'
+        'to it routes through case sourceMatches instead of the representative pair. A row under ' +
+        'apps/manager/ reaches the pattern only through the derived name alternation, which the ' +
+        'pinned source above accepts or rejects as a deliberate edit — including a nested one, ' +
+        'since the derivation slices only the apps/manager/ prefix and so emits `checks/Foo` for ' +
+        'a nested row, which the alternation does match.'
     );
   }
 });
@@ -420,21 +510,44 @@ test('the two studio recipes share one bulk-surface pattern, and it names only t
 });
 
 test('every recorded library name is spelled as library.html spells it', () => {
-  // The `library` column is a hand-typed mirror of `openspec/specs/design-system/library.html`,
-  // and a hand-maintained mirror with nothing checking it rots. This is a SPELLING guard only —
-  // it proves the name exists there, not that the shipped component conforms to that entry. The
-  // conformance gate that reads the library properly is the next change in this programme.
+  // The `library` column and the whole `RULED_OUT` register are hand-typed mirrors of
+  // `openspec/specs/design-system/library.html`, and a hand-maintained mirror with nothing
+  // checking it rots — which is this change's own thesis, so shipping one unguarded inside it
+  // would be self-refuting. `RULED_OUT` is otherwise asserted only to be non-empty, and nothing
+  // imports it, so a name invented there would sit in a register the module calls "part of the
+  // specification, not commentary" with nothing able to disagree.
+  //
+  // `library.html` is the only usable anchor. Measured: all ten `<Name>` values appear there, and
+  // NONE appears in `spec.md`, which states the same ten judgements in prose ("a member row", "an
+  // actor picker") — so anchoring on `spec.md` would produce a guard satisfiable only by rewriting
+  // the specification.
+  //
+  // This is a SPELLING guard only — it proves the name exists there, not that the shipped
+  // component conforms to that entry, nor that the verdict recorded beside it is the verdict
+  // `library.html` records. The conformance gate that reads the library structurally is the next
+  // change in this programme.
   const library = readFileSync(
     path.join(REPO_ROOT, 'openspec/specs/design-system/library.html'),
     'utf8'
   );
+  const spelled = (name) => name.replace('<', '&lt;').replace('>', '&gt;');
+
   const named = MANIFEST_ROWS.filter((row) => row.library !== null);
   assert.ok(named.length > 0, 'no row records a library name, so this property has no domain');
   for (const row of named) {
-    const escaped = row.library.replace('<', '&lt;').replace('>', '&gt;');
     assert.ok(
-      library.includes(escaped),
+      library.includes(spelled(row.library)),
       `${row.path} records library entry ${row.library}, which library.html does not contain`
+    );
+  }
+
+  assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty, so this half has no domain');
+  for (const entry of RULED_OUT) {
+    assert.ok(
+      library.includes(spelled(entry.name)),
+      `the ruled-out register names ${entry.name}, which library.html does not contain. That ` +
+        'register mirrors the declined candidates the capability records; a name only this file ' +
+        'has is a decision the specification never made.'
     );
   }
 });
