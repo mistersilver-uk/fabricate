@@ -26,7 +26,8 @@ The shared primitive set MUST be the set enumerated in this capability, and a su
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
-A candidate MUST have two or more independent callers to enter the set, and a single-caller candidate is recorded as ruled out with its caller named, so the absence is a decision rather than an oversight.
+A candidate MUST have two or more independent callers to enter the set.
+A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
 
 #### Scenario: A new surface needs a control the set already contains
 
@@ -117,6 +118,9 @@ A name composed from a value MUST be derived by a shared helper, because the alt
 A change with no visible focus consequence MUST be announced through a live region, and focus MUST move BEFORE the announcement is made, because polite speech is cancelled by a focus change.
 Reorder announces the moved item, its new position and the total.
 
+Any element with a bounded width MUST state what a value too long for it does.
+The default is to wrap to a stated number of lines and then truncate with an ellipsis, never to expand the container: a long document name and a long localized string are the normal case rather than the exception, and a control that grows with its content moves every control beside it.
+
 Every pointer target MUST offer at least a 24 by 24 pixel hit area, per WCAG 2.2 section 2.5.8.
 The hit area MAY exceed the painted area, so a 2px divider still carries a 24px handle and a chromeless remove action is 24px around a 9px glyph.
 A control that cannot meet the minimum in a dense row MUST offer a comfortable density its caller can select.
@@ -135,10 +139,14 @@ Every primitive renders inside a Foundry ApplicationV2 window, inside Foundry's 
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
 A container query adds no specificity, so the narrow case is declared after the wide one.
+The shipped container breakpoints are the ladder, and a new surface uses them rather than inventing one: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
 
-A focusable element that is not a form control, contentEditable, or a button with a form MUST carry the keyboard-focus opt-out attribute when it handles arrow, Page or Home and End keys, or the keypress ALSO reaches Foundry's bindings and pans or zooms the canvas.
-A listbox MUST keep DOM focus in its search input and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
+A focusable element that is not a form control, contentEditable, or a button with a form MUST carry `data-keyboard-focus="true"` when it handles arrow, Page, or Home and End keys, or the keypress ALSO reaches Foundry's bindings and pans or zooms the canvas.
+The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
+A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
+Where the list has a search field, that field holds focus.
+Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 
 A floating surface MUST be portalled to the application root and positioned by measurement, flip and clamp.
 Core clips at `.window-content` and the manager adds further clipping boundaries, so a CSS offset cannot escape them; `document.body` is NOT a valid portal target because it loses window stacking.
@@ -176,10 +184,8 @@ A choice between two to four named things is a segmented control, or option card
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
 
-A record count on a navigation item is a bare mono numeral with no fill and no border.
-An issue summary is a filled warning badge carrying the count.
-Unsaved edits are a chip beside the title and a 6px dot on the parent navigation item.
-These four marks are the Rail Marker Family in `DOMAIN.md` and MUST NOT be substituted for one another.
+The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
+The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
@@ -255,26 +261,32 @@ The row that authors what a craft CONSUMES and the row that authors what it PROD
 There is no "result" kind and no "ingredient" kind: the row does not name which side it is on.
 The CONTEXT the row is rendered in decides which kinds its select offers, and that is the only difference between the two sides.
 
-The kind vocabulary is closed:
+The kind vocabulary is closed.
+Two of the six are NOT yet shipped in this repository and are marked as such, because a vocabulary that presents a planned kind as a live one sends an implementer looking for code that does not exist:
 
 - `component` — both sides.
 - `currency` — both sides.
 - `activity` — a completed activity, both sides.
+  NOT SHIPPED here; it exists in the premium companion and enters this repository only with the work that needs it.
 - `knowledge` — recipe knowledge, RESULT only.
+  NOT SHIPPED here.
 - `tag` — INGREDIENT only.
 - `essence` — INGREDIENT only.
 
 `tag` and `essence` are ingredient-only because each describes a CLASS of thing to consume rather than a record, and a craft cannot produce a class.
 `knowledge` is result-only because knowing a recipe is something a craft grants and never something it consumes.
+The shipped ingredient side today offers `component`, `currency`, `essence` and `tag`; the shipped result side offers `component` alone.
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
 A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list.
 `tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
 The catalogue lists each tag with the number of components already carrying it, which is what distinguishes a real tag from a typo of one, and offers creating an absent tag from its own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
-The any-of / all-of control MUST appear only when the row holds two or more tags: against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
+The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
+Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
 
-Every STANDALONE row ends with the control that converts it into a choice group, because any requirement can acquire an alternative.
+Every STANDALONE row CARRIES the control that converts it into a choice group, because any requirement can acquire an alternative.
+It sits immediately before the remove action, which is always last.
 A row already inside a group MUST NOT render that control: the group carries the adder for its own alternatives, and a second one inside a member row would offer to nest a group inside a group.
 
 The purple treatment of `tag` is the whole row and not just its chip: the lead chip, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
@@ -286,6 +298,8 @@ A unit renders to the RIGHT of the stepper it qualifies and never beneath the va
 A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
 
 A RESULT amount is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
+Authoring has no previewed actor, so the rolled form shows NO resolved value: a number there would be fiction.
+The same expression control resolves against an actor wherever a real one is in scope, such as a player-side preview, and the presence of a resolved value is therefore a property of the surface rather than of the control.
 The rolled form is the shared expression control — dice plus optional actor data paths — showing the value resolved against the previewed actor, or stating that it does not reduce to a number.
 The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
 
@@ -331,12 +345,16 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 An INGREDIENT SET holds what a craft consumes and a RESULT GROUP holds what it produces.
 Both are containers for the same requirement rows and the same choice groups, and the authoring surface MUST render them as the same shape so that the two sides of a recipe read as one model.
 
+A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
+Where the two documents are read together, they name one thing.
 A choice group is valid in BOTH containers and means something different in each, which the surface MUST make legible.
 In an ingredient set it is the crafter deciding what to spend.
 In a result group it is the player choosing which reward to take.
 A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
 
-Exactly ONE result group is produced per craft attempt in every mode, so the result group and not the individual result row is the unit of routing.
+The ROUTED modes select exactly one result group per craft attempt, which is what makes the group and not the individual result row their unit of routing.
+That is a property of those modes and not of the model: `progressive` awards EVERY result group whose difficulty threshold the roll meets or exceeds, which is the stated distinction between it and the routed modes.
+A surface that assumes single selection everywhere renders progressive wrongly.
 
 Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
 A set MUST NOT name more than one group: the engine would have no basis to choose between them.
@@ -369,7 +387,12 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 A native `select` popup is drawn by the operating system, so it ignores the theme, differs between browsers and platforms, and can carry no tick, group heading, description, badge, or reason for being unavailable.
 Every select in the product MUST therefore render the app’s own option list, using the floating-surface geometry, whether or not the options need any of those affordances.
-Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup for a short list.
+Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
+
+There is ONE exception, and it is structural rather than discretionary: a select inside a Foundry-owned dialog body.
+`DialogV2` cleans its content and re-serialises it through `innerHTML`, so no mounted component and no attached listener survives, its callers read their value back through `form.elements`, and its `dialog` element has no application root to portal into.
+A select there stays native, and the surrounding stylesheet gives the control a themed background, because `color-scheme` alone does not reach the popup.
+A component that ships native for a stated reason of its own outranks this requirement under the precedence order above, and two do so today.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live, and is dropped where the trigger already states the value.
 
@@ -397,6 +420,7 @@ An empty table keeps its heading and count, drops the header row, and says what 
 
 Every editor’s validation surface MUST use one arrangement: a verdict stating in the product’s own words what the blocking issues prevent, then the pass, warning and blocking counts in that order, then the issues grouped by the part of the record they belong to, in the order the editor’s own tabs run.
 It is a full-width screen with no inspector rail, because the issues are the content.
+The manager's shell selects full width per VIEW rather than per tab, so an editor whose validation is a tab either becomes a full-width view or states why it keeps its third column; two shipped editors repurpose that column rather than reserving it for an inspector.
 A passing group still renders, so a GM sees what was checked rather than inferring it from silence, and blocking issues sort above warnings inside a group.
 Each issue offers an action that moves focus to the offending control.
 
@@ -439,14 +463,16 @@ Grouped, navigable validation output is NOT a notice: it is the validation surfa
 
 ### Requirement: Screens are composed from published recipes
 
-Every product screen MUST be one of three archetypes, and its element order is fixed so that two screens of the same archetype are navigable in the same way.
+Every product screen MUST be one of four archetypes — browse, editor, player, and validation — and its element order is fixed so that two screens of the same archetype are navigable in the same way.
+A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, because it edits a scope rather than a record; that is the one permitted departure from the editor order.
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
 The selection bar replaces the filter bar in place when anything is selected.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and it never hides its disabled arrows.
 
-An EDITOR screen orders the breadcrumb, the title block with its lede, the action pair with back before save, the tab bar, and then the body beside the inspector rail.
+An EDITOR screen orders the breadcrumb, the title block with its lede, the action pair with back before save, the tab bar, and then the body.
+An inspector rail is OPTIONAL and several shipped editors have none; where one is present it is the third track, and where an editor repurposes that track for something else it says so.
 A blocking notice is the only element permitted between the tab bar and the first card.
 An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
@@ -464,6 +490,8 @@ The player window carries NO premium signal in any state, and a player-side choo
 
 A new shared primitive enters the set only through a change that adds its entry to this capability and its specimen to `openspec/specs/design-system/library.html` in the same change.
 The entry MUST state the primitive's purpose, its canonical geometry in published ladder values, its Svelte API including the event contract and the accessible naming it requires, and the caller count that justified it.
+That obligation binds a primitive the change ADDS or ALTERS.
+An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference; the library records which entries currently do so, and closing that list is tracked as a debt rather than presented as complete.
 
 A change that adds a component under `src/ui/svelte/components/` without a corresponding entry here has added an undocumented primitive, and a change that adds an entry here without the specimen has added a geometry nobody can see.
 Where a proposal conflicts with a shipped component, the change MUST either adopt the shipped behaviour or state why it is being replaced.
