@@ -22,10 +22,11 @@
  * ── AND THE ABSENCE HALF OF CLAUSE (b) IS LOAD-BEARING ──────────────────────────────────
  *
  * Asserting only that the RIGHT bundle is spread at each site is satisfied by a mutation that
- * ADDS a wrong bundle rather than replacing one — `{...toolScopeProps}` beside
- * `{...essenceScopeProps}` on an essence page would pass a presence-only check while handing
- * that screen the tool family's `setEnabled`, which is exactly the leak the per-entity-type
- * design exists to prevent. So each site asserts the other two bundles are ABSENT.
+ * ADDS a wrong bundle rather than replacing one. Svelte spreads are LAST-WINS over identical
+ * keys, and all three bundles carry the same four, so `{...toolScopeProps}` written after
+ * `{...essenceScopeProps}` on an essence page does not merge the two families — it REPLACES
+ * the essence family outright, and the screen silently edits tools. A presence-only check sees
+ * its own bundle still spread and passes. So each site asserts the other two are ABSENT.
  *
  * ── CLAUSE (d) IS A DESIGN CONSTRAINT, NOT A HANG DETECTOR ──────────────────────────────
  *
@@ -197,7 +198,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',
   './world/WorldPrerequisitesTab.svelte',
-  'svelte',]);
+  'svelte',
+]);
 
 /**
  * The lines of one element's attribute block, from its opening tag to its closing `/>`.
@@ -373,26 +375,43 @@ test('(d) the root gains no import: its script specifier set is unchanged', () =
   assert.deepEqual(
     specifiers.sort(),
     ROOT_IMPORT_SPECIFIERS.slice(),
-    'this is a wiring change: the shell reads state it already holds and imports nothing new'
+    'this is a wiring change: the shell reads state it already holds and imports nothing new. ' +
+      'If YOUR change legitimately adds one, this pin is not a verdict on it — add the ' +
+      'specifier to ROOT_IMPORT_SPECIFIERS above and say so in your commit'
   );
 });
 
-test('the ScopedPlaceholderPage capture claim moved to a route that still renders it', () => {
-  // Neither view-lab coverage test can see this move — `ScopedPlaceholderPage` stays inside the
-  // closure through the other six pages and stays claimed by some case either way — which is
-  // exactly why the assertion needs a home. A claim left on `world-component-catalogue` would
-  // silently publish that catalogue's frame as evidence of a placeholder-body change, on the
-  // first route whose body is replaced.
+test('every case that RENDERS the shared placeholder body also CLAIMS it, and only those', () => {
+  // Criterion 4, as a biconditional rather than as two named cases.
+  //
+  // NEITHER VIEW-LAB COVERAGE TEST CAN SEE THIS. `ScopedPlaceholderPage` is inside the lab
+  // closure through seven routes and is claimed by SOME case whatever happens, so a claim on a
+  // route whose body a later lane has replaced goes stale in SILENCE — and then publishes that
+  // route's real screen as evidence of a placeholder-body change. That is the failure this
+  // assertion exists for, and it is why it needs a home at all.
+  //
+  // AND WHY IT IS NOT "the claim lives on the longest-lived route". Nominating one case only
+  // holds if the four lanes land in a predicted order, and nothing enforces one: PR 7 can ship
+  // before 6c. Requiring the claim to track RENDERING removes the ordering assumption — a lane
+  // that replaces a body deletes that route's claim in the same change, and this reds if it
+  // forgets, in either direction.
   const PLACEHOLDER = 'src/ui/svelte/apps/manager/scoped/ScopedPlaceholderPage.svelte';
-  const claims = (caseId) => {
-    const found = VIEW_LAB_CASES.find((entry) => entry.id === caseId);
-    assert.ok(found, `${caseId} is a registered View Lab case`);
-    return (found.sourceMatches || []).some((pattern) => pattern.test(PLACEHOLDER));
-  };
-  assert.ok(claims('world-vocabulary'), 'world-vocabulary claims the shared placeholder body');
+  const rendersPlaceholder = (viewCase) =>
+    typeof viewCase.expectSelector === 'string' &&
+    viewCase.expectSelector.includes('data-scoped-page');
+  const claimsPlaceholder = (viewCase) =>
+    (viewCase.sourceMatches || []).some((pattern) => pattern.test(PLACEHOLDER));
+
+  const rendering = VIEW_LAB_CASES.filter(rendersPlaceholder).map((entry) => entry.id);
+  const claiming = VIEW_LAB_CASES.filter(claimsPlaceholder).map((entry) => entry.id);
   assert.ok(
-    !claims('world-component-catalogue'),
-    'and world-component-catalogue no longer does: its body is the first of the seven replaced'
+    rendering.length >= 4,
+    `only ${rendering.length} cases render the shared placeholder; the scan is broken`
+  );
+  assert.deepEqual(
+    claiming.slice().sort(),
+    rendering.slice().sort(),
+    'the set of cases claiming the shared placeholder body is exactly the set that renders it'
   );
 });
 
