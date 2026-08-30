@@ -122,6 +122,10 @@ import {
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
 } from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
+// THE SHARED READ SEAM (issue 1370). Seven call sites in this file enter through it, and this
+// file is outside the CI lint glob - so an omitted import here is a ReferenceError that no
+// lint, no test and no build reports. `tests/main-undefined-identifiers.test.js` is the guard.
+import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityReads.js';
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
