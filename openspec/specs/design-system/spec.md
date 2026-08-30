@@ -56,6 +56,12 @@ By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtim
 Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
 Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
 
+A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
+All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the eight offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
+In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `ironblood-forge` one tagged Mist renders a warm red-brown — in both cases the picker’s own label is wrong.
+The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
+Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
+
 Elevation is for surfaces that float OVER content and MUST come from `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`.
 A card that merely sits on the page uses a border and no shadow.
 
