@@ -23,6 +23,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { managerPrimitiveNamesByEvidence } from './designSystemPrimitives.js';
+
 const PLAYER = 'fabricate-app';
 const MANAGER = 'fabricate-crafting-system-manager';
 
@@ -81,26 +83,30 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 /**
  * The MANAGER's own shared primitives — its equivalent of `src/ui/svelte/components/`.
  *
- * An explicit list rather than a directory glob, because `apps/manager/` mixes primitives with
- * feature views: a glob would swallow `RecipesBrowserView.svelte` too and route every manager
- * change to the representative set, destroying the targeting this registry exists for.
+ * A NAMED SET rather than a directory glob, because `apps/manager/` mixes primitives with feature
+ * views: a glob would swallow `RecipesBrowserView.svelte` too and route every manager change to
+ * the representative set, destroying the targeting this registry exists for.
+ *
+ * DERIVED, never listed here. It used to be a hand-written array of fourteen names, which made
+ * this file a second opinion about which components are shared primitives — a question
+ * `openspec/specs/design-system/spec.md` already answers normatively and which
+ * `scripts/lib/designSystemPrimitives.js` now enumerates machine-readably (issue 1378). Two
+ * hand-maintained copies of one set disagree eventually, and the disagreement is silent: the
+ * broad-signal routing would simply stop matching a primitive the capability had admitted, and
+ * every PR touching it would publish frames that cannot contain it.
+ *
+ * The manifest carries a per-row `evidence` judgement rather than a location, so this takes the
+ * `'broad'` rows and nothing else. The four bulk-edit chrome files and `BulkDeleteCard` are
+ * `'targeted'` there for the reasons recorded below, so they stay out of this set exactly as they
+ * did when the list was typed by hand.
+ *
+ * The derivation SORTS. `BROAD_SIGNAL_PATTERN` below embeds these names in an alternation, so its
+ * source would otherwise depend on the manifest's authoring order — correct today only because
+ * that order happens to be alphabetical, and wrong the first time a row is appended rather than
+ * inserted. `tests/design-system-primitives.test.js` pins the resulting pattern source as a
+ * literal string, so a widening or narrowing of this set has to be an accepted edit to that pin.
  */
-const MANAGER_PRIMITIVES = [
-  'ArmedDangerButton',
-  'Callout',
-  'Chip',
-  'EditorValidationSurface',
-  'EmptyState',
-  'ExplainerCard',
-  'IconFactRow',
-  'ItemDropZone',
-  'ManagerModal',
-  'RadioCardGroup',
-  'RollDataExpressionInput',
-  'SearchablePopover',
-  'SegmentedControl',
-  'ToggleCard',
-];
+const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');
 
 /**
  * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section
@@ -113,6 +119,13 @@ const MANAGER_PRIMITIVES = [
  * to one of them requires. They have exactly two consumers, both of which claim them below, so
  * targeting is both possible and honest; the alternative is a shared primitive with dozens of
  * consumers, which is what `MANAGER_PRIMITIVES` is for.
+ *
+ * That exclusion is no longer enforced by their absence from a list in this file. They are shipped
+ * primitives and `scripts/lib/designSystemPrimitives.js` carries a row for each, holding this
+ * judgement as `evidence: 'targeted'` — so `MANAGER_PRIMITIVES` above, which takes the `'broad'`
+ * rows, cannot pick them up. `tests/design-system-primitives.test.js` asserts the two directions
+ * of that against `BROAD_SIGNAL_PATTERN` itself, which is what makes the judgement recorded beside
+ * the row and the routing it produces the same fact rather than two.
  */
 const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
@@ -129,7 +142,9 @@ const BULK_EDIT_CHROME_PATTERN =
  *
  * Not in `MANAGER_PRIMITIVES` either, for the reason stated above: a broad signal is claim-exempt
  * and routes to the representative set, and this component has exactly the delete frames as its
- * consumers, so targeting is both possible and honest.
+ * consumers, so targeting is both possible and honest. Its manifest row in
+ * `scripts/lib/designSystemPrimitives.js` records that as `evidence: 'targeted'`, separately from
+ * the four chrome files, because the two select different frames.
  */
 const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
 
@@ -191,12 +206,54 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * exceptions for a primitive whose changed presentation is otherwise absent from both generic
  * frames. Keeping the path literal makes the mapping test fail on a primitive rename, while the
  * case id fails closed through the registry filter if its deliberate state is removed.
+ *
+ * ── THE HAZARD THIS TABLE CARRIES, AND WHY IT IS EXPORTED ──────────────────────────────────────
+ *
+ * "Fails closed through the registry filter" is exactly the problem as well as the safety. A value
+ * naming a case id that does not exist, or one whose case has `publish: false`, is dropped by the
+ * `selected.has(id) && viewCase.publish` filter at the end of {@link mapChangedFilesToCases} —
+ * silently. The primitive then keeps publishing the representative pair, the entry sits here
+ * looking like configuration, and nothing anywhere says it never ran. Issue 1116 names that
+ * precisely: unreachable configuration looks identical to working configuration.
+ *
+ * So this is EXPORTED, solely so `tests/design-system-primitives.test.js` can assert the entries
+ * resolve — every key matched by {@link BROAD_SIGNAL_PATTERN} and present on disk, every value the
+ * id of a case that publishes. That test also pins the KEY LIST, not just the entries, because a
+ * later refactor that moved these into the case literals and left an empty object behind would
+ * leave the loop running over nothing and the property green over an empty domain.
+ *
+ * This is not a mistake the registry has been spared: two comments in this file cited
+ * `manager-gathering-stamina-rolls` for years and no case has ever had that id.
  */
-const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
   // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
   // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
+  // The most-used control in the app, and until issue 1378 it published no frame that renders one.
+  // Both representative frames are browse surfaces: `manager-components-normal` lists components
+  // and `fabricate-app-shell` lists recipes, and neither contains a stepper at all, so every PR
+  // that restyled this primitive published two frames in which the changed control is absent.
+  //
+  // `manager-gathering-economy-actors` is the frame that answers for it. Its actor stamina table
+  // is a four-track grid of steppers and its steps drive THREE states into one frame: Brenna's row
+  // is rolled, so its Current stepper is live and filled while its Max stepper renders the
+  // rolled-max PLACEHOLDER (the unset-value state), and Idrin's and Vosk's rows render the
+  // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
+  // case's own steps fill one at `[data-economy-stamina-max]`.
+  'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // BOTH band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below. The
+  // strip has exactly two importers — `checks/CraftingCheckEditor.svelte` and
+  // `checks/SimpleCraftingCheckEditor.svelte` — and they are its two modes, not two instances of
+  // one. `coverage-mode-routed-check-checks` is the routed mode: many tiers, and the only frame in
+  // the registry showing a NAMED label on the strongest band. `manager-checks-simple-two-band-strip`
+  // is the simple mode: two outcomes and a DRAGGABLE handle, which the routed frame does not draw.
+  // A change to the handle is invisible in the first and a change to band naming is invisible in
+  // the second, so one of the two would always be the wrong frame to publish alone.
+  'src/ui/svelte/components/ThresholdBandStrip.svelte': Object.freeze([
+    'manager-checks-simple-two-band-strip',
+    'coverage-mode-routed-check-checks',
+  ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not
@@ -582,7 +639,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
     // Deliberately NO pattern for `manager/EmptyState.svelte`, for the reason
-    // `manager-gathering-stamina-rolls` records about `Stepper`: `EmptyState` is in
+    // `manager-gathering-economy-actors` records about `Stepper`: `EmptyState` is in
     // `MANAGER_PRIMITIVES`, so `BROAD_SIGNAL_PATTERN` matches it and `selectRenderFileCases`
     // `continue`s on a broad-signal file BEFORE consulting any case's `sourceMatches` — such an
     // entry would be unreachable. This case is reached instead through
@@ -4874,8 +4931,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // Deliberately NO pattern for `components/Stepper.svelte`: `BROAD_SIGNAL_PATTERN` matches
     // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
     // BEFORE it consults any case's `sourceMatches`, so such an entry would be unreachable code.
-    // A broad signal adds `REPRESENTATIVE_CASE_IDS` only, which is why this case still needs its
-    // own `GatheringEconomyView` pattern to be selected by a change to the view itself.
+    //
+    // THIS CASE IS NONETHELESS THE STEPPER'S EVIDENCE (issue 1378). The seam is the other one:
+    // `BROAD_SIGNAL_CASE_OVERRIDES` is keyed on the primitive rather than declared by the case, and
+    // it names this id. That is additive — a stepper change publishes the representative pair AND
+    // this frame — so the pair is not lost, which is the property `viewLabCases.js`'s override
+    // docblock states and `tests/view-lab-cases.test.js` pins.
+    //
+    // The pattern below is still required and is not a duplicate of that: the override selects this
+    // case when the PRIMITIVE changes, and this pattern selects it when the VIEW does.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
@@ -7028,11 +7092,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     // Deliberately NO pattern for `components/ThresholdBandStrip.svelte`, for the reason
-    // `manager-gathering-stamina-rolls` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
+    // `manager-gathering-economy-actors` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
     // matches `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a
     // broad-signal file BEFORE consulting any case's `sourceMatches`, so such an entry would
-    // be unreachable. A change to the strip PRIMITIVE therefore publishes the representative
-    // set, and a change to this editor — where the band colours are chosen — publishes this.
+    // be unreachable.
+    //
+    // A change to the strip PRIMITIVE used to publish the representative set alone, neither
+    // frame of which draws a band strip. It now additionally publishes THIS case and
+    // `manager-checks-simple-two-band-strip` through `BROAD_SIGNAL_CASE_OVERRIDES` (issue
+    // 1378), which names both because the strip's two importers are its two MODES: this is
+    // the routed one, and the simple one owns the draggable handle. The pattern below still
+    // publishes this case when the editor — where the band colours are chosen — changes.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   managerCase({
@@ -7350,6 +7420,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
     kinds: ['manager', 'checks'],
+    // The strip's SIMPLE mode, and one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for
+    // `components/ThresholdBandStrip.svelte` (issue 1378). No `sourceMatches` pattern for the
+    // strip here, and none is possible: `BROAD_SIGNAL_PATTERN` matches `^src/ui/svelte/components/`
+    // and `selectRenderFileCases` `continue`s before consulting any case. The override is the seam
+    // — see `coverage-mode-routed-check-checks`, which is the routed half of the same pair.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
   }),
   managerCase({
