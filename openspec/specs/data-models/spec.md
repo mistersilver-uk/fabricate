@@ -1031,7 +1031,7 @@ The readers now enter through the read union, which answers from this record for
 Every shipped writer writes this copy, and no identity writer writes the world one.
 The world copy is the **World Identity Snapshot**: taken from this record at migration time, equal to it by construction at that moment, and written by no identity writer thereafter.
 It is READ now, and it supplies only the keys this record does not carry; where the two disagree the answer is re-derived FROM this record at read time, and the divergence is reported to the GM.
-This record OWNS nothing the three destinations do not cover, which is what makes `essenceDefinitions` the one of the three in-system arrays the sweep can retire IN FULL — see `## CraftingSystem` requirement 36, and note that the two-section count is NOT the reason.
+This record OWNS nothing the three destinations do not cover, which is what makes `essenceDefinitions` the one of the three in-system arrays that requirement 36's own retirement can retire IN FULL — see `## CraftingSystem` requirement 36, and note that the two-section count is NOT the reason.
 
 ### Properties
 

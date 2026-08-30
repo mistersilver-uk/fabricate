@@ -189,6 +189,23 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
 }
 
 /**
+ * How many drifted records the TOAST names before deferring to the console.
+ *
+ * A NOTIFICATION IS NOT A REPORT SURFACE, and Foundry's own CSS is why. `.notification` has no
+ * `max-height` and no `overflow`, and carries `pointer-events: all`, at roughly 60% viewport
+ * width for a `LIFETIME_MS` of 5000. Verified at V14.365. An uncapped join over a bulk edit to a
+ * 200-component library is about 18 KB of text in one fixed-position block: it overflows the
+ * viewport and swallows pointer events over the canvas and the sidebar for five seconds, and the
+ * GM cannot clear the underlying drift because no world scoped-entity editor exists yet.
+ *
+ * NOTHING IS LOST BY CAPPING. `ui.notifications.info` defaults `console: true`, so the composed
+ * message already reaches the console, and the count and field total stay exact in the sentence.
+ * The cap is on the ENUMERATION only - the notice still NAMES records rather than counting them,
+ * because a bare count tells a GM something is stale and gives them no way to find it.
+ */
+const IDENTITY_DRIFT_NOTICE_RECORD_CAP = 5;
+
+/**
  * The per-session notice naming the entities whose world identity snapshot has gone stale.
  *
  * A DISCLOSURE OBLIGATION, NOT A CORRECTION. The read union re-derives identity from the
@@ -201,7 +218,9 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
  * stale and gives them no way to find it; the detector already reports one row per
  * `(entityId, field)`, and collapsing that to a number throws the whole answer away. Rows are
  * grouped per `(system, entity)` so one record with three stale fields reads as one clause with
- * three fields rather than as three unrelated records.
+ * three fields rather than as three unrelated records. The ENUMERATION is capped at
+ * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} records with an explicit remainder clause; the counts
+ * in the sentence stay exact, and the console keeps the whole list.
  *
  * IDENTITY ONLY, AND IT SAYS SO. `WORLD_IDENTITY_FIELDS` covers names, images, descriptions and
  * source links; the detector is BLIND to `tags`, `category`, `breakage`, `onBreak`,
@@ -234,12 +253,23 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
     }
   }
   if (byRecord.size === 0) return '';
-  const named = [...byRecord.values()]
+  const records = [...byRecord.values()];
+  const shown = records.slice(0, IDENTITY_DRIFT_NOTICE_RECORD_CAP);
+  const withheld = records.length - shown.length;
+  let named = shown
     .map(
       (record) =>
         `${record.entityId} (${record.entityType}: ${record.fields.join(', ')}) in ${record.systemId}`
     )
     .join('; ');
+  if (withheld > 0) {
+    named += ` ${localizeWith(
+      localize,
+      'FABRICATE.Migration.WorldScopeEntities.IdentityDriftOverflow',
+      { count: withheld },
+      `...and ${withheld} more - the full list is in the console`
+    )}`;
+  }
   return localizeWith(
     localize,
     'FABRICATE.Migration.WorldScopeEntities.IdentityDrift',

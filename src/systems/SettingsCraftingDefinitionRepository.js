@@ -233,6 +233,16 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
  * @returns {Array<object>} the persisted array, or `[]` when the key holds anything else.
  */
 export function readPersistedCraftingSystems(getSetting = defaultGetSetting) {
-  const raw = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS);
-  return Array.isArray(raw) ? raw : [];
+  try {
+    const raw = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS);
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    // GUARDED, on the three scope stores' own precedent, and the reason is the CALLER'S SHAPE
+    // rather than this key's likelihood of throwing. `initialize()` is awaited inside an async
+    // `ready` hook, and Foundry's hook dispatch catches SYNCHRONOUS throws only - so a rejection
+    // here escapes unhandled and silently skips everything sited after it: the world-time pass,
+    // all three flag auto-stamps and the identity remap. A disclosure notice must not be able
+    // to cost a world its startup work.
+    return [];
+  }
 }

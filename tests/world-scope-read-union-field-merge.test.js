@@ -184,7 +184,7 @@ describe('the two spread hazards are RETIRED while requirement 36 holds', () => 
     assert.equal(union[0].enabled, false, 'the world layer supplies keys the record does not carry');
   });
 
-  it('`member` and `inherited` survive the re-spread, because no shipped record carries them', () => {
+  it('`member` and `inherited` are emitted, and no shipped record carries them to contest it', () => {
     const union = unionScopedDefinitions({
       corpus: collidingCorpus(
         { id: 'comp-1' },

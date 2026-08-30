@@ -127,6 +127,26 @@ const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
  * @param {object|(() => object|null)|null|undefined} seam
  * @returns {object|null}
  */
+/**
+ * One scope store's published corpus, or `null` when there is no readable world half.
+ *
+ * `_resolveStoreSeam` catches a throwing GETTER; this also catches a throwing `corpus()`.
+ * `## Scoped Entity Definitions` requirement 16 says an UNREADABLE world half must answer the
+ * in-system array ITSELF, and without this the manager spelling would take
+ * `getComponentsForSystem` down where the module spelling degrades. The two share one body
+ * precisely so they cannot disagree, and this closes the last place they could.
+ *
+ * @param {object|(() => object|null)|null} seam
+ * @returns {object|null}
+ */
+function _resolveStoreCorpus(seam) {
+  try {
+    return _resolveStoreSeam(seam)?.corpus?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function _resolveStoreSeam(seam) {
   if (!seam) return null;
   try {
@@ -488,7 +508,7 @@ export class CraftingSystemManager {
    */
   _resolveScopedUnion(system, seam, field) {
     const record = typeof system === 'string' ? this.getSystem(system) : system;
-    return resolveScopedEntityRead(record, _resolveStoreSeam(seam)?.corpus?.() ?? null, field);
+    return resolveScopedEntityRead(record, _resolveStoreCorpus(seam), field);
   }
 
   /**

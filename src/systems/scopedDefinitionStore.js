@@ -185,13 +185,22 @@ function membershipsForSystem(memberships, systemId) {
  * THE READ UNION for one entity type and one crafting system.
  *
  * IT IS NOT THE BASIS UNION, and conflating the two is the single most consequential mistake
- * available in this change. This one answers what a system's entity list IS: the world entities
- * whose membership record for that system is PRESENT, resolved through #1358's three-layer
- * resolver, unioned with that system's surviving in-system array, WORLD WINNING on an id
- * collision FIELD BY FIELD. It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw
- * world entities — an unfiltered union would give every system every world entity and delete the
- * membership model #1358 built, and a raw-entity union would hand back world defaults in place of
- * a system's own overrides, bypassing the inherit map.
+ * available in this change. This one answers what a system's entity list IS: that system's
+ * surviving in-system array, merged with the world entities whose membership record for that
+ * system is PRESENT, each resolved through #1358's three-layer resolver. It is
+ * MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities — an unfiltered
+ * union would give every system every world entity and delete the membership model #1358
+ * built, and a raw-entity union would hand back world defaults in place of a system's own
+ * overrides, bypassing the inherit map.
+ *
+ * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
+ * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
+ * read time, and the world layer supplies only the keys it does not carry. The world-wins
+ * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
+ * re-arms when requirement 36 retires.**
+ * The two sections below are kept in that order — the `1363` correction first, then the
+ * `1370` inversion — because each is the reason the next was needed, and a reader who meets
+ * only the first must not read it as the current rule.
  *
  * ## "WORLD WINS" IS PER FIELD, AND WAS PER RECORD (issue 1363)
  *
@@ -235,6 +244,14 @@ function membershipsForSystem(memberships, systemId) {
  * {@link identityOf} as the oracle for "which identity keys does this record carry" — it skips
  * exactly the `undefined` ones. Without that half, a world entity's stale `description` survives on
  * a record the GM has since cleared.
+ *
+ * THE MEMO'S SYSTEM-HALF GUARD IS `(revision, length)`, AND THIS CHANGE IS THE FIRST FOR WHICH
+ * THAT DECIDES REAL ANSWERS. All thirteen `advanceDefinitionRevision` call sites advance
+ * `components` or `recipeItemDefinitions`; none advances `tools` or `essenceDefinitions`. No
+ * writer needs one today, because every shipped tool and essence edit REPLACES the array. A
+ * future IN-PLACE edit preserving both identity and length would serve a stale union to every
+ * repointed reader, silently - so a writer added there must advance the revision, exactly as the
+ * component writers do.
  *
  * ROW ORDER and ROW SET are dated to the same requirement, and that is why this walks `legacy`
  * ONCE. The union emits the in-system array's rows, in the in-system array's order, and the world
@@ -296,7 +313,7 @@ export function unionScopedDefinitions({
   // memberships) build is still an O(entities x memberships) build on every world edit.
   const bySystem = membershipsForSystem(memberships, system);
   const byId = worldEntitiesById(entities);
-  const identityFields = WORLD_IDENTITY_FIELDS[entityType] ?? [];
+  const identityFields = liftedIdentityFields(entityType);
 
   const union = [];
   for (const entry of legacy) {
@@ -325,6 +342,36 @@ export function unionScopedDefinitions({
     union.push(merged);
   }
   return union;
+}
+
+/**
+ * The lifted identity field list for one entity type, REFUSING an unrecognised one.
+ *
+ * IT THROWS RATHER THAN DEFAULTING TO AN EMPTY LIST, and that is the whole point of the
+ * function. The DELETE half of the key rule is a CORRECTNESS rule, so defaulting an unknown key
+ * to "delete nothing" fails OPEN: a typo in one of the three call sites would leave a stale
+ * world name, icon or image on a record the GM has since cleared, on every read, with every
+ * suite in the repository still green. Measured: two such typos kept 943 tests across 23 files
+ * passing. A key that silently disables a correctness rule should be loud.
+ *
+ * The three production callers are `resolveComponentScope`, `resolveEssenceScope` and
+ * `resolveToolScope`, and each passes a literal.
+ *
+ * @param {'components'|'essences'|'tools'} entityType
+ * @returns {readonly string[]}
+ */
+function liftedIdentityFields(entityType) {
+  const fields = WORLD_IDENTITY_FIELDS[entityType];
+  if (!fields) {
+    const known = Object.keys(WORLD_IDENTITY_FIELDS).join(', ');
+    throw new TypeError(
+      'unionScopedDefinitions: unknown entityType ' +
+        JSON.stringify(entityType) +
+        '; expected one of ' +
+        known
+    );
+  }
+  return fields;
 }
 
 /**

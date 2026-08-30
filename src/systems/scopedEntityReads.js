@@ -119,9 +119,14 @@ export function resolveScopedEntityRead(system, corpus, field) {
   // manager's retired `if (!record?.id) return []` branch: every reader this seam replaces
   // answered `system.components` for an id-less record, and blanking one would delete a whole
   // system's library from every listing that reads it.
-  if (!hasWorldHalf(world) || !system?.id) return systemDefinitions;
+  //
+  // TRIMMED, because the union trims too. A whitespace-only id is TRUTHY here and empty there,
+  // so an untrimmed check would send it into a union that answers a REALLOCATED copy - which is
+  // exactly the object identity this passthrough exists to preserve.
+  const systemId = typeof system?.id === 'string' ? system.id.trim() : system?.id;
+  if (!hasWorldHalf(world) || !systemId) return systemDefinitions;
   return getScopedDefinitionUnion(world, systemDefinitions, () =>
-    read.union(world, system.id, systemDefinitions)
+    read.union(world, systemId, systemDefinitions)
   );
 }
 

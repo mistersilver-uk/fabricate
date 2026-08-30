@@ -522,8 +522,16 @@ function simpleCorpusCases() {
         scopedUnionRows: components.length,
         // THE ROW COUNT ALONE IS BLIND, exactly as in `scopedUnionRead`: this roster overlaps
         // the in-system array, so the row count is 5,000 whether or not the world half
-        // participated. Only a merged row carries `member`.
-        scopedUnionWorldWins: components.filter((entry) => entry.member === true).length,
+        // participated. Only a MERGED row carries `member`.
+        //
+        // NOT `scopedUnionWorldWins`, which is what the issue-1359 case above still calls the
+        // identical measurement. That spelling described a rule issue 1370 INVERTED: while
+        // `## CraftingSystem` requirement 36 holds the world layer wins no key, row or order
+        // the in-system record decides. What this counts is how many rows the world half
+        // CONTRIBUTED to, which is what makes it a non-degenerate two-half union. The older
+        // case keeps its spelling because renaming it would move a committed baseline this
+        // change must not move; the two count the same thing.
+        scopedUnionMergedRows: components.filter((entry) => entry.member === true).length,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
         worldScopeBytes: settingBytes(world.settings, 'componentScope'),
       }),
@@ -558,7 +566,8 @@ function simpleCorpusCases() {
       counts: ({ world }, components) => ({
         scopedUnionReads: SCOPED_UNION_READS,
         scopedUnionRows: components.length,
-        scopedUnionWorldWins: components.filter((entry) => entry.member === true).length,
+        // See the sibling case above for why this is not spelled `scopedUnionWorldWins`.
+        scopedUnionMergedRows: components.filter((entry) => entry.member === true).length,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
         worldScopeBytes: settingBytes(world.settings, 'componentScope'),
       }),

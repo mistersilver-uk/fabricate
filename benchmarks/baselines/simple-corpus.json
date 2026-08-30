@@ -183,7 +183,7 @@
         "identityIndexBuilds": 1,
         "scopedUnionReads": 25,
         "scopedUnionRows": 5000,
-        "scopedUnionWorldWins": 2500,
+        "scopedUnionMergedRows": 2500,
         "worldScopeEntities": 2500,
         "worldScopeBytes": 656382
       }
@@ -195,7 +195,7 @@
         "identityIndexBuilds": 1,
         "scopedUnionReads": 25,
         "scopedUnionRows": 5000,
-        "scopedUnionWorldWins": 2500,
+        "scopedUnionMergedRows": 2500,
         "worldScopeEntities": 2500,
         "worldScopeBytes": 656382
       }

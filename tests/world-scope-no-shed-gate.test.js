@@ -25,7 +25,10 @@
  *     function) would have sailed past it.
  *  3. It would have tripped on the legitimate call in `tests/helpers/scale/benchmarkCases.js`.
  *     The walk is rooted at `src/` ALONE, which excludes it BY CONSTRUCTION rather than by an
- *     exclusion list a later lane can widen.
+ *     exclusion list a later lane can widen. (Its sibling exemption — a line-local marker for
+ *     the manager's three delegating closures — was RETIRED at issue 1370: those closures no
+ *     longer exist, so the marker exempted nothing while remaining available to re-arm by
+ *     accident. The manager's own method headers fall to `DEFINITION` instead.)
  *  4. Its emit half passed key-presence against an empty-array mutation. This one asserts CONTENT:
  *     three entities in, length three out, identity fields verbatim.
  *
@@ -91,8 +94,15 @@ const CALL = new RegExp(`(?:${NAMES})\\(`);
 const DEFINITION = new RegExp(
   `^\\s*(?:export\\s+)?(?:async\\s+)?(?:function\\s+)?(?:${NAMES})\\([^)]*\\)\\s*\\{`
 );
-/** The three legitimate delegating call sites inside the manager's own read-union methods. */
-const CALL_SITE_MARKER = /\(corpus, record\) =>/;
+/**
+ * A CALL held as a VALUE rather than invoked by name.
+ *
+ * `CALL` requires `name(`, so a door built by putting a scope function in a dispatch table and
+ * invoking it through the table — which is exactly how `scopedEntityReads.js` builds the door
+ * ~20 leaf readers use — is INVISIBLE to it. That is not a hole to disclaim: it is the PR's own
+ * primary entry point, so the gate matches it too and the assertion below names it.
+ */
+const VALUE_HELD = new RegExp(`:\\s*(?:${NAMES})\\b(?!\\()`);
 
 // ---------------------------------------------------------------------------
 // 1. The POSITIVE existence anchor
@@ -199,24 +209,30 @@ function unionCallSites() {
     // start of the line.
     const lines = stripComments(readFileSync(full, 'utf8')).split('\n');
     lines.forEach((line, index) => {
-      if (!CALL.test(line) || DEFINITION.test(line)) return;
-      if (CALL_SITE_MARKER.test(line) || CALL_SITE_MARKER.test(lines[index - 1] ?? '')) return;
-      sites.push(`${rel} :: ${enclosingMethod(lines, index)}`);
+      const invoked = CALL.test(line) && !DEFINITION.test(line);
+      const held = VALUE_HELD.test(line);
+      if (!invoked && !held) return;
+      sites.push(`${rel} :: ${held ? 'value-held' : enclosingMethod(lines, index)}`);
     });
   }
   return [...new Set(sites)].sort();
 }
 
-test('the read union is entered from EXACTLY the manager read accessors', () => {
-  // REPLACES issue 1363's "no production reader is repointed". PR 8a repoints the reader set, and
-  // it does so through ONE door: `scopedEntityReads.js` for the readers that hold a system record,
-  // and these four manager accessors for the readers that hold a manager. A fifth entry point
-  // appearing here means some path is building its own union instead of sharing the memoized one.
+test('the read union is entered from EXACTLY two doors, and both are named here', () => {
+  // REPLACES issue 1363's "no production reader is repointed". PR 8a repoints the reader set
+  // through TWO doors and no others: the shared seam's dispatch table, which every reader
+  // holding a system RECORD enters, and the manager's four read accessors, which every reader
+  // holding a MANAGER enters. A third entry point appearing here means some path is building
+  // its own union instead of sharing the memoized one.
+  //
+  // The seam's three rows are VALUE-HELD, so an earlier form of this test could not see them and
+  // promised exactness it did not check. They are matched now.
   assert.deepEqual(unionCallSites(), [
     'src/systems/CraftingSystemManager.js :: getComponentsForSystem',
     'src/systems/CraftingSystemManager.js :: getEssenceDefinition',
     'src/systems/CraftingSystemManager.js :: getEssenceDefinitions',
     'src/systems/CraftingSystemManager.js :: getToolsForSystem',
+    'src/systems/scopedEntityReads.js :: value-held',
   ]);
 });
 
@@ -236,6 +252,13 @@ test('that call-site scan is NOT vacuous - it reds when a repoint is reverted', 
     CALL.test(reverted),
     false,
     'and a REVERTED repoint stops matching, so the list above would lose an entry'
+  );
+  // The VALUE-HELD shape, which `CALL` cannot see and which the seam's own table uses.
+  assert.equal(VALUE_HELD.test('  components: { union: resolveComponentScope },'), true);
+  assert.equal(
+    VALUE_HELD.test('  const x = resolveComponentScope(corpus, id, defs);'),
+    false,
+    'an ordinary invocation is CALL’s business, not this one’s'
   );
 });
 

@@ -31,7 +31,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { getMatchHandler } from '../src/models/match/matchTypes.js';
 import { buildWorldIdentityDriftNotice } from '../src/migration/worldScopeEntityNotice.js';
@@ -42,7 +42,11 @@ import {
   resolvedToolsFor,
 } from '../src/systems/scopedEntityReads.js';
 
-import { installFoundryStubs, makeManagerWithScope } from './helpers/worldScopeCorpus.js';
+import {
+  installFoundryStubs,
+  makeManagerWithScope,
+  makeScopeStore,
+} from './helpers/worldScopeCorpus.js';
 
 installFoundryStubs();
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -168,6 +172,51 @@ describe('identity is re-derived from the in-system record on every read', () =>
     assert.equal('registeredItemUuid' in row, false);
     assert.equal(row.name, 'Ash Salt', 'a field the record DOES carry is untouched');
   });
+
+  it('re-derives an ABSENCE for an ESSENCE too', () => {
+    // `WORLD_IDENTITY_FIELDS` is keyed per entity type, so the DELETE half is a DIFFERENT field
+    // list for each of the three. Proving it for components alone leaves the other two resting on
+    // a `entityType` string that nothing checks.
+    const manager = makeManagerWithScope(CraftingSystemManager, {
+      essenceScope: scopePayload({
+        id: 'fire',
+        name: 'Fire',
+        icon: 'fas fa-fire',
+        colorToken: 'rose',
+        description: 'the snapshot blurb',
+      }),
+    });
+    const system = { id: SYSTEM_ID, essenceDefinitions: [{ id: 'fire', name: 'Fire' }] };
+
+    const [row] = manager.resolveScopedEssences(system);
+
+    assert.equal('description' in row, false);
+    assert.equal('icon' in row, false);
+    assert.equal('colorToken' in row, false);
+    assert.equal(row.name, 'Fire');
+  });
+
+  it('re-derives an ABSENCE for a TOOL too', () => {
+    const manager = makeManagerWithScope(CraftingSystemManager, {
+      toolScope: scopePayload({
+        id: 'hammer',
+        name: 'Hammer',
+        img: 'stale.png',
+        description: 'the snapshot blurb',
+        originItemUuid: 'Item.stale',
+        registeredItemUuid: 'Item.stale',
+        aliasItemUuids: ['Item.alias'],
+      }),
+    });
+    const system = { id: SYSTEM_ID, tools: [{ id: 'hammer', name: 'Hammer' }] };
+
+    const [row] = manager.resolveScopedTools(system);
+
+    for (const field of ['img', 'description', 'originItemUuid', 'registeredItemUuid', 'aliasItemUuids']) {
+      assert.equal(field in row, false, `${field} must be deleted, not supplied by the world half`);
+    }
+    assert.equal(row.name, 'Hammer');
+  });
 });
 
 // -----------------------------------------------------------------------------------------------
@@ -248,6 +297,74 @@ describe('an unknown world half returns the in-system array ITSELF', () => {
       assert.equal(answer.length, 6, `${label} must keep all six rows`);
       assert.equal(answer, system.components, `${label} must not reallocate`);
     }
+  });
+});
+
+// -----------------------------------------------------------------------------------------------
+// THE PRODUCTION BRANCH — the lazy global probe every leaf reader actually takes
+// -----------------------------------------------------------------------------------------------
+
+describe('the seam resolves its world half through the global store probe', () => {
+  // WHY THIS EXISTS. `resolveScopedEntityRead` takes its corpus either from an explicitly passed
+  // argument or, when none is passed, from `globalThis.game?.fabricate?.<accessor>?.()?.corpus?.()`.
+  // ALL of the repointed leaf readers call `resolvedComponentsFor(system)` with ONE argument, so
+  // the probe is the production branch — and nothing else in this repository drives it to a
+  // non-null corpus: the manager fixtures inject seams into the MANAGER, the benchmark cases pass
+  // the corpus explicitly, and the unknown-half suite above deletes `game.fabricate` outright.
+  //
+  // Without this, a wrong accessor name or a wrong method on the store degrades EVERY leaf reader
+  // to the raw in-system array, silently, with the whole suite green — invisible at `1.30.0`
+  // because the halves are equal, and wrong the release a world writer ships.
+  const SEEDED = 'probe-comp';
+
+  function seededStores() {
+    const payload = scopePayload(
+      { id: SEEDED, name: 'World Probe', description: 'from the world half' },
+      { worldDefault: { category: 'ore' } }
+    );
+    return {
+      getComponentScopeStore: () => makeScopeStore('components', payload),
+      getEssenceScopeStore: () => makeScopeStore('essences', scopePayload({ id: SEEDED })),
+      getToolScopeStore: () => makeScopeStore('tools', scopePayload({ id: SEEDED })),
+    };
+  }
+
+  beforeEach(() => {
+    globalThis.game = globalThis.game ?? {};
+    globalThis.game.fabricate = seededStores();
+  });
+
+  afterEach(() => {
+    delete globalThis.game.fabricate;
+  });
+
+  it('returns a MERGED row with one argument, so the accessor and the method are both right', () => {
+    const system = { id: SYSTEM_ID, components: [{ id: SEEDED, name: 'In-System Probe' }] };
+
+    const [row] = resolvedComponentsFor(system);
+
+    // `member` is stamped by the three-layer resolver and appears on NO stored record, so it can
+    // only be here if the world half was actually read.
+    assert.equal(row.member, true, 'the probe must reach the store and its published corpus');
+    assert.equal(row.category, 'ore', 'and resolve the world default the record does not carry');
+    assert.equal(row.name, 'In-System Probe', 'while the in-system record still decides its keys');
+  });
+
+  it('drives the same branch for essences and tools', () => {
+    const essence = { id: SYSTEM_ID, essenceDefinitions: [{ id: SEEDED, name: 'In-System' }] };
+    const tool = { id: SYSTEM_ID, tools: [{ id: SEEDED, name: 'In-System' }] };
+    assert.equal(resolvedEssencesFor(essence)[0].member, true);
+    assert.equal(resolvedToolsFor(tool)[0].member, true);
+  });
+
+  it('still degrades to the in-system array when the probe finds no store', () => {
+    // The negative half, on the SAME fixture, so the positive arm above cannot be passing for the
+    // reason the passthrough would pass for.
+    delete globalThis.game.fabricate;
+    const system = { id: SYSTEM_ID, components: [{ id: SEEDED, name: 'In-System Probe' }] };
+    const answer = resolvedComponentsFor(system);
+    assert.equal(answer, system.components, 'the SAME object');
+    assert.equal('member' in answer[0], false, 'and no resolver stamp, because nothing resolved');
   });
 });
 
@@ -453,7 +570,9 @@ describe('the behaviour keys are re-derived from the in-system record', () => {
     };
 
     assert.equal(manager.resolveScopedEssences(system)[0].enabled, false);
-    assert.equal(resolvedEssencesFor(system)[0].enabled, false, 'and through the seam too');
+    // NOT asserted 'through the seam' here: with no `game.fabricate` the seam takes the
+    // unknown-half passthrough and hands back this fixture's own literal, which would pass
+    // against a completely broken probe. The probe has its own describe below.
   });
 
   it('(g) keeps a GM-DISABLED tool disabled', () => {
@@ -463,10 +582,9 @@ describe('the behaviour keys are re-derived from the in-system record', () => {
     const system = { id: SYSTEM_ID, tools: [{ id: 'tool-1', name: 'Hammer', enabled: false }] };
 
     assert.equal(manager.resolveScopedTools(system)[0].enabled, false);
-    assert.equal(resolvedToolsFor(system)[0].enabled, false, 'and through the seam too');
   });
 
-  it('(h) still emits member and inherited, which no shipped record carries', () => {
+  it('(h) emits member and inherited, which no shipped record carries and so cannot contest', () => {
     const manager = componentManager({ id: 'comp-1' }, { membership: { inherit: { category: false } } });
     const system = { id: SYSTEM_ID, components: [{ id: 'comp-1', name: 'Ash Salt' }] };
 
@@ -561,6 +679,30 @@ describe('the world identity drift report', () => {
         'and nothing has been changed - this is identity only (names, images, descriptions and ' +
         'source links), not behaviour.'
     );
+  });
+
+  it('CAPS the enumeration and says how many it withheld', () => {
+    // A notification is not a report surface: core's `.notification` has no `max-height` and no
+    // `overflow` and carries `pointer-events: all`, so an uncapped join over a bulk edit to a
+    // 200-component library overflows the viewport and swallows pointer events for five seconds.
+    // `ui.notifications.info` defaults `console: true`, so the full list still reaches the console.
+    const drift = [];
+    for (let index = 0; index < 12; index += 1) {
+      drift.push({
+        systemId: SYSTEM_ID,
+        entityType: 'components',
+        entityId: `comp-${index}`,
+        field: 'name',
+      });
+    }
+
+    const message = buildWorldIdentityDriftNotice(drift, null);
+
+    assert.match(message, /out of date for 12 record\(s\) across 12 field\(s\)/, 'counts stay EXACT');
+    assert.match(message, /\.\.\.and 7 more/, 'and the remainder is stated rather than dropped');
+    assert.equal(message.includes('comp-4'), true, 'the first five records are NAMED');
+    assert.equal(message.includes('comp-5'), false, 'the sixth is not');
+    assert.ok(message.length < 1000, `the toast stays bounded; got ${message.length} characters`);
   });
 
   it('says nothing at all when there is no drift', () => {

@@ -11,12 +11,14 @@
  *  1. **An UNLEDGERED SITE REDS.** Revert one repoint and the scan finds a site the ledger does
  *     not name.
  *  2. **A STALE ANCHOR REDS.** Edit a ledger anchor and its file no longer contains it.
- *  3. **A POSITIVE CONTROL: the scan must PROVE it found things.** Measured, obligations 1 and 2
- *     BOTH stay green against a matcher that matches nothing — obligation 1 is the only one that
- *     exercises the scanner, and a vacuous scan finds no unledgered site, while obligation 2 reads
- *     each file directly and never touches the matcher at all. This gate is the SOLE discharge of
- *     the omitted-reader finding, so a vacuous matcher would silently reinstate it while every
- *     acceptance criterion stayed green.
+ *  3. **A POSITIVE CONTROL: the scan must PROVE it found things.** Obligation 1 alone cannot
+ *     carry that: a vacuous scan finds no unledgered site, so it passes. The design this gate
+ *     REJECTED read each ledgered file directly for obligation 2, which never touched the
+ *     matcher either — measured, BOTH stayed green against a matcher matching nothing. As
+ *     SHIPPED, obligation 2 reads the scan's own `rows`, so a vacuous matcher reds it too; the
+ *     control below is what makes that true rather than incidental. This gate is the SOLE
+ *     discharge of the omitted-reader finding, so a vacuous matcher would otherwise silently
+ *     reinstate it while every acceptance criterion stayed green.
  *
  * The precedent is the direct sibling: `tests/world-scope-no-shed-gate.test.js` records an earlier
  * form of that guarantee which "asserted a NAME IS NOT FOUND, so deleting the three methods kept
@@ -49,7 +51,10 @@
  *    arrays as `system[ENTITY_FIELDS[entityType]]`, so this scan sees nothing in that file. It is
  *    the one reader that MUST keep reading the raw setting, and it would neither red here as
  *    unledgered nor be pinned here. `tests/world-scope-consumer-sweep.test.js` pins it instead.
- *  - **DESTRUCTURING is unmatchable.** `const { components } = system` does not match.
+ *  - **DESTRUCTURING is unmatchable, and is the ONE remaining hole.** `const { components } =
+ *    system` does not match, and no receiver appears before the name to anchor on. A BRACKET
+ *    access with a string literal — `system['components']` — used to share this hole and no
+ *    longer does; it is matched, and the header on `MATCHER` records what that cost.
  *
  * ## THE COMMITTED TOTALS, AND WHY THE DELTA'S BASE MEASUREMENT IS NOT THE LIVE FLOOR
  *
@@ -68,8 +73,20 @@ import { describe, it } from 'node:test';
 
 import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
 
-/** The matcher, with NO receiver predicate. See the module note. */
-const MATCHER = /\.(?:components|essenceDefinitions|tools)\b/g;
+/**
+ * The matcher: a DOT access, or a BRACKET access with a string literal.
+ *
+ * NO RECEIVER PREDICATE on the dot form, deliberately — see the module note.
+ *
+ * The bracket form is the one place a receiver IS required, and only to tell
+ * `system['components']` from an ARRAY LITERAL. Measured: without the receiver the pattern also
+ * matches `domainsForSystemFields(['components'])` and `Object.freeze(['components', …])`,
+ * adding eleven false sites across three files. The receiver must abut the bracket, because
+ * `of ['components', …]` puts a word character before a SPACE and a bracket. Adding this form
+ * moved no total: 162 / 146 / 19 / 118 / 17 / 45 before and after.
+ */
+const MATCHER =
+  /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
 
 /** The two directories the sweep deliberately did not enter. */
 const EXCLUDED_PREFIXES = Object.freeze(['src/ui/', 'src/migration/']);
@@ -271,7 +288,7 @@ const POSITIVE_ANCHORS = Object.freeze([
     'src/systems/CraftingSystemManager.js',
     'const components = Array.isArray(system.components) ? system.components : [];',
   ],
-  ['src/systems/CraftingEngine.js', 'const components = Array.isArray(system?.components)'],
+  ['src/systems/CraftingEngine.js', 'toolItems: toolValidation.tools,'],
   ['src/systems/InventoryListingBuilder.js', 'toolLookup.tools.length === 0'],
   [
     'src/systems/CompendiumImporter.js',
@@ -332,10 +349,15 @@ describe('the world-scope reader ledger', () => {
 
   it('finds EXACTLY the committed totals, so a matcher that matched nothing reds here', () => {
     const { totals } = scan();
-    assert.deepEqual(totals, SCAN_TOTALS);
-    assert.ok(
-      BASE_SCAN.lines > SCAN_TOTALS.lines,
-      'and the sweep really did remove raw reads: the pre-sweep tree carried more matched lines'
+    assert.deepEqual(
+      totals,
+      SCAN_TOTALS,
+      'The live scan no longer matches the committed totals. If you have LEGITIMATELY added or ' +
+        'removed a raw read of a crafting system’s `components`, `essenceDefinitions` or `tools` ' +
+        'anywhere under `src/` outside `src/ui/**` and `src/migration/**` — including a chat ' +
+        'view-model field or any other non-system receiver — then update the LEDGER entry and ' +
+        'these six numbers together. If you have not, the MATCHER has changed and is now finding ' +
+        'the wrong population.'
     );
   });
 

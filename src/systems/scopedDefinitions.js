@@ -2,14 +2,18 @@
  * The generic three-layer resolution primitive behind Scoped Entity Definitions (issue 1358, part
  * of epic 1357), and the normalizers for the two records it resolves over.
  *
- * NO LIVE RESOLUTION PATH REACHES THE THREE-LAYER RESOLVER YET, and the consumer sweep
- * (epic 1357, PR 8a - the READ repointing half) is what changes that. The older claim here — "nothing in the shipped runtime
- * imports this module" — was already false when it was written (`scopedDefinitionStore.js`
- * imports `findWorldDefault` and `membershipKey`, and that store is reached from
- * `CraftingSystemManager`) and `1.30.0` makes it emphatically false, because that store's read
- * union is now correct for a migrated world and the tool scope's authority resolver is routed
- * from four production readers. Until the sweep, `## Component`, `## EssenceDefinition` and
- * `## Tool` still describe what the code actually resolves against, and
+ * THE THREE-LAYER RESOLVER IS ON A LIVE PATH as of issue 1370: `resolveScopedDefinition` runs
+ * once per merged row on every read union, and every non-UI reader of a system's components,
+ * essence definitions or tools now enters through one. Two earlier claims here were retired on
+ * the way: "nothing in the shipped runtime imports this module" was already false when written
+ * (`scopedDefinitionStore.js` imports `findWorldDefault` and `membershipKey`), and "no live
+ * resolution path reaches the resolver yet" is what 8a ended.
+ *
+ * READING IS NOT AUTHORITY. While `## CraftingSystem` requirement 36 holds, the in-system
+ * record decides every key it carries, the row order and the row set, so what this resolver
+ * contributes to a merged row is the keys that record does NOT carry — plus `member` and
+ * `inherited`, which no stored record carries at all. `## Component`, `## EssenceDefinition`
+ * and `## Tool` therefore still describe the live per-system shape, and
  * `## Scoped Entity Definitions` describes what this module implements.
  *
  * THE THREE LAYERS, in strict precedence:
