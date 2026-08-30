@@ -19,7 +19,7 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file
 // cannot derive: what to CALL it, and whether it needs a caption. Its only non-builtin import is
-// `scripts/lib/designSystemPrimitives.js`, a leaf that imports nothing at all, so it still makes
+// `scripts/lib/designSystemPrimitives.js`, a leaf that imports no repository module, so it still makes
 // no cycle of the kind the `decideScreenshotGate` note above warns about.
 //
 // `labelForCaseId` has always documented itself as wired into this path and never was: the
