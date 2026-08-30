@@ -293,7 +293,7 @@ function scan() {
       totals.matches += found.length;
       totals.lines += 1;
       files.add(file);
-      const key = `${file} ${line.trim()}`;
+      const key = `${file}\u0000${line.trim()}`;
       rows.set(key, (rows.get(key) ?? 0) + 1);
     }
   }
@@ -309,7 +309,7 @@ function scan() {
 }
 
 const ledgerByKey = new Map(
-  LEDGER.map(([file, anchor, count, reason]) => [`${file} ${anchor}`, { count, reason }])
+  LEDGER.map(([file, anchor, count, reason]) => [`${file}\u0000${anchor}`, { count, reason }])
 );
 
 describe('the world-scope reader ledger', () => {
@@ -343,7 +343,7 @@ describe('the world-scope reader ledger', () => {
     const { rows } = scan();
     for (const [file, anchor] of POSITIVE_ANCHORS) {
       assert.ok(
-        rows.has(`${file} ${anchor}`),
+        rows.has(`${file}\u0000${anchor}`),
         `${file} no longer carries the named anchor \`${anchor}\` — either the scan is vacuous ` +
           'or this control needs a new anchor'
       );
@@ -360,7 +360,7 @@ describe('the world-scope reader ledger', () => {
     const unledgered = [];
     for (const [key, count] of rows) {
       const entry = ledgerByKey.get(key);
-      const [file, anchor] = key.split(' ');
+      const [file, anchor] = key.split('\u0000');
       if (!entry) {
         unledgered.push(`${file} :: ${anchor} (x${count}) is not in the ledger`);
       } else if (entry.count !== count) {
@@ -381,7 +381,7 @@ describe('the world-scope reader ledger', () => {
 
   it('carries no STALE anchor: every ledgered line still exists in its file', () => {
     const { rows } = scan();
-    const stale = LEDGER.filter(([file, anchor]) => !rows.has(`${file} ${anchor}`)).map(
+    const stale = LEDGER.filter(([file, anchor]) => !rows.has(`${file}\u0000${anchor}`)).map(
       ([file, anchor]) => `${file} :: ${anchor}`
     );
     assert.deepEqual(stale, [], 'a ledger entry whose line is gone is an excuse for nothing');
