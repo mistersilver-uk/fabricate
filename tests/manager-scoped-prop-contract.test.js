@@ -419,14 +419,41 @@ test('every case whose PAGE renders the shared placeholder body also claims it, 
   // resolving across exactly the transition this guard has to survive.
   const pageByRoute = new Map();
   for (const file of readdirSync(resolve(repoRoot, SCOPED_DIR)).filter((n) => n.endsWith('.svelte'))) {
-    if (file === 'ScopedPlaceholderPage.svelte') continue;
     const source = readFileSync(resolve(repoRoot, SCOPED_DIR, file), 'utf8');
     for (const [, token] of source.matchAll(/(?:pageId|data-scoped-page)="([a-z][a-z-]*)"/g)) {
       assert.ok(!pageByRoute.has(token), `route ${token} is owned by two pages; the map is ambiguous`);
-      pageByRoute.set(token, { file, source });
+      // `delegates` is derived from the SHAPE of the page — a page that hands its body to the
+      // shared component passes `pageId="<token>"` to it — and never from the component's NAME.
+      // The pairing below is what that buys.
+      pageByRoute.set(token, { file, source, delegates: /pageId="/.test(source) });
     }
   }
   assert.equal(pageByRoute.size, 7, 'the seven world scoped routes each resolve to exactly one page');
+
+  // ── THE IMPORT LITERAL IS PINNED TO THE SHAPE, SO A RENAME CANNOT SILENCE THIS ─────────
+  //
+  // Two hand-maintained spellings of one component name drive the biconditional below: the
+  // `PLACEHOLDER` path and the `import ScopedPlaceholderPage` probe. They encode the SAME name,
+  // so an ordinary complete rename — component, its importers, and the capture claims, all
+  // updated correctly — goes stale in BOTH at once, and the biconditional collapses to
+  // `[] === []` and passes. Measured: seven routes still delegating, `rendering` empty,
+  // `claiming` empty, green. The three view-lab suites are green on that tree too, so nothing
+  // else catches it either.
+  //
+  // Pairing "delegates its body" against "imports the shared one" removes the coupling,
+  // because only ONE side of it carries the name. It degrades correctly rather than needing
+  // maintenance: as each lane replaces a body both sets lose that route together, and when the
+  // epic finishes both are empty because nothing delegates any more.
+  assert.deepEqual(
+    [...pageByRoute.entries()].filter(([, page]) => page.delegates).map(([token]) => token).sort(),
+    [...pageByRoute.entries()]
+      .filter(([, page]) => /import ScopedPlaceholderPage/.test(page.source))
+      .map(([token]) => token)
+      .sort(),
+    'a page delegates its body if and only if it imports the shared one. If these disagree the ' +
+      'import literal above has gone stale — most likely the component was renamed — and the ' +
+      'biconditional below is comparing an empty set to an empty set'
+  );
 
   const routeOf = (viewCase) => /data-scoped-page="([a-z][a-z-]*)"/.exec(viewCase.expectSelector || '')?.[1];
   const rendersPlaceholder = (viewCase) => {
