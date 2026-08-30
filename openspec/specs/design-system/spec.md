@@ -174,6 +174,7 @@ The distinction is the surface, not the subject — a recipe is a record in both
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
+A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
 
 A record count on a navigation item is a bare mono numeral with no fill and no border.
 An issue summary is a filled warning badge carrying the count.
@@ -346,6 +347,10 @@ The routing surface MUST surface two authoring hazards rather than leaving them 
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
 A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
 
+The mapping is authored ON the thing that routes — the ingredient set, or the outcome tier — as a select naming its result group, so the whole routing reads as one column rather than as a field buried inside each set’s own editor.
+Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
+Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves elsewhere.
+
 A mode change that would reduce the permitted cardinality MUST state what it will delete before the switch rather than reporting it afterwards.
 
 #### Scenario: A recipe offers the player a choice of reward
@@ -359,6 +364,64 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result group
 - **AND** the group is not duplicated to serve them
+
+### Requirement: Every select renders the app’s own option list
+
+A native `select` popup is drawn by the operating system, so it ignores the theme, differs between browsers and platforms, and can carry no tick, group heading, description, badge, or reason for being unavailable.
+Every select in the product MUST therefore render the app’s own option list, using the floating-surface geometry, whether or not the options need any of those affordances.
+Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup for a short list.
+
+The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live, and is dropped where the trigger already states the value.
+
+#### Scenario: A select offers three plain options
+
+- **WHEN** a surface needs a one-of-N choice with no descriptions or badges
+- **THEN** it still renders the app’s option list rather than a native popup
+
+### Requirement: Art that is an identity is picked as a picture
+
+Where art IS the identity of a record — a component, an essence, a recipe — the control MUST render the picture itself at a size worth looking at and MUST NOT render the stored path.
+Empty is a dashed square that reads as a slot; filled is the art carrying an edit affordance revealed on hover and on focus.
+The path-bearing variant exists only where the record’s identity is something else and the art is an attribute of it.
+
+### Requirement: A table is used only where columns are compared
+
+A headed, paged table is the right shape only where a reader compares the same field DOWN a column, such as a date, an amount or a name.
+A record carrying art, a status and actions is a list row, and forcing it into columns costs those affordances and buys nothing; the test is whether the columns would be worth sorting.
+
+A table states its record count in its heading rather than leaving it to be inferred from the pager, closes with the standard pagination bar at full container width, and scrolls horizontally inside its own container so the page never does.
+A column header MUST NOT appear sortable unless sorting it is meaningful.
+An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
+
+### Requirement: Validation is one screen everywhere
+
+Every editor’s validation surface MUST use one arrangement: a verdict stating in the product’s own words what the blocking issues prevent, then the pass, warning and blocking counts in that order, then the issues grouped by the part of the record they belong to, in the order the editor’s own tabs run.
+It is a full-width screen with no inspector rail, because the issues are the content.
+A passing group still renders, so a GM sees what was checked rather than inferring it from silence, and blocking issues sort above warnings inside a group.
+Each issue offers an action that moves focus to the offending control.
+
+The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
+
+#### Scenario: A GM opens validation on a different editor
+
+- **WHEN** a GM opens the validation surface of an editor they have not used before
+- **THEN** the verdict, counts and grouped issues appear in the same arrangement as every other editor
+
+### Requirement: A player chooses the item, not just the requirement
+
+Where a requirement names a CLASS rather than a record — a tag requirement — the player still chooses which held item satisfies it, so every held item carrying the tag renders as a candidate.
+A candidate whose count falls short renders dimmed rather than hidden, because knowing what almost works is what tells a player what to go and find.
+
+An essence requirement has no single source: several components each contribute, so the surface states the TOTAL against the requirement and shows which items make it up and by how much.
+An overshoot is stated rather than hidden, because spending more of an essence than the requirement asks is a real cost the player is choosing.
+
+A held-versus-needed count renders on a SOLID ground rather than a soft wash: it is read at a glance against artwork of unknown colour, and a translucent fill cannot be relied on to stay legible over it.
+
+#### Scenario: Several held items carry the required tag
+
+- **WHEN** a player resolves a tag requirement and holds four items carrying it
+- **THEN** all four render as candidates
+- **AND** the ones that cannot meet the count are dimmed rather than omitted
 
 ### Requirement: One blocking notice, and non-blocking notices stack
 
