@@ -2297,6 +2297,20 @@ export class RecipeManager {
       const amount = Math.max(0, Number(match.amount) || 0);
       return `${amount}x ${name} essence`;
     }
+    // Currency is the SAME opaque-id class as the essence branch above (issue 1410). The pure
+    // handler's `describe` and `Ingredient.getDescription` both print `match.unit`, which is a
+    // generated `randomID()` for any unit the currency editor created — so a cost read
+    // "1 9KJkn2dfmziq29Gq" everywhere this resolver feeds: the GM ingredient summary, the default
+    // group name, the "A OR B" alternatives line, and the player-facing option name. Neither of
+    // those two can fix it, because neither can reach the unit list.
+    //
+    // `formatCurrencyRequirement` is the SAME renderer the sibling `costLabel` already uses a few
+    // lines away, so the two stop disagreeing about one unit: it resolves the id through the
+    // recipe's own units to `abbreviation` -> `label`, and keeps the raw id only for a genuinely
+    // orphaned reference, where a stale id still reads better than a blank cost.
+    if (match?.type === 'currency' && match.unit) {
+      return formatCurrencyRequirement(match, this._resolveNormalizedCurrencyUnits(recipe));
+    }
     return ingredient.getDescription?.() || '';
   }
 
@@ -2362,7 +2376,17 @@ export class RecipeManager {
     }
 
     if (match?.type === 'currency') {
-      return { componentId: null, name, img: FALLBACK_CURRENCY_IMG };
+      // Resolve the unit through the recipe's units rather than taking `name` from
+      // `getDescription()` (issue 1410). This name WINS over the resolver at the option-choice
+      // site — `visual.name || this._resolveIngredientDescription(...)` — so leaving it as the
+      // handler's raw-id sentence would keep the player-facing option name broken even with the
+      // resolver's own currency branch in place. The sentence stays as the fallback, which is what
+      // an incomplete match (no unit) still reads as.
+      return {
+        componentId: null,
+        name: this._resolveIngredientDescription(recipe, ingredient) || name,
+        img: FALLBACK_CURRENCY_IMG,
+      };
     }
 
     return { componentId: null, name, img: null };

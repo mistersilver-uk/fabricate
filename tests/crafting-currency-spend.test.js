@@ -722,6 +722,85 @@ test('RecipeManager.evaluateCraftability: currency option costLabel resolves the
   );
 });
 
+test('RecipeManager.evaluateCraftability: currency option NAME and group name resolve the unit, never the id', () => {
+  // Issue 1410, the sibling of 763 above: the cost row was already correct while every surface
+  // fed by the DESCRIPTION path still printed the raw id, so one unit rendered two different ways
+  // in the same view. The reporter's shape: a generated id, an authored label, and an
+  // abbreviation, which takes display precedence.
+  const generatedUnitId = '9KJkn2dfmziq29Gq';
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: generatedUnitId,
+        label: 'Coins of Crowns',
+        abbreviation: 'Coins',
+        actorPath: 'system.gold.coins',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
+  const manager = new RecipeManager();
+  const recipe = {
+    craftingSystemId: 'sys-cur',
+    ingredientSets: [makeSet([[currencyOption(generatedUnitId, 1), itemOption('comp-a')]])],
+  };
+  const actor = makeDnd5eActor({ id: 'a', items: [makeItem({ id: 'a', componentId: 'comp-a' })] });
+
+  const result = manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+  const optionChoice = result.ingredientChoices.find((choice) => choice.kind === 'option');
+  assert.ok(optionChoice, 'a multi-option group emits an option choice');
+  const currencyOption_ = optionChoice.options.find((option) => option.isCurrency);
+
+  // The player-facing option NAME. This one is load-bearing: the option choice reads
+  // `visual.name || _resolveIngredientDescription(...)`, so the visual's own currency branch has
+  // to resolve the unit too — a resolver-only fix leaves exactly this surface broken.
+  assert.equal(currencyOption_.name, '1 Coins');
+  assert.ok(
+    !currencyOption_.name.includes(generatedUnitId),
+    'the raw generated unit id must never leak into the option name'
+  );
+  // And the sibling cost row still agrees with it, which is the whole complaint.
+  assert.equal(currencyOption_.costLabel, '1 Coins');
+
+  // The group name comes from the same description path (`_defaultGroupName`).
+  assert.ok(
+    !String(optionChoice.groupName || '').includes(generatedUnitId),
+    'the raw generated unit id must never leak into the group name'
+  );
+});
+
+test('RecipeManager: an orphaned currency unit id still renders, rather than blanking the cost', () => {
+  // The documented last resort: a cost referencing a unit the ladder no longer carries keeps
+  // printing the raw id, because a stale id reads better than an empty cost. Pinned so the fix
+  // above cannot be "tidied" into swallowing the reference.
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: 'kept',
+        label: 'Kept',
+        abbreviation: 'K',
+        actorPath: 'system.gold.kept',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
+  const manager = new RecipeManager();
+  const recipe = {
+    craftingSystemId: 'sys-cur',
+    ingredientSets: [makeSet([[currencyOption('vanished-unit', 2), itemOption('comp-a')]])],
+  };
+  const actor = makeDnd5eActor({ id: 'a', items: [makeItem({ id: 'a', componentId: 'comp-a' })] });
+
+  const result = manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+  const optionChoice = result.ingredientChoices.find((choice) => choice.kind === 'option');
+  const currencyOption_ = optionChoice.options.find((option) => option.isCurrency);
+  assert.equal(currencyOption_.name, '2 vanished-unit');
+});
+
 test('RecipeManager.evaluateCraftability: currency option costLabel prefers an authored abbreviation', () => {
   const generatedUnitId = 'K9grZcOMgO9Xbm41';
   const system = makeCurrencySystem({
