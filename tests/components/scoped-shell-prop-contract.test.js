@@ -30,6 +30,10 @@ import {
   detectShellSpreads,
   shellBindingsIn,
 } from '../helpers/scopedShellSpread.js';
+// EXTRACTED for issue 1372, which needs the identical reader for the four essence screens. Two
+// copies of a depth-tracking splitter is the duplication SonarCloud counts, and the question both
+// suites ask is one question.
+import { declaredPropNames as declaredProps } from '../helpers/sveltePropsDeclaration.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
@@ -40,41 +44,6 @@ const SHELLS = Object.freeze([FRAME, CATALOGUE, RULES]);
 
 function sourceOf(path) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
-}
-
-/**
- * The prop names a component's single `$props()` destructure declares.
- *
- * A `...rest` key is reported as the literal `...rest`, so a destructure that opened itself up to
- * arbitrary keys fails the set equality rather than passing under the name it collected them
- * into.
- *
- * @param {string} source
- * @returns {string[]} sorted
- */
-function declaredProps(source) {
-  const start = source.indexOf('let {');
-  const end = source.indexOf('} = $props();', start);
-  assert.ok(start !== -1 && end > start, 'no `let { … } = $props()` destructure found');
-  const body = source.slice(start + 'let {'.length, end);
-  const names = [];
-  let depth = 0;
-  let current = '';
-  for (const character of body) {
-    if ('([{`'.includes(character)) depth += 1;
-    else if (')]}`'.includes(character)) depth = Math.max(0, depth - 1);
-    if (character === ',' && depth === 0) {
-      names.push(current);
-      current = '';
-    } else current += character;
-  }
-  names.push(current);
-  return names
-    .map((entry) => entry.replace(/\/\/[^\n]*/g, '').trim())
-    .filter(Boolean)
-    .map((entry) => (entry.startsWith('...') ? entry : entry.split(/[=:]/)[0].trim()))
-    .filter(Boolean)
-    .sort();
 }
 
 const CATALOGUE_PROPS = [

@@ -1945,6 +1945,25 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
    It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
 
+### GM World Essence Screens
+
+The four essence screens — the world Essence Catalogue, the world essence entry editor, the system Essence Rules list and the system Essence Rules editor — render the essence half of `## Scoped Entity Definitions`.
+They are stated here rather than left to `### Scoped entity editor patterns` because three of the six differences between the entity types fall on the essence, and each of them changes what a screen may draw.
+
+1. **The World Essence Catalogue renders every world essence with its glyph and its colour, its membership count, and a per-system indicator carrying THREE states** — not a member, a member that is disabled, a member that is enabled.
+   `enabled: false` KEEPS the membership record and its overrides, so "absent" and "disabled" are different authored states with different repairs: one is fixed by a toggle and the other by an Add.
+   It renders **no source-item badge, column, filter or sort key, and no item image at all**, because a world essence has no source-item link: its lifted identity is exactly `name`, `icon`, `colorToken` and `description`, and its identity is a glyph plus a colour token.
+2. **The world essence entry editor holds identity plus the two world defaults `effectSource` and `macro`**, each stating how many member systems inherit it and how many override it locally BEFORE the change lands, because that count is the whole reach of the edit and a GM cannot recover it afterwards.
+   Only those two fields take a world default; everything else Fabricate carries for an essence — its per-system `enabled` flag above all — stays on the in-system record and takes none.
+3. **A world-defaults `effectSource` picker offers ONLY world-addressable referents** — a world component id or a document UUID — and never a system's own component list.
+   This is requirement 7 of `### Scoped entity editor patterns` applied to the one field that carries it.
+4. **The System Essence Rules list filters membership with exactly TWO options**, `In this system` and `All world essences`, each carrying its count.
+   The shared list model offers three for a system-scope list; this screen offers two, because "not in this system" alone is a list a GM can only add from, and "all" already contains it with the members for context.
+5. **The System Essence Rules editor renders the shared inherit row over `effectSource` and `macro` and LOCKS the corresponding value card read-only while that section is inherited**, so the editor never presents an edit affordance for a value the system does not own.
+   Turning that section's switch off is the one action that unlocks it.
+   With no membership record at all the editor states the block and offers the one action that fixes it, because nothing in that system reads any value the editor could otherwise present.
+6. **Neither essence screen renders a copy-provenance stamp**, because `copyMembership` writes none and normalization would discard one.
+
 ### Scoped entity editor patterns
 
 The six scoped-entity editors — a catalogue and an entry editor for each of components, essences and tools — share one set of patterns, built once.
@@ -1971,6 +1990,10 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
+12. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
+    A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
+    A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
+    A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.
 
 ### Scoped entity list shells
 

@@ -242,6 +242,53 @@ const CHECK_PRESENTATION = Object.freeze({
     'Enabled state matches its use',
     'usage',
   ],
+  // ── THE WORLD-DEFAULTS GROUP (issue 1372) ──────────────────────────────────────────────
+  // One title per check, with the STATE carried in the detail line, exactly as the seven above
+  // do. The prototype words these as two different titles per check — "Default effect source is
+  // set" against "No default effect source" — and that is deliberately not reproduced: a title
+  // that changes with the state makes the row unfindable by its own name, and the status word
+  // beside it already says which of the two it is.
+  worldEffectSource: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckWorldEffectSource',
+    'A default effect source is set',
+    'world',
+  ],
+  worldMacro: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckWorldMacro',
+    'A default property macro is set',
+    'world',
+  ],
+  worldUsage: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckWorldUsage',
+    'A crafting system has rules for it',
+    'world',
+  ],
+  // ── THE SYSTEM-SCOPE GROUP (issue 1372) ────────────────────────────────────────────────
+  systemRules: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckSystemRules',
+    'This system has rules for it',
+    'system',
+  ],
+  systemEnabled: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckSystemEnabled',
+    'Enabled in this system',
+    'system',
+  ],
+  systemEffectSource: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckSystemEffectSource',
+    'Effect source resolves here',
+    'system',
+  ],
+  systemMacro: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckSystemMacro',
+    'Property macro resolves here',
+    'system',
+  ],
+  systemCarrier: [
+    'FABRICATE.Admin.Manager.Essence.Validation.CheckSystemCarrier',
+    'A component in this system carries it',
+    'system',
+  ],
 });
 
 const CHECK_GROUPS = Object.freeze([
@@ -263,6 +310,21 @@ const CHECK_GROUPS = Object.freeze([
     fallback: 'Usage',
     icon: 'fas fa-cubes',
   }),
+  // The two SCOPED groups (issue 1372). They render only on the screen that owns them, because
+  // `essenceValidationPresentation` drops a group with no rows and the evaluator returns no
+  // world check in system scope or vice versa.
+  Object.freeze({
+    id: 'world',
+    labelKey: 'FABRICATE.Admin.Manager.Scoped.Essence.WorldDefaults',
+    fallback: 'World defaults',
+    icon: 'fas fa-globe',
+  }),
+  Object.freeze({
+    id: 'system',
+    labelKey: 'FABRICATE.Admin.Manager.Scoped.Essence.ThisSystem',
+    fallback: 'This system',
+    icon: 'fas fa-screwdriver-wrench',
+  }),
 ]);
 
 /**
@@ -275,12 +337,21 @@ const CHECK_GROUPS = Object.freeze([
  * @param {object} essence
  * @param {object} context see `essenceEditorValidation`.
  * @param {(key: string, fallback: string) => string} text
+ * @param {(key: string, fallback: string, data: object) => string} [format] the caller's
+ *   interpolating localizer. It DEFAULTS to token replacement over `text`, so the three-argument
+ *   call sites that shipped before issue 1372 keep working and still render the counts and names
+ *   the scoped detail lines carry.
  * @returns {{checks: object[], counts: object, groups: object[]}}
  */
 export function essenceValidationPresentation(
   essence,
   context = {},
-  text = (_key, fallback) => fallback
+  text = (_key, fallback) => fallback,
+  format = (key, fallback, data) =>
+    Object.entries(data ?? {}).reduce(
+      (copy, [token, value]) => copy.replaceAll(`{${token}}`, String(value)),
+      text(key, fallback)
+    )
 ) {
   const { checks, counts } = essenceEditorValidation(essence, context);
   const byId = new Map(checks.map((check) => [check.id, check]));
@@ -301,7 +372,9 @@ export function essenceValidationPresentation(
         id,
         status: checkStatus(check),
         title: text(labelKey, fallback),
-        detail: essenceCheckDetail(id, check.state, text),
+        detail:
+          essenceCheckDetail(id, check.state, text) ||
+          scopedCheckDetail(id, check.state, context, format),
       };
     });
 
@@ -360,6 +433,131 @@ function essenceCheckDetail(id, state, text) {
     );
   }
   return '';
+}
+
+/**
+ * The detail line under one SCOPED check row (issue 1372).
+ *
+ * SEPARATE FROM `essenceCheckDetail` on purpose. That function answers from `(id, state)` alone
+ * and every one of the seven shipped rows can; these rows cannot — "no default effect source"
+ * versus "Ember Infusion — 3 systems inherit it" is the same check in two states, and the second
+ * needs the count and the name the world entry already holds. Folding the context into the
+ * shipped function would give five of its seven cases a parameter they never read.
+ *
+ * The keys are FULLY LITERAL for the reason `CHECK_PRESENTATION` states: `lang-keys-no-orphans`
+ * credits a captured literal as a covering PREFIX, and an interpolation that stops mid-segment
+ * covers no leaf at all.
+ *
+ * @param {string} id
+ * @param {string} state
+ * @param {object} context
+ * @param {(key: string, fallback: string, data: object) => string} format
+ * @returns {string}
+ */
+function scopedCheckDetail(id, state, context, format) {
+  const inheriting = Number(context?.memberSystemCount) || 0;
+  if (id === 'worldEffectSource') {
+    return state === 'authored'
+      ? format(
+          'FABRICATE.Admin.Manager.Essence.Validation.WorldEffectSourceSet',
+          '{name} — {count} systems inherit it.',
+          { name: context?.worldEffectSourceName || '', count: inheriting }
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.Validation.WorldEffectSourceUnset',
+          'Systems that inherit gain no active effects on craft.',
+          {}
+        );
+  }
+  if (id === 'worldMacro') {
+    return state === 'authored'
+      ? format(
+          'FABRICATE.Admin.Manager.Essence.Validation.WorldMacroSet',
+          '{name} — {count} systems inherit it.',
+          { name: context?.worldMacroName || '', count: inheriting }
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.Validation.WorldMacroUnset',
+          'Nothing runs on craft for systems that inherit.',
+          {}
+        );
+  }
+  if (id === 'worldUsage') {
+    return state === 'used'
+      ? format('FABRICATE.Admin.Manager.Essence.Validation.WorldUsed', 'Used by {count} systems.', {
+          count: inheriting,
+        })
+      : format(
+          'FABRICATE.Admin.Manager.Essence.Validation.WorldUnused',
+          'No system has rules for it, so nothing reads its values yet.',
+          {}
+        );
+  }
+  return systemCheckDetail(id, state, context, format);
+}
+
+/**
+ * The detail line under one SYSTEM-SCOPE check row (issue 1372).
+ *
+ * Split from {@link scopedCheckDetail} so neither function is a chain of eight branches, which
+ * SonarCloud reports as cognitive complexity on a file it already indexes.
+ *
+ * @param {string} id
+ * @param {string} state
+ * @param {object} context
+ * @param {(key: string, fallback: string, data: object) => string} format
+ * @returns {string}
+ */
+function systemCheckDetail(id, state, context, format) {
+  const system = context?.systemName || '';
+  if (id === 'systemRules' && state === 'missing') {
+    return format(
+      'FABRICATE.Admin.Manager.Essence.Validation.NoRulesInSystem',
+      'No rules in {system}. Add it there to give it values this system reads.',
+      { system }
+    );
+  }
+  if (id === 'systemEnabled' && state === 'disabled') {
+    return format(
+      'FABRICATE.Admin.Manager.Essence.Validation.DisabledHere',
+      'Disabled here — quantities still match and are consumed; only its behaviour is suppressed.',
+      {}
+    );
+  }
+  if (id === 'systemEffectSource' || id === 'systemMacro') {
+    return sectionOriginDetail(state, system, format);
+  }
+  if (id === 'systemCarrier' && state === 'missing') {
+    return format(
+      'FABRICATE.Admin.Manager.Essence.Validation.NoCarrier',
+      'Enabled here, and no component carries it — recipes requiring it can never be satisfied.',
+      {}
+    );
+  }
+  return '';
+}
+
+/** Which scope a resolved section came from, in one sentence. */
+function sectionOriginDetail(state, system, format) {
+  if (state === 'inherited') {
+    return format(
+      'FABRICATE.Admin.Manager.Essence.Validation.SectionInherited',
+      'Inherited from the world default.',
+      {}
+    );
+  }
+  if (state === 'overridden') {
+    return format(
+      'FABRICATE.Admin.Manager.Essence.Validation.SectionOverridden',
+      'Overridden for {system}.',
+      { system }
+    );
+  }
+  return format(
+    'FABRICATE.Admin.Manager.Essence.Validation.SectionUnresolved',
+    'Neither the world default nor this system sets one.',
+    {}
+  );
 }
 
 /**

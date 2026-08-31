@@ -20,6 +20,27 @@
   `form="manager-essence-edit-form"`. Both halves must survive verbatim: drop either and
   Save silently stops working. The header renders in the SHELL's action bar, not here,
   which is why this file does not import it.
+
+  ── THE WORLD-SCOPE MODEL (issue 1372) ────────────────────────────────────────────
+  `scope`, `actions`, `systems` and `systemId` are the four keys `essenceScopeProps` supplies at
+  this call site, so declaring them is correct rather than hazardous — the spread owns each name
+  and the lookup never falls through to the bundle thunk.
+
+  What they add is three things, and each is OFF unless the world corpus can actually answer it:
+
+   - an IDENTITY BANNER saying that name, icon and colour come from the Essence Catalogue and are
+     shared with N other systems, so a GM editing them here knows the blast radius;
+   - the shared `InheritRow` over `effectSource` and `macro`, and the LOCK that follows from it:
+     while a section is inherited this system does not own the value, so the On-craft tab renders
+     it read-only and draws no unlink. The switch is the one control that unlocks it;
+   - the NO-MEMBERSHIP block: this system has no record for this essence, so nothing here reads
+     its values. It states that and offers the one action that fixes it.
+
+  THE IDENTITY BANNER CARRIES NO DEEP LINK, AND THAT IS A REPORTED LIMIT RATHER THAN A CHOICE.
+  Navigating to the world entry needs a route callback, and this view's call site in
+  `CraftingSystemManagerRoot.svelte` passes none — the file `### GM World Scoped Entity Routes`
+  requirement 7 closes to this lane. The banner therefore NAMES the catalogue and where it lives;
+  the link is a shell change and belongs to whoever may open that file.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
@@ -40,8 +61,16 @@
   } from '../../../../utils/macroReference.js';
   import { essenceEditorValidation } from '../../../../utils/essenceValidation.js';
   import { essenceOnCraftCount } from './essences/essenceStudio.js';
+  import Callout from './Callout.svelte';
+  import InheritRow from './scoped/InheritRow.svelte';
+  import MembershipActions from './scoped/MembershipActions.svelte';
+  import { essenceSectionNote, essenceSectionValueName } from './scoped/essenceScoped.js';
 
   let {
+    scope = null,
+    actions = null,
+    systems = [],
+    systemId = '',
     essence = null,
     managedItemOptions = [],
     showSourceUi = false,
@@ -78,6 +107,55 @@
   let lastEssenceId = $state(null);
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
+  let armedToken = $state('');
+
+  // ── THE WORLD-SCOPE JOIN ────────────────────────────────────────────────────────────────
+  // Every one of these is guarded on `scopedKnown`, which is false for an unreadable corpus, for
+  // a new draft, and for an essence the world catalogue does not hold — the last being an
+  // ordinary state, because the in-system array still decides its own rows while
+  // `## CraftingSystem` requirement 36 holds. In every one of those the editor renders exactly as
+  // it did before this change.
+  const activeSystemId = $derived(String(systemId || ''));
+  const worldEntry = $derived(
+    essence?.id ? ((scope?.entries ?? []).find((entry) => entry.id === essence.id) ?? null) : null
+  );
+  const scopedKnown = $derived(
+    scope?.available === true && activeSystemId !== '' && worldEntry !== null
+  );
+  const systemRow = $derived(
+    (worldEntry?.systems ?? []).find((row) => row.systemId === activeSystemId) ?? null
+  );
+  const member = $derived(systemRow?.member === true);
+  const inheritedMap = $derived(systemRow?.inherited ?? {});
+  const systemName = $derived(
+    (Array.isArray(systems) ? systems : []).find((system) => system?.id === activeSystemId)?.name ||
+      activeSystemId
+  );
+  // AN ABSENT `inherit` KEY READS AS INHERITING, matching `isSectionInherited`. So the lock is on
+  // by default for a member, which is the correct default: a fresh membership record inherits
+  // every section, and an editor that presented an edit affordance for it would offer to change
+  // a value the system does not own.
+  const lockedSections = $derived({
+    effectSource: scopedKnown && member && inheritedMap.effectSource !== false,
+    macro: scopedKnown && member && inheritedMap.macro !== false,
+  });
+  const worldDefaultNames = $derived({
+    effectSource: essenceSectionValueName(worldEntry?.defaults?.effectSource),
+    macro: essenceSectionValueName(worldEntry?.defaults?.macro),
+  });
+  const inheritNotes = $derived({
+    effectSource: essenceSectionNote({
+      inherited: inheritedMap.effectSource !== false,
+      worldName: worldDefaultNames.effectSource,
+      format: formatted,
+    }),
+    macro: essenceSectionNote({
+      inherited: inheritedMap.macro !== false,
+      worldName: worldDefaultNames.macro,
+      format: formatted,
+    }),
+  });
+  const sharedWithCount = $derived(Math.max(0, (Number(worldEntry?.membershipCount) || 0) - 1));
 
   const isNew = $derived(!essence?.id);
   const selectedSource = $derived(
@@ -117,6 +195,17 @@
   const validationContext = $derived({
     propertyMacrosEnabled: showPropertyMacroUi,
     effectTransferEnabled: showSourceUi,
+    // The five system-scope checks are armed ONLY when the world corpus can answer them.
+    // `membershipKnown: false` is what keeps the shipped seven-check tab byte-identical for an
+    // essence the world catalogue does not hold.
+    membershipKnown: scopedKnown,
+    member,
+    enabledHere: enabled !== false,
+    sectionInherited: inheritedMap,
+    resolvedEffectSource: sourceComponentId || worldDefaultNames.effectSource,
+    resolvedMacro: propertyMacroUuid || worldDefaultNames.macro,
+    componentCarrierCount: essence?.componentUsageCount || 0,
+    systemName,
     // `null` while resolution is still in flight, which PASSES: a spinner must not read as
     // a defect. Only a proven miss reports `false`.
     macroResolved: propertyMacroUuid ? !macroMissing : null,
@@ -174,6 +263,14 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  function formatted(key, fallback, data) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(data ?? {})) {
+      result = result.replaceAll(`{${token}}`, String(value));
+    }
+    return result;
   }
 
   function sourceIdentity(definition) {
@@ -342,6 +439,65 @@
     ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
     : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence')}
 >
+  {#if scopedKnown}
+    <!-- THE IDENTITY BANNER. It names what this editor does NOT own, which is the one thing a
+         system-scope editor over a shared definition has to say before anything else. -->
+    <section class="manager-essence-scope-banner" data-essence-scope-banner={essence?.id}>
+      <p class="manager-essence-scope-note">
+        {formatted(
+          'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner',
+          'Name, icon and colour come from the Essence Catalogue, shared with {count} other system(s). Everything below belongs to {system} alone.',
+          { count: sharedWithCount, system: systemName }
+        )}
+      </p>
+      {#if !member}
+        <!-- THE BLOCK STATE. No membership record means nothing in this system reads any of the
+             values below, so the editor says so and offers the one action that changes it. -->
+        <Callout
+          tone="warning"
+          text={formatted(
+            'FABRICATE.Admin.Manager.Scoped.Essence.NoRulesHere',
+            'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
+            { system: systemName }
+          )}
+          dataAttr="data-essence-scope-state"
+          dataValue="no-membership"
+        />
+      {/if}
+      <MembershipActions
+        entityType="essence"
+        entityId={essence?.id ?? ''}
+        systemId={activeSystemId}
+        entityName={essence?.name ?? ''}
+        {systemName}
+        {member}
+        enabled={systemRow?.enabled === true}
+        disabled={saving}
+        {armedToken}
+        onArm={(token) => (armedToken = token)}
+        onDisarm={() => (armedToken = '')}
+        onAdd={() => actions?.addToSystem?.(essence?.id, activeSystemId)}
+        onRemove={() => actions?.removeFromSystem?.(essence?.id, activeSystemId)}
+        onToggleEnabled={(next) => actions?.setEnabled?.(essence?.id, activeSystemId, next)}
+      />
+      {#if member}
+        <!-- THE TWO INHERIT SWITCHES, and they sit ABOVE the tab strip rather than inside the
+             On-craft tab on purpose: the switch is what unlocks the value card beneath it, and a
+             GM must be able to see both the state and the control that changes it at once. -->
+        <div class="manager-essence-scope-inherit">
+          <InheritRow
+            entityType="essence"
+            inherited={inheritedMap}
+            notes={inheritNotes}
+            disabled={saving}
+            onToggle={(section, next) =>
+              actions?.setSectionInherited?.(essence?.id, activeSystemId, section, next)}
+          />
+        </div>
+      {/if}
+    </section>
+  {/if}
+
   <EssenceEditorTabs
     {activeTab}
     {onCraftCount}
@@ -386,6 +542,8 @@
           {managedItemOptions}
           effectTransferEnabled={showSourceUi}
           propertyMacrosEnabled={showPropertyMacroUi}
+          {lockedSections}
+          {inheritNotes}
           {saving}
           onSourceSelect={(itemId) => {
             sourceComponentId = itemId || '';
@@ -420,6 +578,29 @@
 </main>
 
 <style>
+  /* The world-scope banner. STATIC class names, so Svelte can prove each selector is used and
+     `lint:svelte:warnings` stays at zero; `styles/fabricate.css` is closed to this lane. */
+  .manager-essence-scope-banner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-essence-scope-note {
+    margin: 0;
+    color: var(--fab-mv2-text-muted);
+    font-size: 0.74rem;
+    line-height: 1.55;
+  }
+
+  .manager-essence-scope-inherit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+  }
+
   /* Route-level placement — the two-track template and the route's own overflow — is
      GLOBAL (`.fabricate-manager[data-manager-view="essence-edit"] .manager-main`), because
      a scoped child block cannot reach a shell container rule. What is scoped here is only

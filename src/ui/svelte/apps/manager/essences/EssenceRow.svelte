@@ -63,6 +63,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
 
   let {
@@ -72,16 +73,31 @@
     bulkSelected = false,
     effectTransferEnabled = false,
     propertyMacrosEnabled = false,
+    // ── THE THREE-STATE MEMBERSHIP ANSWER (issue 1372) ─────────────────────────────────────
+    // `''` means the world corpus could not answer it, which is NOT the same as `absent`: a row
+    // that cannot be asked renders exactly as it did before this change, and a row that answered
+    // `absent` renders the Add treatment. Collapsing the two would put an Add button on every row
+    // of a world whose corpus is unreadable.
+    membershipState = '',
+    // `{section, label}[]` — `· world default` / `· overridden here`, per world-default section.
+    inheritSuffixes = [],
     text = (_key, fallback) => fallback,
     format = (_key, fallback) => fallback,
     onSelect = () => {},
     onEdit = () => {},
     onToggleEnabled = () => {},
     onToggleBulkSelected = () => {},
+    onAddToSystem = null,
   } = $props();
 
   const isCard = $derived(variant === 'grid');
   const disabled = $derived(essence?.enabled === false);
+  // AN ABSENT ROW HAS NOTHING TO EDIT, DISABLE, SELECT OR DELETE. It is a world essence this
+  // system has no record for, so the enable toggle would write to a record that does not exist,
+  // the pencil would open an editor over nothing, and the bulk checkbox would enrol it in a
+  // delete that addresses this system's own list. It renders its identity, its state and ONE
+  // verb: Add.
+  const absent = $derived(membershipState === 'absent');
   const capabilities = $derived(
     essenceCapabilityPills(essence, { effectTransferEnabled, propertyMacrosEnabled }, text)
   );
@@ -133,6 +149,7 @@
     'data-essence-variant': 'grid',
     'data-essence-enabled': disabled ? 'false' : 'true',
     'data-essence-bulk-selected': String(bulkSelected),
+    ...(membershipState ? { 'data-essence-membership-state': membershipState } : {}),
   });
 </script>
 
@@ -152,7 +169,13 @@
 {#snippet nameRow()}
   <span class="manager-essence-name-row">
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
-    {#if disabled}
+    {#if absent}
+      <StatusPill
+        tone="neutral"
+        icon="fas fa-circle-minus"
+        label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
+      />
+    {:else if disabled}
       <StatusPill
         tone="neutral"
         icon="fas fa-circle-pause"
@@ -160,6 +183,30 @@
       />
     {/if}
   </span>
+{/snippet}
+
+<!-- WHERE EACH WORLD-DEFAULT SECTION'S VALUE CAME FROM. A resolved value renders identically
+     whether this system inherited it or authored it, and that difference is the whole subject of
+     the world-scope model - so the suffix is what makes one readout two facts. -->
+{#snippet inheritReadout()}
+  {#if inheritSuffixes.length > 0}
+    <span class="manager-essence-inherit-readout" data-essence-inherit-readout={essence.id}>
+      {#each inheritSuffixes as suffix (suffix.section)}
+        <span data-essence-inherit={suffix.section}>{`· ${suffix.label}`}</span>
+      {/each}
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet addToSystemButton()}
+  <ManagerButton
+    role="primary"
+    data-essence-add-to-system={essence.id}
+    onclick={() => onAddToSystem?.(essence.id)}
+  >
+    <i class="fas fa-plus" aria-hidden="true"></i>
+    <span>{text('FABRICATE.Admin.Manager.Essence.AddToSystem', 'Add to this system')}</span>
+  </ManagerButton>
 {/snippet}
 
 <!-- NEVER hidden for a disabled essence: hiding a pill removes state. They render in the
@@ -272,7 +319,13 @@
   >
     {#snippet media()}{@render medallionTile()}{/snippet}
     {#snippet badges()}
-      {#if disabled}
+      {#if absent}
+        <StatusPill
+          tone="neutral"
+          icon="fas fa-circle-minus"
+          label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
+        />
+      {:else if disabled}
         <StatusPill
           tone="neutral"
           icon="fas fa-circle-pause"
@@ -281,9 +334,11 @@
       {/if}
       {@render capabilityPills('is-card-badges')}
     {/snippet}
-    {#snippet selection()}{@render selectionBox()}{/snippet}
-    {#snippet footerStart()}{@render statusToggle()}{/snippet}
-    {#snippet footerEnd()}{@render editButton()}{/snippet}
+    {#snippet selection()}{#if !absent}{@render selectionBox()}{/if}{/snippet}
+    {#snippet footerStart()}
+      {#if absent}{@render addToSystemButton()}{:else}{@render statusToggle()}{/if}
+    {/snippet}
+    {#snippet footerEnd()}{#if !absent}{@render editButton()}{/if}{/snippet}
   </LibraryCard>
 {:else}
   <li
@@ -291,6 +346,7 @@
     class:is-bulk-selected={bulkSelected}
     data-essence-id={essence.id}
     data-essence-variant="row"
+    data-essence-membership-state={membershipState || undefined}
     data-essence-enabled={disabled ? 'false' : 'true'}
     data-essence-bulk-selected={bulkSelected}
     aria-current={selected ? 'true' : undefined}
@@ -310,11 +366,16 @@
 
     <div class="manager-essence-cluster">
       {@render capabilityPills()}
-      {@render usageReadout()}
-      {@render statusToggle()}
-      <!-- FIRST `.manager-icon-button` in the row stays the edit pencil (View Lab navigates by it). -->
-      {@render editButton()}
-      {@render selectionBox()}
+      {@render inheritReadout()}
+      {#if absent}
+        {@render addToSystemButton()}
+      {:else}
+        {@render usageReadout()}
+        {@render statusToggle()}
+        <!-- FIRST `.manager-icon-button` in the row stays the edit pencil (View Lab navigates by it). -->
+        {@render editButton()}
+        {@render selectionBox()}
+      {/if}
     </div>
   </li>
 {/if}

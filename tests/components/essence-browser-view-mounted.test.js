@@ -33,6 +33,10 @@ const harness = createMountedComponentHarness({
     'src/utils/browserPagination.js',
     'src/utils/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
+    // The essence world-scope presentation leaf (issue 1372). `EssenceBrowserView` reads the
+    // three-state membership answer and the inherit suffix from it; it imports nothing, so this
+    // one entry closes the graph. An omission does not fail this suite, it CANCELS it.
+    'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
