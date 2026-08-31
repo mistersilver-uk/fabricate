@@ -89,12 +89,19 @@ const MANIFEST_NAMES = MANIFEST_ROWS.filter((row) => row.library !== null).map((
  */
 const RULED_OUT_NAMES = RULED_OUT.flatMap((entry) => primitiveNamesIn(entry.name));
 
+/** Every shipped component, as the repository-relative POSIX path a manifest row names. */
+const SHIPPED_COMPONENT_PATHS = toRepositoryPaths(
+  REPO_ROOT,
+  listSvelteComponents(path.join(REPO_ROOT, 'src'))
+);
+
 /** Every shipped component's basename, without the extension. */
 const SHIPPED_COMPONENT_NAMES = new Set(
-  toRepositoryPaths(REPO_ROOT, listSvelteComponents(path.join(REPO_ROOT, 'src'))).map((file) =>
-    path.basename(file, '.svelte')
-  )
+  SHIPPED_COMPONENT_PATHS.map((file) => path.basename(file, '.svelte'))
 );
+
+/** The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive. */
+const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 
 test('the corpus every property below quantifies over is alive', () => {
   assert.ok(library.blockCount > 0, 'the parser found no spec-head block; the anchor is dead');
@@ -268,6 +275,21 @@ test('every library entry is either recorded as shipped or recorded as unbuilt',
   );
 });
 
+test('no library entry recorded as unbuilt ships as a component', () => {
+  // The clause above compares the register against the MANIFEST; this one compares it against the
+  // DISK. That is the difference between "the two documents agree" and "the two documents describe
+  // the repository", and only the second catches a primitive that shipped without its row: the name
+  // stays in the register, the manifest never learns about it, and the two artifacts go on agreeing
+  // with each other about a set that no longer matches what is built.
+  assert.deepEqual(
+    SPECIFIED_ONLY.filter((name) => SHIPPED_COMPONENT_NAMES.has(name)),
+    [],
+    'a library entry is recorded as specified-but-unbuilt and a component of that name ships. ' +
+      'Either it shipped without its manifest row, which is the name-no-diff-can-be-attributed-to ' +
+      'case, or an unrelated file took the name, which makes the register ambiguous.'
+  );
+});
+
 /**
  * The 24 shipped rows the library does not name.
  *
@@ -311,6 +333,41 @@ test('the shipped rows the library does not name are exactly the known set', () 
     UNDOCUMENTED_ROWS,
     'the undocumented shipped set changed. Adding one is a new undocumented primitive; removing ' +
       'one means a library entry was written for it, which is the direction this list should move.'
+  );
+});
+
+/**
+ * The clause that makes the prohibition enforceable rather than merely stated.
+ *
+ * `AGENTS.md` forbids adding a component under `src/ui/svelte/components/` without its specimen and
+ * its row, and `spec.md` names this file as the gate that fails on that. Neither was true until this
+ * property existed: a five-line stub dropped into that directory with no specimen and no row left
+ * the whole file green, and so did the same stub WITH a specimen but no row. Nothing distinguished
+ * "specified but unbuilt" from "specified, built, and unrecorded".
+ *
+ * Requiring the ROW is what closes it, because the row is the only obligation the rest of this file
+ * can reason from. A row either names a library entry — which must resolve to a specimen, and must
+ * not name a declined candidate — or it is `library: null`, in which case it must appear in
+ * {@link UNDOCUMENTED_ROWS}, which is pinned by exact equality. So a new component reaches a green
+ * gate only by acquiring a specimen or by being recorded as an accepted debt, and either way an
+ * author states which.
+ */
+test('every component in the primitive directory carries a manifest row', () => {
+  const recorded = new Set(MANIFEST_ROWS.map((row) => row.path));
+  const inDirectory = SHIPPED_COMPONENT_PATHS.filter((file) =>
+    file.startsWith(PRIMITIVE_DIRECTORY)
+  );
+  assert.ok(
+    inDirectory.length > 10,
+    `the walk found ${inDirectory.length} files under ${PRIMITIVE_DIRECTORY}, so either the ` +
+      'directory moved or the walk is not reaching it, and this property has no domain'
+  );
+  assert.deepEqual(
+    inDirectory.filter((file) => !recorded.has(file)),
+    [],
+    `a component under ${PRIMITIVE_DIRECTORY} carries no manifest row. Record it: with the name ` +
+      'of its library specimen, or with `library: null` and a row in the undocumented register ' +
+      'above, which says out loud that it ships as an undocumented primitive.'
   );
 });
 
