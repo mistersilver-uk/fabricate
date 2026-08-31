@@ -269,6 +269,7 @@
         role="tabpanel"
         aria-labelledby={`scoped-essence-entry-tab-${activeTab}`}
         tabindex="-1"
+        data-keyboard-focus="true"
       >
         {#if activeTab === 'definition'}
           <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
