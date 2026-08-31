@@ -1963,6 +1963,55 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
 
+### Scoped entity list shells
+
+The world catalogues and the system-scope rules lists share ONE list composition, built once and configured per scope.
+
+1. **The frame is ONE component, and neither shell may inline it.**
+   Three lanes need the same list-plus-inspector composition, and three independent copies of it is a measured duplication failure rather than an aesthetic one.
+2. **The composition is ASYMMETRIC by scope, because the shipped layout is.**
+   All seven world scoped routes are released to full width and render no shared aside, so a world catalogue draws its own inspector column inside `main`.
+   The three system-scope routes are not released and their shared 300px aside is live, so a rules list draws NO inspector: a second column beside it would put two inspectors on screen with neither gateway file open to reconcile them.
+   The inspector region renders only when an inspector body is supplied.
+3. **The row is not a button and carries two independent selected states.**
+   It contains a selection checkbox's input and label, so the click target is a nested identity button and the checkbox sits at the trailing edge.
+   "Inspected" and "in the write set" are different questions and one row carries both; the inspected row carries `aria-current`.
+4. **The shells own the identity cell and the inspector's identity header; the lane owns the meta run and the body.**
+   An identity cell means the same thing in all three catalogues and a badge run does not.
+5. **The identity record differs in THREE ways across the three types.**
+   An essence has no source-link field, carries its thumbnail as `icon` where a component and a tool carry `img`, and is the only type carrying `colorToken`.
+   Two of the three are read by shell-owned markup.
+   This records a fact `data-models/spec.md` has not yet carried; the correction ships with this change.
+6. **Every entity-shape difference is a DESCRIPTOR answer, never a call-site test of the entity type.**
+   The descriptor is reached either through the projection's published keys or through `scopedStudio`'s accessors over the same descriptor — `MembershipActions` reads `scopedEnableable` and is conformant on both readings.
+   Note that the seeded-section filter in `inheritableSections` removes NOTHING for a tool today, because `repairRequirements` was never in `TOOL_SECTIONS`; the protection is that no section list contains it, not that the filter subtracts it.
+7. **The two identity facts are DERIVED from the world identity field lists, never restated.**
+   The key spaces disagree — plural against singular — so the derivation carries an explicit bridge and a gate pins each list it reads as non-empty.
+   A broken bridge answers `false` everywhere, which on a component is indistinguishable from a correct answer.
+8. **`enabled` is ABSENT on a component row, not `false`.**
+   `'enabled' in row` is the only correct read: a consumer branching on truthiness is satisfied by an absent key today and by a persisted `false` tomorrow, and those are different states.
+9. **A composed primitive that renders its own root class needs a host-sheet rule**, and the shells pass that class and every hook attribute explicitly rather than inheriting another studio's defaults, which would retune six scoped screens whenever that studio changes.
+10. **`available: false` suspends the whole authoring surface.**
+    Search, filter, sort, the selection toolbar and every add, remove and copy affordance are suppressed, and the panel is its own treatment rather than the no-state hero with different copy.
+    The projection reports every seeded flag false in this state precisely so a screen cannot offer a destructive action against a corpus nobody could read.
+11. **A list has THREE no-content states, not two**: unavailable, empty, and filtered-to-nothing.
+    Telling a GM their world holds nothing when a query matched nothing is the same class of harm as offering actions over an unreadable corpus.
+12. **The shells own the list state machine**: which row is inspected, the selection set across pages, the filter, the sort, the page, and the armed destructive token.
+    The selection count is the size of the whole selection rather than its intersection with the page; the tri-state box acts on rendered rows; select-all-results acts on the whole filtered set.
+    A filter change prunes the selection and clamps the page, and any selection, filter, sort or page change disarms.
+13. **Filter, sort and paging arithmetic and selection reduction are COMPOSED from the shipped pure models, never restated.**
+    A page index is clamped by the model that owns the arithmetic, and the clamped value is what both the row slice and the pagination footer read — a footer fed an unclamped index states a range the list does not show.
+14. **Membership rows come from the projection's joined rows, and the roster prop supplies ONLY `id` and `name`**, with an id fallback.
+    The shells read `entries` and never the corpus roster `entities`.
+15. **The snippet parameter lists are part of the contract**, carrying the whole projection so a lane reaches a conditionally present field without adding a shell prop or reaching around the shells.
+16. **The shells render no route hook and no provenance.**
+    The page owns the route; `normalizeMembership` discards a `from` key, so recording where a copy came from is a data-model change.
+17. **Generic chrome copy is noun-free.**
+    A slot-filled noun cannot carry article or adjective agreement; strings that need a noun arrive pre-localized from the lane.
+18. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
+    `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
+    The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
+
 ### GM Travel Route
 
 World always exposes `Parties` for global party management and `Travel` for the world's realm
