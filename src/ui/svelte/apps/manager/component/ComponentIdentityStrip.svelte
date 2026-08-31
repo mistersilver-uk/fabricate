@@ -327,9 +327,7 @@
     }}
     onmousedown={onLinkedSourceMouseDown}
   >
-    <i
-      class={dropActive ? 'fas fa-download' : 'fas fa-arrow-right-arrow-left'}
-      aria-hidden="true"
+    <i class={dropActive ? 'fas fa-download' : 'fas fa-arrow-right-arrow-left'} aria-hidden="true"
     ></i>
     {#if dropActive}
       <!-- Under a drag the strip stops describing the CURRENT link and describes what
