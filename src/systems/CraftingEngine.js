@@ -4,6 +4,7 @@ import {
   resolvePresentComponentIds,
   resolvePresentToolIds,
 } from '../gatheringToolRuntime.js';
+import { getMatchHandler } from '../models/match/matchTypes.js';
 import { Tool } from '../models/Tool.js';
 import {
   TOOL_IMAGE_SENTINEL,
@@ -5414,7 +5415,14 @@ export class CraftingEngine {
       // the currency editor created — so the player was told "Requires 1 9KJkn2dfmziq29Gq".
       // The model cannot fix that itself: it has no access to the unit ladder, and only this
       // call site does.
-      if (!line && ingredient?.match?.type === 'currency' && ingredient.match.unit) {
+      // The HANDLER's own completeness test, the same predicate the resolver in RecipeManager
+      // uses, so the two call sites cannot drift: an incomplete match still falls through to
+      // the description it produced before, rather than rendering as a zero-amount cost.
+      if (
+        !line &&
+        ingredient?.match?.type === 'currency' &&
+        getMatchHandler(ingredient.match).isComplete(ingredient.match)
+      ) {
         // Deliberately the SAME sentence `Ingredient.getDescription` produces, with only the unit
         // resolved: the shipped message shape is asserted by an existing contract test, and this
         // hotfix is fixing an opaque id, not rewording a player-facing failure message.
