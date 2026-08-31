@@ -198,6 +198,7 @@
       style={popoverStyle}
       role="dialog"
       tabindex="-1"
+      data-keyboard-focus="true"
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EditDuration', 'Edit duration')}
       use:portal={() => getPopoverHost()}
       onclick={stop}

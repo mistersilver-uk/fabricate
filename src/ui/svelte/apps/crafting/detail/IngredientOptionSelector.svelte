@@ -91,6 +91,7 @@
               aria-checked={selected}
               aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: option.name })}
               tabindex={selected ? 0 : -1}
+              data-keyboard-focus="true"
               data-option-index={option.optionIndex}
               data-option-satisfied={option.satisfied ? 'true' : 'false'}
               onclick={() => commitOption(choice, option.optionIndex)}
@@ -149,6 +150,7 @@
               aria-checked={selected}
               aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: stack.name })}
               tabindex={selected ? 0 : -1}
+              data-keyboard-focus="true"
               data-held-id={stack.itemId}
               onclick={() => commitStack(choice, stack.itemId)}
               onkeydown={(event) =>

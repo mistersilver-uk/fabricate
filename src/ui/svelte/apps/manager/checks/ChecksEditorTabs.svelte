@@ -88,6 +88,7 @@
       aria-selected={activeSection === section.id}
       aria-controls={activeSection === section.id ? `checks-panel-${section.id}` : undefined}
       tabindex={activeSection === section.id ? 0 : -1}
+      data-keyboard-focus="true"
       data-checks-section-button={section.id}
       onclick={() => onSelect(section.id)}
       onkeydown={(event) => onKeydown(event, index)}

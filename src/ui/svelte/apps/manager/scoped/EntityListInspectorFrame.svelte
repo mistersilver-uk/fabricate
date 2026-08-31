@@ -688,6 +688,7 @@
           class="manager-scoped-list-inspector"
           bind:this={inspectorElement}
           tabindex="-1"
+          data-keyboard-focus="true"
           data-scoped-list-inspector
           aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
         >

@@ -415,6 +415,7 @@
           style={`left: ${percentOf(boundary)}%;`}
           role="slider"
           tabindex={disabled ? -1 : 0}
+          data-keyboard-focus="true"
           aria-label={boundaryLabel(resolved[index], resolved[index + 1])}
           aria-valuenow={boundary}
           aria-valuemin={bounds[0]}

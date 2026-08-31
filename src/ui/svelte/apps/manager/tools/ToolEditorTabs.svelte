@@ -65,6 +65,7 @@
       aria-selected={activeTab === tab[0]}
       aria-controls={`tool-panel-${tab[0]}`}
       tabindex={activeTab === tab[0] ? 0 : -1}
+      data-keyboard-focus="true"
       class="manager-editor-tab-button"
       class:is-active={activeTab === tab[0]}
       class:is-danger={tab[0] === 'validation' && errorCount > 0}

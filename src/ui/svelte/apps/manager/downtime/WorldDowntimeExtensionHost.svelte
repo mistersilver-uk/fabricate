@@ -222,6 +222,7 @@
           class="downtime-extension-panel"
           role="region"
           tabindex="-1"
+          data-keyboard-focus="true"
           aria-labelledby={navLabelId(tab.id)}
           hidden={tab.id !== activeTabId}
         >
