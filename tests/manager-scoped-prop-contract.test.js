@@ -186,6 +186,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBulkEditPanel.svelte',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
+  // beside its sibling below because this list is asserted SORTED. See the note on
+  // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
+  './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',
   './scoped/WorldEssenceCataloguePage.svelte',
@@ -198,6 +202,14 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // presentation leaf and slugs the new record's id with suffix collision resolution, so the
   // alternative to importing it was a second copy of that logic in the gateway.
   './scoped/essenceScoped.js',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4). The world entry editors
+  // buffer their edits and are saved explicitly, and BOTH things that act on a buffered edit are
+  // renderable only here: the header action pair, because `.manager-header` is a sibling of
+  // `.manager-main`, and the route-exit prompt, because leaving via the rail or the breadcrumb
+  // never reaches the page. `scopedEntryDraft.js` is the epic's own import-free draft leaf and
+  // `confirmScopedEntryExit` is the guard shape both entry editors take, so the alternative to
+  // importing it was a second copy of that shape in the gateway.
+  './scoped/scopedEntryDraft.js',
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
   './world/WorldCurrencyTab.svelte',

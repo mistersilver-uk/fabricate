@@ -5874,6 +5874,7 @@
             "RollupEnabled": "Enabled",
             "RollupSplit": "{on} on / {off} off",
             "RollupUnused": "Unused",
+            "Save": "Save essence",
             "SearchPlaceholder": "Search essences…",
             "SelectAllShort": "All",
             "StatComponents": "Components",

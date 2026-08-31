@@ -2022,7 +2022,16 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
 13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
     It is a mode of the one primitive, never a reason for a second implementation.
-14. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
+14. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**
+    A world entry editor is an EDITOR by `design-system/spec.md`'s archetype, so it carries that recipe's action pair — back before save — and its edits accumulate in a draft rather than persisting on change.
+    The pair is ONE shared component rendered by the manager shell, because `.manager-header` is a sibling of `.manager-main` and no page can render into it; `Save` takes the shipped `is-primary` role rather than the reference's peach, and is disabled while there is nothing to flush, because a control that is always available says nothing about whether the last edit landed.
+    Save writes only the fields that DIFFER from the record on disk, so re-pointing one world default does not restate the identity over whatever another client wrote to it meanwhile, and it answers whether every write landed.
+    Leaving with an unflushed edit — by the header's back, by the rail, or by the breadcrumb — raises the shipped three-way save / discard / keep-editing prompt, and navigation is gated on the SAVE having landed rather than on the choice having been made.
+    The draft, the dirty answer, the flush and the guard shape are ONE module shared by the three entry editors: a draft is a SHAPE, and the same shape reached by two implementations is how a persisted record and its editors drift apart.
+    **MEMBERSHIP AND DELETE ARE NOT BUFFERED.**
+    Adding an entity to a crafting system, removing it, switching it on or off, and deleting the world record are actions on records this draft does not describe, each with its own armed confirmation; an armed `Remove` that removed nothing until a later button states the opposite of what arming an action says.
+    A delete drops the draft before it navigates, because the record the draft is an edit of no longer exists and the exit guard would otherwise offer to save into it.
+15. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
     A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.

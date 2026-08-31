@@ -38,9 +38,9 @@
   The shell's header renders the `<h1>` and the three-crumb trail; a second title here is the
   duplication `ScopedPlaceholderPage` records against the first frame of a world page.
 
-  Declared props are EXACTLY the four bundle keys plus the two static attributes the call site
-  passes. See `CraftingSystemManagerRoot.svelte`: a name declared here that the site does not pass
-  falls through to the spread and subscribes its readers to the whole bundle.
+  Declared props are EXACTLY the bundle keys this page reads plus the static attributes the call
+  site passes. See `CraftingSystemManagerRoot.svelte`: a name declared here that the site does not
+  pass falls through to the spread and subscribes its readers to the whole bundle.
 
   Props:
    - scope / actions: from `essenceScopeProps`. The `systems` roster is deliberately NOT declared:
@@ -49,6 +49,8 @@
      `{id, name}` roster beside it would offer a second answer to one question.
    - entityId: which essence this entry is open on.
    - onBackToCatalogue(): the middle breadcrumb's target, also offered as a control here.
+   - onDraftChange() / onDirtyChange(): the buffered edit's two wires to the shell; see the
+     BUFFERED EDIT block below and the props' own note.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -69,6 +71,14 @@
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
   import {
+    flushScopedEntryDraft,
+    scopedEntryBaseline,
+    scopedEntryDirty,
+    scopedEntryWrites,
+    withScopedEntryDefault,
+    withScopedEntryIdentity,
+  } from './scopedEntryDraft.js';
+  import {
     essenceColourCaption,
     essenceInheritLine,
     essenceSectionValueName,
@@ -78,7 +88,30 @@
     isDocumentUuid,
   } from './essenceScoped.js';
 
-  let { scope = null, actions = null, entityId = '', onBackToCatalogue = () => {} } = $props();
+  let {
+    scope = null,
+    actions = null,
+    entityId = '',
+    onBackToCatalogue = () => {},
+    // THE BUFFERED EDIT'S THREE WIRES TO THE SHELL (issue 1372).
+    //
+    // The header pair and the route-exit cascade are both the shell's — `.manager-header` is a
+    // SIBLING of `.manager-main`, so this page structurally cannot render into it — so the shell
+    // needs a way to flush this editor and a way to ask whether there is anything to flush.
+    //
+    //  - onDraftChange(handle|null): a LIVE handle, `{isDirty, save, discard}`, reported once on
+    //    mount and withdrawn on unmount. Live rather than a snapshot for the reason the handle's
+    //    own comment gives: the guard reads it at click time and a snapshot published by an
+    //    effect can be one turn behind.
+    //  - onDirtyChange(dirty): the reactive half, for the header button's disabled state.
+    //
+    // There is deliberately NO `reseedNonce` prop, which is how `SystemEditView` spells discard:
+    // the handle carries `discard()` directly, and a nonce the call site did not pass would fall
+    // through to the bundle spread and subscribe every one of its readers to the whole world
+    // corpus — the hazard this file's header records.
+    onDraftChange = () => {},
+    onDirtyChange = () => {},
+  } = $props();
 
   // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders for
   // this route. See the twin block in `WorldEssenceCataloguePage.svelte`.
@@ -137,6 +170,20 @@
     return result;
   }
 
+  /**
+   * THE IDENTITY FIELDS THIS EDITOR BUFFERS, which are exactly the four an essence lifts to
+   * world scope.
+   *
+   * Stated here rather than imported because this file's dependency graph is copied module by
+   * module into three hand-rolled mounted trees, and `worldScopeEntityGrouping.js` is not in all
+   * of them — an omission there HANGS a suite rather than failing it. It is a MIRROR, so it is
+   * guarded: `essence-world-scope-screens.test.js` asserts this list equals
+   * `WORLD_IDENTITY_FIELDS.essences`, and reds if either side gains or loses a field.
+   *
+   * @type {readonly string[]}
+   */
+  const IDENTITY_FIELDS = Object.freeze(['name', 'icon', 'colorToken', 'description']);
+
   let activeTab = $state('definition');
   let armedToken = $state('');
   /** @type {{[section: string]: string}} */
@@ -147,7 +194,133 @@
     (scope?.entries ?? []).find((candidate) => candidate.id === entityId) ?? null
   );
   const entity = $derived(entry?.entity ?? null);
-  const normalizedIcon = $derived(normalizeEssenceIcon(entity?.icon || DEFAULT_ESSENCE_ICON));
+  const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
+
+  /**
+   * THE EDIT IS BUFFERED, AND SAVE IS WHAT WRITES IT (issue 1372, maintainer parity round 4).
+   *
+   * This screen persisted every keystroke and every drop on change, so it had no Save action at
+   * all — while the prototype heads it with one (`essEntry.png`) and `design-system/spec.md`'s
+   * EDITOR recipe orders "the action pair with back before save". The mechanism is
+   * `scopedEntryDraft.js`, shared with the tool entry editor rather than written twice: a draft
+   * is a SHAPE, and the same shape reached by two implementations is how a persisted record and
+   * its editors drift apart.
+   *
+   * MEMBERSHIP AND DELETE ARE NOT BUFFERED, and `scopedEntryDraft.js` records why: each is an
+   * action on a different record with its own armed confirmation, and an armed `Remove` that
+   * removed nothing until a later button says the opposite of what arming an action says.
+   */
+  const shape = $derived({ identityFields: IDENTITY_FIELDS, sections });
+  const persisted = $derived(scopedEntryBaseline(entry, shape));
+
+  /**
+   * WHAT THIS EDITOR KNOWS IS ON DISK, which is the persisted projection EXCEPT immediately
+   * after its own Save.
+   *
+   * A world-scope write reaches this screen back through Foundry: the store writes the setting,
+   * the replicated `updateSetting` hook reloads it, and only then does the admin store
+   * republish. So between a successful Save and the end of that round trip the projection still
+   * holds the OLD record — and a dirty flag measured against it alone would leave `Save` lit
+   * over an edit that had already landed, and have the route-exit guard offer to write it a
+   * second time.
+   *
+   * So a Save records what it wrote, and the next publish drops that record: whichever arrives
+   * first, the answer below is the state on disk. Nothing re-seeds the DRAFT from a publish,
+   * which is the race that would eat the keystroke a GM is in the middle of.
+   *
+   * @type {{identity: Record<string, unknown>, defaults: Record<string, unknown>}|null}
+   */
+  let flushed = $state(null);
+  const baseline = $derived(flushed ?? persisted);
+  $effect(() => {
+    // Read for the DEPENDENCY, not for the value: any publish of the world corpus makes the
+    // projection the better answer again.
+    void persisted;
+    flushed = null;
+  });
+
+  /** @type {{identity: Record<string, unknown>, defaults: Record<string, unknown>}|null} */
+  let draft = $state(null);
+  let seededEntityId = $state(undefined);
+
+  // Seed on IDENTITY change ONLY, never on every publish: the admin store republishes `viewState`
+  // twice on a refresh, and again on any unrelated world-corpus write, so a reference-triggered
+  // re-seed would overwrite whatever the GM had typed since. This is the same id gate
+  // `SystemEditView` states for the identity sub-form. Discard re-seeds through `discardDraft`
+  // rather than through this effect, so a second discard on the same essence still lands.
+  $effect(() => {
+    const currentId = entry?.id ?? '';
+    if (currentId === seededEntityId) return;
+    seededEntityId = currentId;
+    draft = currentId ? scopedEntryBaseline(entry, shape) : null;
+    flushed = null;
+    sectionRefusal = {};
+  });
+
+  const identity = $derived(draft?.identity ?? persisted.identity);
+  const defaults = $derived(draft?.defaults ?? persisted.defaults);
+  // The entity as the GM has it on screen: the persisted record with the buffered identity over
+  // it, so the validation tab and the player preview report the state Save would produce rather
+  // than the one on disk.
+  const draftEntity = $derived(entity ? { ...entity, ...identity } : null);
+  const dirty = $derived(scopedEntryDirty(draft, baseline));
+
+  /**
+   * Flush the buffered edit. Answers `false` when a write refused, which is what the route-exit
+   * guard gates navigation on: a Save that did not land must leave the GM here with the edit
+   * still in front of them.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveDraft() {
+    const pending = draft;
+    if (!pending) return true;
+    const landed = await flushScopedEntryDraft({
+      entityId: entry?.id ?? '',
+      writes: scopedEntryWrites(pending, baseline),
+      actions,
+    });
+    if (landed) flushed = pending;
+    return landed;
+  }
+
+  /** Throw the buffered edit away and re-seed from the record on disk. */
+  function discardDraft() {
+    draft = scopedEntryBaseline(entry, shape);
+    flushed = null;
+    sectionRefusal = {};
+  }
+
+  /**
+   * THE SHELL HANDLE, and it is a LIVE ACCESSOR rather than a reported snapshot.
+   *
+   * The shell renders the header pair and owns the route-exit cascade, so it has to be able to
+   * ask "is there anything unsaved" at the moment a GM clicks something. A snapshot cannot
+   * answer that: it is published by an effect, effects flush asynchronously, and the one path
+   * that changes the answer and navigates in the same turn — Delete, which clears the draft and
+   * then returns to the catalogue — would be read at its previous value and prompt to save an
+   * essence that no longer exists.
+   *
+   * `isDirty()` reads the same `$derived` the header button is disabled from, so the guard and
+   * the button cannot disagree about one click.
+   */
+  const draftHandle = {
+    isDirty: () => dirty,
+    save: saveDraft,
+    discard: discardDraft,
+  };
+  $effect(() => {
+    onDraftChange(draftHandle);
+    return () => onDraftChange(null);
+  });
+  // The REACTIVE half, for the header button's disabled state. Separate from the handle above
+  // because a disabled attribute has to re-render when the answer changes, and the handle
+  // deliberately never does.
+  $effect(() => {
+    onDirtyChange(dirty);
+  });
+
+  const normalizedIcon = $derived(normalizeEssenceIcon(identity.icon || DEFAULT_ESSENCE_ICON));
 
   /**
    * The colour token's display name and the value this theme resolves it to.
@@ -157,7 +330,7 @@
    * opposite of what the tile shows. See `essenceColourCaption` for why the hex is read rather
    * than written.
    */
-  const colourCaption = $derived(essenceColourCaption(entity?.colorToken));
+  const colourCaption = $derived(essenceColourCaption(identity.colorToken));
 
   /**
    * The world-default card HEADINGS, in the prototype's words.
@@ -185,11 +358,17 @@
     }
     return scopedSectionLabel(section, text);
   }
-  const defaults = $derived(entry?.defaults ?? null);
-  const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
   const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
   const memberCount = $derived(Number(entry?.membershipCount) || 0);
 
+  // VALIDATION AND THE PREVIEW READ THE DRAFT, not the record on disk. Both answer "what would
+  // this essence be", and on a buffered-edit screen the answer a GM needs is about the state Save
+  // would produce — a Validation tab reporting the persisted state would go on saying a default
+  // is missing while the GM was looking at the one they had just dropped in.
+  //
+  // The inherit LINES below still read `entry`, and that is the opposite case for the same
+  // reason: how many systems inherit a section is a fact about the persisted membership records,
+  // which this editor does not touch at all.
   const validationContext = $derived({
     scope: 'world',
     memberSystemCount: memberCount,
@@ -199,16 +378,16 @@
     worldMacroName: essenceSectionValueName(defaults?.macro),
   });
   const presentation = $derived(
-    essenceValidationPresentation(entity, validationContext, text, format)
+    essenceValidationPresentation(draftEntity, validationContext, text, format)
   );
   const counts = $derived(presentation.counts);
 
   const previewEssence = $derived({
     id: entity?.id ?? '',
-    name: entity?.name ?? '',
-    icon: entity?.icon || PAGE_ICON,
-    colorToken: entity?.colorToken || '',
-    description: entity?.description ?? '',
+    name: identity.name ?? '',
+    icon: identity.icon || PAGE_ICON,
+    colorToken: identity.colorToken || '',
+    description: identity.description ?? '',
     enabled: true,
     hasEffectTransfer: Boolean(defaults?.effectSource),
     hasPropertyMacro: Boolean(defaults?.macro),
@@ -426,7 +605,7 @@
    * @param {string} section
    * @param {object} data the raw drag payload.
    */
-  async function dropSection(section, data) {
+  function dropSection(section, data) {
     const value = resolveDropUuid(data);
     if (!acceptable(section, value)) {
       sectionRefusal = {
@@ -439,20 +618,48 @@
       return;
     }
     sectionRefusal = { ...sectionRefusal, [section]: '' };
-    await actions?.updateWorldDefaultSection?.(entityId, section, value);
+    setSection(section, value);
   }
 
-  async function clearSection(section) {
+  function clearSection(section) {
     sectionRefusal = { ...sectionRefusal, [section]: '' };
-    await actions?.updateWorldDefaultSection?.(entityId, section, null);
+    setSection(section, null);
   }
 
-  async function patchIdentity(field, value) {
-    await actions?.updateEntity?.(entityId, { [field]: value });
+  /**
+   * Stage one world-default section into the draft. REASSIGNED, never mutated: Svelte 5's
+   * `writable` does not proxy, so an in-place write renders nothing and a `$state`-only test
+   * passes over it — which is why `scopedEntryDraft.js` returns a new object rather than
+   * accepting one to edit.
+   *
+   * @param {string} section
+   * @param {unknown} value
+   */
+  function setSection(section, value) {
+    draft = withScopedEntryDefault(draft ?? persisted, section, value);
   }
 
+  /** Stage one identity field into the draft. See {@link setSection} for the reassignment rule. */
+  function patchIdentity(field, value) {
+    draft = withScopedEntryIdentity(draft ?? persisted, field, value);
+  }
+
+  /**
+   * Delete the world essence, then leave.
+   *
+   * THE DRAFT IS DROPPED FIRST, and that is not tidying. The record this editor buffers an edit
+   * for no longer exists, so leaving with the draft still standing would have the route-exit
+   * guard offer to save it into a record `updateEntity` refuses — a prompt about work the GM has
+   * just deliberately destroyed. Clearing it synchronously is enough because the shell reads the
+   * handle rather than a reported snapshot.
+   */
   async function deleteEssence() {
-    await actions?.deleteEntity?.(entityId);
+    const deleted = await actions?.deleteEntity?.(entityId);
+    if (deleted !== false) {
+      draft = null;
+      flushed = null;
+      seededEntityId = '';
+    }
     onBackToCatalogue();
   }
 </script>
@@ -572,7 +779,7 @@
                   >
                   <Medallion
                     icon={normalizedIcon}
-                    tint={entity?.colorToken || ''}
+                    tint={identity.colorToken || ''}
                     size={150}
                     glyph={48}
                   />
@@ -608,9 +815,9 @@
                     <input
                       class="manager-scoped-entry-name"
                       type="text"
-                      value={entity?.name ?? ''}
+                      value={identity.name ?? ''}
                       data-scoped-entry-name
-                      onchange={(event) => patchIdentity('name', event.currentTarget.value)}
+                      oninput={(event) => patchIdentity('name', event.currentTarget.value)}
                     />
                   </label>
 
@@ -629,13 +836,13 @@
                     </span>
                     <textarea
                       rows="3"
-                      value={entity?.description ?? ''}
+                      value={identity.description ?? ''}
                       data-scoped-entry-description
                       placeholder={text(
                         'FABRICATE.Admin.Manager.Scoped.Essence.DescriptionPlaceholder',
                         'What this quality means in your world, and where it comes from.'
                       )}
-                      onchange={(event) => patchIdentity('description', event.currentTarget.value)}
+                      oninput={(event) => patchIdentity('description', event.currentTarget.value)}
                     ></textarea>
                   </label>
 
@@ -653,8 +860,8 @@
                       allowNone
                       allowCustom={false}
                       manageDismiss={false}
-                      colorToken={entity?.colorToken || ''}
-                      unset={!entity?.colorToken}
+                      colorToken={identity.colorToken || ''}
+                      unset={!identity.colorToken}
                       customColor=""
                       presetGridLabel={text(
                         'FABRICATE.Admin.Manager.Essence.Colour.Presets',
