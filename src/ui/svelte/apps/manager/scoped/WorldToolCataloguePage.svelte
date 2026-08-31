@@ -350,9 +350,16 @@
 
   /* The shipped segmented-control treatment, matched to `.manager-tools-authority-segments`
      so a GM sees one break-mode control across the two scopes. */
+  /* WRAPS rather than shrinking. Three segments each carry a full label — the widest is
+     `Inherit · Tool-specific (default)` — and the option inside is an `inline-flex` with no
+     truncation, so a row that shrinks its segments below their content width pushes the text
+     outside the card. The capture gate measures exactly that and reported the third segment
+     clipped. Wrapping keeps every label whole at any card width; truncating would hide the
+     value the segment exists to state. */
   .manager-world-tool-break-segments {
     display: flex;
     flex: 1 1 auto;
+    flex-wrap: wrap;
     gap: var(--fab-space-2xs);
     padding: 3px;
     border: 1px solid var(--fab-mv2-border);
@@ -363,10 +370,9 @@
 
   .manager-world-tool-break-segments label {
     display: flex;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
-    min-width: 0;
     padding: 6px var(--fab-space-2);
     border-radius: 7px;
     cursor: pointer;

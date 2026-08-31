@@ -3908,7 +3908,7 @@ export function buildLabContent() {
         {
           id: 'lab-tool-unlinked',
           name: 'Unclaimed Bellows',
-          img: `${ICON_BASE}/tools/smithing/bellows-tan.webp`,
+          img: `${ICON_BASE}/tools/smithing/furnace-boiler-steel.webp`,
           description: 'A world record no game-world Item stands behind yet.',
         },
       ],
