@@ -246,12 +246,12 @@ function managerFixture(theme, width, height) {
           <button type="button" class="manager-nav-button is-active" data-boundary>
             <i aria-hidden="true">*</i>
             <span class="manager-nav-label">Crafting Systems With Extra Words</span>
-            <span class="manager-nav-count">6</span>
+            <span class="manager-nav-count" data-contrast-nav-count-active>6</span>
           </button>
           <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
             <span class="manager-nav-label">Recipes</span>
-            <span class="manager-nav-count">12</span>
+            <span class="manager-nav-count" data-contrast-nav-count-idle>12</span>
           </button>
           <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
@@ -363,6 +363,16 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
+  // The rail's bare-numeral `.manager-nav-count` (issue 1304), one probe per GROUND it
+  // renders on: the idle rail's own `--fab-bg-0` fill, and `--fab-surface-active` under the
+  // active row. A 0.625rem/600 numeral is not large text, so the bar is 4.5:1 on both — and
+  // the two grounds are different enough that a token clearing one used to fail the other
+  // (the active row's translucent tint sits closer to the rail's own ink than the opaque
+  // idle fill does).
+  const idleCountRatio = contrastSample(result, '[data-contrast-nav-count-idle]');
+  assert.ok(idleCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the idle rail's nav count should pass WCAG AA, got ${idleCountRatio.toFixed(2)}:1`);
+  const activeCountRatio = contrastSample(result, '[data-contrast-nav-count-active]');
+  assert.ok(activeCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the active row's nav count should pass WCAG AA against --fab-surface-active, got ${activeCountRatio.toFixed(2)}:1`);
 }
 
 /*
@@ -440,7 +450,7 @@ async function inspectRenderedSurface(page) {
       }
       return layers;
     };
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]', '[data-contrast-nav-count-idle]', '[data-contrast-nav-count-active]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
