@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { normalizeModifierLibrary } from '../src/systems/modifierLibrary.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import {
@@ -107,24 +108,29 @@ test('a library left in the gathering config resolves NOTHING', async () => {
   assert.equal(result.diagnostics[0].code, 'MISSING_CHARACTER_MODIFIER');
 });
 
-// The preset bundles are unchanged and are now seeded into the SYSTEM library, so their
-// output is asserted through the normalizer that owns that library.
-test('seeded presets survive the system normalizer, edits and all', () => {
+// The preset bundles are unchanged. Since issue 1308 the library they seed is WORLD scope, so
+// their output is asserted through the normalizer that owns it rather than through the crafting
+// system, which no longer carries a copy.
+test('seeded presets survive the library normalizer, edits and all', () => {
   const presets = getCharacterModifierPresetsForFoundrySystem('dnd5e');
   const seeded = seedCharacterModifierPresets({ presets }).next;
   seeded[0].label = 'Mighty Strength';
   seeded[0].expression = '@abilities.str.mod + 1';
-  const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  const system = manager._normalizeSystem({ id: 'sys', name: 'S', modifiers: seeded });
-  const strength = system.modifiers.find(entry => entry.id === seeded[0].id);
+  const library = normalizeModifierLibrary(seeded);
+  const strength = library.find(entry => entry.id === seeded[0].id);
   assert.equal(strength.label, 'Mighty Strength');
   assert.equal(strength.expression, '@abilities.str.mod + 1');
   assert.equal(strength.isRollExpression, false);
 });
 
-test('a new system has an empty library and nothing is auto-seeded', () => {
+// Nothing is auto-seeded, and since issue 1308 a crafting system carries no library key at all:
+// the world store owns it, so the system's own copy is SHED rather than emitted empty. Asserting
+// `undefined` rather than `[]` is the point — an emitted empty array would be the per-system copy
+// coming back, and the allowlist rebuild would then keep overwriting the world library's readers.
+test('a new system carries no library key and nothing is auto-seeded', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  assert.deepEqual(manager._normalizeSystem({ id: 'sys', name: 'S' }).modifiers, []);
+  assert.equal(manager._normalizeSystem({ id: 'sys', name: 'S' }).modifiers, undefined);
+  assert.deepEqual(normalizeModifierLibrary(undefined), []);
 });
 
 test('seedCharacterModifierPresets adds dnd5e presets idempotently', () => {

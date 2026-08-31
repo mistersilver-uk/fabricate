@@ -84,6 +84,16 @@ test('interpretMacroSpendResult interprets the macro return contract', () => {
   assert.ok(noMessage.message.length > 0);
 });
 
+/**
+ * A resolver answering a runnable SCRIPT macro for every uuid.
+ *
+ * Injected because `MacroCoinSpender` now RESOLVES the uuid and gates on the document before it
+ * delegates (issue 1301), and this suite defines no `globalThis.fromUuid`. Without it every case
+ * below refuses at the gate and never reaches its own `runMacro`, so the assertions that count
+ * macro invocations would pass vacuously — or, worse, read as green while proving nothing.
+ */
+const resolveRunnableMacro = async () => ({ type: 'script', command: 'return true;' });
+
 test('MacroCoinSpender runs canAfford for check and decrement for spend, never increment', async () => {
   const runs = [];
   const runMacro = async (uuid, context) => {
@@ -92,6 +102,7 @@ test('MacroCoinSpender runs canAfford for check and decrement for spend, never i
   };
   const spender = new MacroCoinSpender({
     macros: { canAfford: 'Macro.can', increment: 'Macro.inc', decrement: 'Macro.dec' },
+    resolveMacro: resolveRunnableMacro,
     runMacro,
   });
   const ctx = { macroContext: { actor: { name: 'Hero' }, cost: [{ abbreviation: 'gp', amount: 2 }] } };
@@ -109,6 +120,7 @@ test('MacroCoinSpender runs canAfford for check and decrement for spend, never i
 test('MacroCoinSpender surfaces failure objects and thrown errors as invalid', async () => {
   const failSpender = new MacroCoinSpender({
     macros: { canAfford: 'Macro.can', decrement: 'Macro.dec' },
+    resolveMacro: resolveRunnableMacro,
     runMacro: async () => ({ canAfford: false, message: 'Too poor' }),
   });
   const failed = await failSpender.check({ name: 'Hero' }, { amount: 2 }, { macroContext: {} });
@@ -117,6 +129,7 @@ test('MacroCoinSpender surfaces failure objects and thrown errors as invalid', a
 
   const throwSpender = new MacroCoinSpender({
     macros: { canAfford: 'Macro.can', decrement: 'Macro.dec' },
+    resolveMacro: resolveRunnableMacro,
     runMacro: async () => {
       throw new Error('macro blew up');
     },
@@ -125,7 +138,11 @@ test('MacroCoinSpender surfaces failure objects and thrown errors as invalid', a
   assert.equal(thrown.valid, false);
 
   // A missing/unconfigured macro key is invalid, not a silent pass.
-  const emptySpender = new MacroCoinSpender({ macros: {}, runMacro: async () => true });
+  const emptySpender = new MacroCoinSpender({
+    macros: {},
+    resolveMacro: resolveRunnableMacro,
+    runMacro: async () => true,
+  });
   const noConfig = await emptySpender.check({ name: 'Hero' }, { amount: 2 }, { macroContext: {} });
   assert.equal(noConfig.valid, false);
 });

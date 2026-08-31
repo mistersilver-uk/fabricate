@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-formula-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     'src/utils/rollExpressionAverage.js',

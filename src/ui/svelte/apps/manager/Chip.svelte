@@ -26,9 +26,9 @@
      surrounding markup demands it — a chip inside a `role="list"` must be a list item,
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
-     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `tag`, or '' for the
-     default neutral fill. Tone is colour only and never changes the size; a tone that
-     resized would reintroduce the drift this component removes.
+     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`,
+     `tag`, or '' for the default neutral fill. Tone is colour only and never changes the
+     size; a tone that resized would reintroduce the drift this component removes.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
@@ -47,9 +47,11 @@
      component INSTANCE, not its node, so a caller that must measure or focus the chip
      — `SearchablePopover` positions its popover off the trigger's bounding box and
      restores focus to it on close — has no other way to reach it.
-   - density: 'default' (the manager's one chip scale) or 'row' — the Checks Studio
+   - density: 'default' (the manager's one chip scale), 'row' — the Checks Studio
      modifier row's own scale for an in-line annotation chip (the bounds chip, the
-     "Rolls dice" chip), taken from the prototype (issue 1096). `styles/fabricate.css`
+     "Rolls dice" chip), taken from the prototype (issue 1096) — or 'action', the page
+     header's action cluster, where a chip stands in the same row as the Back / Delete /
+     Save buttons and has to be one of them. `styles/fabricate.css`
      cannot state it: that sheet imports at `layer(modules)` while this component's
      `css: 'injected'` block lands UNLAYERED (svelte.config.js), and an unlayered
      declaration beats a layered one no matter how specific the layered selector is
@@ -108,6 +110,20 @@
     'danger',
     'neutral',
     'negative',
+    // ACCENT (issue 1286): the chip is a real, chosen, ON state — the complications
+    // section's "Applies to" chips are accent-when-on — and none of the nine tones above
+    // could say it. `active`/`positive` is the SUCCESS family and reads as "this passed";
+    // `tag` is the purple membership fill. The accent family already ships the four
+    // tokens a chip tone needs (`-border`, `-text`, `-soft`), so this states the family
+    // rather than inventing a treatment.
+    'accent',
+    // MUTED (issue 1286): an explicitly DIMMED, unavailable chip — "Salvage · n/a" on a
+    // system whose salvage is not progressive. It is genuinely distinct from `neutral`,
+    // which has two dozen call sites and is the RECESSIVE DEFAULT for a fact that is
+    // merely present. The tone that reads "unavailable" today is `is-disabled` — and that
+    // is joined to the WARNING family two rules below, so routing an n/a pill there would
+    // paint it amber and read as a hazard the GM must act on.
+    'muted',
     // An item TAG (issue 772). Tags are purple across the manager, and the component
     // editor's tag pill carried that colour in the global sheet before it converted onto
     // this component. Without the tone here, `TONES` would DROP `tag` silently at the
@@ -125,6 +141,7 @@
       mono ? 'is-mono' : '',
       truncate ? 'is-truncated' : '',
       density === 'row' ? 'is-row' : '',
+      density === 'action' ? 'is-action' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -155,17 +172,39 @@
      `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, which every
      Fabricate surface carries. */
 
-  /* A NOTE ON SPECIFICITY, because it decides what may stay in the global sheet.
-     Svelte compiles these selectors to `.manager-chip.svelte-<hash>` — two classes,
-     (0,2,0) — and `css: 'injected'` (svelte.config.js) puts them in `document.head`
-     AFTER Foundry's `<link>` for styles/fabricate.css. So a global rule at (0,2,0), such
-     as `.fabricate-manager .manager-vocabulary-chip-unused`, TIES with this block and
-     loses on source order. Every global rule that must still beat a chip declaration is
-     therefore written at three classes or more, e.g.
-     `.fabricate-manager .manager-chip.manager-vocabulary-chip-unused`. What legitimately
-     remains global is what a scoped block cannot reach: an ancestor-context rule (a chip
-     in the header action bar matches the 34px control beside it) and the chip's position
-     inside a parent's layout. */
+  /* A NOTE ON LAYERS FIRST, THEN SPECIFICITY, because the two used to be written here the
+     other way round and the order is the whole of it (corrected in issue 1118). The `density`
+     note in this component's props block already had it right; this one did not, and both are
+     load-bearing, so they now say the same thing.
+
+     LAYERS DECIDE. `module.json` gives `styles/fabricate.css` no explicit layer, so Foundry
+     imports it at `layer(modules)` — `tests/view-lab/cascade.css` mirrors that, and
+     `vite.config.js` strips the JS-side import from the production build, so it is the only
+     way the sheet loads in the product. `css: 'injected'` (svelte.config.js) puts THIS block
+     in `document.head` unlayered, and an unlayered author declaration beats every layered one
+     at ANY specificity. So a global rule that restates a property declared below cannot win,
+     however many classes it is written with. Measured, not reasoned: with the sheet layered,
+     `.manager-header-actions .manager-chip { min-height: 34px }` at three classes leaves the
+     chip at this block's 20px; unlayered, the same markup reports 34px. Two such rules were
+     retired from the header cluster in issue 1118 for exactly that reason, and
+     `styles/fabricate.css` records the same finding from a parity run at
+     `.manager-checks-card .manager-modifier-readonly-expression`.
+
+     SPECIFICITY DECIDES ONLY AMONG UNLAYERED RULES — which is to say, among this block and
+     other components' scoped blocks. Svelte compiles these selectors to
+     `.manager-chip.svelte-<hash>`, two classes, (0,2,0). A CALLER's own `:global(...)` rule
+     is unlayered too, so at three classes it does out-specify this block and render, which is
+     what `CraftingModifierCatalogueCard.svelte` did before `density` existed. That is still a
+     second implementation of the one chip's geometry, which is what issue 883 retired and
+     what `manager-layout.test.js`'s hand-rolled-chip ratchet exists to catch.
+
+     What legitimately remains in the global sheet is what this block cannot reach and does
+     not declare: the chip's POSITION inside a parent's layout. Not its geometry — a chip that
+     must be a different size in one context takes a variant prop here, as `density="row"`
+     does. `.fabricate-manager .manager-chip.manager-vocabulary-chip-unused` is written at
+     three classes and states `color`/`background`, which this block also declares, so it is
+     in the same position the header rules were in: a candidate for the same treatment rather
+     than an example to copy. */
 
   /* Pill (issue 643): fully-rounded rather than 6px-cornered, matching the Recipe Studio
      language. The COMPACT scale (issue 883) is the only scale — 20px tall, `0.62rem`,
@@ -304,6 +343,27 @@
     color: var(--fab-text-muted);
   }
 
+  /* ACCENT (issue 1286): the chosen-ON chip. `--fab-accent-text` rather than `--fab-accent`
+     is the ink, for the reason that token was added at all — the raw accent over
+     `--fab-accent-soft` measures under AA in `ironblood-forge`, and every other semantic
+     family here already inks its soft fill with its own `*-text`. */
+  .manager-chip.is-accent {
+    border-color: var(--fab-accent-border);
+    color: var(--fab-accent-text);
+    background: var(--fab-accent-soft);
+  }
+
+  /* MUTED (issue 1286): dimmed and unavailable — an outline with the disabled ink and NO
+     fill, so it recedes behind every toned chip beside it without borrowing the warning
+     family's alarm. Deliberately not `opacity`: an opacity on the chip would also fade a
+     leading glyph and any swatch dot to a different degree than the label, and it composes
+     unpredictably with a caller's own container opacity. */
+  .manager-chip.is-muted {
+    border-color: var(--fab-border);
+    color: var(--fab-text-disabled);
+    background: none;
+  }
+
   /* ROW density (issue 1096): the Checks Studio modifier row's in-line annotation chip
      — the bounds chip ("-1 to +5") and the "Rolls dice" chip — sits at a scale the
      prototype draws slightly taller and cooler than the manager-wide default: a 22px
@@ -326,6 +386,37 @@
     background: var(--fab-bg-2);
     font-size: 10px;
     font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ACTION density: a chip standing in the page header's action cluster.
+     
+     THE ROW CENTRES ITS CHILDREN, so a 20px chip beside 34px buttons floated in the middle
+     of the group and read as a stray label rather than as the first member of it — which is
+     where every Core editor and every companion drill-down puts its own `Unsaved`. Measured
+     in Chromium against the composed page, not reasoned: 20px against 34px.
+     
+     34px IS THE BUTTON'S OWN FIGURE, from `.fabricate-manager .manager-button` in
+     `styles/fabricate.css`. It is restated here rather than read, because there is nothing to
+     read it from: a `min-height` in a layered sheet cannot be inherited by an unlayered block,
+     and the two are decided in different places by different layers. What keeps them equal is
+     `manager-header-geometry.test.js`, which measures BOTH in one composed page and fails
+     naming the pair — a duplicated figure with a gate on it, rather than a duplicated figure
+     with a comment on it.
+     
+     THIS IS A VARIANT ON THE PRIMITIVE, not a caller override, for the reason `density`
+     documents above — and here that reason is not theoretical. Two global rules claimed this
+     exact geometry (`min-height: 34px` at three classes, `min-height: 38px` at four) and both
+     were inert, because the sheet is layered and this block is not; issue 1118 retired them
+     rather than arbitrating them. A third attempt written the same way would be inert in the
+     same way.
+     
+     The radius is left at the base rule's 10px. The retired rules asked for 999px and 6px
+     between them, which is two answers to a question the design does not put: the base chip's
+     corner is the chip's corner, and a header chip is a chip. */
+  .manager-chip.is-action {
+    min-height: 34px;
+    padding: 0 var(--fab-space-3);
     white-space: nowrap;
   }
 

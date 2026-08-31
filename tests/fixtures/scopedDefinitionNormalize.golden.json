@@ -1,0 +1,2460 @@
+{
+  "baseline": {
+    "id": "sys-scoped",
+    "name": "Scoped Smithing",
+    "description": "A corpus that exercises every reference the Valid Id Basis gates.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "itemTags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "visibilityMode": "knowledge",
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "essenceDefinitions": [
+      {
+        "id": "ess-fire",
+        "name": "Fire",
+        "description": "Heat",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-earth",
+        "name": "Earth",
+        "description": "Stone",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-water",
+        "name": "Water",
+        "description": "Flow",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": "cmp-ash-salt",
+        "sourceItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "associatedSystemItemId": "cmp-ash-salt"
+      },
+      {
+        "id": "ess-air",
+        "name": "Air",
+        "description": "Breath",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": false,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      }
+    ],
+    "recipeItemDefinitions": [],
+    "membershipResolvesByRecipeIds": false,
+    "modifiers": [
+      {
+        "id": "mod-medicine",
+        "label": "Medicine",
+        "expression": "@abilities.med.mod",
+        "isRollExpression": false
+      }
+    ],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "componentCategories": [
+      "ore",
+      "ingot",
+      "reagent"
+    ],
+    "categoryIcons": {
+      "smithing": "fas fa-hammer",
+      "alchemy": "fas fa-flask"
+    },
+    "componentCategoryIcons": {
+      "ore": "fas fa-gem",
+      "ingot": "fas fa-bars",
+      "reagent": "fas fa-flask"
+    },
+    "categories": [
+      "smithing",
+      "alchemy"
+    ],
+    "tags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "essences": [
+      "ess-fire",
+      "ess-earth",
+      "ess-water",
+      "ess-air"
+    ],
+    "enableTags": true,
+    "enableEssences": true,
+    "enableCategories": true,
+    "enableMultiStepRecipes": true,
+    "components": [
+      {
+        "id": "cmp-ash-salt",
+        "name": "Ash Salt",
+        "img": "icons/commodities/materials/bowl-powder-grey.webp",
+        "description": "A grey crystalline residue.",
+        "originItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [
+          "alchemical"
+        ],
+        "essences": {
+          "ess-fire": 2,
+          "ess-earth": 1
+        },
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ore",
+        "name": "Iron Ore",
+        "img": "icons/commodities/metal/ore-chunk-iron.webp",
+        "description": "Raw ore.",
+        "originItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ore",
+        "tags": [
+          "metal"
+        ],
+        "essences": {
+          "ess-earth": 3
+        },
+        "difficulty": 1,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ingot",
+        "name": "Iron Ingot",
+        "img": "icons/commodities/metal/ingot-stack-steel.webp",
+        "description": "A smelted bar.",
+        "originItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ingot",
+        "tags": [
+          "metal",
+          "refined"
+        ],
+        "essences": {
+          "ess-earth": 2,
+          "ess-fire": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-spring-water",
+        "name": "Spring Water",
+        "img": "icons/consumables/potions/potion-flask-corked-blue.webp",
+        "description": "Clean water.",
+        "originItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "registeredItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-water": 4
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-charcoal",
+        "name": "Charcoal",
+        "img": "icons/commodities/materials/lump-coal-black.webp",
+        "description": "Burnt wood.",
+        "originItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-fire": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-whetstone",
+        "name": "Whetstone",
+        "img": "icons/tools/smithing/whetstone-block-grey.webp",
+        "description": "A honing block.",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "general",
+        "tags": [],
+        "essences": {
+          "ess-earth": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "tool-hammer",
+        "enabled": true,
+        "componentId": null,
+        "label": "Smith's Hammer",
+        "name": "Smith's Hammer",
+        "img": "icons/tools/smithing/hammer-sledge-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 10
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-crucible",
+        "enabled": true,
+        "componentId": "cmp-whetstone",
+        "label": "Crucible",
+        "name": "Crucible",
+        "img": "icons/tools/smithing/crucible-steel-grey.webp",
+        "description": "A honing block.",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": 5
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-mortar",
+        "enabled": false,
+        "componentId": null,
+        "label": "Mortar and Pestle",
+        "name": "Mortar and Pestle",
+        "img": "icons/tools/laboratory/mortar-pestle-yellow.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": false,
+          "ids": [],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      }
+    ],
+    "characterPrerequisites": [
+      {
+        "id": "prq-smiths-tools",
+        "name": "Smith's Tools",
+        "icon": "fa-solid fa-user-shield",
+        "path": "tools.smith.value",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "gatheringRealmSettings": {
+      "enabled": false
+    }
+  },
+  "emptyComponents": {
+    "id": "sys-scoped",
+    "name": "Scoped Smithing",
+    "description": "A corpus that exercises every reference the Valid Id Basis gates.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "itemTags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "visibilityMode": "knowledge",
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "essenceDefinitions": [
+      {
+        "id": "ess-fire",
+        "name": "Fire",
+        "description": "Heat",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-earth",
+        "name": "Earth",
+        "description": "Stone",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-water",
+        "name": "Water",
+        "description": "Flow",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": "cmp-ash-salt",
+        "sourceItemUuid": null,
+        "associatedSystemItemId": "cmp-ash-salt"
+      },
+      {
+        "id": "ess-air",
+        "name": "Air",
+        "description": "Breath",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": false,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      }
+    ],
+    "recipeItemDefinitions": [],
+    "membershipResolvesByRecipeIds": false,
+    "modifiers": [
+      {
+        "id": "mod-medicine",
+        "label": "Medicine",
+        "expression": "@abilities.med.mod",
+        "isRollExpression": false
+      }
+    ],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "componentCategories": [
+      "ore",
+      "ingot",
+      "reagent"
+    ],
+    "categoryIcons": {
+      "smithing": "fas fa-hammer",
+      "alchemy": "fas fa-flask"
+    },
+    "componentCategoryIcons": {
+      "ore": "fas fa-gem",
+      "ingot": "fas fa-bars",
+      "reagent": "fas fa-flask"
+    },
+    "categories": [
+      "smithing",
+      "alchemy"
+    ],
+    "tags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "essences": [
+      "ess-fire",
+      "ess-earth",
+      "ess-water",
+      "ess-air"
+    ],
+    "enableTags": true,
+    "enableEssences": true,
+    "enableCategories": true,
+    "enableMultiStepRecipes": true,
+    "components": [],
+    "tools": [
+      {
+        "id": "tool-hammer",
+        "enabled": true,
+        "componentId": null,
+        "label": "Smith's Hammer",
+        "name": "Smith's Hammer",
+        "img": "icons/tools/smithing/hammer-sledge-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 10
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-crucible",
+        "enabled": true,
+        "componentId": "cmp-whetstone",
+        "label": "Crucible",
+        "name": "Crucible",
+        "img": "icons/tools/smithing/crucible-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": null,
+        "originItemUuid": null,
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": 5
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-mortar",
+        "enabled": false,
+        "componentId": null,
+        "label": "Mortar and Pestle",
+        "name": "Mortar and Pestle",
+        "img": "icons/tools/laboratory/mortar-pestle-yellow.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": false,
+          "ids": [],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      }
+    ],
+    "characterPrerequisites": [
+      {
+        "id": "prq-smiths-tools",
+        "name": "Smith's Tools",
+        "icon": "fa-solid fa-user-shield",
+        "path": "tools.smith.value",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "gatheringRealmSettings": {
+      "enabled": false
+    }
+  },
+  "emptyEssenceDefinitions": {
+    "id": "sys-scoped",
+    "name": "Scoped Smithing",
+    "description": "A corpus that exercises every reference the Valid Id Basis gates.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "itemTags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "visibilityMode": "knowledge",
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "essenceDefinitions": [],
+    "recipeItemDefinitions": [],
+    "membershipResolvesByRecipeIds": false,
+    "modifiers": [
+      {
+        "id": "mod-medicine",
+        "label": "Medicine",
+        "expression": "@abilities.med.mod",
+        "isRollExpression": false
+      }
+    ],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "componentCategories": [
+      "ore",
+      "ingot",
+      "reagent"
+    ],
+    "categoryIcons": {
+      "smithing": "fas fa-hammer",
+      "alchemy": "fas fa-flask"
+    },
+    "componentCategoryIcons": {
+      "ore": "fas fa-gem",
+      "ingot": "fas fa-bars",
+      "reagent": "fas fa-flask"
+    },
+    "categories": [
+      "smithing",
+      "alchemy"
+    ],
+    "tags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "essences": [],
+    "enableTags": true,
+    "enableEssences": true,
+    "enableCategories": true,
+    "enableMultiStepRecipes": true,
+    "components": [
+      {
+        "id": "cmp-ash-salt",
+        "name": "Ash Salt",
+        "img": "icons/commodities/materials/bowl-powder-grey.webp",
+        "description": "A grey crystalline residue.",
+        "originItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [
+          "alchemical"
+        ],
+        "essences": {},
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ore",
+        "name": "Iron Ore",
+        "img": "icons/commodities/metal/ore-chunk-iron.webp",
+        "description": "Raw ore.",
+        "originItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ore",
+        "tags": [
+          "metal"
+        ],
+        "essences": {},
+        "difficulty": 1,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ingot",
+        "name": "Iron Ingot",
+        "img": "icons/commodities/metal/ingot-stack-steel.webp",
+        "description": "A smelted bar.",
+        "originItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ingot",
+        "tags": [
+          "metal",
+          "refined"
+        ],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-spring-water",
+        "name": "Spring Water",
+        "img": "icons/consumables/potions/potion-flask-corked-blue.webp",
+        "description": "Clean water.",
+        "originItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "registeredItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-charcoal",
+        "name": "Charcoal",
+        "img": "icons/commodities/materials/lump-coal-black.webp",
+        "description": "Burnt wood.",
+        "originItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-whetstone",
+        "name": "Whetstone",
+        "img": "icons/tools/smithing/whetstone-block-grey.webp",
+        "description": "A honing block.",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "general",
+        "tags": [],
+        "essences": {},
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "tool-hammer",
+        "enabled": true,
+        "componentId": null,
+        "label": "Smith's Hammer",
+        "name": "Smith's Hammer",
+        "img": "icons/tools/smithing/hammer-sledge-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 10
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-crucible",
+        "enabled": true,
+        "componentId": "cmp-whetstone",
+        "label": "Crucible",
+        "name": "Crucible",
+        "img": "icons/tools/smithing/crucible-steel-grey.webp",
+        "description": "A honing block.",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": 5
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-mortar",
+        "enabled": false,
+        "componentId": null,
+        "label": "Mortar and Pestle",
+        "name": "Mortar and Pestle",
+        "img": "icons/tools/laboratory/mortar-pestle-yellow.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": false,
+          "ids": [],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      }
+    ],
+    "characterPrerequisites": [
+      {
+        "id": "prq-smiths-tools",
+        "name": "Smith's Tools",
+        "icon": "fa-solid fa-user-shield",
+        "path": "tools.smith.value",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "gatheringRealmSettings": {
+      "enabled": false
+    }
+  },
+  "emptyComponentCategories": {
+    "id": "sys-scoped",
+    "name": "Scoped Smithing",
+    "description": "A corpus that exercises every reference the Valid Id Basis gates.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "itemTags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "visibilityMode": "knowledge",
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "essenceDefinitions": [
+      {
+        "id": "ess-fire",
+        "name": "Fire",
+        "description": "Heat",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-earth",
+        "name": "Earth",
+        "description": "Stone",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-water",
+        "name": "Water",
+        "description": "Flow",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": "cmp-ash-salt",
+        "sourceItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "associatedSystemItemId": "cmp-ash-salt"
+      },
+      {
+        "id": "ess-air",
+        "name": "Air",
+        "description": "Breath",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": false,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      }
+    ],
+    "recipeItemDefinitions": [],
+    "membershipResolvesByRecipeIds": false,
+    "modifiers": [
+      {
+        "id": "mod-medicine",
+        "label": "Medicine",
+        "expression": "@abilities.med.mod",
+        "isRollExpression": false
+      }
+    ],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "componentCategories": [],
+    "categoryIcons": {
+      "smithing": "fas fa-hammer",
+      "alchemy": "fas fa-flask"
+    },
+    "componentCategoryIcons": {},
+    "categories": [
+      "smithing",
+      "alchemy"
+    ],
+    "tags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "essences": [
+      "ess-fire",
+      "ess-earth",
+      "ess-water",
+      "ess-air"
+    ],
+    "enableTags": true,
+    "enableEssences": true,
+    "enableCategories": true,
+    "enableMultiStepRecipes": true,
+    "components": [
+      {
+        "id": "cmp-ash-salt",
+        "name": "Ash Salt",
+        "img": "icons/commodities/materials/bowl-powder-grey.webp",
+        "description": "A grey crystalline residue.",
+        "originItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [
+          "alchemical"
+        ],
+        "essences": {
+          "ess-fire": 2,
+          "ess-earth": 1
+        },
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ore",
+        "name": "Iron Ore",
+        "img": "icons/commodities/metal/ore-chunk-iron.webp",
+        "description": "Raw ore.",
+        "originItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ore",
+        "tags": [
+          "metal"
+        ],
+        "essences": {
+          "ess-earth": 3
+        },
+        "difficulty": 1,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ingot",
+        "name": "Iron Ingot",
+        "img": "icons/commodities/metal/ingot-stack-steel.webp",
+        "description": "A smelted bar.",
+        "originItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ingot",
+        "tags": [
+          "metal",
+          "refined"
+        ],
+        "essences": {
+          "ess-earth": 2,
+          "ess-fire": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-spring-water",
+        "name": "Spring Water",
+        "img": "icons/consumables/potions/potion-flask-corked-blue.webp",
+        "description": "Clean water.",
+        "originItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "registeredItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-water": 4
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-charcoal",
+        "name": "Charcoal",
+        "img": "icons/commodities/materials/lump-coal-black.webp",
+        "description": "Burnt wood.",
+        "originItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-fire": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-whetstone",
+        "name": "Whetstone",
+        "img": "icons/tools/smithing/whetstone-block-grey.webp",
+        "description": "A honing block.",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "general",
+        "tags": [],
+        "essences": {
+          "ess-earth": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "tool-hammer",
+        "enabled": true,
+        "componentId": null,
+        "label": "Smith's Hammer",
+        "name": "Smith's Hammer",
+        "img": "icons/tools/smithing/hammer-sledge-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 10
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-crucible",
+        "enabled": true,
+        "componentId": "cmp-whetstone",
+        "label": "Crucible",
+        "name": "Crucible",
+        "img": "icons/tools/smithing/crucible-steel-grey.webp",
+        "description": "A honing block.",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": 5
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-mortar",
+        "enabled": false,
+        "componentId": null,
+        "label": "Mortar and Pestle",
+        "name": "Mortar and Pestle",
+        "img": "icons/tools/laboratory/mortar-pestle-yellow.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": false,
+          "ids": [],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      }
+    ],
+    "characterPrerequisites": [
+      {
+        "id": "prq-smiths-tools",
+        "name": "Smith's Tools",
+        "icon": "fa-solid fa-user-shield",
+        "path": "tools.smith.value",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "gatheringRealmSettings": {
+      "enabled": false
+    }
+  },
+  "emptyCategories": {
+    "id": "sys-scoped",
+    "name": "Scoped Smithing",
+    "description": "A corpus that exercises every reference the Valid Id Basis gates.",
+    "enabled": true,
+    "resolutionMode": "simple",
+    "features": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "itemTags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "visibilityMode": "knowledge",
+    "recipeVisibility": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "requirements": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "essenceDefinitions": [
+      {
+        "id": "ess-fire",
+        "name": "Fire",
+        "description": "Heat",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-earth",
+        "name": "Earth",
+        "description": "Stone",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "ess-water",
+        "name": "Water",
+        "description": "Flow",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": "cmp-ash-salt",
+        "sourceItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "associatedSystemItemId": "cmp-ash-salt"
+      },
+      {
+        "id": "ess-air",
+        "name": "Air",
+        "description": "Breath",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": false,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      }
+    ],
+    "recipeItemDefinitions": [],
+    "membershipResolvesByRecipeIds": false,
+    "modifiers": [
+      {
+        "id": "mod-medicine",
+        "label": "Medicine",
+        "expression": "@abilities.med.mod",
+        "isRollExpression": false
+      }
+    ],
+    "craftingCheck": {
+      "enabled": true,
+      "mode": "passFail",
+      "consumption": {
+        "consumeIngredientsOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "salvageResolutionMode": "simple",
+    "toolBreakage": {
+      "authority": "toolSpecific"
+    },
+    "salvageCraftingCheck": {
+      "enabled": false,
+      "consumption": {
+        "consumeComponentOnFail": true,
+        "breakToolsOnFail": false
+      },
+      "failureResultPolicy": "perRecord",
+      "simple": {
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "tiers": [],
+        "macroUuid": null,
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "outcomes": [
+        "fail",
+        "pass"
+      ],
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "gatheringCraftingCheck": {
+      "enabled": false,
+      "failureResultPolicy": "perRecord",
+      "progressive": {
+        "awardMode": "equal",
+        "rollFormula": "",
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "routed": {
+        "type": "relative",
+        "rollFormula": "",
+        "dc": 15,
+        "thresholdMode": "meet",
+        "dcMode": "static",
+        "macroUuid": null,
+        "tiers": [],
+        "relativeOutcomes": [],
+        "fixedOutcomes": [],
+        "checkBreakage": {
+          "triggers": []
+        }
+      },
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "mod-medicine"
+      ]
+    },
+    "alchemy": null,
+    "teaserConfig": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "componentCategories": [
+      "ore",
+      "ingot",
+      "reagent"
+    ],
+    "categoryIcons": {},
+    "componentCategoryIcons": {
+      "ore": "fas fa-gem",
+      "ingot": "fas fa-bars",
+      "reagent": "fas fa-flask"
+    },
+    "categories": [],
+    "tags": [
+      "metal",
+      "alchemical",
+      "refined"
+    ],
+    "essences": [
+      "ess-fire",
+      "ess-earth",
+      "ess-water",
+      "ess-air"
+    ],
+    "enableTags": true,
+    "enableEssences": true,
+    "enableCategories": true,
+    "enableMultiStepRecipes": true,
+    "components": [
+      {
+        "id": "cmp-ash-salt",
+        "name": "Ash Salt",
+        "img": "icons/commodities/materials/bowl-powder-grey.webp",
+        "description": "A grey crystalline residue.",
+        "originItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ashsalt00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [
+          "alchemical"
+        ],
+        "essences": {
+          "ess-fire": 2,
+          "ess-earth": 1
+        },
+        "difficulty": 2,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ore",
+        "name": "Iron Ore",
+        "img": "icons/commodities/metal/ore-chunk-iron.webp",
+        "description": "Raw ore.",
+        "originItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironore000000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ore",
+        "tags": [
+          "metal"
+        ],
+        "essences": {
+          "ess-earth": 3
+        },
+        "difficulty": 1,
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-iron-ingot",
+        "name": "Iron Ingot",
+        "img": "icons/commodities/metal/ingot-stack-steel.webp",
+        "description": "A smelted bar.",
+        "originItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.ironingot0000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "ingot",
+        "tags": [
+          "metal",
+          "refined"
+        ],
+        "essences": {
+          "ess-earth": 2,
+          "ess-fire": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-spring-water",
+        "name": "Spring Water",
+        "img": "icons/consumables/potions/potion-flask-corked-blue.webp",
+        "description": "Clean water.",
+        "originItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "registeredItemUuid": "Compendium.world.materials.Item.springwater00001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-water": 4
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-charcoal",
+        "name": "Charcoal",
+        "img": "icons/commodities/materials/lump-coal-black.webp",
+        "description": "Burnt wood.",
+        "originItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "registeredItemUuid": "Compendium.world.materials.Item.charcoal00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "reagent",
+        "tags": [],
+        "essences": {
+          "ess-fire": 3
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      },
+      {
+        "id": "cmp-whetstone",
+        "name": "Whetstone",
+        "img": "icons/tools/smithing/whetstone-block-grey.webp",
+        "description": "A honing block.",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "tier": null,
+        "category": "general",
+        "tags": [],
+        "essences": {
+          "ess-earth": 1
+        },
+        "salvage": {
+          "enabled": false,
+          "allowPlayerResultReorder": true,
+          "ingredientQuantity": 1,
+          "dcOverride": null,
+          "toolIds": [],
+          "resultGroups": []
+        }
+      }
+    ],
+    "tools": [
+      {
+        "id": "tool-hammer",
+        "enabled": true,
+        "componentId": null,
+        "label": "Smith's Hammer",
+        "name": "Smith's Hammer",
+        "img": "icons/tools/smithing/hammer-sledge-steel-grey.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.hammer0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "breakageChance",
+          "breakageChance": 10
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-crucible",
+        "enabled": true,
+        "componentId": "cmp-whetstone",
+        "label": "Crucible",
+        "name": "Crucible",
+        "img": "icons/tools/smithing/crucible-steel-grey.webp",
+        "description": "A honing block.",
+        "registeredItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "originItemUuid": "Compendium.world.tools.Item.whetstone00000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": true,
+          "ids": [
+            "prq-smiths-tools"
+          ],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": 5
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      },
+      {
+        "id": "tool-mortar",
+        "enabled": false,
+        "componentId": null,
+        "label": "Mortar and Pestle",
+        "name": "Mortar and Pestle",
+        "img": "icons/tools/laboratory/mortar-pestle-yellow.webp",
+        "description": "",
+        "registeredItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "originItemUuid": "Compendium.world.tools.Item.mortar0000000001",
+        "aliasItemUuids": [],
+        "requirement": null,
+        "prerequisites": {
+          "enabled": false,
+          "ids": [],
+          "gateMode": "usability"
+        },
+        "bonus": {
+          "enabled": false,
+          "expression": ""
+        },
+        "breakage": {
+          "mode": "limitedUses",
+          "maxUses": null
+        },
+        "checkBreakable": true,
+        "onBreak": {
+          "mode": "destroy"
+        },
+        "repairRequirements": []
+      }
+    ],
+    "characterPrerequisites": [
+      {
+        "id": "prq-smiths-tools",
+        "name": "Smith's Tools",
+        "icon": "fa-solid fa-user-shield",
+        "path": "tools.smith.value",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "gatheringRealmSettings": {
+      "enabled": false
+    }
+  }
+}

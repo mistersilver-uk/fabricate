@@ -23,6 +23,7 @@
  * real Foundry edges in {@link InteractableManager#_resolutionDeps}.
  */
 
+import { resolvedToolsFor } from '../systems/scopedEntityReads.js';
 import { resolveToolForItem } from '../utils/sourceUuid.js';
 
 /**
@@ -96,7 +97,7 @@ function orderByPreferredSystem(systems, preferredSystemId) {
  * @returns {string|null}
  */
 function firstToolMatch(item, system) {
-  const tools = Array.isArray(system?.tools) ? system.tools : [];
+  const tools = resolvedToolsFor(system);
   const resolved = resolveToolForItem(item, tools, system?.id);
   if (!resolved?.id) return null;
   const toolId = String(resolved.id);

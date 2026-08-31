@@ -17,6 +17,15 @@
  * returns the corpus or throws, so a set derived here is complete or the boot failed
  * (issue 1261) — which is what {@link WHOLE_CORPUS_ID_BASIS} declares to the builder.
  *
+ * ## Why the basis is EXTENDED here rather than in the shared constant
+ *
+ * {@link WHOLE_CORPUS_ID_BASIS} answers "did we read the WHOLE corpus", and it is shared with
+ * the mutation-time cleanup door, which has no `1.30.0` re-key window to reason about. The
+ * `componentIdentityRemap` kind is computed HERE, per boot, from the persisted re-key map, and
+ * is spread OVER that constant — so the shared literal keeps meaning exactly what it says and
+ * the currency question is answered only where it is asked. See `worldScopeRekeyPending.js`
+ * for why completeness and currency are different questions and why this one fails closed.
+ *
  * ## Why it warns
  *
  * `runStartupMaintenance` returns only FAILED labels and the caller discards the return, so
@@ -29,6 +38,7 @@
 import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
 
 import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
+import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 /**
  * Compose the startup housekeeping pass list for this boot.
@@ -107,10 +117,16 @@ export function composeStartupPassList({
     ],
   ];
 
+  const basis = {
+    ...WHOLE_CORPUS_ID_BASIS,
+    // FALSE while the `1.30.0` re-key map is still pending: the ids are complete but they have
+    // just MOVED, and the pass that repairs every actor-side reference to them has not run.
+    componentIdentityRemap: !hasPendingWorldScopeRekey(getSetting),
+  };
   const omissions = [];
   const passes = buildStartupPassList({
     candidates,
-    basis: WHOLE_CORPUS_ID_BASIS,
+    basis,
     onOmit: (omission) => {
       omissions.push(omission);
     },
@@ -118,10 +134,11 @@ export function composeStartupPassList({
 
   if (omissions.length > 0) {
     warn(
-      'Fabricate | Startup cleanup skipped: the ids it would prune against are not known to be complete. ' +
+      'Fabricate | Startup cleanup skipped: the ids it would prune against are not known to be complete, ' +
+        'or have just been re-keyed by a migration whose identity repair has not run yet. ' +
         'No data was removed. Omitted: ' +
         omissions.map((omission) => omission.label).join(', '),
-      { omitted: omissions, basis: WHOLE_CORPUS_ID_BASIS }
+      { omitted: omissions, basis }
     );
   }
   return passes;

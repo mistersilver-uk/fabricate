@@ -33,6 +33,7 @@
   import { selectableEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     group = {},
@@ -257,18 +258,16 @@
          system enables essences, and the `data-recipe-add` marker family is preserved on
          each button. -->
     <div class="manager-recipe-requirement-adds">
-      <button
-        type="button"
-        class="manager-button is-dashed"
+      <ManagerButton
+        role="dashed"
         data-recipe-add="alternative-component"
         onclick={() => appendAlternative('component')}
       >
         <i class="fas fa-cube" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
-      </button>
-      <button
-        type="button"
-        class="manager-button is-dashed"
+      </ManagerButton>
+      <ManagerButton
+        role="dashed"
         data-recipe-add="alternative-tag"
         onclick={() => appendAlternative('tags')}
       >
@@ -276,28 +275,26 @@
         <span
           >{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span
         >
-      </button>
+      </ManagerButton>
       {#if canAddCost}
-        <button
-          type="button"
-          class="manager-button is-dashed"
+        <ManagerButton
+          role="dashed"
           data-recipe-add="alternative-cost"
           onclick={() => appendAlternative('currency')}
         >
           <i class="fa-solid fa-coins" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
-        </button>
+        </ManagerButton>
       {/if}
       {#if hasEssences}
-        <button
-          type="button"
-          class="manager-button is-dashed"
+        <ManagerButton
+          role="dashed"
           data-recipe-add="alternative-essence"
           onclick={() => appendAlternative('essence')}
         >
           <i class="fas fa-flask-vial" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')}</span>
-        </button>
+        </ManagerButton>
       {/if}
     </div>
   {:else}

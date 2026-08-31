@@ -33,6 +33,7 @@
  */
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/iconPickerPopover.js',
@@ -56,6 +57,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+  'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
@@ -82,6 +84,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkRoll.js',
+  'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
   // The progressive PREVIEW SANDBOX derivation (issue 1097). BOTH halves of the checks tree
   // import it — `ChecksView` to read and write the order, `ChecksRightMenu` to keep the
@@ -93,6 +96,25 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // evaluator reads like over-filling; it is not, and the check is mechanical — drop any
   // one of them and the checks suites HANG rather than fail.
   'src/toolBreakageRuntime.js',
+  // Issue 1363 (epic 1357, PR 3): `toolBreakageRuntime.js` now resolves the EFFECTIVE
+  // tool-breakage authority through the world scope rather than re-defaulting locally, so its
+  // closure gains the resolver and the two pure scope modules underneath it. Mechanical, like
+  // every entry in this block: drop one and the suite HANGS rather than fails.
+  'src/systems/toolBreakageAuthority.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedDefinitionStore.js',
+  // Issue 1370 (epic 1357, PR 8a): `toolBreakageRuntime.js` now reads the system's TOOL LIBRARY
+  // through the shared read seam as well, so the closure gains the seam and the two scope
+  // modules its sibling exports need. `scopedDefinitionStore.js` gained the migration module's
+  // lifted-identity field list, which is the one definition of that list in the tree. Same
+  // mechanical rule as the rest of this block: drop one and the suite HANGS rather than fails.
+  'src/systems/scopedEntityReads.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/migration/worldScopeEntityGrouping.js',
+  'src/utils/definitionIndex.js',
+  'src/utils/sourceReferenceUnion.js',
   'src/config/flags.js',
   'src/config/stackQuantityPathPresets.js',
   'src/models/Ingredient.js',

@@ -152,17 +152,21 @@ GatheringEnvironment = {
 ```
 
 The environment carries no persisted inline `tasks` field: the store normalizer emits none, and a legacy inline `tasks` list on an imported/older record is dropped on the next save without conversion.
-Runtime tasks are composed exclusively from the system task library (via `enabledTaskIds` / `forcedTaskIds`).
+Runtime tasks are composed exclusively from the system task library (via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`).
 
 ### Requirements
 
 1. `craftingSystemId` must reference an existing `CraftingSystem`.
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
 3. A gathering environment may be **saved** without any task source so a GM can persist a partially-authored place and return to it later.
-It may only be **enabled** when it has at least one composed task source (a matching library task in automatic mode, or an `enabledTaskIds` / `forcedTaskIds` entry in manual mode), in either `targeted` or `blind` selection mode.
+It may only be **enabled** when it has at least one composed task source (in automatic mode, a library task that matches or is listed in `forcedTaskIds`, and is not listed in `disabledTaskIds`; in manual mode, an `enabledTaskIds` entry), in either `targeted` or `blind` selection mode.
 A disabled environment with no task source persists fine; enabling it (via the editor toggle or a save with `enabled: true`) is rejected until a task source exists.
 This gates enable, not save.
-4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` / `forcedTaskIds`); there is no inline task definition.
+3a. **Closed by #1315** (recorded here because #1321 deferred it to that issue): the enable gate no longer carries a mode-blind guard.
+It asks each mode its own question — manual for a non-empty `enabledTaskIds`, which is exactly what manual composes, and automatic through `environmentComposesRecord`, which is exactly what automatic composes.
+The two guards it retired both failed permissively: one accepted a non-empty `enabledTaskIds` in automatic mode, which ignores that list, and the other accepted a non-empty `forcedTaskIds` in manual mode, which ignores that list as of #1315.
+Closing them means the gate now refuses some environments it used to accept — an automatic environment whose only matching task is excluded no longer reports a task source — which is the point: it composes nothing.
+4. If `selectionMode === "blind"`, the environment composes one or more hidden tasks from the system task library (`enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`); there is no inline task definition.
 Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.
 When absent, surfaces fall back to the shared default `'icons/environment/wilderness/terrain-forest-gray.webp'`.
@@ -182,15 +186,20 @@ Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs 
 They are global gathering conditions used as **runtime gates** — a Gathering Task or event whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and events are skipped during d100 event selection.
 Matching itself is decided by biome (and, for events, danger) only — geography (`GatheringRealm`) is not a composition axis.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledEventIds`, and `disabledEventIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
-12a. `compositionMode` controls reusable task/event composition.
-In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledEventIds`; stale `enabled*Ids` and `forced*Ids` are ignored.
-In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledEventIds` are ignored.
-12b. `forcedTaskIds` / `forcedEventIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`).
+12a. `compositionMode` controls reusable task/event composition, and each of the three id lists belongs to exactly one mode.
+In **automatic** mode, the environment composes every library-enabled record matching its biome (and, for events, danger) context, minus the records listed in `disabledTaskIds` / `disabledEventIds`, plus the records listed in `forcedTaskIds` / `forcedEventIds`; stale `enabled*Ids` entries are ignored.
+In **manual** mode, the environment composes exactly the library-enabled records listed in `enabled*Ids`, with no match filter at all, so a listed record composes whether or not it still matches; stale `disabled*Ids` and `forced*Ids` entries are ignored.
+The library-enabled gate precedes **both** modes: a record with `enabled === false` composes in no environment in either mode, so "exactly `enabled*Ids`, and nothing else" over-claims — it is exactly the library-enabled members of `enabled*Ids`.
+`environmentComposesRecord` in `src/systems/gatheringComposition.js` is the one implementation of this rule, and every layer that answers "does this environment compose this record" reads it from there.
+12b. `forcedTaskIds` / `forcedEventIds` are GM "force-add" overrides of **automatic** mode's match filter, and are honored in that mode alone: a record listed there is composed into the environment even when it does not match the environment's biome/danger context (composition state `forceIncluded`).
+Manual mode has no match filter and therefore nothing for a force to override, so it ignores the lists entirely and offers no force-add control.
+Force add and exclude are automatic mode's two overrides of its own filter and can name the same record; **exclude wins**, so a record listed in both `forced*Ids` and `disabled*Ids` does not compose.
+A force cannot revive a library-disabled record either, because the library-enabled gate in §12a precedes both overrides.
 A forced record remains force-included until removed even if later environment edits make it match normally.
 Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime.
-Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode.
-Removing a forced task or event in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
-12c. `taskOrder` and `eventOrder` provide deterministic ordering for composed reusable records. `eventOrder` applies to every composed/included event, including manual `forcedEventIds`.
+Removing a forced task or event in automatic mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
+The `1.29.0` migration folded every **manual** environment's force lists into its `enabled*Ids` and then cleared `forced*Ids` on **every** environment, manual and automatic alike, so an upgraded world's force lists are empty by construction and a non-empty one is a force add the GM made in automatic mode after the upgrade.
+12c. `taskOrder` and `eventOrder` provide deterministic ordering for composed reusable records. `eventOrder` applies to every composed/included event, including automatic mode's `forcedEventIds`.
 Records absent from the order list retain library order after ordered records.
 12c.1.
 GM authoring UI exposes event reorder controls only when the selected system's event selection mode is `highestRankedDrop`.
@@ -199,8 +208,9 @@ Other event selection modes do not expose reorder handles or move actions.
 12d.
 GM authoring UI for manual task and event composition shows only two record groups: **Included in this environment** and **Available to add**.
 Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section.
+Matching and non-matching rows alike present a plain **Add**, because manual mode composes what the GM picks without filtering it, and library-disabled rows present an "enable in library first" note instead of an action.
 Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded.
-Automatic composition retains its Excluded and Non-matching sections.
+Automatic composition retains its Excluded and Non-matching sections, and its Non-matching section is the only place a **Force add** is offered.
 12e. `taskDropRateAdjustments` and `eventDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and events.
 Task adjustments are keyed first by task id and then by drop-row id.
 Event adjustments are keyed by event id.
@@ -665,15 +675,17 @@ There is **no** gathering-scoped tools store; the 0.7.0 migration (`migrateTools
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
 3. Crafting systems without a `tools` array normalize to `tools: []` on load.
 4. The Manager authors tools into the system-owned library; the same library backs the recipe/step/ingredient-set/salvage tool gate, the canvas interactable browser, and gathering.
-5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which is sourced the same way, from `system.modifiers` (issue 1117), with a live registry lookup by id as the fallback for a caller that holds no system.
+5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which since issue 1308 is sourced from the WORLD modifier library through `resolveModifierLibrary`, unioned with any surviving legacy in-system copy.
+The live registry lookup by crafting-system id that used to serve a caller holding no system is RETIRED: it existed only because the library was per system, and there is nothing system-specific left to look up.
 Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 6. The library is per crafting system.
 Tools are not shared across crafting systems.
 
 ## One Library, Two Arithmetics
 
-A system authors modifiers in exactly ONE place (issue 1117): `CraftingSystem.modifiers`, edited in System settings › Modifiers.
-Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; the shapes are now one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
+A WORLD authors modifiers in exactly ONE place (issues 1117 and 1308): the `characterLibraries` world setting's `modifiers[]`, edited in System settings › Modifiers and relocating to a World route in the follow-up change.
+Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; issue 1117 made the shapes one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
+Issue 1308 then made the LIBRARY one per world rather than one per crafting system, for the same reason at the next scope up: an expression evaluated against the acting character is not a fact about a crafting system, so three systems meant three copies of Medicine that could drift apart.
 
 **What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
 A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
@@ -697,11 +709,11 @@ The capability activates when 683 lands; no separate follow-up issue is opened.
 
 ### Purpose
 
-Represent a d100 drop row's or event's REFERENCE into the system's one modifier library, with its own operator and bounds.
+Represent a d100 drop row's or event's REFERENCE into the world's one modifier library, with its own operator and bounds.
 
 ### Properties
 
-The library entry itself is `CraftingSystem.modifiers[]` (§data-models); this section owns only the reference shape and the arithmetic it drives.
+The library entry itself is the world `characterLibraries.modifiers[]` (§data-models → ModifierLibrary); this section owns only the reference shape and the arithmetic it drives.
 
 Character modifier row references use this shape:
 
@@ -718,9 +730,9 @@ GatheringCharacterModifierReference = {
 
 ### Requirements
 
-1. References resolve against the ONE system-level library `CraftingSystem.modifiers` (issue 1117).
-The gathering config carries no library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired, the `1.23.0` migration merges it up, and the gathering config normalizer — an allowlist rebuild — no longer emits the key.
-2. A new system's library is empty.
+1. References resolve against the ONE WORLD library, `characterLibraries.modifiers` (issues 1117 and 1308), read through `resolveModifierLibrary` — which unions the world library with any surviving legacy in-system copy, so an unmigrated client still resolves every `modifierId`.
+Neither the gathering config nor the crafting system carries a library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired by the `1.23.0` migration and `CraftingSystem.modifiers` by the `1.28.0` migration, and both normalizers — allowlist rebuilds — no longer emit their key.
+2. A new WORLD's library is empty, and creating a crafting system does not create one.
 Presets are never seeded automatically.
 3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
 It seeds into the one system library, from the one authoring surface.
@@ -786,12 +798,18 @@ A composed event whose required `weather` or `timeOfDay` values are not satisfie
 7. Events may reference per-system character modifiers. `eventModifier` adjusts the d100 roll; `characterModifiers` adjust the threshold.
 The two surfaces are evaluated independently.
 8. Event output must respect blind task and GM-only redaction rules.
+9. **A Gathering Event is NOT a component Complication, and the two must never be merged.**
+   They are Fabricate's two GM-authored consequence records and they sit adjacent, so the difference is stated rather than left to be inferred.
+   An **Event** is ENVIRONMENT-scoped, composed into an environment by TAG matching, selected by the d100 roll against its own `dropRate`, and exists only in gathering.
+   A **Complication** is COMPONENT-scoped, attached directly to one component with no composition step, selected by the stage outcome a progressive award produced for that component, and fires across all three activities — progressive crafting, progressive salvage and progressive gathering.
+   An Event answers "what else happened while you were out there"; a Complication answers "what went wrong with THIS thing".
+   Neither is a special case of the other, and a system may author both.
 
 ## EnvironmentTask
 
 ### Purpose
 
-Represent one attemptable gathering activity — a **library-task** record (`GatheringTask`) authored once in the system task library and composed into environments at runtime (via `enabledTaskIds` / `forcedTaskIds`), not an inline-within-environment record.
+Represent one attemptable gathering activity — a **library-task** record (`GatheringTask`) authored once in the system task library and composed into environments at runtime (via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`), not an inline-within-environment record.
 
 ### Properties
 
@@ -851,7 +869,7 @@ Older aliases remain accepted for compatibility but are not the preferred author
 9. Required-but-reusable, breakable prerequisites for a gathering task are expressed solely through **Tools** referenced by `task.toolIds` (resolved against the **system-owned** Tools library `system.tools`, composed onto the environment as `__libraryTools` by `GatheringRichStateService.composeEnvironment`).
 There is no gathering-side catalyst concept and no gathering-scoped tools store.
 10. `defaultEnvironmentId` is a **new optional field** (`string | null`) and a **placement hint only**.
-Tasks previously carried no environment reference (they are composed into environments many-to-many via `enabledTaskIds` / `forcedTaskIds`).
+Tasks previously carried no environment reference (they are composed into environments many-to-many via `enabledTaskIds` in manual mode, or the automatic-mode biome match plus `forcedTaskIds`).
 It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._normalizeGatheringTask` and is preserved by `GatheringEnvironmentStore`.
 It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing.
 It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
@@ -1355,6 +1373,8 @@ A candidate whose pool is fully reserved is excluded from the blind candidate dr
 7. Because only a GM may write world-scoped state, and because the draw must not run on a client the acting player controls, a player's blind start that would create a waiting run is routed to the active GM.
 The GM re-runs the whole attempt with the requesting user as the viewer — re-evaluating actor authorization, scene, visibility, tool, stamina, and reservation-aware node availability against that user — then resolves the task, takes the reservation, and writes both records.
 The requesting user is the server-attested socket sender, never a value carried in the request.
+Every one of those gates must be answered about the **requesting user's own document permissions**, never about the applying client's ambient identity: a GM holds owner permission on every document in the world, so a gate that consults the applying client is satisfied for a requester who owns nothing and authorizes nothing at all.
+The run the relay creates is owned by the **requesting user** rather than by the GM that applied it, because a matured run resolves its viewer from the run's owning user — and a GM viewer would write the drawn task's identity into the player-readable actor record this whole rule exists to keep it out of.
 8. Where no GM is connected the start is reported as blocked rather than silently dropped.
 9. A GM's run listing shows the real task behind an in-flight blind run, explicitly marked as a secret preview the acting player cannot see.
 Player-facing listings continue to show the generic blind label and no task identity.
@@ -1757,6 +1777,25 @@ Diagnostics from the check evaluator (missing formula or a malformed numeric res
 5. Every referenced `Component` must have `difficulty >= 1`.
 6. If a check resolves to `failure`, progressive awarding is skipped.
 
+### Component Complications
+
+A progressive gathering attempt fires the component complications its committed award earned, on the contract `resolution-modes/spec.md` § Component Complications defines for all three activities.
+
+1. The firing point is inside the terminal side-effect commit, WITHIN the guard that decides whether the outcome awards results at all, and immediately AFTER the award.
+   An outcome that guard refuses awarded nothing, so its stages never happened and it fires nothing.
+   The chat card is posted by the caller, after this.
+2. Gathering has no player reorder step, so the AUTHORED result order is fire order — the same rule § Award Modes states for the award itself.
+3. **An attempt aborted by the `fail` invalid-cost policy fires NOTHING.**
+   Progressive gathering is the one activity that treats an invalid progressive difficulty as a hard misconfiguration rather than a skip, and it aborts before the award, so the firing point is never reached.
+   That is the same rule the crafting misconfiguration gate states, and for the same reason: a GM authoring gap is not a narrative outcome.
+4. **The macro contract is CROSS-ACTIVITY and is defined in `recipes-and-steps/spec.md` § Complication Macros**, which this domain references rather than restates.
+   Everything there applies unchanged to a gathering-fired complication: GM-authoritative execution, the addressing-only relay payload, the attested-sender and actor re-authorization rules, the drop when no GM is connected, and the tolerate-running-twice rule.
+5. **This path ships DORMANT.**
+   Progressive gathering is unreachable from any GM-selectable configuration today: the runtime task conversion pins the d100 resolution mode and the economy editor renders both formula-rolled modes disabled, pending issue 683.
+   The wiring lands anyway, on the same precedent as the other dormant gathering seams, so that issue 683 flips one switch rather than reopening this design.
+   Its tests MUST drive the progressive outcome resolution and the terminal commit DIRECTLY: an end-to-end gathering test of this passes VACUOUSLY, asserting that nothing fires on a d100 attempt, which is true whether or not any of it works.
+   No player-facing progressive gathering surface is built, because none is reachable.
+
 ## Execution Lifecycle
 
 Gathering is a single-attempt, single-step workflow.
@@ -1807,6 +1846,9 @@ There is no multi-step gathering state in this phase.
 
 ### Award Item Stacking
 
+These rules govern the **gathering** award, and only it.
+The companion-facing `awardComponents` member stacks by rules of its own, stated in `companion-api/spec.md`; two capabilities one word apart must cross-reference each other, or the wrong rule gets applied to one of them.
+
 A fresh award may stack onto an existing owned item carrying a value at the configured stack-quantity path, only through the list-aware Component Item Matching resolver named in the data-models spec, supplied the awarding system's resolved component set and system id.
 The stack-quantity path is tested for presence, not numericality: a stored non-numeric value still counts as stackable, so a system that stores the count as a string does not silently stop stacking.
 An award must never be folded into an owned item that resolves to a different component than the award source.
@@ -1819,7 +1861,7 @@ Timed backend completion/resolution, timed result creation, timed tool side effe
 Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation.
 The raw engine instance is not public.
 The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible.
-Creating an environment persists a disabled draft shell; task content is composed from the system task library — the environments editor authors the environment's library-task composition (`enabledTaskIds` / `forcedTaskIds`) rather than any inline task list, and inline Environment Tasks no longer exist (task authoring lives in the system Task Library editor).
+Creating an environment persists a disabled draft shell; task content is composed from the system task library — the environments editor authors the environment's library-task composition (`enabledTaskIds` in manual mode, `forcedTaskIds` in automatic mode) rather than any inline task list, and inline Environment Tasks no longer exist (task authoring lives in the system Task Library editor).
 Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs.
 The editor's per-environment overrides (drop-rate adjustments, event ordering, blind-selection weights) are wired from the root into the tab, and the tab delegates those mutations to the admin store; base task fields, result groups, tool references, visibility gates, progressive/check config, time requirements, and failure outcomes are authored on the library task in the Task Library editor, not inline on the environment.
 Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups.
@@ -1977,7 +2019,7 @@ Actor.flags.fabricate.gatheringRuns = {
 GatheringRun = {
   id: string,
   actorUuid: string,
-  userId: string,
+  userId: string, // the user who REQUESTED the run, never the client that applied it
   craftingSystemId: string,
   environmentId: string,
   taskId: string,
@@ -2069,7 +2111,7 @@ If a linked scene is deleted:
 ## Testing Requirements
 
 - Unit tests for environment validation:
-  - an environment (`targeted` or `blind`) requires a composed task source to be enabled, but may be saved without one while disabled; automatic library composition can satisfy the source via matching Gathering Tasks
+  - an environment (`targeted` or `blind`) requires a composed task source to be enabled, but may be saved without one while disabled; automatic library composition can satisfy the source via matching Gathering Tasks not listed in `disabledTaskIds`
   - `blind` allows multiple tasks and validates blind-selection/redaction configuration
 - Unit tests for default tag seeding and preservation of GM-customized tags
 - Unit tests for task/event composition matching by biome and danger (geography — `GatheringRealm` — is not a composition axis), plus runtime condition gating by global weather and global time of day

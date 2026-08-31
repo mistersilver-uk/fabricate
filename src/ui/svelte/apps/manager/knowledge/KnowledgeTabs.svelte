@@ -81,6 +81,7 @@
       aria-selected={activeTab === tab[0]}
       aria-controls={`knowledge-panel-${tab[0]}`}
       tabindex={activeTab === tab[0] ? 0 : -1}
+      data-keyboard-focus="true"
       data-knowledge-tab={tab[0]}
       onclick={() => onChange(tab[0])}
       onkeydown={(event) => handleKeydown(event, index)}

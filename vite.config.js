@@ -46,6 +46,17 @@ export default defineConfig(({ command }) => {
     return {
       plugins,
       server: {
+        // PIN THE IPv4 ADDRESS. Vite's default host ('localhost') binds whichever single
+        // address the OS resolves that name to — on Windows that is `[::1]`, leaving the IPv4
+        // `127.0.0.1:5173` unclaimed. `strictPort` then cannot do its job: another process (a
+        // stray test that starts its own dev server on import, say) takes the half Vite never
+        // asked for, no conflict is ever detected, and the browser — which resolves
+        // `localhost` to IPv4 first — is served that other app instead of the Foundry proxy
+        // below. The dev server looks broken while it is in fact healthy one stack over.
+        // Binding IPv4 explicitly claims the address browsers actually reach for, and makes a
+        // squatted port fail loudly at startup. Same choice, same reason, as
+        // `tests/view-lab/vite.config.js`.
+        host: '127.0.0.1',
         port: 5173,
         strictPort: true,
         hmr: { port: 5174 },
@@ -53,6 +64,23 @@ export default defineConfig(({ command }) => {
         // Vite has to be allowed to read outside this repo. Scoped to that one directory
         // rather than opened up, and omitted entirely when premium is not checked out.
         fs: { allow: ['.', ...(premiumSourceRoot() ? [premiumSourceRoot()] : [])] },
+        // WATCH ONLY THE SOURCE. Everything below is gitignored, read-only, and enormous, and
+        // chokidar costs one inotify handle PER FILE against a budget of 65,536 for the whole
+        // user session on a stock Linux box. `.worktrees/` alone holds a full checkout per agent
+        // lane — over 130,000 files here — so the dev server cannot start at all while any lane
+        // exists: it dies with `ENOSPC ... watch '<some>.hbs'` naming a file in another
+        // worktree's system cache, which reads as a Vite bug rather than a watch-budget one.
+        // None of these trees is ever edited, so watching them buys nothing at any price.
+        watch: {
+          ignored: [
+            '**/.worktrees/**',
+            '**/.foundry-e2e/**',
+            '**/.foundry-chrome/**',
+            '**/ui-screenshot-artifact/**',
+            '**/test-results/**',
+            '**/dist/**',
+          ],
+        },
         proxy: {
           '/socket.io': { target: 'http://localhost:30000', ws: true },
         },

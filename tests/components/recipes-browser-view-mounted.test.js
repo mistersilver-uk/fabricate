@@ -23,6 +23,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 const RECIPE_RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
   'src/utils/recipeBrowserModel.js',
@@ -52,7 +53,12 @@ const RECIPE_PRIMITIVES = [
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
-  'src/ui/svelte/components/CollapsibleGroupHeader.svelte'
+  'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+  // The manager's ONE labelled push-button (issue 1118). Hoisted here rather than named in
+  // one harness for the reason the chip above gives: the primitive allowlist guard reads the
+  // WHOLE file, so naming it in only one of two harnesses reads as covered while the other
+  // one HANGS.
+  'src/ui/svelte/components/ManagerButton.svelte'
 ];
 
 const browser = createMountedComponentHarness({

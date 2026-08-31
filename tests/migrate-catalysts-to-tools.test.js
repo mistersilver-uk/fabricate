@@ -338,6 +338,30 @@ test('generated tool ids are stable across runs', () => {
   assert.equal(mk().systems[0].tools[0].id, mk().systems[0].tools[0].id);
 });
 
+// The assertion above compares two calls WITHIN one run, so it holds no matter what
+// `generateToolId` hashes — including after a change to the hash input that silently
+// renumbers every tool in every already-migrated world. `system.tools[].id` is PERSISTED
+// data and the migration's documented idempotency is a promise about a world that has
+// already run it: a re-run must resolve the same dedupe key to the same id, or it appends
+// duplicate library tools and orphans every `toolIds` reference written by the first pass.
+//
+// The one input most likely to be "tidied" by a later reader is the U+0000 separator in
+// `generateToolId`'s FNV-1a input (`${systemId}\0${dedupeKey}`) — it is invisible in a
+// diff, and until issue 1118 it was a RAW NUL byte, which made GNU grep classify the file
+// as binary and skip it in any search lacking `-a`. So the id is pinned to a literal here.
+// If this value moves, the change is a data migration, not a refactor.
+test('generateToolId is pinned to a golden value (persisted ids must never drift)', () => {
+  const out = migrateCatalystsToTools(
+    [recipe('r1', 'sys-1', { catalysts: [{ componentId: 'forge', degradesOnUse: false }] })],
+    [system('sys-1')]
+  );
+  assert.equal(
+    out.systems[0].tools[0].id,
+    'tool-cat-37a22b2c',
+    'the id derivation changed: separator, hash, prefix or dedupe-key shape'
+  );
+});
+
 test('migratedCount reflects the number of catalysts converted', () => {
   const systems = [system('sys-1')];
   const recipes = [recipe('r1', 'sys-1', {
@@ -385,7 +409,7 @@ test('0.6.0 runs from 0.5.0: catalysts become tools + toolIds and version advanc
   assert.equal(systems[0].tools.length, 1);
   // The full runner also applies the later 0.7.0, 0.8.0, and 0.9.0 migrations, so the
   // persisted version advances to the highest migration version.
-  assert.equal(settings.store.get('migrationVersion'), '1.27.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.30.0');
   assert.equal(summary.migratedCatalystCount, 1);
 
   // The transient count field is never persisted onto any setting payload.
@@ -419,7 +443,7 @@ test('version gate: 0.6.0 conversion is NOT re-applied when migrationVersion is 
   assert.ok(setKeys.includes('recipes'), 'recipes re-persisted by the 1.7.0 catalysts strip');
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted (no conversion, no rename)');
   assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig not persisted (no task catalysts here)');
-  assert.equal(settings.store.get('migrationVersion'), '1.27.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.30.0');
   assert.equal(summary.migratedCatalystCount, 0);
 });
 

@@ -455,11 +455,43 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${hook} must render in its section's trailing slot, not as a full-width button below it`
       );
     }
-    assert.equal(
-      /class="manager-button"\s+data-essence-bulk-/.test(bulkPanelSource),
-      false,
-      'neither reset is a full-width manager button any more'
-    );
+    // This used to pin the ABSENCE of `class="manager-button" data-essence-bulk-` — the
+    // defect's exact spelling. That string is now unproducible in this repository, for two
+    // independent reasons: both resets are `Chip`s, and the primitive that renders a manager
+    // button emits its classes from a `.join(' ')` and never writes that literal in markup at
+    // all (issue 1118). A guard that CANNOT fail is worse than one that does: it reports green
+    // for a reason unrelated to the thing it was written to watch.
+    //
+    // So it is retargeted onto what "full width" means now. Issue 1118 took `width: 100%` off
+    // the `dashed` role and gave the primitive an `is-full-width` class emitted by a
+    // `fullWidth` prop, because full width is a statement about the CONTAINER rather than
+    // about the verb. That class, and that prop, are the two ways a reset could go back to
+    // being the stacked full-width button this test exists to keep it from being — and the
+    // check is bound to each reset's own opening tag, so a `fullWidth` on some other control
+    // in the panel cannot satisfy or break it.
+    for (const hook of ['data-essence-bulk-icon-reset', 'data-essence-bulk-colour-reset']) {
+      const start = bulkPanelSource.lastIndexOf('<', bulkPanelSource.indexOf(hook));
+      // The tag ends at the first `>` that is not the tail of an `=>`: every one of these
+      // controls carries an inline `onclick={() => …}`, so a plain scan to the next `>` would
+      // stop inside the handler and read half the attributes.
+      let end = start;
+      do {
+        end = bulkPanelSource.indexOf('>', end + 1);
+      } while (end > 0 && bulkPanelSource[end - 1] === '=');
+      const tag = bulkPanelSource.slice(start, end + 1);
+      assert.ok(tag.includes(hook), `${hook} should sit in one opening tag`);
+      assert.equal(
+        /\bis-full-width\b|\bfullWidth\b/.test(tag),
+        false,
+        `${hook} must not be full width — it is a trailing chip on the label row, not a ` +
+          'second stacked button under the control'
+      );
+      assert.equal(
+        /\bmanager-button\b/.test(tag),
+        false,
+        `${hook} must not be a manager button at all; it is a Chip`
+      );
+    }
   });
 
   it('composes the editor icon control as a picker row under a tile whose own reset overlays it', () => {

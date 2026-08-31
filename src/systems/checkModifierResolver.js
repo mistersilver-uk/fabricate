@@ -102,6 +102,7 @@
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { reduceRollExpression } from '../utils/rollExpressionAverage.js';
 
+import { resolveModifierLibrary } from './characterLibraries.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   appendCheckModifierRollTerms,
@@ -303,15 +304,24 @@ function readSubjectModifierIds(activity, subject) {
  * `undefined` when it has never been asked; the key is always present on the bag
  * so the shape is fixed, and {@link resolveMaxModifierPicks} owns what absence means.
  *
- * @param {object|null|undefined} system The crafting system (owner of `modifiers`).
+ * @param {object|null|undefined} system The crafting system. Since issue 1308 it no longer owns
+ *   the modifier library — the world does — but it is still read for any surviving legacy copy
+ *   on a client that has not migrated yet.
  * @param {'crafting'|'salvage'|'gathering'} activity Which activity's selection to read.
  * @param {object|null|undefined} subject The record being resolved: a recipe, a component
  *   or a gathering task.
+ * @param {object|Function|null} [characterLibrariesStore] Explicit world-libraries seam. Omitted
+ *   in production, where the module registry resolves it; supplied by tests.
  * @returns {{ activity: string, catalogue: Array|undefined, systemPolicy: unknown,
  *   defaultModifierIds: Array|undefined, subjectModifierIds: Array|null,
  *   maxModifierPicks: number|undefined }}
  */
-export function buildCheckModifierContext(system, activity, subject) {
+export function buildCheckModifierContext(
+  system,
+  activity,
+  subject,
+  characterLibrariesStore = null
+) {
   const check = system?.[ACTIVITY_CHECK_KEYS.get(activity) ?? ''] ?? {};
   return {
     activity,
@@ -320,7 +330,7 @@ export function buildCheckModifierContext(system, activity, subject) {
     // 1.23.0 migration and the export upcast are the only two paths a legacy payload
     // arrives through, and no read-alias is kept here for the same reason 1.22.0 kept
     // none — a silent alias makes the relocation unobservable.
-    catalogue: system?.modifiers,
+    catalogue: resolveModifierLibrary(system, characterLibrariesStore),
     systemPolicy: check.defaultModifierPolicy,
     defaultModifierIds: check.defaultModifierIds,
     subjectModifierIds: readSubjectModifierIds(activity, subject),

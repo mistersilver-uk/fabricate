@@ -5,6 +5,7 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
@@ -432,16 +433,17 @@
   // salvage-only or gathering-only progressive system.
   const showProgressiveDifficulty = $derived(difficultyAxisProgressive === true);
 
+  // The badge reads as the VALUE ALONE — `3`, or `None` — and names itself through its
+  // tooltip rather than its text. In a row of badges the words "Progressive difficulty"
+  // repeated on every component crowded out the description they sit beside, and the gauge
+  // glyph plus a bare number is already unambiguous once the tooltip is there to confirm it.
+  // The label is not dropped, only moved: `difficultyBadgeTitle` carries it.
   function difficultyBadgeFor(item) {
     if (!showProgressiveDifficulty) return '';
     const difficulty = Number(item?.difficulty);
-    const label = text(
-      'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
-      'Progressive difficulty'
-    );
     return Number.isFinite(difficulty) && difficulty >= 1
-      ? `${label} ${difficulty}`
-      : `${label} ${text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}`;
+      ? String(difficulty)
+      : text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None');
   }
 
   // The row carries ONE action — Edit. Copy-source-UUID and Delete moved into the
@@ -454,6 +456,10 @@
       selected: isSelectedComponent(item),
       categoryBadge: categoryBadgeFor(item),
       difficultyBadge: difficultyBadgeFor(item),
+      difficultyBadgeTitle: text(
+        'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
+        'Progressive difficulty'
+      ),
       originLabel: origin.label,
       originTone: origin.tone,
       originIcon: origin.icon,
@@ -484,7 +490,7 @@
 -->
 <main
   class="manager-main"
-  aria-label={text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}
+  aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
   <section
     class="manager-component-drop-zone"
@@ -534,6 +540,7 @@
   <section
     class="manager-toolbar manager-component-toolbar"
     tabindex="-1"
+    data-keyboard-focus="true"
     data-component-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
@@ -626,9 +633,8 @@
             <option value={option.key}>{option.label}</option>
           {/each}
         </select>
-        <button
-          type="button"
-          class="manager-button manager-component-sort-direction"
+        <ManagerButton
+          class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Component.SortDirection',
@@ -647,7 +653,7 @@
               ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
               : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span
           >
-        </button>
+        </ManagerButton>
       </div>
     </div>
 
@@ -736,12 +742,8 @@
           'No components match your filters.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button"
-          data-clear-filters="components"
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton data-clear-filters="components" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

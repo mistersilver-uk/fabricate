@@ -40,6 +40,7 @@
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
  * The reasons a destroy target is refused before any deletion is attempted.
@@ -116,7 +117,10 @@ export class BulkDestroyService {
     const system = this.getCraftingSystem?.(target?.systemId) ?? null;
     if (!system) return buildRow(target, null, BULK_DESTROY_SKIP_REASONS.unknownSystem);
 
-    const component = findById(getDefinitionIndex(system.components), target?.componentId);
+    const component = findById(
+      getDefinitionIndex(resolvedComponentsFor(system)),
+      target?.componentId
+    );
     if (!component) {
       return buildRow(target, null, BULK_DESTROY_SKIP_REASONS.unknownComponent);
     }

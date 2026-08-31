@@ -54,6 +54,10 @@ const COMPARED_FIELDS = [
   'gatheringConfig',
   'currencyConfig',
   'travelConfig',
+  'characterLibraries',
+  'componentScope',
+  'essenceScope',
+  'toolScope',
 ];
 function pickComparedFields(envelope) {
   return Object.fromEntries(COMPARED_FIELDS.map((key) => [key, envelope[key]]));
@@ -150,8 +154,8 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
   // export that simply carries an empty slice rather than one that throws.
   assert.match(
     closure,
-    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig\s*\)/,
-    'exportSystem must hand gatheringEnvironments + gatheringConfig + currencyConfig + travelConfig to buildExportPayload'
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig,\s*characterLibraries,\s*componentScope,\s*essenceScope,\s*toolScope\s*\)/,
+    'exportSystem must hand every world slice to buildExportPayload'
   );
   assert.ok(
     closure.includes('fabricate.currencyConfigStore?.get?.() ?? {}'),
@@ -161,6 +165,23 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
     closure.includes('fabricate.gatheringRealmStore?.get?.() ?? {}'),
     'exportSystem should resolve the realm library from the world travel store'
   );
+  assert.ok(
+    closure.includes('fabricate.characterLibrariesStore?.get?.() ?? {}'),
+    'exportSystem should resolve both character libraries from the world store'
+  );
+  // The three world-scope entity stores (issue 1364) are reached through the READY-UNGATED
+  // accessors, not through the raw instance fields the four slices above use, because those
+  // accessors are what `CraftingSystemManager` itself reads them through.
+  for (const accessor of [
+    'getComponentScopeStore',
+    'getEssenceScopeStore',
+    'getToolScopeStore',
+  ]) {
+    assert.ok(
+      closure.includes(`fabricate.${accessor}?.()?.get?.() ?? {}`),
+      `exportSystem should resolve the world scope through ${accessor}`
+    );
+  }
 });
 
 test("source contract: the Manager's Export button passes the same args as the public API", () => {
@@ -182,7 +203,7 @@ test("source contract: the Manager's Export button passes the same args as the p
 
   assert.match(
     closure,
-    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig\s*\)/,
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig,\s*characterLibraries,\s*componentScope,\s*essenceScope,\s*toolScope\s*\)/,
     'the Manager export must hand every authoring slice to buildExportPayload'
   );
   assert.ok(
@@ -193,6 +214,20 @@ test("source contract: the Manager's Export button passes the same args as the p
     closure.includes('services.getGatheringRealmStore?.()?.get?.() || {}'),
     'the Manager export resolves the realm library from the world travel store'
   );
+  assert.ok(
+    closure.includes('services.getCharacterLibrariesStore?.()?.get?.() || {}'),
+    'the Manager export resolves both character libraries from the world store'
+  );
+  for (const accessor of [
+    'getComponentScopeStore',
+    'getEssenceScopeStore',
+    'getToolScopeStore',
+  ]) {
+    assert.ok(
+      closure.includes(`services.${accessor}?.()?.get?.() || {}`),
+      `the Manager export resolves the world scope through ${accessor}`
+    );
+  }
 });
 
 test('both export call sites pass every parameter the exporter declares', () => {
@@ -222,6 +257,10 @@ test('both export call sites pass every parameter the exporter declares', () => 
       'gatheringConfig',
       'currencyConfig',
       'travelConfig',
+      'characterLibraries',
+      'componentScope',
+      'essenceScope',
+      'toolScope',
     ],
     'buildExportPayload gained or lost a parameter — pin it in BOTH call-site guards above ' +
       'before updating this list, or the new slice exports empty from one path and full from ' +

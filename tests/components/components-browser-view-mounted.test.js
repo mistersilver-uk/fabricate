@@ -27,6 +27,7 @@ const browser = createMountedComponentHarness({
   tmpPrefix: 'fabricate-components-browser-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/utils/componentCategories.js',
     'src/utils/componentBrowserModel.js',
@@ -59,6 +60,9 @@ const browser = createMountedComponentHarness({
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
+    // The manager's ONE labelled push-button (issue 1118): the sort-direction toggle and the
+    // filtered empty state's Clear filters both render it. Omitting it HANGS this suite.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'

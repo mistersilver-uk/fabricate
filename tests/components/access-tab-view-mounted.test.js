@@ -13,6 +13,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-access-tab-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js'
   ],
@@ -24,6 +25,9 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // THE manager's labelled push-button (issue 1118). Clear filters and Clear search both render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/AccessTabView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/AccessTabView.svelte'

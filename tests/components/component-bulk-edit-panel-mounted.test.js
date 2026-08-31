@@ -31,6 +31,7 @@ const panel = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/componentCategories.js',
@@ -52,6 +53,10 @@ const panel = createMountedComponentHarness({
     // The shared bulk-edit chrome (issue 1010). The panel now renders its header, hero,
     // section headings, staged select and Apply through these three, so they are STATIC
     // imports of the component under test and belong in its closure.
+    // THE manager's labelled push-button (issue 1118). `BulkEditPanelShell` renders its
+    // Apply through the primitive, so it is a STATIC import of this tree; omitting it HANGS
+    // this suite as `# cancelled` rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',

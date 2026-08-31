@@ -24,6 +24,7 @@
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     resultGroups = [],
@@ -223,15 +224,15 @@
       )}
       contextClass="manager-recipe-tab-empty"
     >
-      <button
-        type="button"
-        class="manager-button is-dashed manager-recipe-add-full"
+      <ManagerButton
+        role="dashed"
+        fullWidth
         data-recipe-add="result-set"
         onclick={() => addGroup()}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
-      </button>
+      </ManagerButton>
     </EmptyState>
   {:else}
     <!-- Results has NO OR relationship between groups (§C2): the producing group is
@@ -258,14 +259,9 @@
         </li>
       {/each}
     </ul>
-    <button
-      type="button"
-      class="manager-button is-dashed manager-recipe-add-full"
-      data-recipe-add="result-set"
-      onclick={() => addGroup()}
-    >
+    <ManagerButton role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
-    </button>
+    </ManagerButton>
   {/if}
 </section>

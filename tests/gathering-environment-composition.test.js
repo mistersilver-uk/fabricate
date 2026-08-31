@@ -77,16 +77,18 @@ test('automatic mode excludes records listed in disabledTaskIds', () => {
   assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't3']);
 });
 
-test('manual mode includes only explicitly enabled matching tasks', () => {
+test('manual mode composes exactly the explicitly enabled tasks', () => {
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({ compositionMode: 'manual', enabledTaskIds: ['t1', 't3'] }), system);
   assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't3']);
 });
 
-test('manual mode never makes a non-matching explicitly-included task available', () => {
+test('manual mode composes an explicitly-included task whether or not it matches', () => {
+  // Manual mode has no match filter (issue #1315): the GM's picked list IS the composition, so
+  // `tDesert` composes into a cave environment because it was picked, not because it fits.
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({ compositionMode: 'manual', enabledTaskIds: ['t1', 'tDesert'] }), system);
-  assert.deepEqual(composed.tasks.map(task => task.id), ['t1']);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['t1', 'tDesert']);
 });
 
 test('automatic mode ignores a stale enabled allow-list and includes all matching records', () => {
@@ -118,39 +120,65 @@ test('events compose by danger matching and respect the shared composition mode'
   assert.deepEqual(composedManualEmpty.events.map(event => event.id), []);
 });
 
-test('manual mode force-adds a non-matching task into the composed environment', () => {
+test('manual mode ignores the forced list, which belongs to automatic mode', () => {
   const service = makeService({ tasks: libraryTasks });
-  // tDesert does not match a cave environment, but the GM force-added it.
+  // A manual environment has no filter for a force to override (issue #1315), so `forcedTaskIds`
+  // is inert here — `tDesert` composes only if the GM adds it to the picked list.
   const composed = service.composeEnvironment(environment({
     compositionMode: 'manual',
     enabledTaskIds: ['t1'],
     forcedTaskIds: ['tDesert']
   }), system);
-  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['t1']);
 });
 
-test('automatic mode ignores the forced allow-list', () => {
+test('automatic mode honours the forced allow-list', () => {
+  // The rule flip's own proof (issue #1315). Automatic composition is "everything matching, minus
+  // the excluded, PLUS the forced": a force is how a GM overrides the match filter, and this is
+  // the mode that has one.
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'automatic',
     forcedTaskIds: ['tDesert']
   }), system);
-  // Auto-mode composition is "all matching available unless excluded"; forces are ignored.
-  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3']);
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3', 'tDesert']);
 });
 
-test('manual task disabledTaskIds do not veto force-added tasks', () => {
+test('automatic mode lets an exclusion beat a force on the same record', () => {
+  // The two overrides can collide, and exclude wins. Asserted here rather than left to branch
+  // order in the predicate, because "which of my two lists decides" is a GM-facing answer.
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({
-    compositionMode: 'manual',
-    enabledTaskIds: ['t1'],
+    compositionMode: 'automatic',
     forcedTaskIds: ['tDesert'],
     disabledTaskIds: ['tDesert']
   }), system);
-  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3']);
 });
 
-test('manual event disabledEventIds do not veto enabled or force-added events', () => {
+test('a force cannot revive a task disabled in the library', () => {
+  // The library-enabled gate precedes both modes, so neither override can reach past it.
+  const service = makeService({
+    tasks: [{ id: 'tOff', name: 'Retired', enabled: false, biomes: ['desert'], dropRows: [] }]
+  });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    forcedTaskIds: ['tOff']
+  }), system);
+  assert.deepEqual(composed.tasks.map(task => task.id), []);
+});
+
+test('manual task disabledTaskIds are ignored, because manual mode has no exclusion', () => {
+  const service = makeService({ tasks: libraryTasks });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'manual',
+    enabledTaskIds: ['t1', 'tDesert'],
+    disabledTaskIds: ['tDesert']
+  }), system);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['t1', 'tDesert']);
+});
+
+test('manual event composition is the enabled list alone: forced and disabled are both inert', () => {
   const service = makeService({
     events: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
@@ -163,10 +191,12 @@ test('manual event disabledEventIds do not veto enabled or force-added events', 
     forcedEventIds: ['hDesert'],
     disabledEventIds: ['hCave', 'hDesert']
   }), system);
-  assert.deepEqual(composed.events.map(event => event.id).sort(), ['hCave', 'hDesert']);
+  assert.deepEqual(composed.events.map(event => event.id), ['hCave']);
 });
 
 test('eventOrder sorts matching and force-added events together', () => {
+  // In AUTOMATIC mode, where both populations exist: three events compose by matching and a
+  // fourth by force, and `eventOrder` ranks them as one list rather than two.
   const service = makeService({
     events: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
@@ -176,8 +206,7 @@ test('eventOrder sorts matching and force-added events together', () => {
     ]
   });
   const composed = service.composeEnvironment(environment({
-    compositionMode: 'manual',
-    enabledEventIds: ['hCave', 'hStorm', 'hGas'],
+    compositionMode: 'automatic',
     forcedEventIds: ['hDesert'],
     eventOrder: ['hDesert', 'hStorm', 'hGas', 'hCave']
   }), system);

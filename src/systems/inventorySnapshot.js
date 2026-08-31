@@ -93,6 +93,7 @@
 import { getFabricateFlag } from '../config/flags.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
  * The deduped, ordered actor set a snapshot reads.
@@ -301,7 +302,7 @@ export function buildInventorySnapshot({
       const stacksByComponentId = new Map();
       const essenceTotals = new Map();
       const quantityByTag = new Map();
-      const components = Array.isArray(system?.components) ? system.components : [];
+      const components = resolvedComponentsFor(system);
       const canResolve = typeof resolveComponent === 'function' && components.length > 0;
 
       for (const { item } of heldItems()) {

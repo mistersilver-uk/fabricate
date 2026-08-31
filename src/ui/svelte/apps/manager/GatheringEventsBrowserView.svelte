@@ -6,6 +6,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
 
   let {
     events = [],
@@ -327,15 +328,14 @@
         .replace('{total}', eventList.length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="gathering-events"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </section>
 
@@ -355,11 +355,7 @@
           'Create reusable events before attaching them to environments.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button is-primary"
-          onclick={() => onCreateEvent(selectedSystemId)}
-        >
+        <ManagerButton role="primary" onclick={() => onCreateEvent(selectedSystemId)}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span
             >{text(
@@ -367,7 +363,7 @@
               'Create gathering event'
             )}</span
           >
-        </button>
+        </ManagerButton>
       </EmptyState>
     {:else if filteredEvents.length === 0}
       <EmptyState
@@ -381,8 +377,8 @@
           'Clear search and filters to show all events in this system.'
         )}
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

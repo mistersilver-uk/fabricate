@@ -1489,7 +1489,23 @@
   grid-template-rows: auto auto 1fr;
   height: 100%;
   min-width: 0;
-  overflow: hidden;
+
+  /* CLIP, NOT HIDDEN (issue 1286).
+
+     `overflow: hidden` still creates a SCROLL CONTAINER: the user gets no scrollbar, but the
+     box remains scrollable PROGRAMMATICALLY — and focus does exactly that. This root is a grid
+     whose `1fr` body row can be shorter than its own content, so a tall panel leaves the root
+     with real scrollable overflow. The first click on a control low in such a panel then makes
+     the browser scroll that control into view, taking the whole app with it: rail and body
+     slide up out of the frame and the lower third of the window becomes an UNRECOVERABLE void,
+     because with no scrollbar there is no way back.
+
+     The complications editor is what first made this reachable — tall enough to give the root
+     ~738px of scrollable overflow — but the trap belongs to the root, not to that panel, and
+     any future panel of the same height would spring it again. `clip` creates no scroll
+     container at all, so there is nothing for focus to scroll. Nothing scrolls this root
+     programmatically; the real scrollers are further in and are untouched. */
+  overflow: clip;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
 
@@ -1592,6 +1608,59 @@
   min-height: 68px;
   padding: var(--fab-space-2);
   line-height: 1.4;
+}
+
+/*
+  …and the SAME baseline for `<select>` (issue 1286).
+
+  The block above promises that "a NEW field can never bleed again", and for four years it
+  did not cover the one element type that bleeds MOST visibly: a select's fallback chrome is
+  Foundry's own cool purple-grey with a TRANSPARENT border, which reads as a lighter slab
+  against these surfaces rather than as a missing border. Selects were themed
+  per-container instead — `.fabricate-manager .manager-field select` and
+  `.manager-component-inline-control` (both further down this file) — so a select that leaves
+  a `.manager-field` and carries only `.manager-input` reverted, exactly as the note on that
+  rule warns. `.fab-complication-comparator` and `.fab-complication-trigger-select` are what
+  found it: both sit in a revealed input strip rather than a field wrapper, and both painted
+  Foundry's default beside a correctly themed `<input>` on the same row.
+
+  PAINT ONLY, and that split is the whole reason this is a separate rule rather than another
+  selector on the group above.
+
+   - The paint properties are byte-identical to the free-text baseline, so a select and the
+     text input beside it are the same control family. That is measurable: the comparator now
+     matches its own row's expression field rather than the two neighbouring treatments the
+     manager already had (6px in a `.manager-field`, 7px on `.manager-scope-select`), both of
+     which keep their own radius because their rules out-specify this one.
+   - `min-height` is deliberately ABSENT. The text baseline can pin 34px because a bare
+     `<input>` has no other height source; a manager select does — and they disagree on
+     purpose. 28px on a pagination-size picker, 32px on `.manager-scope-select` and the bulk
+     editor, 36px in a `.manager-field`. `min-height` is not a property a higher-specificity
+     `height` declaration can override, so a 34px floor here would silently GROW every one of
+     those and no cascade rule would stop it. A call site that needs a select flush with a
+     34px input states that height itself; `ComponentComplicationsSection` does.
+   - No `appearance: none` either, for the same class of reason: on an `<input>` it is a
+     no-op, on a `<select>` it deletes the dropdown arrow. The `@supports (appearance:
+     base-select)` block below sets `appearance` for the engines that can honour it, and an
+     engine without it must keep the platform widget rather than a chevron-less rectangle.
+
+  Specificity is (0,1,1) — one step below the (0,2,1) of the group above, and below every
+  per-control select rule in this file — so this only ever paints a select that nothing else
+  claims. `:disabled` mirrors the free-text disabled rule below at (0,1,2), which still loses
+  to `.fabricate-manager .manager-field select:disabled` (0,2,2).
+*/
+.fabricate-manager select {
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager select:disabled {
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
 }
 
 /*
@@ -1736,6 +1805,19 @@
   cursor: default;
 }
 
+/* THE MANAGER'S FOCUS-RING CONTRACT, and it is a PAIR: the first half suppresses whatever
+   ring Foundry's core or the browser would draw, and the second supplies the manager's own on
+   keyboard focus only. The two element lists must therefore match, or an element type is
+   stripped of a ring by the first half and given none by the second.
+
+   `a` joins both lists in issue 1118. Twelve manager buttons are anchors now — docs links,
+   the premium unlock, the explainer card's links — and an anchor matched neither list, so
+   those twelve were the only manager buttons with no accent ring on keyboard focus.
+
+   `textarea` joins the second list in the same edit, and it is a repair rather than a
+   symmetry tidy-up: it was in the suppressing half and absent from the supplying one, so a
+   focused manager textarea drew NO ring at all. */
+.fabricate-manager a:focus,
 .fabricate-manager button:focus,
 .fabricate-manager input:focus,
 .fabricate-manager select:focus,
@@ -1745,9 +1827,11 @@
   box-shadow: none;
 }
 
+.fabricate-manager a:focus-visible,
 .fabricate-manager button:focus-visible,
 .fabricate-manager input:focus-visible,
 .fabricate-manager select:focus-visible,
+.fabricate-manager textarea:focus-visible,
 .fabricate-manager [tabindex]:focus-visible {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 2px;
@@ -1858,12 +1942,35 @@
   overflow-wrap: anywhere;
 }
 
-/* Header actions (Back, Delete, Save/Create) share one compact scale: taller than
-   a row button but well under the title, and a label a notch below body text so the
-   toolbar reads as chrome, not content. */
-.fabricate-manager .manager-header-actions .manager-button {
-  min-height: 38px;
+/* Header actions (Back, Delete, Save/Create) share one compact scale: a label a notch
+   below body text so the toolbar reads as chrome, not content.
 
+   The HEIGHT is no longer stated here (issue 1118). This rule declared 38px and the block
+   below re-declares the Tool Studio's 34px against `fab-manager-button` at the SAME (0,3,0)
+   — a tie the 38 won only by standing earlier in the sheet, across 27 buttons in one
+   `<div>`. The maintainer ruled 34px the correct outcome rather than arbitrating the tie:
+   34px is what the Tool Studio, the authority for a manager button, has always rendered.
+   That repaint stands, and it is a real one: 27 buttons in one `<div>` come down 4px.
+
+   WHAT DOES NOT STAND is the second half this comment used to carry — that the chip beside
+   them came down off 38px with it. IT WAS NEVER 38px AND IT IS NOT 34px. This sheet is
+   imported at `layer(modules)` and `Chip.svelte`'s `css: 'injected'` block is UNLAYERED, so
+   the chip's own `min-height: 20px` beats anything stated here at any specificity — the same
+   ownership fact `.manager-checks-card .manager-modifier-readonly-expression` below records
+   from a parity run. Measured both ways in Chromium against the real compiled component:
+   layered, the header chip is 20px tall with a 10px radius at 9.92px; unlayered — which is
+   only the dev server, since `vite.config.js` strips the JS-side import from the production
+   build — the same markup reports 34px. The product is the layered one. So the header
+   cluster is a 34px button beside a Chip-owned ~20px pill, both of the chip rules that
+   claimed otherwise are retired below, and deleting the 38px `is-warning` rule was a no-op
+   rather than the alignment this comment used to claim it was.
+
+   What survives is the container's TYPE scale, which it states across all three of its
+   children — this button, the chip and the save-error alert are all 0.72rem. The primitive
+   re-declares the same 0.72rem with no ancestor requirement, so on a converted button the
+   remaining tie is zero-pixel; this rule is what types a header button the primitive does
+   not render. */
+.fabricate-manager .manager-header-actions .manager-button {
   /* 0.72rem (~11.5px) matches the prototype's header buttons (issue 643 audit). */
   font-size: 0.72rem;
 }
@@ -1913,8 +2020,31 @@
 
 /* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is
    borderless until hover, while the tool studio's Back button keeps a border so it
-   reads as a button before the pointer arrives (§F6). */
-.fabricate-manager .manager-button.fab-manager-button.is-ghost {
+   reads as a button before the pointer arrives (§F6).
+
+   `:not(:disabled)` is load-bearing, not decoration — see the invariant stated at
+   `.manager-button:disabled` below. Without it this rule painted a SWITCHED-OFF ghost
+   button in its switched-on colours, which is what `ToolEditView`'s Back button did for
+   the whole of a tool save (issue 1118).
+
+   TWO container rules stated this role's paint and both are retired, on one principle: a
+   role's paint belongs to the role, and the container keeps only its own scale.
+
+   `.manager-header-actions .manager-button.is-ghost` stated the same three values through
+   `--fab-border` and `--fab-text-muted`, which are what `--fab-mv2-border` and
+   `--fab-mv2-text-muted` alias, so which of the two (0,4,0) rules won was a zero-pixel
+   question decided by source order.
+
+   `.manager-tool-edit-actions .manager-button.is-ghost` was the SAME rule one container
+   over, and retiring it is not cosmetic: at (0,4,0) and unqualified it beat
+   `.manager-button:disabled` (0,3,0) outright, so it was the live half of the defect this
+   role's `:not(:disabled)` exists to end — in the one container `ToolEditView`'s
+   `disabled={saving}` Back button actually sits in, which is to say on the exemplar. Its
+   three declarations were byte-identical to this rule's, and every child of that container
+   is a `<ManagerButton>`, so nothing unconverted lost paint with it. `manager-layout.test.js`
+   now probes this invariant in every container the sheet styles, not just one, because a
+   probe scoped to one container is what let this survive a whole review round. */
+.fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled) {
   border-color: var(--fab-mv2-border);
   color: var(--fab-mv2-text-muted);
   background: transparent;
@@ -1926,26 +2056,41 @@
   background: var(--fab-surface-soft);
 }
 
-/* The `dashed` role (issue 1096): the full-width append action at the foot of a list.
-   Measured from the prototype's own "Add outcome tier" and pinned by the Checks Studio
-   parity fixture's `add-tier-button` region. It re-declares `font-size` because the
-   prototype's is 11px, a notch under the 0.72rem (11.52px) toolbar scale — this button
-   sits INSIDE a card's content, not in its chrome. */
+/* The `dashed` role (issue 1096): the append action at the foot of a list. Measured from
+   the prototype's own "Add outcome tier" and pinned by the Checks Studio parity fixture's
+   `add-tier-button` region. It re-declares `font-size` because the prototype's is 11px, a
+   notch under the 0.72rem (11.52px) toolbar scale — this button sits INSIDE a card's
+   content, not in its chrome.
+
+   `width: 100%` is NOT stated here any more (issue 1118). Full width is a statement about
+   the CONTAINER, not about the verb: `dashed` means "append to the list above me", and six
+   of the ten literal dashed sites sit in wrapping flex rows where a pinned full width
+   stacks a four-up row into four rows. The primitive takes a `fullWidth` prop instead and
+   emits `is-full-width`, declared below. */
 .fabricate-manager .manager-button.fab-manager-button.is-dashed {
   display: flex;
-  width: 100%;
 
   /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a
      `min-height` alone let the button stand one pixel over the prototype's 34. */
   height: 34px;
   min-height: 34px;
   padding: 0 var(--fab-space-3);
-  border: 1px dashed var(--fab-border-strong);
+
+  /* Longhands rather than the `border` shorthand: the dashed EDGE is geometry and survives
+     into the disabled state, while the ink beside it is paint and must not — a shorthand
+     here would carry `border-color` across that line with it. */
+  border-width: 1px;
+  border-style: dashed;
   border-radius: 9px;
-  color: var(--fab-text-muted);
-  background: transparent;
   font-size: 11px;
   font-weight: 600;
+}
+
+/* Paint only, and qualified: see the invariant at `.manager-button:disabled` below. */
+.fabricate-manager .manager-button.fab-manager-button.is-dashed:not(:disabled) {
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-muted);
+  background: transparent;
 }
 
 .fabricate-manager .manager-button.fab-manager-button.is-dashed:not(:disabled):hover {
@@ -1954,32 +2099,13 @@
   background: var(--fab-surface-soft);
 }
 
-/* Ghost Back button (§F6): quiet, but the design keeps a resting border so it reads
-   as a button before hover, not a bare label. */
-.fabricate-manager .manager-header-actions .manager-button.is-ghost {
-  border-color: var(--fab-border);
-  color: var(--fab-text-muted);
-  background: transparent;
-}
-
-.fabricate-manager .manager-header-actions .manager-button.is-ghost:not(:disabled):hover {
-  border-color: var(--fab-border);
-  color: var(--fab-text);
-  background: var(--fab-surface-soft);
-}
-
-/* The header "Unsaved" state chip sits in the button row, so it takes the button's
-   6px rounded-rectangle corners and compact header height rather than the default
-   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6).
-
-   Kept as-is through issue 883. This is an ANCESTOR-CONTEXT rule — a chip sized for the
-   container it sits in, like the tab badge's deliberate 18px/0.56rem — not a second
-   default scale a screen can opt into, which is what that issue removed. It is already
-   at four classes, so it still outranks the scoped block. */
-.fabricate-manager .manager-header-actions .manager-chip.is-warning {
-  min-height: 38px;
-  border-radius: 6px;
-  font-size: 0.72rem;
+/* `fullWidth` (issue 1118), split out of the `dashed` role that used to carry it. A dashed
+   add at the foot of a full-width list spans that list because it extends it; the same verb
+   in a wrapping row of chips must not. It is a CAPABILITY of the primitive rather than a
+   fourth hand-written class string — `.manager-recipe-add-full` was the recipe-namespaced
+   spelling of exactly this statement, and it is retired with this edit. */
+.fabricate-manager .manager-button.fab-manager-button.is-full-width {
+  width: 100%;
 }
 
 /* The attempted-and-failed save alert that the editor toolbars render beside Save
@@ -1989,7 +2115,12 @@
    two rules above, so the shared class would read visibly hot next to the chip and
    buttons it sits with. Same ANCESTOR-CONTEXT reasoning as the warning chip: sized for
    the container, not a new scale a screen can opt into. The 6px radius and the danger
-   palette are shared, so it still reads as one family with both. */
+   palette are shared, so it still reads as one family with both.
+
+   Ruled with the rest of the header cluster in issue 1118 and deliberately UNCHANGED: it
+   declares no height at all, and `.manager-header-actions` centres its items, so the 38px
+   → 34px ruling reaches this alert without an edit. Stated rather than assumed, because
+   the button and the chip both needed one. */
 .fabricate-manager .manager-header-actions .manager-header-save-error {
   margin: 0;
   padding: var(--fab-space-1) var(--fab-space-2);
@@ -2012,25 +2143,55 @@
   overflow-wrap: anywhere;
 }
 
+/* THE ACTION CLUSTER IS NEVER THE THING THAT GIVES. `.manager-header` is a two-child
+   `space-between` row and both children shrink by default, so a heading with a long title or a
+   wrapped subtitle claimed the width and squeezed this — and because the cluster wraps, it
+   BROKE rather than overflowing: `Save faction` dropped onto a second line under `Delete
+   faction` while the heading beside it ran to two lines of description.
+
+   `flex-wrap: wrap` STAYS. It is the right behaviour when the window is genuinely too narrow
+   for four controls, which is a different situation from a neighbour taking the room; what was
+   wrong was reaching it because a name or a description was long.
+
+   THE HEADING NEEDS NOTHING ADDED FOR THIS. A `flex: 1 1 auto` was written on
+   `.manager-heading` beside this, on the reasoning that one of the two children had to be
+   named as the side that absorbs the slack. Driven mutation says otherwise: with this cluster
+   refusing to shrink, the heading's default `flex: 0 1 auto` and its existing `min-width: 0`
+   are the whole of what it needs, and the rule changed no measurement. Measured in
+   `tests/components/manager-header-geometry.test.js`. */
 .fabricate-manager .manager-header-actions,
 .fabricate-manager .manager-action-group {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--fab-space-2);
+  flex: 0 0 auto;
   flex-wrap: wrap;
 }
 
-.fabricate-manager .manager-header-actions .manager-chip,
-.fabricate-manager .manager-action-group .manager-chip {
-  min-height: 34px;
+/* NO CHIP RULE LIVES HERE ANY MORE, and the reason is ownership rather than taste
+   (issue 1118). Two rules did: `.manager-header-actions .manager-chip.is-warning`
+   (`border-radius: 6px; font-size: 0.72rem`, and a `min-height: 38px` before it) and
+   `.manager-header-actions .manager-chip, .manager-action-group .manager-chip`
+   (`min-height: 34px; border-radius: 999px`). Between them they claimed the header chip was
+   a tall rounded rectangle sized to the button beside it, and they said so at four and three
+   classes respectively, which is what the note in `Chip.svelte` used to say was enough.
 
-  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
-     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
-     height it would read as a rounded rectangle instead of the pill it has always been
-     (issue 883). */
-  border-radius: 999px;
-}
+   It is not enough, and specificity is not the axis. This sheet is imported at
+   `layer(modules)` — `tests/view-lab/cascade.css` mirrors how Foundry loads a module
+   stylesheet, and `vite.config.js` strips the JS-side import from the production build so
+   that is the only way it loads — while Svelte's `css: 'injected'` blocks land UNLAYERED. An
+   unlayered author declaration beats every layered one at any specificity. `Chip.svelte`
+   declares `min-height`, `border-radius` and `font-size` itself, so every declaration these
+   two rules made was inert. Measured in Chromium against the real compiled component: with
+   the sheet in `layer(modules)` the header chip renders 20px tall, 10px radius, 9.92px;
+   without the layer the same markup reports the 34px and 6px these rules asked for. The
+   product is the layered one.
+
+   What legitimately remains here is what a scoped block cannot reach and Chip does not
+   declare: the chip's POSITION inside this row, which the flex rule above states for every
+   child at once. A geometry opinion about the chip belongs in `Chip.svelte`, through a
+   variant prop, exactly as `density="row"` does. */
 
 .fabricate-manager .manager-breadcrumbs {
   display: flex;
@@ -2307,7 +2468,9 @@
    renders a single child straight into `.manager-main`, so without this it lands in the shared
    shell's auto-sized first row and a tall ladder grows the Manager instead of scrolling inside
    `.manager-world-currency`'s own overflow. */
-.fabricate-manager[data-manager-view="world-currency"] .manager-main {
+.fabricate-manager[data-manager-view="world-currency"] .manager-main,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-main,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -2483,7 +2646,6 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: var(--fab-accent);
   background: none;
   box-shadow: none;
   font-family: inherit;
@@ -2496,6 +2658,25 @@
      control an eighth of a pixel proud, which is what the parity run reported. */
   line-height: normal;
   white-space: nowrap;
+}
+
+/* The INK is split out and qualified, and the split states which of the declarations above
+   are a RESET and which is paint (issue 1118). At (0,4,0) and unqualified, `color` beat
+   `.manager-button:disabled` (0,3,0), so a switched-off link-styled action would have stayed
+   accent-blue — the same shape of defect as the Tool Studio's ghost Back, on a control that
+   happens to have no `disabled` call site yet. Qualified, it takes the disabled rule's muted
+   ink like every other role.
+
+   `border: 0` and `background: none` deliberately do NOT move with it. They are the LINK
+   RESET, in the same class as `appearance: none` and `box-shadow: none`: what makes this a
+   link rather than a button, in both states. A disabled link snapping back to a bordered
+   34px box would be a worse answer than a muted one. The disabled rule's own `border-color`
+   and `background` are therefore not overridden here so much as invisible by construction —
+   there is no border to colour and no box to fill — which is why this control is not a second
+   exception beside `.manager-button.is-danger.is-armed`. */
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link > i {
@@ -2935,16 +3116,34 @@
 }
 
 /* (0,4,0), which is what it takes to beat `.manager-button.fab-manager-button.is-dashed`'s
-   pinned full width and 34px height. A preset CHIP hugs its own sentence and sits beside its
-   sibling; the dashed control at the foot of a list spans that list because it extends it.
-   Size and fill only: the dashed edge, radius scale, weight and ink stay the primitive's. */
+   34px height. A preset CHIP hugs its own sentence and sits beside its sibling; the dashed
+   control at the foot of a list spans that list because it extends it.
+   Size and fill only: the dashed edge, radius scale, weight and ink stay the primitive's.
+
+   `width: auto` is gone from here in issue 1118, and its absence is the point: the role no
+   longer pins `width: 100%` at all — full width moved to the primitive's `fullWidth`
+   capability — so there is nothing left for this rule to release. It was the first and
+   loudest evidence that width belonged to the container rather than to the verb. */
 .fabricate-manager .manager-checks-trigger-presets .manager-button.fab-manager-button.is-dashed {
   flex: 0 1 auto;
-  width: auto;
   height: 30px;
   min-height: 0;
   padding: 0 12px;
   border-radius: 8px;
+}
+
+/* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). The
+   geometry above must survive being switched off — a disabled preset that snapped back to
+   34px would move the row — while the fill must not: at (0,5,0) and unqualified this
+   declaration beat `.manager-button:disabled` (0,3,0), so a switched-off preset kept its lit
+   `--fab-bg-0` surface. That is the same defect as the Tool Studio's ghost Back, one
+   container further on, and no preset renders `disabled` today, which is exactly why nothing
+   caught it: it was latent, not shipping. It is repaired rather than filed because the
+   invariant the sheet states is that the disabled paint is role- AND container-independent,
+   and an invariant with a documented exception is a convention. */
+.fabricate-manager
+  .manager-checks-trigger-presets
+  .manager-button.fab-manager-button.is-dashed:not(:disabled) {
   background: var(--fab-bg-0);
 }
 
@@ -3546,7 +3745,7 @@
    specific the layered selector is. So a rule HERE restating a property `Chip.svelte`'s own
    scoped block declares cannot win, at any specificity — this exact pair was written here
    first, at (0,4,0), and the parity run reported the chip still at the shared primitive's
-   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `<style>` is not
+   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `\3c style>` is not
    bound by that: it is unlayered too, so a `:global(...)` block there CAN out-specify
    `Chip.svelte`'s base rule and render correctly, and one did. That is still a second
    implementation of the one chip's geometry — exactly what issue 883 retired regardless of
@@ -5066,7 +5265,13 @@
    The currency editor moved out of the System Settings form, where the surrounding form
    supplied its padding and scrolling. Standing alone in `manager-main` it has to supply both
    itself, so the page scrolls in its own right rather than growing the window. */
-.fabricate-manager .manager-world-currency {
+
+/* The two Rules & Resources siblings share the currency page's block (issue 1311): one authored
+   library, scrolling in its own right, with the same padding and rhythm. Listed rather than
+   renamed to a shared class, because a rename would touch every currency rule below it. */
+.fabricate-manager .manager-world-currency,
+.fabricate-manager .manager-world-prerequisites,
+.fabricate-manager .manager-world-modifiers {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
@@ -5708,12 +5913,30 @@
   pointer-events: none;
 }
 
-.fabricate-manager .manager-clear-filters {
+/* Chained onto `fab-manager-button` (0,4,0) in issue 1118, for the reason
+   `.manager-button.fab-manager-button.manager-checks-card-head-link` gives verbatim: a bare
+   `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control,
+   which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its
+   compact padding to the standard control's — six times over, in six browser toolbars.
+
+   NOTE what the chain changes, because it is more than it looks. At (0,2,0) this rule was
+   already losing `min-height`, `padding` and `font-weight` to the base
+   `.fabricate-manager .manager-button` (0,2,0, declared later in this file), so the compact
+   30px/600/space-2 control it describes has never been what shipped: the six buttons render
+   the standard 34px/700/space-3 one. Only `margin-left`, `font-size` and the two colours
+   were reaching them. Chaining does not merely defend this rule against the primitive — it
+   makes it TAKE EFFECT for the first time, which is a real six-site repaint and is budgeted
+   as one. The alternative was to delete the three declarations that never applied, which
+   would have preserved the pixels by preferring the accident to the intent. */
+.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters {
   margin-left: auto;
   padding: 0 var(--fab-space-2);
   min-height: 30px;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.manager-clear-filters:not(:disabled) {
   color: var(--fab-mv2-text-muted);
   background: transparent;
 }
@@ -6546,7 +6769,7 @@
    input` and `.manager-toolbar .manager-button`, but not `select`.
 
    The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
-   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
+   same reason. It had re-derived the bar in its own scoped `\3c style>`, which looked
    equivalent and was not, in two ways a source read cannot show:
 
     - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
@@ -6752,9 +6975,27 @@
    toolbar's compact scale and match the sort select's 9px radius / 34px height.
 
    The component browser's direction toggle was in exactly that pre-fix state — its own
-   class carried no CSS at all — so it joins the rule (issue 676). */
-.fabricate-manager .manager-button.manager-recipe-sort-direction,
-.fabricate-manager .manager-button.manager-component-sort-direction {
+   class carried no CSS at all — so it joins the rule (issue 676).
+
+   `fab-manager-button` joins the chain in issue 1118. Chaining `.manager-button` alone lifts
+   this to (0,3,0), which was enough to beat the base rule but only TIES the primitive's own
+   (0,3,0) control — and a tie is decided by source order, which the conversion sweep is
+   licensed to change. At (0,4,0) the compact scale and the 9px radius no longer depend on
+   where in this file anything sits.
+
+   The ESSENCE browser's toggle joins them in the same issue, addressed by its `data-*` hook
+   rather than by a class. It is the third instance of one control — same verb, same place in
+   the same toolbar shape, Asc/Desc beside a sort select — and it never matched this rule at
+   all: it carried `manager-essence-sort-direction`, which this sheet declared NOWHERE, so it
+   painted from the base control instead. That is a divergence this sweep INHERITED rather than
+   caused; measured in Chromium against the two siblings, `gap`, `font-size`, `height`,
+   `min-height` and `padding` already agreed, and only `border-radius` (6px against their 9px)
+   and `font-weight` (700 against their 600) did not. The dead class went with the conversion,
+   so the hook is the honest handle: an attribute selector counts as one class-level component,
+   which puts this third selector at the same (0,4,0) as the other two. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-sort-direction,
+.fabricate-manager .manager-button.fab-manager-button.manager-component-sort-direction,
+.fabricate-manager .manager-button.fab-manager-button[data-essence-sort-direction] {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
@@ -6864,66 +7105,112 @@
   min-width: 0;
 }
 
-/* These three chain `.manager-button` into the selector (raising specificity to
-   0,3,0) so they beat the base `.fabricate-manager .manager-button` rule declared
-   LATER in this file (0,2,0) — which otherwise wins on source order and repaints
-   every one of them the dark overlay surface, collapsing Edit's accent fill and
-   Delete's danger text into the same flat button (issue 643). This is the same
-   `.manager-button.<modifier>` specificity lift used for the recipe add-buttons. */
+/* These chain `.manager-button` into the selector (raising specificity to 0,3,0) so they
+   beat the base `.fabricate-manager .manager-button` rule declared LATER in this file
+   (0,2,0) — which otherwise wins on source order and repaints every one of them the dark
+   overlay surface, collapsing Edit's accent fill and Delete's danger text into the same
+   flat button (issue 643).
+
+   `fab-manager-button` joins that chain in issue 1118, taking them to (0,4,0). At (0,3,0)
+   they only TIED the primitive's own control rule, and a tie is decided by source order,
+   which the conversion sweep is licensed to change — so the 36/38px heights and the 0.78rem
+   label held by luck rather than by specificity. The four selectors are ONE stacked column
+   in the component inspector (Edit / Copy / Unlink / Delete), so they are chained in one
+   edit or none: lifting only the loudest of them would misalign the column it was
+   protecting. */
 
 /* Dark secondary: the panel surface, a subtle border, normal text. The font-size
-   and weight match the Edit button so all three action buttons read at one size. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate,
-.fabricate-manager .manager-button.manager-component-browser-inspector-copy,
-.fabricate-manager .manager-button.manager-component-browser-inspector-unlink {
+   and weight match the Edit button so all three action buttons read at one size.
+
+   Paint and geometry are separate rules here for the reason the invariant at
+   `.manager-button:disabled` gives: chaining this treatment above the primitive also lifted
+   it above that rule, so a switched-off control would have kept its switched-on colours.
+   The geometry is state-independent and stays unqualified; the ink is not. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
+.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-copy,
+.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-unlink {
   width: 100%;
   min-height: 36px;
   justify-content: center;
-  border-color: var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-/* Accent primary: the loudest control on the panel. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit,
-.fabricate-manager .manager-button.manager-component-browser-inspector-edit {
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+}
+
+/* Accent primary: the loudest control on the panel. Both rows stay role-LESS (issue 1118):
+   the accent fill is this panel's own treatment, not the `primary` role's Save green. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit,
+.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
-  border-color: var(--fab-accent-border);
-  color: var(--fab-on-accent);
-  background: var(--fab-accent);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:focus-visible,
-.fabricate-manager .manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-component-browser-inspector-edit:focus-visible {
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
 
 /* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly
-   danger-tinted border so it reads as destructive without shouting louder than Edit. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete,
-.fabricate-manager .manager-button.manager-component-browser-inspector-delete {
+   danger-tinted border so it reads as destructive without shouting louder than Edit.
+
+   The border and the ink are no longer RESTATED here (issue 1118). Both rows render
+   `role="danger"` now, and `.manager-button.is-danger` below declares exactly
+   `--fab-danger-border` and `--fab-danger-text` — two copies of one decision is the failure
+   this conversion exists to end. What stays is the panel's own SURFACE, which is not a
+   duplicate: `is-danger` declares no background at all, so dropping this one would take the
+   button off the inspector's solid surface and onto the base 6% overlay. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete,
+.fabricate-manager .manager-button.fab-manager-button.manager-component-browser-inspector-delete {
   width: 100%;
   min-height: 36px;
   justify-content: center;
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-mv2-surface-1);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:focus-visible,
-.fabricate-manager .manager-button.manager-component-browser-inspector-delete:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-component-browser-inspector-delete:focus-visible {
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
+  background: var(--fab-mv2-surface-1);
+}
+
+/* `:focus-visible` ONLY. The hover half was byte-identical to
+   `.manager-button.is-danger:not(:disabled):hover`, which states the same three values at
+   (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the
+   one state the pair still has to declare for itself. */
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -9213,6 +9500,13 @@
    `!isChecksRoute` guard, so the studio rendered against a ~300px dead strip — the
    exact regression the comment above says this pairing exists to prevent, arriving
    from the other direction. */
+
+/* The three Rules & Resources routes join this list in issue 1311. `world-currency` belonged here
+   and always did: its aside has been suppressed in the root since issue 1278, but the column was
+   never released, so the page has been rendering against the ~300px dead strip the comment above
+   warns about — the Checks regression, arriving from the other direction a second time. The two
+   new routes join it because they are the same kind of surface: one authored library, with
+   nothing to put in a third column. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view^="checks"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
@@ -9220,6 +9514,12 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="world-currency"] .manager-body,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-body,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -9237,8 +9537,382 @@
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
+.fabricate-manager[data-manager-view="world-currency"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
+}
+
+/* The seven world scoped-entity routes (issue 1362, epic 1357) release the third column.
+   Each is a single authored surface — a catalogue, an entry editor or the World Vocabulary —
+   with nothing to put in an inspector, so the aside is suppressed in
+   `CraftingSystemManagerRoot.svelte` and the column released here. Those two are ONE decision
+   and `tests/manager-full-width-gate.test.js` asserts them against each other by selector
+   string, which is what stops this pair drifting the way `checks` (issue 1096) and
+   `world-currency` (issue 1311) each did.
+
+   SELECTORS ARE GROUPED. The gate parses a group exactly as it parses a singleton, and
+   fourteen near-identical blocks is churn in the one file no later lane in this epic may
+   reopen. */
+.fabricate-manager[data-manager-view="world-components"] .manager-body,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-essences"] .manager-body,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-tools"] .manager-body,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-body,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* EQUAL SPECIFICITY, or the collapse no-ops. `.manager-body.is-rail-collapsed` beats a
+   single-class rule, so a released column with no collapsed sibling silently snaps back to
+   three tracks the moment the GM collapses the rail. The gate requires both. */
+.fabricate-manager[data-manager-view="world-components"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-essences"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-tools"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+/* THE ROWS OVERRIDE SITS ON `.manager-main`, not on `.manager-body`, which declares no
+   `grid-template-rows` at all — writing it there would be inventing a row model for every
+   route that shares the base rule. The page owns one scrolling region: the header is chrome
+   above it, and the placeholder (and later the catalogue) is the single row inside it. */
+.fabricate-manager[data-manager-view="world-components"] .manager-main,
+.fabricate-manager[data-manager-view="world-component-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-essences"] .manager-main,
+.fabricate-manager[data-manager-view="world-essence-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-tools"] .manager-main,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-main,
+.fabricate-manager[data-manager-view="world-vocabulary"] .manager-main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
+}
+
+/* The scoped-entity preview shell's DEFAULT class stem (issue 1362).
+
+   `ScopedEntityPreview` takes its stem as a prop so a converted site keeps the rules that
+   already target it — `ToolBehaviorPreview` passes `manager-tool-preview`, whose five rules
+   are further down this file. Its DEFAULT stem had no rules at all, so the shell rendered
+   unstyled for any caller that did not bring its own, and the component's own doc said these
+   names were declared here when they were not. The six scoped editors PRs 6a-c and 7 build are
+   exactly those callers, and requirement 7 of `### GM World Scoped Entity Routes` closes this
+   file to them — so the default has to arrive with the shell.
+
+   Deliberately in the global sheet rather than a scoped `<style>` on the component: the stem is
+   a dynamic class, so Svelte cannot prove a scoped selector is used and would emit an
+   unused-selector warning that `lint:svelte:warnings` fails on. */
+.fabricate-manager .manager-scoped-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* THE TRACK IS THE IMAGE'S OWN WIDTH, and the third track is `max-content`, both matching the
+   converted tool site below. A 44px track under a 46px image overflows its own column by 2px
+   and eats the `--fab-space-2` gap; an `auto` third track is free to grow past its content. */
+.fabricate-manager .manager-scoped-preview-identity {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-preview-identity > img {
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+/* THE MIDDLE CHILD IS AN UNCLASSED `<div>` AND A GRID ITEM, so its `min-width: auto` resolves
+   to the min-content width of the `h3` below — which carries `white-space: nowrap`. Without
+   this it overflows the `minmax(0, 1fr)` track and the ellipsis pair on the heading can never
+   take effect: a long world entity name blows the identity row out of the aside instead of
+   truncating inside it. The converted tool site carries the same rule for the same reason. */
+.fabricate-manager .manager-scoped-preview-identity > div {
+  min-width: 0;
+}
+
+/* The serif family is the prototype's, and it is the type authority for this heading; the
+   converted tool site below carries it too, so a scoped editor that used the default stem
+   would otherwise render its identity title in the body face. */
+.fabricate-manager .manager-scoped-preview-identity h3 {
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-scoped-preview-identity p {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-scoped-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-preview-live {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  font-size: 0.72rem;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-scoped-preview-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+/* The inherit row set (issue 1362). NO GROUP CHROME — no header, no divider, no empty state —
+   because a one-section entity draws exactly one row, and chrome around a single control costs
+   more vertical space than the control it frames. */
+.fabricate-manager .manager-scoped-inherit-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2) 0;
+}
+
+.fabricate-manager .manager-scoped-inherit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-inherit-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-scoped-inherit-note {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--fab-text-muted);
+}
+
+/* The membership action cluster. It wraps rather than overflowing, because the tool path
+   carries one more control than the component path and the rail column is the narrowest
+   place either is rendered. */
+.fabricate-manager .manager-scoped-membership-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* ── THE SCOPED-ENTITY LIST SHELLS' HOST-SHEET STEM (issue 1380) ────────────────────────────
+   A REQUIREMENT-7 CORRECTION, NOT A REOPENING. `ui-integration/spec.md`
+   `### GM World Scoped Entity Routes` requirement 7 closes this file to the lanes that build the
+   six scoped editors, and it also says a gateway closure "is void for a seam the enumeration does
+   not name". The enumeration pre-loaded here covers `manager-scoped-preview-*`,
+   `manager-scoped-inherit-*` and `manager-scoped-membership-actions`: a preview panel, an inherit
+   row and an action cluster. It names nothing for a LIST, a toolbar, a filter row or an inspector
+   frame, and the epic already set this precedent for the identical defect in the block above —
+   "its DEFAULT stem had no rules at all, so the shell rendered unstyled for any caller that did
+   not bring its own... the default has to arrive with the shell."
+
+   THIS BLOCK IS ADDITIVE AND EDITS NO EXISTING RULE. Every selector below carries a
+   `manager-scoped-list-*` class that nothing else in this repository renders, so the Component,
+   Recipe and Essence Studios are byte-identical across it. In particular the `.is-selection` join
+   at the multi-select row block ABOVE is deliberately left alone: appending a fourth name there
+   would change three shipped studios' rendering to save four declarations here.
+
+   ── WHY ANY OF IT IS HERE AND NOT IN THE FRAME'S SCOPED `<style>` ──────────────────────────
+   Two mechanical reasons, and neither is a preference:
+
+    1. `BulkSelectionToolbar` renders `<div class="{rowClass} is-selection">` IN ITS OWN TEMPLATE.
+       Svelte's scoping hash is applied to the elements a component renders, so a scoped rule in
+       the frame cannot reach that root at all. This is the exact defect recorded against the
+       essence view further up this file: the selection row lost its `display: flex`, its
+       `width: 100%` and its hairline, and `Clear`'s `margin-left: auto` went inert.
+    2. The toolbar's `<select>` and search `<input>` have to OUTRANK Foundry core's own aggressive
+       element rules. `.fabricate-manager .manager-scoped-list-toolbar select` is (0,2,1); a
+       Svelte-scoped `select.svelte-<hash>` is (0,1,1) and loses. Without this the controls render
+       at core's 14px `.application` base — full-width, taller than the controls beside them, and
+       wrapping one filter row into three, which is what the block above records happening.
+
+   The frame keeps everything a scoped rule CAN prove: its grid tracks, its container query and
+   its own inspector surface. */
+
+/* The filter row, and the selection row that joins it. Same metrics as the three studio filter
+   rows, restated rather than joined onto them for the reason the `.is-selection` note gives:
+   those selectors are pinned by exact string in `tests/components/manager-layout.test.js`. */
+.fabricate-manager .manager-scoped-list-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The row CONTEXT that separates the selection register from the filter row above it: a hairline
+   rule and the row's own gap. Its content is a control, a count and two text actions, so the
+   filter row's own spacing would be too loose. */
+.fabricate-manager .manager-scoped-list-filter-row.is-selection {
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+/* The control type scale. See reason 2 in the block header. */
+.fabricate-manager .manager-scoped-list-toolbar .manager-search input,
+.fabricate-manager .manager-scoped-list-toolbar select {
+  font-size: var(--fab-recipe-control-font);
+}
+
+.fabricate-manager .manager-scoped-list-toolbar .manager-search input {
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-scoped-list-toolbar select {
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  cursor: pointer;
+}
+
+/* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge,
+   8px corner, translucent overlay fill — and the geometry matches the recipe and component rows'
+   denser 11px/12px card, because a scoped list is the same kind of library at the same density. */
+.fabricate-manager .manager-scoped-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 62px;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-scoped-list-row > * {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-list-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-mv2-surface-3);
+}
+
+/* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity
+   cue, so it reads in the accent family rather than in success or amber; `.is-bulk-selected` is
+   "this row is in the set the next Apply writes to", one surface step forward. Written as two
+   rules in this order so a row that is both renders the active surface. */
+.fabricate-manager .manager-scoped-list-row.is-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-scoped-list-row.is-bulk-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* The identity cell is a real `<button>` wearing row chrome, so Foundry's host button geometry is
+   reset explicitly — the same properties `Chip`'s and the selection toolbar's button rules reset,
+   and for the same reason: core's fixed button height crops it. */
+.fabricate-manager .manager-scoped-list-identity {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 1 1 260px;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-scoped-list-identity:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-scoped-list-identity:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-scoped-list-identity .manager-system-copy {
+  display: grid;
+  align-content: center;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-scoped-list-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-1);
+  min-width: 0;
 }
 
 /* World > Parties owns the entire content column: the card editor makes the former
@@ -9929,10 +10603,13 @@
   gap: var(--fab-space-3);
 }
 
-/* The three custom-macro drop zones (canAfford / increment / decrement) sit side-by-side in a
-   single responsive row, collapsing to fewer columns on narrow widths. */
+/* The custom-macro drop zones (canAfford / increment / decrement / balance) sit side-by-side in a
+   single responsive row, collapsing to fewer columns on narrow widths. `auto-fit` rather than a
+   literal column count: the field list is generated from CURRENCY_MACRO_KEYS, so a hardcoded
+   count silently wraps the newest field onto a short second row the first time the vocabulary
+   grows (issue 1342 added a fourth). The track floor is what decides the column count. */
 .fabricate-manager .manager-currency-macro-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: start;
 }
 
@@ -10218,7 +10895,7 @@
    reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
-   (48px wide, 22px tall, transparent) from its component-scoped <style>. This rule is
+   (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
    `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
@@ -10561,6 +11238,28 @@
   font-weight: 600;
 }
 
+/* The deep-link out of a recipe tab to the canonical authoring screen — "Manage access" on
+   the Access tab, "Open Books & Scrolls" on the Books & Scrolls tab. `align-self: flex-start`
+   so it sizes to its own label rather than stretching the full width of a tab body that no
+   longer shrinks its children to content.
+
+   HOISTED here from TWO scoped blocks (issue 1118). `RecipeAccessTab.svelte` and
+   `RecipeBooksScrollsTab.svelte` each declared this identical rule in their own `<style>`,
+   which is two sources of truth for one control and could only ever drift; and neither
+   survived its button becoming a `<ManagerButton>`, because Svelte scopes a rule by stamping
+   its `svelte-<hash>` onto the elements a component WRITES and never onto a child component's
+   internals. Both were pruned to an `(unused)` comment the moment the tag changed. One
+   declaration, in the sheet that can actually reach the element.
+
+   Chained onto the primitive's own classes for the reason every re-chained bespoke rule in
+   this sweep is: at (0,2,0) it would be arbitrated against
+   `.fabricate-manager .manager-button.fab-manager-button` by injection order rather than by
+   specificity. `align-self` is a property the primitive does not declare, so nothing is being
+   won BACK here — the chain is what keeps that true if either side grows. */
+.fabricate-manager .manager-button.fab-manager-button.manager-recipe-tab-action {
+  align-self: flex-start;
+}
+
 .fabricate-manager .manager-recipe-tools-tab,
 .fabricate-manager .manager-recipe-results-tab,
 .fabricate-manager .manager-recipe-ingredients-tab {
@@ -10688,8 +11387,9 @@
   background: var(--fab-border);
 }
 
-/* Quiet ghost button (used by the header Back and the Validation "View" links). */
-.fabricate-manager .manager-button.is-ghost {
+/* Quiet ghost button (used by the header Back and the Validation "View" links).
+   Qualified in issue 1118 — see the invariant at `.manager-button:disabled` below. */
+.fabricate-manager .manager-button.is-ghost:not(:disabled) {
   border-color: transparent;
   color: var(--fab-text-muted);
   background: transparent;
@@ -10701,22 +11401,51 @@
   background: var(--fab-surface-soft);
 }
 
-/* Dashed accent add-button used across the rebuilt requirement tabs. */
+/* The dashed add-button, RECONCILED with the primitive's `dashed` role (issue 1118).
+   This selector used to state an accent edge and accent ink and no geometry at all, while
+   `.manager-button.fab-manager-button.is-dashed` above stated the muted, 34px, 11px control
+   measured against the prototype. Two treatments for one verb, and the one a control got
+   depended on whether it happened to have been converted yet.
+
+   The primitive's treatment is the survivor — it is the one measured against a prototype
+   region and gated by the Checks Studio parity fixture — so the reconciliation copies it
+   here rather than deleting either rule. Deleting this one is not available: four of the
+   dashed controls are `SearchablePopover` triggers, which are rendered from a class STRING
+   and therefore never gain `fab-manager-button`. They sit in the same rows as converted
+   dashed buttons, so they must carry the same complete treatment or the row shows two
+   dashed styles side by side.
+
+   `width` is deliberately absent, for the reason the role's own comment gives: full width
+   is a statement about the container, and it lives on `is-full-width` now. This is why the
+   values are COPIED rather than shared through the primitive's selector — the primitive's
+   is chained on a class these four controls cannot have. */
 .fabricate-manager .manager-button.is-dashed {
+  display: flex;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-width: 1px;
   border-style: dashed;
-  border-color: var(--fab-accent-border);
-  color: var(--fab-accent);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-button.is-dashed:not(:disabled) {
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
 .fabricate-manager .manager-button.is-dashed:not(:disabled):hover {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
 }
 
 /* ── The Validation tab's aggregate header (issue 676) ────────────────────────────
    Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
-   open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
+   open. It lives in the GLOBAL sheet, not a scoped Svelte \3c style>, for two reasons: the
    rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
    `.manager-recipe-val-*`), and a component-scoped
    block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
@@ -10989,11 +11718,13 @@
   font-size: 0.78rem;
 }
 
-/* Full-width dashed add-set / add-stage row (§C6). */
-.fabricate-manager .manager-button.is-dashed.manager-recipe-add-full {
-  width: 100%;
-  justify-content: center;
-}
+/* The full-width dashed add-set / add-stage row (§C6) is no longer expressed by a
+   recipe-namespaced class (issue 1118): `.manager-button.is-dashed.manager-recipe-add-full`
+   is retired here, and its four call sites take the primitive's `fullWidth` capability
+   instead. It stated `width: 100%` and `justify-content: center`, and the second was already
+   the base control's — so what it really said was "this one spans its list", which three
+   candidate sites in `ComponentEditView` need too and could never have spelled through a
+   `manager-recipe-*` class. One meaning, one implementation. */
 
 /* Danger-bordered dashed panel for an outcome that produces nothing (§C5). */
 .fabricate-manager .manager-recipe-result-empty {
@@ -11214,6 +11945,30 @@
   background: var(--fab-mv2-bg);
 }
 
+/* A recipe stage row that draws a complication strip hands its PADDING to the row's own
+   line (`.manager-recipe-stage-line`, in RecipeResultItemRow.svelte) and clips itself, so
+   the strip below can run edge to edge with its `border-top` acting as a card divider —
+   which is exactly how the prototype builds this card: `flex-direction: column;
+   overflow: hidden` with the padding on an inner top row and the band as its sibling.
+   Inset by the card's padding instead, the band's rule drew as a short line floating
+   inside the card rather than as a divider across it (issue 1286).
+
+   `overflow: hidden` is what keeps the band's warning fill inside the card's 8px radius.
+   It cannot clip the row's component picker: `SearchablePopover` portals its popover to
+   the manager host rather than rendering it in flow.
+
+   The grip and the ordinal moved INSIDE that line, so this no longer needs the
+   `align-items: flex-start` it once carried to stop them centring against the whole card —
+   they now centre against the line they label, which is what they always meant to do.
+
+   Additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
+   and moves no existing stage row in either studio — the join above stays the one place
+   the two surfaces share values. */
+.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications) {
+  overflow: hidden;
+  padding: 0;
+}
+
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is
    `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×)
    but wrong here: a stage row carries four more controls, so a greedy field took ~85% of
@@ -11242,10 +11997,19 @@
 
 /* Extra separation between the trailing controls, on top of the row's 12px gap: these are
    four unrelated affordances (a read-only fact, a deep link, a reorder rocker and a
-   delete), and packed at 8px they read as one undifferentiated clump. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-reorder,
-.fabricate-manager .manager-salvage-stage-row > .manager-icon-button,
+   delete), and packed at 8px they read as one undifferentiated clump.
+
+   The three salvage selectors now go through `.manager-salvage-stage-line` (issue 1286),
+   keeping `.manager-salvage-stage-row` ahead of it so each compound still outranks the
+   shared `.manager-salvage-stage-edit` rule below, which declares `margin: 0`. That
+   wrapper is `display: contents` on every row, so it matches exactly the controls this
+   rule already matched and no stage row moves; what it buys is that a row which ALSO draws
+   a complication band no longer hands this 4px to the BAND's own Edit link, which belongs
+   to the band's eyebrow rather than to the row's trailing cluster. The recipe selectors are
+   untouched — that row nests its controls in `.manager-recipe-option-controls`. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-edit,
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-reorder,
+.fabricate-manager .manager-salvage-stage-row > .manager-salvage-stage-line > .manager-icon-button,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-edit,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-reorder,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-result-remove {
@@ -11678,17 +12442,17 @@
   gap: var(--fab-space-2);
 }
 
-/* The recipe dashed add-buttons (set-level adds, the group-level alternative
-   adds, and the full-width "Add ingredient set") inherit the ambient ~1rem, which
-   out-sizes the sibling recipe controls. Pin them to the recipe-control scale.
-   Scoped to these recipe rows only — the global `.manager-button.is-dashed` on
-   other screens is untouched (issue 643). */
-.fabricate-manager .manager-recipe-ingredient-set-add .manager-button,
-.fabricate-manager .manager-recipe-requirement-adds .manager-button,
-.fabricate-manager .manager-button.manager-recipe-add-full {
-  /* 0.7rem (~11.2px) matches the prototype's dashed add buttons (issue 643 audit). */
-  font-size: 0.7rem;
-}
+/* RETIRED in issue 1118: the recipe dashed add-buttons no longer need a container rule to
+   pin their type. This group existed because those buttons "inherit the ambient ~1rem,
+   which out-sizes the sibling recipe controls" (issue 643) and the `is-dashed` role stated
+   no size at all — so each recipe container had to state one, at 0.7rem, and the three
+   selectors between them reached ten controls in four components.
+
+   `is-dashed` now states 11px itself, for every dashed control on every screen and for the
+   `SearchablePopover` triggers among them, so the ambient bleed this defended against
+   cannot happen. Keeping the group would have left a 0.2px disagreement between a converted
+   dashed button (11px, from the role) and the popover trigger beside it (11.2px, from here),
+   which is precisely the two-treatments-for-one-verb defect the reconciliation removes. */
 
 /* A requirement is a flat container by default (a single alternative reads as a
    bare row). When it holds two or more alternatives they read as one bracketed
@@ -12539,24 +13303,35 @@
 /*
   The header's premium unlock action (issue 1185). It is deliberately NOT `.is-primary`:
   that variant is the green Save treatment, and a promotional unlock in Save-green would
-  read as the page's commit action. It takes the brand accent instead, and declares
-  `text-decoration` because `.manager-button` assumes a `<button>` and this one is a link.
+  read as the page's commit action. It takes the brand accent instead.
 
-  It is selected through `.manager-header-actions` rather than on its own, and that is
-  load-bearing rather than cosmetic: `.manager-header-actions .manager-button` is (0,3,0) and
-  a bare `.manager-downtime-unlock` is (0,2,0), so the accent fill this rule exists to state
-  was losing to the ghost button's and the shipped control read as ordinary header chrome.
+  It used to be selected through `.manager-header-actions`, because a bare
+  `.manager-downtime-unlock` is (0,2,0) and the container's button rule is (0,3,0), so the
+  accent fill this rule exists to state was losing and the shipped control read as ordinary
+  header chrome. Issue 1118 replaces that ancestor with `fab-manager-button`: at (0,4,0) the
+  fill beats the primitive's own control outright instead of tying its container's, and the
+  rule stops depending both on source order and on where the anchor is rendered.
+
+  `text-decoration` is gone from here too. It was declared because "`.manager-button` assumes
+  a `<button>` and this one is a link" — a fact now true of all twelve manager-button
+  anchors, so it is stated once, for `a.manager-button`, beside the base control.
 */
-.fabricate-manager .manager-header-actions .manager-downtime-unlock {
+.fabricate-manager .manager-button.fab-manager-button.manager-downtime-unlock {
   min-height: 34px;
   padding: 0 14px;
-  border-color: var(--fab-accent-border);
   border-radius: 8px;
-  color: var(--fab-on-accent);
-  background: var(--fab-accent);
   font-size: 11.5px;
   font-weight: 600;
-  text-decoration: none;
+}
+
+/* Split from the geometry above for the invariant at `.manager-button:disabled`. This one
+   is an anchor and cannot be disabled, so the qualifier changes nothing it renders — it is
+   here so that "a re-chained treatment states its paint under `:not(:disabled)`" is true of
+   every rule in this sheet rather than of most of them. */
+.fabricate-manager .manager-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
 }
 
 /*
@@ -13032,6 +13807,30 @@
   cursor: pointer;
 }
 
+/* THE DISABLED INVARIANT (issue 1118). A switched-off manager button paints from this rule,
+   whatever role it carries — so every rule that states a role's RESTING paint is qualified
+   `:not(:disabled)`, here and above, and none of them relies on standing later in the sheet
+   than this one.
+
+   It was not so. This rule is (0,3,0); `.manager-button.is-primary`, `.is-danger` and
+   `.is-warning-action` are (0,3,0) too and stand LATER, and the primitive's `is-ghost` and
+   `is-dashed` companions are (0,4,0) and beat it outright. So a disabled button kept its
+   enabled colours in every role — visibly, in the screen this conversion designates as the
+   authority: `ToolEditView`'s Back button is `role="ghost"` and `disabled` for the whole of
+   a tool save, and looked switched on throughout it. `opacity` and `cursor` survived, which
+   is why it read as a dimmed live control rather than a dead one.
+
+   Qualifying the ROLES rather than re-chaining this rule is deliberate. This selector also
+   serves `.manager-icon-button` and every hand-written `.manager-button` the sweep does not
+   convert, so chaining `fab-manager-button` onto it would have taken the disabled paint away
+   from exactly the controls that have no other. `:not(:disabled)` states the thing that is
+   actually true — a role's resting paint is its ENABLED paint — and makes the two states
+   mutually exclusive, so nothing here is decided by order at all.
+
+   `.manager-button.is-danger.is-armed` is the one deliberate exception, and it is not a
+   role: it is the armed half of the two-step row confirmation, which disables itself while
+   the destructive write it just confirmed is in flight. It keeps its solid danger surface
+   through that write. */
 .fabricate-manager .manager-button:disabled,
 .fabricate-manager .manager-icon-button:disabled {
   border-color: var(--fab-overlay-light-12);
@@ -13047,19 +13846,31 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-button.is-primary {
+/* Twelve manager buttons are anchors, not buttons (issue 1118): docs links, the premium
+   unlock, the explainer card's links. The control contract above assumes a `<button>`, which
+   carries no underline; a link does. Each of those sites used to clear it for itself, or not
+   — this states it once.
+
+   It lives in the GLOBAL sheet rather than in `ManagerButton.svelte` because that component
+   deliberately has no scoped `<style>` at all: a second source of truth for one control is
+   the exact failure the primitive exists to end, and the parity harness reads this file. */
+.fabricate-manager a.manager-button {
+  text-decoration: none;
+}
+
+.fabricate-manager .manager-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success);
 }
 
-.fabricate-manager .manager-icon-button.is-primary {
+.fabricate-manager .manager-icon-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-button.is-danger,
-.fabricate-manager .manager-icon-button.is-danger {
+.fabricate-manager .manager-button.is-danger:not(:disabled),
+.fabricate-manager .manager-icon-button.is-danger:not(:disabled) {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
 }
@@ -13083,8 +13894,33 @@
   background: var(--fab-danger);
 }
 
-.fabricate-manager .manager-button.is-warning-action,
-.fabricate-manager .manager-icon-button.is-warning-action {
+/* The `warning` role's treatment. It has a call site now (issue 1118, task 9), and that call
+   site CANNOT CURRENTLY RENDER — both halves matter, so both are written down.
+   `environment/CompositionList.svelte`'s labelled Force add spelt the class `is-warning`,
+   which this sheet declares nowhere, so it shipped with no warning treatment at all while
+   this rule sat here with nothing rendering it — a defect and a dead rule, from one typo.
+   `<ManagerButton role="warning">` emits THIS class name, which is why the primitive keeps a
+   named role-to-class mapping rather than a template over the role name.
+
+   THE REPAIRED SITE IS UNREACHABLE, NOT MERELY UNLINKED. It sits in that component's
+   standalone Non-matching section, which the markup gates on `mode !== 'manual'`, and its own
+   guard demands `mode === 'manual'`; the two conditions are mutually exclusive. It is not
+   alone in there: FOUR branches of that section are gated the same way — the menu's Force add
+   and its library-disabled note, and the row's labelled Force add and its own note — and all
+   four are dead for one reason. Manual mode grew its own Available-to-add section, with an
+   icon Force add that does render and does spell the class correctly, and these were left
+   behind. Which way to repair that is a product decision about where a manual force-add
+   As of issue 1315 the role has a real rendering consumer for the first time: the labelled
+   Force add in the automatic-mode Non-matching list, which is where overriding a filter — and
+   therefore the word "warning" — actually means something. The `.manager-icon-button` half of
+   these two selectors is retired with it: its only consumer was the manual-mode icon Force add
+   that 1315 deletes, `manager-icon-button` is hand-applied at call sites rather than emitted by
+   a primitive with a role, so nothing can write that pair again without deliberately reaching
+   for it.
+
+   The three declarations are paint only. That is what makes the role order-independent
+   against `.manager-button.fab-manager-button`, which states geometry and no colour. */
+.fabricate-manager .manager-button.is-warning-action:not(:disabled) {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
@@ -13115,8 +13951,7 @@
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-button.is-warning-action:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-warning-action:not(:disabled):hover {
+.fabricate-manager .manager-button.is-warning-action:not(:disabled):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
@@ -14442,16 +15277,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-tool-inspector-actions .manager-button {
-  width: 100%;
-  padding: 0 var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-inspector-actions .manager-button span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .fabricate-manager .manager-tools-component-browser-header {
   display: flex;
   flex-direction: column;
@@ -15440,7 +16265,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-drop-inspector-stack .manager-button {
+/* The inspector's controls run at 28px, a notch under the standard 34px control, because
+   they sit in a 300px column beside a rate slider. Chained on `fab-manager-button` (0,4,0)
+   in issue 1118: as an ancestor-context rule at (0,3,0) it only TIED the primitive's own
+   control, and both of its buttons convert, so the 28px was held by source order alone. */
+.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button {
   min-height: 28px;
   padding: 0 var(--fab-space-2);
 }
@@ -15730,28 +16559,44 @@
   line-height: 1.35;
 }
 
+/* The trailing track holds the Add button and is `max-content`, not a number (issue 1118).
+   It was 48px, and the button inside it was pinned to exactly 48px with 8px of padding —
+   a box sized to the two words it happens to hold today. Converted, that button takes the
+   primary role's `0 var(--fab-space-4)`: 32px of padding in a 48px box, which clips the
+   label whatever it says. A content-sized track states the actual requirement — the column
+   is as wide as the button — and it is the same fix in both templates. */
 .fabricate-manager .manager-condition-add {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 48px;
+  grid-template-columns: 36px minmax(0, 1fr) max-content;
   gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
 
-.fabricate-manager .manager-region-add {
-  grid-template-columns: minmax(0, 1fr) 48px;
-}
-
 .fabricate-manager .manager-biome-add {
-  grid-template-columns: 36px 36px minmax(0, 1fr) 48px;
+  grid-template-columns: 36px 36px minmax(0, 1fr) max-content;
 }
 
+/* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the
+   sibling input at `.manager-condition-add input` below and is the only reason the row's
+   controls line up. All four of the declarations that went were describing the pinned 48px
+   box this rule no longer needs, but they did not all go the same way, and the distinction is
+   the difference between a measurement and a decision:
+
+    - `padding` and `font-size` LOST. This rule is (0,2,0) and
+      `.manager-button.fab-manager-button` is (0,3,0) and states both, so a converted button
+      took `0 var(--fab-space-3)` and `0.72rem` whatever was written here.
+    - `width: 48px` was UNCONTESTED and is deleted DELIBERATELY. The primitive declares no
+      `width` at all, so this one won and would have kept on winning — it is gone because a
+      48px box holding a converted button's 32px of padding clips its label whatever the label
+      says, which is the whole reason the trailing grid track above became `max-content`.
+    - `justify-content: center` went with them because the base control already states it.
+
+   `.manager-region-add` was retired in the same edit. It re-templated this grid for a
+   region row, and no element in any component carries the class — the row it was written
+   for renders through `.manager-condition-add` itself. */
 .fabricate-manager .manager-add-button {
-  width: 48px;
   height: 36px;
-  padding: 0 var(--fab-space-2);
-  justify-content: center;
-  font-size: 0.78rem;
 }
 
 .fabricate-manager .manager-condition-current select,
@@ -16868,19 +17713,23 @@
    scale, so the GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its
    per-character reset cluster join it rather than restating the values. Without this
    they inherited the ambient ~1rem and read as heavier and larger than every other
-   action button in the same window. */
+   action button in the same window.
+
+   Deliberately NOT chained onto `fab-manager-button` (issue 1118), which is the treatment
+   every other tying ancestor-context rule in this sheet got. Two reasons, both concrete.
+   The three values here are the SAME three the primitive states — 34px, `--fab-space-3`,
+   0.72rem, copied from this very block when the primitive was released from its ancestor —
+   so the tie is provably zero-pixel whichever way it falls. And `.manager-knowledge-row-
+   actions` holds an `ArmedDangerButton`, which renders `class="manager-button is-danger"`
+   from its own markup and never gains the primitive class: chaining it would leave that
+   Delete inheriting the ambient ~1rem beside the 0.72rem Expend button next to it, which is
+   the exact regression this rule was written to fix. */
 .fabricate-manager .manager-tool-edit-actions .manager-button,
 .fabricate-manager .manager-knowledge-row-actions .manager-button,
 .fabricate-manager .manager-knowledge-reset-actions .manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tool-edit-actions .manager-button.is-ghost {
-  border-color: var(--fab-mv2-border);
-  background: transparent;
-  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-tool-edit-status {
@@ -18875,11 +19724,6 @@
   padding: 0 var(--fab-space-2) 0 0;
 }
 
-.fabricate-manager .manager-tools-row-editor .manager-button {
-  min-height: 28px;
-  padding: 0 var(--fab-space-3);
-}
-
 .fabricate-manager .manager-tools-row-editor .manager-icon-button {
   width: 28px;
   height: 28px;
@@ -19425,6 +20269,28 @@
   /* The recipe editor title sits at the prototype's 20px, a notch under the browser
      list heading's 22px global default (issue 643 audit). */
   font-size: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* THE SUBTITLE IS CLAMPED THE WAY THE TITLE ABOVE IT ALREADY WAS. The global
+   `.manager-subtitle` sets `overflow-wrap: anywhere`, which is right for a route whose subline
+   is a short measure — `Training · 8 days total` — and wrong for one carrying a document's own
+   prose. A faction's description is the GM's paragraph: it wrapped to two lines, grew the
+   heading, and broke the action cluster beside it.
+
+   SCOPED TO THE IDENTITY HEADER, not written on `.manager-subtitle`. That class draws on every
+   route in the Manager, several of which are meant to wrap, and clamping it globally would
+   truncate sublines nobody complained about in order to fix one that somebody did.
+
+   `max-width` AS WELL AS THE CLAMP. One line of a long description would otherwise run the
+   full width of everything the cluster does not take, and an ellipsis at the far right of a
+   1200px header is a sentence a GM has to scan an empty row to find the end of. 62ch is a
+   reading measure; the heading is of course narrower when the window is. */
+.fabricate-manager .manager-recipe-edit-heading-copy .manager-subtitle {
+  max-width: 62ch;
+  overflow: hidden;
+  overflow-wrap: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -20569,6 +21435,159 @@
   white-space: nowrap;
 }
 
+/* ── A FIRED COMPLICATION IS PROSE, NOT A CHIP (issue 1286) ────────────────────────
+   The base `__item` / `__label` treatment above is built for "3x Iron Ingot": the grid
+   packs items into `minmax(140px, 1fr)` tracks and the label is
+   `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`. A complication row
+   puts its NAME, the component that carries it and a free-prose DESCRIPTION into that one
+   label, so on the base treatment it renders as a single ellipsed line in a 140-250px
+   cell — clipped partway through the name, with the description, which is the only reason
+   the authoring section exists, never drawn at all.
+
+   The block deliberately emitted `--complication` with no rule on the reasoning that an
+   unstyled modifier lands safely on the base treatment. That reasoning is right for
+   regression safety and wrong for this content, so the modifier gets a rule and the
+   regression safety is kept by construction instead: EVERY selector below is reached only
+   through a class no card emits unless a complication fired, so a card without one cannot
+   move. `tests/crafting-chat-card.test.js` pins both halves — byte-identity for the
+   no-complication card, and a rendered gate that the description is actually on screen. */
+.fabricate-gather-chat__item--complication,
+.fabricate-craft-chat__item--complication {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fabricate-gather-chat__item--complication .fabricate-gather-chat__label,
+.fabricate-craft-chat__item--complication .fabricate-craft-chat__label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+/* The runs inside that one label are separated by WEIGHT rather than by more
+   punctuation — the renderer already joins them with an em dash, and a second visual
+   separator on top of it reads as a list. The name leads; the component that carries the
+   complication is context; the description keeps the body treatment because it is the
+   sentence a GM wrote for the table to read. */
+.fabricate-gather-chat__complication-name,
+.fabricate-craft-chat__complication-name {
+  font-weight: 700;
+}
+
+/* The stage position joins the component on the SAME de-emphasis rather than getting a rule
+   of its own, because it is context of the same kind: which of that component's places in
+   the ordered list this row is about. It is drawn only when two rows would otherwise be
+   identical, so at full weight it would shout on exactly the rows that already repeat. */
+.fabricate-gather-chat__complication-source,
+.fabricate-craft-chat__complication-source,
+.fabricate-gather-chat__complication-position,
+.fabricate-craft-chat__complication-position {
+  opacity: 0.72;
+}
+
+/* ── THE GM-ONLY COMPLICATION ROW IS A STACK, NOT A ROW OF COLUMNS (issue 1286) ────
+   Every selector in this block is reached through `.fabricate-craft-chat--gm`, the block
+   modifier ONLY `buildGmComplicationCardContent` emits. That is not decoration: the player
+   complication row above shares the `__item--complication` element and its two rules, and a
+   sibling change pins that two repeated player rows are not byte-identical, so the GM
+   treatment has to be unreachable from a player card by construction rather than by care.
+
+   WHAT WAS WRONG. The GM row hung its notes off the `__item` as siblings of `__label`.
+   `__item` is `display: flex` in ROW direction, so each note became a flex track inside a
+   `minmax(140px, 1fr)` grid cell: the live card drew the severity `Major` as `M o r` down
+   three lines, and the stage note and the effect roll as two more slivers beside it. Widening
+   the track would not have fixed it — the content is four independent statements about one
+   complication, and four statements want four lines.
+
+   WHAT IS RIGHT. The whole row now nests inside the one `__label`, which becomes the column.
+   Nothing here introduces a new colour, weight or spacing idiom: the section headings reuse
+   the card's own `__heading` treatment (uppercase, tracked, 0.58 opacity) and the facts
+   inherit the label's body size, so the card reads as the same card with room to breathe. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__item--complication .fabricate-craft-chat__label {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+/* Name left, severity eyebrow right, sharing one baseline. `space-between` rather than a
+   `margin-left: auto` on the eyebrow so a row with no severity at all still draws its name
+   flush.
+
+   It WRAPS, because both children legitimately refuse to shrink: the eyebrow is `nowrap` and
+   the name is a GM-authored string of unbounded length, and the chat sidebar this is read in
+   is 300px wide. Without the wrap the pair overflow the row together, which is a smaller copy
+   of the defect this whole block exists to remove — the eyebrow drops to its own line instead.
+   The name SHRINKS rather than grows: with `flex-grow` it would swallow the free space and
+   push a severity that fits perfectly well onto that second line. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fab-space-chip) var(--fab-space-2);
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Severity: the card's own eyebrow treatment, sized against the 0.85em label rather than
+   against the card root (0.74 / 0.85), and never wrapped — a two-word severity broken across
+   lines is the same defect this block exists to remove, one element smaller. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-severity {
+  flex: 0 0 auto;
+  font-size: 0.87em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.58;
+  white-space: nowrap;
+}
+
+/* The audience note shares the component's de-emphasis rather than getting one of its own:
+   it is context of the same kind, and the row already carries an eyebrow. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-audience {
+  opacity: 0.72;
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-heading {
+  font-size: 0.87em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.58;
+}
+
+/* A macro only the GM can repair is not narration, so it reads in the danger ramp the
+   failure notice above already uses rather than in the neutral one its neighbours use.
+
+   Its own CLASS rather than a `--fault` modifier on the block above, because the guard in
+   `tests/crafting-chat-card.test.js` requires every branch of every complication rule to end
+   its complication-only class at a word boundary — a modifier suffix would read to that scan
+   as an ungated selector, and the scan is worth more than the naming symmetry. */
+.fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault {
+  color: var(--fab-danger);
+}
+
+/* Its heading keeps the eyebrow's SHAPE and drops the eyebrow's fade. 0.58 of the danger ramp
+   on a parchment chat background is the lowest-contrast run on the card, and this is the one
+   run that has to be read: everything else here is narration a GM can skim, and this is a
+   broken link only they can repair. */
+.fabricate-craft-chat--gm
+  .fabricate-craft-chat__complication-fault
+  .fabricate-craft-chat__complication-heading {
+  opacity: 0.95;
+}
+
 .fabricate-gather-chat__footer {
   display: flex;
   flex-wrap: wrap;
@@ -21388,7 +22407,7 @@
 
 /* World > Parties (issue 1182).
 
-   The pane is a CARD LIST whose appearance lives in the scoped `<style>` blocks of
+   The pane is a CARD LIST whose appearance lives in the scoped `\3c style>` blocks of
    `GatheringPartiesTab`, `PartyExpandedBody`, `PartyMemberRow`, `PartyAddMemberPanel`
    and `PartyTravelActorPanel`. Only four kinds of rule are left here, each because a
    scoped block cannot express it:
@@ -22618,7 +23637,7 @@
    so the body drops the formula and the DC — a batch has no single subject — and
    replaces them with a subject strip and a note saying the answer lands on every roll.
 
-   These rules live HERE rather than in a scoped `<style>` block because the dialog body
+   These rules live HERE rather than in a scoped `\3c style>` block because the dialog body
    is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
    scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
    dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the
@@ -23122,29 +24141,25 @@
   line-height: 1.25;
 }
 
-.fabricate-manager .manager-tools-create-actions,
+/* `.manager-tools-create-actions` IS GONE FROM THIS SHEET (issue 1118). No element in any
+   component carries the class — the row it was written for is not rendered any more — so its
+   three rules were dead: this group's flex context, a `select` sizing rule, and its own
+   `flex-wrap`. The cascade reconciliation retired its fourth,
+   `.manager-tools-create-actions .manager-button`, and MERGED that rule's declarations into
+   the `select` one on the way past, which left the retirement half done and the dead rule
+   looking freshly maintained. Retiring the class outright is what the first edit meant.
+
+   `.manager-tools-create-prompt`, `.manager-tools-item-shortcuts` and
+   `.manager-tools-library-toolbar` are dead by the same grep and are NOT retired here: they
+   are a separate container family and belong to a dead-CSS sweep of their own, not to a
+   button conversion. `.manager-tools-library-actions` is live — `ToolsBrowserView` renders
+   it — which is why this group survives at all. */
 .fabricate-manager .manager-tools-item-shortcuts,
 .fabricate-manager .manager-tools-library-toolbar,
 .fabricate-manager .manager-tools-library-actions {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tools-create-actions select {
-  min-width: 0;
-  flex: 1 1 180px;
-}
-
-.fabricate-manager .manager-tools-create-actions {
-  flex-wrap: wrap;
-}
-
-.fabricate-manager .manager-tools-create-actions .manager-button,
-.fabricate-manager .manager-tools-create-actions select {
-  min-height: 34px;
-  height: 34px;
-  font-size: 0.7rem;
 }
 
 .fabricate-manager .manager-tools-item-shortcuts {
@@ -23526,18 +24541,13 @@
 @container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-tools-authority-card,
   .fabricate-manager .manager-tools-create-card,
-  .fabricate-manager .manager-tools-create-actions,
   .fabricate-manager .manager-tools-library-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-tools-authority-segments,
-  .fabricate-manager .manager-tools-create-actions > * {
-    width: 100%;
-  }
-
   .fabricate-manager .manager-tools-authority-segments {
+    width: 100%;
     flex-direction: column;
     max-width: none;
   }

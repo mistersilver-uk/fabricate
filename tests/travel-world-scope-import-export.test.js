@@ -35,6 +35,7 @@ import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.
 
 import { makeHarness } from './helpers/authoringExportHarness.js';
 import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
+import { emptyCopyOptions } from './helpers/worldEntityIndex.js';
 
 const SOURCE_SYSTEM_ID = 'sys-wayfaring';
 const VALE_ID = 'realm-northreach-vale';
@@ -126,7 +127,7 @@ function importerInto(world) {
 
 /** Run the WHOLE composition, exactly as `game.fabricate.importSystemFromFile` does. */
 async function runWholeComposition(world, envelope, mode = 'keep') {
-  const packData = prepareForImport(envelope, mode);
+  const packData = prepareForImport(envelope, mode, emptyCopyOptions());
   const summary = await importerInto(world).importFromPackData(packData, {
     overwriteExisting: true,
   });
@@ -138,11 +139,10 @@ function realmIds(travelConfig) {
 }
 
 describe('the export envelope carries the world travel configuration', () => {
-  it('stamps schema 4 and puts the realm library beside the currency ladder', () => {
+  it('stamps the current schema and puts the realm library beside the currency ladder', () => {
     const envelope = exportedEnvelope();
 
     assert.equal(envelope.schemaVersion, FABRICATE_EXPORT_SCHEMA_VERSION);
-    assert.equal(FABRICATE_EXPORT_SCHEMA_VERSION, 4, 'the travel slice is what bumped 3 → 4');
     assert.deepEqual(realmIds(envelope.travelConfig), [VALE_ID, QUARRY_ID]);
     assert.equal(envelope.travelConfig.revealMode, 'onPartyTokenEntry');
     assert.equal(envelope.travelConfig.modifierVisibility, 'gmOnly');

@@ -41,6 +41,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../EmptyState.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import ToggleCard from '../ToggleCard.svelte';
   import CheckFailurePolicy from './CheckFailurePolicy.svelte';
@@ -1327,7 +1328,7 @@
       previewActorId,
       previewRecord?.id ?? '',
       previewPlan.dc,
-    ].join(' ')
+    ].join('\0')
   );
   let adoptedPreviewSignature = $state('');
   $effect(() => {
@@ -1509,9 +1510,7 @@
         )}
       </p>
     {/if}
-    <button
-      type="button"
-      class="manager-button"
+    <ManagerButton
       data-gathering-failure-outcome-link
       disabled={!previewedGatheringTask}
       onclick={() => onOpenGatheringTask(previewedGatheringTask?.id || '')}
@@ -1523,7 +1522,7 @@
           'Open this task'
         )}</span
       >
-    </button>
+    </ManagerButton>
   </section>
 {/snippet}
 
@@ -1619,15 +1618,14 @@
               'This system can roll a check here, but it is switched off. Every attempt that meets its requirements succeeds outright — no formula, no DC, no failure policy.'
             )}
           >
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               data-checks-turn-on
               onclick={() => onToggleCheckActive(activity, true)}
             >
               <i class="fas fa-power-off" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Checks.Off.TurnOn', 'Turn this check on')}</span>
-            </button>
+            </ManagerButton>
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}

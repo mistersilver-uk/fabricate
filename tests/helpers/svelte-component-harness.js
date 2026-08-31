@@ -202,6 +202,7 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
 // the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js'
@@ -234,6 +235,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
+  'src/systems/characterLibraries.js',
   'src/systems/CraftingListingBuilder.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out
   // of the builder into an import-free leaf so #1091's summary projection can share them
@@ -312,6 +314,30 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/progressiveStageThresholds.js',
   // The player's stored stage order is reconciled against the authored list here.
   'src/utils/progressiveResultOrder.js',
+  // Same rule, issue 1286: both progressive read-models attach each stage's player
+  // complication forecast through this leaf, and `inventoryStore` marks the fired tense
+  // with its sibling export. It is a leaf but for `complicationPlan.js`, which is itself a
+  // leaf but for the frozen complication vocabularies — so these three entries close it.
+  'src/utils/progressiveStageComplications.js',
+  'src/utils/complicationPlan.js',
+  'src/utils/componentComplications.js',
+  // Same rule, issue 1370: `CraftingListingBuilder` and `inventorySnapshot` no longer read
+  // `system.components` directly. They enter through the SHARED READ SEAM, which is the one
+  // door onto the world-scope read union. These SEVEN entries are that seam's whole closure —
+  // scopedEntityReads -> componentScope + essenceScope + toolScope (+ definitionIndex, already
+  // listed above), each of those -> scopedDefinitionStore + scopedDefinitions, and
+  // scopedDefinitionStore -> worldScopeEntityGrouping, which imports nothing.
+  //
+  // The migration module is here for its LIFTED IDENTITY FIELD LIST alone: the union deletes
+  // every identity field the in-system record does not carry, and that list has exactly one
+  // definition in the tree.
+  'src/systems/scopedEntityReads.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/systems/scopedDefinitions.js',
+  'src/migration/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 
@@ -362,6 +388,15 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
   // just the stage-list one.
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  // The per-stage complication band (issue 1286). `ProgressiveStageList` — already listed
+  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` and
+  // imports `RowDisclosure`. All three are in the STATIC graph whether or not a fixture
+  // draws a band, so omitting any of them HANGS every mounted crafting suite (# cancelled)
+  // rather than failing one. `Chip` and `RowDisclosure` are import-free leaves, so these
+  // three entries close it.
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',

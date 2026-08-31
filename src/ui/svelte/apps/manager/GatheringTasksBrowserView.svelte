@@ -6,6 +6,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
 
   let {
     tasks = [],
@@ -323,15 +324,14 @@
         .replace('{total}', taskList.length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="gathering-tasks"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </section>
 
@@ -351,11 +351,7 @@
           'Create gathering tasks before attaching them to environments.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button is-primary"
-          onclick={() => onCreateTask(selectedSystemId)}
-        >
+        <ManagerButton role="primary" onclick={() => onCreateTask(selectedSystemId)}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span
             >{text(
@@ -363,7 +359,7 @@
               'Create gathering task'
             )}</span
           >
-        </button>
+        </ManagerButton>
       </EmptyState>
     {:else if filteredTasks.length === 0}
       <EmptyState
@@ -377,8 +373,8 @@
           'Clear search and filters to show all gathering tasks in this system.'
         )}
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}

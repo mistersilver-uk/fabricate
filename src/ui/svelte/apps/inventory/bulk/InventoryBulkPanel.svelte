@@ -30,6 +30,15 @@
   against `entries`, because that (click order) is the order the store snapshots for
   destroy, whereas salvage runs the name-sorted queue.
 
+  ## The forecast block is READ, never derived
+
+  Pre-commit, the panel draws a "What could go wrong" block above the queue: one group
+  card per queued entry carrying player-visible complications (issue 1286). Every field
+  it renders — the ordered rows, their positions, whose order those positions are
+  numbered against — is already published on the entry by the store. This panel calls no
+  forecast builder and reads no component's authored complications: the audience rule
+  that decides what a player may be shown has exactly one owner.
+
   ## Brokenness does not block
 
   A broken tool is still salvageable — `_isBrokenTool`'s own docblock and the spec
@@ -62,6 +71,7 @@
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
+  import InventoryBulkComplicationGroup from './InventoryBulkComplicationGroup.svelte';
   import InventoryBulkReport from './InventoryBulkReport.svelte';
 
   let {
@@ -121,6 +131,32 @@
   // whose component permits player reorder qualify; a GM who pinned the authored order
   // sets `allowPlayerResultReorder: false` and must not be told otherwise.
   const reorderedCount = $derived(salvageable.filter((entry) => entry.allowsReorder).length);
+
+  // ── The "What could go wrong" block (issue 1286) ──────────────────────────────────
+  //
+  // The QUEUED entries carrying a player-visible complication forecast, in queue order,
+  // and the count of the warnings they hold between them.
+  //
+  // Both READ the projection the store publishes on each entry. This panel never calls
+  // `forecastComplications` and never reads `component.complications`: the redaction
+  // rule that decides what a player may be shown has ONE owner, and a panel deriving any
+  // part of it a second time is how a `gmOnly` consequence eventually reaches a player.
+  //
+  // The count is a count of the rows the block actually draws, not a deduplicated tally.
+  // A number in a section eyebrow that disagrees with the rows beneath it is worse than
+  // no number at all, and each queued row is its own resolution — the same complication
+  // on two rows can genuinely fire twice.
+  const complicationGroups = $derived(
+    salvageable
+      .map((entry) => ({
+        entry,
+        complications: Array.isArray(entry.complications) ? entry.complications : [],
+      }))
+      .filter((group) => group.complications.length > 0)
+  );
+  const complicationCount = $derived(
+    complicationGroups.reduce((total, group) => total + group.complications.length, 0)
+  );
 
   const state = $derived.by(() => {
     if (hasReport) return 'report';
@@ -267,6 +303,12 @@
   </button>
 {/snippet}
 
+{#snippet complicationCountLabel()}
+  <span data-inventory-bulk-complication-count={complicationCount}>
+    {localize('FABRICATE.App.Complications.Count', { count: complicationCount })}
+  </span>
+{/snippet}
+
 {#snippet removeControl(entry)}
   <button
     type="button"
@@ -331,6 +373,32 @@
           {localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
         </p>
       {:else}
+        <!-- ABOVE the queue, and PRE-COMMIT only. The forecast is what the player weighs
+             before spending the one gesture that rolls the whole batch, so it has to be
+             read before the commit control rather than found under it. It is absent in
+             the `running` and `report` states entirely: once the run commits, the fired
+             record is reported on the aggregate chat card, and a stale forecast standing
+             beside a committed outcome reads as a second, contradicting report. -->
+        {#if complicationGroups.length > 0}
+          <InventoryBulkSection
+            title={localize('FABRICATE.App.Complications.Title')}
+            titleTrailing={complicationCountLabel}
+            attrs={{ 'data-inventory-bulk-complications': '' }}
+          >
+            <!-- One card per QUEUED ENTRY, keyed on the entry, so the block reads against
+                 the queue directly below it. -->
+            {#each complicationGroups as group (group.entry.key)}
+              <InventoryBulkComplicationGroup
+                img={group.entry.img}
+                name={group.entry.name}
+                orderProvenance={group.entry.orderProvenance ?? null}
+                complications={group.complications}
+                attrs={{ 'data-inventory-bulk-complication-group': group.entry.key }}
+              />
+            {/each}
+          </InventoryBulkSection>
+        {/if}
+
         <InventoryBulkSection
           title={localize('FABRICATE.App.Inventory.Bulk.QueueTitle')}
           attrs={{ 'data-inventory-bulk-queue': 'preview' }}

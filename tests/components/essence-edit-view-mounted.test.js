@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-edit-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
@@ -53,6 +54,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    // THE manager's labelled push-button (issue 1118). `ExplainerCard`'s docs link and
+    // `EditorValidationSurface`'s View action both render through the primitive, so it is a
+    // STATIC import of this tree; omitting it HANGS this suite as `# cancelled`.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',
@@ -61,6 +66,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
+    // The shared scoped validation shell (issue 1362).
+    'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceValidationTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     // The REAL player essence/component tile the behaviour preview now mounts (issue 1036,

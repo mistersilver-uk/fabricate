@@ -77,6 +77,23 @@ export function isGameMaster() {
   return globalThis.game?.user?.isGM === true;
 }
 
+/**
+ * Localize `key`, substituting `data` when supplied.
+ *
+ * DELIBERATELY calls `i18n.format(key, data)` rather than `i18n.localize(key, data)` for the
+ * `data` branch. On Foundry V13.351 `format(stringId, data={})` and `localize(stringId)` are
+ * two separately declared methods and `localize` takes no `data` argument at all, so this
+ * split is required there. On V14.365 `format` is no longer declared as its own method — the
+ * class declares only `localize(stringId, data)`, which now accepts `data` itself — and
+ * `format` survives solely as a non-enumerable prototype alias of `localize`, installed with
+ * no deprecation warning. `i18n.format(key, data)` is therefore correct on BOTH supported
+ * builds today; "modernising" this call to `i18n.localize(key, data)` would silently break on
+ * V13.351, where `localize` ignores a second argument.
+ *
+ * @param {string} key
+ * @param {object} [data]
+ * @returns {string} the key itself when no `game.i18n` is reachable (outside a running world).
+ */
 export function localize(key, data) {
   const i18n = globalThis.game?.i18n;
   if (!i18n) return key;

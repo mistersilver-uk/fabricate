@@ -188,6 +188,71 @@ test('presets: bundles keyed by foundry system id', () => {
   }
 });
 
+// Shape sources (pf2e master; re-verify on a major pf2e release):
+//   ActorPF2e#getRollData()  src/module/actor/base.ts           -> `{ actor: this }`, no system spread
+//   CORE_SKILL_SLUGS         src/module/actor/values.ts         -> 'crafting', never 'cra'
+//   Statistic#rank           src/module/system/statistic/       -> ZeroToFour | null, on the PREPARED
+//                                                                 statistic; skill TRACE data carries
+//                                                                 value/totalModifier/dc/attribute, no rank
+//   AbilityData.mod          src/module/actor/creature/data.ts  -> abilities live under `system`
+test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2e-shaped rollData', () => {
+  // `pf2e`'s ActorPF2e#getRollData() returns `{ actor: this }` and nothing else — it
+  // does NOT spread `system` the way `dnd5e` does. A bare `skills.…` path is therefore
+  // dead in every pf2e world, and because an unknown path degrades to 0 rather than
+  // throwing, it fails as a condition that can never be met rather than as an error.
+  // That is exactly the defect these presets shipped with, so the root is pinned here.
+  for (const preset of PF2E_CHARACTER_PREREQUISITE_PRESETS) {
+    assert.ok(
+      preset.path.startsWith('actor.'),
+      `pf2e preset "${preset.id}" must root at actor.; got "${preset.path}"`
+    );
+  }
+
+  // A pf2e skill's proficiency `rank` lives on the PREPARED statistic (actor.skills),
+  // not under system.skills, whose trace data carries value/totalModifier/dc/attribute
+  // and no rank at all. Ability modifiers do live under system. This fixture reproduces
+  // both, so a preset moved to the wrong one of the two fails here.
+  const pf2eRollData = {
+    actor: {
+      skills: { crafting: { rank: 2 } },
+      system: { abilities: { str: { mod: 3 } } },
+    },
+  };
+  for (const preset of PF2E_CHARACTER_PREREQUISITE_PRESETS) {
+    // NUMBER, not merely defined: `actor.skills.crafting` (one segment short) resolves to
+    // the Statistic object and would pass a not-undefined check, then coerce to 0 at
+    // runtime -- the original never-satisfiable failure wearing a different path.
+    assert.equal(
+      typeof resolveRollDataPath(pf2eRollData, preset.path),
+      'number',
+      `pf2e preset "${preset.id}" must resolve to a number against pf2e-shaped roll data`
+    );
+  }
+  assert.equal(evaluatePrerequisite(pf2eRollData, { path: 'actor.skills.crafting.rank', op: 'gte', value: 2 }), true);
+  assert.equal(evaluatePrerequisite(pf2eRollData, { path: 'skills.cra.rank', op: 'gte', value: 1 }, { warn: () => {} }), false);
+});
+
+test('presets: dnd5e paths stay bare, because dnd5e spreads system onto its roll data', () => {
+  for (const preset of DND5E_CHARACTER_PREREQUISITE_PRESETS) {
+    assert.ok(
+      !preset.path.startsWith('actor.'),
+      `dnd5e preset "${preset.id}" must not root at actor.; got "${preset.path}"`
+    );
+  }
+  const dnd5eRollData = {
+    skills: { arc: { value: 1 } },
+    tools: { smith: { value: 1 } },
+    abilities: { int: { mod: 2 }, str: { value: 21 } },
+  };
+  for (const preset of DND5E_CHARACTER_PREREQUISITE_PRESETS) {
+    assert.equal(
+      typeof resolveRollDataPath(dnd5eRollData, preset.path),
+      'number',
+      `dnd5e preset "${preset.id}" must resolve to a number against dnd5e-shaped roll data`
+    );
+  }
+});
+
 test('seedCharacterPrerequisitePresets: idempotent merge preserves existing ids', () => {
   const first = seedCharacterPrerequisitePresets({ presets: DND5E_CHARACTER_PREREQUISITE_PRESETS, currentLibrary: [] });
   assert.equal(first.added.length, DND5E_CHARACTER_PREREQUISITE_PRESETS.length);

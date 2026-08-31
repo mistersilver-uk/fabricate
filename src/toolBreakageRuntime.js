@@ -1,6 +1,8 @@
 import { stampItemDataRoleIdentity } from './config/flags.js';
 import { Tool } from './models/Tool.js';
 import { setStackQuantity } from './systems/itemStackQuantity.js';
+import { resolvedToolsFor } from './systems/scopedEntityReads.js';
+import { effectiveToolBreakageAuthority } from './systems/toolBreakageAuthority.js';
 
 /**
  * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item-data payload
@@ -29,9 +31,7 @@ import { setStackQuantity } from './systems/itemStackQuantity.js';
 export function stampReplacementComponentIdentity(itemData, system, componentId) {
   const systemId = system?.id;
   stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
-  const linkingTools = (Array.isArray(system?.tools) ? system.tools : []).filter(
-    (tool) => tool?.componentId === componentId
-  );
+  const linkingTools = resolvedToolsFor(system).filter((tool) => tool?.componentId === componentId);
   if (linkingTools.length === 1) {
     stampItemDataRoleIdentity(itemData, systemId, 'toolId', linkingTools[0].id);
   }
@@ -463,10 +463,13 @@ export function createToolBreakageRuntime({
     });
   }
 
-  // Resolve the system's breakage authority (issue 419). Unknown / missing →
-  // `toolSpecific` (today's behaviour).
+  // Resolve the system's EFFECTIVE breakage authority (issue 419; routed through the world
+  // scope at issue 1363). It used to re-default to `toolSpecific` here, which was harmless only
+  // while the crafting-system normalizer minted a concrete value on every save. Now that the
+  // normalizer is absence-preserving, a local re-default would silently ignore a world authority
+  // a GM has authored — the flip would be inert at this reader.
   function resolveAuthority(system) {
-    return system?.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
+    return effectiveToolBreakageAuthority(system);
   }
 
   return {

@@ -638,7 +638,7 @@
                     icon="fas fa-user-shield"
                     title={text(
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone',
-                      'No prerequisites yet — add them in System Settings.'
+                      'No prerequisites yet — add them in System Settings; they are shared by every crafting system.'
                     )}
                     dataAttr="data-recipe-item-character-prereq-empty"
                   />

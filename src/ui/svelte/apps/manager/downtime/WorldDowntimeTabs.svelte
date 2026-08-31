@@ -80,6 +80,7 @@
         aria-label={localize(tab.accessibleName)}
         aria-describedby={`world-downtime-tooltip-${tab.id}`}
         tabindex={tab.id === focusableTabId ? 0 : -1}
+        data-keyboard-focus="true"
         data-downtime-tab={tab.id}
         onclick={(event) => activate(tab, event.currentTarget)}
         onkeydown={(event) => onKeydown(event, index)}

@@ -10,6 +10,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { effectiveToolBreakageAuthority } from '../src/systems/toolBreakageAuthority.js';
 
 // Minimal stubs so the module can load without a Foundry runtime.
 let idCounter = 0;
@@ -19,7 +20,9 @@ globalThis.foundry = {
     getProperty: () => undefined
   }
 };
-globalThis.game = {};
+// `updateSystem` calls `_assertGM`, so the stub user must be a GM (issue 1374): the clear
+// round trip below drives the REAL `updateSystem`, not a normalizer call.
+globalThis.game = { user: { isGM: true } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
@@ -325,22 +328,102 @@ test('_normalizeSystem preserves the complete canonical Tool shape and strips Ki
   assert.equal('kind' in tool, false);
 });
 
-test('_normalizeSystem defaults toolBreakage.authority to toolSpecific when absent', () => {
+// THE FLIP (issue 1363, epic 1357, PR 3). This normalizer used to MINT `toolSpecific` for an
+// absent or unrecognised authority on every normalize, which meant every persisted system carried
+// a concrete value and the WORLD half of `resolveToolBreakageAuthority` was provably unreachable.
+// It is ABSENCE-PRESERVING now: no key at all. The shipped read-shape guarantee that a system with
+// no persisted `toolBreakage` READS AS `toolSpecific` is preserved — but by the RESOLVER, which is
+// where the world value can be consulted, rather than by minting a value the corpus cannot tell
+// apart from a GM's deliberate choice.
+test('_normalizeSystem emits NO toolBreakage key at all when none was authored', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S' });
-  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+  assert.equal('toolBreakage' in system, false, 'an unauthored authority must not be minted');
 });
 
-test('_normalizeSystem coerces an unknown toolBreakage.authority to toolSpecific', () => {
+test('_normalizeSystem drops an unknown toolBreakage.authority rather than coercing it', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'bogus' } });
-  assert.deepEqual(system.toolBreakage, { authority: 'toolSpecific' });
+  assert.equal('toolBreakage' in system, false);
+});
+
+test('the shipped read shape survives the flip: no authored authority still RESOLVES as toolSpecific', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 's', name: 'S' });
+  // `## CraftingSystem` requirement 21's guarantee, now answered where the world half can be
+  // consulted. With no world value authored the answer is bit-identical to the pre-flip mint.
+  assert.equal(effectiveToolBreakageAuthority(system, null), 'toolSpecific');
+  assert.equal(effectiveToolBreakageAuthority(system, {}), 'toolSpecific');
+  // …and the world half is REACHABLE for the first time, which is the whole point of the flip.
+  assert.equal(
+    effectiveToolBreakageAuthority(system, { authority: 'checkDriven' }),
+    'checkDriven',
+    'a system that authored nothing inherits the world authority'
+  );
 });
 
 test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'checkDriven' } });
   assert.deepEqual(system.toolBreakage, { authority: 'checkDriven' });
+});
+
+// ── THE ABSENCE ROUND TRIP (issue 1374, epic 1357) ──────────────────────────────────────────
+//
+// The world-scope write path now treats any argument that is neither authority token as a
+// CLEAR of the per-system override, and writes `{ toolBreakage: {} }`. That only clears
+// anything because NOTHING ON THE PATH MERGES: `updateSystem` builds `{...current, ...updates}`,
+// a SHALLOW merge, so the empty block REPLACES the stored one; and the normalizer above is
+// absence-preserving, so it emits no key for an unrecognized block. Break either half and the
+// key survives — holding the ORIGINAL token after a deep merge, and a SUBSTITUTED `toolSpecific`
+// after a re-minting normalizer.
+//
+// IT NEEDS THE REAL MANAGER, which is why it is here rather than beside the store action that
+// performs the write. The admin-store suite's system-manager double ends its `updateSystem` in
+// `Object.assign`, which cannot delete a key, so a correct clear leaves the key present there
+// and this property is not expressible against it. That suite asserts the FORWARDED PATCH; this
+// one asserts what the patch does.
+//
+// THE PRE-STATE ASSERTION IS NOT CEREMONY. Every other fixture in this file authors no
+// `toolBreakage` at all, so the post-state would hold trivially with no clear having happened.
+
+// A manager holding real, normalized systems with `save()` stubbed — the house pattern, so the
+// REAL `updateSystem` runs rather than a hand-rebuilt imitation of it.
+function makeLoadedManager(systems = []) {
+  const manager = makeManager();
+  for (const system of systems) {
+    manager.systems.set(system.id, manager._normalizeSystem(system));
+  }
+  manager.initialized = true;
+  manager.save = async () => {};
+  return manager;
+}
+
+test('updateSystem CLEARS an authored toolBreakage.authority with an empty block', async () => {
+  const manager = makeLoadedManager([
+    { id: 'sys1', name: 'System One', toolBreakage: { authority: 'checkDriven' } },
+  ]);
+
+  const before = manager.getSystem('sys1');
+  assert.equal(
+    'toolBreakage' in before,
+    true,
+    'pre-state: this system HAS authored an override, so the clear below has something to clear'
+  );
+  assert.equal(before.toolBreakage.authority, 'checkDriven');
+
+  await manager.updateSystem('sys1', { toolBreakage: {} });
+
+  const after = manager.getSystem('sys1');
+  assert.equal(
+    'toolBreakage' in after,
+    false,
+    'the override is GONE, not re-minted as toolSpecific: absence is what the resolver reads ' +
+      'the world value for'
+  );
+  // …and the world half is reachable again for this system, which is the point of clearing.
+  assert.equal(effectiveToolBreakageAuthority(after, { authority: 'checkDriven' }), 'checkDriven');
+  assert.equal(effectiveToolBreakageAuthority(after, null), 'toolSpecific');
 });
 
 test('_normalizeCheckBreakage defaults to an empty trigger list (no enabled flag)', () => {

@@ -45,12 +45,11 @@ function makeServices(overrides = {}) {
 describe('inventoryStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-inventory-store-');
-    // The store reconciles the player's stage order and recomputes cumulative
-    // thresholds through these two leaves (issue 675). Both are import-free, so
-    // copying them verbatim is enough for the compiled store's imports to resolve.
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    ({ createInventoryStore } = await compiler.load(
+    // The store's real import graph, walked rather than restated. This suite used to name
+    // the two ordering leaves by hand; issue 1286 added a third import with a closure of
+    // its own, and a copy list that falls behind an import does not fail this suite — it
+    // HANGS it, and `node --test` reports that as `cancelled` under a `fail 0` summary.
+    ({ createInventoryStore } = await compiler.loadWithClosure(
       'src/ui/svelte/stores/inventoryStore.svelte.js'
     ));
   });

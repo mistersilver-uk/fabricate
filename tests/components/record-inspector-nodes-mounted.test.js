@@ -93,6 +93,18 @@ describe('RecordInspector available-node stepper', () => {
     }
     copyModule('src/ui/svelte/util/foundryBridge.js');
     copyModule('src/gatheringImageDefaults.js');
+    // The per-state tone / glyph / copy map (issue 1321), extracted out of
+    // `CompositionStatePill.svelte`'s own `<script>` so the composition-state vocabulary can
+    // be asserted against it. The pill is compiled into this tree above, so this is a STATIC
+    // import of the mounted graph; the map is import-free by design, which is why this chip
+    // does not grow a `src/systems/` dependency and this single entry closes the edge. This
+    // suite hand-rolls its compile loop with NO dependency validator, so omitting it does not
+    // fail a test: the whole file is reported as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND in the hook. Its sibling
+    // `tests/components/record-inspector-node-max.test.js` registers the same module through
+    // `createMountedComponentHarness`, whose closure validator names the missing file
+    // instead — the asymmetry is why an omission here is more dangerous.
+    copyModule('src/ui/svelte/apps/manager/environment/compositionStateMeta.js');
     Component = (await import(pathToFileURL(join(
       tempRoot,
       'src/ui/svelte/apps/manager/environment/RecordInspector.svelte.js'

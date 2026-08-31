@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-difficulty-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
   ],

@@ -75,6 +75,18 @@ export class GatheringRunManager {
     return this.getActiveRuns(actor).find((run) => run.taskId === normalizedTaskId) || null;
   }
 
+  /**
+   * Create an active run.
+   *
+   * `runData.userId` names the run's OWNING user and is honoured when supplied (issue
+   * 1288). The ambient `getUserId()` is only the fallback, because it is wrong on every
+   * path that creates a run on someone else's behalf: `applyGatheringBlindStart` re-runs a
+   * relayed blind start on the ELECTED GM's client, so the ambient user there is the GM
+   * and the run would be stamped as the GM's. That is not a cosmetic mis-attribution —
+   * `getGatheringRunViewer` resolves this field back into the viewer that matures the run,
+   * and a GM viewer makes `_isOpaqueBlindTask` false, which writes the drawn task's real
+   * id into the player-readable actor flag that issue 901 exists to keep it out of.
+   */
   async createRun(actor, runData = {}) {
     this._assertActor(actor);
     this._assertRunReferences(runData);
@@ -92,7 +104,7 @@ export class GatheringRunManager {
     const run = this._normalizeRun(
       {
         actorUuid: actor.uuid,
-        userId: this.getUserId(),
+        userId: stringOrNull(runData.userId) || this.getUserId(),
         ...pickRunPayload(runData),
         id: this.randomID(),
         status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
@@ -142,7 +154,7 @@ export class GatheringRunManager {
     const run = this._normalizeRun(
       {
         actorUuid: actor.uuid,
-        userId: this.getUserId(),
+        userId: stringOrNull(runData.userId) || this.getUserId(),
         ...pickRunPayload(runData),
         ...terminalPayload,
         id: this.randomID(),

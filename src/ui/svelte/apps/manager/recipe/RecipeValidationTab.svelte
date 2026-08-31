@@ -14,6 +14,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
@@ -370,12 +371,12 @@
               {/if}
             </div>
             {#if row.target}
-              <button
-                type="button"
-                class="manager-button is-ghost manager-recipe-val-view"
+              <ManagerButton
+                role="ghost"
+                class="manager-recipe-val-view"
                 data-recipe-issue-view={row.target}
                 onclick={() => onSelectIssue(row.target)}
-                >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</button
+                >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</ManagerButton
               >
             {/if}
             <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</Chip>

@@ -51,6 +51,11 @@ import {
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
 import {
+  planWorldScopeIdentitySmoke,
+  seededFlagPaths,
+  WORLD_SCOPE_SMOKE_FLAG_NAMESPACE,
+} from './lib/worldScopeIdentitySmoke.js';
+import {
   CORE_TOUR_IDS,
   TOUR_PROGRESS_STORAGE_KEY,
   SUPPRESSED_STEP_INDEX,
@@ -68,6 +73,14 @@ import {
   joinWorldSession as joinWorldSessionShared,
   launchWorld as launchWorldShared
 } from './lib/foundryBrowserBoot.js';
+// The rail's (id, label) pairs (issue 1362). Both this harness and
+// `tests/foundry-manager-rail-hooks.test.js` read them from one place, so a relabel
+// cannot update the harness and leave the component behind, or the reverse.
+import {
+  MANAGER_SYSTEM_RAIL_ENTRIES,
+  MANAGER_WORLD_SCOPED_RAIL_ENTRIES,
+  railSelector
+} from './lib/managerRailEntries.js';
 import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
@@ -495,7 +508,7 @@ async function captureManagerThemes(page) {
 // the group; from a crafting child route (e.g. recipe-edit) it only expands, so
 // always follow with the Recipes sub-item to land on the recipes browser.
 async function openManagerCraftingSection(page, subitemId, managerView) {
-  await page.locator('.fabricate-manager .manager-nav-parent:has-text("Crafting")').first().click();
+  await page.locator(railSelector('manager-nav-crafting')).click();
   const subitem = page.locator(`.fabricate-manager #manager-crafting-nav-${subitemId}`).first();
   await subitem.waitFor({ state: 'visible', timeout: 5_000 });
   await subitem.click();
@@ -557,7 +570,7 @@ async function openChecksSection(page, section) {
  * @param {string} [section]
  */
 async function openChecksActivity(page, activity, section = '') {
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  await page.locator(railSelector('manager-nav-checks')).click();
   const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
   await navItem.waitFor({ state: 'visible', timeout: 5_000 });
   await navItem.click();
@@ -2566,10 +2579,16 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
           }]
         },
         // Player-gathering scenario library tasks. Each player environment fixture
-        // below force-includes one of these via compositionMode 'manual' +
-        // forcedTaskIds. region 'meadowlands' keeps them from matching the automatic
-        // Azure Grove / GM fixtures (northreach / no region); no weather/timeOfDay
-        // constraint keeps them available. Library tasks are d100 drop-row gathers —
+        // below picks exactly one of these via compositionMode 'manual' +
+        // enabledTaskIds (issue 1315: force add composes nothing in manual mode, so
+        // the pick has to live on the enabled list manual actually reads). None of
+        // these tasks declares a `biomes` constraint, so under automatic composition
+        // every one of them would match — and compose into — every environment at
+        // once; manual's picked-list-only rule is what keeps each fixture isolated to
+        // its one scenario. region 'meadowlands' keeps them out of the Azure Grove /
+        // GM fixtures' OWN picks (northreach / no region), which are manual too and
+        // name their own ids explicitly; no weather/timeOfDay constraint keeps them
+        // available. Library tasks are d100 drop-row gathers —
         // the per-scenario "state" (success / scene-block / tool-block / timed /
         // empty / blind) comes from the environment config or the drop-rate, since
         // progressive/check/catalyst/failure task resolution no longer exists.
@@ -3664,9 +3683,11 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
     const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-    // rc/ci gather env: MANUAL composition force-includes ONLY the guaranteed task
-    // and NO events, so the always-run inventory-delta assertion cannot be
-    // perturbed by a hazardous event flipping the outcome.
+    // rc/ci gather env: MANUAL composition picks ONLY the guaranteed task (issue
+    // 1315: manual composes exactly `enabledTaskIds`, so the id lives there rather
+    // than on a force list, which manual mode ignores) and NO events, so the
+    // always-run inventory-delta assertion cannot be perturbed by a hazardous event
+    // flipping the outcome.
     const rcGatherEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke RC Meadow',
@@ -3678,7 +3699,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       compositionMode: 'manual',
       region: 'northreach',
       biomes: ['forest'],
-      forcedTaskIds: [rcGatherTaskId]
+      enabledTaskIds: [rcGatherTaskId]
     });
     // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
     // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event.
@@ -4395,7 +4416,7 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
  * @param {import('playwright').Page} page
  */
 async function exerciseManagerEnvironmentPointerTargets(page) {
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Gathering")').first().click();
+  await page.locator(railSelector('manager-nav-gathering')).click();
   await page.locator('.fabricate-manager .manager-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
   const search = page.locator('.fabricate-manager input[aria-label="Search environments"]').first();
@@ -4460,6 +4481,156 @@ async function installNotificationHidingCss(page) {
   });
 }
 
+/**
+ * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with
+ * a role flag naming the OLD id, the legacy flat scalar, one in-flight run of each kind at BOTH
+ * flag depths, one recorded alchemy dead end, and the persisted re-key map that drives the
+ * repair.
+ *
+ * The plan itself is computed by `scripts/lib/worldScopeIdentitySmoke.js` and unit-tested by
+ * `tests/world-scope-identity-smoke-plan.test.js`; nothing here decides what to write or what to
+ * expect. This function is the Foundry edge alone.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, actorId: string}} options
+ */
+async function setupWorldScopeIdentityFixture(page, { systemId, actorId }) {
+  const plan = planWorldScopeIdentitySmoke({
+    systemId,
+    oldComponentId: 'zzz-smoke-old-component',
+    newComponentId: 'aaa-smoke-new-component',
+    oldToolId: 'zzz-smoke-old-tool',
+    newToolId: 'aaa-smoke-new-tool',
+  });
+  const seeded = seededFlagPaths(plan);
+  return page.evaluate(
+    async ({ plan, seeded, actorId, namespace }) => {
+      const actor = game.actors.get(actorId);
+      if (!actor) throw new Error(`world-scope identity fixture requires actor ${actorId}`);
+      const item = actor.items.contents[0];
+      if (!item) throw new Error('world-scope identity fixture requires one owned item');
+
+      const before = {
+        rekeyMap: game.settings.get('fabricate', 'worldScopeRekeyMap'),
+        actorFlags: {},
+        itemFlags: {},
+      };
+      const readBack = (document, key, bare) =>
+        document.getFlag(namespace, bare ? key : `fabricate.${key}`) ?? null;
+      for (const entry of seeded) {
+        const target = entry.key.startsWith('roles.') || entry.key === 'componentId' ? 'itemFlags' : 'actorFlags';
+        const document = target === 'itemFlags' ? item : actor;
+        before[target][entry.key] = readBack(document, entry.key, entry.bare);
+      }
+
+      const write = (document, entry) =>
+        document.setFlag(namespace, entry.bare ? entry.key : `fabricate.${entry.key}`, entry.value);
+      await write(item, plan.componentFlag);
+      await write(item, plan.toolFlag);
+      await write(item, plan.legacyScalar);
+      await write(actor, plan.craftingRuns);
+      await write(actor, plan.salvageRuns);
+      await write(actor, plan.gatheringRuns);
+      await write(actor, plan.alchemyDeadEnds);
+      await game.settings.set('fabricate', 'worldScopeRekeyMap', plan.rekeyMap);
+
+      return { plan, seeded, actorId, itemId: item.id, before, namespace };
+    },
+    { plan, seeded, actorId, namespace: WORLD_SCOPE_SMOKE_FLAG_NAMESPACE }
+  );
+}
+
+/**
+ * Run the REAL repair and assert every FLAG VALUE it must have rewritten.
+ *
+ * THE FLAG-VALUE ASSERTION IS WHAT CARRIES FALSIFIABILITY. Every resolution outcome on this
+ * world stays green with `remapWorldScopeIdentityFlags` never written, because resolution falls
+ * through to the source-reference tier this change does not touch.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object}} options
+ */
+async function verifyWorldScopeIdentityRemap(page, { fixture }) {
+  const failures = await page.evaluate(async ({ fixture }) => {
+    const { plan, actorId, itemId, namespace } = fixture;
+    const summary = await game.fabricate.remapWorldScopeIdentityFlags();
+    if (!summary) return ['the repair reported nothing, so the re-key map was not pending'];
+
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    const read = (document, key, bare) =>
+      document?.getFlag(namespace, bare ? key : `fabricate.${key}`);
+    const expected = plan.expectations;
+    const problems = [];
+    const check = (label, actual, want) => {
+      if (JSON.stringify(actual) !== JSON.stringify(want)) {
+        problems.push(`${label}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual)}`);
+      }
+    };
+
+    check('roles.componentId', read(item, plan.componentFlag.key, false), expected.componentFlag);
+    check('roles.toolId', read(item, plan.toolFlag.key, false), expected.toolFlag);
+    check('legacy componentId scalar', read(item, 'componentId', false), expected.legacyScalar);
+
+    const crafting = read(actor, 'craftingRuns', false)?.active?.[expected.runIds.craftingRunId];
+    check('craftingRuns requirement componentId', crafting?.steps?.[0]?.requirements?.[0]?.componentId, expected.craftingRunComponentId);
+    check('craftingRuns step toolIds', crafting?.steps?.[0]?.toolIds, [expected.craftingRunToolId]);
+
+    const salvage = read(actor, 'salvageRuns', false)?.active?.[expected.runIds.salvageRunId];
+    check('salvageRuns componentId', salvage?.componentId, expected.salvageRunComponentId);
+
+    // THE OTHER DEPTH. `gatheringRuns` is written with a bare `setFlag`, so a pass that assumes
+    // the doubly-nested depth silently misses it and this assertion is the only thing that sees.
+    const gathering = read(actor, 'gatheringRuns', true)?.active?.[expected.runIds.gatheringRunId];
+    check('gatheringRuns toolIds (single-scope depth)', gathering?.toolIds, [expected.gatheringRunToolId]);
+
+    const [systemId] = Object.keys(plan.rekeyMap);
+    check('alchemyDeadEnds', read(actor, 'alchemyDeadEnds', false)?.[systemId], [
+      expected.alchemyDeadEndKey,
+    ]);
+    return problems;
+  }, { fixture });
+
+  if (failures.length > 0) {
+    throw new Error(`world-scope identity remap did not rewrite: ${failures.join('; ')}`);
+  }
+}
+
+/**
+ * Remove every flag and setting the fixture wrote, restoring what was there before.
+ *
+ * The restore runs in a `finally` and must tolerate a `null` handle, because `setup` itself can
+ * throw. The smoke world is REUSED across runs, so a skipped restore poisons every later run.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object|null}} options
+ */
+async function restoreWorldScopeIdentityFixture(page, { fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ fixture }) => {
+    const { seeded, actorId, itemId, before, namespace } = fixture;
+    const actor = game.actors.get(actorId);
+    const item = actor?.items?.get(itemId);
+    for (const entry of seeded) {
+      const document = entry.key.startsWith('roles.') || entry.key === 'componentId' ? item : actor;
+      if (!document) continue;
+      const key = entry.bare ? entry.key : `fabricate.${entry.key}`;
+      const previous = (entry.key.startsWith('roles.') || entry.key === 'componentId'
+        ? before.itemFlags
+        : before.actorFlags)[entry.key];
+      // UNSET FIRST, ALWAYS. `Document#update`'s recursive merge never REMOVES a key, so writing
+      // the previous container back over a seeded one leaves every seeded run in it — and the
+      // smoke world is REUSED, so that residue outlives the run. Unsetting and then re-writing
+      // is the only sequence that leaves the world exactly as the fixture found it.
+      await document.unsetFlag(namespace, key);
+      if (previous !== null && previous !== undefined) {
+        await document.setFlag(namespace, key, previous);
+      }
+    }
+    await game.settings.set('fabricate', 'worldScopeRekeyMap', before.rekeyMap ?? {});
+  }, { fixture });
+}
+
 async function setupToolStudioFixture(page, { systemId, recipeId }) {
   return page.evaluate(async ({ systemId, recipeId }) => {
     const clone = (value) => foundry.utils.deepClone(value);
@@ -4499,9 +4670,18 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     });
     if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');
 
+    // Character prerequisites are WORLD scope (issue 1308/1311): the Tool Studio
+    // Requirements tab's `prerequisiteOptions` (`ToolRequirementsTab.svelte`, threaded
+    // through `ToolEditView`) reads `selectedCharacterPrerequisites`, which is
+    // `$viewState.worldCharacterPrerequisites` — the `characterLibraries` world setting's
+    // `characterPrerequisites` list — never `getSystem(id).characterPrerequisites`. The
+    // fixture below temporarily REPLACES that world list with the 5-row parity corpus and
+    // must restore the pre-fixture world list afterward, so what is captured here for
+    // restoration is the world list, not the system's (now-unused) legacy field.
+    const worldCharacterLibraries = game.settings.get('fabricate', 'characterLibraries') || {};
     const restore = {
       tools: clone(system.tools || []),
-      characterPrerequisites: clone(system.characterPrerequisites || []),
+      characterPrerequisites: clone(worldCharacterLibraries.characterPrerequisites || []),
       toolBreakage: clone(system.toolBreakage || { authority: 'toolSpecific' }),
       recipeToolIds: clone(recipe.toolIds || []),
       recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
@@ -4528,11 +4708,16 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       value,
     }));
     await csm.updateSystem(systemId, {
-      characterPrerequisites: parityPrerequisites,
       // The parity frame owns an exact eight-row fixture. Clear the unrelated
       // smoke tools first; restoration below reinstates the original array.
       tools: [],
       toolBreakage: { authority: 'toolSpecific' },
+    });
+    // Read-modify-write: `settings.set` REPLACES the whole `characterLibraries` value, so
+    // the world modifier library seeded earlier must be spread back in rather than dropped.
+    await game.settings.set('fabricate', 'characterLibraries', {
+      ...worldCharacterLibraries,
+      characterPrerequisites: parityPrerequisites,
     });
     let { item: upsertedTool } = await csm.upsertTool(systemId, {
       id: requestedToolId,
@@ -4615,8 +4800,14 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.();
     await csm.updateSystem(systemId, {
       tools: fixture.tools,
-      characterPrerequisites: fixture.characterPrerequisites,
       toolBreakage: fixture.toolBreakage,
+    });
+    // Character prerequisites are WORLD scope; restore the pre-fixture world list rather
+    // than a system-scoped field (see the matching comment in `setupToolStudioFixture`).
+    // Read-modify-write so the world modifier library is not clobbered.
+    await game.settings.set('fabricate', 'characterLibraries', {
+      ...(game.settings.get('fabricate', 'characterLibraries') || {}),
+      characterPrerequisites: fixture.characterPrerequisites,
     });
     await rm.updateRecipe(recipeId, {
       toolIds: fixture.recipeToolIds,
@@ -4855,6 +5046,13 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
  * resolve a still-held source copy and decrement a party-pool key this fixture never
  * incremented.
  *
+ * The companion-contract step's throwaway actor is deleted here too, and deleting the
+ * DOCUMENT is what makes its granted entry go with it — a learned flag has no independent
+ * existence. That is the whole reason the step creates its own actor rather than granting
+ * onto a fixture character and undoing it: the only published undo is `resetActorKnowledge`,
+ * which sweeps every learned id for the system, clears their discovery progress and
+ * decrements learn budgets.
+ *
  * @param {import('playwright').Page} page
  * @param {{systemId: string, fixture: object|null}} options
  */
@@ -4896,6 +5094,9 @@ async function restoreKnowledgeFixture(page, { systemId, fixture }) {
     }
     for (const itemId of fixture.sourceItemIds || []) {
       await game.items.get(itemId)?.delete().catch(() => {});
+    }
+    if (fixture.contractActorId) {
+      await game.actors.get(fixture.contractActorId)?.delete().catch(() => {});
     }
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, fixture });
@@ -5077,6 +5278,160 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-narrow');
   await setManagerWindowSize(page, { width: 1280, height: 900 });
+}
+
+/**
+ * Create the throwaway actor the companion-contract step grants onto (issue 1289).
+ *
+ * A THROWAWAY, and never one of the fixture's own characters, because the only published
+ * lever that would undo a grant is `resetActorKnowledge` — and that sweeps EVERY learned id
+ * for the system, wipes the swept ids' discovery progress and decrements learn budgets. Run
+ * against a fixture character it would silently destroy the seeded state the frames above
+ * depend on, inside a section whose whole contract is that it is persisted-net-zero. A
+ * document the section created is one the section can simply delete.
+ *
+ * Created AFTER the captures rather than in `setupKnowledgeFixture`, because a new player
+ * character joins the Knowledge roster and would appear as an extra row in every frame this
+ * section publishes. Its id is written into the fixture record the moment it exists, so
+ * `restoreKnowledgeFixture` deletes it even if the verification below throws.
+ *
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string>} the created actor's id
+ */
+async function createCompanionContractActor(page) {
+  return page.evaluate(async () => {
+    const types = Array.from(game.documentTypes?.Actor || []);
+    const type = types.includes('character') ? 'character' : types[0];
+    if (!type) throw new Error('Companion contract step found no creatable Actor type');
+    const actor = await Actor.create({ name: 'Smoke Companion Contract Target', type });
+    if (!actor?.id) throw new Error('Companion contract step could not create its throwaway actor');
+    return actor.id;
+  });
+}
+
+/**
+ * Prove `game.fabricate.api.COMPANION` in a REAL world (issue 1289, criterion 17).
+ *
+ * Three claims no unit test can make, because `src/main.js` cannot be imported under
+ * `node --test` and every suite that pins it is therefore a text scan or a faithful copy:
+ *
+ *  1. The descriptor is actually PUBLISHED on the live global, and its version is a number.
+ *  2. Every declared member resolves through its own declared `host` and `path` against the
+ *     real facade and the real crafting engine — including the two rows that are not facade
+ *     functions at all (a number on the descriptor, and a method on the object a `handle`
+ *     accessor returns).
+ *  3. A grant against a real Actor document and a real knowledge-mode crafting system
+ *     succeeds, persists the four documented scalars through Foundry's own flag write, and a
+ *     repeat answers `alreadyKnown` — which is the idempotency read going through the shared
+ *     entry-boundary reader rather than a bare map index.
+ *
+ * The fixture characters' flags, their copies' learn counts and the world party-learn pool
+ * are snapshotted around the whole step and compared, so a grant that reached anything other
+ * than its own throwaway actor fails here rather than in some later run's unrelated frame.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, recipeId: string, fixture: object}} options
+ */
+async function verifyCompanionContract(page, { systemId, recipeId, fixture }) {
+  return page.evaluate(async ({ systemId, recipeId, fixture }) => {
+    const actorId = fixture.contractActorId;
+    const GRANTED_BY = 'Foundry smoke: companion contract';
+    const readFlag = (document, key) => document?.getFlag('fabricate', `fabricate.${key}`) ?? null;
+
+    // Everything this step is committed NOT to touch, in one string.
+    const snapshot = () => JSON.stringify({
+      actors: [
+        fixture.chipStatesActorId,
+        fixture.partyPoolActorId,
+        fixture.learnedOnlyActorId,
+        fixture.untrackedActorId,
+      ].map((id) => {
+        const actor = game.actors.get(id);
+        return {
+          id,
+          learnedRecipes: readFlag(actor, 'learnedRecipes'),
+          discoveryProgress: readFlag(actor, 'discoveryProgress'),
+        };
+      }),
+      learnCounts: Object.entries(fixture.ownedByKey || {}).map(([key, owned]) => {
+        const item = game.actors.get(owned.actorId)?.items?.get(owned.itemId);
+        return [key, readFlag(item, 'recipeItemLearning'), readFlag(item, 'recipeItemUsage')];
+      }),
+      // The `total`-scope party budget is a WORLD setting, so a stray decrement would leak
+      // out of this section entirely.
+      partyLearnPool: game.settings.settings?.has?.('fabricate.recipeItemPartyLearnPool')
+        ? game.settings.get('fabricate', 'recipeItemPartyLearnPool')
+        : null,
+    });
+    const before = snapshot();
+
+    const contract = game.fabricate?.api?.COMPANION;
+    if (!contract) throw new Error('game.fabricate.api.COMPANION is not published on the live global');
+    if (typeof contract.schemaVersion !== 'number') {
+      throw new Error(`COMPANION.schemaVersion is ${typeof contract.schemaVersion}, expected a number`);
+    }
+    if (!Object.isFrozen(contract)) throw new Error('COMPANION is published unfrozen');
+
+    // Resolve THROUGH the declared host and path rather than assuming a facade function:
+    // two of the eight rows are not one.
+    const hosts = {
+      contract,
+      facade: game.fabricate,
+      craftingEngine: game.fabricate.getCraftingEngine(),
+    };
+    for (const member of contract.members) {
+      const host = hosts[member.host];
+      if (!host) throw new Error(`COMPANION member ${member.name} declares unresolvable host ${member.host}`);
+      const resolved = host[member.path];
+      const expected = member.kind === 'value' ? 'number' : 'function';
+      if (typeof resolved !== expected) {
+        throw new Error(
+          `COMPANION member ${member.name} resolved to ${typeof resolved} through ${member.host}.${member.path}; expected ${expected}`
+        );
+      }
+    }
+
+    // Fail here, naming the cause, if an earlier phase ever moves the smoke system off its
+    // `knowledge` default — otherwise the grant below refuses and reads as a product defect.
+    const system = game.fabricate.getCraftingSystemManager().getSystem(systemId);
+    if (game.fabricate.getRecipeVisibilityService().isLearnedKnowledgeObservable(system) !== true) {
+      throw new Error(`Companion contract step needs an observable system; ${systemId} is not one`);
+    }
+
+    const granted = await game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy: GRANTED_BY });
+    if (granted?.success !== true || granted?.outcome !== 'granted') {
+      throw new Error(`Grant against a real actor answered ${JSON.stringify(granted)}`);
+    }
+
+    const entry = readFlag(game.actors.get(actorId), 'learnedRecipes')?.[recipeId];
+    if (
+      !entry ||
+      entry.granted !== true ||
+      entry.grantedBy !== GRANTED_BY ||
+      entry.sourceItemUuid !== null ||
+      !Number.isFinite(Number(entry.learnedAt))
+    ) {
+      throw new Error(`The granted entry did not persist as four scalars: ${JSON.stringify(entry)}`);
+    }
+
+    const repeat = await game.fabricate.grantRecipeKnowledge({ actorId, recipeId, grantedBy: GRANTED_BY });
+    if (repeat?.success !== true || repeat?.outcome !== 'alreadyKnown') {
+      throw new Error(`A repeat grant answered ${JSON.stringify(repeat)}; expected alreadyKnown`);
+    }
+
+    const after = snapshot();
+    if (before !== after) {
+      throw new Error(
+        `The companion contract step changed fixture state it does not own.\nbefore: ${before}\nafter:  ${after}`
+      );
+    }
+    return {
+      schemaVersion: contract.schemaVersion,
+      memberCount: contract.members.length,
+      grantedOutcome: granted.outcome,
+      repeatOutcome: repeat.outcome,
+    };
+  }, { systemId, recipeId, fixture });
 }
 
 async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actorId, fixture }) {
@@ -5326,7 +5681,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     height: 724,
     sourceViewport: { width: 1280, height: 720 },
   });
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
+  await page.locator(railSelector('manager-nav-tool-rules')).click();
   await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
   const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
@@ -7247,13 +7602,9 @@ async function main() {
           requirements: {
             currency: { enabled: true }
           },
-          // Two character prerequisites so the System Settings Character
-          // Prerequisites list renders populated for the issue-768 list-ergonomics
-          // evidence (section collapse, copy-to-modifiers).
-          characterPrerequisites: [
-            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
-            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
-          ],
+          // Character prerequisites moved to the WORLD `characterLibraries` setting
+          // alongside modifiers (issue 1308/1311) — seeded below, next to the modifier
+          // library, rather than on this system-scoped payload. See the comment there.
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -7720,6 +8071,16 @@ async function main() {
         const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+        // MANUAL composition (issue 1315): the `enabledTaskIds`/`enabledEventIds`
+        // below are the picked lists manual mode actually reads. At the point this
+        // fixture is created, `gatheringConfig` for this system holds no library
+        // tasks yet (the settings.set that seeds `smoke-forage-library` runs further
+        // down, once the library-owning fields it depends on exist), so automatic
+        // mode's match-the-library gate has nothing to match against and the
+        // environment would fail its "must have a task before enable" validation.
+        // Manual's gate only checks that the picked list is non-empty, so it needs
+        // no library at create time; by the time a player actually browses Azure
+        // Grove, the library (and the ids named here) exists and composes as picked.
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
@@ -7727,6 +8088,7 @@ async function main() {
           img: 'icons/magic/nature/tree-spirit-blue.webp',
           enabled: true,
           selectionMode: 'targeted',
+          compositionMode: 'manual',
           sceneUuid: azureGroveScene.uuid,
           region: 'northreach',
           biomes: ['forest', 'ruins'],
@@ -7743,39 +8105,39 @@ async function main() {
             name: 'Verdant Meadow',
             description: 'Open grassland thick with common herbs, easy to harvest.',
             img: 'icons/consumables/plants/grass-leaves-green.webp',
-            forcedTaskIds: ['smoke-meadow-herbs']
+            enabledTaskIds: ['smoke-meadow-herbs']
           },
           {
             name: 'Sunken Ruins',
             description: 'Half-drowned ruins where forgotten reagents still linger.',
             img: 'icons/environment/wilderness/wall-ruins.webp',
             sceneUuid: 'Scene.fabricateMissingGatheringScene',
-            forcedTaskIds: ['smoke-sunken-survey']
+            enabledTaskIds: ['smoke-sunken-survey']
           },
           {
             name: 'Crystal Thicket',
             description: 'A thicket of glittering crystal fronds, perilous to harvest by hand.',
             img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
-            forcedTaskIds: ['smoke-crystal-dew']
+            enabledTaskIds: ['smoke-crystal-dew']
           },
           {
             name: 'Timed Orchard',
             description: 'An orchard whose slow blooms ripen only with patience.',
             img: 'icons/consumables/fruit/apple-red-tree-green.webp',
-            forcedTaskIds: ['smoke-slow-bloom']
+            enabledTaskIds: ['smoke-slow-bloom']
           },
           {
             name: 'Withered Patch',
             description: 'A blighted patch picked all but bare.',
             img: 'icons/magic/fire/flame-burning-tree-stump.webp',
-            forcedTaskIds: ['smoke-withered-search']
+            enabledTaskIds: ['smoke-withered-search']
           },
           {
             name: 'Moonlit Blind Grove',
             description: 'A moonlit grove where harvests reveal themselves only once attempted.',
             img: 'icons/creatures/mammals/wolf-howl-moon-forest-blue.webp',
             selectionMode: 'blind',
-            forcedTaskIds: ['smoke-moonpetal']
+            enabledTaskIds: ['smoke-moonpetal']
           }
         ];
         for (const fixture of playerFixtureDefinitions) {
@@ -7851,11 +8213,32 @@ async function main() {
           }
         });
 
-        // Modifiers and Tools are SYSTEM-OWNED (the `craftingSystems` setting). Persist both
-        // through the canonical manager update after the Gathering fixture exists: the System
-        // Settings list reads `getSystem(id).modifiers`, while the Tools view and gathering tool
-        // gate read `getSystem(id).tools`.
+        // Tools remain SYSTEM-OWNED (the `craftingSystems` setting): the Tools view and the
+        // gathering tool gate both read `getSystem(id).tools`. Persist through the canonical
+        // manager update after the Gathering fixture exists.
+        //
+        // Modifiers AND character prerequisites both moved to WORLD scope (issue 1308,
+        // rehomed onto their own World > Rules & Resources routes by issue 1311). Every
+        // screen that lists either — World > Rules & Resources > Modifiers /
+        // Character Prerequisites, and every per-activity picker fed from
+        // `selectedSystemModifiers` / `selectedCharacterPrerequisites` in
+        // `CraftingSystemManagerRoot.svelte` (Checks cards, salvage/gathering modifier
+        // pickers, and the Tool Studio Requirements tab) — reads the `characterLibraries`
+        // world setting ONLY (`CharacterLibrariesStore#listModifiers` /
+        // `#listCharacterPrerequisites`); none of them fall back to
+        // `getSystem(id).modifiers` / `.characterPrerequisites`. `resolveModifierLibrary`
+        // and `resolveCharacterPrerequisiteLibrary` (`src/systems/characterLibraries.js`)
+        // still union in a system's legacy copies for worlds the 1.28.0 migration has not
+        // yet lifted, but this smoke world is created fresh under current code, so nothing
+        // exercises that fallback here — seeding only the world lists is what every
+        // consumer actually needs. This is the FIRST write to `characterLibraries` in the
+        // run, so a plain object literal is safe; any LATER write to this setting (e.g. the
+        // Tool Studio fixture below) must read-modify-write it instead, because
+        // `settings.set` REPLACES the whole value rather than merging.
         await csm.updateSystem(systemId, {
+          tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
+        });
+        await game.settings.set('fabricate', 'characterLibraries', {
           modifiers: [
             {
               id: 'smoke-mod-herbalism',
@@ -7870,7 +8253,10 @@ async function main() {
               expression: '@skills.survival.value'
             }
           ],
-          tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
+          characterPrerequisites: [
+            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
+            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
+          ]
         });
 
         // Reference the deliberately-unlabelled tool from the Brew Healing Potion
@@ -7973,9 +8359,11 @@ async function main() {
         // Seed a gathering library task that will NOT match the environment's
         // conditions/biome, then create a MANUAL environment that explicitly
         // includes it. A manually-included-but-non-matching task is classified
-        // `includedButUnavailable`, which surfaces a `staleIncluded` TASK-kind
-        // issue in the overview — exercising the task/event deep-link (which must
-        // resolve to the OWNING environment id, not the task record id).
+        // `includedNotMatching` (issue 1315: manual mode composes the picked list
+        // whether or not it matches, so this is information rather than a fault),
+        // which surfaces a `staleIncluded` TASK-kind issue in the overview —
+        // exercising the task/event deep-link (which must resolve to the OWNING
+        // environment id, not the task record id).
         const blockedConfig = game.settings.get('fabricate', 'gatheringConfig') || {};
         await game.settings.set('fabricate', 'gatheringConfig', {
           ...blockedConfig,
@@ -8315,9 +8703,20 @@ async function main() {
         if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System Overview', 'Components', 'Crafting', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Checks', 'Graph']) {
-          if (!navLabels.includes(expected)) {
-            throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
+        // THE MEMBERSHIP LOOP, BY ID AND THEN BY LABEL (issue 1362). It used to walk nine
+        // LABELS and test `navLabels.includes(...)`, which the world scoped-entity leaves
+        // broke twice over: `Components` stopped appearing at all, and `Tags & Categories`
+        // became an exact duplicate across the two rail scopes, so `includes` could no longer
+        // say WHICH one it had found. Resolving the entry by its stable id fixes identity;
+        // asserting its rendered label afterwards keeps the check on what a GM actually reads.
+        for (const entry of [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES]) {
+          const button = page.locator(railSelector(entry.id));
+          if (await button.count() === 0) {
+            throw new Error(`Manager selected nav is missing rail entry #${entry.id} (${entry.label}). Saw: ${navLabels.join(', ')}`);
+          }
+          const rendered = (await button.locator('.manager-nav-label').first().innerText()).trim();
+          if (rendered !== entry.label) {
+            throw new Error(`Manager rail entry #${entry.id} should read "${entry.label}"; it reads "${rendered}".`);
           }
         }
         // The rail's crafting-system card SELECTS (issue 643): it names the current system
@@ -8529,7 +8928,7 @@ async function main() {
                 selectionMode: 'targeted',
                 sceneUuid: '',
                 compositionMode: 'manual',
-                forcedTaskIds: ['smoke-meadow-herbs'],
+                enabledTaskIds: ['smoke-meadow-herbs'],
                 includedRealmIds: [hiddenVale.id]
               });
             }
@@ -8632,16 +9031,17 @@ async function main() {
           .catch(() => {});
 
         // --- Settings-list ergonomics (issue 768) ---
-        // The seeded system carries two Modifiers, two Character
-        // Prerequisites and two Currency Units. Capture the three lists together
-        // proving the three increment-1 features: (a) the shared IconPicker open on
-        // a modifier (icon-picker parity), (b) a whole-section collapse on the
-        // Currency Units card, and (c) the row-level copy buttons on the summary
-        // rows. Reset afterwards so the Currency captures below start expanded.
+        // The three lists no longer share a page. Currency Units left for its own World route in
+        // issue 1278, and Modifiers and Character prerequisites followed in issue 1311, so this
+        // walk navigates to World > Rules & Resources > Modifiers and captures the ergonomics
+        // there: the shared IconPicker open on a modifier (icon-picker parity) and the row-level
+        // copy button on a summary row.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
-        const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
+        await page.locator('#manager-world-nav-rules').first().click();
+        await page.locator('#manager-rules-nav-modifiers').first().click();
+        const modifierCard = page.locator('.fabricate-manager [data-world-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-        const modifierRows = modifierCard.locator('[data-system-modifier]');
+        const modifierRows = modifierCard.locator('[data-world-modifier]');
         await modifierRows.nth(1).waitFor({ state: 'visible', timeout: 5_000 });
         const modifierRowCount = await modifierRows.count();
         if (modifierRowCount !== 2) {
@@ -8674,15 +9074,23 @@ async function main() {
           await page.waitForTimeout(150);
         }
 
-        // --- World currency configuration (#393, rehomed by #1278) ---
-        // The ladder is WORLD scope now, so this walks to World > Currency rather than a
-        // crafting system's Settings tab, and needs no participation toggle to get there: the
-        // page is ungated precisely so a GM can author the coins BEFORE any system enables
-        // them. Seed the dnd5e (actorProperty) ladder, then capture each spend strategy. The
-        // smoke world is dnd5e, so the actorInventory branch shows the no-provider callout
-        // (the pf2e provider grid needs a pf2e world, which the e2e fixtures do not ship).
+        // --- World currency configuration (#393, rehomed by #1278, folded under Rules &
+        // Resources by #1311) ---
+        // The ladder is WORLD scope now, so this walks to World > Rules & Resources > Currency
+        // rather than a crafting system's Settings tab, and needs no participation toggle to
+        // get there: the page is ungated precisely so a GM can author the coins BEFORE any
+        // system enables them. Seed the dnd5e (actorProperty) ladder, then capture each spend
+        // strategy. The smoke world is dnd5e, so the actorInventory branch shows the
+        // no-provider callout (the pf2e provider grid needs a pf2e world, which the e2e
+        // fixtures do not ship).
+        //
+        // Currency is a Rules & Resources SUBITEM (`#manager-rules-nav-currency`), not the
+        // standalone top-level `#manager-world-nav-currency` item issue 1278 originally added —
+        // issue 1311 folded it under the same group as Modifiers and Character Prerequisites,
+        // and the walk is already on that route from the modifiers capture above (the Rules
+        // submenu stays expanded), so this only needs to select the sibling subitem.
         await setManagerWindowSize(page, { width: 1280, height: 900 });
-        await page.locator('.fabricate-manager #manager-world-nav-currency').first().click();
+        await page.locator('.fabricate-manager #manager-rules-nav-currency').first().click();
         await page.waitForTimeout(300);
         const currencyCard = page.locator('.fabricate-manager [data-world-currency-units]').first();
         await currencyCard.waitFor({ state: 'visible', timeout: 5_000 });
@@ -9321,7 +9729,7 @@ async function main() {
         // above may have visited another system and intentionally own their cleanup.
         await returnToSystemLibrary(page);
         await selectSmokeSystemInManager(page, craftingSetup.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
         if (await page.locator('.fabricate-manager .manager-component-drop-zone').count() === 0) {
@@ -9670,7 +10078,7 @@ async function main() {
         process.stdout.write('  D0: component edit salvage screenshotted\n');
 
         // Return to the components browser for the remaining navigation.
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await componentSearch().fill('Iron Sword');
 
@@ -9695,7 +10103,7 @@ async function main() {
         await screenshot(page, 'manager-component-edit-salvage-off');
         process.stdout.write('  D0: component edit salvage (off) screenshotted\n');
 
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Issue 764: the Simple-mode salvage editor at its one-success-group CAP. The two
@@ -9706,7 +10114,7 @@ async function main() {
         // Fails loudly by design (no guard): a missing hint means the cap regressed.
         await softClick(page.locator('.fabricate-manager .manager-scope-return'));
         await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await componentSearch().fill('Smoke Relic');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)')
@@ -9728,7 +10136,7 @@ async function main() {
         // the fully-seeded routed system they expect.
         await softClick(page.locator('.fabricate-manager .manager-scope-return'));
         await selectSmokeSystemInManager(page, craftingSetup.systemId);
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Checks → Gathering check editor (#437). The gathering check editor is
@@ -9869,7 +10277,7 @@ async function main() {
           process.stderr.write(`Checks crafting modifiers capture failed: ${err.message}\n`);
         }
 
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Components → stacked. Earlier CI runs hung silently between this
@@ -9892,7 +10300,7 @@ async function main() {
         // pages 1→2 under a shrunk page, then capture the continuation page. Placed AFTER the
         // stacked frame so the shrunk page size can never leak into an earlier capture.
         const openComponentsBrowser = async () => {
-          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator(railSelector('manager-nav-component-rules')).click();
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
         };
@@ -9943,7 +10351,7 @@ async function main() {
         // ── D0 section: tags & categories + essences (issue #826 skip guard) ──
         if (shouldRunScreenshotSection('tags-essences')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();
+        await page.locator(railSelector('manager-nav-tags')).click();
         await page.locator('.fabricate-manager[data-manager-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
         if (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count() === 0) {
@@ -9993,7 +10401,7 @@ async function main() {
         });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        const essenceNav = page.locator('.fabricate-manager .manager-nav-button:has-text("Essences")');
+        const essenceNav = page.locator(railSelector('manager-nav-essence-rules'));
         if (await essenceNav.count() > 0 && !(await essenceNav.first().isDisabled())) {
           await essenceNav.first().click();
           await page.locator('.fabricate-manager[data-manager-view="essences"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -10361,6 +10769,49 @@ async function main() {
           });
         }
 
+        // ── D0 section: world-scope identity-flag repair (issue 1363) ────────
+        // ACCEPTANCE CRITERION 6c, and the ONLY arm of criterion 6 that can fail on a live
+        // world. A stale `roles[<systemId>].componentId` names an id absent from the re-keyed
+        // candidate set, so tier 1 returns null and resolution falls through to the UNCHANGED
+        // source-reference tier — which means "owned copies still resolve", "a craft, a salvage
+        // and a gather succeed" and "every browser lists the same entities" are ALL TRUE with
+        // the repair never written. So this section asserts the FLAG VALUE ITSELF.
+        //
+        // Its fixture is purely ADDITIVE persisted state — one world setting and a handful of
+        // flags on ONE owned item and its actor — and the `finally` restore removes every one,
+        // so the section is net-zero even when it fails.
+        //
+        // `rethrow: true`, matching the Tool Studio section and NOT the Knowledge one. The
+        // shared scaffold reserves `false` for a purely EVIDENTIAL section, whose only cost on
+        // failure is its own frames; this section captures no frames at all and is pure
+        // behavioural assertion, so a failure here is a product regression that must abort the
+        // phase rather than be recorded and walked past.
+        // DELIBERATELY UNGATED by `shouldRunScreenshotSection`. Screenshot scoping decides which
+        // FRAMES a run captures, and this section captures none: it is acceptance criterion 6c's
+        // only runtime proof, and gating it on the `tools` token would skip the world-scope
+        // identity check in every scoped run that happens not to select a token unrelated to it.
+        //
+        // THE COST OF THAT PAIR IS STATED RATHER THAN LEFT TO BE DISCOVERED. Ungated plus
+        // `rethrow: true` means EVERY scoped screenshot run now pays this behavioural section, and
+        // a failure in it aborts the phase — costing every later section's frames, including ones
+        // the scoped run was invoked to capture. That is the deliberate trade: this is the only
+        // place the shipped flag repair is exercised against a live world, and a scoped run that
+        // silently skipped it would let a real regression reach `main` behind a green capture job.
+        // `craftingSetup` and `cleanup.crafterId` are both in scope for any run that reaches D0.
+        {
+          await runFixturedScreenshotSection({
+            results,
+            step: 'world-scope-identity-remap',
+            rethrow: true,
+            setup: () => setupWorldScopeIdentityFixture(page, {
+              systemId: craftingSetup.systemId,
+              actorId: cleanup.crafterId,
+            }),
+            exercise: (fixture) => verifyWorldScopeIdentityRemap(page, { fixture }),
+            restore: (fixture) => restoreWorldScopeIdentityFixture(page, { fixture }),
+          });
+        }
+
         // ── D0 section: GM Knowledge surface (issue 785) ─────────────────────
         // Screenshots-profile scoping can run this section on its own. Its fixture is
         // purely ADDITIVE persisted world state (new world Items, new recipe-item
@@ -10379,7 +10830,18 @@ async function main() {
               chipStatesActorId: cleanup.crafterId,
               partyPoolActorId: cleanup.travelMemberId,
             }),
-            exercise: (fixture) => exerciseKnowledgeSurface(page, { fixture }),
+            exercise: async (fixture) => {
+              await exerciseKnowledgeSurface(page, { fixture });
+              // The companion contract's runtime proof (issue 1289, criterion 17) runs LAST
+              // and on a throwaway actor of its own, so it can neither disturb a frame above
+              // nor the fixture characters those frames photograph.
+              fixture.contractActorId = await createCompanionContractActor(page);
+              await verifyCompanionContract(page, {
+                systemId: craftingSetup.systemId,
+                recipeId: craftingSetup.healingPotionRecipeId,
+                fixture,
+              });
+            },
             restore: (fixture) => restoreKnowledgeFixture(page, {
               systemId: craftingSetup.systemId,
               fixture,
@@ -10468,7 +10930,7 @@ async function main() {
           // Guarded independently so a hiccup here does not fail the overview step.
           try {
             const blockedNames = craftingSetup.blockedComponentNames || [];
-            await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+            await page.locator(railSelector('manager-nav-component-rules')).click();
             await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
             await page.locator('.fabricate-manager [data-component-difficulty]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
@@ -11082,7 +11544,7 @@ async function main() {
           await setManagerWindowSize(page, { width: 1280, height: 820 });
           await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
           await settleManagerNav(page);
-          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator(railSelector('manager-nav-component-rules')).click();
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
 

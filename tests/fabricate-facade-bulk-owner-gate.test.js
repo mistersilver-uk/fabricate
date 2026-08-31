@@ -699,7 +699,9 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
       ['the harness mirror', mirror],
     ]) {
       assert.ok(
-        body.includes('findById(getDefinitionIndex(system?.components), target?.componentId)'),
+        body.includes(
+          'findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId)'
+        ),
         `${label} must resolve the component through the retained index, or "faithful copy" ` +
           `is a claim the tree does not support.`
       );

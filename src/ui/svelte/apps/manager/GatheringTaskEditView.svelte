@@ -7,6 +7,7 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
@@ -1173,16 +1174,21 @@
                   >
                 </div>
               {/each}
-              <button
-                type="button"
-                class="manager-button manager-task-stamina-add"
+              <!-- Dashed, and deliberately NOT `fullWidth` (issue 1118, row 34). It is the
+                   add-a-row verb at the foot of the modifier list, which is what `dashed`
+                   states; the list is a column of grid rows and a full-width dashed control
+                   under them would read as a fourth row rather than as the slot that adds
+                   one. Its scoped `justify-self: start` went with the conversion — it was a
+                   grid property on a flex item and had never done anything. -->
+              <ManagerButton
+                role="dashed"
                 disabled={(characterModifierLibrary || []).length === 0}
                 onclick={addStaminaCostModifier}
                 data-gathering-add-stamina-modifier
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
-              </button>
+              </ManagerButton>
             </div>
           </div>
         </div>
@@ -1936,11 +1942,15 @@
               )}
             />
           </label>
-          <button type="button" class="manager-button" onclick={onAddDrop}>
+          <!-- Primary (issue 1118, row 35): the section's CREATE action in toolbar chrome is
+               the loud one, and the identical verb in this screen's own empty state — same
+               `onAddDrop`, same label — was already `is-primary`. Two spellings of one verb
+               on one screen is exactly the drift the primitive exists to end. -->
+          <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
             >
-          </button>
+          </ManagerButton>
         </div>
       </div>
 
@@ -1959,8 +1969,11 @@
               'No drops have been added.'
             )}
           >
-            <button type="button" class="manager-button is-primary" onclick={onAddDrop}
-              >{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</button
+            <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.AddDrop',
+                'Add drop rule'
+              )}</ManagerButton
             >
           </EmptyState>
         {:else if filteredRows.length === 0}
@@ -2421,9 +2434,5 @@
     grid-template-columns: minmax(0, 1fr) 56px 102px 102px auto;
     gap: var(--fab-space-2);
     align-items: center;
-  }
-
-  .manager-task-stamina-add {
-    justify-self: start;
   }
 </style>

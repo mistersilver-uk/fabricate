@@ -410,6 +410,66 @@ export function findByRecipeId(index, recipeId) {
   return bucket;
 }
 
+// ---------------------------------------------------------------------------
+// The resolved scoped-definition union memo (issue 1359)
+// ---------------------------------------------------------------------------
+
+/**
+ * The memoized READ union of a world scope corpus with one system's in-system array.
+ *
+ * @type {WeakMap<object, WeakMap<object[], {revision: number, length: number, union: object[]}>>}
+ */
+const _scopedUnions = new WeakMap();
+
+/**
+ * The memo for `resolveComponentScope` and its siblings (issue 1359, epic 1357).
+ *
+ * IT OBEYS THIS MODULE'S OWN RULE and is keyed on the two OBJECTS the union is derived from — the
+ * world scope store's published corpus and the system's live definition array — never on a system
+ * id. A `systemId` key aliases a deleted-and-recreated system, aliases across manager instances,
+ * and aliases two copy-imported systems that deliberately share ids, which is exactly why
+ * `getDefinitionIndex` keys on the candidate array itself.
+ *
+ * BOTH CLAUSES ARE REQUIRED. A world-only key would serve a stale union after an in-place edit to
+ * the system's own array; a system-only key would serve a stale union after a replicated world
+ * write. The world half needs no revision counter of its own: `scopedDefinitionStore` replaces its
+ * published corpus WHOLESALE in `load()` and `_persist()`, so a remote write invalidates by
+ * identity. The system half reuses the SAME `(revision, length)` guard `getDefinitionIndex` uses,
+ * so the twelve `advanceDefinitionRevision` sites already cover it and `revisionTokens.js` — minted
+ * by the two managers alone — is untouched.
+ *
+ * A build bumps `indexBuilds`, on the same reasoning that counter was added for: a memo that is
+ * silently rebuilt per call is genuinely still O(entities + memberships) per read, and a counter
+ * that could not see it would report a triumphant zero.
+ *
+ * @param {object|null|undefined} worldCorpus The world scope store's published corpus.
+ * @param {object[]|null|undefined} systemDefinitions The system's live in-system array.
+ * @param {() => object[]} build Computes the union when the memo misses.
+ * @returns {object[]}
+ */
+export function getScopedDefinitionUnion(worldCorpus, systemDefinitions, build) {
+  // An absent corpus or a non-array system list has no stable identity to key on, so it is
+  // computed fresh rather than cached under a shared sentinel that two systems would collide in.
+  if (!worldCorpus || typeof worldCorpus !== 'object' || !Array.isArray(systemDefinitions)) {
+    _counters.indexBuilds += 1;
+    return build();
+  }
+  let bySystem = _scopedUnions.get(worldCorpus);
+  if (!bySystem) {
+    bySystem = new WeakMap();
+    _scopedUnions.set(worldCorpus, bySystem);
+  }
+  const revision = _revisions.get(systemDefinitions) ?? 0;
+  const cached = bySystem.get(systemDefinitions);
+  if (cached && cached.revision === revision && cached.length === systemDefinitions.length) {
+    return cached.union;
+  }
+  const union = build();
+  _counters.indexBuilds += 1;
+  bySystem.set(systemDefinitions, { revision, length: systemDefinitions.length, union });
+  return union;
+}
+
 /**
  * The membership lookups `utils/recipeItemMembership.js` accepts, backed by the retained
  * index (issue 1155).

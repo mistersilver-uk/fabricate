@@ -98,7 +98,7 @@
       {#if prerequisiteOptions.length === 0}<p class="manager-muted">
           {text(
             'FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites',
-            'No shared prerequisites are defined for this system.'
+            'No character prerequisites are defined in this world yet.'
           )}
         </p>{/if}
       {#each prerequisiteOptions as option (option.id)}

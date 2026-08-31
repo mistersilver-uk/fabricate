@@ -20,6 +20,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -304,15 +305,15 @@
       </div>
     </section>
 
-    <button
-      type="button"
-      class="manager-button is-primary manager-books-scrolls-edit-action"
+    <ManagerButton
+      role="primary"
+      class="manager-books-scrolls-edit-action"
       data-item-page-edit
       onclick={() => onOpenRecipeItem(item.id)}
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.EditRecipeItem', 'Edit recipe item')}</span>
-    </button>
+    </ManagerButton>
   {/if}
 </div>
 
@@ -447,7 +448,17 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-books-scrolls-edit-action {
+  /* `:global()` AND CHAINED (issue 1118), for the two reasons `BulkEditPanelShell` gives at
+     length. `:global()` because this is a `<ManagerButton>` now, and Svelte stamps its
+     `svelte-<hash>` class onto the elements this component WRITES rather than onto a child
+     component's internals — a scoped selector would have matched nothing while the compiler,
+     `lint:svelte:warnings` and every hand-stamped fixture all reported clean, and this
+     button would have quietly stopped filling the rail and stopped sitting on its bottom
+     edge. Chained because `justify-content` is stated by the base control at (0,2,0) and a
+     bare `:global(.manager-books-scrolls-edit-action)` would be (0,1,0); naming the ancestor
+     and both primitive classes puts all three declarations at (0,4,0), which is decided by
+     specificity rather than by which sheet the browser loaded last. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.manager-books-scrolls-edit-action) {
     width: 100%;
     justify-content: center;
     margin-top: auto;

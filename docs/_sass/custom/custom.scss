@@ -1,0 +1,545 @@
+// Fabricate documentation theme — component styling.
+//
+// just-the-docs imports this last, after every theme module and after the generated callout
+// rules, so plain source order wins at equal specificity. Nothing here needs !important except
+// the reduced-motion reset at the foot of the file, where it is the point.
+//
+// Two things this file deliberately does not do:
+//
+//   * It does not interpolate Liquid. Sass reads _sass partials off disk after Liquid has
+//     already run, so `{{ site.baseurl }}` would emit literally and produce a dead URL without
+//     erroring. Asset URLs are written relative to the compiled sheet, which lives at
+//     {baseurl}/assets/css/ — that makes them baseurl-agnostic by construction.
+//   * It does not invent font sizes. Every `@include fs-N` in the theme emits !important, so a
+//     size can only be matched by including the same mixin, or changed wholesale through
+//     $font-size-1…10 in custom/setup.scss.
+
+// -----------------------------------------------------------------------------------------
+// Fonts
+// -----------------------------------------------------------------------------------------
+//
+// Self-hosted from docs/assets/fonts, copied from the module's own assets/fonts. Only the
+// weights actually requested below are shipped. The body face is left as the theme's system
+// stack: the module's UI face is Foundry's Signika, which this repository does not carry, and
+// a system stack reads better than either at paragraph length.
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/spectral-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/spectral-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+}
+
+// -----------------------------------------------------------------------------------------
+// Headings
+// -----------------------------------------------------------------------------------------
+//
+// Serif for names and headings, matching the module's own rule. base.scss sets no
+// font-family on headings, so this lands without a fight.
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+#toctitle,
+.site-title {
+  font-family: $fab-font-serif;
+}
+
+// Only 400 and 600 of Spectral ship, so weights are pinned to those two rather than left to
+// synthesis: the theme asks for 500 on every heading and 300 on h1.
+h1 {
+  font-weight: 400;
+}
+
+h2,
+h3,
+h5,
+h6,
+#toctitle,
+.site-title {
+  font-weight: 600;
+}
+
+// typography.scss draws h4 as letter-spaced upper case, which reads badly in a serif.
+h4 {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+// -----------------------------------------------------------------------------------------
+// Links
+// -----------------------------------------------------------------------------------------
+//
+// The theme already underlines prose links; the work here is recolouring the decoration. Its
+// default is $border-color, which against this palette is close to invisible, and that would
+// leave links distinguished from body text by hue alone — the accent and the body colour are
+// both warm and sit only a step apart.
+
+a:not([class]) {
+  text-decoration-color: $fab-accent-border;
+
+  &:hover {
+    color: $fab-accent-hover;
+    text-decoration-color: $fab-accent;
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Callouts
+// -----------------------------------------------------------------------------------------
+//
+// The generated rules supply the hairline, the left bar and the title; this adds the tinted
+// fill, the radius and the spacing, mirroring src/ui/svelte/apps/manager/Callout.svelte.
+//
+// Its governing decision is copied deliberately: the tone lives in the glyph, the bar and the
+// title, while the prose stays neutral. A callout is then a block of ordinary text that has
+// been framed, not a block of coloured text — which is what makes a long one readable.
+
+@mixin fab-callout($fill, $tone) {
+  padding: 0.9rem 1rem;
+  color: $fab-text; // a step brighter than surrounding body text, but still neutral
+  background-color: $fill;
+  border-radius: $fab-radius-callout;
+  border-left-width: 3px;
+  border-left-color: $tone;
+
+  // Replaces the theme's two stacked black shadows, which only muddy a dark surface.
+  box-shadow: $fab-shadow-sm;
+}
+
+p.note,
+blockquote.note,
+p.note-title,
+blockquote.note-title {
+  @include fab-callout($fab-info-soft, $fab-info);
+}
+
+p.tip,
+blockquote.tip,
+p.tip-title,
+blockquote.tip-title {
+  @include fab-callout($fab-success-soft, $fab-success);
+}
+
+p.warning,
+blockquote.warning,
+p.warning-title,
+blockquote.warning-title {
+  @include fab-callout($fab-warning-soft, $fab-warning);
+}
+
+p.gm,
+blockquote.gm,
+p.gm-title,
+blockquote.gm-title {
+  @include fab-callout($fab-purple-soft, $fab-purple);
+}
+
+// The title is generated as ::before from the `title` key in _config.yml, glyph included.
+p.note::before,
+p.tip::before,
+p.warning::before,
+p.gm::before,
+blockquote.note::before,
+blockquote.tip::before,
+blockquote.warning::before,
+blockquote.gm::before {
+  padding-bottom: 0.35rem;
+  letter-spacing: 0.08em;
+}
+
+// A heading inside a callout takes the callout's colour rather than the page heading colour,
+// so the framing reads as one block.
+p.note,
+p.tip,
+p.warning,
+p.gm,
+blockquote.note,
+blockquote.tip,
+blockquote.warning,
+blockquote.gm {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: inherit;
+  }
+}
+
+// A plain blockquote keeps the theme's sidebar shape but takes an accent edge, so it does not
+// read as a callout that failed to render.
+blockquote:not([class]) {
+  color: $fab-text-muted-opaque;
+  border-left-color: $fab-accent-border;
+}
+
+// -----------------------------------------------------------------------------------------
+// Code
+// -----------------------------------------------------------------------------------------
+
+// code.scss draws the inner box of every code block with `border: 1px solid $body-text-color`.
+// Against this palette that is a bright peach hairline around every block.
+div.highlighter-rouge div.highlight,
+div.listingblock div.content,
+figure.highlight pre,
+figure.highlight :not(pre) > code {
+  border-color: $fab-border;
+}
+
+:not(pre, figure) > code {
+  color: $fab-text;
+  border-color: $fab-border;
+}
+
+code {
+  font-variant-numeric: tabular-nums;
+}
+
+// The github-dark token palette is WCAG-validated and stays, but its neutrals are cool and
+// read as a foreign object inside a warm design. Only the colours carrying no semantic weight
+// are rewarmed.
+.highlight {
+  .c,
+  .ch,
+  .cd,
+  .cm,
+  .c1,
+  .cs {
+    color: $fab-text-muted-opaque;
+  }
+
+  .p {
+    color: $fab-text-secondary;
+  }
+}
+
+// The copy button sits over the code well.
+div.highlighter-rouge,
+div.listingblock > div.content,
+figure.highlight {
+  > button {
+    color: $fab-text-muted-opaque;
+
+    svg {
+      fill: $fab-text-muted-opaque;
+    }
+
+    &:focus {
+      outline-color: $fab-accent;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Tables
+// -----------------------------------------------------------------------------------------
+
+.table-wrapper {
+  border: 1px solid $fab-border;
+  box-shadow: $fab-shadow-md;
+}
+
+th,
+td {
+  border-bottom-color: $fab-border;
+  border-left-color: $fab-border;
+}
+
+thead th {
+  color: $fab-text;
+  background-color: $fab-bg-3;
+  border-bottom-color: $fab-border-strong;
+}
+
+// -----------------------------------------------------------------------------------------
+// Sidebar and navigation
+// -----------------------------------------------------------------------------------------
+
+.nav-category {
+  color: $fab-text-muted-opaque;
+}
+
+// The wash behind the active item comes from $feedback-color, not from here. It is emitted a
+// second time into just-the-docs-head-nav.css for the no-JavaScript path, so driving it from
+// the variable is what keeps both paths identical; only the text colour is set here.
+.nav-list .nav-list-item .nav-list-link {
+  &:hover,
+  &.active {
+    color: $fab-accent-hover;
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Search
+// -----------------------------------------------------------------------------------------
+
+.search-input {
+  color: $fab-text;
+
+  &::placeholder {
+    color: $fab-text-muted-opaque;
+  }
+}
+
+.search-results {
+  border: 1px solid $fab-border;
+}
+
+.search-result-previews {
+  border-left-color: $fab-border;
+}
+
+// Bold alone is a weak signal against a serif-and-mono page.
+.search-result-highlight {
+  color: $fab-accent-hover;
+}
+
+.search-button {
+  color: $fab-accent;
+  border-color: $fab-accent-border;
+}
+
+// -----------------------------------------------------------------------------------------
+// Buttons
+// -----------------------------------------------------------------------------------------
+
+.btn-primary {
+  color: $fab-on-accent;
+  background-color: $fab-accent;
+
+  &:hover,
+  &:active {
+    color: $fab-on-accent;
+    background-color: $fab-accent-hover;
+  }
+}
+
+.btn-outline {
+  box-shadow: inset 0 0 0 2px $fab-accent-border;
+
+  &:hover,
+  &:active {
+    box-shadow: inset 0 0 0 3px $fab-accent-border;
+  }
+}
+
+// buttons.scss reaches for the literal CSS keyword `blue` here.
+.btn:focus,
+.btn:focus:hover {
+  box-shadow: 0 0 0 3px $fab-accent-border;
+}
+
+// -----------------------------------------------------------------------------------------
+// Footer
+// -----------------------------------------------------------------------------------------
+//
+// Left alone, the theme renders an <hr> with nothing under it on desktop -- its credit block is
+// mobile-only. back_to_top and gh_edit_link in _config.yml fill it, but they arrive mismatched:
+// the edit link carries .text-small while "Back to top" sits at full body size, so the utility
+// link ends up louder than the prose it follows.
+
+.main-content footer {
+  margin-top: $sp-5;
+  color: $fab-text-muted-opaque;
+
+  // Not just the direct child: the edit link is wrapped in the theme's own flex row, and base.scss
+  // gives every p a 1em top margin. Without this the two links read as separate blocks.
+  p {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  // The theme's own mixin rather than a hand-picked value, so this tracks .text-small exactly,
+  // breakpoint bump included.
+  #back-to-top {
+    @include fs-2;
+  }
+
+  // Chrome, not content. These stay quiet until pointed at, so they do not compete with the
+  // links in the page above them.
+  a {
+    color: $fab-text-muted-opaque;
+    text-decoration-color: $fab-border-strong;
+
+    &:hover {
+      color: $fab-accent;
+      text-decoration-color: $fab-accent-border;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Images and figures
+// -----------------------------------------------------------------------------------------
+//
+// These declarations used to live inline on _includes/screenshot.html. They are here so the
+// two images written as plain markdown — the logo and the themes strip — are framed the same
+// way as the generated View Lab frames.
+
+.main-content img {
+  border: 1px solid $fab-border;
+  border-radius: $border-radius;
+}
+
+.main-content figure {
+  margin: 1.5rem 0;
+}
+
+.main-content figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.main-content figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: $fab-text-muted-opaque;
+}
+
+// -----------------------------------------------------------------------------------------
+// Focus, selection, scrollbars
+// -----------------------------------------------------------------------------------------
+//
+// The theme ships no :focus-visible rule at all.
+
+:focus-visible {
+  outline: 2px solid $fab-accent-border;
+  outline-offset: 2px;
+}
+
+// navigation.scss pulls the nav outline inward to stop it clipping; keep that.
+.nav-list .nav-list-item .nav-list-link:focus-visible,
+.nav-list .nav-list-item .nav-list-expander:focus-visible {
+  outline-offset: -1px;
+}
+
+::selection {
+  color: $fab-on-accent;
+  background-color: $fab-accent-border;
+}
+
+.side-bar,
+.search-results {
+  scrollbar-color: $fab-border-strong $fab-bg-0;
+  scrollbar-width: thin;
+}
+
+// -----------------------------------------------------------------------------------------
+// Motion
+// -----------------------------------------------------------------------------------------
+//
+// base.scss sets smooth scrolling and the search overlay animates for 400ms; neither is gated.
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Print
+// -----------------------------------------------------------------------------------------
+//
+// print.scss never neutralises the colour scheme, so a printed page would otherwise be warm
+// cream text on white paper — browsers drop backgrounds but keep foregrounds.
+
+@media print {
+  body,
+  .main-content {
+    color: #111;
+    background-color: #fff;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  #toctitle,
+  a {
+    color: #000;
+  }
+
+  .side-bar {
+    background-color: #fff;
+  }
+
+  :not(pre, figure) > code,
+  div.highlighter-rouge,
+  div.listingblock > div.content,
+  figure.highlight,
+  .highlight,
+  pre.highlight {
+    color: #111;
+    background-color: #fff;
+  }
+
+  div.highlighter-rouge div.highlight,
+  div.listingblock div.content,
+  figure.highlight pre,
+  :not(pre, figure) > code {
+    border-color: #999;
+  }
+
+  th,
+  td {
+    color: #111;
+    background-color: #fff;
+    border-color: #999;
+  }
+
+  p.note,
+  p.tip,
+  p.warning,
+  p.gm,
+  blockquote.note,
+  blockquote.tip,
+  blockquote.warning,
+  blockquote.gm {
+    color: #111;
+    background-color: #fff;
+    box-shadow: none;
+  }
+}

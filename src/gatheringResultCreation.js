@@ -26,6 +26,7 @@ import {
   setStackQuantity,
   updateStackQuantity,
 } from './systems/itemStackQuantity.js';
+import { resolvedComponentsFor } from './systems/scopedEntityReads.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
 export function flattenGatheringResults(resultGroups = []) {
@@ -38,10 +39,9 @@ export function flattenGatheringResults(resultGroups = []) {
 // (`findStackableMatch`) must be handed this exact set + `system.id` so a fresh award is
 // never folded into an owned item that resolves to a different component (issue 556).
 export function resolveGatheringSystemComponents(system, craftingSystemManager) {
-  const own = Array.isArray(system?.components) ? system.components : [];
+  const own = resolvedComponentsFor(system);
   if (own.length > 0) return own;
-  const resolved = craftingSystemManager?.getSystem?.(system?.id)?.components;
-  return Array.isArray(resolved) ? resolved : [];
+  return resolvedComponentsFor(craftingSystemManager?.getSystem?.(system?.id));
 }
 
 /**
@@ -66,10 +66,10 @@ export function resolveGatheringResultAward(result, system, craftingSystemManage
   }
   const componentId = result?.componentId || result?.systemItemId;
   const component =
-    (system?.components ?? []).find((entry) => entry.id === componentId) ??
-    craftingSystemManager
-      ?.getSystem?.(system?.id)
-      ?.components?.find((entry) => entry.id === componentId) ??
+    resolvedComponentsFor(system).find((entry) => entry.id === componentId) ??
+    resolvedComponentsFor(craftingSystemManager?.getSystem?.(system?.id)).find(
+      (entry) => entry.id === componentId
+    ) ??
     null;
   if (!component) return { source: null, componentId: null };
   if (component.registeredItemUuid) {

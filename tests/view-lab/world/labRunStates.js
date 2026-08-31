@@ -18,12 +18,21 @@
  *   inProgress · waitingTime (time-gated, not yet mature) · succeeded · failed · cancelled
  * crossed with single-step and multi-step, because the step rail only appears for the latter.
  *
- * One record is authored for a reason beyond how it RENDERS: the in-flight blind gathering run in
- * {@link buildLabGatheringRuns}, which exists so the Journal's viewer-dependent redaction (issue
- * 901) has a state to be photographed in at all. See that function.
+ * Two records are authored for a reason beyond how they RENDER, and each says so where it is built:
+ * the in-flight blind gathering run in {@link buildLabGatheringRuns}, which exists so the Journal's
+ * viewer-dependent redaction (issue 901) has a state to be photographed in at all; and the resolved
+ * progressive salvage run in {@link buildResolvedProgressiveSalvageRun}, which exists so the
+ * complication feature's FIRED state (issue 1286) is reachable — every `player-salvage*` case is
+ * pre-roll, so without it no frame and no parity region could show a complication that has fired.
  */
 
+import {
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from '../../../src/systems/gatheringComposition.js';
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
+
+import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { RUN_CONTAINER_PATHS, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
 /** World time the lab pins to; a run's timestamps are relative to it. */
@@ -120,26 +129,54 @@ function resolveBlindDraw(environments) {
 /**
  * The first environment matching `predicate`, and one task it composes.
  *
+ * This module has no gathering task library to test biome/danger matches against — `buildLabRunStates`
+ * is called with `environments` only, not the system's task records — so it cannot resolve automatic
+ * mode's actual composed set: `matches − disabled`, bounded by NO id list at all (see
+ * `gatheringComposition.js`). The only candidates available here are the environment's own declared
+ * `enabledTaskIds` and `forcedTaskIds`, so the pool this function draws from is their union, which the
+ * lab world's authoring convention keeps a superset of what really composes — it is a stand-in for a
+ * real task library, not a claim that either list bounds automatic composition.
+ *
+ * `environmentComposesRecord` is still the arbiter of which pool candidate survives, called with
+ * `matches: true` for every candidate (pool membership is the only evidence this function has, so it
+ * is asserted rather than computed). That makes the predicate's real job here the mode split: a manual
+ * environment keeps every pool candidate (`enabled ∪ forced` IS manual composition), while an
+ * automatic one additionally drops anything the environment explicitly excludes via `disabledTaskIds`
+ * — the exclusion the raw union alone did not know to apply.
+ *
+ * Exported so a drift test can import and mutate it directly against a task-id-only fixture, the same
+ * way it is used here.
+ *
  * @param {object[]} environments Persisted environment records from `labContent`.
  * @param {Function} predicate Which environment to take.
  * @param {string} description What was being looked for, for the failure message.
  * @param {string|null} [avoid] A task id to pass over when the environment composes another.
  * @returns {{environment: object, taskId: string}} The environment and a task composed in it.
  */
-function resolveDraw(environments, predicate, description, avoid = null) {
+export function resolveDraw(environments, predicate, description, avoid = null) {
   const environment = (environments ?? []).find((entry) => predicate(entry));
   if (!environment) {
     throw new Error(`labRunStates: the lab world declares no ${description} gathering environment`);
   }
-  // `compositionMode: 'manual'` puts the composed set in `forcedTaskIds`; an automatic environment
-  // lists them in `enabledTaskIds`. Either is the real set of tasks that environment can yield.
-  const composed = environment.forcedTaskIds ?? environment.enabledTaskIds ?? [];
+  const declaredTaskIds = (key) => {
+    const value = environment?.[key];
+    return Array.isArray(value) ? value : [];
+  };
+  const pool = [
+    ...new Set([...declaredTaskIds('enabledTaskIds'), ...declaredTaskIds('forcedTaskIds')]),
+  ];
+  const mode = resolveGatheringCompositionMode(environment);
+  const composed = pool.filter((id) =>
+    environmentComposesRecord(environment, { id, enabled: true }, 'task', mode, true)
+  );
   // `avoid` keeps the completed run off the blind run's drawn task. Not cosmetic: the GM frame is
   // read by comparing the secret preview against the rows around it, and a history row carrying the
   // same task name makes "the GM sees the drawn task" indistinguishable from a coincidence.
   const taskId = composed.find((entry) => entry !== avoid) ?? composed[0];
   if (!taskId) {
-    throw new Error(`labRunStates: ${description} environment "${environment.id}" composes no task`);
+    throw new Error(
+      `labRunStates: ${description} environment "${environment.id}" composes no task`
+    );
   }
   return { environment, taskId };
 }
@@ -360,9 +397,150 @@ export function buildLabRunStates({ actor, userId, recipes, environments }) {
           finishedAt: NOW - 8 * HOUR,
           createdResults: [],
         },
+        buildResolvedProgressiveSalvageRun({ actorUuid, userId }),
       ],
     },
     gatheringRuns: buildLabGatheringRuns({ actorUuid, userId, environments }),
+  };
+}
+
+/**
+ * A RESOLVED progressive salvage run, with per-stage outcomes and a fired-complication list.
+ *
+ * ## Why it has to exist at all (issue 1286)
+ *
+ * The complication feature's player treatment has two states — forecast and FIRED — and the
+ * fired one is a fact about a resolution that already happened. Every `player-salvage*` case
+ * is pre-roll, and the one salvage record this module already seeds carries
+ * `createdResults: []` on a Simple-mode component, so before this the fired treatment was
+ * unreachable in the lab: no frame could show it and no parity region could measure it. This
+ * is that state, authored the way every other record here is authored.
+ *
+ * ## The numbers are the award loop's, not decoration
+ *
+ * `hb-cracked-alembic` resolves salvage progressively, and its ordered stages cost their
+ * result components' own difficulties: Empty Vial 1, Ground Reagent 2, Frostcap Mushroom 4.
+ * The budget is the check's `value` verbatim (`initialRemaining: Number(checkResult?.value)`),
+ * and a progressive check never fails — `runFormulaProgressive` returns `success: true` and a
+ * raw total, with no threshold gate — so a total of 5 is a legal successful resolution that
+ *
+ *   - pays stage 1 (1), leaving 4;
+ *   - pays stage 2 (2), leaving 2;
+ *   - cannot pay stage 3 (4) and BREAKS, under this system's `awardMode: 'equal'`.
+ *
+ * That leaves two stages `full`, one `halted`, none `unreached` and none `skipped` — which is
+ * why `createdResults` holds exactly two records and why the fired list names stage 2 and
+ * stage 3 rather than all three. A record whose arithmetic did not close would publish a
+ * confident, wrong screenshot, which is the failure this whole harness exists to prevent.
+ *
+ * Quantities are 1 and not the authored 2 and 1: the progressive salvage branch forces
+ * `quantity: 1` per stage, so a record echoing the group's authored quantities would disagree
+ * with the items the engine actually creates.
+ *
+ * ## `firedComplications` carries `publicComplications`' whole output
+ *
+ * The list is written at write time with `publicComplications`, because the container is an
+ * actor flag replicated to every client with actor permission. Two consequences are seeded
+ * literally rather than described:
+ *
+ *   - `hb-comp-dust-spoiled` fires here too — it is enabled for salvage and its only clause is
+ *     `stageAwarded`, which stage 2 satisfies — and it is ABSENT from this list, because it is
+ *     `gmOnly`. That absence is the disclosure guarantee, in the one document a player reads.
+ *   - the entries are keyed by `resultId`, not by `componentId`, so the badge lands on the
+ *     occurrence that fired and on none of that component's others. `resultId` is stable only
+ *     because `labContent.js` authors the stage ids; see `CRACKED_ALEMBIC_STAGE_IDS`.
+ *
+ * The four keys the delta pins for the run record (`resultId`, `componentId`,
+ * `complicationId`, `buckets`) are a SUBSET of what `publicComplications` returns, and the
+ * projection's own docblock says a caller persisting it may narrow but must not widen. This
+ * seeds the unnarrowed shape, so a reader that takes only the four still reconciles and a
+ * strip that renders the authored name and description has something to render.
+ *
+ * @param {object} options Options.
+ * @param {string} options.actorUuid The owning actor's uuid.
+ * @param {string} options.userId Owning user id.
+ * @returns {object} A persisted-shape terminal salvage run.
+ */
+function buildResolvedProgressiveSalvageRun({ actorUuid, userId }) {
+  return {
+    id: 'lab-salvage-progressive-resolved',
+    actorUuid,
+    userId,
+    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+    componentId: 'hb-cracked-alembic',
+    componentName: 'Cracked Alembic',
+    status: 'succeeded',
+    startedAt: NOW - 7 * HOUR,
+    updatedAt: NOW - 6 * HOUR,
+    finishedAt: NOW - 6 * HOUR,
+    // The order captured onto the run AT START, which is what a world-time-resumed salvage
+    // spends the budget down rather than re-reading the player's settings. Authored order
+    // here: this run was not reordered.
+    resultOrder: [
+      CRACKED_ALEMBIC_STAGE_IDS.vial,
+      CRACKED_ALEMBIC_STAGE_IDS.reagent,
+      CRACKED_ALEMBIC_STAGE_IDS.frostcap,
+    ],
+    consumedComponents: [{ itemUuid: 'Item.hb-cracked-alembic', quantity: 1 }],
+    usedTools: [],
+    createdResults: [
+      {
+        itemUuid: 'Item.hb-empty-vial',
+        componentId: 'hb-empty-vial',
+        quantity: 1,
+        name: 'Empty Vial',
+        img: `${ICON_BASE}/consumables/potions/bottle-bulb-empty-glass.webp`,
+      },
+      {
+        itemUuid: 'Item.hb-mortar-dust',
+        componentId: 'hb-mortar-dust',
+        quantity: 1,
+        name: 'Ground Reagent',
+        img: `${ICON_BASE}/commodities/materials/bowl-powder-grey.webp`,
+      },
+    ],
+    // `outcome` is null for every progressive check by construction, and `value` IS the
+    // budget the loop spent — the two facts the stage classification above rests on.
+    checkResult: {
+      success: true,
+      outcome: null,
+      value: 5,
+      data: {
+        formula: '1d20 + @abilities.int.mod',
+        resolvedFormula: '1d20 + 0',
+        total: 5,
+        value: 5,
+      },
+    },
+    failureReason: null,
+    firedComplications: [
+      {
+        resultId: CRACKED_ALEMBIC_STAGE_IDS.reagent,
+        componentId: 'hb-mortar-dust',
+        complicationId: 'hb-comp-dust-cloud',
+        // AWARDED and fired at once, which the prototype never had to draw: its own rule
+        // derives "fired" from a stage being short. The stage keeps its success chip and
+        // carries the fired band beneath it.
+        buckets: ['full'],
+        name: 'Choking dust',
+        description:
+          'The reagent goes up in a fine bitter cloud. Everyone at the bench coughs through the next exchange.',
+        severity: 'severe',
+      },
+      {
+        resultId: CRACKED_ALEMBIC_STAGE_IDS.frostcap,
+        componentId: 'hb-frostcap',
+        complicationId: 'hb-comp-frostcap-shatter',
+        // The one stage the budget could not pay. `halted` rather than `unreached`: the loop
+        // reached it and broke on it, and the two stay distinct even though `stageMissed`
+        // unions them.
+        buckets: ['halted'],
+        name: 'The cap shatters',
+        description:
+          'The fungus is more ice than flesh by now. Handled short of its stage it bursts across the bench.',
+        severity: 'major',
+      },
+    ],
   };
 }
 

@@ -383,3 +383,67 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
     assert.equal(result.counts.succeeded, 2, 'and the run itself still happened');
   });
 });
+
+describe('buildBulkSalvageChatContent: every row’s complications on the ONE card (issue 1286)', () => {
+  /** Three rows, two of which fired something. */
+  const MODEL = {
+    status: 'succeeded',
+    actorNames: ['Akra'],
+    counts: { total: 3, succeeded: 3, failed: 0 },
+    subjects: [
+      cardSubject({ name: 'Iron Ore' }),
+      cardSubject({ name: 'Boar Hide' }),
+      cardSubject({ name: 'Cave Bone' }),
+    ],
+    complications: [
+      {
+        name: 'Shrapnel Burst',
+        description: 'Splinters spray across the bench.',
+        severity: 'major',
+        componentName: 'Iron Ingot',
+      },
+      {
+        name: 'Rancid Stench',
+        description: 'The hide sours as it parts.',
+        severity: 'minor',
+        componentName: 'Cured Leather',
+      },
+    ],
+  };
+
+  it('renders one complications section carrying every row, not one section per row', () => {
+    const html = card(MODEL);
+    assert.equal(
+      occurrences(html, 'fabricate-craft-chat__section--complications'),
+      1,
+      'ONE section: a bulk run is not one resolution, but it is one card'
+    );
+    assert.ok(html.includes('Shrapnel Burst'), 'the first row’s complication');
+    assert.ok(html.includes('Rancid Stench'), 'the third row’s complication');
+    assert.ok(
+      html.includes('Iron Ingot') && html.includes('Cured Leather'),
+      'each names its own stage occurrence, or two rows’ beats are indistinguishable'
+    );
+  });
+
+  it('reads the shared complications heading key, not a bulk-only one', () => {
+    const asked = [];
+    buildBulkSalvageChatContent(MODEL, (key) => {
+      asked.push(key);
+      return loc(key);
+    });
+    assert.ok(
+      asked.includes(SALVAGE_CHAT_KEYS.complications),
+      'the salvage map forwards the crafting map’s key rather than spelling a fourth'
+    );
+    assert.ok(
+      asked.every((key) => !key.includes('BulkSalvageComplications')),
+      'and no bulk-only complications key was invented'
+    );
+  });
+
+  it('a run that fired nothing renders no section at all', () => {
+    const html = card({ ...MODEL, complications: [] });
+    assert.ok(!html.includes('--complications'), 'no empty heading, no empty grid');
+  });
+});

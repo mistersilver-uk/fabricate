@@ -11,7 +11,7 @@
  * (CraftingEngine); this module only maps the salvage model onto the shared keys.
  */
 
-import { buildResultCard } from './CraftingChatCard.js';
+import { buildResultCard, CRAFTING_CHAT_KEYS } from './CraftingChatCard.js';
 
 /**
  * The salvage label-key map for `buildResultCard`: the subject is the source
@@ -33,6 +33,9 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
   producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
+  // The shared complications heading, read from the crafting map rather than re-spelled,
+  // for the reason this whole module exists: a salvage card is the SAME card (issue 1286).
+  complications: CRAFTING_CHAT_KEYS.complications,
 });
 
 /**
@@ -49,6 +52,9 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {string}  [model.failureReason]
+ * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
+ *   [model.complications] - Fired component complications, already redacted to the
+ *   player-visible set by the caller (issue 1286).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
  */
@@ -64,6 +70,7 @@ export function buildSalvageChatContent(model = {}, localize = (key) => key) {
       rollValue: model.rollValue,
       tierStep: model.tierStep,
       failureReason: model.failureReason,
+      complications: model.complications,
     },
     SALVAGE_CHAT_KEYS,
     localize

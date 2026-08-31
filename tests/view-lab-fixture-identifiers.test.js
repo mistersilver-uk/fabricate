@@ -97,8 +97,8 @@ const IDENTITY_SOURCES = {
   // library entry id, and `manager-system-edit-modifier-rolls` opens one by id in its steps and
   // asserts the note by id in its `expectSelector` — so a renamed entry would break the case in
   // two places and be caught by neither until a capture run.
-  'data-system-modifier': new Set(modifierLibraryIds()),
-  'data-system-modifier-roll-note': new Set(modifierLibraryIds()),
+  'data-world-modifier': new Set(modifierLibraryIds()),
+  'data-world-modifier-roll-note': new Set(modifierLibraryIds()),
   // The essence browser's bulk selection control (issue 1036) — the exact mirror of
   // `data-component-select` and `data-recipe-select` above. The essence bulk-edit case pins
   // fixture ids in its row ticks, so a rename would otherwise surface only in a capture run.

@@ -314,11 +314,13 @@ function withoutExtension(name) {
  * The View Lab case and head SHA a published frame's URL identifies, or `null` when the URL is not
  * one of this pull request's published frames.
  *
- * THE URL IS THE MACHINE-READABLE IDENTITY, NOT THE ALT TEXT. `labelForCaseId` is not wired into the
- * CLI publish path, so the alt text falls back to a `VIEW_RECIPES` lookup and only then to the bare
- * id — ambiguous by construction. `uploadScreenshotObjects` builds `${prefix}/${pr}[/${sha}]/${name}`,
- * so the last path segment minus its extension is the case id and the segment before it is the head
- * the frames were drawn for.
+ * THE URL IS THE MACHINE-READABLE IDENTITY, NOT THE ALT TEXT, and it stays that way now that
+ * `labelForCaseId` IS wired into the CLI publish path. The alt text is a human-facing sentence
+ * chosen for a reader — it is localizable in principle, it is `sanitizeLabel`d, and a maintainer
+ * pasting their own evidence writes whatever they like in it. None of that is true of the URL:
+ * `uploadScreenshotObjects` builds `${prefix}/${pr}[/${sha}]/${name}`, so the last path segment
+ * minus its extension is the case id and the segment before it is the head the frames were drawn
+ * for. Matching on the label would make this gate depend on wording.
  *
  * ANCHORED ON THE PR NUMBER, deliberately. "Looks like hex" is unsound as a discriminator, because
  * `normalizeHeadShaSegment` permits `[0-9a-zA-Z._-]+` — a legacy `<view>.png` segment can satisfy

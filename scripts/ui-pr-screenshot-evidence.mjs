@@ -17,6 +17,17 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // cycle and `VIEW_RECIPES` above is a top-level `Object.freeze([...])` a cyclic partial-evaluation
 // order can observe as `undefined`.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+// The View Lab's own case registry, for the two things a published frame needs and this file
+// cannot derive: what to CALL it, and whether it needs a caption. Its only non-builtin import is
+// `scripts/lib/designSystemPrimitives.js`, a leaf that imports no repository module, so it still makes
+// no cycle of the kind the `decideScreenshotGate` note above warns about.
+//
+// `labelForCaseId` has always documented itself as wired into this path and never was: the
+// lookup fell through `VIEW_RECIPES` — a table keyed on SMOKE recipe ids, which a View Lab case
+// id is not — and landed on the bare id. Every lab frame in every PR body has therefore been
+// captioned `manager-world-downtime-test-companion-installed` rather than with the sentence the
+// registry already held.
+import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -90,25 +101,40 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
 ];
 
+// The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
+// They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall through
+// BOTH studios' directory globs — a change to any of them would otherwise map to no view at all
+// and fall to the broad `theme-or-global-ui` recipe, publishing frames that cannot show the
+// change. Enumerated by name rather than widened to a directory glob, because
+// `apps/manager/*.svelte` is the whole manager and would conscript these frames as the evidence
+// for every screen in it.
+//
+// `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
+// four chrome primitives, the delete card renders in all three studios, and
+// `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
+// registries must not disagree about what evidence a change to one file requires.
+//
+// HOISTED to one constant (issue 1378). It was written out twice, once in each studio's match
+// list, which made this file hold two copies of the answer to "which shared surfaces do both
+// studios render" — a mirror with nothing checking the copies agreed, and a literal Sonar's
+// Automatic Analysis counts twice besides. There is now one.
+//
+// The five files it names are `evidence: 'targeted'` rows in
+// `scripts/lib/designSystemPrimitives.js`, which is the same judgement stated from the design
+// system's side: these are shared primitives whose consumers are few enough to attribute a frame
+// to. `tests/design-system-primitives.test.js` binds the two, so promoting one of them to a broad
+// signal there — which would route it to the representative pair and away from the bulk frames
+// this list sends it to — fails rather than silently splitting the two registries' answers.
+const BULK_STUDIO_SURFACE_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/;
+
 // The Component Studio BROWSER's own files (issue 676): the view and every component in
 // `components/`, which is the browser's directory (`component/` is the EDITOR's, mirroring
 // the Recipe Studio's `recipes/` vs `recipe/` split). Shared by every browser frame below.
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-  // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue
-  // 1132). They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall
-  // through BOTH the `components/` glob above and the `recipes/` one — a change to any of them
-  // would otherwise map to no view at all and fall to the broad `theme-or-global-ui` recipe,
-  // publishing frames that cannot show the change. Enumerated by name rather than widened to a
-  // directory glob, because `apps/manager/*.svelte` is the whole manager and would conscript
-  // these frames as the evidence for every screen in it.
-  //
-  // `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
-  // four chrome primitives, the delete card renders in all three studios, and
-  // `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
-  // registries must not disagree about what evidence a change to one file requires.
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
+  BULK_STUDIO_SURFACE_PATTERN,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -139,15 +165,16 @@ const BULK_EDIT_MODEL_MATCHES = [
 // so a browser-side component placed in the latter would republish the editor frames and never
 // this one — the split is load-bearing and stated on `manager-recipes` below too.
 //
-// The four shared bulk-edit primitives are enumerated here for the same reason they are
-// enumerated in the components list: they sit directly under `apps/manager/`, so they fall
-// through BOTH studios' directory globs and a change to one of them would otherwise map to no
-// recipe view at all. Widening to `apps/manager/*.svelte` instead would conscript these frames
-// as the evidence for every screen in the manager.
+// The shared bulk surfaces are named here for the same reason they are named in the components
+// list: they sit directly under `apps/manager/`, so they fall through BOTH studios' directory
+// globs and a change to one of them would otherwise map to no recipe view at all. Widening to
+// `apps/manager/*.svelte` instead would conscript these frames as the evidence for every screen
+// in the manager. It is the SAME constant both studios use — see `BULK_STUDIO_SURFACE_PATTERN`,
+// which was written out twice here until issue 1378.
 const RECIPES_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
+  BULK_STUDIO_SURFACE_PATTERN,
 ];
 
 // A single-frame recipes-browser view: one same-named smoke label over the shared browser match
@@ -1622,10 +1649,22 @@ export function sanitizeLabel(label = '') {
   );
 }
 
+// A frame's caption, when it has one, sits BENEATH the image as its own paragraph rather than
+// inside the alt text. Alt text is read by a screen reader and by nothing else a PR reviewer uses,
+// so a warning hidden there is a warning most readers never meet — which is the whole failure this
+// caption exists to fix. It is sanitized on the same terms the label is: the text is this
+// repository's own today, and a caption that could break the managed block is a hazard whoever
+// wrote it.
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded.map(({ label, url }) => `![${prefix}${sanitizeLabel(label)}](${url})`).join('\n\n');
+  return uploaded
+    .map(({ label, note, url }) => {
+      const image = `![${prefix}${sanitizeLabel(label)}](${url})`;
+      const caption = sanitizeLabel(note ?? '');
+      return caption ? `${image}\n\n> ${caption}` : image;
+    })
+    .join('\n\n');
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -1713,7 +1752,7 @@ function normalizeHeadShaSegment(headSha) {
 // caller supply labels from its own registry; otherwise labels resolve from
 // `VIEW_RECIPES` and fall back to the id (the id is DERIVED from the filename here, so
 // the pairing is unambiguous by construction).
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId } = {}) {
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId = labelForCaseId, noteForId = evidenceNoteForCaseId } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
@@ -1732,7 +1771,8 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
     const label = (labelForId && labelForId(viewId)) || (recipe ? recipe.label : viewId);
-    uploaded.push({ viewId, label, url: `${cfg.baseUrl}/${key}`, key, file });
+    const note = (noteForId && noteForId(viewId)) || '';
+    uploaded.push({ viewId, label, note, url: `${cfg.baseUrl}/${key}`, key, file });
   }
   return uploaded;
 }

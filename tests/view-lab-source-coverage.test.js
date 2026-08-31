@@ -38,7 +38,19 @@ const MOUNTED_ROOTS = [
  * that no longer resolves to a tracked file, or that has left the closure, fails — so a stale
  * exemption cannot outlive the thing it exempted.
  */
-const UNCLAIMED_BY_DESIGN = Object.freeze([]);
+const UNCLAIMED_BY_DESIGN = Object.freeze([
+  ...['Component', 'Essence', 'Tool'].map((entity) => ({
+    path: `src/ui/svelte/apps/manager/scoped/World${entity}EntryPage.svelte`,
+    reason:
+      `The world ${entity} entry route exists and normalizes (issue 1362), but NOTHING NAVIGATES ` +
+      'TO IT until its catalogue ships: the deep link is a catalogue row, and this PR ships the ' +
+      'catalogue as a placeholder. A case could only reach it by seeding a state no GM can, ' +
+      'which is the fixture-bypass hazard already recorded against this registry — and a case ' +
+      'that claimed it WITHOUT reaching it would publish a frame of a different screen as its ' +
+      'evidence, which is the exact failure this gate exists to prevent. PRs 6a, 6b and 6c ship ' +
+      'the row that opens it and its case together, and delete this entry.',
+  })),
+]);
 
 /**
  * Components a case may match even though no mounted window renders them.

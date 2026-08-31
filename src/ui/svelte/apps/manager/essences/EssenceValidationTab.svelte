@@ -2,10 +2,13 @@
 <!--
   The essence editor's VALIDATION tab (issue 1036).
 
-  It renders the shared `EditorValidationSurface`, exactly as the Tool Studio and the Recipe
-  Studio do; the check SET, its order and its severities come from the pure
-  `essenceValidation.js`, and the mapping onto copy from `essenceStudio.js`. Nothing about
-  which checks exist is decided here.
+  It renders the shared `ScopedValidationTab` (issue 1362), which is the generalisation of
+  the shell this file and `tools/ToolValidationTab` were both already written as; the check
+  SET, its order and its severities come from the pure `essenceValidation.js`, and the mapping
+  onto copy from `essenceStudio.js`. Nothing about which checks exist is decided here.
+
+  It keeps its `manager-essence-tab-stack` class and its `data-essence-tab-panel="validation"`
+  hook, so no shipped rule and no test selector stops matching.
 
   ── AN ESSENCE ALWAYS SAVES ───────────────────────────────────────────────────────
   Unlike a Tool, a blocking issue here does not stop the save and does NOT disable the
@@ -18,8 +21,8 @@
   informational and always passes; its detail line says which of the two states it is.
 -->
 <script>
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import { essenceValidationPresentation } from './essenceStudio.js';
 
   let { essence = null, context = {} } = $props();
@@ -68,34 +71,18 @@
   }
 </script>
 
-<div class="manager-essence-tab-stack" data-essence-tab-panel="validation">
-  <EditorValidationSurface
-    title={text('FABRICATE.Admin.Manager.Essence.Tabs.Validation', 'Validation')}
-    intro={text(
-      'FABRICATE.Admin.Manager.Essence.Validation.Intro',
-      'An essence always saves. These checks report what is unfinished.'
-    )}
-    {summary}
-    {counts}
-    countLabels={{
-      passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
-      warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
-      blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
-    }}
-    groups={presentation.groups}
-    rowDataAttr="data-essence-validation-check"
-    statusLabels={{
-      pass: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusPass', 'PASS'),
-      warn: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusWarn', 'WARNING'),
-      block: text('FABRICATE.Admin.Manager.Essence.Validation.StatusBlock', 'INCOMPLETE'),
-    }}
-  />
-</div>
-
-<style>
-  .manager-essence-tab-stack {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-  }
-</style>
+<ScopedValidationTab
+  stackClass="manager-scoped-tab-stack manager-essence-tab-stack"
+  hookAttribute="data-essence-tab-panel"
+  hookValue="validation"
+  title={text('FABRICATE.Admin.Manager.Essence.Tabs.Validation', 'Validation')}
+  intro={text(
+    'FABRICATE.Admin.Manager.Essence.Validation.Intro',
+    'An essence always saves. These checks report what is unfinished.'
+  )}
+  {summary}
+  {counts}
+  groups={presentation.groups}
+  rowDataAttr="data-essence-validation-check"
+  blockLabel={text('FABRICATE.Admin.Manager.Essence.Validation.StatusBlock', 'INCOMPLETE')}
+/>

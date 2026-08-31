@@ -10,6 +10,7 @@ These files are the single source of truth for Fabricate specifications.
 - `recipe-visibility/spec.md`
 - `destructive-changes-and-migrations/spec.md`
 - `integrations/spec.md`
+- `companion-api/spec.md`
 - `gathering-and-harvesting/spec.md`
 - `import-export/spec.md`
 - `agentic-workflow/spec.md`

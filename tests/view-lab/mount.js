@@ -131,9 +131,19 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
-    // World Parties is the one Manager route that remains operable with no selected system.
-    // Clearing through the real admin store after construction reaches that state without
-    // weakening production's persisted-selection normalization.
+    // TWO things, and the name says only the second: a world seeded with NO crafting systems,
+    // and the persisted selection cleared through the real admin store after construction. Both
+    // halves are needed, because a Manager refresh resolves an empty selection back to the first
+    // available system — so only an empty LIBRARY makes 'nothing selected' stable. `buildLabWorld`
+    // is where the first half happens (`content.systems = []`), and clearing through the store
+    // rather than by seeding reaches the second without weakening production's
+    // persisted-selection normalization.
+    //
+    // So this IS the lab's suppress-the-seeded-systems input, as well as its clear-the-selection
+    // one: `manager-world-parties-no-selection` photographs the second half and
+    // `manager-systems-empty` the first. Before adding a param that means the same thing, note
+    // what it would cost — a new param here sits outside every marked region below, so a change
+    // to this file would select surface coverage rather than the frames it moved.
     clearSystem: params.get('clearSystem') === '1',
     // Seed an EMPTY party list, for the World > Parties empty state. It takes no
     // post-construction store call the way `clearSystem` does: the pane's empty state is a
@@ -377,35 +387,48 @@ async function mountPlayerApp(content, params) {
  * @returns {object} An API-v1 World navigation provider.
  */
 function labDowntimeProvider() {
+  // NAMED ONCE, then used twice: as the provider's tab set, and as the source the
+  // cross-navigation control below reads its destination's real label out of (issue 1332). A
+  // second literal for that label would be a mirror inside one function, and the frame it
+  // captions is published as evidence.
+  const tabs = [
+    {
+      id: 'ledger',
+      label: 'Test Companion — Ledger',
+      accessibleName: 'Open the downtime ledger',
+      // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
+      // a long multi-word label, on the same tab, or the widest case is one the layout
+      // assertions do not look at.
+      badge: { count: 1284, accessibleName: '1,284 downtime claims waiting for review' },
+      tooltip: 'Every character’s downtime, in one ledger',
+      icon: 'fas fa-scroll',
+      title: 'Downtime ledger',
+      subtitle: 'Downtime Studio · Every character’s work, in one place.',
+      breadcrumb: 'Ledger',
+    },
+    {
+      id: 'crew',
+      label: 'Test Companion — Crew',
+      accessibleName: 'Open the downtime crew roster',
+      tooltip: 'Who is working on what',
+      icon: 'fas fa-users-gear',
+    },
+    {
+      id: 'writs',
+      label: 'Test Companion — Writs',
+      accessibleName: 'Open downtime writs',
+      tooltip: 'Standing orders and commissions',
+      icon: 'fas fa-file-signature',
+    },
+  ];
+  // The tab this screen's cross-navigation control points at: the next of the stand-in's own
+  // three, wrapping. Derived rather than mapped, so adding a tab above needs nothing here.
+  const nextTab = (tabId) => tabs[(tabs.findIndex((tab) => tab.id === tabId) + 1) % tabs.length];
+
   return {
     apiVersion: 1,
     id: 'downtime',
-    tabs: [
-      {
-        id: 'ledger',
-        label: 'Ledger',
-        accessibleName: 'Open the downtime ledger',
-        tooltip: 'Every character’s downtime, in one ledger',
-        icon: 'fas fa-scroll',
-        title: 'Downtime ledger',
-        subtitle: 'Downtime Studio · Every character’s work, in one place.',
-        breadcrumb: 'Ledger',
-      },
-      {
-        id: 'crew',
-        label: 'Crew',
-        accessibleName: 'Open the downtime crew roster',
-        tooltip: 'Who is working on what',
-        icon: 'fas fa-users-gear',
-      },
-      {
-        id: 'writs',
-        label: 'Writs',
-        accessibleName: 'Open downtime writs',
-        tooltip: 'Standing orders and commissions',
-        icon: 'fas fa-file-signature',
-      },
-    ],
+    tabs,
     // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
     // about and the frame has to be able to show it. The old stand-in mounted a short padded
     // div, which renders identically in a 689px target and a 528px one — so the frame could
@@ -446,7 +469,7 @@ function labDowntimeProvider() {
       openEditor.addEventListener('click', () => {
         context?.setRouteChrome?.({
           title: 'Marn the Quartermaster',
-          subtitle: 'Crew member · two projects in flight',
+          subtitle: 'Test companion record · not a Fabricate surface',
           breadcrumb: 'Marn',
           actionsLabel: 'Crew member actions',
           // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
@@ -488,16 +511,58 @@ function labDowntimeProvider() {
         context?.onRouteReselect?.(closeEditor);
       });
 
+      // Item 2 (issue 1332): A COMPANION SENDING THE GM TO ANOTHER OF ITS OWN TABS, which is
+      // the control the seam was widened for — a setting shown where the GM feels its effect,
+      // with a way to reach the screen where it is changed. Until Core published
+      // `navigateToTab` a companion could NAME another of its screens and not reach it, so this
+      // button was either absent or dead, and no frame could tell those two apart from a
+      // working one. Pressing it moves the panel AND the rail's current sub-item with no rail
+      // click, which is a claim about behaviour a photograph can carry.
+      const destination = nextTab(tabId);
+      const crossLink = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        `Go to ${destination.label}`
+      );
+      crossLink.type = 'button';
+      // The literal hook, for the reason the drill-down states above it: the case registry's
+      // selector guard greps this file for the hook a selector names, and a `dataset` write
+      // would leave that literal nowhere in it.
+      crossLink.setAttribute('data-lab-companion-tab-link', '');
+      crossLink.addEventListener('click', () => context?.navigateToTab?.(destination.id));
+
       const panel = element(
         'div',
         'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
           'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
           'background:var(--fab-bg-2)'
       );
+      // THE BANNER, AND IT IS FOR THE PHOTOGRAPH RATHER THAN FOR THE TEST (issue 1324). Every
+      // frame that registers this provider is published to a PR body on a PUBLIC repository, and
+      // a reader has nothing but the picture. A stand-in whose tabs look like a product's reads
+      // as a feature -- and to a reader who KNOWS those tabs are in neither the free module nor
+      // Premium it reads as a feature that leaked, which is the question this banner exists to
+      // answer before it is asked.
+      //
+      // In the PANEL rather than only in the rail, because the panel is the largest thing in the
+      // frame and the one a reader looks at. The rail's labels say it too; this says it where
+      // the eye already is.
+      const banner = element(
+        'div',
+        'flex:0 0 auto;padding:8px 12px;border:1px solid var(--fab-warning);border-radius:8px;' +
+          'background:var(--fab-warning-soft, var(--fab-bg-3));color:var(--fab-warning);' +
+          'font-size:11px;font-weight:700;letter-spacing:0.04em',
+        'TEST-ONLY COMPANION — registered by tests/view-lab/mount.js so Core can photograph its ' +
+          'own companion seam. Not a Fabricate feature; in neither the free module nor Premium.'
+      );
+      banner.setAttribute('data-lab-companion-banner', '');
+      panel.append(banner);
       panel.append(
-        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Test companion — ${tabId}`)
       );
       panel.append(openEditor);
+      panel.append(crossLink);
       const scroller = element(
         'div',
         'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'

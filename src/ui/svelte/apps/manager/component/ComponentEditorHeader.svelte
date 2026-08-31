@@ -35,6 +35,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     dirty = false,
@@ -68,23 +69,11 @@
 {/if}
 <!-- Ghost, matching the recipe editor's Back (ruling 1): Back is not a peer of Save, and
      at the base `.manager-button` weight it competed with it. -->
-<button
-  type="button"
-  class="manager-button is-ghost"
-  {...backHook}
-  onclick={() => onBack()}
-  disabled={saving}
->
+<ManagerButton role="ghost" {...backHook} onclick={() => onBack()} disabled={saving}>
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
-</button>
-<button
-  type="submit"
-  form={formId}
-  class="manager-button is-primary"
-  {...saveHook}
-  disabled={!canSave}
->
+</ManagerButton>
+<ManagerButton role="primary" type="submit" form={formId} {...saveHook} disabled={!canSave}>
   <i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
   <span>{saveLabel}</span>
-</button>
+</ManagerButton>

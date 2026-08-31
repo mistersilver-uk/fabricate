@@ -350,21 +350,6 @@
               handleResultDrop(index);
             }}
           >
-            <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
-                 (issue 676). The order was stacked UNDER the grip inside one handle,
-                 which read as a decorated grip rather than as the stage number that the
-                 award loop actually spends down. -->
-            <span
-              class="manager-recipe-stage-grip"
-              aria-hidden="true"
-              title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-              ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
-            >
-            <span
-              class="manager-recipe-stage-ordinal"
-              data-recipe-result-ordinal={String(index + 1)}
-              aria-hidden="true">{index + 1}</span
-            >
             <RecipeResultItemRow
               {item}
               {componentOptions}
@@ -373,6 +358,29 @@
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
             >
+              {#snippet leadingControls()}
+                <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
+                     (issue 676). The order was stacked UNDER the grip inside one handle,
+                     which read as a decorated grip rather than as the stage number that the
+                     award loop actually spends down.
+
+                     They are a SNIPPET rather than the card's own first two children
+                     (issue 1286) so that a stage carrying a complication band can put them
+                     on the band's own line: as the card's leading flex items they pushed
+                     the full-bleed band ~58px in. The row renders them unchanged and in the
+                     same place when there is no band. -->
+                <span
+                  class="manager-recipe-stage-grip"
+                  aria-hidden="true"
+                  title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
+                  ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
+                >
+                <span
+                  class="manager-recipe-stage-ordinal"
+                  data-recipe-result-ordinal={String(index + 1)}
+                  aria-hidden="true">{index + 1}</span
+                >
+              {/snippet}
               {#snippet reorderControls()}
                 <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
                      the DC + Edit pair, before the remove control. Drag is an

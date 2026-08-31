@@ -295,6 +295,7 @@
           aria-selected={activeTab === tab.id}
           aria-controls={`inventory-detail-panel-${tab.id}`}
           tabindex={activeTab === tab.id ? 0 : -1}
+          data-keyboard-focus="true"
           data-inventory-detail-tab={tab.id}
           onclick={() => (activeTab = tab.id)}
           onkeydown={(event) => onTabKeydown(event, index)}

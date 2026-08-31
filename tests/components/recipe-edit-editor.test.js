@@ -1,4 +1,7 @@
 import { describe, it } from 'node:test';
+// The one place the aside/column pairing is asked, shared with recipe-edit-placeholder
+// and with the scoped-entity suites PRs 6a-c add (issue 1362).
+import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -707,13 +710,32 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.BackToBrowse'), 'Back button uses Recipe.BackToBrowse');
     assert.ok(rootSource.includes('onclick={deleteRecipeFromEdit}'), 'header Delete recipe wired');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.Delete'), 'Delete button uses Recipe.Delete');
-    // Scope the danger-class assertion to the recipe-edit header branch.
-    const recipeEditHeader = rootSource.slice(
-      rootSource.indexOf("{:else if currentView === 'recipe-edit'}"),
-      rootSource.indexOf("{:else if currentView === 'components'}")
+    // The destructive role, read off THE Delete element rather than off a source slice.
+    //
+    // This asked `rootSource.slice(<branch start>, <branch end>).includes('is-danger')`, and
+    // both halves of that were fragile in the same way. The literal went when the toolbar
+    // moved onto `ManagerButton` (issue 1118) — but note WHY it was invisible to a
+    // whole-file check: `is-danger` still occurs in this component, on four
+    // `manager-icon-button` sites that are a different primitive entirely. A token surviving
+    // somewhere else in the file is exactly what hides its disappearance from the region you
+    // meant, so the region is the wrong unit. And the slice's own bounds are two `indexOf`
+    // calls on branch preludes that no longer resolve the moment a route is renamed or
+    // reordered, at which point the assertion reads a garbage span instead of failing.
+    //
+    // `onclick={deleteRecipeFromEdit}` occurs exactly once in the component and names this
+    // control and no other, so it addresses the element without needing a slice at all. The
+    // open tag is bounded by `[^<>]`, so the match stops at this element's own `>` and
+    // cannot reach the Save button's attributes; when it stops resolving, `deleteTag` is
+    // null and the first assertion fails by name rather than the check going quiet.
+    const deleteTag = /<ManagerButton[^<>]*\bonclick=\{deleteRecipeFromEdit\}[^<>]*>/.exec(
+      rootSource
     );
-    assert.ok(recipeEditHeader.includes('is-danger'), 'Delete button carries the is-danger class');
-    assert.ok(!recipeEditHeader.includes('cancelRecipeEdit'), 'recipe-edit header no longer renders Cancel');
+    assert.ok(deleteTag, 'the recipe-edit header renders Delete as a ManagerButton');
+    assert.ok(
+      deleteTag[0].includes('role="danger"'),
+      'Delete button carries the danger destructive role'
+    );
+    assert.ok(!rootSource.includes('cancelRecipeEdit'), 'recipe-edit header no longer renders Cancel');
     assert.ok(rootSource.includes('onPickImagePath={services?.pickImagePath}'), 'passes onPickImagePath');
     assert.ok(rootSource.includes('recipe={recipeDraft}'), 'passes the root-held draft as recipe');
     assert.ok(rootSource.includes('onUpdateRecipe={(patch) => patchRecipeDraft(patch)}'), 'onUpdateRecipe stages into the draft');
@@ -740,28 +762,17 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       rootSource.includes('store.resolveRecipeAccess?.('),
       'access ids are resolved in the STORE, never in the tab'
     );
-    // The aside's suppression list no longer names recipe-edit at all.
-    const asideGuard = rootSource.slice(
-      // The Checks half of this guard became the route PREDICATE when issue 1096 split
-      // `checks` into four child routes, so the anchor moved with it. Retargeted rather
-      // than relaxed: a stale `indexOf` returns -1, the slice below then reads from the end
-      // of the file, and the guard assertion passes over an EMPTY string — green, and
-      // checking nothing at all.
-      rootSource.indexOf("{#if currentView !== 'environment-edit' && !isChecksRoute"),
-      rootSource.indexOf('<aside class="manager-inspector"')
-    );
-    // Issue 676: the aside IS suppressed on recipe-edit now. This guard and the
-    // two-column override list in styles/fabricate.css are ONE decision expressed twice
-    // — suppress without releasing and a 300px empty box holds the strip open; release
+    // Issue 676: the aside IS suppressed on recipe-edit now, and that suppression plus the
+    // two-column override in styles/fabricate.css are ONE decision expressed twice —
+    // suppress without releasing and a 300px empty box holds the strip open; release
     // without suppressing and the empty aside wraps to a row under the editor.
-    assert.ok(
-      asideGuard.includes("currentView !== 'recipe-edit'"),
-      'the aside is suppressed on recipe-edit, matching the released grid column'
-    );
-    assert.ok(
-      /\[data-manager-view="recipe-edit"\] \.manager-body/.test(css),
-      'recipe-edit is in the two-column override list, releasing the rail column to the tabs'
-    );
+    //
+    // ASKED AS SET MEMBERSHIP since issue 1362, which replaced the twelve-clause boolean
+    // guard this used to slice with a single read of `FULL_WIDTH_VIEWS`. That is the
+    // stronger question — the chain could name a route the stylesheet never released — and
+    // the helper asserts every index before it slices, which is the vacuous-green failure
+    // the comment this replaces named and did not actually defend against.
+    assertFullWidthRoute({ rootSource, css, routeId: 'recipe-edit' });
   });
 
   it('passes the read-only recipe-item summary props to RecipeEditView, but no authoring path', () => {

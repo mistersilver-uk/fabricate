@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
 
   let { environment = null, composition = { counts: {} }, onSelectRecord = () => {} } = $props();
@@ -34,7 +35,6 @@
     hasDanger: ['CheckDanger', 'Has a danger level'],
     hasCompositionMode: ['CheckCompositionMode', 'Has a composition mode'],
     hasAvailableTask: ['CheckAvailableTask', 'Has at least one available task'],
-    noStaleIncluded: ['CheckNoStale', 'Has no stale included tasks or events'],
   };
   const ISSUE_LABELS = {
     noAvailableTasks: ['IssueNoAvailableTasks', 'No tasks are available to players.'],
@@ -44,7 +44,7 @@
     ],
     staleIncluded: [
       'IssueStaleIncluded',
-      'Included task or event no longer matches the environment.',
+      'An included task or event does not match this environment, and composes anyway.',
     ],
     noScene: ['IssueNoScene', 'No scene is linked.'],
     noEventsAtDanger: ['IssueNoEventsAtDanger', 'Danger is set but no events are available.'],
@@ -56,8 +56,14 @@
   };
   const RECORD_ISSUE_LABELS = {
     staleIncluded: {
-      task: ['IssueStaleIncludedTask', 'The task "{name}" no longer matches this environment.'],
-      event: ['IssueStaleIncludedEvent', 'The event "{name}" no longer matches this environment.'],
+      task: [
+        'IssueStaleIncludedTask',
+        'The task "{name}" does not match this environment, and composes anyway.',
+      ],
+      event: [
+        'IssueStaleIncludedEvent',
+        'The event "{name}" does not match this environment, and composes anyway.',
+      ],
     },
     taskNoDescription: {
       task: ['IssueTaskNoDescriptionTask', 'The task "{name}" has no player-facing description.'],
@@ -139,9 +145,18 @@
                 >
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
-                  <button
-                    type="button"
-                    class="manager-button manager-environment-issue-action"
+                  <!-- `data-environment-issue-action` replaces the bespoke
+                       `manager-environment-issue-action` class (issue 1118): the sheet
+                       declared NOTHING for it in any theme, so it was a test selector
+                       wearing a style class's clothes, and it named neither the verb nor
+                       the record it opens. -->
+                  <!-- Ghost (issue 1118, row 44), for the reason the system overview's
+                       identical deep link is: the quiet NAVIGATIONAL verb of
+                       `ui-integration/spec.md`, beside a severity chip that is meant to
+                       carry the row's weight. -->
+                  <ManagerButton
+                    role="ghost"
+                    data-environment-issue-action={issue.recordKind}
                     onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}
                   >
                     {issue.recordKind === 'event'
@@ -153,7 +168,7 @@
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask',
                           'View task'
                         )}
-                  </button>
+                  </ManagerButton>
                 {/if}
               </li>
             {/each}

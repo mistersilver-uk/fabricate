@@ -13,6 +13,11 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
     // omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // The promoted tab-strip primitive (issue 1362). This is a DEPENDENCY DECLARATION, not
+    // an assertion: `RecipeItemEditorTabs` is a caller of it now, and the shared harness's
+    // closure validator THROWS naming this file if it is omitted. Every assertion below is
+    // unchanged, which is the mechanical tell that the promotion moved no rendered contract.
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte'

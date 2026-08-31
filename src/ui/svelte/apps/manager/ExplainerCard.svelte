@@ -46,6 +46,8 @@
   import-free `components/` leaf directory), which is why it lives here.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
+
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
 
   let { icon = '', title = '', items = [], links = [], dataAttr = '', dataValue = '' } = $props();
@@ -112,15 +114,16 @@
   {#if docsLinks.length > 0}
     <div class="manager-setup-links">
       {#each docsLinks as link (link.href)}
-        <a
-          class="manager-button is-ghost manager-explainer-card-docs"
+        <ManagerButton
+          role="ghost"
+          tag="a"
+          class="manager-explainer-card-docs"
           href={link.href}
           target="_blank"
-          rel="noreferrer"
         >
           <i class={link.icon || DEFAULT_LINK_ICON} aria-hidden="true"></i>
           <span>{link.label}</span>
-        </a>
+        </ManagerButton>
       {/each}
     </div>
   {/if}

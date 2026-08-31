@@ -132,6 +132,21 @@ function renderSources() {
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
+/**
+ * The components that RENDER the manager rail.
+ *
+ * Shared by the string-label branch and the rail-HOOK branch below, because the two guard the
+ * same thing and a second copy of the rule is a second thing to weaken. An unscoped search is
+ * what makes either branch vacuous: `Tools` is a common English word, and
+ * `manager-world-nav-parties` would resolve out of a test fixture or a comment.
+ *
+ * @param {Map<string, string>} sources
+ * @returns {Array<[string, string]>}
+ */
+function railRenderingFiles(sources) {
+  return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+}
+
 function navDeclarationScope(sources, template) {
   const builders = [...sources].filter(([, text]) => text.includes(template));
   const scope = new Map(builders);
@@ -365,6 +380,36 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     }
     return;
   }
+  // A RAIL HOOK, scoped to the components that render the rail (issue 1362).
+  //
+  // The label steps this replaced were checked against `railRenderingFiles`, and the generic
+  // token branch at the bottom of this function is WEAKER than that in two different ways —
+  // which is exactly why the string branch was kept alive for the eight labels this relabel
+  // does not touch rather than being deleted wholesale:
+  //
+  //  - it searches the WHOLE `src/` tree, so `manager-nav-tool-rules` would resolve out of a
+  //    comment or an unrelated component;
+  //  - and it STRIPS ATTRIBUTE VALUES before tokenizing, so an attribute-shaped hook such as
+  //    `[data-manager-nav="component-catalogue"]` would verify only that the ATTRIBUTE NAME
+  //    exists somewhere — every one of the nine rail values could be wrong and stay green.
+  //
+  // The branch is therefore conditioned on the hook SHAPE rather than on whether the id is
+  // interpolated: an attribute-value hook is weakened exactly as badly as an interpolated id.
+  const railHook =
+    /^#(manager-(?:world-)?nav-[a-z0-9-]+)$/.exec(selector) ??
+    /^\[data-(?:manager|world)-nav-item="([^"]+)"\]$/.exec(selector);
+  if (railHook) {
+    const railFiles = railRenderingFiles(sources);
+    if (railFiles.length === 0) {
+      missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
+    } else if (!railFiles.some(([, text]) => text.includes(railHook[1]))) {
+      missing.push(
+        `${viewCase.id}: rail hook "${railHook[1]}" appears in no component that renders ` +
+          `"${RAIL_BUTTON_CLASS}" (${railFiles.map(([file]) => file).join(', ')})`
+      );
+    }
+    return;
+  }
   const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(selector);
   if (navId) {
     const [, group, id] = navId;
@@ -451,7 +496,7 @@ test('every interaction step names text that exists in the manager UI', () => {
         // English words that occur all over a 300-file haystack, so an unscoped `includes` could
         // never fail. Demonstrated: deleting the entire manager rail still resolved all eight, out
         // of `lang/en.json` and unrelated components, leaving 92 steps across ~60 cases unguarded.
-        const railFiles = [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+        const railFiles = railRenderingFiles(sources);
         if (railFiles.length === 0) {
           missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
         } else if (!railFiles.some(([, text]) => text.includes(step))) {
@@ -528,10 +573,65 @@ test('every interaction step names text that exists in the manager UI', () => {
   );
 });
 
+/**
+ * The four rail labels that BECAME AMBIGUOUS when the world scoped-entity leaves landed
+ * (issue 1362), as an enumerated DENY-LIST rather than a blanket ban on string steps.
+ *
+ * Only these four collide. `Components`, `Essences` and `Tools` were relabelled to
+ * `Component Rules` / `Essence Rules` / `Tool Rules`, and `Tools` is additionally a live
+ * SUBSTRING of the new `Tools Catalogue`; `Tags & Categories` was not relabelled at all and is
+ * now CHARACTER-FOR-CHARACTER IDENTICAL across the two rail scopes. A substring collision is
+ * recoverable by DOM order; an exact duplicate is not.
+ *
+ * The other four labels — `Crafting`, `Checks`, `Gathering`, `System Overview`, 109 steps —
+ * keep the string branch, and that is deliberate rather than laziness. The string branch
+ * validates a label against the components that actually RENDER the rail button class; the
+ * selector branch that would replace it strips attribute VALUES before tokenizing. Deleting
+ * the branch outright would have forced all 158 migrations AND removed a STRONGER check than
+ * what replaced it.
+ *
+ * @type {readonly string[]}
+ */
+const MIGRATED_RAIL_LABELS = Object.freeze([
+  'Components',
+  'Essences',
+  'Tools',
+  'Tags & Categories',
+]);
+
+test('no case reaches a rail entry by one of the four ambiguous labels', () => {
+  const offending = [];
+  let stringSteps = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const step of viewCase.steps ?? []) {
+      if (typeof step !== 'string') continue;
+      stringSteps += 1;
+      if (MIGRATED_RAIL_LABELS.includes(step)) offending.push(`${viewCase.id}: "${step}"`);
+    }
+  }
+  // NON-VACUITY. The string branch stays ALIVE for the labels this relabel does not touch, so
+  // a registry that had quietly lost every string step would satisfy the deny-list while also
+  // having discarded the stronger check it protects.
+  assert.ok(
+    stringSteps > 100,
+    `only ${stringSteps} string steps remain; the string branch and its scoped rail check are ` +
+      'supposed to stay alive for the 109 steps this relabel does not touch'
+  );
+  assert.deepEqual(
+    offending,
+    [],
+    'these steps click a rail entry by a label that now names TWO buttons (or is a ' +
+      'substring of another). Use the stable id instead: `#manager-nav-component-rules`, ' +
+      '`#manager-nav-essence-rules`, `#manager-nav-tool-rules`, `#manager-nav-tags`, or ' +
+      'the matching `#manager-world-nav-*` leaf.\n  ' +
+      offending.join('\n  ')
+  );
+});
+
 test('every expectSelector names UI that still exists', () => {
   // The step sweep above never looked at `expectSelector`, so a hook named only there — which
   // is the normal shape for a case whose whole job is to assert a state — was guarded by
-  // nothing. `data-system-modifier-roll-note` was exactly that: mutated to nonsense, every
+  // nothing. `data-world-modifier-roll-note` was exactly that: mutated to nonsense, every
   // guard passed and only a 20-minute capture run would have found it.
   const sources = renderSources();
   const haystack = [...sources.values()].join('\n');
@@ -575,6 +675,8 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
+// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
   'player-gathering-stacked',
@@ -582,19 +684,38 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-alchemy-stacked',
   'player-journal-stacked',
 ];
+
+// And the manager case that asserts the OPPOSITE shape (issue 1362): a released third column
+// — exactly TWO resolved tracks — with the inspector aside genuinely ABSENT. Both halves are
+// measured in the browser, because they are two separate edits and doing only the stylesheet
+// one leaves the empty aside wrapped to an implicit grid row, where the track count is still
+// two and the frame still photographs a dead strip.
+const FULL_WIDTH_LAYOUT_CASE_IDS = ['world-scoped-narrow'];
+const LAYOUT_CASE_IDS = [...RESPONSIVE_LAYOUT_CASE_IDS, ...FULL_WIDTH_LAYOUT_CASE_IDS];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
-test('exactly the five 1024px player responsive cases declare complete layout expectations', () => {
+test('exactly the declared 1024px cases carry complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
-  assert.deepEqual(
-    declared.map((viewCase) => viewCase.id),
-    RESPONSIVE_LAYOUT_CASE_IDS
-  );
+  assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
     assert.deepEqual(viewCase.position, { width: 1024, height: 860 });
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    RESPONSIVE_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, 960);
+    assert.equal(viewCase.expectLayout.expectedTracks ?? 1, 1, 'a stacked case is one track');
+  }
+  for (const viewCase of declared.filter((entry) =>
+    FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
+    // NO width bound: a full-width case is not asserting a breakpoint, and a default would
+    // silently bound it at the responsive cases' 960px.
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.expectedTracks, 2);
+    assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
   }
 });
 
@@ -631,7 +752,7 @@ test('a layout assertion helper change selects every case whose layout it valida
     true,
     'a helper-only change must require screenshot evidence'
   );
-  assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]), RESPONSIVE_LAYOUT_CASE_IDS);
+  assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]).sort(), [...LAYOUT_CASE_IDS].sort());
 });
 
 test('the capture runner threads and asserts declared layouts before taking a screenshot', () => {
@@ -1096,24 +1217,53 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-settings',
       'manager-world-downtime-narrow',
       'manager-world-downtime-collapsed',
-      'manager-world-downtime-premium-installed',
+      'manager-world-downtime-test-companion-installed',
       // The companion driving Core's own route header. It is the only frame in the corpus
       // that can photograph the runtime route-chrome channel: every other Downtime case rests
       // on a list screen, which renders identically whether or not that channel exists.
-      'manager-world-downtime-companion-chrome',
+      'manager-world-downtime-test-companion-chrome',
+      // Issue 1302 — the parent rollup, appended after the four tab cases (never inserted
+      // among them): the manifest above is order-sensitive and `cases.slice(0, 4)` below is
+      // index-based, so a new case has to land after both without disturbing either.
+      'manager-world-downtime-test-companion-rollup',
+      // Issue 1332 — the companion NAVIGATING, appended for the same reason. It is the only
+      // frame reached by pressing a control the COMPANION drew rather than one of Core's, which
+      // is the whole of what `navigateToTab` added: before it, such a control could name its
+      // destination and not reach it, and a dead button photographs exactly like a live one.
+      'manager-world-downtime-test-companion-tab-navigation',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
   // share one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane
   // are Core's own content, and the spec says neither is rendered over a companion's screens
   // — so requiring the CTA of every downtime case would pin exactly the defect it forbids.
-  // Both PROVIDER-MODE frames are excluded from the Core-preview loop, and for the one reason:
-  // over a companion's screens Core renders no preview pane and no CTA at all, so every
-  // assertion below is about markup the spec forbids there.
-  const premium = allCases.find((entry) => entry.id.endsWith('-premium-installed'));
-  const companionChrome = allCases.find((entry) => entry.id.endsWith('-companion-chrome'));
-  assert.ok(Boolean(companionChrome), 'the runtime route-chrome frame is still registered');
-  const cases = allCases.filter((entry) => entry !== premium && entry !== companionChrome);
+  // All THREE provider-mode frames are excluded from the Core-preview loop, and for the one
+  // reason: over a companion's screens Core renders no preview pane and no CTA at all, so
+  // every assertion below is about markup the spec forbids there. The rollup case joins the
+  // premium-installed and companion-chrome frames for the same reason — it is reached on
+  // `expectView: 'systems'`, not `'world-downtime'`, and asserts a DOM-removal claim the
+  // Core-preview loop below has no vocabulary for.
+  // SELECTED BY WHAT MAKES THEM DIFFERENT, not by how they are spelled. These three used to be
+  // picked out with `id.endsWith('-premium-installed')` and two siblings like it, which is an
+  // instrument whose reach exceeds its claim: renaming a frame silently dropped it back into the
+  // Core-preview loop below, where every assertion is about content a companion's screens must
+  // NOT carry. The fact that separates them is that they register the lab's stand-in companion,
+  // and that is on the case as `query.downtimeProvider`.
+  const withCompanion = allCases.filter((entry) => entry.query?.downtimeProvider === '1');
+  assert.equal(
+    withCompanion.length,
+    4,
+    'the frames that register the stand-in companion are no longer four'
+  );
+  const named = (id) => {
+    const found = withCompanion.find((entry) => entry.id === id);
+    assert.ok(Boolean(found), `${id} is no longer registered as a stand-in companion frame`);
+    return found;
+  };
+  const premium = named('manager-world-downtime-test-companion-installed');
+  const companionChrome = named('manager-world-downtime-test-companion-chrome');
+  const rollup = named('manager-world-downtime-test-companion-rollup');
+  const cases = allCases.filter((entry) => !withCompanion.includes(entry));
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
@@ -1150,7 +1300,10 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     ['manager-world-downtime-narrow'],
     'the narrow frame is the one whose window really overflows, and it proves the pane scrolls'
   );
-  assert.equal(getCaseById('manager-world-downtime-narrow').expectScrollable, '.downtime-preview-scroll');
+  assert.equal(
+    getCaseById('manager-world-downtime-narrow').expectScrollable,
+    '.downtime-preview-scroll'
+  );
   const normal = cases.slice(0, 4);
   for (const viewCase of normal) {
     assert.ok(
@@ -1301,6 +1454,100 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     mountSource,
     /longDowntimeLabels[\s\S]{0,900}registerWorldNavProvider/,
     'long-copy evidence keeps the real Core fallback provider active'
+  );
+
+  // Issue 1302 — the parent rollup, on a closed disclosure with zero interaction (AC-19). This
+  // is the persona state a fresh Manager open actually lands on: `railGroupUserExpanded.worldDowntime`
+  // seeds `false` and nothing locks the group open off the Downtime route, so no GM ever sees the
+  // rollup's counterpart today without navigating away from the one place the badge would matter.
+  assert.equal(rollup.expectView, 'systems', 'reached with no interaction, on the systems browser');
+  assert.equal(
+    rollup.query?.downtimeProvider,
+    '1',
+    'a provider is registered so the rollup can render'
+  );
+  assert.deepEqual(rollup.steps, [], 'the default state, not a state reached by clicking anything');
+  assert.match(
+    rollup.expectSelector,
+    /data-world-downtime-badge-total/,
+    'proves the rollup itself is present'
+  );
+  assert.match(
+    rollup.expectSelector,
+    /:not\(:has\(\[data-world-nav-premium\]\)\)/,
+    'and proves the muted PREMIUM chip is a DOM removal here, not merely restyled — the two ' +
+      'never coexist in the parent row’s one trailing track'
+  );
+  const rollupLabelAttribute = rollup.expectAttributes.find(
+    (entry) => entry.selector === '[data-world-downtime-badge-total]' && entry.name === 'aria-label'
+  );
+  assert.ok(rollupLabelAttribute, 'the rollup states its own accessible name');
+  // The lab provider's only badge lives on `ledger`, so the total is that badge's own count —
+  // proving the arithmetic sums the RESOLVED value once per tab, never registered-plus-runtime.
+  const labBadge = mountSource.match(
+    /id: 'ledger',[\s\S]{0,400}?badge: \{ count: (\d+), accessibleName: '[^']+' \}/
+  );
+  assert.ok(labBadge, "the lab companion's ledger tab still declares a badge");
+  assert.equal(
+    rollupLabelAttribute.value,
+    `${labBadge[1]} updates`,
+    "the rollup's aria-label states the lab provider's own badge total, unformatted"
+  );
+  assert.deepEqual(
+    rollup.expectContained,
+    [{ container: '#manager-world-nav-downtime', target: '[data-world-downtime-badge-total]' }],
+    'the rollup sits inside the parent row it replaces the chip in'
+  );
+  // Issue 1302 — the sub-item badge is keyed on the tab id on BOTH sides, matching the
+  // rollup's own pair above: `expectContained` resolves each side with `document.querySelector`
+  // and is first-match, not strict, so an unkeyed pair (e.g. `.manager-nav-subitem`) would
+  // silently compare the first sub-item's box against the first badge's box instead of the
+  // ledger row's own pair, and ship green while mis-targeting the capture.
+  assert.deepEqual(
+    premium.expectContained,
+    [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      {
+        container: '[data-world-downtime-item="ledger"]',
+        target: '[data-world-downtime-badge="ledger"]',
+      },
+    ],
+    'the premium-installed frame pins its own tab-id-keyed badge containment, not just the rollup'
+  );
+
+  // Issue 1332 — the navigating frame. Its whole evidence value rests on HOW it is reached: a
+  // rail sub-item click lands on the same panel and photographs the same pixels, so a case that
+  // drifted to one would publish a frame that says nothing about the seam it was added for.
+  const tabNavigation = named('manager-world-downtime-test-companion-tab-navigation');
+  assert.deepEqual(
+    tabNavigation.steps.map((step) => step.selector),
+    ['#manager-world-nav-downtime', '[data-lab-companion-tab-link]'],
+    'the destination is reached by pressing the COMPANION’s own control'
+  );
+  assert.ok(
+    tabNavigation.steps.every((step) => !step.selector.startsWith('#manager-downtime-nav-')),
+    'and never by pressing the rail sub-item, which would reach the same frame for free'
+  );
+  assert.match(
+    mountSource,
+    /data-lab-companion-tab-link[\s\S]{0,600}navigateToTab/,
+    'and the control it presses is the one the stand-in wires to context.navigateToTab'
+  );
+  assert.equal(
+    tabNavigation.expectSelector,
+    '[data-downtime-extension-panel="crew"]',
+    'the frame asserts the DESTINATION tab’s panel, not the one that asked'
+  );
+  const followed = tabNavigation.expectAttributes.filter((entry) => entry.name === 'aria-current');
+  assert.deepEqual(
+    followed,
+    [
+      { selector: '#manager-downtime-nav-crew', name: 'aria-current', value: 'true' },
+      { selector: '#manager-downtime-nav-ledger', name: 'aria-current', value: null },
+    ],
+    'and asserts the RAIL followed — both that it moved and that it left, which one side alone ' +
+      'would not distinguish from a rail that marks every sub-item current'
   );
 });
 
@@ -2433,7 +2680,10 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
   // attributed to a case, and each answers with one frame of every surface.
   for (const line of [
     'function managerCase(entry) {',
-    "  'RadioCardGroup',",
+    // Was `  'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array. Issue
+    // 1378 replaced that array with a derivation over `designSystemPrimitives.js`, so the same
+    // constant is now one line rather than fourteen; this is that line.
+    "const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');",
     '  ...journalBlindRunCases(),',
     'export function mapChangedFilesToCases(files = [], { patches } = {}) {',
   ]) {
@@ -3739,9 +3989,9 @@ test('parsePlayerMountRegions refuses every shape whose spans would be a guess',
 });
 
 test('the player companion cases photograph the seam through the production registry', () => {
-  const surface = getCaseById('player-extension-surface');
-  const narrow = getCaseById('player-extension-surface-narrow');
-  const fault = getCaseById('player-extension-fault');
+  const surface = getCaseById('player-test-companion-surface');
+  const narrow = getCaseById('player-test-companion-surface-narrow');
+  const fault = getCaseById('player-test-companion-fault');
   const mountSource = readFileSync(resolve(ROOT, LAB_MOUNT_PATH), 'utf8');
   const lang = JSON.parse(readFileSync(resolve(ROOT, 'lang/en.json'), 'utf8'));
 
@@ -3833,7 +4083,7 @@ test('the player companion cases photograph the seam through the production regi
   assert.match(
     mountSource,
     /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions, \{\s*experimentalFeaturesEnabled: params\.experimental,/,
-    'and states the experimental gate from the param that seeds the lab world\'s own setting'
+    "and states the experimental gate from the param that seeds the lab world's own setting"
   );
 });
 

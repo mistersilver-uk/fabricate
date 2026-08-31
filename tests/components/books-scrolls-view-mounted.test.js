@@ -11,6 +11,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-books-scrolls-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
     // wires the drop listeners through the dragDrop action. Omitting either raw
     // module from the allowlist does not fail the mount — it HANGS (# cancelled).
@@ -25,6 +26,9 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    // THE manager's labelled push-button (issue 1118). Both Clear filters controls render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte'

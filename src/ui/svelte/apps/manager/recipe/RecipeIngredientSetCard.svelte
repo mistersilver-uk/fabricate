@@ -19,6 +19,7 @@
   import { selectableEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     set = {},
@@ -268,15 +269,14 @@
       showChevron={false}
       onChoose={(id) => addComponentRequirement(id)}
     />
-    <button
-      type="button"
-      class="manager-button is-dashed"
+    <ManagerButton
+      role="dashed"
       data-recipe-add="tag-requirement"
       onclick={() => addTagRequirement()}
     >
       <i class="fas fa-tags" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
-    </button>
+    </ManagerButton>
     {#if (essenceOptions || []).length > 0}
       <!-- §B6: the set-level essence add. Essence is now a first-class match type
            (issue 649), so this appends a single-option essence GROUP (AND-required,
@@ -314,15 +314,10 @@
       />
     {/if}
     {#if canAddCost}
-      <button
-        type="button"
-        class="manager-button is-dashed"
-        data-recipe-add="cost"
-        onclick={() => addCurrencyRequirement()}
-      >
+      <ManagerButton role="dashed" data-recipe-add="cost" onclick={() => addCurrencyRequirement()}>
         <i class="fa-solid fa-coins" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
-      </button>
+      </ManagerButton>
     {/if}
   </div>
 </div>

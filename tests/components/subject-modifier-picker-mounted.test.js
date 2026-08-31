@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-subject-modifier-picker-',
   rawModules: [
     // `resolveMaxModifierPicks` decides what an ABSENT cap means, and these close its graph.
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
@@ -35,6 +36,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // `ModifierPillSelect`'s add menu dismisses on an outside click.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],

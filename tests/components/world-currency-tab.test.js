@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-currency-tab-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -36,6 +37,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'

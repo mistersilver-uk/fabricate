@@ -16,7 +16,8 @@
       key: 'Automatic',
       fallback: 'Automatic',
       descKey: 'AutomaticHint',
-      descFallback: 'All matching enabled tasks and events are available unless locally excluded.',
+      descFallback:
+        'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.',
     },
     {
       value: 'manual',
@@ -25,7 +26,7 @@
       fallback: 'Manual',
       descKey: 'ManualHint',
       descFallback:
-        'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.',
+        'Only the tasks and events you add are available, whether or not they match this environment.',
     },
   ];
 

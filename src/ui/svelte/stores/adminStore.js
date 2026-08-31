@@ -88,6 +88,13 @@ import {
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import {
+  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
+  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
+  conditionSettingsToCurrent,
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from '../../../systems/gatheringComposition.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { Tool } from '../../../models/Tool.js';
@@ -106,6 +113,10 @@ import {
   normalizeFailureResultPolicy,
 } from '../../../utils/failureResultPolicy.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
+// The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
+// write path treats ANY third value as a CLEAR of the per-system override, so the set that
+// decides which arguments are tokens must be the same set the resolver and the normalizer use.
+import { TOOL_BREAKAGE_AUTHORITIES } from '../../../systems/toolScope.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -145,6 +156,11 @@ import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
+import { createWorldScopeActions } from './worldScopeActions.js';
+import {
+  buildWorldScopeState as _buildWorldScopeState,
+  emptyWorldScopeState as _emptyWorldScopeState,
+} from './worldScopeProjection.js';
 
 // `DERIVED_RECIPE_PROJECTION_FIELDS` and `withoutDerivedRecipeProjectionFields` moved to
 // the row projection alongside the derivation they describe, and are re-exported here so
@@ -248,12 +264,8 @@ const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
-const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
-  'includedByMatch',
-  'explicitlyIncluded',
-  'forceIncluded',
-  'includedButUnavailable',
-]);
+// ENVIRONMENT_INCLUDED_COMPOSITION_STATES is imported from gatheringComposition.js — the
+// module that now owns the full composition-state vocabulary — rather than defined here.
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -395,6 +407,23 @@ function _buildManagedItemOptions(managedItems = []) {
     ...(item.originItemUuid && { originItemUuid: item.originItemUuid }),
     ...(item.registeredItemUuid && { registeredItemUuid: item.registeredItemUuid }),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && { difficulty: item.difficulty }),
+    // The AUTHORED complication list (issue 1286), for the two GM read-only strips: the
+    // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
+    // rows. Both draw the complications of the component the row REFERENCES, which is never
+    // the component the editor is editing, so this option list is the only feed either strip
+    // has — the same reason `difficulty` is projected here.
+    //
+    // It is the UNREDACTED authored list, and deliberately NOT `forecastComplications`:
+    // that projection filters to `visibility: 'visible'`, which is the PLAYER's view, while
+    // the authored default is `gmOnly`. A GM screen fed from it would show nothing at all
+    // for exactly the complications a GM authors by default.
+    //
+    // Absence-preserving on `difficulty`'s idiom above, not `|| []`:
+    // `authoredComplications` keys the persisted field on a NON-EMPTY array, so a component
+    // with none carries no key and this projection must not invent an empty one.
+    ...(Object.prototype.hasOwnProperty.call(item, 'complications') && {
+      complications: _clonePlain(item.complications),
+    }),
   }));
 }
 
@@ -1168,9 +1197,19 @@ function _emptyWorldCurrencyState() {
     worldCurrency: {
       spendStrategy: 'actorProperty',
       providerId: '',
-      macros: { canAfford: '', increment: '', decrement: '' },
+      macros: { canAfford: '', increment: '', decrement: '', balance: '' },
       units: [],
     },
+  };
+}
+
+// The WORLD character libraries projection (issue 1308), a top-level sibling for the reason the
+// currency projection is one: hanging a world library off `selectedSystem` would make the same
+// library appear to change when the GM merely clicks a different crafting system.
+function _emptyCharacterLibrariesState() {
+  return {
+    worldCharacterPrerequisites: [],
+    worldModifiers: [],
   };
 }
 
@@ -1855,6 +1894,11 @@ export function createAdminStore(services) {
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
     ..._emptyWorldCurrencyState(),
+    ..._emptyCharacterLibrariesState(),
+    // The three world-scope entity corpora (issue 1362). Seeded EMPTY rather than absent so a
+    // world screen mounted before the first publish reads a shape rather than `undefined`, and
+    // so `seeded` reads all-false — an UNKNOWN corpus, never an empty one.
+    ..._emptyWorldScopeState(),
   });
 
   function _setEnvironmentDraftState(
@@ -3257,32 +3301,71 @@ export function createAdminStore(services) {
 
   // --- Character prerequisites (issue 544) — system-owned pass/fail gates ------
 
-  function _systemCharacterPrerequisites(systemId) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return [];
-    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
-    return normalizeCharacterPrerequisiteList(system?.characterPrerequisites, _randomID);
+  /**
+   * The world character-libraries store (issue 1308). Both libraries are world scope now, so
+   * none of the list actions below takes a crafting system id and none of them requires a system
+   * to be selected — a GM authors these from a world surface, exactly as they do the coin ladder.
+   *
+   * @returns {object|null}
+   */
+  function _characterLibrariesStore() {
+    return services.getCharacterLibrariesStore?.() ?? null;
   }
 
-  async function _persistSystemCharacterPrerequisites(systemId, prerequisites) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return null;
-    const systemManager = services.getCraftingSystemManager?.();
-    if (!systemManager?.updateSystem) return null;
+  /**
+   * Confirm the removal of one world character-library entry (issue 1308).
+   *
+   * These two lists are the only DESTRUCTIVE edits on a page framed as "settings for the selected
+   * crafting system" whose reach is actually the whole world, and until this they were a single
+   * unconfirmed click on a bare icon button. Removing a modifier does not merely delete the
+   * entry: every check that named it loses it from `defaultModifierIds` on that system's next
+   * save, in every system, and a prerequisite removal ungates every book that cited it. The copy
+   * names that reach outright, on the pattern the party-delete confirmation already sets.
+   *
+   * The two key literals are passed in WHOLE rather than composed from a scope token. A
+   * template-literal key would read to the lang-key scanner as the bare Manager namespace base,
+   * which would then count every key beneath it as referenced and silently disarm the
+   * orphaned-key gate for the whole namespace.
+   *
+   * @param {Array<object>} library The list the entry is being removed from.
+   * @param {string} entryId
+   * @param {string} titleKey Full lang key for the dialog title.
+   * @param {string} contentKey Full lang key for the dialog body.
+   * @returns {Promise<boolean>}
+   */
+  async function _confirmLibraryEntryDelete(library, entryId, titleKey, contentKey) {
+    const entry = (Array.isArray(library) ? library : []).find((item) => item?.id === entryId);
+    const name = String(entry?.name || entry?.label || entryId);
+    const escapedName = _escapeHtml(name);
+    const confirmed = await services.confirmDialog?.({
+      title: services.localize?.(titleKey, { name }) || `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.(contentKey, { name: escapedName }) ||
+        `Delete <strong>${escapedName}</strong> from every crafting system?`
+      }</p>`,
+      ..._deleteConfirmButtons(),
+    });
+    return confirmed === true;
+  }
+
+  function _characterPrerequisites() {
+    const store = _characterLibrariesStore();
+    return normalizeCharacterPrerequisiteList(store?.listCharacterPrerequisites?.(), _randomID);
+  }
+
+  async function _persistCharacterPrerequisites(prerequisites) {
+    const store = _characterLibrariesStore();
+    if (!store?.saveCharacterPrerequisites) return null;
     const normalized = normalizeCharacterPrerequisiteList(prerequisites, _randomID);
-    const updated = await systemManager.updateSystem(id, { characterPrerequisites: normalized });
-    return Array.isArray(updated?.characterPrerequisites)
-      ? updated.characterPrerequisites
-      : normalized;
+    const saved = await store.saveCharacterPrerequisites(normalized);
+    return Array.isArray(saved?.characterPrerequisites) ? saved.characterPrerequisites : normalized;
   }
 
-  async function addCharacterPrerequisite(systemId = get(selectedSystemId), partial = {}) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return null;
+  async function addCharacterPrerequisite(partial = {}) {
     const entry = normalizeCharacterPrerequisite({ id: _randomID(), ...partial }, _randomID);
     if (!entry) return null;
-    const persisted = await _persistSystemCharacterPrerequisites(id, [
-      ..._systemCharacterPrerequisites(id),
+    const persisted = await _persistCharacterPrerequisites([
+      ..._characterPrerequisites(),
       entry,
     ]);
     if (persisted === null) return null;
@@ -3290,33 +3373,34 @@ export function createAdminStore(services) {
     return entry;
   }
 
-  async function updateCharacterPrerequisite(
-    systemId = get(selectedSystemId),
-    prerequisiteId,
-    updates = {}
-  ) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id || !prerequisiteId) return false;
+  async function updateCharacterPrerequisite(prerequisiteId, updates = {}) {
+    if (!prerequisiteId) return false;
     let changed = false;
-    const next = _systemCharacterPrerequisites(id).map((entry) => {
+    const next = _characterPrerequisites().map((entry) => {
       if (entry.id !== prerequisiteId) return entry;
       changed = true;
       return normalizeCharacterPrerequisite({ ...entry, ...updates, id: entry.id }, _randomID);
     });
     if (!changed) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
   }
 
-  async function deleteCharacterPrerequisite(systemId = get(selectedSystemId), prerequisiteId) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id || !prerequisiteId) return false;
-    const current = _systemCharacterPrerequisites(id);
+  async function deleteCharacterPrerequisite(prerequisiteId) {
+    if (!prerequisiteId) return false;
+    const current = _characterPrerequisites();
     const next = current.filter((entry) => entry.id !== prerequisiteId);
     if (next.length === current.length) return false; // unknown id — nothing removed
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const confirmedPrerequisite = await _confirmLibraryEntryDelete(
+      current,
+      prerequisiteId,
+      'FABRICATE.Admin.Manager.CharacterPrerequisites.DeleteTitle',
+      'FABRICATE.Admin.Manager.CharacterPrerequisites.DeleteContent'
+    );
+    if (!confirmedPrerequisite) return false;
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
@@ -3330,27 +3414,18 @@ export function createAdminStore(services) {
    *
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<boolean>}
    */
-  async function reorderCharacterPrerequisite(
-    fromIndex,
-    toIndex,
-    systemId = get(selectedSystemId)
-  ) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return false;
-    const next = _reorderListByIndex(_systemCharacterPrerequisites(id), fromIndex, toIndex);
+  async function reorderCharacterPrerequisite(fromIndex, toIndex) {
+    const next = _reorderListByIndex(_characterPrerequisites(), fromIndex, toIndex);
     if (!next) return false;
-    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    const persisted = await _persistCharacterPrerequisites(next);
     if (persisted === null) return false;
     await refresh();
     return true;
   }
 
-  async function seedCharacterPrerequisitePresetsForSystem(systemId = get(selectedSystemId)) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return { added: 0, skipped: 0, unsupported: true, foundrySystemId: '' };
+  async function seedPrerequisitePresets() {
     const foundrySystemId = String(services.getFoundrySystemId?.() || '');
     const presets = getCharacterPrerequisitePresetsForFoundrySystem(foundrySystemId);
     if (presets.length === 0) {
@@ -3358,10 +3433,10 @@ export function createAdminStore(services) {
     }
     const { added, skipped, next } = seedCharacterPrerequisitePresets({
       presets,
-      currentLibrary: _systemCharacterPrerequisites(id),
+      currentLibrary: _characterPrerequisites(),
     });
     if (added.length > 0) {
-      const persisted = await _persistSystemCharacterPrerequisites(id, next);
+      const persisted = await _persistCharacterPrerequisites(next);
       if (persisted === null) {
         return { added: 0, skipped: skipped.length, unsupported: false, foundrySystemId };
       }
@@ -3387,19 +3462,6 @@ export function createAdminStore(services) {
       includeDanger,
       conditionSettings,
     }).matches;
-  }
-
-  function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    if (disabled.includes(String(recordId))) return false;
-    return enabled.length === 0 || enabled.includes(String(recordId));
   }
 
   /**
@@ -3430,7 +3492,7 @@ export function createAdminStore(services) {
       ])
     );
     const conditionSettings = system.conditions || null;
-    const conditions = _gatheringCurrentConditions(conditionSettings);
+    const conditions = conditionSettingsToCurrent(conditionSettings);
     const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
 
     const tasks = _classifyCompositionRecords({
@@ -3597,33 +3659,36 @@ export function createAdminStore(services) {
         conditions,
         { includeDanger, conditionSettings }
       );
+      // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
+      // issue 1315); manual mode has no filter to override, so it has neither.
       const excluded = compositionMode !== 'manual' && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
-      // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
-      const forceIncluded = compositionMode === 'manual' && forced.includes(id);
+      const forceIncluded = compositionMode !== 'manual' && forced.includes(id);
 
       let compositionState;
       if (!libraryEnabled) compositionState = 'libraryDisabled';
+      // Exclude is checked before force so the two can collide on the same record without a
+      // branch order bug deciding it silently: exclude wins.
       else if (excluded) compositionState = 'excluded';
       else if (forceIncluded) compositionState = 'forceIncluded';
-      // In automatic mode the enabled allow-list is ignored (matching the runtime composition
-      // service), so a non-matching record is always "not matching" — never a stale
-      // "included but unavailable". Only manual mode honors the explicit inclusion.
+      // Manual mode composes exactly `enabled*Ids`, with no match filter (maintainer ruling), so
+      // a picked non-matching record still composes — it is `includedNotMatching`, not a stale
+      // unreachable state, and stays distinct from `notMatching` so the Included list can flag it.
       else if (!matches)
         compositionState =
           compositionMode === 'manual' && explicitlyIncluded
-            ? 'includedButUnavailable'
+            ? 'includedNotMatching'
             : 'notMatching';
       else if (compositionMode === 'manual')
         compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
       // A record is runtime-available only when its composition state would compose it AND
-      // the current weather/time satisfy the record's required conditions.
-      const composed =
-        compositionState === 'includedByMatch' ||
-        compositionState === 'explicitlyIncluded' ||
-        compositionState === 'forceIncluded';
+      // the current weather/time satisfy the record's required conditions. `composed` is the
+      // projection of `environmentComposesRecord` onto the vocabulary — the shared four-state
+      // set (see `gatheringComposition.js`), which now includes `includedNotMatching` because a
+      // manual pick composes whether or not it currently matches.
+      const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
       const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
       const dropRateAdjustment = _dropRateAdjustmentSummary({
@@ -3762,14 +3827,38 @@ export function createAdminStore(services) {
       availableTasks: 0,
       excludedTasks: 0,
       candidateTasks: 0,
-      unavailableTasks: 0,
+      includedNotMatchingTasks: 0,
       availableEvents: 0,
       excludedEvents: 0,
       candidateEvents: 0,
-      unavailableEvents: 0,
+      includedNotMatchingEvents: 0,
       diagnosticTasks: 0,
       diagnosticEvents: 0,
+      requiredTools: 0,
     };
+  }
+
+  /**
+   * Distinct tool ids required by the tasks that are actually available right now — the same
+   * `runtimeState === 'available'` population `availableTasks` counts, so the "required tools"
+   * fact on the environment inspector card shares one population and one freshness with its two
+   * neighbors instead of being a separately-derived, structurally match-blind number. This means
+   * the count is weather- and time-of-day dependent, exactly like its neighbors (see task 3 of
+   * issue 1321's delta for the deliberate trade).
+   */
+  function _requiredToolCount(tasks) {
+    const toolIds = new Set();
+    for (const row of tasks) {
+      if (row.runtimeState !== 'available') continue;
+      for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
+        // Trim before counting, matching the helper this replaced: an untrimmed pair would
+        // count ' pick ' and 'pick' as two distinct required tools, and a whitespace-only
+        // entry as one. Not reachable with generated ids, but the old code guarded it.
+        const trimmed = String(toolId ?? '').trim();
+        if (trimmed) toolIds.add(trimmed);
+      }
+    }
+    return toolIds.size;
   }
 
   function _compositionCounts(tasks, events) {
@@ -3777,13 +3866,18 @@ export function createAdminStore(services) {
       const available = records.filter((r) => r.runtimeState === 'available').length;
       const excluded = records.filter((r) => r.compositionState === 'excluded').length;
       const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-      const unavailable = records.filter(
-        (r) => r.compositionState === 'includedButUnavailable'
+      // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime
+      // available whenever conditions are met. The field was called `unavailable*` and fed a
+      // GM-facing fact labelled "Included but unavailable" — a number that had inverted against
+      // its own label — so producer, consumers, `data-runtime-fact` and label key were renamed
+      // with it.
+      const includedNotMatching = records.filter(
+        (r) => r.compositionState === 'includedNotMatching'
       ).length;
       const diagnostic = records.filter(
         (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
       ).length;
-      return { available, excluded, candidate, unavailable, diagnostic };
+      return { available, excluded, candidate, includedNotMatching, diagnostic };
     };
     const t = tally(tasks);
     const h = tally(events);
@@ -3791,62 +3885,39 @@ export function createAdminStore(services) {
       availableTasks: t.available,
       excludedTasks: t.excluded,
       candidateTasks: t.candidate,
-      unavailableTasks: t.unavailable,
+      includedNotMatchingTasks: t.includedNotMatching,
       diagnosticTasks: t.diagnostic,
       availableEvents: h.available,
       excludedEvents: h.excluded,
       candidateEvents: h.candidate,
-      unavailableEvents: h.unavailable,
+      includedNotMatchingEvents: h.includedNotMatching,
       diagnosticEvents: h.diagnostic,
+      requiredTools: _requiredToolCount(tasks),
     };
   }
 
   /**
-   * Whether `environment` currently composes the library task/event `record`, mirroring the
-   * runtime `GatheringRichStateService.composeEnvironment` filter chain exactly:
-   *   library-enabled  AND  (matches OR force-included)  AND  the composition-mode include gate.
-   * In manual mode a record is composed only when force-added, or when it both matches and is on
-   * the enabled allow-list; a stale enabled entry for a non-matching record is NOT composed.
+   * Whether `environment` currently composes the library task/event `record`. Consumes the
+   * shared `environmentComposesRecord` predicate directly, so this mirrors the runtime
+   * `GatheringRichStateService.composeEnvironment` filter chain exactly by construction rather
+   * than by a separately maintained copy of it.
    */
   function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
-    if (!record?.id || record.enabled === false) return false;
-    const recordId = String(record.id);
+    if (!record?.id) return false;
     const includeDanger = kind === 'event';
-    const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    const forced = Array.isArray(environment?.[forcedKey])
-      ? environment[forcedKey].map(String)
-      : [];
-    if (mode === 'manual') {
-      if (forced.includes(recordId)) return true;
-      return (
-        enabled.includes(recordId) &&
-        _gatheringLibraryRecordMatchesEnvironment(
-          record,
-          environment,
-          {},
-          includeDanger,
-          conditionSettings
-        )
-      );
-    }
-    return (
-      !disabled.includes(recordId) &&
-      _gatheringLibraryRecordMatchesEnvironment(
-        record,
-        environment,
-        {},
-        includeDanger,
-        conditionSettings
-      )
+    const matches = _gatheringLibraryRecordMatchesEnvironment(
+      record,
+      environment,
+      {},
+      includeDanger,
+      conditionSettings
+    );
+    return environmentComposesRecord(
+      environment,
+      record,
+      kind,
+      resolveGatheringCompositionMode(environment),
+      matches
     );
   }
 
@@ -3878,13 +3949,6 @@ export function createAdminStore(services) {
     // them (the previous `enabledTaskIds` lookup could only ever match on an id collision).
     if (kind !== 'task' && kind !== 'event') return [];
     return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
-  }
-
-  function _gatheringCurrentConditions(conditionSettings) {
-    return {
-      weather: conditionSettings?.weather?.current || DEFAULT_GATHERING_CONDITIONS.weather,
-      timeOfDay: conditionSettings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay,
-    };
   }
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
@@ -4305,6 +4369,7 @@ export function createAdminStore(services) {
         environmentTaskCounts[String(environment.id)] = {
           availableTaskCount: counts.availableTasks || 0,
           availableEventCount: counts.availableEvents || 0,
+          requiredToolCount: counts.requiredTools || 0,
         };
       }
       let environmentId = get(selectedEnvironmentId);
@@ -4492,6 +4557,18 @@ export function createAdminStore(services) {
     // rail resolves granted character ids over this, NOT the PC-filtered roster.
     const accessCharacters = services.getAccessCharacterActors?.() || [];
 
+    // ONE READ OF THE WORLD CORPUS PER PUBLISH (issue 1374), hoisted here so the selected-system
+    // projection and the published `worldScope` key are computed from the SAME snapshot.
+    //
+    // It was two reads: this projection took `getToolScopeStore().corpus().toolBreakage` for
+    // itself while `buildWorldScopeState()` took the same value again at publish time, on the
+    // far side of four `await`s. Two reads of one seam can disagree, and the direct one skipped
+    // the `readCorpus` try/catch its two siblings both carry and both call mandatory — a store
+    // that threw would have aborted this whole branch and left the GM a Manager whose entire
+    // selected-system half never populated. Reading the PROJECTED value inherits that guard
+    // instead of restating it.
+    const worldScopeState = buildWorldScopeState();
+
     let selectedSystemData = null;
     let essenceCards = [];
     let recipeListData = {
@@ -4551,15 +4628,21 @@ export function createAdminStore(services) {
         systemRecipes
       );
 
+      // The WORLD tool-breakage block, taken off the corpus this publish already projected and
+      // passed EXPLICITLY (issue 1374). The projection resolves the effective authority from
+      // it, so the manager surfaces that draw or gate on the authority stop re-defaulting the
+      // system's own token. It is threaded rather than probed through a lazy global read
+      // because all eight `game.*` occurrences in this module are comments, five of which
+      // promise it stays that way.
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions
+        sceneOptions,
+        worldScopeState.worldScope?.tool?.toolBreakage ?? null
       );
-
       recipeListData = _buildRecipeList(
         systemManager,
         recipeManager,
@@ -4694,6 +4777,8 @@ export function createAdminStore(services) {
       ...environmentState,
       ...travel.buildState(),
       ...buildWorldCurrencyState(),
+      ...buildCharacterLibrariesState(),
+      ...worldScopeState,
     }));
   }
 
@@ -4705,6 +4790,75 @@ export function createAdminStore(services) {
     const store = services.getCurrencyConfigStore?.();
     if (!store) return _emptyWorldCurrencyState();
     return { worldCurrency: normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID }) };
+  }
+
+  // The three world-scope entity corpora (issue 1362, epic 1357), read straight from their
+  // stores on every publish for the same reasons the two blocks above are: cheap, and honest
+  // when another GM edits the world corpus, with no per-system cache to invalidate.
+  //
+  // A TOP-LEVEL SIBLING KEY. It is world scope, so hanging it off `selectedSystem` would
+  // republish it as `null` the moment no system is selected — the NORMAL state for a world
+  // screen. The projection ALWAYS answers a new object, so a `$derived` over it re-propagates
+  // on every publish rather than only when the corpus identity moves.
+  function buildWorldScopeState() {
+    return _buildWorldScopeState({ stores: _worldScopeStores(), systems: _allSystems() });
+  }
+
+  // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
+  // with PR 7 of epic 1357, and this file carries the producer leg ahead of it: it reads
+  // through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings, which
+  // answers `null` until the service is registered; `projectWorldVocabulary` then publishes
+  // `{available: false, total: 0}`, and the rail leaf's badge reads 0 — truthful, because a
+  // world with no vocabulary store has no world vocabulary.
+  function _worldScopeStores() {
+    return {
+      component: services.getComponentScopeStore?.() ?? null,
+      essence: services.getEssenceScopeStore?.() ?? null,
+      tool: services.getToolScopeStore?.() ?? null,
+      vocabulary: services.getVocabularyScopeStore?.() ?? null,
+    };
+  }
+
+  function _allSystems() {
+    try {
+      return services.getCraftingSystemManager?.()?.getSystems?.() || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
+  // by nothing in `src/` yet: every Phase 8 world route is a placeholder, so no screen calls
+  // one of these. That is a deliberate, stated state rather than dead code — issue 1374 opened
+  // the prop seam that carries these families to the pages, and PRs 6a/6b/6c and 7 wire their
+  // screens to them.
+  //
+  // THE FOURTH LEG MATCHES THE READ PATH'S (issue 1374). The read path has had an optional
+  // `vocabulary` leg since issue 1362 and this one had three, so PR 7 could see its corpus
+  // projected and had no route to a write path at all. `createWorldScopeActions` mints a family
+  // per key of its OWN `WRITE_DESCRIPTORS`, which declares no `vocabulary`, so this leg is
+  // INERT until the vocabulary lane declares that family in `worldScopeActions.js` — a file it
+  // owns. Supplied here because the store leg is the one half of the pair that lives in a
+  // gateway file.
+  const worldScope = createWorldScopeActions({
+    getStores: {
+      component: () => services.getComponentScopeStore?.() ?? null,
+      essence: () => services.getEssenceScopeStore?.() ?? null,
+      tool: () => services.getToolScopeStore?.() ?? null,
+      vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
+    },
+  });
+
+  // Read the world character libraries straight from their store on every publish, for the same
+  // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
+  // invalidate because there is no per-system copy any more.
+  function buildCharacterLibrariesState() {
+    const store = _characterLibrariesStore();
+    if (!store) return _emptyCharacterLibrariesState();
+    return {
+      worldCharacterPrerequisites: store.listCharacterPrerequisites?.() ?? [],
+      worldModifiers: store.listModifiers?.() ?? [],
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -5548,13 +5702,20 @@ export function createAdminStore(services) {
     if (!current) return false;
     const viewModel = _buildEnvironmentCompositionViewModel(current);
     const records = kind === 'event' ? viewModel.events : viewModel.tasks;
+    // Both kinds filter on the shared four-state included set, not `runtimeState`. The prior
+    // task-kind branch (`runtimeState === 'available' || compositionState ===
+    // 'includedNotMatching'`) was a latent bug: `runtimeState` requires `conditionsMet`, so an
+    // included record whose current weather/time did not match would drop out of `ids`, and this
+    // function writes `ids` as the entire new order array — an ambient runtime condition would
+    // silently discard that record's saved rank. Using the same predicate-derived set as the
+    // "Included" list `CompositionList.svelte` renders keeps the filter and the UI's index into
+    // it in agreement, which matters here because a drag supplies an index into that same list.
+    // Reachability: `reorderEnvironmentRecord('task', …)` has no UI caller today —
+    // `CompositionList.svelte`'s drag handlers are all gated on `showEventRankControls`
+    // (`kind === 'event' && eventSelectionMode === 'highestRankedDrop'`) — so this branch is
+    // exercised only by tests and future task-kind reorder UI, and both get the correct rule.
     const ids = records
-      .filter((entry) =>
-        kind === 'event'
-          ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
-          : entry.runtimeState === 'available' ||
-            entry.compositionState === 'includedButUnavailable'
-      )
+      .filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
       .map((entry) => entry.id);
     const from = Number(fromIndex);
     const to = Number(toIndex);
@@ -5967,14 +6128,29 @@ export function createAdminStore(services) {
 
   // Tool-breakage authority (issue 419): "toolSpecific" (each tool's own mode +
   // legacy breakTools) | "checkDriven" (the active check's checkBreakage decides
-  // breakage for all required tools). Persisted as a system-level field; the engine
-  // normalizer coerces unknown/missing to "toolSpecific".
+  // breakage for all required tools). Persisted as a system-level field.
+  //
+  // THE THIRD ARGUMENT IS A CLEAR (issue 1374). Anything that is neither token writes
+  // `{ toolBreakage: {} }`, which REMOVES the per-system override and lets the world value
+  // through `resolveToolBreakageAuthority`. This action used to coerce every other argument
+  // to `toolSpecific`, which made "inherit the world break mode" a one-way door: a GM could
+  // author an override and never take it back.
+  //
+  // THE CLEAR WORKS BECAUSE NOTHING ON THE PATH MERGES. `CraftingSystemManager#updateSystem`
+  // builds `{...current, ...updates}`, a SHALLOW merge, so an empty block REPLACES the stored
+  // one rather than merging into it; and since 1.30.0 the normalizer is ABSENCE-PRESERVING —
+  // it emits `toolBreakage` only for a recognized token, and its enclosing literal carries no
+  // `...system` spread — so the absence survives the round trip to disk and back. This is the
+  // structural opposite of the `setFlag` merge trap, and it is asserted end to end in
+  // `tests/crafting-system-tool-normalization.test.js` against the REAL manager, because a
+  // store double whose `updateSystem` ends in `Object.assign` cannot delete a key and so
+  // cannot see the property at all.
   async function setToolBreakageAuthority(authority) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return false;
-    const nextAuthority = authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific';
-    await systemManager.updateSystem(sysId, { toolBreakage: { authority: nextAuthority } });
+    const toolBreakage = TOOL_BREAKAGE_AUTHORITIES.includes(authority) ? { authority } : {};
+    await systemManager.updateSystem(sysId, { toolBreakage });
     await refresh();
     return true;
   }
@@ -6748,7 +6924,7 @@ export function createAdminStore(services) {
       if (nextConditions.timeOfDay.values.some((option) => option.id === timeOfDay))
         nextConditions.timeOfDay.current = timeOfDay;
     }
-    config.conditions = _gatheringCurrentConditions(nextConditions);
+    config.conditions = conditionSettingsToCurrent(nextConditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -6798,7 +6974,7 @@ export function createAdminStore(services) {
     if (setting.values.every((existing) => !(existing.id === option.id)))
       setting.values = [...setting.values, option];
     if (!setting.current) setting.current = option.id;
-    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
+    config.conditions = conditionSettingsToCurrent(systemConfig.conditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -6868,7 +7044,7 @@ export function createAdminStore(services) {
         (existing) => existing !== tag
       ),
     }));
-    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
+    config.conditions = conditionSettingsToCurrent(systemConfig.conditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -7322,27 +7498,27 @@ export function createAdminStore(services) {
    * @param {string} systemId Target crafting system id.
    * @returns {{ manager: object, system: object, library: Array<object> }|null}
    */
-  function _systemModifierContext(systemId) {
-    const systemManager = services.getCraftingSystemManager();
-    const system = systemId ? systemManager?.getSystem?.(systemId) : null;
-    if (!system) return null;
-    return {
-      manager: systemManager,
-      system,
-      library: Array.isArray(system.modifiers) ? system.modifiers : [],
-    };
+  /**
+   * The world modifier library and the store that owns it (issue 1308). No crafting system is
+   * consulted and none needs to be selected: the library is authored once for the world.
+   *
+   * @returns {{ store: object, library: Array<object> }|null}
+   */
+  function _modifierContext() {
+    const store = _characterLibrariesStore();
+    if (!store) return null;
+    return { store, library: store.listModifiers?.() ?? [] };
   }
 
   /**
-   * Persist a whole replacement modifier library for one system and re-project.
+   * Persist a whole replacement world modifier library and re-project.
    *
-   * @param {string} systemId Target crafting system id.
-   * @param {object} manager The crafting system manager.
+   * @param {object} store The world character-libraries store.
    * @param {Array<object>} next The replacement library.
    * @returns {Promise<void>}
    */
-  async function _saveSystemModifierLibrary(systemId, manager, next) {
-    await manager.updateSystem(systemId, { modifiers: next });
+  async function _saveModifierLibrary(store, next) {
+    await store.saveModifiers(next);
     await refresh();
   }
 
@@ -7355,8 +7531,8 @@ export function createAdminStore(services) {
    * @param {object} [partial] Partial entry (id, label, icon, expression, min, max).
    * @returns {Promise<object|null>}
    */
-  async function addSystemModifier(systemId = get(selectedSystemId), partial = {}) {
-    const context = _systemModifierContext(systemId);
+  async function addModifier(partial = {}) {
+    const context = _modifierContext();
     if (!context) return null;
     const id = String(partial?.id || _randomID());
     if (context.library.some((entry) => entry.id === id)) return null;
@@ -7371,7 +7547,7 @@ export function createAdminStore(services) {
       expression: partial?.expression || '',
     });
     if (!entry) return null;
-    await _saveSystemModifierLibrary(systemId, context.manager, [...context.library, entry]);
+    await _saveModifierLibrary(context.store, [...context.library, entry]);
     return entry;
   }
 
@@ -7379,19 +7555,18 @@ export function createAdminStore(services) {
    * Update one modifier entry by id. Updates that fail normalization (e.g. no id)
    * preserve the prior entry. Returns true when the library changed.
    *
-   * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id.
    * @param {object} [updates] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateSystemModifier(systemId = get(selectedSystemId), modifierId, updates = {}) {
-    const context = _systemModifierContext(systemId);
+  async function updateModifier(modifierId, updates = {}) {
+    const context = _modifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.map((entry) =>
       entry.id === modifierId ? _normalizeSystemModifier({ ...entry, ...updates }) || entry : entry
     );
     if (next.every((entry, index) => entry === context.library[index])) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7401,16 +7576,22 @@ export function createAdminStore(services) {
    * treats an unresolved reference as misconfiguration, and the check normalizer drops a
    * dangling `defaultModifierIds` entry on the next save).
    *
-   * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteSystemModifier(systemId = get(selectedSystemId), modifierId) {
-    const context = _systemModifierContext(systemId);
+  async function deleteModifier(modifierId) {
+    const context = _modifierContext();
     if (!context || !modifierId) return false;
     const next = context.library.filter((entry) => entry.id !== modifierId);
     if (next.length === context.library.length) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    const confirmedModifier = await _confirmLibraryEntryDelete(
+      context.library,
+      modifierId,
+      'FABRICATE.Admin.Manager.Modifiers.DeleteTitle',
+      'FABRICATE.Admin.Manager.Modifiers.DeleteContent'
+    );
+    if (!confirmedModifier) return false;
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
@@ -7420,29 +7601,26 @@ export function createAdminStore(services) {
    *
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<boolean>}
    */
-  async function reorderSystemModifier(fromIndex, toIndex, systemId = get(selectedSystemId)) {
-    const context = _systemModifierContext(systemId);
+  async function reorderModifier(fromIndex, toIndex) {
+    const context = _modifierContext();
     if (!context) return false;
     const next = _reorderListByIndex(context.library, fromIndex, toIndex);
     if (!next) return false;
-    await _saveSystemModifierLibrary(systemId, context.manager, next);
+    await _saveModifierLibrary(context.store, next);
     return true;
   }
 
   /**
-   * Idempotently seed the active Foundry game system's preset bundle into the
-   * selected crafting system's modifier library. Existing ids are preserved; the
-   * return value identifies added vs. skipped presets and flags unsupported
-   * Foundry systems for the caller to surface to the GM.
+   * Idempotently seed the active Foundry game system's preset bundle into the WORLD modifier
+   * library. Existing ids are preserved; the return value identifies added vs. skipped presets
+   * and flags unsupported Foundry systems for the caller to surface to the GM.
    *
-   * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<{added: Array, skipped: Array, unsupported: boolean, foundrySystemId?: string}>}
    */
-  async function seedSystemModifierPresets(systemId = get(selectedSystemId)) {
-    const context = _systemModifierContext(systemId);
+  async function seedModifierPresets() {
+    const context = _modifierContext();
     if (!context) return { added: [], skipped: [], unsupported: true };
     const foundrySystemId =
       typeof services.getFoundrySystemId === 'function'
@@ -7456,19 +7634,18 @@ export function createAdminStore(services) {
       presets,
       currentLibrary: context.library,
     });
-    await _saveSystemModifierLibrary(
-      systemId,
-      context.manager,
+    await _saveModifierLibrary(
+      context.store,
       result.next.map((entry) => _normalizeSystemModifier(entry)).filter(Boolean)
     );
     return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
   }
 
-  // The default a freshly added reference points at. It reads the SYSTEM library (issue
-  // 1117), not the gathering config, which is why it takes a system id rather than the
-  // gathering `systemConfig` block its callers already hold.
-  function _firstCharacterModifierId(systemId) {
-    return _systemModifierContext(systemId)?.library?.[0]?.id || '';
+  // The default a freshly added reference points at. It reads the ONE library (issue 1117),
+  // which since issue 1308 is world scope, so it consults neither the gathering config nor a
+  // crafting system.
+  function _firstCharacterModifierId() {
+    return _modifierContext()?.library?.[0]?.id || '';
   }
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
@@ -7513,7 +7690,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
+      partial?.modifierId || _firstCharacterModifierId() || ''
     ).trim();
     if (!modifierId) return null;
     let created = null;
@@ -7631,7 +7808,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
+      partial?.modifierId || _firstCharacterModifierId() || ''
     ).trim();
     if (!modifierId) return null;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
@@ -7986,7 +8163,7 @@ export function createAdminStore(services) {
   // IT NO LONGER CARRIES THE LIBRARY. Until issue 1117 this also accepted a system-level
   // `checkModifiers` array, because the Checks card authored the entries; the library now
   // has ONE authoring surface (System settings > Modifiers, through
-  // `_saveSystemModifierLibrary` above) and the Checks card is selection-only. Keeping a
+  // `_saveModifierLibrary` above) and the Checks card is selection-only. Keeping a
   // second write path for the same array is exactly how two screens come to disagree about
   // which wrote last, so the half was removed rather than left dormant.
   //
@@ -9043,6 +9220,15 @@ export function createAdminStore(services) {
     // came to disagree with the API's (issue 642). `tests/export-system-gathering-bundle.test.js`
     // pins both call sites against the exporter's own signature so they cannot drift again.
     const travelConfig = services.getGatheringRealmStore?.()?.get?.() || {};
+    // And the world character libraries (issue 1308), for the same reason and with the same
+    // consequence.
+    const characterLibraries = services.getCharacterLibrariesStore?.()?.get?.() || {};
+    // And the three WORLD-SCOPE ENTITY settings (issue 1364), membership-filtered by the exporter
+    // to this system. Omitting one exports an empty world roster, empty world defaults and no
+    // membership records, so the destination's world corpus learns nothing about the system.
+    const componentScope = services.getComponentScopeStore?.()?.get?.() || {};
+    const essenceScope = services.getEssenceScopeStore?.()?.get?.() || {};
+    const toolScope = services.getToolScopeStore?.()?.get?.() || {};
     const payload = buildExportPayload(
       system,
       recipes,
@@ -9050,7 +9236,11 @@ export function createAdminStore(services) {
       gatheringEnvironments,
       gatheringConfig,
       currencyConfig,
-      travelConfig
+      travelConfig,
+      characterLibraries,
+      componentScope,
+      essenceScope,
+      toolScope
     );
     const filename = makeExportFilename(system.name);
     const json = JSON.stringify(payload, null, 2);
@@ -9574,16 +9764,16 @@ export function createAdminStore(services) {
     updateGatheringLibraryEvent,
     deleteGatheringLibraryEvent,
     duplicateGatheringLibraryEvent,
-    addSystemModifier,
-    updateSystemModifier,
-    deleteSystemModifier,
-    reorderSystemModifier,
-    seedSystemModifierPresets,
+    addModifier,
+    updateModifier,
+    deleteModifier,
+    reorderModifier,
+    seedModifierPresets,
     addCharacterPrerequisite,
     updateCharacterPrerequisite,
     deleteCharacterPrerequisite,
     reorderCharacterPrerequisite,
-    seedCharacterPrerequisitePresetsForSystem,
+    seedPrerequisitePresets,
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
     deleteGatheringDropRowCharacterModifier,
@@ -9691,6 +9881,12 @@ export function createAdminStore(services) {
     eraseLearnedRecipe,
     resetActorSystemKnowledge,
     resetActorAllKnowledge,
+    // --- World scope: components, essences and tools (issue 1362, epic 1357) ---
+    //
+    // EXPOSED BUT UNREACHABLE. Every world route this PR ships is a placeholder, so nothing
+    // in `src/` calls one of these yet. The key set is part of the contract: `setEnabled` is
+    // absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only there.
+    worldScope,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

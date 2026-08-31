@@ -402,10 +402,14 @@ test('buildCheckModifierContext keeps the cap key present but undefined when unb
   );
 });
 
+// `catalogue` is an ARRAY rather than `undefined` since issue 1308: the builder resolves the
+// world library through `resolveModifierLibrary`, which always answers with a list. Every
+// consumer already coerced with `Array.isArray(catalogue) ? catalogue : []`, so nothing
+// downstream can tell the two apart.
 test('buildCheckModifierContext tolerates a null system, an unknown activity and a null subject', () => {
   assert.deepEqual(buildCheckModifierContext(null, 'crafting', null), {
     activity: 'crafting',
-    catalogue: undefined,
+    catalogue: [],
     systemPolicy: undefined,
     defaultModifierIds: undefined,
     subjectModifierIds: null,

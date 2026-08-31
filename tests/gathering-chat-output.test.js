@@ -70,8 +70,13 @@ test('posts exactly one card with resolved component/event/tool/economy content'
   await engine._postGatheringChatMessage(buildArgs());
 
   assert.equal(chatCreated.length, 1, 'one message posted');
-  const { content, user, speaker } = chatCreated[0];
-  assert.equal(user, 'user-1', 'posts as the current user');
+  const { content, speaker, ...rest } = chatCreated[0];
+  // NO `user` KEY, AND ITS ABSENCE IS THE ASSERTION. `ChatMessage`'s author field is `author`,
+  // there is no `user` -> `author` shim on this document, and `DocumentAuthorField` already
+  // defaults to `game.user.id` -- so a `user` key was silently dropped on v14 and warned on v13
+  // while the card was authored correctly anyway. Passing it asserted nothing and cost a
+  // compatibility warning; this pins that it is not passed rather than that it is.
+  assert.ok(!('user' in rest), 'no dead `user` key -- ChatMessage defaults `author` itself');
   assert.equal(speaker.alias, 'Aria', 'speaker is the gathering actor');
   assert.ok(content.includes('2× Herb'), 'component name + quantity resolved via componentId join');
   assert.ok(content.includes('src="icons/herb.png"'), 'component image resolved');

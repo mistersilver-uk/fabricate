@@ -63,6 +63,11 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 
 - Every mode's check has a single supported source: a GM-authored roll formula (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively.
 This built-in dice-expression check is the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration — no macro and no game-system adapter is required or supported.
+- A **Standalone Check Roll** published to a companion (`companion-api/spec.md`) consults **none** of this section: no modifier catalogue, no `defaultModifierPolicy`, no `bySubject` pick, no `maxModifierPicks`, no tool bonus, no authored trigger, no tier stepping and no `failureResultPolicy`.
+It has no subject and no crafting system to draw them from, so it is the check-roll mechanics **without** the system-derived terms.
+A companion that wants a system's modifiers applied routes a real craft or salvage instead.
+- The published member applies the **post-shim** usability test below **before** dispatching to a runner, so a formula the retirement shim empties is refused as `noFormula` rather than reaching `runFormulaPassFail`'s non-blocking `engine: false` branch and passing with the DC ignored.
+The same branch remains reachable from a **direct** runner caller and is tracked as `fabricate#1296`; the published member refuses in front of it rather than repairing it.
 - A check is **usable** IFF its mode's `rollFormula` is authored.
 The historical macro-as-check-source and the `checkSource: "builtIn"` game-system adapter (`builtIn: { ability, skill, dc, advantage }`) were removed in 1.8.0 and are not part of the model; see `data-models` requirement 30 and its *Crafting Check Macro Contract* section.
 - Each of the three activity checks carries a **failure-result policy**, `failureResultPolicy` (`'never' | 'perRecord' | 'always'`), answering whether a FAILED check may produce a result at all.
@@ -71,11 +76,12 @@ A newly-created system defaults to `perRecord`; an absent or unrecognized value 
 Its reach is bounded by what each mode's model can express: real on crafting `simple` and alchemy `simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI, route with a `disposition: 'failure'`, and are PRODUCED by the crafting failure branch (see `recipes-and-steps` §Check and Resolution item 3, including the disposition allowlist that stops a single-group routed recipe awarding its SUCCESS output on a failed check); inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering the whole path ships DORMANT pending issue 683.
 **The policy therefore gates AUTHORING as well as resolution** — the tier picker, the readiness validator and the routing all read the same policy-conditional set, so the editor can never offer a tier the validator calls unroutable or the engine refuses to resolve.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
-- A crafting system carries **ONE named modifier library at the SYSTEM level**, `CraftingSystem.modifiers`, of `{id, label, expression, isRollExpression, icon?, min?, max?}` (issue 1117: it absorbed the gathering character-modifier library, so a system authors modifiers in exactly one place).
+- A world carries **ONE named modifier library, at WORLD level**, in the `characterLibraries` setting, of `{id, label, expression, isRollExpression, icon?, min?, max?}` (issue 1117 absorbed the gathering character-modifier library into a single system-level list; issue 1308 lifted that list off the crafting system, so a WORLD authors modifiers in exactly one place and three crafting systems no longer mean three copies of the same expression).
+  A crafting system carries no `modifiers` key and no participation flag over the library; what it still owns is the SELECTION, below.
 - **A roll-shaped expression is legal EVERYWHERE, a check included** (issue 1118).
   `isRollExpression` is derived and is a DISPLAY classification only: a check appends a rolling entry to its formula AS DICE, so the authored variance survives to the roll, appears in `roll.dice`, animates and shows on the chat card.
   This reverses the rule issue 1117 shipped, which modelled a check modifier on a tool bonus (a scalar) and raised a blocking `modifierRollExpression`; that issue id is RETIRED, not reworded, because there is nothing left to report about an entry that rolls.
-Each of the three activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — carries its OWN selection over that one catalogue: a **COMBINATION RULE** (`defaultModifierPolicy`), a default eligible id set (`defaultModifierIds`) and an optional pick cap (`maxModifierPicks`).
+Each of the three activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — still carries its OWN selection over that one library, on the crafting system: a **COMBINATION RULE** (`defaultModifierPolicy`), a default eligible id set (`defaultModifierIds`) and an optional pick cap (`maxModifierPicks`).
 The catalogue is defined once; each activity decides which entries apply and how they combine.
 A check roll formula ALWAYS carries the resulting **check-modifier contribution**; the GM authors no placeholder and cannot forget one, so a catalogue that reaches a rolled check always contributes.
 The rule states BOTH how the eligible entries combine AND **who selects them**, and it has four values: `addAll` (take the activity's own default set; nobody selects), `highest` (the single highest-AVERAGING entry of that same set; nobody selects), **`bySubject`** (the record being resolved selects, at authoring time), and `playerPicks` (the PLAYER selects, at roll time).
@@ -434,11 +440,140 @@ This is the key distinction from the routed modes, which select exactly one resu
 Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - `equal`: award result when `remaining >= cost`; then `remaining -= cost`.
+  **Otherwise STOP**: the first stage the budget cannot afford ends the award, and every later stage is left unevaluated.
 - `exceed`: award result when `remaining > cost`; then `remaining -= cost`.
+  **Otherwise STOP**, on the same terms as `equal`.
+  A stage whose cost EXACTLY equals `remaining` therefore stops an `exceed` award where `equal` would have awarded it.
 - `partial`:
   - if `remaining >= cost`, award and decrement.
   - else if `remaining > 0`, award the current result (with only partial credit), set `remaining = 0`, stop.
   - else stop.
+
+**All three modes STOP at the first unaffordable stage; none of them skips it and carries on.**
+That is stated explicitly because it is the difference between "the player did not receive the later stages" and "the player nearly reached the next stage", and every consumer that classifies stages depends on it.
+The one case that CONTINUES rather than stopping is an invalid cost (a `costFor` that is non-finite or below 1), and only under the `skip` policy; under the `fail` policy an invalid cost aborts the whole award as a misconfiguration.
+An invalid cost is a GM authoring gap rather than a budget outcome, and it is reported separately for that reason.
+
+### Award Loop Reporting
+
+The award loop is the only place that knows WHY it stopped, so it REPORTS that rather than leaving each caller to re-derive it.
+Alongside `awarded`, `remaining` and the misconfiguration `invalidResultId`, it returns three additive facts:
+
+- `partialResult` — the `partial`-mode tail award, or `null`.
+  **It is a MEMBER of `awarded`**, so "fully awarded" is `awarded` MINUS `partialResult`; a consumer reading "fully awarded = every member of `awarded`" classifies a partial-only component as both fully awarded and partial at once.
+- `haltedResult` — the ONE stage that stopped the loop and was NOT awarded, or `null`.
+  A partial tail award and a halt are MUTUALLY EXCLUSIVE, because the `partial` branch awards the tail and only THEN stops; under `partial` a resolution has a halted stage only when the budget reached zero exactly, or started at or below it.
+  `haltedResult` is `null` when the budget covered the whole list, and `null` for an aborted `fail` resolution, which is a misconfiguration rather than a budget halt.
+- `skippedResults` — every invalid-cost stage in the WHOLE ordered list, not merely in the prefix the loop visited before stopping, so a misconfigured stage sitting after the halt is reported as skipped rather than mistaken for a stage that was never reached.
+
+These three are ADDITIVE: `awarded`, `remaining` and `invalidResultId` are unchanged, and every existing caller reads only those.
+Re-deriving any of them in a caller is forbidden rather than merely discouraged.
+The break index is not recoverable from `awarded` plus `remaining` once a skipped stage sits between the last award and the halt; and the salvage path does not zero the budget after a partial tail, so "was there a partial" is not inferable from `remaining` there either.
+Re-derivation is what makes the crafting and salvage classifiers disagree about the same resolution.
+
+Every progressive resolution PUBLISHES those facts to its engine as one flat, id-list-shaped record — `awardedResultIds`, `remaining`, `partialResultId`, `haltedResultId`, `skippedResultIds` — and the same five keys are published by all three activities, so a consumer learns one shape rather than one per activity.
+It is published in full on every branch, including a resolution that awarded nothing: a consumer that reads five keys on one branch and two on another learns two shapes for one fact.
+
+### Component Complications
+
+A `Component` may carry GM-authored **complications** (`data-models/spec.md` § Component requirements 19-25) that fire when that component takes part in a progressive resolution.
+Progressive mode is the only resolution mode that has stages, so it is the only mode that can fire one.
+
+#### The five stage buckets
+
+Each stage in the ordered list lands in EXACTLY ONE bucket, and the partition is total.
+
+| bucket | definition |
+| --- | --- |
+| `full` | in `awarded` and NOT `partialResult` |
+| `partial` | `partialResult`, the `partial`-mode tail award, which is itself a member of `awarded` |
+| `halted` | `haltedResult`: the one stage that stopped the loop and was not awarded |
+| `unreached` | every stage after the stop point — the halt, or the partial tail the loop stops on — which the loop never evaluated |
+| `skipped` | a stage this classifier must not read as an outcome: an invalid cost, derived over the WHOLE ordered list rather than the visited prefix, OR a stage with no resolvable result id |
+
+Classification order is load-bearing three times: the id-less test runs FIRST OF ALL, because a stage with no resolvable result id is in none of the id sets the other four tests consult and would otherwise fall out of the bottom of the chain; `skipped` is tested next so an invalid cost sitting after the stop point is never read as `unreached`; and `partial` is tested before `full` because the tail award is a member of `awarded`.
+
+**A stage with no resolvable result id is `skipped`, and MUST NOT be `unreached`.**
+The partition must be total, so an id-less stage has to land somewhere, and `skipped` is the one bucket that contributes to nothing.
+`unreached` is the worst reading available: the award loop pushes a result into `awarded` whatever its id, and only the id set drops the id-less ones, so an id-less stage the loop DID award would classify as `unreached` and fire a `stageMissed` complication naming a component the player is holding.
+The loop can and does award a result it cannot name; it is this classifier that cannot recognise it afterwards, and a complication must fail toward silence rather than toward accusing the player of a miss.
+`_normalizeSalvageResult` mints an id for every salvage result, so no shipped path reaches this today — but this spec contemplates an id-less progressive result, so the branch is specified rather than left to fall through.
+
+`halted` and `unreached` stay DISTINCT even though the `stageMissed` clause below unions them, so a later change can offer "only the stage you nearly reached" without reopening this model, and so an output can say which of the two it was.
+
+#### The per-entry facts
+
+The unit is the RESULT ENTRY, not the component.
+A component may legitimately appear several times in one ordered list, and each occurrence is evaluated on its OWN bucket, against nothing else.
+
+| clause | matches when |
+| --- | --- |
+| `when.stageAwarded` | this entry is `full` |
+| `when.stagePartial` | this entry is `partial` |
+| `when.stageMissed` | this entry is `halted` OR `unreached` |
+| `when.checkTrigger` | the NAMED trigger on the ACTIVE activity's progressive check block matched this check result |
+
+An entry is in exactly one bucket, so at most one of the three stage clauses can match on it.
+A component whose first entry was awarded and whose third was missed matches `stageAwarded` on the first and `stageMissed` on the third, and neither fact reaches the other entry: a `stageMissed` complication MUST NOT fire against an award the player received.
+The `checkTrigger` and `rollCondition` clauses are per-resolution facts and read the same on every entry, which is what makes a trigger-only complication fire once per entry of the component that carries it.
+
+`skipped` contributes to NOTHING: a GM misconfiguration is not a narrative outcome, and a skipped stage must never appear as one on any output.
+That is total rather than clause-by-clause — a `skipped` entry fires nothing at all, including a complication whose only enabled clause is a trigger or a condition roll, because there is no award for the consequence to attach to.
+An entry with no resolvable result id is `skipped` and so fires nothing, on the same rule.
+
+`match: 'all'` requires every ENABLED clause; `match: 'any'` requires one; a complication with nothing enabled never fires.
+A clause the GM did not enable is absent from the quantification rather than false, so `rollCondition.enabled: false` contributes nothing and can never make `all` unsatisfiable.
+The `rollCondition` gate is settled by a live roll and FAILS CLOSED on every uncertainty — no dice engine, a non-finite total, an unparseable comparand, or a comparator the numeric table does not know.
+Its comparand is resolved by SUBSTITUTING roll data without rolling, so a comparand that is itself a dice expression fails the gate closed rather than being re-rolled on every evaluation.
+
+#### Once per result entry, never once per component
+
+**A complication fires at most once per RESULT ENTRY per resolution**, deduplicated on `(result entry, complicationId)`.
+A component listed five times whose complication matched on three of those entries fires three times, rolls its `1d6` three times, and reports three outcomes.
+
+The reason is what repetition MEANS in a progressive result set.
+An entry carries no quantity, so listing the iron ingot five times is the only way to ask for five ingots: each entry is its own award, spent for its own share of the budget, and won or missed on its own.
+A player exercises that by reordering, and a GM mandates it by authoring, so a rule that fired once per component would silently charge one consequence for five awards — and would have to invent which of the five to blame it on.
+
+Each firing NAMES the entry that produced it and reports THAT entry's bucket, which is now a direct read rather than a choice: the firing belongs to the entry it was evaluated on.
+Without that name a player reading "you missed the iron ingot" against an output that also granted an iron ingot cannot reconcile the two.
+There is no `(componentId, complicationId)` firing key anywhere in the runtime, and none may be reintroduced: the delivery de-duplication key (`recipes-and-steps/spec.md`) is `(resolutionId, resultId, complicationId)` and already distinguishes the occurrence.
+
+The only surviving dedupe is WITHIN one entry: a component that authors the same complication id twice fires it once for that entry.
+
+Fire order is the ordered stage list's own order: the player's reordered list for crafting, the order captured onto the run at start for salvage, and the authored order for gathering, which has no reorder feature.
+Firings are emitted in that entry order, and a component's several firings are therefore interleaved with other components' at the positions their entries occupy.
+
+Evaluation and firing are ONE unit, and both readings below are normative on a player surface.
+A component staged five times is FORECAST on all five, because a player reordering the list has to see, on each entry, what that entry could cost them.
+It is MARKED on exactly the entries that fired — between none and all five — because the fired records name entries, one record per firing.
+A surface that collapsed the forecast to one entry per component would hide the cost of the very reordering the list exists for, and one that marked a single occupancy of a component that fired on three would claim one `1d6` was rolled when three were.
+
+Because a complication can now fire more than once in one resolution, an output listing fired complications MAY show the same complication more than once, and MUST NOT de-duplicate those rows: collapsing them under-reports what happened.
+Repeated rows are told APART instead of merged.
+Every player-facing fired-complication row therefore carries the STAGE POSITION of the entry that produced it: the 1-based place of that entry in the ordered stage list, counting every stage so the numbering keeps its gaps.
+It is the same number, meaning the same thing, that a player-facing per-stage list numbers its rows by — the player's own arrangement for crafting and salvage, the authored order for gathering — because a number that named a row the player cannot find would be worse than no number.
+
+A row states that position when, and ONLY when, another row in the SAME rendered output would draw identically to it.
+A complication that fired once is already unambiguous, and a position appended to it is noise.
+"Draws identically" is decided over what the row actually renders, so two DIFFERENT complications a GM named and worded alike on one component are disambiguated on the same rule, and rows for different components never collide.
+The decision belongs to the output that assembles the final row set, never to the resolution that produced one firing: the aggregate bulk card's rows come from many separate resolutions, none of which can see whether its row is about to collide.
+A firing that carries no position — one recorded before positions existed — degrades to an unmarked row rather than to a stated non-number.
+
+The GM-only card deliberately does NOT carry the position.
+The number's referent is the acting client's ordered list, which that card does not draw and the GM has no view of, so on that surface it would be an unverifiable number pointing at an invisible list; and it would add a fourth client-supplied claim to a relay payload specified as addressing-only (`recipes-and-steps/spec.md`).
+Its rows are instead distinguished by the acting client's claimed bucket, by the GM-side effect roll, and by the macro outcome, each reported per firing.
+The residual case is recorded rather than fixed: two firings of one `gmOnly` complication on one component that share a bucket, author no effect roll and name no macro still render as two identical GM rows, and the `resultId` the payload already carries is the field a future fix would render.
+
+#### Documented consequences
+
+These follow from the model above and are recorded rather than fixed.
+
+- An `outcomeTier` trigger condition can NEVER match a progressive check, because a progressive roll produces a null outcome.
+- A trigger condition reading the forced progressive value and one reading the raw roll total can disagree on the same roll.
+- `when.stagePartial` can never match under `equal` or `exceed`, because neither mode produces a partial tail.
+- Under `exceed`, a stage whose cost exactly equals `remaining` is `halted` where `equal` calls it `full`.
+- A resolution the award loop aborted on an invalid cost under the `fail` policy fires NOTHING.
 
 ### Player Reorder
 

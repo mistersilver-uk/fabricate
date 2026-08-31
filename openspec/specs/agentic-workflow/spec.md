@@ -98,6 +98,26 @@ The comparison MUST record each artifact's stable identity and dimensions, autho
 - **AND** a source declaration, token name, or gate fixture copied from the implementation is not accepted as proof that the visual effect exists
 - **AND** a reusable shipped primitive is used for the same behavior unless the approved inventory documents an incompatibility
 
+#### Scenario: extending a multi-PR prototype's parity oracle
+
+The parity oracle for a prototype spanning several PRs lives under `tmp/` beside the prototype, because a prototype is a design artefact rather than a repository asset.
+Its CLOSED SCREEN LIST is not versioned here either.
+It belongs to the WORK — the epic or issue that owns the prototype — because it names that prototype's screens and the PRs that owe them, and it stops being true the moment the work lands.
+What this spec versions is the RULE below, which is reusable by any prototype; the roster the rule is applied to is recorded on the owning issue, where removing a screen is a visible edit to a tracked decision rather than a silent one.
+
+- **WHEN** a prototype's screens are delivered across several PRs and the first of them establishes the oracle
+- **THEN** that PR authors the PROTOTYPE half complete — every screen, every region, every alignment group and every inventory root — so the deferred screens are already measured on the reference side and a later PR supplies locators rather than deciding what to measure
+- **AND** every screen it cannot yet reach in the subject carries an `unreachable` note stating WHY, which asserts the absence: the run fails the moment the subject starts rendering that element, so an excuse cannot outlive the constraint it records
+- **AND** a screen the gateway PR itself delivers is EXCLUDED from the deferred roster and named as an exclusion on the owning issue, so it reads as a decision rather than an omission
+- **AND** a later PR extends the oracle only by deleting an `unreachable` note and supplying locators; it adds no screen, no alignment group and no shared region, because those are claims about the reference rather than about its own work
+- **AND** a PR that DELETES a screen, a region or an alignment group rather than supplying its locators is a finding against that PR
+
+#### Scenario: a product state the prototype cannot reach
+
+- **WHEN** a rendered state has no counterpart in the prototype at all — a collapsed rail the mockup never draws, a responsive breakpoint below its fixed width
+- **THEN** it is recorded as product-only and out of the oracle's reach rather than being added to the reference side
+- **AND** its evidence is a captured frame plus whatever mechanical gate covers the same decision, and the plan says which, because a state the oracle structurally cannot see has no other witness
+
 ### Requirement: Branch and PR workflow
 
 All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.
@@ -550,6 +570,11 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 Automatically published evidence MUST be identifiable as belonging to the pull request's current head.
 The evidence gate MUST NOT decide before the automated producer for that same head has concluded, UNLESS the pull request body already carries evidence sufficient to satisfy the gate for that head.
 
+Published evidence MUST be **legible to a reader who has only the picture**.
+Each frame MUST be named from the canonical view-case registry rather than by its case id, and a frame that depicts a surface the module does not ship MUST carry a visible caption saying so and naming where that surface comes from.
+This repository is public and its pull requests are readable by anyone; a frame that photographs Core's own companion seam necessarily shows a stand-in module registered by the test harness, and an uncaptioned picture of it reads as a shipped feature to precisely the readers who know it is not one.
+The caption MUST sit beside the image rather than in its alt text, which is read by a screen reader and by almost nothing else a reviewer uses.
+
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
@@ -680,6 +705,80 @@ An approximate case that does not declare itself approximate is worse than no ca
 - **WHEN** a condition depends on behaviour the Foundry-free renderer does not have, such as a native Foundry dialog or a Foundry-side service call
 - **THEN** the case stays declared as falling short and the limitation is recorded in the register
 - **AND** the renderer does not substitute a facsimile of the missing behaviour, because a frame depicting UI the product never draws is evidence of something that does not exist
+
+### Requirement: Documentation screenshot provenance
+
+A new or replaced screenshot on the documentation site MUST be generated from a named view case rather than curated by hand.
+A screenshot committed before this requirement's generator existed remains valid documentation evidence without migration, because retiring evidence that is still accurate buys nothing and a rule that silently indicts shipped work is a rule nobody can act on.
+
+#### Scenario: a doc page declares an image slot
+
+- **WHEN** a documentation page needs a visual reference for a view the canonical view-case registry covers
+- **THEN** the page declares an image slot naming that case id, and the committed asset is generated from that case
+- **AND** a slot whose asset is absent fails a gate rather than rendering a hole
+- **AND** the published frame carries a description of what it shows, recorded alongside the case id rather than at each call site, so one frame is described once however many pages use it, and a gate refuses an empty description
+
+#### Scenario: only exact and beyond cases feed documentation
+
+- **WHEN** a case is selected to feed a documentation image slot
+- **THEN** only a case declaring `reaches: exact` or `reaches: beyond` may be used
+- **AND** a case that reaches the right application window but not the specific condition its live-smoke counterpart shows is refused, under the View-case reach declaration requirement, because publishing it as a documentation reference would present a shortfall as the condition the page describes
+
+#### Scenario: generation fails closed
+
+- **WHEN** the harvested Foundry window chrome, the image encoder, or the decoder the frame comparison needs is absent at generation time
+- **THEN** generation aborts naming what is missing and how to obtain it, and writes no image
+- **AND** no approximated frame is emitted, because a reader cannot tell a wrong documentation screenshot from a right one, which makes it worse than a stale one
+- **AND** the restriction on harvested material is the one already stated in the Harvested Foundry window chrome requirement, and nothing here widens or narrows it
+
+#### Scenario: a frame whose render did not succeed this run
+
+- **WHEN** the renderer reports a per-case failure while an earlier run's output for that case is still on disk
+- **THEN** that frame is not consumed, because the renderer accumulates output and a surviving stale frame would otherwise be republished as current documentation
+- **AND** a render that produced no fresh record of what it rendered is refused wholesale rather than read from whatever record was already on disk, because a record left by an earlier run is internally consistent and would otherwise certify every frame in it
+
+#### Scenario: only changed frames are rewritten
+
+- **WHEN** the generator runs against an already-populated documentation image set
+- **THEN** it rewrites only those frames whose fresh render differs from the committed one by more than the renderer's own measured noise
+- **AND** it reports which images changed and which were left alone, so a reviewer can tell a real visual change from re-encoding noise
+- **AND** both sides of the comparison pass through identical encoding, so that the encoder's own treatment is not mistaken for a render difference
+- **AND** the provenance digest is taken over the renderer's output rather than the published asset, and records WHICH render produced the committed asset rather than deciding whether it changed, since a renderer that is not byte-stable cannot have its digest re-derived
+
+#### Scenario: the renderer's own noise is not a documentation change
+
+- **WHEN** two renders of the same case differ only by antialiasing jitter, which this renderer produces and which moves between runs rather than settling
+- **THEN** the frame counts as unchanged and is not rewritten, because rewriting a tenth of the set on every run destroys the reviewable diff the selective rewrite exists to protect
+- **AND** the tolerance that decides this is derived from measured noise and is required to sit below the smallest reader-visible change the measurement established, a single changed character of on-screen text, demonstrated in both directions, so that it cannot widen into a blindfold
+- **AND** the tolerance bounds AREA as well as amplitude, because the measured noise is local to control edges while a colour or theme change is not, and an amplitude-only rule would call a whole recoloured panel unchanged
+- **AND** the margins between the tolerance and each measured population are themselves asserted, so the tolerance cannot be widened later without the gate that justifies it going red
+
+#### Scenario: the toolchain that produced the frames changes
+
+- **WHEN** the harvested Foundry version or the browser build that rasterises the frames changes
+- **THEN** the whole generated set is expected to be rewritten with no visual change to review
+- **AND** the provenance that produced the set is recorded alongside it and gated, so that such a rewrite is identifiable as a toolchain change rather than mistaken for content changes
+
+#### Scenario: the map is gated in both directions
+
+- **WHEN** either a documentation image or the case id feeding it is renamed, added, or removed
+- **THEN** a gate fails unless both sides move together, so neither can drift out from under the other
+- **AND** the generated images occupy a namespace distinct from hand-curated ones, so that the reverse direction enumerates real files rather than restating the map to itself
+
+#### Scenario: a screenshot predating the generator
+
+- **WHEN** a screenshot was committed to the documentation site before this requirement's generator existed
+- **THEN** it remains valid documentation evidence and is not required to be re-authored through an image slot
+- **AND** only a new or replaced screenshot must use the generated slot mechanism
+- **AND** the carve-out is decided by which namespace a frame occupies rather than by when it was committed, so a reader can tell the two populations apart without consulting history
+- **AND** the hand-curated population is closed and may only shrink, because a replacement for one of its frames is a new screenshot and must be generated
+
+#### Scenario: a documentation image that is not an application view
+
+- **WHEN** a documentation image depicts something the renderer has no route for, such as a palette reference assembled from the stylesheet rather than a screen the product draws
+- **THEN** it is exempt from generation, because a rule requiring a case for something no case can reach would be unsatisfiable rather than demanding
+- **AND** the exemption turns on what the artifact IS, not on the convenience of leaving it alone, so an application view that a case could reach is never covered by it
+- **AND** the exempt set is enumerated rather than inferred, so adding to it is a visible act
 
 ### Requirement: Provider-specific skill metadata
 

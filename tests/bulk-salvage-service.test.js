@@ -10,6 +10,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   BULK_MAX_ITEMS,
@@ -43,14 +45,41 @@ const HIDE = bulkComponent({ id: 'comp-hide', name: 'Boar Hide', img: 'icons/hid
 const BONE = bulkComponent({ id: 'comp-bone', name: 'Cave Bone', img: 'icons/bone.webp' });
 
 /** A one-system service over `components`, with the salvage seam supplied by the test. */
-function makeService({ systems, salvage, promptRollDecision, postChatMessage, maxItems }) {
+function makeService({
+  systems,
+  salvage,
+  promptRollDecision,
+  postChatMessage,
+  deliverComplications,
+  maxItems,
+}) {
   return new BulkSalvageService({
     salvage,
     getCraftingSystem: craftingSystemLookup(systems),
     promptRollDecision,
     postChatMessage,
+    deliverComplications,
     maxItems,
   });
+}
+
+/**
+ * One addressing-only GM request, as `CraftingEngine#salvage` returns them on
+ * `complicationRequests` when the caller defers delivery.
+ */
+function complicationRequest(overrides = {}) {
+  return {
+    craftingSystemId: 'sys-a',
+    componentId: 'comp-ore',
+    complicationId: 'complication-1',
+    resultId: 'result-1',
+    activity: 'salvage',
+    bucket: 'unreached',
+    actorUuid: 'Actor.a1',
+    resolutionId: null,
+    effectRollTotal: null,
+    ...overrides,
+  };
 }
 
 describe('classifySalvageOutcome reads the discriminators in the ONE total order', () => {
@@ -1130,6 +1159,382 @@ describe('BulkSalvageService.run: progress ticks over EVERY entry', () => {
     assert.ok(
       logged.some((line) => line.includes('progress listener threw')),
       'the throw is reported to the console rather than swallowed'
+    );
+  });
+});
+
+describe('BulkSalvageService.run: complications are batched, not emitted per row (issue 1286)', () => {
+  it('DEFERS every row so the engine emits nothing of its own', async () => {
+    const { seam, calls } = recordingSalvage({ success: true, results: [] });
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, HIDE, BONE] })],
+      salvage: seam,
+      deliverComplications: () => true,
+    });
+
+    await service.run({
+      targets: [
+        bulkTarget({ componentId: 'comp-ore' }),
+        bulkTarget({ componentId: 'comp-hide' }),
+        bulkTarget({ componentId: 'comp-bone' }),
+      ],
+      interactive: false,
+    });
+
+    assert.deepEqual(
+      calls.map((call) => call.options.deferComplicationDelivery),
+      [true, true, true],
+      'without this each row emits its own socket message, spending 25 units of the sender ' +
+        'budget on one gesture against a limiter sized for the fanned-out PAIR count'
+    );
+  });
+
+  it('relays a 25-row run as ONE message, never 25', async () => {
+    // ONE message because this run is one addressed `(craftingSystemId, actorUuid)` pair,
+    // which is the unit the relay batches by — not because a bulk run relays one whatever
+    // it addresses. A run genuinely spanning pairs relays one per pair, and that is asserted
+    // separately below. What is refused here is a per-ROW relay: at `BULK_MAX_ITEMS` it
+    // would spend 25 units of the sender's budget on a single gesture rather than 1, and the
+    // GM-side limiter (`COMPLICATION_RATE_LIMIT`) is sized against the fanned-out pair
+    // count, not against the row count.
+    const delivered = [];
+    // 25 DISTINCT components on ONE system for ONE actor: the pre-flight refuses a repeated
+    // `(actor, system, component)` as a duplicate, so a fixture queueing the same target 25
+    // times would run a single row and prove nothing about the batching.
+    const components = Array.from({ length: BULK_MAX_ITEMS }, (_, index) =>
+      bulkComponent({ id: `comp-${index}`, name: `Component ${index}` })
+    );
+    const service = makeService({
+      systems: [bulkSystem({ components })],
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        complicationRequests: [complicationRequest({ componentId, resultId: componentId })],
+      }),
+      deliverComplications: (message) => {
+        delivered.push(message);
+      },
+    });
+
+    const result = await service.run({
+      targets: components.map((component) => bulkTarget({ componentId: component.id })),
+      interactive: false,
+    });
+
+    assert.equal(result.counts.succeeded, BULK_MAX_ITEMS, 'all 25 rows really ran');
+    assert.equal(
+      delivered.length,
+      1,
+      'ONE message for the whole run, whatever the row count — 25 rows must not be 25 messages'
+    );
+    assert.equal(delivered[0].craftingSystemId, 'sys-a');
+    assert.equal(delivered[0].actorUuid, 'Actor.a1');
+    assert.equal(
+      delivered[0].complications.length,
+      BULK_MAX_ITEMS,
+      'and it carries every row’s request rather than trading loss for batching'
+    );
+  });
+
+  it('carries every runnable row’s requests in ONE message, in run order', async () => {
+    const delivered = [];
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, HIDE, BONE] })],
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        complicationRequests: [complicationRequest({ componentId, resultId: componentId })],
+      }),
+      deliverComplications: (message) => {
+        delivered.push(message);
+      },
+    });
+
+    await service.run({
+      targets: [
+        bulkTarget({ componentId: 'comp-ore' }),
+        bulkTarget({ componentId: 'comp-hide' }),
+        bulkTarget({ componentId: 'comp-bone' }),
+      ],
+      interactive: false,
+    });
+
+    assert.equal(delivered.length, 1);
+    assert.deepEqual(
+      delivered[0].complications.map((request) => request.componentId),
+      ['comp-ore', 'comp-hide', 'comp-bone']
+    );
+  });
+
+  /**
+   * Run `targets`, with every row firing one request that names the system and actor it came
+   * from, and return the relayed messages. Shared by the three batch-key cases below, which
+   * differ ONLY in the `(system, actor)` shape of their targets — written once because
+   * SonarCloud counts `tests/**` for new-code duplication and three near-identical service
+   * fixtures is exactly the block that gate fails on.
+   */
+  async function relayedMessages({ systems, targets }) {
+    const delivered = [];
+    const service = makeService({
+      systems,
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        complicationRequests: [
+          complicationRequest({ craftingSystemId: systemId, componentId, actorUuid }),
+        ],
+      }),
+      deliverComplications: (message) => {
+        delivered.push(message);
+      },
+    });
+    await service.run({ targets, interactive: false });
+    return delivered;
+  }
+
+  /** The addressing of each relayed message, in relay order. */
+  const addressing = (delivered) =>
+    delivered.map((message) => [message.craftingSystemId, message.actorUuid]);
+
+  /** What each relayed message actually CARRIES, read back off the requests themselves. */
+  const carried = (delivered, field) =>
+    delivered.map((message) => message.complications.map((request) => request[field]));
+
+  it('splits by ADDRESSED PAIR, because the payload names one system and one actor', async () => {
+    // Both are GM-side AUTHORIZATION inputs — the system is what the authored complication
+    // is re-read from, the actor is what the attested sender is re-authorized against — so
+    // neither can be per-entry without moving the authorization decision onto the wire.
+    const delivered = await relayedMessages({
+      systems: [
+        bulkSystem({ id: 'sys-a', components: [ORE] }),
+        bulkSystem({ id: 'sys-b', components: [HIDE] }),
+      ],
+      targets: [
+        bulkTarget({
+          actorId: 'a1',
+          actorUuid: 'Actor.a1',
+          systemId: 'sys-a',
+          componentId: 'comp-ore',
+        }),
+        bulkTarget({
+          actorId: 'a2',
+          actorUuid: 'Actor.a2',
+          systemId: 'sys-b',
+          componentId: 'comp-hide',
+        }),
+      ],
+    });
+
+    assert.deepEqual(addressing(delivered), [
+      ['sys-a', 'Actor.a1'],
+      ['sys-b', 'Actor.a2'],
+    ]);
+  });
+
+  // The case above varies the system AND the actor together, so it holds for a key built from
+  // either half alone. The two cases below drive the halves SEPARATELY, because collapsing
+  // this key is not bookkeeping: with the actor half gone, a run spanning two actors on one
+  // system relays ONE message whose `actorUuid` is whichever row batched first, carrying the
+  // OTHER actor's requests — so the elected GM re-authorizes actor A and then runs actor B's
+  // complications against A. That is precisely the "authorization decision on the wire" this
+  // grouping exists to prevent (`recipes-and-steps/spec.md` § "The relay payload carries
+  // ADDRESSING ONLY"). With the system half gone, the GM re-reads the authored complication
+  // from the wrong system's record instead.
+  it('relays TWO ACTORS on ONE system as two messages, each carrying only its own', async () => {
+    const delivered = await relayedMessages({
+      systems: [bulkSystem({ id: 'sys-a', components: [ORE, HIDE] })],
+      targets: [
+        bulkTarget({
+          actorId: 'a1',
+          actorUuid: 'Actor.a1',
+          systemId: 'sys-a',
+          componentId: 'comp-ore',
+        }),
+        bulkTarget({
+          actorId: 'a2',
+          actorUuid: 'Actor.a2',
+          systemId: 'sys-a',
+          componentId: 'comp-hide',
+        }),
+      ],
+    });
+
+    assert.deepEqual(
+      addressing(delivered),
+      [
+        ['sys-a', 'Actor.a1'],
+        ['sys-a', 'Actor.a2'],
+      ],
+      'one message per actor, both naming the one system the run addressed'
+    );
+    assert.deepEqual(
+      carried(delivered, 'actorUuid'),
+      [['Actor.a1'], ['Actor.a2']],
+      'and neither message carries the other actor’s requests, or the GM would authorize ' +
+        'one actor and run the other’s complications against it'
+    );
+  });
+
+  it('relays TWO SYSTEMS for ONE actor as two messages, each carrying only its own', async () => {
+    const delivered = await relayedMessages({
+      systems: [
+        bulkSystem({ id: 'sys-a', components: [ORE] }),
+        bulkSystem({ id: 'sys-b', components: [HIDE] }),
+      ],
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-b', componentId: 'comp-hide' }),
+      ],
+    });
+
+    assert.deepEqual(
+      addressing(delivered),
+      [
+        ['sys-a', 'Actor.a1'],
+        ['sys-b', 'Actor.a1'],
+      ],
+      'one message per system, both naming the one actor the run addressed'
+    );
+    assert.deepEqual(
+      carried(delivered, 'craftingSystemId'),
+      [['sys-a'], ['sys-b']],
+      'and neither message carries the other system’s requests, or the GM would re-read ' +
+        'the authored complication from a record that does not hold it'
+    );
+  });
+
+  it('relays nothing at all when no row fired a complication', async () => {
+    const delivered = [];
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({ success: true, results: [] }),
+      deliverComplications: (message) => {
+        delivered.push(message);
+      },
+    });
+
+    await service.run({ targets: [bulkTarget()], interactive: false });
+
+    assert.deepEqual(delivered, [], 'an empty message would spend a unit of the sender’s budget');
+  });
+
+  it('never lets a failed relay cost the player the card or the run', async (t) => {
+    silenceErrors(t);
+    const posted = [];
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({
+        success: true,
+        results: [],
+        complicationRequests: [complicationRequest()],
+      }),
+      deliverComplications: () => {
+        throw new Error('the socket is gone');
+      },
+      postChatMessage: async (message) => {
+        posted.push(message);
+      },
+    });
+
+    const result = await service.run({ targets: [bulkTarget()], interactive: false });
+
+    assert.equal(result.posted, true, 'the awards are committed; a lost beat is not a lost item');
+    assert.equal(posted.length, 1);
+  });
+
+  it('relays BEFORE the aggregate card is posted, which is only prose until it is asserted', () => {
+    // `run()` states the ordering — "after the award commits, before the chat card is
+    // posted" — as the reason the relay sits where it does, and the relay is fire-and-forget
+    // while the card is awaited, so moving `_deliverComplications` below `_postAggregateCard`
+    // leaves every other assertion in this file green. The ordering is load-bearing: the GM
+    // whisper reports what a resolution did, and a table reading its result card before the
+    // GM has been told is the wrong way round.
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../src/systems/BulkSalvageService.js'),
+      'utf8'
+    );
+    const start = source.indexOf('  async run({');
+    assert.notEqual(start, -1, 'BulkSalvageService should declare run()');
+    const body = source.slice(start, source.indexOf('\n  }\n', start));
+    const relay = body.indexOf('this._deliverComplications(entries)');
+    const card = body.indexOf('this._postAggregateCard(entries');
+    assert.ok(relay !== -1 && card !== -1, 'both calls are in run() itself');
+    assert.ok(relay < card, 'the relay must precede the card');
+  });
+
+  it('runs, and relays nothing, with no delivery seam wired at all', async () => {
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({
+        success: true,
+        results: [],
+        complicationRequests: [complicationRequest()],
+      }),
+    });
+
+    const result = await service.run({ targets: [bulkTarget()], interactive: false });
+    assert.equal(result.counts.succeeded, 1);
+  });
+});
+
+describe('BulkSalvageService.run: the aggregate card carries the fired complications', () => {
+  it('collects every row’s player-visible complications onto ONE card model', async () => {
+    const posted = [];
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, HIDE] })],
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        complications: [
+          {
+            resultId: 'r1',
+            componentId,
+            complicationId: `x-${componentId}`,
+            buckets: ['unreached'],
+            name: `Trouble with ${componentId}`,
+            description: 'It goes wrong.',
+            severity: 'major',
+          },
+        ],
+      }),
+      postChatMessage: async (message) => {
+        posted.push(message);
+      },
+    });
+
+    await service.run({
+      targets: [bulkTarget({ componentId: 'comp-ore' }), bulkTarget({ componentId: 'comp-hide' })],
+      interactive: false,
+    });
+
+    assert.equal(posted.length, 1);
+    assert.ok(
+      posted[0].content.includes('Trouble with comp-ore'),
+      'model.complications was undefined before this, so the block could never render'
+    );
+    assert.ok(posted[0].content.includes('Trouble with comp-hide'));
+    assert.ok(
+      posted[0].content.includes('Iron Ore') && posted[0].content.includes('Boar Hide'),
+      'a bulk card lists many components, so an unattributed complication row cannot be placed'
+    );
+  });
+
+  it('renders no complication block for a run that fired none', async () => {
+    const posted = [];
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE] })],
+      salvage: async () => ({ success: true, results: [] }),
+      postChatMessage: async (message) => {
+        posted.push(message);
+      },
+    });
+
+    await service.run({ targets: [bulkTarget()], interactive: false });
+
+    assert.equal(
+      posted[0].content.includes('--complications'),
+      false,
+      'a run that fired nothing is byte-identical to what it was before this feature'
     );
   });
 });

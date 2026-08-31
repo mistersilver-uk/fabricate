@@ -48,8 +48,24 @@
         "UnknownError": "unknown error",
         "NoFix": "no fix action provided"
       },
+      "CharacterLibraries": {
+        "CollisionNotice": "Fabricate merged every crafting system's character prerequisites and modifiers into one world library. {count} entr(ies) shared an id across systems but were defined differently, so only one definition survived: {entries}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources."
+      },
       "UnifyModifiers": {
         "CollisionNotice": "Fabricate merged each system’s check modifiers and gathering character modifiers into one Modifiers library. {count} gathering modifier(s) in {systems} shared an id with a check modifier and were renamed with a \"-gathering\" suffix; every reference to them was updated. Review them under System settings › Modifiers."
+      },
+      "WorldScopeEntities": {
+        "Created": "Fabricate gave this world one shared record per component, essence and tool: {components} world component(s), {essences} world essence(s) and {tools} world tool(s). Every crafting system keeps exactly the behaviour it had.",
+        "Merged": "{count} of them were the same real item in more than one system and are now one record.",
+        "Renames": "{count} definition(s) took the oldest system’s identity or a new id, and every reference to them was rewritten: {renames}.",
+        "TransitiveGroups": "{count} group(s) were merged through a shared source item rather than directly. Check them in case two different things were joined.",
+        "Refusals": "{count} system(s) could not be re-keyed safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}.",
+        "FlaggedForReview": "{count} reference(s) already point at nothing, and Fabricate can now tell you which: {references}. Nothing has been removed - review them when you get a chance.",
+        "UnsafeSystemIds": "{count} crafting system id(s) contain a character Fabricate cannot use inside an item flag, so owned copies in them were left to resolve by their source item instead: {systems}.",
+        "LockedSkips": "{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by their source item.",
+        "SkippedErrors": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().",
+        "IdentityDrift": "Fabricate’s shared world record is out of date for {records} entry(ies) across {fields} field(s): {entities}. Each crafting system’s own copy is what everything reads, so nothing is wrong and nothing has been changed — this covers names, images, descriptions and source links only.",
+        "IdentityDriftOverflow": "…and {count} more — the full list is in the console (F12)"
       }
     },
     "Canvas": {
@@ -415,6 +431,21 @@
       "Extension": {
         "FaultTitle": "This section could not be displayed",
         "FaultDescription": "The module providing \"{providerId}\" failed to render its content. Check the console for details, or reopen this window to try again."
+      },
+      "Complications": {
+        "Forecast": "This can go wrong",
+        "Fired": "This happened",
+        "NotFired": "This didn't happen",
+        "More": "+{count} more",
+        "Title": "What could go wrong",
+        "Count": "{count} could fire",
+        "OrderPlayers": "Your saved order, remembered every time you salvage this component.",
+        "OrderArrangeable": "Your GM's order — arrange this component's results and yours is remembered.",
+        "OrderGm": "Your GM sets the order for this component.",
+        "ResultEyebrow": "Result {position} · {name} · DC {difficulty}",
+        "SeverityMinor": "Minor",
+        "SeverityMajor": "Major",
+        "SeveritySevere": "Severe"
       },
       "Inventory": {
         "Loading": "Loading your inventory…",
@@ -1266,6 +1297,31 @@
       }
     },
     "Chat": {
+      "Complications": "Complications",
+      "ComplicationResult": "Result {position}",
+      "GmComplication": {
+        "Title": "Complications (GM only)",
+        "Actor": "Actor",
+        "ReportedBy": "Reported by",
+        "WhyItFired": "Why it fired",
+        "WhatHappens": "What happens",
+        "NeedsAttention": "Needs your attention",
+        "EffectRoll": "Effect roll",
+        "EffectRollClaimed": "as their game rolled it",
+        "EffectRollUnrollable": "couldn't be rolled",
+        "PlayerVisible": "Shown to the player",
+        "MacroSkipped": "Macro skipped: it does not resolve to a script macro",
+        "MacroFailed": "Macro failed \u2014 see the console",
+        "Reason": {
+          "full": "Their game reports this one awarded in full.",
+          "partial": "Their game reports this one only partly awarded.",
+          "halted": "Their game reports the roll falling short here.",
+          "unreached": "Their game reports the roll never reaching this one.",
+          "checkTrigger": "The check hit the trigger you set for it.",
+          "rollCondition": "Its own condition roll came up.",
+          "unknown": "Fabricate can't tell which of its conditions fired it."
+        }
+      },
       "CraftSuccess": "Crafting Successful",
       "CraftFailure": "Crafting Failed",
       "Actor": "Crafter",
@@ -1310,6 +1366,34 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier"
     },
+    "Check": {
+      "Roll": {
+        "Passed": "{label} check passed with {total} against DC {dc}.",
+        "Failed": "{label} check failed with {total} against DC {dc}.",
+        "Rolled": "{label} check rolled {total}.",
+        "RollFailed": "{label} check could not be rolled: {detail}",
+        "Cancelled": "The {label} check prompt was dismissed, so nothing was rolled.",
+        "EngineUnavailable": "This client has no dice engine, so the {label} check could not be rolled.",
+        "NoFormula": "The {label} check has no usable roll formula, so there is nothing to roll.",
+        "InvalidRollDecision": "A roll decision was supplied for a non-interactive {label} check, where it would have been silently discarded and the base formula rolled.",
+        "InvalidCallSite": "A check roll must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not roll.",
+        "GMOnly": "Only a GM can roll a check for an actor.",
+        "NoActor": "No such actor to roll a check for.",
+        "NotReady": "Fabricate is still starting up, so no check can be rolled yet.",
+        "DefaultLabel": "Fabricate"
+      },
+      "BulkDecision": {
+        "Decided": "One roll decision was settled, covering {count} of {total} checks.",
+        "NothingToDecide": "None of the supplied formulas can roll a check, so there was nothing to decide.",
+        "Cancelled": "The bulk roll prompt was dismissed, so no decision was settled.",
+        "InvalidCallSite": "A bulk check decision must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client did not prompt.",
+        "GMOnly": "Only a GM can settle a bulk check decision.",
+        "NotReady": "Fabricate is still starting up, so no bulk check decision can be settled yet.",
+        "Failed": "The bulk check decision could not be settled."
+      }
+    },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
       "LearningDisabled": "Learning is not enabled for this crafting system",
@@ -1325,6 +1409,19 @@
       "CouldNotLearnRecipe": "Could not learn recipe",
       "PrerequisiteNotMet": "You must learn the required recipes first.",
       "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}.",
+      "Grant": {
+        "Success": "Granted {recipe} to {actor}.",
+        "AlreadyKnown": "{actor} already knows {recipe}, so nothing was written.",
+        "GMOnly": "Only a GM can grant recipe knowledge.",
+        "NoActor": "No such actor to grant recipe knowledge to.",
+        "NotReady": "Fabricate is still starting up, so recipe knowledge cannot be granted yet.",
+        "RecipeNotFound": "No such recipe to grant.",
+        "SystemNotFound": "No crafting system found for {recipe}.",
+        "KnowledgeNotObservable": "This crafting system never reveals learned recipes ({visibilityMode} visibility, {resolutionMode} resolution), so granting {recipe} would change nothing a player can see.",
+        "InvalidGrantedBy": "The grant source must be a text label, or omitted; it is never converted from another type.",
+        "GrantedByTooLong": "The grant source must be {max} characters or fewer; it is not truncated, because a shortened name is a different name.",
+        "Failed": "The recipe knowledge grant could not be completed."
+      },
       "Reset": {
         "Success": "Reset crafting knowledge for {actor} ({count} recipe(s)).",
         "GMOnly": "Only a GM can reset crafting knowledge.",
@@ -1345,6 +1442,90 @@
         "Erased": "Erased {count} learned recipe(s).",
         "EraseFailed": "Failed to erase the learned recipe.",
         "Failed": "The knowledge action could not be completed."
+      }
+    },
+    "Currency": {
+      "Affordability": {
+        "Affordable": "{actor} can afford {amount} {unit}.",
+        "NotAffordable": "{actor} cannot afford {amount} {unit}.",
+        "GMOnly": "Only a GM can check whether a character can afford a cost.",
+        "NoActor": "No such actor to check currency for.",
+        "NotReady": "Fabricate is still starting up, so currency cannot be checked yet.",
+        "UnitNotFound": "No currency unit named {unit} is configured for this world.",
+        "InvalidAmount": "The amount to check must be a number greater than zero.",
+        "LadderEmpty": "This world has no currency units configured, so no cost can be priced.",
+        "LadderInvalid": "This world's currency configuration is invalid, so no cost can be priced: {detail}",
+        "CheckUnavailable": "The affordability check could not be completed: {detail}"
+      },
+      "Credit": {
+        "Credited": "{actor} was credited {amount} {unit}.",
+        "CreditFailed": "The currency credit was not applied: {detail}",
+        "CreditUnavailable": "The currency credit could not be confirmed, so no amount is reported: {detail}",
+        "CreditNotConfigured": "This world's currency configuration cannot apply this credit, so nothing was written: {detail}",
+        "UnitNotFound": "No currency unit named {unit} is configured for this world.",
+        "InvalidAmount": "The amount to credit must be a whole number of coins greater than zero; it is never rounded, because a rounded amount is a different amount.",
+        "LadderEmpty": "This world has no currency units configured, so no credit can be applied.",
+        "LadderInvalid": "This world's currency configuration is invalid, so no credit can be applied: {detail}",
+        "InvalidCallSite": "A currency credit must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client credited nothing.",
+        "GMOnly": "Only a GM can credit currency to a character.",
+        "NoActor": "No such actor to credit currency to.",
+        "NotReady": "Fabricate is still starting up, so currency cannot be credited yet."
+      }
+    },
+    "Component": {
+      "Award": {
+        "Awarded": "Placed on the character sheet.",
+        "PartiallyAwarded": "Some of the components asked for were placed on the character sheet, and the rest were not; each entry reports its own result.",
+        "Failed": "The component award could not be completed.",
+        "ComponentNotFound": "No such component to award in this crafting system.",
+        "InvalidQuantity": "The quantity to award must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "MultiUnitUnsupported": "This item cannot carry a stack quantity, so more than one unit of it cannot be awarded. Either this game system has no quantity field on its items, or this world's configured item stack-quantity path does not name the count — check Fabricate's stack-quantity path advisory before awarding single units one at a time, because on a misconfigured path that leaves loose items that will never stack.",
+        "InvalidAwards": "The components to award must be a list of between one and {max} entries, each naming exactly a component and a quantity.",
+        "SystemNotFound": "No crafting system named {system} to award components from.",
+        "InvalidCallSite": "A component award must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client awarded nothing.",
+        "GMOnly": "Only a GM can award components to a character.",
+        "NoActor": "No such actor to award components to.",
+        "NotReady": "Fabricate is still starting up, so components cannot be awarded yet."
+      }
+    },
+    "Holdings": {
+      "Read": {
+        "Read": "Read from the combined holdings of the characters asked about.",
+        "Failed": "The pooled holdings could not be read.",
+        "ComponentNotFound": "No component of that name in any crafting system.",
+        "UnitNotFound": "No currency unit of that name on the world coin ladder.",
+        "ToolNotFound": "No tool of that name in any crafting system.",
+        "BalanceNotConfigured": "How much coin the characters are carrying could not be read — this world's coin ladder is empty or invalid, or it spends coin through a macro and has published no balance macro. Nothing else in this request was affected.",
+        "InvalidCostType": "A cost must name one of the axes Fabricate reads: a component, a currency unit, or a tool.",
+        "CostTypeUnsupported": "That is a Fabricate cost axis, but not one the pooled holdings read answers yet.",
+        "InvalidQuantity": "The quantity a cost asks for must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "InvalidCosts": "The costs to read must be a list of between one and {max} entries, each naming exactly an axis, a name and a quantity.",
+        "InvalidActorUuids": "The characters to read must be a list of between one and {max} character UUIDs, and every one of them must resolve — nothing is read from a partly resolved set.",
+        "GMOnly": "Only a GM can read the pooled holdings of a group of characters.",
+        "NoActor": "None of the characters asked about could be found.",
+        "NotReady": "Fabricate is still starting up, so pooled holdings cannot be read yet."
+      },
+      "Consume": {
+        "Consumed": "Taken from the combined holdings of the characters.",
+        "Failed": "The pooled holdings could not be taken. Anything already taken was given back where Fabricate could give it back; any cost still reporting an amount consumed names what could not be returned, and the takes beside it name who is still short.",
+        "Insufficient": "The characters are not carrying enough to pay this, so nothing was taken.",
+        "NotAttempted": "Nothing was taken for this cost, because the request was refused before it was reached — usually because another cost in the same request could not be paid.",
+        "ComponentNotFound": "No such component to take in this crafting system.",
+        "UnitNotFound": "No such currency unit on the world coin ladder.",
+        "SystemNotFound": "No crafting system of that id to take components from.",
+        "InvalidCostType": "A cost must name one of the axes Fabricate takes: a component or a currency unit.",
+        "CostTypeUnsupported": "That is a Fabricate cost axis, but not one the pooled holdings take settles.",
+        "InvalidQuantity": "The quantity a cost asks to be taken must be a whole number of units greater than zero; it is never rounded, because a rounded quantity is a different quantity.",
+        "InvalidCosts": "The costs to take must be a list of between one and {max} entries, each naming an axis, the resolved ids that identify what to take, and a quantity.",
+        "InvalidActorUuids": "The characters to take from must be a list of between one and {max} character UUIDs, and every one of them must resolve — nothing is taken from a partly resolved set.",
+        "CreditNotConfigured": "This world spends coin through a macro and has published no increment macro, so Fabricate has no way to give the coin back if the take has to be undone. Nothing was taken.",
+        "InvalidCallSite": "Taking from pooled holdings must declare where it is called from, as either a GM action or a broadcast handler.",
+        "NotElected": "Another connected GM is the elected executor for this broadcast, so this client took nothing.",
+        "GMOnly": "Only a GM can take from the pooled holdings of a group of characters.",
+        "NoActor": "None of the characters to take from could be found.",
+        "NotReady": "Fabricate is still starting up, so pooled holdings cannot be taken yet."
       }
     },
     "Admin": {
@@ -1369,6 +1550,10 @@
           "taskLink": "Task links",
           "eventLink": "Event links",
           "recipeItem": "Recipe item links",
+          "worldEntityCollision": "World entity identity collisions",
+          "worldEntityMissing": "Missing world entities",
+          "worldDefaultDeclined": "Declined world defaults",
+          "worldToolBreakageDropped": "Dropped world tool breakage authority",
           "unknown": "Other references"
         },
         "OwnerType": {
@@ -1411,7 +1596,7 @@
           "RegenHint": "How much stamina actors recover as world time passes.",
           "MaxStamina": "Maximum stamina",
           "MaxStaminaPlaceholder": "40 or 4 * @abilities.con.mod",
-          "MaxStaminaHint": "A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full. See the Gathering Formulas help page for examples.",
+          "MaxStaminaHint": "A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full. See the Expressions help page for examples.",
           "StartStamina": "Starting stamina",
           "StartStaminaPlaceholder": "blank = full",
           "Roll": "Roll",
@@ -1424,7 +1609,7 @@
           "RegenPer": "Per",
           "RegenAmount": "Amount per interval",
           "RegenAmountPlaceholder": "1 or 1 + @abilities.con.mod",
-          "RegenAmountHint": "A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod). See the Gathering Formulas help page for examples.",
+          "RegenAmountHint": "A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod). See the Expressions help page for examples.",
           "Unit": {
             "minutes": "Minute",
             "hours": "Hour",
@@ -1725,7 +1910,7 @@
           "IssueDisabledIncomplete": "The recipe is disabled and cannot be enabled until its gaps are fixed.",
           "IssueNoAvailableTasks": "The environment composes no available gathering tasks.",
           "IssueActiveNoComposition": "The environment is on but composes no available tasks.",
-          "IssueStaleIncluded": "The environment includes a record that is no longer available.",
+          "IssueStaleIncluded": "The environment includes a record that does not match it, and composes it anyway.",
           "IssueNoScene": "The environment has no linked scene.",
           "IssueNoEventsAtDanger": "The environment carries danger but composes no events.",
           "IssueTaskNoDescription": "A gathering task has no description.",
@@ -1741,9 +1926,11 @@
           "IssueAlchemySignatureCollision": "Two recipes share an ingredient signature, so alchemy attempts are ambiguous."
         },
         "Nav": {
+          "ComponentRules": "Component Rules",
+          "EssenceRules": "Essence Rules",
+          "ToolRules": "Tool Rules",
           "Systems": "Crafting Systems",
           "SystemsShort": "Systems",
-          "Components": "Components",
           "Recipes": "Recipes",
           "Crafting": "Crafting",
           "ExpandCrafting": "Expand crafting menu",
@@ -1755,7 +1942,6 @@
           "CollapseRail": "Collapse navigation rail",
           "ExpandRail": "Expand navigation rail",
           "Essences": "Essences",
-          "Tools": "Tools",
           "TagsCategories": "Tags & Categories",
           "Checks": "Checks",
           "Rules": "Rules",
@@ -2488,7 +2674,6 @@
         },
         "Component": {
           "Kicker": "Components View",
-          "Title": "Components",
           "Subtitle": "Manage item-backed components for the selected crafting system.",
           "Actions": "Component actions",
           "Library": "Component directory",
@@ -2545,6 +2730,117 @@
           "ProgressiveDifficultyLabel": "Difficulty value",
           "ProgressiveDifficultyHint": "Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.",
           "NoDifficulty": "No difficulty",
+          "Complications": {
+            "Title": "Complications",
+            "Hint": "What goes wrong when this component is produced as a stage of a progressive result — a progressive craft, salvage or gathering. A complication does not fire when this component is itself salvaged or spent.",
+            "Empty": "Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence.",
+            "Add": "Add complication",
+            "Remove": "Remove complication",
+            "NewName": "New complication",
+            "PlayerPill": "Player",
+            "PlayerPillTitle": "Shown to the player when it fires.",
+            "StripTitle": "{count} complications on {name}",
+            "StripTitleOne": "1 complication on {name}",
+            "StripEdit": "Edit complications on {name}",
+            "ActivityProgressiveCount": "{activity} uses progressive resolution in this system \u2014 {count} complications.",
+            "ActivityProgressiveCountOne": "{activity} uses progressive resolution in this system \u2014 1 complication.",
+            "Activity": {
+              "gathering": "Gathering",
+              "salvage": "Salvage",
+              "crafting": "Crafting"
+            },
+            "ActivityCount": "{activity} · {count}",
+            "ActivityNone": "{activity} · n/a",
+            "ActivityProgressive": "{activity} uses progressive resolution in this system.",
+            "ActivityNotProgressive": "{activity} does not use progressive resolution in this system, so a complication enabled for it is stored but never fires.",
+            "NotProgressive": "· not progressive",
+            "Name": "Name",
+            "NamePlaceholder": "What goes wrong",
+            "SeverityLabel": "Severity",
+            "Severity": {
+              "minor": "Minor",
+              "major": "Major",
+              "severe": "Severe"
+            },
+            "TellPlayer": "Tell the player",
+            "Description": "What happens",
+            "DescriptionPlaceholder": "Read-aloud or GM note for the moment it fires.",
+            "AppliesTo": "Applies to",
+            "When": "When",
+            "MatchLabel": "How the conditions combine",
+            "Match": {
+              "any": "Any",
+              "all": "All"
+            },
+            "MatchHintAny": "any checked condition is enough",
+            "MatchHintAll": "every checked condition must be true",
+            "Condition": {
+              "StageMissed": {
+                "Title": "The award is missed",
+                "Detail": "The roll never reaches this stage, or stops before it — nothing is granted for it."
+              },
+              "StagePartial": {
+                "Title": "The award is only partly covered",
+                "Detail": "The roll covers some of this stage’s difficulty but not all of it. Only reachable where the system awards partial stages."
+              },
+              "StageAwarded": {
+                "Title": "The award is granted",
+                "Detail": "Fires on a clean stage — for consequences that come with the prize."
+              },
+              "CheckTrigger": {
+                "Title": "A named progressive check trigger fires",
+                "Detail": "Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.",
+                "Select": "Check trigger",
+                "Unknown": "Trigger no longer exists",
+                "None": "This system\u2019s progressive checks name no triggers yet \u2014 add one under Checks before a complication can wait on it."
+              }
+            },
+            "RollCondition": {
+              "Title": "A dice expression resolves true",
+              "Detail": "Rolled against the character at the moment the result is decided.",
+              "Expression": "Condition dice expression",
+              "Comparator": "Comparison",
+              "Value": "Compare against"
+            },
+            "Then": "Then",
+            "ThenHint": "both optional — leave them off and the complication is narration only",
+            "EffectRoll": {
+              "Title": "Roll a dice expression",
+              "Detail": "Rolled and posted to chat when the complication fires.",
+              "Expression": "Effect dice expression",
+              "Label": "Effect roll label",
+              "LabelPlaceholder": "Label for the roll — e.g. Shrapnel damage"
+            },
+            "Macro": {
+              "Title": "Run a macro",
+              "Detail": "Receives the component, the character and the complication. It runs on a GM client.",
+              "DropTitle": "Drop a macro here",
+              "DropHint": "Or browse this world’s script macros.",
+              "Browse": "Browse macros",
+              "Search": "Search macros...",
+              "None": "No script macros in this world",
+              "Unlink": "Remove macro",
+              "NotScript": "That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.",
+              "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium."
+            },
+            "Summary": {
+              "StageMissed": "the award is missed",
+              "StagePartial": "the award is only partly covered",
+              "StageAwarded": "the award is granted",
+              "CheckTrigger": "a check trigger fires",
+              "CheckTriggerNamed": "{name} fires",
+              "RollCondition": "{expr} {operator} {value}",
+              "JoinAny": " or ",
+              "JoinAll": " and ",
+              "Sentence": "When {clauses}",
+              "SentenceWithEffects": "When {clauses} · {effects}",
+              "EffectJoin": ", ",
+              "EffectRoll": "rolls {expr}",
+              "EffectMacro": "runs {name}",
+              "EffectMacroUnnamed": "runs a macro",
+              "NoTrigger": "No trigger set — never fires"
+            }
+          },
           "Salvage": "Salvage",
           "SalvageReorder": {
             "Title": "Allow player result re-ordering",
@@ -3466,7 +3762,7 @@
             "ClearEventModifier": "Remove modifier",
             "CharacterModifiers": "Character modifiers",
             "CharacterModifiersHint": "Pick reusable actor-driven modifiers from the per-system library. These adjust the threshold, not the roll.",
-            "CharacterModifiersEmptyLibrary": "No character modifiers exist in this system yet. Add them in the Character Modifiers library first.",
+            "CharacterModifiersEmptyLibrary": "No character modifiers exist in this world yet. Add them in the Character Modifiers library first.",
             "CharacterModifierOperator": "Operator",
             "CharacterModifierMin": "Min",
             "CharacterModifierMax": "Max",
@@ -3716,16 +4012,17 @@
           "Composition": {
             "ModeLabel": "Composition mode",
             "Automatic": "Automatic",
-            "AutomaticHint": "All matching enabled tasks and events are available unless locally excluded.",
+            "AutomaticHint": "All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.",
             "Manual": "Manual",
-            "ManualHint": "Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.",
+            "ManualHint": "Only the tasks and events you add are available, whether or not they match this environment.",
             "IncludedByMatch": "Included by match",
             "Included": "Included",
             "Candidate": "Not included",
             "Excluded": "Excluded",
-            "IncludedButUnavailable": "Included but unavailable",
+            "IncludedNotMatching": "Included, not matching",
             "NotMatching": "Not matching",
             "LibraryDisabled": "Library disabled",
+            "UnknownState": "Unrecognised state",
             "Unnamed": "Unnamed",
             "NoDescription": "No description",
             "IncludedInEnvironment": "Included in this environment",
@@ -3819,7 +4116,7 @@
             "CandidateTasks": "Task candidates",
             "AvailableEvents": "Available events",
             "ExcludedEvents": "Excluded events",
-            "UnavailableIncluded": "Included but unavailable",
+            "IncludedNotMatching": "Included, not matching",
             "RuntimeSummary": "Runtime summary",
             "Unnamed": "Unnamed environment"
           },
@@ -3846,9 +4143,9 @@
             "MatchEvidence": "Matching evidence",
             "TaskEnvironmentMatching": "Task Environment Matching",
             "EventEnvironmentMatching": "Event Environment Matching",
-            "StaleTitle": "Included but unavailable",
-            "StaleEvent": "This event is included in this environment but is unavailable because it no longer matches the environment context.",
-            "StaleTask": "This task is included in this environment but is unavailable because it no longer matches the environment context.",
+            "StaleTitle": "Included, not matching",
+            "StaleEvent": "This event is included in this environment and composes, but it does not match the environment context.",
+            "StaleTask": "This task is included in this environment and composes, but it does not match the environment context.",
             "RemoveWrapper": "Remove from environment",
             "OpenSource": "Open source",
             "EventChance": "Event chance",
@@ -3889,12 +4186,11 @@
             "CheckDanger": "Has a danger level",
             "CheckCompositionMode": "Has a composition mode",
             "CheckAvailableTask": "Has at least one available task",
-            "CheckNoStale": "Has no stale included tasks or events",
             "IssueNoAvailableTasks": "No tasks are available to players.",
             "IssueActiveNoComposition": "Environment is active but has no valid task composition.",
-            "IssueStaleIncluded": "Included task or event no longer matches the environment.",
-            "IssueStaleIncludedTask": "The task \"{name}\" no longer matches this environment.",
-            "IssueStaleIncludedEvent": "The event \"{name}\" no longer matches this environment.",
+            "IssueStaleIncluded": "An included task or event does not match this environment, and composes anyway.",
+            "IssueStaleIncludedTask": "The task \"{name}\" does not match this environment, and composes anyway.",
+            "IssueStaleIncludedEvent": "The event \"{name}\" does not match this environment, and composes anyway.",
             "IssueNoScene": "No scene is linked.",
             "IssueNoEventsAtDanger": "Danger is set but no events are available.",
             "IssueTaskNoDescription": "Available task has no player-facing description.",
@@ -3910,13 +4206,13 @@
           },
           "Tasks": {
             "Title": "Tasks",
-            "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
-            "ManualIntro": "Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks."
+            "AutomaticIntro": "All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.",
+            "ManualIntro": "Only tasks you add are available to players, whether or not they match this environment."
           },
           "Events": {
             "Title": "Events",
-            "AutomaticIntro": "All matching enabled library events apply unless you exclude them here.",
-            "ManualIntro": "Only events you explicitly include apply here. You can add matching events or force add non-matching events.",
+            "AutomaticIntro": "All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.",
+            "ManualIntro": "Only events you add apply here, whether or not they match this environment.",
             "EventChance": "Event chance",
             "DangerTag": {
               "safe": "Safe",
@@ -3968,7 +4264,6 @@
           "TaskDcOverridePlaceholder": "System default"
         },
         "ListErgonomics": {
-          "ToggleSection": "Collapse or expand this section",
           "CopyToPrerequisites": "Copy to prerequisites",
           "CopyToModifiers": "Copy to modifiers",
           "CopiedAnnouncement": "Copied {name} and icon — set the condition.",
@@ -3977,8 +4272,10 @@
           "ReorderedAnnouncement": "Moved {name} to position {position} of {total}."
         },
         "Modifiers": {
+          "DeleteTitle": "Delete {name}?",
+          "DeleteContent": "Delete modifier <strong>{name}</strong>? It is removed across every crafting system, and any check that selected it drops it on that system's next save.",
           "Title": "Modifiers",
-          "Hint": "Reusable actor-driven modifiers for this system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.",
+          "Hint": "Reusable actor-driven modifiers. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.",
           "Empty": "No modifiers yet.",
           "Add": "Add modifier",
           "Delete": "Delete modifier",
@@ -4003,6 +4300,8 @@
           "RollNote": "This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average."
         },
         "CharacterPrerequisites": {
+          "DeleteTitle": "Delete {name}?",
+          "DeleteContent": "Delete character prerequisite <strong>{name}</strong>? It is removed across every crafting system, and any book, scroll or tool that required it stops gating on it.",
           "Title": "Character prerequisites",
           "Hint": "Pass/fail conditions — a property path, comparison and value — attached to a book or scroll to gate who may learn its recipes.",
           "Empty": "No character prerequisites yet.",
@@ -4059,9 +4358,11 @@
           "MacroCanAfford": "Can afford macro",
           "MacroCanAffordHint": "Runs to gate the craft; return true (or { canAfford: true }) when the actor can pay.",
           "MacroIncrement": "Increment macro",
-          "MacroIncrementHint": "Runs to return currency when a player cancels an in-progress craft, if the system refunds on cancel.",
+          "MacroIncrementHint": "Runs whenever currency has to go back to an actor: a player cancelling an in-progress craft (if the system refunds on cancel), a companion module crediting coin, and giving back a pooled cost whose take could not be completed. Optional — but without it Fabricate refuses to take coin from a group at all, because it would have no way to return it.",
           "MacroDecrement": "Decrement macro",
           "MacroDecrementHint": "Runs after a successful craft to spend the currency cost.",
+          "MacroBalance": "Balance macro",
+          "MacroBalanceHint": "Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as \"unknown\".",
           "MacroDropHint": "Drag a macro here to link it.",
           "MacroDropZoneLabel": "{field}: drag a macro here to link it.",
           "MacroReplaceHint": "Drop a macro to replace it, or right-click to unlink.",
@@ -4167,9 +4468,7 @@
           "DuplicateMember": "This actor already belongs to another enabled party.",
           "DuplicateTravelActor": "This travel actor is already used by another enabled party.",
           "Realms": {
-            "SectionLabel": "Realms",
             "Toggle": "Toggle realms list",
-            "ListLabel": "Realms",
             "Empty": "No realms yet.",
             "Filters": "Realm filters",
             "SearchPlaceholder": "Search realms...",
@@ -4193,29 +4492,11 @@
             "NoAvailableEnvironments": "All environments are in this realm.",
             "NoIncludedEnvironments": "No environments are in this realm yet.",
             "NoEnvironmentMatches": "No environments match your search.",
-            "CreatePlaceholder": "New realm name",
-            "CreateLabel": "New realm name",
-            "Create": "Add realm",
             "RenameLabel": "Realm name",
-            "NameLabel": "Name",
-            "DescriptionLabel": "Description",
-            "BiomesLabel": "Biomes",
-            "BiomesHint": "The terrain in this realm, drawn from the system biome vocabulary.",
-            "AddBiome": "Add biome",
-            "RemoveBiome": "Remove {name}",
-            "NoBiomes": "No biomes selected",
-            "ChooseImage": "Choose realm image",
-            "EnabledToggle": "Toggle realm enabled",
-            "SecretToggle": "Toggle realm secret",
             "Delete": "Delete realm",
-            "DeleteNamed": "Delete {name}",
             "DeleteTitle": "Delete {name}?",
             "DeleteContent": "Delete realm <strong>{name}</strong>?",
-            "DeleteReferenced": "It is still referenced by {environments} environment(s) and {parties} party override(s).",
-            "EnabledChip": "Enabled",
-            "DisabledChip": "Disabled",
-            "SecretChip": "Secret",
-            "RevealedChip": "Revealed"
+            "DeleteReferenced": "It is still referenced by {environments} environment(s) and {parties} party override(s)."
           }
         },
         "World": {
@@ -4230,6 +4511,20 @@
           "PartiesHint": "Create and manage parties shared across every crafting system.",
           "PartiesActions": "World party actions",
           "PartiesInspector": "Selected world party",
+          "RulesNav": "Rules & Resources",
+          "CollapseRules": "Collapse Rules & Resources",
+          "ExpandRules": "Expand Rules & Resources",
+          "RulesDestinations": "Rules & Resources",
+          "Prerequisites": {
+            "Subtitle": "{count} prerequisites · shared by every crafting system",
+            "SubtitleOne": "1 prerequisite · shared by every crafting system",
+            "SubtitleEmpty": "No prerequisites yet · shared by every crafting system"
+          },
+          "Modifiers": {
+            "Subtitle": "{count} modifiers · shared by every crafting system",
+            "SubtitleOne": "1 modifier · shared by every crafting system",
+            "SubtitleEmpty": "No modifiers yet · shared by every crafting system"
+          },
           "CurrencyNav": "Currency",
           "CurrencyTitle": "World Currency",
           "TravelNav": "Travel",
@@ -4237,6 +4532,10 @@
           "Downtime": {
             "Title": "Downtime",
             "Nav": "Downtime",
+            "BadgeTotalOne": "{count} update",
+            "BadgeTotalOther": "{count} updates",
+            "NavWithBadgeOne": "{label}, {count} update",
+            "NavWithBadgeOther": "{label}, {count} updates",
             "Actions": "Downtime actions",
             "Premium": "PREMIUM",
             "PremiumTooltip": "Unlock Downtime Studio with Fabricate Premium",
@@ -4691,7 +4990,7 @@
             "CharacterPrerequisites": "Character prerequisites",
             "CharacterPrerequisitesHint": "Gate who may wield this Tool. Prerequisites are defined in the crafting system editor; pick which ones apply.",
             "RequiredAll": "All selected prerequisites are required (AND)",
-            "NoPrerequisites": "No shared prerequisites are defined for this system.",
+            "NoPrerequisites": "No character prerequisites are defined in this world yet.",
             "GateMode": "When prerequisites fail",
             "GateUsability": "Tool is unusable",
             "GateUsabilityHint": "The character cannot use this Tool for crafting, salvage, or gathering.",
@@ -4909,8 +5208,8 @@
             "BreakToolsOnFail": "Break tools on a failed check",
             "BreakToolsOnFailDesc": "Required tools break when the crafting check fails. Off by default.",
             "ModifierCatalogueHeading": "Check modifiers",
-            "ModifierLibraryNote": "These are defined once for the whole crafting system, in system settings — this check only decides which of them apply and how.",
-            "ModifierCatalogueEmptyLinked": "This system has no modifiers yet. They are defined once, in System settings › Modifiers.",
+            "ModifierLibraryNote": "These are defined once for the whole world, in system settings — this check only decides which of them apply and how.",
+            "ModifierCatalogueEmptyLinked": "This world has no modifiers yet. They are defined once, in System settings › Modifiers.",
             "ModifierUnnamed": "Unnamed modifier",
             "ModifierPillAdd": "Add modifier",
             "ModifierPillRemove": "Remove",
@@ -5448,6 +5747,76 @@
           "ToggleNamed": "Toggle access for {name}",
           "RolePlayer": "Player"
         },
+        "Scoped": {
+          "ComponentCatalogueTitle": "Component catalogue",
+          "ComponentCatalogueSubtitle": "One Component per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.",
+          "ComponentEntryTitle": "Component entry",
+          "ComponentEntrySubtitle": "Identity, the world category and tags, and a row per crafting system that has this Component.",
+          "EssenceCatalogueTitle": "Essence Catalogue",
+          "EssenceCatalogueSubtitle": "One Essence per world, shared by every system. The world sets the effect source and the property macro; each system inherits them or overrides its own.",
+          "EssenceEntryTitle": "Essence entry",
+          "EssenceEntrySubtitle": "Identity and the two world defaults, each stating how many systems inherit it before the change lands.",
+          "ToolCatalogueTitle": "Tools Catalogue",
+          "ToolCatalogueSubtitle": "One Tool per game-world Item, shared by every system. The world sets the defaults; each system inherits them or overrides its own.",
+          "ToolEntryTitle": "Tool entry",
+          "ToolEntrySubtitle": "Identity, the three world-default sections and the world break mode, with a row per crafting system that has this Tool.",
+          "VocabularyTitle": "Tags & Categories",
+          "VocabularySubtitle": "Component categories, Component tags and recipe categories, each with a usage count and a deletion warning naming how many inheriting rule sets are affected.",
+          "Placeholder": {
+            "Title": "Not built yet",
+            "Body": "The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next."
+          },
+          "Sections": {
+            "Category": "Category",
+            "EffectSource": "Effect source",
+            "Macro": "Property macro",
+            "Breakage": "Breakage",
+            "OnBreak": "On break"
+          },
+          "Inherit": {
+            "StateInherited": "Inherited",
+            "StateOverridden": "Overridden",
+            "ToggleLabel": "Fall back to the world default"
+          },
+          "List": {
+            "ClearFilters": "Clear filters",
+            "Filters": "List filters",
+            "FilteredEmpty": "Nothing here matches the current search and filters.",
+            "InheritCount": "{count} inheriting",
+            "InheritHead": "Inheriting systems",
+            "Inspector": "Details",
+            "MembershipAll": "All",
+            "MembershipIn": "In this system",
+            "MembershipLabel": "Membership filter",
+            "MembershipMember": "In at least one system",
+            "MembershipOut": "Not in this system",
+            "MembershipUnused": "In no system",
+            "NoDescription": "No description",
+            "OpenEditor": "Edit in {system}",
+            "OpenEntry": "Open",
+            "OpenWorldEntry": "Open the world entry",
+            "RestingTitle": "Nothing selected",
+            "SearchLabel": "Search",
+            "SearchPlaceholder": "Search…",
+            "SelectRow": "Select {name}",
+            "SortLabel": "Sort order",
+            "SortNameAsc": "Name A–Z",
+            "SortNameDesc": "Name Z–A",
+            "SortSystemsDesc": "Most systems",
+            "SourceLinked": "Linked",
+            "SourceUnlinked": "No source item",
+            "Unavailable": "This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable."
+          },
+          "Membership": {
+            "Add": "Add to this system",
+            "AddHint": "It inherits every world default until you override a section.",
+            "CopyFrom": "Copy from…",
+            "Remove": "Remove",
+            "RemoveConfirm": "Confirm?",
+            "Removing": "Removing…",
+            "RemoveConsequence": "Remove {entity} from {system}. Its overrides go with it; the world record and every other system are untouched."
+          }
+        },
         "Knowledge": {
           "Actions": "Knowledge actions",
           "Delete": "Delete",
@@ -5477,6 +5846,8 @@
           "ItemsEmptyTitle": "No owned copies",
           "LearnedBanner": "Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.",
           "LearnedByCrafting": "Learned by crafting",
+          "LearnedByGrant": "Learned by grant: {grantedBy}",
+          "LearnedByGrantUnlabelled": "Learned by grant",
           "LearnedEmptyHint": "This character has not learned any recipe in this crafting system.",
           "LearnedEmptyTitle": "Nothing learned yet",
           "LearnedFrom": "Learned from {source}",
@@ -5585,7 +5956,7 @@
             "LearningPrerequisites": "Learning prerequisites",
             "LearningPrerequisitesHint": "The character must have these attributes to learn from this book or scroll.",
             "LearningPrerequisitesSearch": "Search prerequisites…",
-            "CharacterPrerequisitesNone": "No prerequisites yet — add them in System Settings.",
+            "CharacterPrerequisitesNone": "No prerequisites yet — add them in System Settings; they are shared by every crafting system.",
             "CharacterPrerequisitesRemove": "Remove",
             "Time": "time",
             "Times": "times",
@@ -5758,7 +6129,7 @@
           "BehaviourHeading": "Alchemy behaviour",
           "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply whatever alchemy check mode is set on The roll section.",
           "LearnOnCraft": "Learn a recipe when its ingredients are matched",
-          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and the only source of discovery under Global visibility.",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and under Global visibility the only source of discovery a player can reach for themselves; a GM can still grant a recipe directly.",
           "ConsumeOnFail": "Consume ingredients on a failed brew",
           "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
           "ShowAttemptHistory": "Show attempt history to players",

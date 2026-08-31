@@ -1,6 +1,12 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 
+import { resolveModifierLibrary } from './characterLibraries.js';
+import {
+  conditionSettingsToCurrent,
+  environmentComposesRecord,
+  resolveGatheringCompositionMode,
+} from './gatheringComposition.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
@@ -14,6 +20,7 @@ import {
   writeState,
 } from './gatheringRichStateInternals.js';
 import { GatheringStaminaService } from './GatheringStaminaService.js';
+import { resolvedToolsFor } from './scopedEntityReads.js';
 
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
@@ -324,47 +331,50 @@ export class GatheringRichStateService {
           eventLimit: environment.eventLimit,
           eventPolicy: environment.eventPolicy,
         });
-    const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
+    const compositionMode = resolveGatheringCompositionMode(environment);
     const tasks = sortRecordsByOrder(
       normalizeList(libraries.tasks)
         .filter((task) => task?.enabled !== false)
-        .filter(
-          (task) =>
+        .filter((task) =>
+          environmentComposesRecord(
+            environment,
+            task,
+            'task',
+            compositionMode,
             this._recordMatchesEnvironment(task, environment, currentConditions, {
               includeDanger: false,
               conditionSettings: systemConditions,
-            }) || this._recordIsForced(environment, task.id, 'task', compositionMode)
-        )
-        .filter((task) =>
-          this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)
+            })
+          )
         ),
       environment?.taskOrder
     ).map((task) => this._libraryTaskToRuntimeTask(task, environment));
     const events = sortRecordsByOrder(
       normalizeList(libraries.events)
         .filter((event) => event?.enabled !== false)
-        .filter(
-          (event) =>
+        .filter((event) =>
+          environmentComposesRecord(
+            environment,
+            event,
+            'event',
+            compositionMode,
             this._recordMatchesEnvironment(event, environment, currentConditions, {
               includeDanger: true,
               conditionSettings: systemConditions,
-            }) || this._recordIsForced(environment, event.id, 'event', compositionMode)
-        )
-        .filter((event) =>
-          this._environmentIncludesLibraryRecord(environment, event.id, 'event', compositionMode)
+            })
+          )
         ),
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
-    // Modifiers are now system-owned (issue 1117), exactly as tools are below: the ONE
-    // authored library is `system.modifiers`, populated by
-    // `CraftingSystemManager._normalizeSystem`, and it serves the check modifiers on all
-    // three activities AND these d100 drop/event/stamina references. The gathering
-    // config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
-    // merges it up and retires the key), and no read-alias is kept for it — a silent
-    // fallback would make the relocation unobservable.
+    // Modifiers are WORLD-owned since issue 1308 (they were system-owned from issue 1117): the
+    // ONE authored library lives in the `characterLibraries` world setting, and it serves the
+    // check modifiers on all three activities AND these d100 drop/event/stamina references. The
+    // gathering config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
+    // merges it up and retires the key), and no read-alias is kept for it — a silent fallback
+    // would make the relocation unobservable.
     const libraryCharacterModifiers = new Map();
-    for (const entry of normalizeList(this._systemModifierLibrary(system, systemId))) {
+    for (const entry of normalizeList(this._worldModifierLibrary(system))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
@@ -375,10 +385,11 @@ export class GatheringRichStateService {
     // live lookup via the global registry when a caller did not pass one. The
     // gathering-config `tools` copy is no longer the source (a reconciliation
     // migration moves any UI-authored tools onto the system).
-    const toolSource =
-      (Array.isArray(system?.tools) && system.tools) ||
-      globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.tools ||
-      [];
+    const toolSource = Array.isArray(system?.tools)
+      ? resolvedToolsFor(system)
+      : resolvedToolsFor(
+          globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)
+        );
     const libraryTools = new Map();
     for (const tool of normalizeList(toolSource)) {
       if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
@@ -1268,7 +1279,7 @@ export class GatheringRichStateService {
     if (!reveals || typeof reveals !== 'object') return [];
     // Build the scope-specific prefix once via revealKey (with a sentinel task
     // id) so the matching format always mirrors the writer's key format.
-    const sentinel = ' ';
+    const sentinel = '\0';
     const sampleKey = revealKey({
       environmentId: envId,
       taskId: sentinel,
@@ -1465,52 +1476,6 @@ export class GatheringRichStateService {
       includeDanger,
       conditionSettings,
     }).matches;
-  }
-
-  _environmentAllowsLibraryRecord(environment, id, kind) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = normalizeList(environment?.[enabledKey]).map(String);
-    const disabled = normalizeList(environment?.[disabledKey]).map(String);
-    if (disabled.includes(String(id))) return false;
-    return enabled.length === 0 || enabled.includes(String(id));
-  }
-
-  /**
-   * Whether a record is force-included into the environment. Forces are honored
-   * only in manual mode (automatic ignores them, like the enabled allow-list);
-   * a force-included record is composed even when it does not match the
-   * environment context.
-   */
-  _recordIsForced(environment, id, kind, compositionMode = 'automatic') {
-    if (compositionMode !== 'manual') return false;
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    return normalizeList(environment?.[forcedKey]).map(String).includes(String(id));
-  }
-
-  /**
-   * Whether a matching, library-enabled record is composed into the
-   * environment, honoring `compositionMode`:
-   * - `automatic`: include every matching record unless explicitly excluded
-   *   (`disabled*Ids`). Any `enabled*Ids` allow-list is ignored — automatic
-   *   means "all matching available unless excluded", so a stale list left
-   *   over from manual mode never suppresses matching records.
-   * - `manual`: include only when explicitly listed (`enabled*Ids`) or
-   *   force-added (`forced*Ids`); stale disabled lists are ignored.
-   */
-  _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const enabled = normalizeList(environment?.[enabledKey]).map(String);
-    const disabled = normalizeList(environment?.[disabledKey]).map(String);
-    if (compositionMode !== 'manual' && disabled.includes(String(id))) return false;
-    if (compositionMode === 'manual') {
-      const forced = normalizeList(
-        environment?.[kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds']
-      ).map(String);
-      return enabled.includes(String(id)) || forced.includes(String(id));
-    }
-    return true;
   }
 
   _libraryTaskToRuntimeTask(task, environment = null) {
@@ -1723,25 +1688,26 @@ export class GatheringRichStateService {
   }
 
   /**
-   * Resolve the character-modifier library for an attempt: prefer the
-   * per-environment map populated at composition time, falling back to the
-   * crafting system's library (needed for stamina regen, which has no
-   * environment context).
+   * Resolve the character-modifier library for an attempt: prefer the per-environment map
+   * populated at composition time, falling back to the WORLD library (needed for stamina regen,
+   * which has no environment context).
+   *
+   * Takes no system id since issue 1318. It carried one while the library belonged to a crafting
+   * system and a caller without the system in hand had to look it up; at world scope there is
+   * nothing system-specific left to resolve, and a retained-but-discarded parameter reads as
+   * though there still were.
    *
    * @param {object} payload
    * @returns {Map<string, object>}
    */
-  _modifierLibrary({ environment = null, system = null, systemId = null } = {}) {
+  _modifierLibrary({ environment = null, system = null } = {}) {
     if (
       environment?.__libraryCharacterModifiers instanceof Map &&
       environment.__libraryCharacterModifiers.size > 0
     ) {
       return environment.__libraryCharacterModifiers;
     }
-    const entries = this._systemModifierLibrary(
-      system,
-      systemId || environment?.craftingSystemId || ''
-    );
+    const entries = this._worldModifierLibrary(system);
     return new Map(entries.map((entry) => [String(entry.id), entry]));
   }
 
@@ -1758,12 +1724,13 @@ export class GatheringRichStateService {
    * @param {string} systemId Its id, used for the registry fallback.
    * @returns {Array<object>} The library entries, possibly empty.
    */
-  _systemModifierLibrary(system, systemId) {
-    if (Array.isArray(system?.modifiers)) return system.modifiers;
-    const resolved = globalThis.game?.fabricate
-      ?.getCraftingSystemManager?.()
-      ?.getSystem?.(String(systemId || ''));
-    return Array.isArray(resolved?.modifiers) ? resolved.modifiers : [];
+  _worldModifierLibrary(system) {
+    // Issue 1308: ONE read of the world library, replacing the registry round-trip this used to
+    // fall back on. That fallback existed only because the library lived on the crafting system,
+    // so a caller without the system in hand had to go and fetch it; the library is world scope
+    // now, so there is nothing system-specific left to look up — which is why this takes no
+    // system id (issue 1318 dropped the one it had been carrying and discarding).
+    return resolveModifierLibrary(system);
   }
 
   /**
@@ -1781,11 +1748,7 @@ export class GatheringRichStateService {
     if (base <= 0) return 0;
     const references = normalizeList(task?.staminaCostModifiers);
     if (references.length === 0) return Math.max(0, Math.round(base));
-    const library = this._modifierLibrary({
-      environment,
-      system,
-      systemId: system?.id || environment?.craftingSystemId,
-    });
+    const library = this._modifierLibrary({ environment, system });
     let total = base;
     for (const reference of references) {
       const entry = library.get(String(reference.modifierId)) || null;
@@ -2028,13 +1991,6 @@ function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
     };
   }
   return normalized;
-}
-
-function conditionSettingsToCurrent(settings) {
-  return {
-    weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
-    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay,
-  };
 }
 
 function normalizeLibraryTask(task = {}) {

@@ -61,11 +61,11 @@
       >{mode === 'manual'
         ? text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.ManualIntro',
-            'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'
+            'Only tasks you add are available to players, whether or not they match this environment.'
           )
         : text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.AutomaticIntro',
-            'All matching enabled library tasks are available unless you exclude them here.'
+            'All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.'
           )}</span
     >
   </p>

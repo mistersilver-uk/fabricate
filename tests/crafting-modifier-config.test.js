@@ -15,6 +15,7 @@ globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { normalizeCheckModifierIds } = await import('../src/utils/checkModifierPicks.js');
+const { normalizeModifierLibrary } = await import('../src/systems/modifierLibrary.js');
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -43,8 +44,8 @@ test('_normalizeCraftingCheck defaults an absent selection to addAll + no ids (b
   assert.deepEqual(result.defaultModifierIds, []);
 });
 
-test('_normalizeModifierLibrary normalizes entries, dropping malformed ones', () => {
-  const result = makeManager()._normalizeModifierLibrary([
+test('normalizeModifierLibrary normalizes entries, dropping malformed ones', () => {
+  const result = normalizeModifierLibrary([
     { id: 'med', label: 'Medicine', expression: '  @abilities.med.mod  ', icon: 'fas fa-staff' },
     { id: '', label: 'no id', expression: '@x' },
     { label: 'missing id', expression: '@y' },
@@ -71,8 +72,8 @@ test('_normalizeModifierLibrary normalizes entries, dropping malformed ones', ()
 // is: only a FINITE number is attached, so every unbounded FORM normalizes to the same
 // key-absent shape. `0` is a real bound and survives — which is why the guard cannot be
 // truthiness.
-test('_normalizeModifierLibrary attaches min/max only when authored', () => {
-  const [bounded, floored, capped, zeroed] = makeManager()._normalizeModifierLibrary([
+test('normalizeModifierLibrary attaches min/max only when authored', () => {
+  const [bounded, floored, capped, zeroed] = normalizeModifierLibrary([
     { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 },
     { id: 'b', label: 'B', expression: '@b', min: 2 },
     { id: 'c', label: 'C', expression: '@c', max: 3 },
@@ -97,7 +98,7 @@ test('_normalizeModifierLibrary attaches min/max only when authored', () => {
   );
 
   for (const junk of [null, undefined, '', NaN, Infinity, -Infinity, 'three', {}, []]) {
-    const [entry] = makeManager()._normalizeModifierLibrary([
+    const [entry] = normalizeModifierLibrary([
       { id: 'j', label: 'J', expression: '@j', min: junk, max: junk },
     ]);
     assert.deepEqual(
@@ -110,8 +111,8 @@ test('_normalizeModifierLibrary attaches min/max only when authored', () => {
 
 // An inverted pair is PRESERVED VERBATIM rather than repaired. It is a blocking readiness
 // issue the GM must fix; silently swapping the two would roll a number nobody authored.
-test('_normalizeModifierLibrary preserves an inverted min/max rather than reordering it', () => {
-  const [entry] = makeManager()._normalizeModifierLibrary([
+test('normalizeModifierLibrary preserves an inverted min/max rather than reordering it', () => {
+  const [entry] = normalizeModifierLibrary([
     { id: 'a', label: 'A', expression: '@a', min: 5, max: -1 },
   ]);
   assert.equal(entry.min, 5);
@@ -437,12 +438,17 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
 
 // THE OTHER END OF THE MIGRATION'S LOAD-BEARING ORDERING.
 // `migrateUnifyModifierLibraries`'s header names the exact failure this pins: because
-// `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system` spread, a library key it
-// does not emit is DELETED on the next save — silently, with no error and nothing
-// recoverable. The migration is defended by its own suite; the normalizer holding the other
-// end was not, and deleting the one-word `modifiers,` emit left the entire suite green
-// while every GM's next system save destroyed their library.
-test('_normalizeSystem carries the SYSTEM library through a whole rebuild, bounds and all', () => {
+// The library moved to WORLD scope in issue 1308, so `_normalizeSystem` no longer emits it and
+// the guard this test was written to hold has moved with it.
+//
+// The original hazard was that `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system`
+// spread, so dropping the one-word `modifiers,` emit destroyed every GM's library on their next
+// save while leaving the whole suite green. The same hazard now reaches the SELECTIONS instead:
+// `validCatalogueIds` comes from the world store, so a manager that cannot see the library
+// filters all three activities' default sets against an empty basis and empties them at once.
+// That is what is asserted here — the ids survive a rebuild AND a re-save, which is the pass
+// that actually bites, because `updateSystem` re-normalizes an already-normalized system.
+test('_normalizeSystem carries the check SELECTIONS through a whole rebuild against the world library', () => {
   const manager = makeManager();
   const catalogue = [
     {
@@ -461,27 +467,24 @@ test('_normalizeSystem carries the SYSTEM library through a whole rebuild, bound
       isRollExpression: false,
     },
   ];
+  manager._characterLibrariesStore = {
+    isSeeded: () => true,
+    listCharacterPrerequisites: () => [],
+    listModifiers: () => catalogue,
+  };
   const created = manager._normalizeSystem({
     id: 'sys-cat',
     name: 'S',
-    modifiers: catalogue,
     craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['med', 'alch'] },
     salvageCraftingCheck: { defaultModifierPolicy: 'highest', defaultModifierIds: ['med'] },
     gatheringCraftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['alch'] },
   });
-  assert.deepEqual(
-    created.modifiers,
-    catalogue,
-    'the entries survive the rebuild, and the bounded one keeps BOTH bounds'
-  );
+  assert.equal(created.modifiers, undefined, 'the per-system copy is shed, not carried');
+  assert.deepEqual(created.craftingCheck.defaultModifierIds, ['med', 'alch']);
   // The SECOND save is the one that matters: `updateSystem` re-normalizes an
-  // already-normalized system, so a dropped key survives the first pass on the caller's
-  // input and disappears on the round-trip.
+  // already-normalized system, so a dropped id survives the first pass on the caller's input
+  // and disappears on the round-trip.
   const resaved = manager._normalizeSystem(created);
-  assert.deepEqual(resaved.modifiers, catalogue, 'and they survive a re-save of it');
-  // The blast radius, stated separately: `validCatalogueIds` is derived from the catalogue,
-  // so losing it does not merely lose the entries — every activity's default set is filtered
-  // against an empty catalogue and emptied too, on all three checks at once.
   assert.deepEqual(resaved.craftingCheck.defaultModifierIds, ['med', 'alch']);
   assert.deepEqual(resaved.salvageCraftingCheck.defaultModifierIds, ['med']);
   assert.deepEqual(resaved.gatheringCraftingCheck.defaultModifierIds, ['alch']);

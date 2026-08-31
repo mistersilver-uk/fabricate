@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-preview-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The preview builds its two synthetic tiles with this pure helper, which imports nothing.
     'src/ui/svelte/util/essencePreviewRow.js',
     // InventoryItemCard's own image leaf.

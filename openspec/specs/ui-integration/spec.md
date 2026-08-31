@@ -11,6 +11,7 @@ Domain behaviour is defined in:
 - `recipe-visibility/spec.md`
 - `destructive-changes-and-migrations/spec.md`
 - `gathering-and-harvesting/spec.md`
+- `companion-api/spec.md`
 
 Global rule: if a system feature is disabled, controls for that feature are hidden.
 
@@ -76,6 +77,10 @@ Product UI padding, margin, and gap spacing must derive from a shared 4px-based 
 
 ### Shared product UI primitives
 
+The `design-system` capability is the canonical record of the RULES that set obeys: its canonical geometry ladders, its Svelte APIs, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
+The set ITSELF is enumerated in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry; that file is part of the capability rather than a companion to it, and it is the artifact to open when a written geometry needs to be seen rather than read.
+This section states the RULE that a repeated thing is one primitive; `design-system` states what the set IS, and a change that adds or alters a shared primitive adds its specimen to that library and, once the primitive ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
+
 Wherever two or more product UI surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
 The subject is every product surface — the GM manager and the player crafting, alchemy, gathering, inventory, and Journal surfaces alike — because two surfaces rendering the same meaning are duplicates whichever audience they face.
 A shared CSS class that each site hand-rolls markup against does not satisfy this, and neither does a copy.
@@ -101,13 +106,44 @@ Three live non-conformances are recorded here rather than left to be discovered,
   A collapsed trigger card keeps its editing body IN THE DOM and hides it with `display: none` rather than removing it: that takes its controls out of the tab order, so a keyboard user cannot land inside a closed card, and it keeps ONE markup tree rather than a second rendering path to keep in step.
   A trigger a GM has just ADDED opens, because the collapsed summary is the resting state of a card that already says something.
   It renders a real `<button>`, so a caller nests it beside a row's content and never converts a `role="button"` wrapper around it into a `<button>`, which would nest buttons and land invalid DOM.
-- THE manager's labelled push-button exists at `src/ui/svelte/components/ManagerButton.svelte`, taking a `role` of `neutral`, `primary`, `ghost` or `danger`.
+- THE manager's labelled push-button exists at `src/ui/svelte/components/ManagerButton.svelte`, taking a `role` from a CLOSED set of six: `neutral`, `primary`, `ghost`, `danger`, `dashed` and `warning`.
   It replaces a CSS CONVENTION — `manager-button` plus a remembered `is-*` modifier — which is exactly the "shared CSS class each site hand-rolls markup against" this section forbids, and which had already drifted: the system Modifiers card painted `Delete modifier` as a neutral verb while the Tool Studio painted the identical verb as danger.
   It is the one primitive here that deliberately has NO scoped `<style>`, and it claims the section’s own button-geometry exception to say so.
   Emitting exactly the classes `styles/fabricate.css` already styles is what makes converting a CORRECT call site provably a no-op on screen, which is the property that lets the sweep proceed one screen at a time; a scoped block would instead be a second source of truth for the same control and would begin to disagree with the global sheet.
   The Tool Studio’s `.manager-tool-edit-actions` cluster is the AUTHORITY for what a manager button looks like, and `tests/components/manager-layout.test.js` compares a converted card button against it in a real browser on `font-size`, `font-weight`, `padding`, `height` and `border-radius`, so drift fails a gate rather than shipping.
+  Each role names a VERB and not a colour, because a colour is something a call site can pick by eye and a verb is not.
+  `neutral` is the SECONDARY verb, and it is the EMPTY MODIFIER rather than a missing one: a bare `.manager-button` is a real and correct treatment, which is why `neutral` is the default and why an unrecognised `role` renders as neutral instead of emitting an unstyled `is-*`.
+  `primary` is the CREATE-OR-COMMIT verb of the chrome cluster it sits in, and a cluster carries at most one.
+  `ghost` is the quiet NAVIGATIONAL verb — Back, Open, View — which moves the GM and changes no record.
+  `dashed` is the APPEND verb at the foot of the list it adds to, because a dashed outline reads as an empty slot waiting to be filled and a solid button does not.
+  `danger` is the DESTRUCTIVE verb: the action removes or unlinks a record, and it is the role `ArmedDangerButton` fixes as an invariant.
+  `warning` is the OVERRIDE verb: the action proceeds against a rule the system has already flagged, and destroys nothing.
+  A control that both destroys and overrides is `danger`.
+  That `warning` is NOT the `warning` of the Right-inspector-actions primitive below, which is "amber, for a verb that BREAKS A LINK" — same word, deliberately different meanings, two different primitives, and neither vocabulary may be read across into the other.
+  The two are stated together here because the words are close enough to be picked by feel, and a call site that reasons "unlink is a warning" from the wrong primitive's requirement paints a destructive verb amber.
+  The set is CLOSED, and a per-site visual tweak travels as a PASS-THROUGH class through the appending `class` prop rather than as a new role.
+  `is-subtle` is the worked example of a legitimate tint: six sites, four of them arriving through a popover's `triggerClass`, carrying three unrelated verbs and differing by a single property, which is a tint and not a meaning.
+  `is-warning` is the worked FAILURE: `environment/CompositionList.svelte` renders ONE verb from two places under the same handler, the same `data-action` and the same localization key, and one of those places spelled the modifier `is-warning`, which the sheet declares nowhere — so that site shipped with no treatment at all while the sheet's `.manager-button.is-warning-action` shipped with no call site.
+  `warning` therefore emits `is-warning-action`, and the role-to-class relation is a NAMED MAPPING in the component rather than an `is-${role}` template, because the roles are a vocabulary while the class each one emits is an implementation detail of the sheet.
+  **The role acquired a rendering consumer in issue 1315, and had none before it**: the labelled Force add in that component's standalone Non-matching section — the inline action on an event row, with a row-menu twin on task rows — which is automatic mode's list of the records its own biome/danger filter rejected, and therefore the one place where proceeding against a rule the system has already flagged is literally what the control does.
+  It was unreachable in every earlier version, which is how the class misspelling survived review and shipping: that section is gated on `mode !== 'manual'` while all four of its Force-add branches demanded `mode === 'manual'`, two mutually exclusive conditions, and 1315 settled where a force add belongs so those branches now test composition state alone and take their mode from the enclosing section.
+  The amber treatment's only previous rendering consumer, manual mode's Available-to-add icon Force add, is deleted by the same change — manual composition applies no match filter and so has nothing for a force to override — so `.manager-icon-button.is-warning-action` is retired with it and the sheet now declares the amber rule for `.manager-button.is-warning-action` alone.
+  The element is POLYMORPHIC through a `tag` prop, spelled the way `Chip.svelte` already spells it rather than as `as`, since one meaning takes one name across the manager primitives.
+  `tag` is `button` or `a`, defaults to `button`, and renders a `<button>` for any unrecognised value.
+  `<button type="button">` remains the default, and `type` is emitted ONLY on a button: an anchor carrying `type="button"` is invalid markup, so the attribute set is built per element rather than let through the rest spread.
+  `tag="a"` with an empty `href` renders a `<button>`, because an anchor without an `href` is not focusable, has no implicit link role and does not activate on Enter — and several anchor sites take their `href` from caller data, so the empty case is reachable in the product rather than merely a typo.
+  `disabled` is not a valid attribute on an anchor, so it is IGNORED there and warns.
+  `rel` defaults to `noreferrer` when `target` is `_blank`, because a primitive that owns the anchor shape owns its safety default too, or the conversion preserves the per-site inconsistency it exists to end.
+  A `fullWidth` prop emits `is-full-width` and is deliberately NOT a role: `dashed` used to pin `width: 100%` itself, which is a statement about the CONTAINER rather than about the verb, and it stacked a four-across wrapping row into four rows.
   `ArmedDangerButton` is a CONSUMER of the same CSS contract and NOT of this component: it owns a two-state arm/confirm machine whose danger role is an invariant rather than a caller’s choice, so composing them would push a `class:is-armed`, a second label slot and a keydown/blur contract into a primitive no other site wants.
-  141 unconverted call sites across 47 components remain and are a debt with a named owner rather than an accepted state; only the Modifiers card and the Tool Studio header are converted, because a broad visual sweep would drag every manager screen’s evidence into one run.
+  No `.svelte` under `src/` renders a raw `class="manager-button"` any longer, with two stated exceptions: `ArmedDangerButton.svelte`'s single site, and `ManagerButton.svelte`'s own two occurrences, which are DOCBLOCK PROSE rather than markup and are named so the source-contract test that pins this does not red on the primitive that satisfies it.
+  Three debts remain, each with a named owner and a stated reason rather than an accepted state.
+  The first is SEVENTEEN `SearchablePopover` `triggerClass` sites, which hand a class STRING to a popover instead of rendering a control, so converting them changes the popover's own trigger contract rather than a call site — a different subject, and one that also decides which global rules may be re-chained above the primitive, since a `triggerClass` trigger never gains `fab-manager-button`.
+  They are `recipe/RecipeIngredientOption.svelte` (four), `recipe/RecipeIngredientSetCard.svelte` (two), `recipe/RecipeToolsSection.svelte`, `recipe/RecipeResultGroupCard.svelte`, `recipe/RecipeResultItemRow.svelte` (composed as a template literal), `recipe/RecipeRoutingAssignment.svelte`, `recipes/RecipeBulkEditPanel.svelte`, `checks/ChecksRightMenu.svelte`, `tools/ToolBreakageTab.svelte`, `MapRegionLinkPicker.svelte`, `RealmOverridePicker.svelte`, `ComponentEditView.svelte`, and `component/ComponentComplicationsSection.svelte`'s "Browse macros" trigger, which issue #1286 landed after this requirement was first written and which this sweep could not have named for the same reason it could not convert it: the file did not exist yet.
+  The second is ONE accent-primary treatment written as THREE declarations reaching FOUR sites: `styles/fabricate.css`'s `.manager-recipe-browser-inspector-edit, .manager-component-browser-inspector-edit` pair covering the two browser inspectors, the same treatment again on `.manager-header-actions .manager-downtime-unlock`, and a third copy in `BulkEditPanelShell.svelte`'s scoped `.fab-bulk-edit-apply`.
+  It stays deferred because "the loudest control on this panel, in the accent" either IS `primary` or is a seventh role, and the set is closed — so it is a vocabulary ruling rather than a conversion, and making it silently by re-pointing three declarations would settle the vocabulary in the stylesheet.
+  The third is TWO treatments of one meaning in the Checks Studio, "go to the canonical authoring screen", both carrying the same `fa-arrow-up-right-from-square` glyph and both role-less: `checks/CraftingModifierCatalogueCard.svelte` renders it as a borderless, padding-free accent TEXT LINK through a pass-through class, and `checks/ChecksView.svelte` renders it as a boxed NEUTRAL button at standard control geometry.
+  It stays deferred for the same reason as the second: a `link` treatment would be a seventh role, so the pair cannot be reconciled by conversion, and it is a card-head-to-card-body pair rather than two cards, which is why an earlier sweep looked for it among sibling cards and did not find it.
 
 #### Threshold band strip
 
@@ -593,8 +629,22 @@ Selected-system navigation:
   Every selected-system direct leaf, expandable parent, and submenu child receives the corresponding type scale, icon/count geometry, row sizing, neutral/hover/focus-visible/active/disabled treatment.
   World Travel uses one child level with the same full-width row geometry and content inset as Gathering; its expanded group uses Gathering's border, background, radius, and gap.
   The shared styling changes no route, disclosure, or ARIA semantics.
+- **The trail has two roots, and neither is nested under the other.**
+  A World route — Parties, Rules & Resources, Travel, Downtime — is rooted at `World`; every other route is rooted at `Crafting Systems`.
+  World routes are `every system`, as the rail's own micro-label says, and Parties, Currency and Travel are each reachable before any crafting system has opted into anything, so a trail reading `Crafting Systems > World > …` states something false about the shape of the app.
+- **Every trail is rooted, and every trail describes the path that was walked.**
+  A trail SHALL begin at its root on every route, including a route whose header is drawn by a view of its own rather than by the shared one.
+  A trail SHALL name each level between the root and the screen, so that a group with sub-screens names the sub-screen too — a trail that stops at the group reads identically on every screen the group contains, and a trail that skips the group describes a path the GM cannot walk.
+- **A crumb that names a subject SHALL name that subject, not the kind of screen it opens.**
+  Where a screen edits a named thing, its leaf is that thing's name, falling back to the type name only while the thing has no name yet.
+  The title says what kind of screen it is, which the GM can already see; the trail is the only place that says WHICH one is open, so a leaf reading `Edit <type>` withholds the one fact only it can carry and renders every subject of that type identically.
+  This governs the BREADCRUMB alone and does not disturb any ruling about what a page title or subtitle may carry.
+- **A crumb is a control exactly when pressing it goes somewhere the GM is not.**
+  An intermediate crumb that names a reachable screen navigates to it; the leaf does not, and neither does a crumb naming the screen already displayed.
+  A crumb rendered as a control that cannot move the GM is worse than a label, because it invites a press that does nothing.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
+  The `World` crumb opens the World route wherever it is not the trail's last crumb, and is inert on the World route itself.
 - The selected-system rail scope uses the shared selector card described above.
   Activating `All crafting systems` returns to the systems browser without clearing the real selected-system store state.
 
@@ -982,15 +1032,21 @@ The identity sub-form (Name + Description only) SHALL participate in the Manager
 A navigation that re-enters the System Overview page on the same system (the validation-blocker link, or re-selecting the already-selected system) SHALL NOT prompt, because the form stays mounted and its pending edit survives.
 The optional-features toggles (the Currency participation toggle included) and the character-modifier / prerequisite cards on the same tab live-apply through the store and stage no draft, so they do not participate in this guard.
 
-The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — a system-owned library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes (behaviour in `recipe-visibility`).
+The Settings tab additionally renders a **Character prerequisites** card (`CharacterPrerequisitesCard`, issue 544) — the WORLD library of reusable pass/fail conditions the GM attaches to a book/scroll to gate who may learn its recipes and to a Tool to gate who may wield it (behaviour in `recipe-visibility` and `data-models` -> Tool).
+Since issue 1308 it edits a world record on a page framed as settings for the SELECTED crafting system, which is the one place in the Manager where those two scopes meet.
+That is a deliberate interim state, and it is made honest in place rather than left implicit: the card header SHALL carry a neutral scope chip reading "every system" — the World rail's own wording, so the two surfaces say one thing — the hint SHALL state that the library is shared by every crafting system, and delete SHALL confirm, naming the cross-system reach, because an unconfirmed one-click delete whose blast radius is every system is not a recoverable mistake.
+The **Modifiers** card on the same tab SHALL carry the identical treatment, for the identical reason.
+Both chips go away when the follow-up change relocates the two editors to their own World route.
 It is an accordion list (one entry expanded at a time): each collapsed row shows the entry name and a live `@path op value` preview, and the expanded body edits the name, then the property `path` (rendered with a leading `@` affordance), an operator dropdown (the nine `CharacterPrerequisite.op` tokens), and a `value` field that is hidden for the valueless operators (`is true` / `is false` / `exists`).
 Add, delete, and an opt-in **Seed presets** action (enabled only for `dnd5e` / `pf2e` worlds, disabled with an explanatory tooltip otherwise) mirror the gathering character-modifier card's affordances.
 Each control live-applies through the admin store (`addCharacterPrerequisite` / `updateCharacterPrerequisite` / `deleteCharacterPrerequisite` / `seedCharacterPrerequisitePresetsForSystem`), staging no dirty draft.
+Since issue 1308 none of those actions takes a crafting-system id and none may early-return on an unselected system: the library they write is world scope, so a system-scoped guard would silently drop the edit.
 
 #### Settings-List Ergonomics
 
 Three Manager library lists — **Character modifiers** and **Character prerequisites** on System Settings, and **Currency units** on the World > Currency route — share a set of ergonomic affordances (issue 768).
 The Currency-units list moved out of System Settings with the rest of the currency editor (issue 1278), and the shared contract follows it: the ergonomics are a property of the list, not of the page it sits on.
+All three now edit WORLD records (issue 1308 moved the other two's data, though not yet their editors), so the shared contract additionally covers SCOPE DISCLOSURE: a list editing a world record from a system-framed page SHALL say so on its header and in its delete confirmation, and one editing it from a World route needs neither, because the route already said it.
 
 The Character-modifiers list SHALL render as a compact summary-row accordion mirroring the Character-prerequisites card: each collapsed row is one line — a chevron, the modifier's icon, its label, and its expression shown inline with the leading `@` sigil stripped for a cleaner read — with the row actions (copy, delete) to the right; activating the summary expands the row to the editor (Icon, Label, Expression).
 The Character-modifier editor SHALL edit its `icon` with the shared pop-over `IconPicker` (the same control the Currency-unit and Character-prerequisite editors use), not a raw icon-class text input; a modifier with no explicit icon falls back to `fa-solid fa-user`.
@@ -1203,7 +1259,8 @@ When `checkBreakable` is false under check-driven authority, on-break controls a
 `flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
 `replaceWith` authors exactly one managed Component target through a full-width shared searchable popover card.
 The Tool Studio does not create or edit direct Item targets; legacy direct Item discriminators remain readable and executable at runtime until the GM deliberately replaces them with a managed Component target.
-Requirements selects shared `system.characterPrerequisites` ids, the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Requirements selects ids from the WORLD character-prerequisite library (issue 1308), the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Its empty state SHALL say the library is empty for the WORLD rather than for this system, and a Tool save SHALL preserve the selected ids: `upsertTool` derives the same Valid Id Basis `_normalizeSystem` does, so a save on a world whose library cannot be vouched for prunes nothing rather than silently clearing the gate.
 The bonus expression input visually supplies a leading `@` for roll-data paths, stores that sigil exactly once, provides explanatory hint text, and does not offer game-system-specific preset values.
 Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
 
@@ -1546,6 +1603,28 @@ The chips are the row's only status signal, and compositing them through a group
 The other tiers are diagnostic rather than actionable and are carried in the row's title, so the narrowest pane is not given a bare fourth chip on every row.
 - Expend does **not** move focus: the row survives, so its own button keeps focus and a keyboard GM can walk a multi-use copy without re-tabbing.
 Only the destructive actions, whose row unmounts, move focus to the owning tab panel.
+- A learned row states its source on ONE line, resolved by a ladder over the entry: a still-owned source copy's name, else the member recipe-item DEFINITION name, else the trailing segment of the dangling uuid, and — for an entry with **no** `sourceItemUuid` — a GM grant or "Learned by crafting".
+The grant rungs are consulted **only** inside the no-uuid branch: an entry that carries a uuid has real book provenance, and that provenance wins over any grant field beside it.
+Inside that branch the discriminant is `granted === true`, **not** the presence of a label, so a grant with no usable label is still rendered as a grant.
+The two grant states carry **distinct** kind values — a labelled `granted` and a label-less one — rather than one kind with an empty name, because the kind is the row's addressable test and capture hook, and collapsing them would leave the label-less state, which is the common one, unaddressable.
+Each of the resulting kinds MUST have its own render arm: with the grant kinds falling through to the book rung's "Learned from {source}", a labelled grant would name a book that does not exist and a label-less one would render a dangling "Learned from " — the first a worse falsehood than the "Learned by crafting" it replaced.
+- The row's leading meta icon is derived from that same kind.
+A grant MUST NOT be decorated with the book glyph the book rungs carry: the line's whole content is that no book was involved, and the glyph would otherwise leave one muted word as the only difference between a grant and a craft.
+The grant glyph MUST NOT be an award, medal or trophy, which would re-narrow a general GM grant to one caller's reward use case.
+- **`granted` and `grantedBy` are UNTRUSTED at display.** The flag they live on is public, so a module that never passed Fabricate's write-side validation can set them to anything.
+The surface MUST test `granted === true` strictly rather than for truth, MUST test `typeof grantedBy === 'string'` strictly rather than coercing (`String({})` renders "[object Object]", and an array survives the entry-boundary reader's nested-record test), and MUST clamp the label to the contract's maximum label length with a visible ellipsis, measured and cut in **code points** — a UTF-16 cut can split a surrogate pair and render the remnant as tofu.
+The bound is **inclusive** of the ellipsis, so the rendered label never exceeds the length the write path refuses past; a contract-legal label renders verbatim.
+This is a clamp, not a re-clamp: the write path _refuses_ an over-length label rather than truncating one, so nothing has clamped this value before.
+Both tests and the clamp belong in the **projection's ladder**, not in the component, so no unclamped foreign text is ever published onto a row.
+- The label MUST be rendered through text interpolation only — never `{@html}`, never into an `href`, and never into a `title` — and it MUST NOT be substituted into its translated sentence through any mechanism that interprets `$` patterns in the replacement.
+Both `String.prototype.replace` and Foundry's `Localization#format` do: a label of `` $` ``, `$&`, `$'` or `$1` then rewrites the GM's audit line instead of appearing in it, while passing every type test, every length clamp and the framework's own escaping.
+That is not a scripting hole — it is foreign text deciding what an audit line says, which is precisely what these rules exist to prevent.
+Splitting the translated sentence on its placeholder and rendering the label as its own text node between the fragments satisfies this; so does a replacer function with the replacement's `$` escaped.
+The requirement is on the property, not the mechanism.
+- These display rules are scoped to **the entries the surface's own enumeration reaches**.
+**Recorded gap, not fixed here:** that enumeration reads the learned-recipe flag map's top level rather than the shared entry-boundary reader, so a recipe id containing a `.` surfaces its first segment, resolves to no recipe, and is counted into `orphanCount` — presenting a real, non-orphaned entry as a phantom orphan and pointing the GM at the all-systems reset grain, which this section names as the orphan roll-up's only lever.
+The gap is **pre-existing and independent of granting**: the same flag is written by the book-learn path and read by the same raw enumeration, so a dotted id already surfaces this way for a book-learned entry, and a dotted id cannot be newly minted because recipe-id intake refuses one.
+Routing the enumeration through the shared reader changes the orphan and other-system roll-ups for every world already carrying such an id, so it is owned by a follow-up rather than made contingent on any one writer.
 - A learned row whose erase will free no budget states WHY as a single icon-led clause appended to its source line, rather than a banner promise the erase cannot keep.
 It MUST NOT be a second sub-label: the previous pairing stated one fact twice, because a source line reading "(copy no longer owned)" was itself the cause of a separate "Frees no slot".
 The clause is cause-SPECIFIC and MUST NOT collapse to one string, because the condition is the full four-condition rule in Knowledge Reset / Erase: a still-owned source copy whose definition carries no learn cap frees nothing, so a clause claiming there is no owned copy would be false for that row.
@@ -1634,9 +1713,10 @@ Current GM editor behavior:
   Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes Gathering Task and event library rows for the selected crafting system, including per-environment automatic/manual composition controls.
 - In automatic composition, task and event tabs show Included, Excluded, and Non-matching record sections; excluding a record writes the matching `disabled*Ids` list and Restore clears it.
+  Non-matching rows offer **Force add**, which writes the matching `forced*Ids` list and composes the record against the filter; it is the `warning`-role control above, and automatic composition is the only mode that offers it.
 - In manual composition, task and event tabs show only Included in this environment and Available to add.
-  Removing an included manual task or event clears `enabled*Ids` and `forced*Ids`, ignores stale `disabled*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
-- Manual Available to add rows present Add for matching records, Force add for enabled non-matching records, and a disabled library note for library-disabled records.
+  Removing an included manual task or event clears `enabled*Ids`, ignores stale `disabled*Ids` and `forced*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
+- Manual Available to add rows present Add for matching AND for enabled non-matching records — manual composition has no match filter, so it has no force add — and a disabled library note for library-disabled records.
 - When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/event options before composing environments.
 - Gathering Task and event row overrides stay inside expandable rows so the default environment workspace remains scannable.
   Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
@@ -1646,7 +1726,8 @@ Current GM editor behavior:
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
-- The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
+- The selected-system inspector exposes the WORLD character modifier library for gathering (issue 1308; per-system until then), with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
+  The inspector projection is an explicit allowlist, so neither library may be projected off the crafting system any more: a field omitted there is invisible to the UI, and one projected from the system would show a stale copy the corpus no longer carries.
 - D100 drop row and event editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
 - The settings/tag area can edit gathering vocabularies for biomes and danger.
   The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records under World > Travel > Realms.
@@ -1716,30 +1797,47 @@ The environments editor must block save when:
 - a task is missing required routed or progressive fields
 - a task's result groups violate reserved failure keyword rules
 
-### GM World Currency Route
+### GM World Rules & Resources Route
 
-World always exposes `Currency` beside `Parties`, including with no selected system.
-It is the ONE place the world coin ladder, spend strategy, provider and GM macro set are authored (`data-models/spec.md` -> CurrencyConfig); a crafting system's Settings tab keeps only the participation toggle.
+World always exposes `Rules & Resources` beside `Parties` and `Travel`, including with no selected system.
+It is the ONE place the three world-scoped libraries are authored: the coin ladder, spend strategy, provider and GM macro set (`data-models/spec.md` -> CurrencyConfig), the character prerequisite library, and the modifier library (`data-models/spec.md` -> CharacterLibraries).
+A crafting system's Settings tab keeps only the currency participation toggle; it carries neither library and offers no authoring surface for one.
 
-- **The route is UNGATED**, like Parties and unlike experimental-gated Downtime.
-  It is reachable with no crafting system selected, with every system's currency toggle off, and with `fabricate.experimentalFeatures` disabled, because a GM must be able to author the coins BEFORE any system opts in — gating the authoring surface on the participation flag would make the ladder unauthorable from a standing start.
-- The rail entry sits directly under `Parties` inside the existing `.manager-world-nav` section, carries the stable id `manager-world-nav-currency` and the hook `data-world-nav-item="currency"`, uses the `fa-coins` icon and a localized accessible name, and surfaces the configured unit count on `.manager-nav-count`.
-  The route token is `world-currency`; it survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and it participates in the Manager confirm-discard route-exit chain like every other destination.
-- The page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries the page hook `data-world-currency-page`.
-  It is full-width with no right inspector, matching World Parties: the route MUST be excluded from the shell's shared `.manager-inspector` aside, not merely left without an inspector branch of its own.
+- **Every route in the group is UNGATED**, like Parties and Travel and unlike experimental-gated Downtime.
+  Each is reachable with no crafting system selected, with every system's currency toggle off, and with `fabricate.experimentalFeatures` disabled, because a GM must be able to author these libraries BEFORE any system references them — gating an authoring surface on a participation flag would make it unauthorable from a standing start.
+- The group is a rail GROUP, not a leaf, following the shipped Travel and Downtime groups: a parent row, a disclosure toggle and a submenu.
+  The parent carries the stable id `manager-world-nav-rules` and the hook `data-world-nav-item="rules"`, uses the `fa-scale-balanced` icon and a localized accessible name, and surfaces the total entry count across all three libraries on `.manager-nav-count`.
+  Activating the parent navigates to Currency rather than opening an empty group.
+- The group has THREE DESTINATIONS, each a route token of its own — `world-currency`, `world-prerequisites`, `world-modifiers` — with sub-item ids `manager-rules-nav-currency`, `manager-rules-nav-prerequisites` and `manager-rules-nav-modifiers` and the hook `data-world-rules-item`.
+  Three sibling tokens rather than one token plus a sub-tab variable, which is what Travel and Downtime use: the Checks group is the precedent for a group whose children are real routes, and preserving `world-currency` avoids renaming a token the View Lab cases, the route-scoped CSS and the documentation all name.
+  The active destination is stamped on the shell as `data-world-rules-tab`.
+  Each survives selected-system capability, card, and selection transitions exactly as the World Parties route does, and each participates in the Manager confirm-discard route-exit chain, carrying its destination as the route-exit subject id so a guard can tell a real move from re-entering the page the GM is already on.
+- Each page renders its own `<main class="manager-main">` (the Downtime world tab's structure, not the Parties one, which reuses `EnvironmentsBrowserView` for historical reasons) and carries a page hook: `data-world-currency-page`, `data-world-prerequisites-page`, `data-world-modifiers-page`.
+- **Full width is TWO edits, and neither is correct alone.**
+  The route MUST be excluded from the shell's shared `.manager-inspector` aside in the component, AND its `.manager-body` grid column MUST be released in the stylesheet, in both the normal and the `.is-rail-collapsed` rule.
+  Suppress the aside without releasing the column and the page renders against a permanent ~300px dead strip; release the column without suppressing the aside and the empty aside wraps to an implicit grid row beneath the editor.
+  This has been got wrong twice: once on the Checks route, and once on `world-currency`, which was suppressed in the component from the day it shipped and never released in the stylesheet.
+  A route appended to the END of an existing grouped selector list is invisible to the parity gate, which inspects only the selector that closes a group, so a newly released route belongs in its own rule pair.
   The aside's fall-through renders a generic "Select a system" panel, so a route omitted from the exclusion list gains a permanent 300px column of unrelated content beside an editor that has no selected system at all.
   The route also carries a `grid-template-rows: minmax(0, 1fr)` layout override, as the Downtime route does and for the same reason: the tab renders a single child straight into `.manager-main`, so on the shared three-row shell it would land in an auto-sized row and a tall ladder would grow the Manager instead of scrolling inside its own panel.
 - **The page header offers NO actions.** The route's own two actions — Add currency unit and Seed presets — live on the card header, where the provider read-only condition that hides them is computed.
   The exclusion is required rather than incidental: the header-actions block falls through to Import / Export / Create for any route without a branch of its own, and those act on CRAFTING SYSTEMS — so on a route that deliberately has no selected system, "Create" would create a crafting system and "Export" would sit permanently disabled against an id the route does not have.
   This is where World Currency departs from World Parties, which lifts its single New party action into the page header instead.
-- **The editor moved wholesale rather than being redesigned.** Every control below is the one that stood in the System Settings units card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*`; no new primitive is introduced.
+- **Each editor moved wholesale rather than being redesigned.** Every control is the one that stood in its System Settings card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*` and `data-system-modifier*` / `data-system-character-prerequisite*` -> `data-world-modifier*` / `data-world-character-prerequisite*`; no new primitive is introduced.
+  The whole-section collapse does NOT move with them: these are pages, not accordions, so the body always renders and the per-ROW summary collapse is the only collapse that survives.
+- **The cross-copy between the prerequisite and modifier libraries becomes a NAVIGATION.**
+  A page component cannot perform one, so each page hands the source entry to a callback and does nothing else; the route owns the mapping, the write to the destination library, the route change, the open request and the aria-live confirmation.
+  The confirmation MUST be rendered by the destination rather than the source: rendered on the source page it is torn down by the navigation before an assistive technology reaches it.
+  The destination opens the new entry and reveals it, because a copy is appended to the end of a library and an entry that is open but off-screen is indistinguishable from one that was never created.
 
 Shipped controls:
 
 - A whole-section collapse toggle in the card header (`<button aria-expanded aria-controls>` with a chevron), matching the Settings-list ergonomics contract; the state is in-memory and never persisted.
 - A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy.
   When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the active Foundry system has none).
-  When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is invoked to refund currency when a player cancels an in-progress craft (the `refundOnPlayerCancel` policy).
+  When `macro`, four macro drag-and-drop zones (`canAfford`/`increment`/`decrement`/`balance`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs.
+  The `increment` hint names every occasion the macro is actually invoked on — the player-cancel refund (the `refundOnPlayerCancel` policy), a companion's currency credit, and giving back a pooled cost a take could not complete — and says what its absence costs, because a hint that describes a macro as reserved or single-purpose sends a GM past the field that a pooled currency take is refused for want of.
+  The `balance` zone is the fourth key (issue 1342) and the only one that ASKS rather than acts: it is what lets a `macro` world answer a pooled holdings read at all, it is OPTIONAL on the `increment` precedent, and its hint states the return contract — a number of the ladder's smallest coin, anything else reading as unknown.
   There is no nested inventory-mode `<select>` — macro is its own peer strategy.
 - Add currency unit and seed preset actions
 - Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
@@ -1751,6 +1849,174 @@ Shipped controls:
 Every control live-applies through the admin store and stages no draft.
 Each store action addresses the ONE world configuration and takes no `systemId`; persistence goes through `CurrencyConfigStore`, which normalizes and always saves (`data-models/spec.md` -> CurrencyConfig requirement 4), rather than through `updateSystem`.
 The projection reads the world config straight from its store on every publish, so another GM's edit to the ladder is picked up without a per-system cache to invalidate.
+
+### GM World Scoped Entity Routes
+
+World exposes the component, essence and tool CATALOGUES and their entry editors, each reachable with no crafting system selected.
+They render the `## Scoped Entity Definitions` model (`data-models/spec.md`): a world record's identity, its world defaults, and a row per crafting system that has a System Membership Record for it.
+
+The World Vocabulary is deliberately NOT part of this requirement — see `### GM World Vocabulary Route`.
+It holds the category and tag vocabularies these entities draw FROM, and folding the two together would be the first place in this corpus to lose the boundary `data-models` draws in terms.
+
+1. **FOUR world rail leaves, ABOVE `Parties`, in the prototype's authored order:** `Component catalogue`, `Tags & Categories`, `Essence Catalogue`, `Tools Catalogue`.
+   Each is UNGATED and reachable with no crafting system selected, like `Parties`, `Travel` and `Rules & Resources` and unlike experimental-gated `Downtime`, because the world catalogue must be authorable before any system opts into anything.
+   **The labels are exactly as authored, and three of them read as typos while none is:** `Component catalogue` carries a lowercase `c`, `Tools Catalogue` is PLURAL where its siblings are singular, and `Tags & Categories` is character-for-character identical to the system-scope entry higher in the same rail.
+   The prototype is the authority for rail labels and order, and the parity oracle asserts landmark ORDER, so "correcting" any of the three reds that gate.
+   Each leaf carries a stable id — `manager-world-nav-component-catalogue`, `manager-world-nav-vocabulary`, `manager-world-nav-essence-catalogue`, `manager-world-nav-tool-catalogue` — and the hook `data-world-nav-item`, and ALL FOUR surface a world corpus count on `.manager-nav-count`.
+   The three entity leaves count their own corpus; the vocabulary leaf's count is defined by `### GM World Vocabulary Route`, which owns that badge because the World Vocabulary is not a scoped-entity corpus.
+   The badge is hidden at the 56px collapsed rail width, where every leaf is reduced to its glyph, so the count is not the collapsed rail's accessible name — see requirement 8.
+2. **SEVEN route tokens** — `world-components`, `world-component-entry`, `world-essences`, `world-essence-entry`, `world-tools`, `world-tool-entry`, and the vocabulary token that requirement's own section names.
+   Each passes `normalizedActiveView` through the world pass-through and ABOVE its `if (!system) return 'systems'` fallthrough, because a world screen's normal state is that no crafting system is selected and that fallthrough would otherwise bounce every one of them.
+   Each is absent from `setView`'s `!selectedSystem` refusal and from `SCOPE_BROWSER_BY_VIEW`: a world route has no per-system record to be stranded on when the rail's scope select changes.
+   Each participates in the Manager confirm-discard route-exit chain.
+3. Each route renders its own `<main class="manager-main">` carrying a per-page hook, `data-scoped-page="<token>"`.
+   **A CATALOGUE'S TRAIL IS TWO CRUMBS AND AN ENTRY'S IS THREE.**
+   A catalogue is `World > <screen>`, because it IS a world screen rather than a destination inside a group.
+   An entry is `World > <catalogue> > <entity>`, with the MIDDLE crumb a button back to its catalogue: an entry editor is released to full width by requirement 4 and therefore renders no inspector, so that crumb is the only affordance out of it, and the same "a button wherever it is not the leaf" rule the `World` crumb follows applies to it.
+   The leaf names the ENTITY when the published corpus can supply a name and falls back to the screen's own title otherwise, because an entry route with no subject chosen and one whose subject the corpus no longer holds are the same thing to a breadcrumb: there is nothing to name, and an empty crumb is not an answer.
+   The shell owns the trail, so the subject a later lane chooses reaches it through props the pages already have: a catalogue page takes `onOpenEntry(entityId)` and an entry page takes `entityId` and `onBackToCatalogue()`.
+   That seam is what keeps requirement 7 true for an entry editor, which cannot render its own crumb.
+4. **Full width is ONE mechanically checked decision over a THREE-state classification.**
+   Suppressing the shell's shared `.manager-inspector` aside in the component and releasing the `.manager-body` grid column in the stylesheet — in BOTH the normal and the `.is-rail-collapsed` rule — are one decision expressed twice, and each half alone is wrong in its own way; this has shipped half-done twice already (the Checks family, and `world-currency`).
+   The decision is recorded ONCE, as a set of `{id, predicate, selector, layoutClass}` entries, and the aside chain is BUILT from that set rather than restating any clause.
+   `predicate` rather than a route token, because three of the shipped exclusions are not tokens: `checks` is a FAMILY matched by a prefix selector, World > Parties is a route+SUBSTATE matched by a compound attribute selector, and the world-rules clause spans three tokens.
+   `layoutClass` because the stylesheet holds THREE layout states and not two: `tool-edit` and `knowledge` suppress the aside AND keep three tracks, repurposing the third column, so a gate asserting "aside excluded equals column released" is unsatisfiable and every loosening of it is vacuous.
+   The classes are `shared-3-track`, `full-width-2-track` and `self-owned-3-track`; the aside chain reads the UNION of the last two, and the Tool Studio library is the route-scoped member of the first — it re-widths its third column and KEEPS its inspector.
+   The gate asserts SELECTOR-STRING equality between the set and the stylesheet's own classification, parses AT-RULE-AWARE (`.manager-body` is re-declared inside an `@container` block, which a flat scan reads as "every route released"), and asserts both parsed sets NON-EMPTY and carrying three named baseline members BEFORE the equality — because the house helper for reading a rule out of that stylesheet answers `''` on no match, so the cheapest green available to a broken parse is two empty sets comparing equal.
+   The rows override sits on `.manager-main`; `.manager-body` declares no `grid-template-rows` at all, so writing one there would invent a row model for every route sharing the base rule.
+5. **The three SYSTEM-scope entries render the authored screen titles `Component Rules`, `Essence Rules` and `Tool Rules`.**
+   These are SCREEN TITLES AND NOT DOMAIN NOUNS: the relation each edits is a System Membership Record, and no route token, setting key, code identifier or persisted field takes the spelling `rules` for it.
+   The route tokens are PRESERVED unrenamed, so every deep link, every capture-case `expectView` and every stored `activeView` keeps resolving.
+   The relabel IS the screen's name everywhere it names the SCREEN — the rail entry, the page title, the breadcrumb crumb and the browser's `<main>` accessible name — because a page titled `Component Rules` whose accessible name said `Components` is the WCAG 2.5.3 Label in Name hazard.
+   Where the same lang key named the DOMAIN NOUN rather than the screen, it is left alone; the system inspector's essence count is the one such use.
+6. **NEITHER HARNESS MAY MATCH A RAIL ENTRY BY VISIBLE TEXT.**
+   Both scopes now carry a `Component`-prefixed entry, `Tools` is a live substring of `Tools Catalogue`, and `Tags & Categories` is an exact duplicate across the two scopes — a substring collision is recoverable by DOM order, and an exact duplicate is not.
+   Every rail button therefore carries a stable `id`, both harnesses target the id, and the id is a COMPLETE LITERAL rather than a stem-built template, because an interpolated id is invisible to the source gate that checks it is rendered at all.
+   A `node --test` gate asserts, on every commit, that no `:has-text(` locator reaches a manager rail button anywhere in the Foundry harness, that every rail id the harness targets is rendered by a component that renders the rail, and that every label in its membership loop is authored beside its own id.
+   The Foundry smoke is the CONFIRMING run and is never the only evidence the label and id sets agree.
+7. **The gateway files carry every seam a later scoped-entity or vocabulary change needs, and are closed to those changes.**
+   `CraftingSystemManagerRoot.svelte`, `adminStore.js`, `styles/fabricate.css` and the Foundry smoke harness carry every route token, rail entry, aside clause, store action, published key and rail locator those changes need, so each of them changes only its own screens.
+   The obligation is evaluated on THOSE changes, as `git diff --name-only origin/main...HEAD` containing none of the four paths.
+   **It binds the PRODUCER side of a published key as well as the consumer side**, which is where it was first got wrong: a rail badge wired to read `worldScope.vocabulary.total` is closed, but a projection that could only ever be handed the three entity stores is not — so the admin store reads an OPTIONAL fourth `vocabulary` store leg on the WRITE path as well as the read path, through the same optional-accessor idiom as its siblings.
+   The read leg answers `null` and the projection answers `{available: false, total: 0}` until a vocabulary store is registered; the write leg is inert until the world-scope action module declares a vocabulary family, and the store, its service accessor, its projection and that family all live outside the four paths.
+   **AND IT BINDS THE DATA SEAM ON THE SAME MECHANISM AS THE ROUTING SEAM.**
+   This corpus registers no component context and exports no store singleton, and no manager component imports a store module, so every value reaches a child as a DECLARED PROP and there is no other route to one.
+   The shell therefore hands each world scoped-entity page and each system-scope entity view the published world corpus for its entity type, that type's world-scope write path, the crafting-system roster the membership rows were built against, and the selected system's id — exactly as requirement 3 hands a catalogue `onOpenEntry` and an entry `entityId` and `onBackToCatalogue`.
+   The World Vocabulary route is NOT a scoped entity and takes its own published state rather than that bundle, for the reason its own requirement gives.
+   The write path arrives PER ENTITY TYPE and never as the whole family, because the family's KEY SET is part of its contract: `setEnabled` is ABSENT on the component path rather than present and refusing, and a screen tests for it there.
+   **The store action set includes CLEARING a per-system tool-breakage authority override**, not only writing one of its two tokens.
+   Normalization is absence-preserving, so "no per-system override" is expressible on disk and the resolver answers the world value for it; an action that coerced every other argument to the system-specific token would make inheritance a one-way door for a change that may not reopen the store.
+   **A RESOLVED published value is not sufficient on its own when a screen must AUTHOR the layer it was resolved from.**
+   A control that offers "inherit" beside the concrete choices needs to know which of them is current, and a resolved token cannot answer that.
+   So the projection that publishes the resolved authority ALSO publishes which scope authored it, one value per branch of the resolver, and the shell carries that value to the control on its own prop.
+   Both halves are the gateway's, and neither is deferrable to the change that draws the control: the producer is open to that change, but the carrier line is inside a closed file, so publishing the value without carrying it would leave it unreachable.
+   **The CAPTURE REGISTRY is NOT one of the closed files, and the reason is structural rather than a concession.**
+   A capture case asserts that a route is REACHABLE and drives it by clicking a rendered control, so a route whose only entrance is a screen that has not shipped cannot be reached: the capture driver throws by name on a selector that matches nothing, and — because capture coverage is keyed on the route a case asserts — an unreachable case becomes its own surface and is selected by every later change to a capture input.
+   A case registered ahead of its screen therefore fails the capture run whole, thereafter, for every change that touches a capture input.
+   A screen and its capture case ship TOGETHER: the change that ships a screen registers its case, adjusts the source claims on the components that screen renders, and removes any standing coverage exemption it makes stale.
+   **A gateway closure is a claim that an enumeration is COMPLETE, and it is void for a seam the enumeration does not name.**
+   Reopening a gateway file to supply a NAMED missing seam is a correction that extends this requirement; reopening one to build a screen is a violation of it.
+   The distinction is not decidable from a diff's file names, so a correction claim is EVIDENCED on the reopening change's own diff — by an unchanged-render or import-surface assertion — rather than asserted in its description.
+8. **At the collapsed 56px rail width no leaf renders its count badge.**
+   `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
+   Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
+
+### GM World Vocabulary Route
+
+World exposes `Tags & Categories` as a world rail leaf, matching the shipped `### GM Travel Route` shape: one route token, ungated, reachable with no crafting system selected.
+It is the authoring surface for the World Vocabulary — component categories, component tags and recipe categories — each with a usage count and a deletion warning naming how many inheriting rule sets are affected.
+
+It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the separation is a decision rather than an accident of drafting: a spec heading is a corpus noun rather than a screen title, there is no authored label covering all four world leaves, and the World Vocabulary is NOT a scoped-entity layer — it holds the vocabularies those entities draw from, which is the boundary `data-models/spec.md` draws in terms.
+
+1. The route token is `world-vocabulary`, and the rail leaf carries the id `manager-world-nav-vocabulary` and the hook `data-world-nav-item="vocabulary"`.
+2. Its label is character-for-character identical to the system-scope `Tags & Categories` entry, which is why no harness may reach either by text; see `### GM World Scoped Entity Routes` requirement 6.
+3. It renders its own `<main class="manager-main">` with the page hook `data-scoped-page="world-vocabulary"`, is released to full width by the one mechanically checked decision of that requirement 4, and participates in the confirm-discard route-exit chain.
+4. **The leaf carries a count badge, and it counts the WHOLE vocabulary** — component categories plus component tags plus recipe categories, summed rather than deduplicated across the three, because a category and a tag that share a label are two entries in the world's vocabulary.
+   It is the fourth of the four badges `### GM World Scoped Entity Routes` requirement 1 names, and it is the only one that is not a corpus of scoped entities.
+   **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
+   It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
+
+### Scoped entity editor patterns
+
+The six scoped-entity editors — a catalogue and an entry editor for each of components, essences and tools — share one set of patterns, built once.
+Each is stated here because the shape of each is decided by the `## Scoped Entity Definitions` MODEL rather than by any one screen, so a screen that reinvented one would be writing a value the normalizer discards.
+
+1. **The inherit row set is read from the SCOPE DESCRIPTOR, never listed per screen.**
+   A component draws exactly ONE row (`category`), an essence two and a tool two.
+   A component's essence quantities, salvage, complications and difficulty are NOT sections and NOT membership fields; they stay on the in-system record, and `normalizeMembership` is an allowlist rebuild that silently DISCARDS any other key on the next `load()` — so a screen that offered a switch for one would write a value that survives the session and vanishes at reload.
+2. **A SEEDED section renders no inherit row.**
+   A tool's `repairRequirements` is copied once and then diverges, so there is no live parent to fall back to and a switch over it would be a claim the resolver does not honour.
+3. **A ONE-SECTION entity renders exactly one row and NO GROUP CHROME** — no header, no divider, no empty state around a single control, because that chrome costs more vertical space than the control it frames and says nothing the row does not.
+4. **The re-inherit copy is "fall back", never "discard", and there is no confirmation**, because re-inheriting RETAINS the dormant local override: the switch flips, the local block stays on disk, and re-overriding restores it rather than re-seeding from the world.
+   Turning a switch OFF seeds the local block from the current world value as a STRUCTURAL COPY, so neither scope can reach into the other through a shared reference.
+5. **`tags` is not a section and renders no inherit row.**
+   It is additive with per-tag muting, so it has its own two write paths and no single switch, which per-tag muting cannot be expressed by.
+6. **The membership action cluster reads `enableable` from the descriptor**, so the COMPONENT path structurally cannot render an enabled switch: a component membership record carries no such field, and the write path does not offer the action at all rather than offering one that refuses.
+   Adding an entity to a system creates a record that inherits every section, and the copy says so; removing deletes only that record and its overrides, and arms through the shared `ArmedDangerButton` keyed on the DOCUMENT ID pair rather than a row index.
+7. **A WORLD-DEFAULTS EDITOR MAY OFFER ONLY WORLD-ADDRESSABLE REFERENTS.**
+   `data-models/spec.md` `### Essence scope` requirement 5 binds a world essence default's `effectSource` to a world-addressable referent and never a system-local component id.
+   The store writes section values OPAQUELY and the normalizer coerces shape rather than addressability, so neither can enforce it: the PICKER is the enforcement point.
+8. **The validation tab and the player preview are shared shells**, and the six editors are callers rather than authors of them.
+   The validation shell renders the shipped editor-validation surface and owns the count and pass/warn status labels both existing sites already agreed on; only the BLOCK label differs, because an essence always saves while a Tool refuses to.
+9. **Requirement rows introduce NO new component:** the shipped tool repair-requirement editor is the recipe-free ingredient editor, already rendered chromeless.
+10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
+11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
+    A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
+
+### Scoped entity list shells
+
+The world catalogues and the system-scope rules lists share ONE list composition, built once and configured per scope.
+
+1. **The frame is ONE component, and neither shell may inline it.**
+   Three lanes need the same list-plus-inspector composition, and three independent copies of it is a measured duplication failure rather than an aesthetic one.
+2. **The composition is ASYMMETRIC by scope, because the shipped layout is.**
+   All seven world scoped routes are released to full width and render no shared aside, so a world catalogue draws its own inspector column inside `main`.
+   The three system-scope routes are not released and their shared 300px aside is live, so a rules list draws NO inspector: a second column beside it would put two inspectors on screen with neither gateway file open to reconcile them.
+   The inspector region renders only when an inspector body is supplied.
+3. **The row is not a button and carries two independent selected states.**
+   It contains a selection checkbox's input and label, so the click target is a nested identity button and the checkbox sits at the trailing edge.
+   "Inspected" and "in the write set" are different questions and one row carries both; the inspected row carries `aria-current`.
+4. **The shells own the identity cell and the inspector's identity header; the lane owns the meta run and the body.**
+   An identity cell means the same thing in all three catalogues and a badge run does not.
+5. **The identity record differs in THREE ways across the three types.**
+   An essence has no source-link field, carries its thumbnail as `icon` where a component and a tool carry `img`, and is the only type carrying `colorToken`.
+   Two of the three are read by shell-owned markup.
+   This records a fact `data-models/spec.md` has not yet carried; the correction ships with this change.
+6. **Every entity-shape difference is a DESCRIPTOR answer, never a call-site test of the entity type.**
+   The descriptor is reached either through the projection's published keys or through `scopedStudio`'s accessors over the same descriptor — `MembershipActions` reads `scopedEnableable` and is conformant on both readings.
+   Note that the seeded-section filter in `inheritableSections` removes NOTHING for a tool today, because `repairRequirements` was never in `TOOL_SECTIONS`; the protection is that no section list contains it, not that the filter subtracts it.
+7. **The two identity facts are DERIVED from the world identity field lists, never restated.**
+   The key spaces disagree — plural against singular — so the derivation carries an explicit bridge and a gate pins each list it reads as non-empty.
+   A broken bridge answers `false` everywhere, which on a component is indistinguishable from a correct answer.
+8. **`enabled` is ABSENT on a component row, not `false`.**
+   `'enabled' in row` is the only correct read: a consumer branching on truthiness is satisfied by an absent key today and by a persisted `false` tomorrow, and those are different states.
+9. **A composed primitive that renders its own root class needs a host-sheet rule**, and the shells pass that class and every hook attribute explicitly rather than inheriting another studio's defaults, which would retune six scoped screens whenever that studio changes.
+10. **`available: false` suspends the whole authoring surface.**
+    Search, filter, sort, the selection toolbar and every add, remove and copy affordance are suppressed, and the panel is its own treatment rather than the no-state hero with different copy.
+    The projection reports every seeded flag false in this state precisely so a screen cannot offer a destructive action against a corpus nobody could read.
+11. **A list has THREE no-content states, not two**: unavailable, empty, and filtered-to-nothing.
+    Telling a GM their world holds nothing when a query matched nothing is the same class of harm as offering actions over an unreadable corpus.
+12. **The shells own the list state machine**: which row is inspected, the selection set across pages, the filter, the sort, the page, and the armed destructive token.
+    **The inspected row is nonetheless CONTROLLABLE BY THE OWNER**, and owning the machine is not in tension with that: a row click is the DEFAULT driver, an owner that sets the value overrides it at any time, and setting it to nothing returns the list to resting.
+    A deep link, a route parameter restored on re-entry, a re-selection after a create or a delete, and a page whose route-exit guard REFUSED a navigation and has to put the selection back all drive it from outside; a shell that latched on the first click leaves that last case unable to undo what it just refused.
+    The selection count is the size of the whole selection rather than its intersection with the page; the tri-state box acts on rendered rows; select-all-results acts on the whole filtered set.
+    A filter change prunes the selection and clamps the page, and any selection, filter, sort or page change disarms.
+13. **Filter, sort and paging arithmetic and selection reduction are COMPOSED from the shipped pure models, never restated.**
+    A page index is clamped by the model that owns the arithmetic, and the clamped value is what both the row slice and the pagination footer read — a footer fed an unclamped index states a range the list does not show.
+14. **Membership rows come from the projection's joined rows, and the roster prop supplies ONLY `id` and `name`**, with an id fallback.
+    The shells read `entries` and never the corpus roster `entities`.
+15. **The snippet parameter lists are part of the contract**, carrying the whole projection so a lane reaches a conditionally present field without adding a shell prop or reaching around the shells.
+16. **The shells render no route hook and no provenance.**
+    The page owns the route; `normalizeMembership` discards a `from` key, so recording where a copy came from is a data-model change.
+17. **Generic chrome copy is noun-free.**
+    A slot-filled noun cannot carry article or adjective agreement; strings that need a noun arrive pre-localized from the lane.
+18. **AN INSPECTOR COLUMN THAT DOES NOT BOUND ITSELF IS NOT AN INSPECTOR.**
+    The route hands the list frame a definite height, and a frame that does not pass it on leaves every scroll region inside it inert: the panel grows to the height of the whole list, so it is never out of view, never scrolled to, and clicking a row below the fold moves the page by a pixel and shows the GM nothing but the selected ring.
+    The shipped shared aside cannot fail this way because it is a sibling of the content column inside a clipped body, so a scope that draws its own column matches that property as well as the width.
+    The gate measures it at a FULL PAGE of rows, because a fixture short enough to fit the viewport cannot tell a bounded column from an unbounded one.
+19. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
+    `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
+    The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
 
 ### GM Travel Route
 
@@ -1973,7 +2239,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.modifiers` library.
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
 Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
@@ -2044,7 +2310,7 @@ It renders the **Combination rule** as one `RadioCardGroup` of four options in `
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
 The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
 
-**NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, System settings › Modifiers.
+**NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, World › Rules & Resources › Modifiers (issue 1311; it was System settings › Modifiers until the library moved to world scope).
 Crafting used to carry an entry editor here, which made the Checks screen a second editor for a system-level library and made salvage and gathering second-class states of that asymmetry; two editors for one array is how two screens come to disagree about which wrote last.
 **Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
 The Checks saver carries no library half at all, so the removal is structural rather than a hidden control.
@@ -2076,7 +2342,7 @@ There is no longer a **"Default modifiers"** sub-heading and no standing intro s
 The intro sits **ABOVE the rows it governs**, not below the rule grid.
 It states what switching an entry on MEANS under the rule the GM just chose, so it belongs where that switching happens; below the grid it landed far under the controls it explains and read as a footnote about the pick cap.
 The rule grid re-renders it the moment the rule changes, so its position cannot leave it describing a rule the GM is about to change.
-The **empty-library state is ONE sentence on all three activities** (issue 1117): it names System settings › Modifiers, because no activity here has an add button and "Add one" would be an instruction this screen cannot carry out.
+The **empty-library state is ONE sentence on all three activities** (issue 1117): it names World › Rules & Resources › Modifiers, because no activity here has an add button and "Add one" would be an instruction this screen cannot carry out.
 
 ### The system Modifiers library — the ONE authoring surface (issue 1117)
 
@@ -2222,6 +2488,33 @@ The GM component surfaces: the component browser and the component editor.
     Because that exit unmounts the panel, the completion message is the surviving on-screen feedback and reports what happened — components deleted, recipes rewritten, and, when non-zero, recipes disabled — while a write that deleted nothing reports no success and leaves the selection intact.
     The keyboard is returned to the studio's toolbar and that same sentence is then announced through the manager's live region, per Emptying a bulk selection above.
     The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component, worded in the FUTURE and gated on its own count so the commonest single delete of all — referenced by no recipe — states neither nought.
+12. The component editor carries a **Complications** authoring section (`data-models/spec.md` § Component requirements 19-25), authoring the component's `complications` list.
+    Each complication authors its name, severity, audience, description, the activities it applies to, how its conditions combine, the condition set, and the two optional effects — a dice expression rolled to chat, and a script macro.
+    Editing one marks the component draft dirty and survives Save and reload, on the component draft's OWN signature rather than on the salvage draft's, because `complications` is a top-level field and a component with salvage disabled must still be able to author one.
+    The macro picker's options are the system's already-filtered script-macro list rather than a new projection, and a dropped macro that is not a script macro is REJECTED at the drop with a stated reason rather than stored to fail later.
+    The section mints client-side complication ids through an INJECTED mint with a Foundry `randomID` fallback, and never through `Math.random()`.
+13. **The Complications section has its own visibility gate: it renders only when the SYSTEM resolves at least one activity progressively.**
+    A complication has no moment to fire in a system with no progressive resolution anywhere, and offering a GM a consequence that can never happen is worse than offering none.
+    The gate is ONE predicate owned by the section, not a prop a host could forget to compute.
+    Within the section an activity the system does not resolve progressively is still AUTHORABLE and is annotated as such: the complication is stored and will not fire, and saying so at authoring time is the point of the annotation.
+    A check-trigger option is labelled by its OWNING activity, because a trigger id names a trigger in exactly one activity's id space (`data-models/spec.md` § Component requirement 24) and two identically-named triggers would otherwise be indistinguishable.
+14. **The trigger sentence is one localization unit.**
+    The one-line summary of when a complication fires and what it does — _"When the award is missed or 1d20 = 1 · rolls 2d6, runs Shrapnel Burst"_ — is generated by a SINGLE shared builder and rendered in three places: the authoring row, the Component Studio's read-only salvage strip, and the Recipe Studio's stage strip.
+    Three call sites joining clauses by hand is three chances to disagree about the conjunction, the operator glyph and the no-trigger case.
+    Every clause, the `and` / `or` conjunction, the effect tail and the never-fires sentence are their own localized strings, and the comparator glyph comes from the shared operator table rather than a restated map.
+    The row clips the sentence rather than wrapping it, so it MUST carry the full sentence as a title, or a longer localized form is invisible past roughly sixty characters.
+15. **The section states what a complication fires ON, and discloses what it does not cover.**
+    Its copy says a complication fires when the component is PRODUCED as a stage of a progressive result — a progressive craft, salvage or gathering — and that it does NOT fire when the component is itself salvaged or spent.
+    That second case is real and is deferred to issue 1287, so the copy discloses it rather than letting a GM author a complication for a moment this build never reaches.
+    The copy says nothing about a player's ability to read world data: `visibility: 'gmOnly'` is a DISCLOSURE guarantee rather than a confidentiality one (`data-models/spec.md` § Component requirement 23), and the place to state that limit is the specification and the field documentation, not a line of editor chrome that would read as a warning about this component.
+16. **Both GM read-only complication strips read the UNREDACTED authored list.**
+    The Component Studio's progressive salvage rows and the Recipe Studio's progressive stage cards each render a read-only complication strip for the component the ROW REFERENCES — never the component being edited — fed by the same component projection the row's read-only difficulty badge reads.
+    They MUST NOT be fed from the PLAYER forecast projection: that projection filters to `visibility: 'visible'` and the authored default is `gmOnly`, so a GM strip fed from it would list nothing for exactly the complications a GM authors by default.
+    Each strip is filtered to the ACTIVITY its surface represents, because a complication enabled only for crafting says nothing about a salvage stage and listing it there would tell the GM a yield carries a consequence it does not.
+    **Neither strip may relax the joined stage-row rule the two studios share**, because that join is deliberate and a change there re-shapes every progressive stage row in BOTH.
+    The Component Studio's salvage strip is therefore a SIBLING of the row — a tucked, indented, left-ruled band that is simply the stage list's next child, marked as presentational so a screen reader does not count one more stage than the award loop spends down.
+    The Recipe Studio's strip sits INSIDE the stage card, and does so through a wrapper that participates in layout ONLY when the strip has something to draw, plus an additive alignment rule scoped to rows that actually draw one.
+    Both routes satisfy the same requirement: a stage row in a system that authors no complication renders exactly as it did before this feature.
 
 ## Step Editor
 
@@ -2508,6 +2801,17 @@ The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage E
   A cap applied to the salvage service alone would let a 40-row selection salvage 25 and destroy all 40, which puts the unbounded behaviour on the destructive path.
   The service keeps its own `bulkLimit` refusal as a defensive backstop that the selection bound makes unreachable through the UI.
 - A run may push older entries out of the 50-entry salvage history; the history is a convenience log, not an audit record.
+- **Component complications are collected onto the aggregate card and relayed in BATCH, never per row.**
+  Each row is its own resolution and fires its own complications, but the run posts one aggregate card and **zero** per-row complication messages, while still running every row's macro.
+  The batch is keyed on the addressed `(craftingSystemId, actorUuid)` pair, which is the relay's unit because both are GM-side authorization inputs (`recipes-and-steps/spec.md` § Complication Macros).
+  An ordinary run addresses one pair and relays **one** message; a run that spans actors or systems relays one per distinct pair, bounded above by the 25-target selection cap stated above.
+  A per-row relay is what is forbidden: it would silently lose the tail of a long run to the GM-side rate limit, on a path the player never sees.
+  Batching also fixes the relay ordering and reduces the de-duplication to one key per pair rather than one per row.
+  The collection rides the BULK CARD model rather than a run record, because a bulk salvage is not one run: each row has its own.
+- The aggregate card's complication block is a **flat fired-complications section on the posted chat card**, rendered by the one renderer all four card builders share and carrying every row's FIRED complications in run order, each attributed by component name because a bulk card lists many components.
+  It is **not** a forecast and has no hidden state: the card is written after the run has committed, from the already-redacted player-visible set (`publicComplications`), so a `gmOnly` complication cannot reach it even when a GM is the acting user.
+  The entries are deliberately **not** de-duplicated across rows: each row is its own resolution, and collapsing two rows that fired the same complication would under-report what happened.
+  The pre-run **forecast** group card is a different surface on a different screen — see § Player Salvage Surface, _Bulk complication forecast_ — and the two must not be conflated: the forecast is drawn before the commit and hidden by it, while this section is written after the run has committed, so a chat card could not be "hidden after the run commits" in any case.
 - A bulk row acts on the **selected** participation when its card is the inspected one, and on the primary otherwise — the same acting-participation rule §Player Salvage Surface states for a single salvage.
 - The listing is **not** reloaded from document hooks while a run is in flight.
   Each item's own item CRUD would otherwise reload the listing under the open panel roughly once per item, since the change subscription's trailing debounce coalesces nothing across items that each take a roll, a message create and up to three flag writes.
@@ -2542,6 +2846,11 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
+- **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
+A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens this dialog and no other — never the subject player's client, and never a relayed one.
+Its chat flavor and its dialog titles are built from the caller's own `label`, defaulted to a **localized activity noun** so that no flavor can render `undefined` and none can render a doubled "check check".
+Its bulk prompt's item count is the caller's **whole batch**, not the usable subset, so a batch in which some formulas cannot roll still reads as the number of things the player queued.
+A dismissal is reported to the caller as `cancelled` with **zero mutation**, which is the property that capability exists to preserve.
 - **Crafting-only "Check modifier" group.**
 When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
 The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
@@ -2591,6 +2900,77 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   It is the single target's actor for a one-actor run and an explicit alias naming the acting user for a multi-actor run, never inferred — an inferred speaker falls through to the controlled tokens on the canvas, so a GM with an unrelated NPC selected would have the card attributed to that NPC.
   A blind run's card is whispered **and** blind, so its own author sees hidden content; that is correct, the in-panel report is their feedback channel, and the blind flag must not be dropped to "fix" it.
   The card is created with **`author`**, not the legacy `user` key the single-salvage poster still passes.
+
+#### The GM-only complication card
+
+Posted to the elected GM alone when a resolution's fired complications reach them over the
+complication relay (`recipes-and-steps/spec.md` § Complication Macros).
+It is built by `buildGmComplicationCardContent`, not by the shared complications renderer the
+four player-facing cards draw: that renderer's row is three player-safe strings on one line,
+and this one additionally says why the complication fired, marks the acting client's
+unverifiable claim as a claim while doing so, reports the GM-side effect roll, and reports a
+macro that was skipped or threw — none of which may ever reach a player surface.
+
+- **A row is a VERTICAL STACK of labelled sections, never a run of columns.**
+  In source order: a head line carrying the complication's name with its severity eyebrow at
+  the right; a muted context line naming the component that carried it and, for a `visible`
+  complication, that the player saw it too; the GM's authored description; then **Why it
+  fired**; then **What happens**; then **Needs your attention**.
+  A section with nothing to say is OMITTED rather than drawn empty — an empty "What happens"
+  heading reads as a consequence that failed to render, and a complication that only narrates
+  legitimately has none.
+  The stack is what the row is FOR: its content is several independent statements about one
+  complication, and the previous single-line treatment hung them off the `<li>` as flex
+  siblings, which rendered a five-letter severity down three lines inside a 140px grid track.
+- **Every rule the GM row adds is reached through the card's `--gm` block modifier**, which no
+  player-facing card emits, so the player complication row and its two shipped rules cannot
+  move.
+  The structural half is asserted in `tests/component-complications-fire.test.js` and the
+  RENDERED half — that the runs stack, that each heading sits above its own facts, and that
+  the severity stays on one line flush right at chat width — in the engine-backed gate in
+  `tests/crafting-chat-card.test.js`, against a negative control with the modifier stripped.
+- **"Why it fired" is re-derived on the GM client, never relayed.**
+  The clause set, the `match` mode and the roll-condition toggle come from the GM's own copy of
+  the `craftingSystems` world setting, exactly like every other disclosure decision this card
+  takes; the acting client contributes only the claimed bucket, which is asked no more than
+  which of the GM's own stage clauses it satisfies.
+  Relaying the acting client's `matchedConditions` is refused: it would be a fourth
+  client-supplied claim on a payload specified as addressing-only, which
+  `resolution-modes/spec.md` § Progressive Awarding turns down by name.
+- **The reason is SOUND, not complete, and never guessed.**
+  Every reason named genuinely contributed to that firing.
+  A clause that may also have contributed but cannot be confirmed from the GM side is omitted
+  rather than asserted, and a firing whose deciding clause cannot be named at all says so in
+  one sentence rather than offering the most likely candidate.
+  Three cases reach that admission and all are real: a `checkTrigger` this side cannot
+  evaluate, a `rollCondition` whose dice this side never saw, and a claimed bucket no enabled
+  stage clause reads.
+- **A claimed outcome is worded as a REPORT; an authored condition is stated flat.**
+  The stage bucket is the acting client's unverifiable claim, so each of its four sentences
+  attributes it — "their game reports the roll falling short here" — rather than asserting it.
+  The attribution lives in the sentence's own grammar rather than behind a separate label,
+  because a "Reported by the acting client" prefix is a phrase a GM has to translate and
+  discharges the same obligation less readably.
+  A condition the GM authored is re-read from their own record and is therefore stated flat.
+- **The consequence roll leads with its TOTAL, under the name the GM gave it.**
+  `Acid damage: 10 (2d6)`, from `effectRoll.label` with the field's own name as the fallback.
+  It is a consequence with no target and nothing to miss, so a `formula = total` form read as
+  though it were the check the complication fired on.
+  A `gmOnly` complication's roll happens on the GM client and states the formula it rolled; a
+  `visible` one's happened on the acting client and reaches this card as a claimed number, so
+  it states its provenance where the formula would otherwise sit.
+- **The card carries NO stage position and no "needed N, rolled M" line**, though both would
+  read well.
+  `resolution-modes/spec.md` § Progressive Awarding rules the position off this surface: its
+  referent is the acting client's ordered list, which this card does not draw and the GM has no
+  view of.
+  The threshold and the check total fail the same test and one more — neither is re-derivable
+  GM-side, because a progressive threshold is a function of the ordered list, that order is the
+  PLAYER's per-user preference and is never exported, and a threshold computed from the GM's
+  authored order would be wrong exactly when the player reordered.
+  Carrying them would make them the fourth and fifth client-supplied claims on an
+  addressing-only payload.
+  "Why it fired" therefore states the outcome in words rather than in numbers.
 
 ### Deferred (this iteration)
 
@@ -2734,7 +3114,10 @@ The salvage deltas are stated at the end of this section; everything else applie
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The extension set is exactly three, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, and an optional **stacked row layout**.
+The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, an optional **stacked row layout**, and an optional per-stage **complication strip**.
+**All four ship.**
+The strip's opt-in is a **tense token** — `off` by default, else `forecast` or `resolved` — and never a caller-supplied snippet, and that spelling is normative rather than incidental: a snippet is defined in the CALLER, so two bodies passing "the same" strip would be two copies of its markup, which is exactly the duplication this shared section exists to prevent.
+A token is sufficient because nothing about the strip varies per caller except the tense, and the tense is the one thing the row data cannot say for itself: an un-fired complication looks identical before a roll and after one that spared it.
 (The per-stage **quantity** opt-in was deleted, not defaulted off: no stage renders a quantity on either surface, consistent with the "result entries carry no quantity" rule.)
 A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
 This exists so a second consumer can add rendering without re-skinning the first.
@@ -2749,6 +3132,53 @@ Stacked, the reorder controls **lead** the row and the stage's identity is a fle
 Every progressive surface, stacked rows included, shows **both** the component's progressive DC ("DC N") and the cumulative threshold ("Reach ≥N"), per the issue #675 ruling and matching `resolution-modes` §Progressive Mode Semantics.
 The "DC N" value is `component.difficulty`, which the GM authors via the stepper titled "This component's Progressive DC"; the **check-level** DC remains nonexistent (the projection resolves it to null, and a component's `dcOverride` does not shift these thresholds).
 
+**The per-stage complication strip.**
+
+`ProgressiveStageList.svelte` takes it as `complications`, the tense token named above, and BOTH shipped bodies pass it: the crafting body passes `forecast` always, and the salvage body passes `resolved` once its run has resolved and `forecast` before that.
+Crafting can pass nothing else, because the fired record lives on the salvage run record and the immediate crafting path writes none.
+It is stated here, in the same section that owns the extension contract, because the projection the strip reads (`forecastComplications`) is shared with the GM authoring surface that fills it, and a strip specified anywhere else would be specified away from the enumeration rule it has to obey.
+
+The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it did before the strip existed, and both bodies pass it so neither gets a private copy of the treatment.
+
+**The data is published on the stage row, and the strip MUST NOT re-derive any of it.**
+Both progressive read-models attach the player projection to the stage rows they already publish — `InventoryListingBuilder._buildSalvage` for salvage and `CraftingListingBuilder._buildProgressiveStages` for crafting — through the one shared `attachStageComplications` helper, so the audience filter, the activity gate and the could-never-fire exclusion are all decided builder-side against the same records the engine fires from.
+A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed; the presence of the DATA is still never the switch, only the caller's opt-in.
+The projection is attached TO the row rather than published beside it because the player's reorder is applied downstream of the builder, and a parallel list keyed by result id would desynchronise at exactly that point.
+Marking the fired tense onto an already-attached list is the paired `markFiredStageComplications`, which only ever MARKS what the forecast already published and can therefore never surface a record the forecast withheld.
+
+- The strip has **two tenses**, and one filter cannot serve both.
+  Before any roll it is a **forecast** — the `visibility: 'visible'` complications this component COULD fire in this activity, read from the player forecast projection, with no roll and no run.
+  After a resolution it additionally marks which of them **fired**.
+- The forecast EXCLUDES a complication that provably cannot fire — one with no enabled clause, and one whose only enabled clause names a check trigger the projected activity's check block does not own — so a count of what could go wrong is not a lie.
+- The fired state is read from the resolution's recorded fired list and is **never re-derived from a stage's missed state**: `match` and the condition roll mean a short stage need not have fired anything, so deriving "fired" from "missed" asserts something untrue about the roll.
+- Under the runless invariant — no run record — **no strip claims fired**, matching the surrounding rule that a body with no run must not invent one and claim every stage fell short.
+- The fired badge lands on the OCCURRENCE the fired record names, and on none of that component's other occurrences, because the record is keyed per stage result id while a row's state chip reconciles per component id.
+- Neither projection may carry `when`, `rollCondition`, `effectRoll` or `macroUuid`: a player must not be shown the trigger, and the macro is not theirs to know about.
+- A stage with several applicable complications renders the FIRST in fire order plus a "+N more" affordance.
+  The inspector column is 300px wide — the documented reason the stacked layout exists — and an unbounded list turns one row into several prose paragraphs.
+- A stage that is both awarded AND fired renders its success state chip **and** the fired band together, the band reading as a consequence of the award rather than a contradiction of it.
+- The strip is a full-bleed band INSIDE the row, so the row becomes a column with today's line wrapped.
+  **That row-structure flip is gated on the strip rendering CONTENT for that stage, not on the extension being passed.**
+  Both bodies pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
+- The band is explicitly NOT draggable.
+  Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
+- The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (§Component Studio requirement 16).
+- **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
+  Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
+  The band's own fill and top rule change with the tense; the tile does not.
+- **The badge's copy is tensed, and a resolved stage does not still forecast.**
+  Before a resolution the badge reads in the future tense ("this can go wrong"); after one, a complication that did NOT fire reads a past-tense negative.
+  A row that still says "this can go wrong" beneath a spent roll asserts something that is no longer true, and the player has no way to tell it from a row that is genuinely still pending.
+  The design prototype does say it — its `fired` flag is derived from a stage being short, so a recovered stage keeps its forecast copy — and this rule deliberately overrides it.
+- **The player row renders the authored DESCRIPTION, and it WRAPS.**
+  The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
+  It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
+  It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
+- **The band is not a drag source and carries no destructive or navigational control.**
+  Pre-roll the salvage list is reorderable and the row IS a drag source, so a mousedown inside the prose would start a drag rather than a text selection.
+  It also carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
+- **The progressive CRAFTING surface is forecast-only.** The fired record is defined on the salvage run record, and crafting has no run record on the immediate path; inventing a second carrier for it is out of scope here.
+
 **Progressive salvage deltas.**
 
 - The award mode is **salvage's own** (`system.salvageCraftingCheck.progressive.awardMode`), authored independently of the recipe's.
@@ -2757,6 +3187,8 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - The player's order is stored under the `salvage:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
+  That holds for the complication surfaces too: no player progressive surface offers a per-stage exclude toggle, an excluded-results list or a hidden-result note.
+  Exclusion would contradict the reconciliation guarantee that a result is never dropped, so the vocabulary is not built rather than built and disabled.
 - The panel MUST state the mode and the flow **rule** as two separate statements: naming the mode ("progressive, ordered") does not tell a player that the roll **stops** at the first result it cannot reach, and stopping is the entire reason the order is worth arranging.
   Neither is a duplicate of the other, and collapsing them loses the mechanic rather than a repetition.
 - Where reordering is permitted, the surface MUST offer a **reset** to the GM's authored order.
@@ -3170,6 +3602,16 @@ The player's route to salvage.
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
+- **Complication disclosure.**
+  The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
+  The projection it reads is attached per stage to `salvage.stages[]` and filtered against salvage's OWN progressive check block, so the ids the forecast filters on are the ids the firing will match against.
+  The fired marks arrive on the store's own `salvageResult`, scoped to the acting `(systemId, componentId)`: that result outlives a selection change, and an unscoped read would badge a DIFFERENT component's stages the moment the salvaged row was released while the result stood.
+  The projection is published only for a progressive salvage, because every other mode resolves without an ordered stage list and so can fire nothing.
+  The audience rules in the rest of this bullet are normative for every projection a player surface may read and for the strip that renders it.
+  A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
+  A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
+  Each occurrence is marked on its own: a component staged twice whose complication fired on both entries renders BOTH strips fired, and one that fired on neither renders neither, because the resolution produces one fired record per firing and the marks follow the records one for one.
+  A component whose only complication is `gmOnly` therefore renders in both GM read-only strips and in neither player surface.
 - **Bulk selection unit.**
   The bulk gesture's unit is the **acting participation**, one unit per row, with no per-row quantity control; a run may span crafting systems and source actors (see §Bulk Salvage Execution).
   Brokenness does **not** block a row from a bulk queue — brokenness is about usability, not salvageability (see §Inventory Tab), and the prototype's "repair before salvaging" would block something Fabricate permits while naming a remedy Fabricate has no action for.
@@ -3177,6 +3619,34 @@ The player's route to salvage.
   Certainty, not resolution mode: `simple` / `routed` / `progressive` is authoring vocabulary a player surface never uses, and the queue row already derives certainty from the row's own yield preview.
   The blocked-reason set and its first-match precedence are `essence`, `recipeItem`, `salvageDisabled`, the three `misconfiguredReason` values (`simpleMultiGroup` / `routedNoFormula` / `progressiveNoFormula`), `toolsUnavailable`, `depleted`.
   These are the already-normative ids rather than a second vocabulary, and a `toolsUnavailable` row names the missing tools.
+- **Bulk complication forecast.**
+  The bulk panel renders a pre-run **"What could go wrong"** block above the queue, titled by a count of what could fire and drawn from the player **forecast** projection.
+  It is drawn in the panel's PRE-COMMIT state only: the forecast is what a player weighs before spending the one gesture that rolls the whole batch, so it is read before the commit control rather than found under it.
+  The block reads that projection **off the queued entry the inventory store publishes** — the same `attachStageComplications` output the single-item panel's stage rows carry, flattened per entry into ordered rows — and re-derives no part of it.
+  The rule that decides what a player may be shown has one owner, and a panel computing any of it a second time is how a `gmOnly` consequence eventually reaches a player; reading the same projection as the stage bands is also what keeps the two screens from disagreeing.
+  `BulkSalvageService.forecast(targets)` is a second, service-side projection of the same rule, published for a caller with no store to read; it is **not** what this block reads.
+  Being a second projection of the SAME rule is binding: it is one entry per stage occurrence too, with no dedupe of its own, and its `count` counts the same things this block's count counts.
+  Only RUNNABLE rows carry a forecast — a blocked row never enters the run, so it can promise neither a yield nor a complication — which is what makes the block inherit the selection cap and every blocked reason by construction rather than through a second filter.
+  A stage no budget can reach contributes nothing, on the yield preview's own rule: a null threshold marks a stage the award loop skips at every budget, and a forecast that listed it would promise a consequence the run cannot deliver.
+  Within a group there is one row per STAGE OCCURRENCE that carries the complication, not one per distinct complication: a component staged twice is two rows at two positions, because a complication is both evaluated AND fired per result entry.
+  Each of those two rows is a consequence the run can actually deliver, independently of the other, so the rows are the forecast's real unit rather than a repetition of one warning.
+  The headline count is a count of the rows the block actually DRAWS, deliberately rather than a de-duplicated tally.
+  That count therefore equals the number of firings this queued entry could produce — it is the same unit the firing rule uses (`resolution-modes/spec.md` § Once per result entry, never once per component), not an approximation of it — and a number in a section eyebrow that disagreed with the rows beneath it would be worse than no number at all.
+  It is a **group card** rather than a flat bulk row because each complication's text is multi-line prose and a bulk row's note does not wrap.
+  It is **hidden once the run commits**, because the fired record is then reported on the aggregate chat card instead (§ Bulk Salvage Execution) and a stale forecast beside a committed outcome reads as a second, contradicting report.
+  The forecast excludes a complication that provably cannot fire, on the same rule § Progressive Stage List states, so the count is not a lie; and it never shows a `gmOnly` complication, on the same audience rule every other player surface obeys.
+  There is **one group card per QUEUED ENTRY** — the component being salvaged — and not one per complication-bearing result component: the queue is what the player selected and what the run acts on, so a block grouped any other way could not be read against the queue directly above it.
+  The rows inside a group are that entry's stages' player-visible complications, in the **player's stored order**, and each row's position badge is its position in that ORDER rather than its index among the rows — a stage that authors no complication leaves a gap, which is what makes the number readable against the ordered list on the single-item panel.
+  Each row states its position, the result it hangs off and that result's DC in **one localized string** in the row's own metadata slot, never as a separate ordinal tile beside the severity tile: an ordinal tile plus a severity tile plus a wrapping name is three leading boxes in the 300px column the stacked stage layout exists to protect.
+  **Every** group card states whose order its positions are numbered against, in **three** states, and it is a per-card statement rather than a heading over the block: a bulk selection can hold one row whose order the GM pinned beside another the player has rearranged, and one heading cannot be true for both.
+  The states are the **player's own** (the rendered order came from their stored preference and differs from the authored one), **arrangeable** (the GM's authored order, which this player may replace), and the **GM's** (the authored order, pinned by `allowPlayerResultReorder: false`).
+  The player's state MUST say the order is **remembered** — it persists and is re-read on every later salvage of that component, and that persistence is the whole reason arranging it is worth a gesture.
+  The arrangeable state MUST name the GM as the order's author AND name the affordance that replaces it: naming only the GM would assert a fixity this player does not have, and naming only the player would be a false claim about their own arrangement.
+  The GM's state states authorship and nothing more — it is neither an error nor a refusal being announced.
+  All three MUST come from the projection rather than be inferred in the panel from the reorder permission and the player-order flag together, which would be the block re-deriving the projection it exists to render.
+  A row with no ordered stage list at all (a `simple` or `routed` row) has **no** provenance — no order exists for anyone to own — and publishes no forecast either, so no card renders that case.
+  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the six-call-site scaffold exists so the second one costs props rather than a component.
+  It renders **no excluded-results note**, on the § Progressive Salvage Deltas rule that no player progressive surface builds any part of the exclusion vocabulary.
 - **Bulk yield preview.**
   The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.
   A no-check `simple` row's results are **guaranteed**; a checked `simple` row's same results are **possible**.
@@ -3540,8 +4010,10 @@ Core's Downtime route reads the surface id `downtime`.
 - A provider is `{ apiVersion: 1, id, tabs, actions?, mount }`.
 The provider declares its own tabs: any ids, at least one of them, rendered in array order.
 Core validates tab SHAPE — a non-empty id, unique within the set, plus a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon — and never tab membership, count, or order.
+A tab may also carry an optional `badge`.
+The tab contract is a **closed key set**: Core refuses a key it does not name, with a deterministic message, exactly as a runtime chrome update does.
 - A tab may carry its own **registered** route chrome: `title`, `subtitle`, `breadcrumb`, and `actionsLabel`, each an optional non-empty localized string.
-Core renders the active tab's chrome as the page title, page subtitle, leaf breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
+Core renders the active tab's chrome as the page title, page subtitle, **tab** breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
 - A tab may carry `actions`, falling back to the provider's own `actions`; each action is `{ id, label, icon?, tooltip?, tone?, primary?, disabled? }` plus exactly one of an `onSelect` function or an absolute `http(s)` `href`.
 Core renders an `href` action as an external anchor with `target="_blank"` and `rel="noopener noreferrer"`, invokes `onSelect` with the mount context plus `actionId`, and contains a throwing handler.
 - **`tone` selects one of Core's own Manager header button treatments** — `primary`, `ghost`, `danger`, or `neutral` — so a companion's Back, Delete and Save render through the same classes as the recipe editor's rather than as a companion-only lookalike.
@@ -3551,10 +4023,10 @@ Core renders an `href` action as an external anchor with `target="_blank"` and `
 - A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
 `tabId` is always one of the provider's own tab ids.
-- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount, setRouteChrome, onRouteReselect, onBeforeNavigate }` and no Core store, document, or component.
+- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount, setRouteChrome, onRouteReselect, onBeforeNavigate, navigateToTab }` and no Core store, document, or component.
 `craftingSystemId` is `null` when no crafting system is selected, and the route stays reachable in that state.
 `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
-**The three runtime channels below are functions on that frozen context and never mutable fields**, because the context's identity is what a remount is keyed on: a chrome update must move the header without moving the context.
+**The four runtime channels below are functions on that frozen context and never mutable fields**, because the context's identity is what a remount is keyed on: a chrome update must move the header without moving the context.
 - **A companion drives Core's own route chrome at runtime, and this REPLACES the earlier requirement that a drill-down render its identity inside the panel.**
 That requirement was ruled on the grounds that route chrome was fixed at registration and that re-registering per drill-down would flash Core's preview and remount the companion.
 Both remain true of re-registration; the ruling is reversed by widening the seam instead, so a companion that opens an editor no longer has to render a back/delete/save header of its own inside the panel — a visible departure from every other Manager screen — and Core's header is what changes.
@@ -3565,13 +4037,20 @@ Every field is optional.
 Each call states the whole runtime chrome, a field is unset by omitting it, and the whole runtime layer is unset with `null` or `{}`, which mean the same thing.
 - **Unsetting falls back rather than clearing.**
 Core resolves each field through the live mount's runtime chrome, then the active tab's registered chrome, then Core's own string, so a companion that never calls `setRouteChrome` renders exactly as it did before the channel existed and one that unsets lands back on its registered chrome.
+- **`breadcrumb` is the one field where the runtime layer EXTENDS the registered layer rather than shadowing it**, and Core SHALL render both as two crumbs.
+A trail is a PATH, so a drill-down belongs BELOW the tab it was reached through rather than in place of it: resolving this field runtime-first left a GM inside a companion's detail reading `World > Downtime > <detail>`, with the tab absent from its own trail and nothing between the route and the leaf.
+The runtime crumb SHALL be suppressed when it equals the tab crumb, so a screen that restates its registered chrome draws one crumb rather than the same word twice.
+Every other field shadows as stated above, and `title` and `subtitle` deliberately so — a detail screen owns what the header calls it.
+- **The tab crumb SHALL return the GM to that tab's own root**, through the same re-activation the rail offers for a click on the sub-item of the tab already on screen, and for the same reason: Core neither knows the level nor could restore it, because the drill-down is inside the companion's own target.
+Core SHALL render that crumb as inert rather than as a control that does nothing when the live mount registered no re-activation handler, or when there is no runtime crumb beneath it — in the second case the tab crumb names the screen the GM is already on.
 An **empty** `actions` array is a statement that this screen has no actions and does not fall back.
 - **Runtime chrome is scoped to one mount and never survives it.**
+A tab **badge** is deliberately the exception on this seam: it is scoped to the REGISTRATION, not to a mount, because its job is to be true while the companion is not mounted.
 It is cleared when the mount ends on every path — a tab change, a route exit, a provider change, a contained fault, or window teardown — so a screen never inherits the chrome describing state a remount has already discarded, and Core's own preview never wears companion copy.
 A call from a context whose mount has ended is refused and changes nothing.
 - **A malformed chrome update is refused with a deterministic message and changes nothing**, exactly as a malformed provider is at registration.
 Validation precedes any state change, so no update is half-applied, and the refusal does not fault the surface or take the Manager down.
-Unlike a provider tab, a chrome update **refuses a key it does not name** rather than ignoring it: a tab is validated once where a companion is watching, while a chrome update happens on a drill-down click where an ignored typo leaves the previous header on screen with nothing to explain it.
+Both a provider tab and a chrome update **refuse a key they do not name** rather than ignoring it, so a mistyped field fails at the call site rather than leaving the previous value on screen with nothing to explain it.
 - **Core renders runtime chrome through its own primitives, not a second set.**
 `status` renders as the Manager's one `Chip` in the same tone Core's own editors use for staged changes, defaulting to the warning tone so a one-field `{ label }` reproduces the "Unsaved" chip exactly.
 `icon` or `image` — mutually exclusive — renders the same medallion identity block the recipe and component editors render, at the same size and through the same classes.
@@ -3608,6 +4087,22 @@ It does not reach a browser reload, a Foundry logout, or any teardown outside th
 It is not consulted on a REMOUNT, whether the companion asked for one through `requestRemount()` or a context value such as the selected crafting system changed, because a remount is not the GM leaving the companion's screen and the companion either asked for it or observes it as a fresh `mount`.
 It is not consulted on re-entering the route or the tab already on screen, which navigate nowhere — re-activating the tab on screen remains `onRouteReselect`'s, and any prompt about the companion's own unsaved work belongs inside that handler.
 For everything this channel does not govern, a companion's own session-scoped handling of its unsaved work remains the only thing standing, unchanged.
+- **A mounted companion may take the GM to another of ITS OWN tabs, through `navigateToTab(tabId)`.**
+A companion could already draw a control naming another of its screens and had no way to reach it, so the control was either absent or dead.
+Core performs exactly the navigation the rail sub-item's own click performs, rather than a second one: asking for the tab already on screen re-activates it through `onRouteReselect` instead of remounting, any other tab is offered to that mount's own `onBeforeNavigate` guard with reason `'tab'` and may still be vetoed, and an allowed move expands the rail group and activates the view.
+It answers `true` when the request was honoured, which includes the re-activation, `false` when it was refused, and a promise of either whenever the guard answers asynchronously.
+- **It reaches this provider's own registered tabs and nothing else.**
+Another provider's surface, a Core route, and an id this provider never declared are all refused, which is the mirror of the rule that the destination is Core's business: a companion may ask for the screens it owns, and Core's routing is not a public control surface.
+Membership is resolved from the REGISTERED provider rather than from whatever Core is currently rendering, so the answer never depends on render state and Core's own fallback tab ids are unreachable through it.
+A call from a context whose mount has ended returns `false` and moves nobody, the same lifecycle rule `setRouteChrome` already has, and for a stronger reason: repainting a header the GM has left is cosmetic, and dragging them off the screen they chose is not.
+- **A navigation asked for while the companion's own guard answer is outstanding is refused.**
+`navigateToTab` called from inside an `onBeforeNavigate` handler's own body, or while a promise that handler returned is still pending, answers `false` and moves nobody.
+It is deliberately NOT folded into the pending-answer sharing above: that rule de-duplicates two navigations CORE raised concurrently, where one GM decision answers both, and here the companion is both the party being asked and the party asking, about a different destination.
+Nesting the inner navigation would re-enter the same guard without bound when a companion always redirects, and would commit the inner route ahead of a veto that is still pending when it redirects conditionally.
+A companion that wants to redirect asks after it has answered, because a redirect is a consequence of the decision rather than part of making it.
+- **A well-formed tab id this provider does not declare answers `false` rather than throwing, and malformed input throws.**
+Membership is a runtime fact that moves under a companion — a provider may re-register with a different tab set, and a conditional tab may not exist yet — so an unknown id is a question a companion may legitimately ask rather than a coding error, and throwing would make Core's own re-registration raise from a companion's correct code.
+A non-string or empty id can never be a runtime question, so it is refused with a deterministic `TypeError` and changes nothing, exactly as a malformed chrome update is.
 - Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
 - Mount and cleanup faults are reported and contained; partial content is cleared, the Core preview becomes the fallback for the whole surface including its rail entries, and a later registration may mount without navigating away.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
@@ -3617,7 +4112,8 @@ Core's premium padlocks and rail note advertise Core's preview and are not rende
 - The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on any surface id, **in either registry**.
 - The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too, and **a companion that registers only a player-window surface lights it as well**.
 The free module renders nothing in that slot, and the title bar names no crafting system: the rail's crafting-system selector already does.
-- The rail's Downtime `PREMIUM` chip is prominent while Core's preview holds the surface and MUTED, not removed, while a provider holds it, so the loud signal is stated once and the rail still names the premium route.
+- The rail's Downtime `PREMIUM` chip is prominent while Core's preview holds the surface and MUTED, not removed, while a provider holds it — except while a nonzero Downtime rollup shows, which takes the parent row's single trailing track for as long as it shows — so the loud signal is stated once and the rail still names the premium route.
+The exception is bounded to that one row and that one state, and it costs the GM no information: a rollup requires a provider registered on a Manager surface, and the title bar's badge above is rendered whenever at least one provider is registered in either registry, so the installed fact is stated in the window throughout.
 The Downtime rail entry's tooltip states the installed condition rather than an unlock offer whenever a provider holds the surface.
 - Fabricate publishes observational hooks — `fabricate.manager.navProviderRegistered`, `fabricate.manager.navProviderUnregistered`, `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted`, and `fabricate.manager.surfaceTabChanged` — exposed on `game.fabricate.api.HOOKS.manager`.
 A listener's return value is ignored and nothing a listener does changes what the Manager renders.
@@ -3631,7 +4127,31 @@ They stay native `button` elements carrying `aria-current`, and they do not take
 **The region takes the active tab's visible `label` as its name**, by pointing `aria-labelledby` at the label element inside the rail sub-item rather than at the sub-item itself, because a landmark inherits the whole accessible name of what it points at and the sub-item's name is an action rather than a screen.
 That label element exists only while the Downtime rail group is expanded, so the panel's accessible name depends on the rail lock below staying in force; removing the lock without also repointing this labelling breaks the region's name, not merely its keyboard reach.
 - **A provider's `label`, `accessibleName` and `tooltip` all land on the rail sub-item**, which in provider mode is the only control naming the active screen: `label` is its visible text, `accessibleName` is its `aria-label` and therefore replaces that text as its accessible name, and `tooltip` is its native tooltip, pointer-visible rather than keyboard-visible.
+A badge's `accessibleName` follows the same rule as `label`: it is final display text, rendered verbatim, and is never treated as a lang key.
+This is newly stated for the Manager registry, which has not previously carried the verbatim rule in canonical text for any field.
 `accessibleName` and `tooltip` remain required, because Core's preview strip consumes the same two fields as an accessible name and a keyboard-visible tooltip.
+- **A provider tab may declare a badge**, `{ count, accessibleName }`, where `count` is a non-negative safe integer and `accessibleName` is a non-empty localized string.
+Both are required when a badge is present, and no other key is accepted.
+- **Core renders a badge on the Manager rail sub-item through its own record-count marker**, a bare mono numeral in the row's trailing track, in provider mode only.
+`count: 0` renders `0`: a stated zero is a positive statement about a tab, distinguishable from a tab that stated no count at all.
+- **A badge is announced as a DESCRIPTION, never as a name.**
+The badge element carries `role="img"` and the badge's `accessibleName`, and the sub-item points `aria-describedby` at it; the sub-item's own accessible name remains the tab's `accessibleName`.
+No `aria-describedby` is present when no badge is rendered, and the badge element is never a descendant of the element that names the companion's panel region.
+- **`game.fabricate.api.managerExtensions.setWorldNavTabBadge(surfaceId, tabId, badge)` changes a badge at runtime, with no mount and no remount.**
+It returns `true` when the surface is held by a provider that declares that tab and `false` otherwise, storing nothing.
+A malformed badge throws a `TypeError` and changes nothing, and validation precedes the liveness check, so the refusal is identical whoever sent it.
+- **A badge resolves through three layers, in one order**: the runtime badge, then the tab's registered badge, then none.
+`null` clears the runtime layer and restores the registered badge; an explicit `{ count: 0, accessibleName }` is a positive zero and does not fall back.
+- **A runtime badge is scoped to the registration and dropped with it.**
+It survives mount, unmount, tab change, route change and window state, and it does not survive its provider leaving the registry, so a re-registered provider starts from its own registered badges.
+- **The Downtime rail parent carries a rollup while its children are hidden.**
+Core sums the **resolved** badge count once per tab the rail renders — never the registered and runtime layers added together — suppresses the mark entirely at zero, and renders it as the rail's issue-summary pill with `role="img"` and a Core-owned name that states the total generically, because Core cannot compose a companion's localized noun across tabs.
+It renders in provider mode only, and only while the group is collapsed **or** the rail is collapsed; the collapsed rail is the state in which it is the group's only remaining signal, so neither condition alone is sufficient.
+While it shows it takes the parent's single trailing track, and the rail's muted `PREMIUM` chip is not rendered — the carve-out recorded against the chip rule above.
+- **The parent row's own accessible name states the rollup while the rollup shows**, because that row's `aria-label` replaces its subtree and would otherwise silence the mark, and it reverts to the plain route name in every other state.
+The composed name is one localized string taking the row's label and the total as tokens, so no locale is forced into English word order and the row's noun has exactly one source.
+- **The player navigation seam is unchanged by all of the above.**
+It gains no badge, its tab contract stays permissive, and §Player Navigation Extension's "no premium signal in any state" ruling is untouched.
 - **Entering the route in provider mode scrolls the active Downtime sub-item into view**, so the route's first visible state shows the current screen's rail item rather than none of the group; it scrolls by the smallest amount that reveals it, and repeats only when the active tab changes.
 - **Focus recovery on a provider change is mode-aware.**
 When a registration, deregistration or contained fault removes the node that held focus, and focus was inside the route's panel, Core focuses whichever element names the active tab in the mode now live: the panel region in provider mode, and Core's own tab button in core-fallback.

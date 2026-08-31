@@ -61,13 +61,24 @@ export const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
  *
  * Pass-through is right for `ic` and for any other real V14 mode key, but it also means
  * a token that is NEITHER a legacy key nor a V14 mode key reaches `applyMode`, which
- * THROWS on one. Nothing in this function catches that. Today the single call site —
+ * THROWS on one. Nothing in this function catches that. Today every call site sits inside
+ * a `try`/`catch` that logs and gives up on the message —
  * `Fabricate#_postBulkSalvageChatMessage`, reached through
- * `BulkSalvageService#_postAggregateCard` — sits inside a `try`/`catch` that logs and
- * returns `posted: false`, so a bad token costs the run its chat card and never the
- * awards it already made. That containment is the CALLER'S and a future caller must
- * bring its own; calling this on a naked path would let a chat-visibility token abort
- * whatever it is embedded in.
+ * `BulkSalvageService#_postAggregateCard`, and `Fabricate#postGmComplicationCard` — so a
+ * bad token costs the run its chat card and never the awards it already made. That
+ * containment is the CALLER'S and a future caller must bring its own; calling this on a
+ * naked path would let a chat-visibility token abort whatever it is embedded in.
+ *
+ * ## NEITHER applier present is a THROW, not a shrug
+ *
+ * `applyRollMode` is called unguarded on purpose. A build exposing neither applier is a
+ * build in which this function cannot establish visibility at all, and every caller wants
+ * the same answer to that: post nothing. An optional call would instead return `chatData`
+ * unchanged and the caller would create the message with core's own default, which is
+ * PUBLIC — so a rename or removal in a future Foundry would turn a whispered GM card and a
+ * blind bulk run's result table into table-wide chat, silently. Failing closed puts that
+ * into the caller's `catch`, which is where every other failure on these paths already
+ * lands.
  *
  * ## The caller must set `chatData.speaker` FIRST
  *
@@ -89,6 +100,6 @@ export function applyBulkChatVisibility(chatData, rollMode) {
     ChatMessage.applyMode(chatData, V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode);
     return chatData;
   }
-  ChatMessage.applyRollMode?.(chatData, rollMode);
+  ChatMessage.applyRollMode(chatData, rollMode);
   return chatData;
 }

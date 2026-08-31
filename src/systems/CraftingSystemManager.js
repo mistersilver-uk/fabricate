@@ -22,6 +22,7 @@ import {
   normalizeComponentCategory,
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
+import { authoredComplications } from '../utils/componentComplications.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import {
   advanceDefinitionRevision,
@@ -64,11 +65,9 @@ import {
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
-  isRollExpression,
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
-  resolveModifierBounds,
 } from './checkModifierResolver.js';
 import {
   craftingDataChange,
@@ -79,6 +78,7 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -89,8 +89,11 @@ import {
   REVISION_SCOPES,
   RevisionRegistry,
 } from './revisionTokens.js';
+import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
+import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -112,6 +115,164 @@ const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
 const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
 // `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
+
+/**
+ * Resolve an injected store seam, whether it was supplied as the store itself or as a lazy getter.
+ * Lazy is the production shape: `game.fabricate` is not populated when the manager is constructed.
+ *
+ * TOTAL. A getter that throws answers `null`, i.e. an UNKNOWN basis, rather than taking the
+ * normalizer down — the issue-970 failure mode, where a throw inside `_normalizeSystem` propagates
+ * through `hydrate` and out of `initialize()`.
+ *
+ * @param {object|(() => object|null)|null|undefined} seam
+ * @returns {object|null}
+ */
+function _resolveStoreSeam(seam) {
+  if (!seam) return null;
+  try {
+    return typeof seam === 'function' ? (seam() ?? null) : seam;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One scope store's published corpus, or `null` when there is no readable world half.
+ *
+ * `_resolveStoreSeam` catches a throwing GETTER; this also catches a throwing `corpus()`.
+ * `## Scoped Entity Definitions` requirement 16 says an UNREADABLE world half must answer the
+ * in-system array ITSELF, and without this the manager spelling would take
+ * `getComponentsForSystem` down where the module spelling degrades. The two share one body
+ * precisely so they cannot disagree, and this closes the last place they could.
+ *
+ * @param {object|(() => object|null)|null} seam
+ * @returns {object|null}
+ */
+function _resolveStoreCorpus(seam) {
+  try {
+    return _resolveStoreSeam(seam)?.corpus?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Valid Id Basis for ONE world-scope entity type (issue 1359, epic 1357): the union of the
+ * world roster and the system's surviving in-system array, or `null` when neither can vouch for
+ * an id.
+ *
+ * MIRRORS `_libraryBasis` EXACTLY, and every clause of it is load-bearing here for the same
+ * reason. The world half counts when `isSeeded('entities')` — the sub-key the id set is actually
+ * drawn from, never the aggregate no-argument form, which ORs across sub-keys and would report
+ * seeded on the strength of a sibling. The legacy half counts only when the in-system array is
+ * NON-EMPTY: an empty array is a legacy KEY, not a legacy corpus — it vouches for nothing while
+ * licensing a full prune. The answer is `null` — prune nothing — only when BOTH are absent.
+ *
+ * Deriving it from `isSeeded()` alone would return `null` on every unmigrated client for every
+ * system, silently disabling every reference prune in the corpus for a release; deriving it from
+ * the in-system array alone is the #1313 defect this work exists to avoid.
+ *
+ * NOT MEMBERSHIP-FILTERED, and that is the difference from the READ union
+ * (`resolveComponentScope` and its siblings). `## Scoped Entity Definitions` makes an absent
+ * membership record a REFUSAL, never a PRUNE, so a reference to a world entity this system is not
+ * a member of must survive normalization and be refused at use. Filtering here would convert that
+ * refusal into a silent, persisted deletion on the first normalize.
+ *
+ * @param {object|null} store The world scope store, or `null`.
+ * @param {unknown} legacy The system's surviving in-system array.
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
+function _scopeEntityBasis(store, legacy) {
+  const seeded = store?.isSeeded?.('entities') === true;
+  const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
+  if (!seeded && !legacyList) return null;
+  const ids = _idSet(legacyList ?? []);
+  if (seeded) for (const id of store.entityIds()) ids.add(id);
+  return ids;
+}
+
+/**
+ * The Valid Id Basis for ONE CATEGORY VOCABULARY — the allowance
+ * `normalizeCategoryIconMap` prunes an icon map against.
+ *
+ * THE SHARPEST OF THE SEVEN PRUNE SITES. The epic's migration empties
+ * `system.componentCategories`, so an ungated icon prune on a client whose world vocabulary has
+ * not been written deletes EVERY authored category icon — and the normalizer is a whitelist
+ * rebuild, so the loss persists on the next save.
+ *
+ * The world half is `fabricate.worldVocabulary`, which epic 1357 registers in PR 7 and which this
+ * change deliberately does not: a persisted key whose values carry no canonical meaning is a live
+ * shape with no description. Until it exists there is no world store to consult, so this is `null`
+ * exactly when the in-system vocabulary is empty. The signature takes the NORMALIZED list so the
+ * basis and the emitted vocabulary cannot disagree.
+ *
+ * @param {string[]} vocabulary The system's normalized category vocabulary.
+ * @returns {string[]|null} `null` means UNKNOWN — prune nothing.
+ */
+function _vocabularyBasis(vocabulary) {
+  return vocabulary.length > 0 ? vocabulary : null;
+}
+
+/**
+ * The names an icon map's entries may carry, given its vocabulary basis.
+ *
+ * With a KNOWN basis this is today's allowance verbatim: the reserved `general` bucket plus the
+ * vocabulary. With an UNKNOWN one it is the map's OWN keys, so `normalizeCategoryIconMap` still
+ * lower-cases every key and sanitizes every icon value — both non-destructive shape rules — while
+ * PRUNING NOTHING.
+ *
+ * @param {unknown} icons The raw icon map.
+ * @param {string[]|null} vocabulary The vocabulary basis.
+ * @returns {string[]}
+ */
+function _iconAllowance(icons, vocabulary) {
+  if (vocabulary !== null) return ['general', ...vocabulary];
+  return icons && typeof icons === 'object' && !Array.isArray(icons) ? Object.keys(icons) : [];
+}
+
+/**
+ * The Valid Id Basis for ONE library: the union of the world list and the system's surviving
+ * legacy copy, or `null` when neither can vouch for an id.
+ *
+ * PER LIBRARY, because the two are independent. A setting payload carrying only `modifiers` says
+ * nothing about whether a prerequisite has ever been authored, so an aggregate seeded flag would
+ * hand this a real, empty, PRUNABLE basis derived from a key that is simply absent.
+ *
+ * A legacy copy counts only when it is NON-EMPTY. An empty array is a legacy key, not a legacy
+ * library: it vouches for nothing while licensing a full prune, and every pre-1308 save emitted
+ * one, so treating its presence as a basis would arm the exact failure this whole mechanism
+ * exists to prevent.
+ *
+ * @param {object|null} store
+ * @param {'characterPrerequisites'|'modifiers'} key
+ * @param {() => Array<object>} readWorld
+ * @param {unknown} legacy
+ * @returns {Set<string>|null} `null` means UNKNOWN — prune nothing.
+ */
+function _libraryBasis(store, key, readWorld, legacy) {
+  const seeded = store?.isSeeded?.(key) === true;
+  const legacyList = Array.isArray(legacy) && legacy.length > 0 ? legacy : null;
+  if (!seeded && !legacyList) return null;
+  return _idSet(seeded ? readWorld() : [], legacyList ?? []);
+}
+
+/**
+ * Collect the trimmed ids of every entry across the given lists into one Set.
+ *
+ * @param {...Array<{id?: unknown}>} lists
+ * @returns {Set<string>}
+ */
+function _idSet(...lists) {
+  const ids = new Set();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+      if (id) ids.add(id);
+    }
+  }
+  return ids;
+}
 
 export class CraftingSystemManager {
   /**
@@ -164,6 +325,190 @@ export class CraftingSystemManager {
     this._isActiveGM =
       seams.isActiveGM ??
       (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
+    // Issue 1308: the WORLD character libraries, which since the move are the source of the two
+    // id sets this manager prunes references against. Optional by design — a fixture that
+    // injects none gets an UNKNOWN basis and prunes nothing, which is the safe direction. See
+    // `_characterLibraryBasis`.
+    this._characterLibrariesStore =
+      seams.characterLibrariesStore ??
+      (() => globalThis.game?.fabricate?.getCharacterLibrariesStore?.() ?? null);
+    // Issue 1359 (epic 1357): the three WORLD-SCOPE entity stores. Optional by design, exactly as
+    // the libraries store above is — a fixture that injects none gets an UNKNOWN basis and prunes
+    // nothing, which is the safe direction. Each defaults to a LAZY getter because
+    // `game.fabricate` is not populated when this manager is constructed, and the accessors it
+    // reads are deliberately NOT `_requireReady()`-gated: optional chaining absorbs an absent
+    // accessor but not a throw. See `_scopeBasis`.
+    this._componentScopeStore =
+      seams.componentScopeStore ??
+      (() => globalThis.game?.fabricate?.getComponentScopeStore?.() ?? null);
+    this._essenceScopeStore =
+      seams.essenceScopeStore ??
+      (() => globalThis.game?.fabricate?.getEssenceScopeStore?.() ?? null);
+    this._toolScopeStore =
+      seams.toolScopeStore ?? (() => globalThis.game?.fabricate?.getToolScopeStore?.() ?? null);
+  }
+
+  /**
+   * Resolve the injected character-libraries store, whether it was supplied as the store itself
+   * or as a lazy getter. Lazy is the production shape: `game.fabricate` is not populated when
+   * this manager is constructed.
+   *
+   * @returns {object|null}
+   * @private
+   */
+  _resolveCharacterLibrariesStore() {
+    return _resolveStoreSeam(this._characterLibrariesStore);
+  }
+
+  /**
+   * Build the VALID ID BASIS for one system's reference pruning — the id sets
+   * `_normalizeSystem` and `upsertTool` check `prerequisites.ids` and `defaultModifierIds`
+   * against before dropping anything.
+   *
+   * RETURNS `null` FOR EACH SET IT CANNOT KNOW TO BE COMPLETE, and `null` means prune nothing.
+   * `DOMAIN.md`'s Valid Id Basis rule is that a destructive pass runs only when its basis is
+   * known-complete, and it names this exact failure — a pass handed an empty set for an entity
+   * class prunes every key scoped to that class on every run, reached by an omitted ARGUMENT
+   * rather than by an incomplete corpus.
+   *
+   * THE BASIS IS A UNION of the world library and the system's own surviving legacy copy, and
+   * the union is what makes it known-complete rather than merely non-empty. Before the 1.28.0
+   * migration lifts them, the legacy in-system entries ARE the live corpus, so including them is
+   * derivation-from-corpus. It is emphatically NOT a `migrationVersion` check, which
+   * `DOMAIN.md` forbids outright: "this client did not run the migration" is true on every
+   * non-primary client on every boot. One formulation covers every dangerous state at once —
+   * the unmigrated player or assistant GM, the deferred or aborted migration pass, a
+   * copy-mode import whose incoming system still carries its own libraries, and `upsertTool`.
+   *
+   * WHY AN EMPTY WORLD LIBRARY IS NOT ENOUGH TO PRUNE ON. Foundry returns the registered
+   * default for a world setting that was never written, so an unmigrated world reads as two
+   * empty arrays — indistinguishable, after normalizing, from a GM who deliberately emptied
+   * both. The store keeps the raw key presence for exactly this decision, so "never written"
+   * yields an unknown basis while "written empty" yields a real, empty, prunable one.
+   *
+   * @param {object} system The system being normalized, still carrying any legacy copy.
+   * @returns {{prerequisiteIds: Set<string>|null, modifierIds: Set<string>|null}}
+   * @private
+   */
+  _characterLibraryBasis(system) {
+    const store = this._resolveCharacterLibrariesStore();
+    return {
+      prerequisiteIds: _libraryBasis(
+        store,
+        'characterPrerequisites',
+        () => store.listCharacterPrerequisites(),
+        system?.characterPrerequisites
+      ),
+      modifierIds: _libraryBasis(
+        store,
+        'modifiers',
+        () => store.listModifiers(),
+        system?.modifiers
+      ),
+    };
+  }
+
+  /**
+   * Build the VALID ID BASIS for one system's WORLD-SCOPE reference pruning (issue 1359, epic
+   * 1357) — the id sets `_normalizeSystem` and the five mutation-time bypass sites check
+   * references against before dropping anything, plus the two category vocabularies the icon maps
+   * are pruned against.
+   *
+   * RETURNS `null` FOR EACH BASIS IT CANNOT KNOW TO BE COMPLETE, and `null` means PRUNE NOTHING.
+   * NO CALL SITE MAY DEFAULT ONE TO `new Set()`: that is the same defect as an omitted argument,
+   * and it is exactly what `DOMAIN.md`'s Valid Id Basis rule forbids — a pass handed an empty set
+   * for an entity class prunes every key scoped to that class on every run.
+   *
+   * `validEssenceIds` therefore changes contract from "always a `Set`" to `Set|null` at every one
+   * of its call sites. `_normalizeEssenceQuantities` already tests `instanceof Set`, and that test
+   * becomes LOAD-BEARING rather than merely defensive.
+   *
+   * THIS IS NOT THE READ UNION. See `_scopeEntityBasis`: the basis is deliberately not
+   * membership-filtered, because an absent membership record is a refusal and never a prune.
+   * `resolveScopedComponents` and its siblings answer the other question.
+   *
+   * @param {object} system The system being normalized, still carrying any legacy in-system array.
+   * @returns {{componentIds: Set<string>|null, essenceIds: Set<string>|null,
+   *   toolIds: Set<string>|null, componentCategories: string[]|null,
+   *   recipeCategories: string[]|null}}
+   * @private
+   */
+  _scopeBasis(system) {
+    return {
+      componentIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._componentScopeStore),
+        system?.components ?? system?.managedItems ?? system?.items
+      ),
+      essenceIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._essenceScopeStore),
+        system?.essenceDefinitions ?? system?.essences
+      ),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      componentCategories: _vocabularyBasis(
+        normalizeCustomComponentCategories(system?.componentCategories)
+      ),
+      recipeCategories: _vocabularyBasis(normalizeCustomRecipeCategories(system?.categories)),
+    };
+  }
+
+  /**
+   * THE READ UNION for one system's components (issue 1359, epic 1357): the world components it is
+   * a MEMBER of, resolved through the three-layer resolver, unioned with its surviving in-system
+   * array, world winning on an id collision.
+   *
+   * WIRED SINCE issue 1370: `getComponentsForSystem` and the rest of the non-UI reader set enter
+   * through this answer, while `_normalizeSystem` still emits `components` exactly as it does
+   * today and `## CraftingSystem` requirement 36 keeps that array authoritative.
+   *
+   * MEMOIZED on `(world corpus, system array)` — never on a system id. See
+   * `getScopedDefinitionUnion`.
+   *
+   * @param {object|string} system The system record, or its id.
+   * @returns {Array<object>}
+   */
+  resolveScopedComponents(system) {
+    return this._resolveScopedUnion(system, this._componentScopeStore, 'components');
+  }
+
+  /**
+   * THE READ UNION for one system's essence definitions. See {@link resolveScopedComponents}.
+   *
+   * @param {object|string} system
+   * @returns {Array<object>}
+   */
+  resolveScopedEssences(system) {
+    return this._resolveScopedUnion(system, this._essenceScopeStore, 'essenceDefinitions');
+  }
+
+  /**
+   * THE READ UNION for one system's tools. See {@link resolveScopedComponents}.
+   *
+   * @param {object|string} system
+   * @returns {Array<object>}
+   */
+  resolveScopedTools(system) {
+    return this._resolveScopedUnion(system, this._toolScopeStore, 'tools');
+  }
+
+  /**
+   * The shared body of the three read unions: resolve the system, resolve the injected store, then
+   * hand both to the ONE implementation in `scopedEntityReads.js`.
+   *
+   * IT DELEGATES RATHER THAN MIRRORS, and that is load-bearing rather than tidy. This method used
+   * to carry its own `if (!record?.id) return []` branch and its own memo call; delegating only
+   * the BUILD would leave the manager spelling reallocating and blanking an id-less record while
+   * the module spelling passed every arm of the unknown-half rule. Both spellings answer the same
+   * object for the same input because there is only one body left.
+   *
+   * @param {object|string} system
+   * @param {object|(() => object|null)|null} seam
+   * @param {'components'|'essenceDefinitions'|'tools'} field
+   * @returns {Array<object>}
+   * @private
+   */
+  _resolveScopedUnion(system, seam, field) {
+    const record = typeof system === 'string' ? this.getSystem(system) : system;
+    return resolveScopedEntityRead(record, _resolveStoreCorpus(seam), field);
   }
 
   /**
@@ -268,12 +613,28 @@ export class CraftingSystemManager {
     );
     // Normalize the shared prerequisite library before Tools so every payload path
     // (settings, import, copy, or direct registration) applies the same ID invariant.
-    const characterPrerequisites = normalizeCharacterPrerequisiteList(
+    // Issue 1308: both libraries are WORLD scope now, so the basis this pass prunes references
+    // against comes from `_characterLibraryBasis` — a union of the world library and any legacy
+    // in-system copy — and either half may be `null`, meaning "not known to be complete, prune
+    // nothing". Deriving it from `system.characterPrerequisites` alone, as this did before the
+    // move, would silently strip every tool prerequisite in any world that has not migrated.
+    const { prerequisiteIds: validToolPrerequisiteIds, modifierIds: validCatalogueIds } =
+      this._characterLibraryBasis(system);
+    const _legacyModifiers = normalizeModifierLibrary(system.modifiers);
+    const _legacyCharacterPrerequisites = normalizeCharacterPrerequisiteList(
       system.characterPrerequisites,
       () => foundry.utils.randomID()
     );
-    const validToolPrerequisiteIds = new Set(characterPrerequisites.map((entry) => entry.id));
-    const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
+    // Issue 1359 (epic 1357): the WORLD-SCOPE Valid Id Basis. Derived from the RAW system, so the
+    // legacy half is judged on what was actually stored rather than on what this normalizer has
+    // already rebuilt, exactly as `_characterLibraryBasis` above is. `essenceIds` is `Set|null`
+    // from here on and MUST NOT be defaulted to an empty Set — see `_scopeBasis`.
+    // The essence half is derived from the ALREADY-NORMALIZED definitions rather than the raw
+    // ones, because that is precisely the set this pass used to prune against: normalization mints
+    // an id for an entry that lacks one and drops an entry it cannot repair, so a raw-derived
+    // legacy half would differ from today's behaviour by exactly those entries.
+    const scopeBasis = this._scopeBasis({ ...system, essenceDefinitions });
+    const essenceIds = scopeBasis.essenceIds;
     // Salvage-normalization context (issue 764), HOISTED above the component map so the
     // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
     // and Simple check formula flag. Both derivations are component-independent, so
@@ -287,8 +648,7 @@ export class CraftingSystemManager {
     // `1.22.0` and `1.23.0` — and is NOT read from either old location here. The
     // migrations and the export-payload upcast are the paths a legacy payload arrives
     // through, and a silent read-alias would make the relocation unobservable.
-    const modifiers = this._normalizeModifierLibrary(system.modifiers);
-    const validCatalogueIds = new Set(modifiers.map((entry) => entry.id));
+
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
@@ -329,8 +689,18 @@ export class CraftingSystemManager {
         def.associatedSystemItemId ||
         (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
       const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
+      // A source component that is not in `items` used to answer `null` unconditionally. That is
+      // only sound when the component basis is KNOWN: with an unwritten world store and an emptied
+      // in-system array the id may name a component this client simply cannot see, and nulling the
+      // authored uuid is a silent, persisted deletion. So the drop is now gated on the basis, and
+      // a retained value passes the SAME `_looksLikeDocumentUuid` guard the other branch applies —
+      // an unknown basis is a licence to keep, never a licence to emit junk.
       const sourceItemUuid = sourceComponentId
-        ? sourceComponent?.originItemUuid || sourceComponent?.registeredItemUuid || null
+        ? sourceComponent?.originItemUuid ||
+          sourceComponent?.registeredItemUuid ||
+          (scopeBasis.componentIds === null && this._looksLikeDocumentUuid(def.sourceItemUuid)
+            ? def.sourceItemUuid
+            : null)
         : this._looksLikeDocumentUuid(def.sourceItemUuid)
           ? def.sourceItemUuid
           : null;
@@ -396,26 +766,51 @@ export class CraftingSystemManager {
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      // The one named modifier library for the WHOLE system (issue 1117). Crafting,
-      // salvage and gathering checks each select over it through their own
-      // `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple below,
-      // and the gathering d100 drop rows, events and stamina costs REFERENCE it too.
-      modifiers,
+      // A SURVIVING LEGACY COPY IS CARRIED THROUGH; THE MIGRATION IS THE ONLY THING THAT REMOVES
+      // IT (issue 1308).
+      //
+      // The library is WORLD scope — authored once, with every crafting system's check triple
+      // selecting over the same list — so on a migrated world there is nothing here to carry and
+      // this emits nothing.
+      //
+      // The tempting alternative was to let the allowlist rebuild shed the key, which is how the
+      // 1.22.0 and 1.23.0 relocations retired theirs. It is wrong here, twice over. Migrations run
+      // on the ACTIVE GM alone, so every player and every assistant GM hydrates through this
+      // normalizer while the world setting is still unwritten; `hydrate` runs it on load, and the
+      // legacy copy is the only place those entries exist on that client, so any later save makes
+      // the loss durable. And `upsertTool` derives its own Valid Id Basis from the NORMALIZED
+      // record, so a shed here silently narrows a basis that pass depends on.
+      //
+      // Carrying it forward is not a read-alias keeping a retired location alive. The 1.28.0
+      // migration strips it exactly once, from the one client entitled to, and it is gone.
+      ...(_legacyModifiers.length > 0 && { modifiers: _legacyModifiers }),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
       salvageResolutionMode,
-      // Tool-breakage authority (issue 419): `toolSpecific` (default, today's
-      // behaviour — each Tool's own mode decides, plus the legacy per-crit/per-tier
-      // `breakTools` force-break) | `checkDriven` (the active check's `checkBreakage`
-      // triggers decide whether ALL required tools break; per-tool modes are ignored
-      // except `immune`). Normalized on read (no versioned migration): unknown /
-      // missing → `toolSpecific`, mirroring the inline resolutionMode defaulters above.
-      toolBreakage: (function _normalizeToolBreakageAuthority(raw) {
-        const authority = ['toolSpecific', 'checkDriven'].includes(raw?.authority)
-          ? raw.authority
-          : 'toolSpecific';
-        return { authority };
+      // Tool-breakage authority (issue 419): `toolSpecific` (each Tool's own mode decides, plus
+      // the legacy per-crit/per-tier `breakTools` force-break) | `checkDriven` (the active
+      // check's `checkBreakage` triggers decide whether ALL required tools break; per-tool modes
+      // are ignored except `immune`).
+      //
+      // ABSENCE-PRESERVING SINCE 1.30.0 (issue 1363, epic 1357). It used to substitute
+      // `toolSpecific` for anything missing or unrecognised on EVERY normalize, which meant
+      // every persisted system carried a concrete value and the WORLD half of
+      // `resolveToolBreakageAuthority` was provably unreachable — the switch was registered and
+      // inert. Emitting NO KEY for an unauthored authority is the one flip that makes the world
+      // half reachable, and it is why `effectiveToolBreakageAuthority` exists: a reader that
+      // re-defaults locally re-creates the unreachability at its own call site.
+      //
+      // NOTHING IS DESTROYED BY THE FLIP. Every value already on disk was minted by the old
+      // normalizer, and the corpus cannot distinguish a minted `toolSpecific` from a deliberate
+      // one — so `## Scoped Entity Definitions` `### Tool scope` requirement 5 mandates treating
+      // every EXISTING value as AUTHORED. The `1.30.0` migration therefore writes no world
+      // authority and touches no system's value; the world half is reachable only for a system
+      // whose override is cleared, or one created afterwards.
+      ...(function _normalizeToolBreakageAuthority(raw) {
+        return ['toolSpecific', 'checkDriven'].includes(raw?.authority)
+          ? { toolBreakage: { authority: raw.authority } }
+          : {};
       })(system.toolBreakage),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(
         system.salvageCraftingCheck,
@@ -436,24 +831,34 @@ export class CraftingSystemManager {
       // it: canonical spec forbids merging, aliasing, or cross-populating the two, so
       // a component category is never offered as a recipe category and vice versa.
       // The reserved `general` bucket is implied, never persisted in the array.
-      componentCategories: normalizeCustomComponentCategories(system.componentCategories),
+      // The SAME normalized list the vocabulary basis was derived from, so the emitted vocabulary
+      // and the allowance the icon map is pruned against cannot disagree. `null` basis and empty
+      // vocabulary are the same state by construction.
+      componentCategories: scopeBasis.componentCategories ?? [],
 
       // Per-category icons (issue 689). A parallel name-keyed map, kept separate
       // from the string vocabulary arrays so those stay backwards-compatible.
       // Each map is filtered to the categories that currently exist (plus the
       // reserved `general` bucket), so a removed category drops its icon on the
       // next normalize — updateSystem REPLACES the whole map, no `-=` needed.
-      categoryIcons: normalizeCategoryIconMap(system.categoryIcons, [
-        'general',
-        ...normalizeCustomRecipeCategories(system.categories),
-      ]),
-      componentCategoryIcons: normalizeCategoryIconMap(system.componentCategoryIcons, [
-        'general',
-        ...normalizeCustomComponentCategories(system.componentCategories),
-      ]),
+      // GATED ON THE VOCABULARY BASIS (issue 1359). Each map is pruned against its OWN
+      // vocabulary — `categoryIcons` against `categories`, `componentCategoryIcons` against
+      // `componentCategories` — and the two are gated separately because they are separate
+      // vocabularies that `## CraftingSystem` requirement 6b forbids merging or aliasing.
+      // With an UNKNOWN basis (an empty in-system vocabulary and no world vocabulary written)
+      // nothing is pruned: the epic's migration empties these arrays, and this normalizer is a
+      // whitelist rebuild, so an ungated prune would delete every authored icon PERMANENTLY.
+      categoryIcons: normalizeCategoryIconMap(
+        system.categoryIcons,
+        _iconAllowance(system.categoryIcons, scopeBasis.recipeCategories)
+      ),
+      componentCategoryIcons: normalizeCategoryIconMap(
+        system.componentCategoryIcons,
+        _iconAllowance(system.componentCategoryIcons, scopeBasis.componentCategories)
+      ),
 
       // Transitional aliases for existing UI code paths
-      categories: normalizeCustomRecipeCategories(system.categories),
+      categories: scopeBasis.recipeCategories ?? [],
       tags: this._normalizeStringList(system.tags ?? system.itemTags),
       essences: resolvedEssenceDefinitions.map((def) => def.id),
       enableTags: true,
@@ -466,13 +871,11 @@ export class CraftingSystemManager {
       // interactable browser, item-drop resolution, and gathering composition —
       // reads a single source of truth. Mirrors how `components` is normalized.
       tools: normalizedTools,
-      // System-owned character prerequisite library (issue 544). Reusable
-      // pass/fail conditions (`{ id, name, icon, path, op, value }`) the GM
-      // authors in System Settings and attaches to gate learning a recipe from a
-      // book/scroll (referenced by id from a recipe item's `caps.learn`).
-      // Normalized wholesale from the incoming array; settings replace (not
-      // deep-merge), so a removed entry does not resurrect.
-      characterPrerequisites,
+      // Carried through on the same rule as the modifier library above, and removed by the same
+      // migration.
+      ...(_legacyCharacterPrerequisites.length > 0 && {
+        characterPrerequisites: _legacyCharacterPrerequisites,
+      }),
       // PARTICIPATION ONLY (issue 1282). The realm library itself is world scope — realms are
       // geography, and the same valley is the same valley whichever crafting system a
       // character is there to serve — so it lives in the `travelConfig` world setting and
@@ -696,7 +1099,7 @@ export class CraftingSystemManager {
     return normalizeFailureResultPolicy(value);
   }
 
-  _normalizeCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeCraftingCheck(check = {}, validCatalogueIds = null) {
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
       .map((o) =>
@@ -742,85 +1145,6 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the SYSTEM-LEVEL modifier library (issue 1117): the ONE named library of
-   * `{id, label, icon?, expression, isRollExpression, min?, max?}` entries that every
-   * activity's check selects over AND that every gathering drop row, event and stamina
-   * cost references. Malformed entries are dropped, ids are trimmed and de-duplicated,
-   * and a bad expression coerces to an empty string.
-   *
-   * IT IS ONE LIBRARY, not two. Until issue 1117 a system authored modifiers twice, in
-   * two near-identical shapes: the check-modifier catalogue at `system.checkModifiers`
-   * and the gathering character-modifier library at
-   * `gatheringConfig.systems[systemId].characterModifiers`. The `1.23.0` migration merges
-   * them here, and the `checkModifiers`/`characterModifiers` keys are both retired — this
-   * normalizer is an ALLOWLIST REBUILD, so an unemitted key is dropped on the next save,
-   * which is exactly why the migration must run first (`_runMigrations` in `src/main.js`
-   * precedes every manager load).
-   *
-   * THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-   * `min`/`max` clamp the resolved value of a CHECK modifier, and gathering's own
-   * per-reference `min`/`max` clamp a drop contribution independently of them.
-   *
-   * `icon`, `min` and `max` are all ABSENCE-PRESERVING: each is attached only when
-   * authored, so `null`, `undefined`, `''` and junk all normalize to the same shape (key
-   * absent) and absence means unbounded. `0` is a real bound and survives, which is why
-   * the guard is `Number.isFinite` and not truthiness. An inverted pair (`min > max`) is
-   * PRESERVED VERBATIM rather than repaired: it is a blocking readiness issue
-   * (`modifierBoundsInverted`) that the GM must fix, and silently swapping the pair would
-   * roll a number nobody authored. `clampModifierValue` makes such an entry contribute 0
-   * meanwhile — the refuse posture gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS`
-   * already takes.
-   *
-   * `isRollExpression` is DERIVED here and never read off the input, so a persisted or
-   * imported flag can never contradict the expression beside it. It is emitted rather
-   * than left to each reader because the two readers that need it — the authoring
-   * surface's Roll chip and the check-readiness rule that BLOCKS on a roll-shaped
-   * expression reaching a check — must classify one entry identically.
-   *
-   * AN ENTRY WITH NO EXPRESSION IS KEPT, which is a deliberate change from the gathering
-   * normalizer this replaces (it dropped one). The library now has an "Add modifier"
-   * button, and an entry that vanished on save the moment it was created would make that
-   * button appear broken. An unresolvable expression is still a runtime misconfiguration
-   * — gathering reports `CHARACTER_MODIFIER_NON_FINITE` for it instead of
-   * `MISSING_CHARACTER_MODIFIER` — so nothing silently succeeds.
-   *
-   * @param {unknown} library Raw `system.modifiers`.
-   * @returns {Array<{id: string, label: string, expression: string, isRollExpression: boolean,
-   *   icon?: string, min?: number, max?: number}>}
-   * @private
-   */
-  _normalizeModifierLibrary(library) {
-    const raw = Array.isArray(library) ? library : [];
-    const seenIds = new Set();
-    const modifiers = [];
-    for (const entry of raw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      const expression = typeof entry.expression === 'string' ? entry.expression.trim() : '';
-      const normalized = {
-        id,
-        label: typeof entry.label === 'string' ? entry.label : '',
-        expression,
-        isRollExpression: isRollExpression(expression),
-      };
-      if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
-      // Asked of the RESOLVER rather than re-derived here, so the persisted shape and the
-      // clamp the engine applies cannot disagree about what an unbounded form is. That
-      // matters more than it looks: `Number(null)`, `Number('')` and `Number([])` are all
-      // `0`, and `0` is a REAL bound on this field — so a hand-written `Number.isFinite`
-      // guard here would MINT a bound of 0 every time the editor cleared one (it patches
-      // `null`), exactly the trap `_normalizeSalvage`'s `dcOverride` guard calls out.
-      const { min, max } = resolveModifierBounds(entry);
-      if (min !== null) normalized.min = min;
-      if (max !== null) normalized.max = max;
-      modifiers.push(normalized);
-    }
-    return modifiers;
-  }
-
-  /**
    * Normalize ONE activity check's selection over the system catalogue (issue 1095):
    * `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }`.
    *
@@ -858,7 +1182,13 @@ export class CraftingSystemManager {
     const defaultModifierIds = (
       Array.isArray(check?.defaultModifierIds) ? check.defaultModifierIds : []
     ).filter((id) => {
-      if (typeof id !== 'string' || !validIds.has(id) || seenDefaults.has(id)) return false;
+      // `!(validIds instanceof Set)` is the UNKNOWN-basis sentinel, matching
+      // `_normalizeToolPrerequisites` (issue 1308). A caller that cannot vouch for the modifier
+      // library passes `null` and nothing is pruned; the three activity-check normalizers above
+      // DEFAULT to that, because their old `new Set()` default was itself the omitted-argument
+      // form of the Valid Id Basis failure — an empty basis prunes every id on every run.
+      if (typeof id !== 'string' || seenDefaults.has(id)) return false;
+      if (validIds instanceof Set && !validIds.has(id)) return false;
       seenDefaults.add(id);
       return true;
     });
@@ -1332,7 +1662,7 @@ export class CraftingSystemManager {
     return null;
   }
 
-  _normalizeSalvageCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeSalvageCraftingCheck(check = {}, validCatalogueIds = null) {
     const normalizedCheck = !check || typeof check !== 'object' ? {} : check;
     const outcomes = Array.isArray(normalizedCheck.outcomes) ? normalizedCheck.outcomes : [];
     const normalizedOutcomes = outcomes
@@ -1379,7 +1709,7 @@ export class CraftingSystemManager {
   // routed). d100 needs no editable config (the fixed d100 roll), so only the
   // progressive and routed sub-objects are authored, reusing the crafting shapes.
   // A per-task DC override lives on the gathering task (`task.dcOverride`).
-  _normalizeGatheringCraftingCheck(check = {}, validCatalogueIds = new Set()) {
+  _normalizeGatheringCraftingCheck(check = {}, validCatalogueIds = null) {
     const source = !check || typeof check !== 'object' ? {} : check;
     return {
       enabled: source.enabled === true,
@@ -2089,6 +2419,15 @@ export class CraftingSystemManager {
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
       difficulty:
         Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
+      // Progressive component complications (issue 1286) sit TOP-LEVEL, directly after
+      // `difficulty` — the other field that spans all three progressive activities — and
+      // deliberately NOT under `salvage`: a complication fires for a component's part in
+      // progressive crafting, salvage OR gathering, and `salvage` is only valid when
+      // `features.salvage` is true, which is exactly where a crafting-output complication
+      // would need it. The attach is absence-preserving, so a component that authored none
+      // (which is every component that predates the feature) keeps NO key and needs no
+      // migration. An authored empty list normalizes to that same absence.
+      ...authoredComplications(item.complications),
       // Salvage config is always normalized and preserved on the component so the
       // `features.salvage` toggle is non-destructive: turning salvage off hides and
       // skips it (UI/validation/runtime gate on the flag) but never deletes authored
@@ -2688,18 +3027,47 @@ export class CraftingSystemManager {
    * and a per-call O(components) allocation on the exact scan this issue exists to
    * bound. Callers must not mutate it.
    *
+   * ANSWERS THROUGH THE READ UNION since issue 1370, and the "live array" contract survives it:
+   * a world half that is absent, unloaded, empty or unreadable returns `system.components`
+   * ITSELF, and a world half that is present returns a memoized union whose identity is stable
+   * for as long as neither half changes.
+   *
    * @param {string} systemId
    * @returns {object[]}
    */
   getComponentsForSystem(systemId) {
-    const system = this.getSystem(systemId);
-    return Array.isArray(system?.components) ? system.components : [];
+    return this.resolveScopedComponents(this.getSystem(systemId));
   }
 
+  /**
+   * The essence definitions of a system.
+   *
+   * KEEPS ITS DEFENSIVE COPY (issue 1370). The read union's unknown-half passthrough answers the
+   * in-system array itself, which this spread then discards — deliberately, because the copy is a
+   * shipped contract of this accessor, no counter or memo depends on the identity it returns, and
+   * removing it would be a silent behaviour change to every caller that sorts or splices the
+   * answer.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
   getEssenceDefinitions(systemId) {
-    const system = this.getSystem(systemId);
-    if (!system) return [];
-    return Array.isArray(system.essenceDefinitions) ? [...system.essenceDefinitions] : [];
+    return [...this.resolveScopedEssences(this.getSystem(systemId))];
+  }
+
+  /**
+   * The first-class tool library of a system, the tool-side twin of
+   * {@link getComponentsForSystem} (issue 1370).
+   *
+   * NEW WITH THE CONSUMER SWEEP. No tool accessor existed, so every tool reader held a system
+   * record and indexed `system.tools` directly; this is the one manager-side entry the sweep
+   * adds. Like the component accessor it returns the LIVE array when there is no world half.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getToolsForSystem(systemId) {
+    return this.resolveScopedTools(this.getSystem(systemId));
   }
 
   /**
@@ -2716,7 +3084,7 @@ export class CraftingSystemManager {
   getEssenceDefinition(systemId, essenceId) {
     const system = this.getSystem(systemId);
     if (!system || !essenceId) return null;
-    return findById(getDefinitionIndex(system.essenceDefinitions), essenceId);
+    return findById(getDefinitionIndex(this.resolveScopedEssences(system)), essenceId);
   }
 
   getRecipeItemDefinitions(systemId) {
@@ -2751,6 +3119,19 @@ export class CraftingSystemManager {
     );
   }
 
+  /**
+   * The authoring and browse accessor for a system's managed items.
+   *
+   * DELIBERATELY NOT REPOINTED at issue 1370. This is the surface the GM authors against and the
+   * one the world catalogue routes take over, so it answers the PERSISTED record rather than a
+   * merged read row: repointing it would have the manager offer a row for editing that no writer
+   * can save back. {@link getComponentsForSystem} is the repointed read accessor, and
+   * `GatheringEngine` moved onto it rather than onto this one.
+   *
+   * @param {string} systemId
+   * @param {string} [search]
+   * @returns {object[]}
+   */
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
@@ -3161,11 +3542,14 @@ export class CraftingSystemManager {
     const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
     const tools = Array.isArray(system.tools) ? system.tools : [];
     const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
-    const validPrerequisiteIds = new Set(
-      (Array.isArray(system.characterPrerequisites) ? system.characterPrerequisites : []).map(
-        (entry) => entry.id
-      )
-    );
+    // Issue 1308: the SAME Valid Id Basis `_normalizeSystem` uses, and derived through the same
+    // helper rather than rebuilt here. This site is easy to miss and expensive to get wrong: it
+    // does not go through `_normalizeSystem`, so before the fix it read the world-scoped library
+    // off `system.characterPrerequisites`, found nothing, and handed `_normalizeToolPrerequisites`
+    // a real-but-empty Set — which its own unknown-basis sentinel cannot refuse. Every Tool save
+    // would then strip that tool's prerequisite ids and flip its gate off, in a fully migrated,
+    // otherwise healthy world.
+    const { prerequisiteIds: validPrerequisiteIds } = this._characterLibraryBasis(system);
     const staged = this._normalizeTool(
       {
         ...existing,
@@ -3798,6 +4182,14 @@ export class CraftingSystemManager {
     const recipeJson = recipes.map((recipe) =>
       typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
     );
+    // DELIBERATELY NOT REPOINTED at issue 1370, and the consequence is stated rather than left to
+    // be discovered. This runs PRE-PERSIST, against the PROPOSED merged record: validating a
+    // not-yet-saved system against a union that does not yet contain it would validate the wrong
+    // subject. The engine-side twin in `CraftingEngine` IS repointed, so after the sweep the same
+    // alchemy uniqueness invariant is evaluated against the union at craft time and against the
+    // raw proposed array at authoring time. The read union's ROW SET is the in-system array's row
+    // set while `## CraftingSystem` requirement 36 holds, which is what keeps the two answers in
+    // agreement; a union that could resurrect a deleted row would make the divergence reachable.
     const components = Array.isArray(system.components) ? system.components : [];
     const validator = new SignatureValidator({
       getSystem: (id) => (id === systemId ? system : null),
@@ -4019,7 +4411,12 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // Issue 1359: the SAME Valid Id Basis `_normalizeSystem` uses, derived through the same
+    // helper rather than rebuilt here. This site BYPASSES `_normalizeSystem`, so before this it
+    // read the in-system array directly and handed `_normalizeComponent` a real-but-empty Set on
+    // any client whose world corpus had not replicated — which `_normalizeEssenceQuantities`
+    // cannot refuse. `Set|null`, and NEVER defaulted to an empty Set.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
       ...this._salvageNormalizationContext(system),
@@ -4865,6 +5262,8 @@ export class CraftingSystemManager {
       // resolve via raw refs). Fresh ids are validated at creation/import.
       const flagKey = this._componentRoleFlagKey(system.id);
       if (!flagKey) continue;
+      // DELIBERATELY NOT REPOINTED at issue 1370: the subject of the restamp is the PERSISTED
+      // record whose durable identity is being repaired, not a merged read row.
       kinds.push({
         bucket: 'components',
         flagKey,
@@ -4877,6 +5276,8 @@ export class CraftingSystemManager {
       // via their own source references (owned copies through `resolveToolForItem`).
       const toolFlagKey = this._toolRoleFlagKey(system.id);
       if (toolFlagKey) {
+        // DELIBERATELY NOT REPOINTED at issue 1370, for the same reason as the component kind
+        // above.
         kinds.push({
           bucket: 'tools',
           flagKey: toolFlagKey,
@@ -5081,7 +5482,9 @@ export class CraftingSystemManager {
     }
 
     // No match: create new component
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(
       {
         ...nextSnapshot,
@@ -5140,7 +5543,9 @@ export class CraftingSystemManager {
       );
     }
 
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       {
         ...existing,
@@ -5352,7 +5757,9 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.components.findIndex((i) => i.id === itemId);
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId },
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
@@ -5460,7 +5867,9 @@ export class CraftingSystemManager {
       hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
     if (!staged) return { updated: 0, componentIds: [] };
 
-    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    // One of the five mutation-time sites that BYPASS `_normalizeSystem` (issue 1359). Same
+    // basis, same helper; `Set|null`, never defaulted to an empty Set. See `_scopeBasis`.
+    const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const salvageContext = this._salvageNormalizationContext(system);
     const changedIds = [];
     for (let idx = 0; idx < system.components.length; idx += 1) {
@@ -6970,6 +7379,14 @@ export class CraftingSystemManager {
         },
       ],
       subject,
+      // The ONE mutation-time pass that prunes against COMPONENT ids, so the ONE that has to
+      // answer whether those ids are still current (issue 1363). The startup door asks the
+      // same question at `composeStartupPassList`; the two doors call the same collaborator
+      // and a kind declared on one and not the other is a gate that disagrees with itself.
+      basis: {
+        ...WHOLE_CORPUS_ID_BASIS,
+        componentIdentityRemap: !hasPendingWorldScopeRekey(getSetting),
+      },
     });
   }
 }

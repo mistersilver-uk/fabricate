@@ -23,13 +23,14 @@
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
 
   let {
     currencyUnits = [],
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
     currencyProviderId = '',
-    currencyMacros = { canAfford: '', increment: '', decrement: '' },
+    currencyMacros = { canAfford: '', increment: '', decrement: '', balance: '' },
     currencyProviderOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
@@ -112,7 +113,8 @@
       labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrement',
       labelFallback: 'Increment macro',
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrementHint',
-      hintFallback: 'Reserved for a future refund flow — configured now but not yet invoked.',
+      hintFallback:
+        'Runs whenever coin goes back to an actor: a cancelled craft, a companion credit, or a pooled take that could not be completed.',
     },
     {
       key: 'decrement',
@@ -120,6 +122,19 @@
       labelFallback: 'Decrement macro',
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrementHint',
       hintFallback: 'Runs after a successful craft to spend the currency cost.',
+    },
+    // The fourth key (issue 1342), and the only one that ASKS rather than acts. It is what lets a
+    // macro world answer a companion's pooled holdings question at all; without it Fabricate can
+    // spend a macro world's coins but cannot see them, and every holdings read answers "cannot
+    // see" rather than a number. Optional, on the increment precedent — a world that never
+    // authors it loses the read and keeps every craft-time behaviour.
+    {
+      key: 'balance',
+      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalance',
+      labelFallback: 'Balance macro',
+      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalanceHint',
+      hintFallback:
+        'Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as "unknown".',
     },
   ];
 
@@ -173,9 +188,10 @@
     return currencyMacroDocs[key] || null;
   }
 
-  // Each empty macro drop zone needs a field-specific accessible name; otherwise the three zones
-  // (canAfford/increment/decrement) expose an identical "Drag a macro here to link it." label and
-  // are indistinguishable to assistive tech. Compose the visible field label with the drop hint.
+  // Each empty macro drop zone needs a field-specific accessible name; otherwise the zones
+  // (canAfford/increment/decrement/balance) expose an identical "Drag a macro here to link it."
+  // label and are indistinguishable to assistive tech. Compose the visible field label with the
+  // drop hint.
   function currencyMacroDropZoneLabel(field) {
     const fieldLabel = text(field.labelKey, field.labelFallback);
     const composed = localize('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel', {
@@ -354,13 +370,12 @@
       </div>
       {#if !currencyUnitsReadOnly}
         <div class="manager-character-modifier-card-header-actions">
-          <button type="button" class="manager-button is-primary" onclick={handleAddCurrencyUnit}>
+          <ManagerButton role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-          </button>
-          <button
-            type="button"
-            class="manager-button"
+          </ManagerButton>
+          <ManagerButton
+            data-seed-currency-presets
             disabled={!currencyPresetsSupported}
             data-tooltip={!currencyPresetsSupported
               ? text(
@@ -372,7 +387,7 @@
           >
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
-          </button>
+          </ManagerButton>
         </div>
       {/if}
     </header>
@@ -818,20 +833,19 @@
                   {/if}
 
                   <div class="manager-character-modifier-actions">
-                    <button
-                      type="button"
-                      class="manager-button"
+                    <ManagerButton
+                      data-currency-unit-done
                       onclick={() => (currencyExpandedUnitId = '')}
-                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
+                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
                     >
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
+                    <ManagerButton
+                      role="danger"
+                      data-currency-unit-delete
                       onclick={() => handleDeleteCurrencyUnit(unit.id)}
                       >{text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                         'Delete currency unit'
-                      )}</button
+                      )}</ManagerButton
                     >
                   </div>
                 </div>

@@ -25,6 +25,7 @@
 -->
 <script>
   import EmptyState from '../EmptyState.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -173,16 +174,15 @@
       />
     {/if}
 
-    <button
-      type="button"
-      class="manager-button manager-recipe-tab-action"
+    <ManagerButton
+      class="manager-recipe-tab-action"
       data-recipe-open-access
       onclick={() => onOpenAccess()}
     >
       <i class="fas fa-user-shield" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AccessTab.ManageAccess', 'Manage access')}</span>
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </button>
+    </ManagerButton>
   </div>
 </section>
 
@@ -254,12 +254,5 @@
     font-size: 0.68rem;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  /* The deep-link out to the canonical authoring screen. `align-self: flex-start` so it
-     sizes to its label instead of stretching the full width of the tab now that the body
-     no longer shrinks its children to content. */
-  .manager-recipe-tab-action {
-    align-self: flex-start;
   }
 </style>

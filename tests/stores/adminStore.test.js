@@ -184,12 +184,32 @@ function createMockServices(overrides = {}) {
     exportRecipes: () => recipes.map((r) => r.toJSON()),
   };
 
+  // The world character libraries (issue 1308). Kept as a plain in-memory fake rather than the
+  // real store, because this suite drives adminStore's projection and write paths and needs to
+  // read the persisted value straight back.
+  const characterLibraries = { characterPrerequisites: [], modifiers: [] };
+  const mockCharacterLibrariesStore = {
+    isSeeded: () => true,
+    get: () => characterLibraries,
+    listCharacterPrerequisites: () => characterLibraries.characterPrerequisites,
+    listModifiers: () => characterLibraries.modifiers,
+    saveCharacterPrerequisites: async (next) => {
+      characterLibraries.characterPrerequisites = next;
+      return characterLibraries;
+    },
+    saveModifiers: async (next) => {
+      characterLibraries.modifiers = next;
+      return characterLibraries;
+    },
+  };
+
   const base = {
     getSetting: (key) => store[key] ?? '',
     setSetting: async (key, value) => {
       store[key] = value;
     },
     getCraftingSystemManager: () => mockSystemManager,
+    getCharacterLibrariesStore: () => mockCharacterLibrariesStore,
     getRecipeManager: () => mockRecipeManager,
     getScriptMacros: () => [],
     getSceneOptions: () => [],
@@ -209,6 +229,7 @@ function createMockServices(overrides = {}) {
   // Expose internal state for assertions
   merged._store = store;
   merged._getSystemsMutable = () => systems;
+  merged._characterLibraries = characterLibraries;
   merged._getRecipesMutable = () => recipes;
 
   return merged;
@@ -398,8 +419,10 @@ describe('createAdminStore', () => {
       await store.refresh();
       const selected = get(store.viewState).selectedSystem;
 
-      // Authority is now visible in the projection (was previously unprojected).
-      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven' });
+      // Authority is now visible in the projection (was previously unprojected), and since
+      // issue 1374 it is RESOLVED against the world scope and carries the scope that authored
+      // it. This system authored `checkDriven` itself, so the source is `system`.
+      assert.deepEqual(selected.toolBreakage, { authority: 'checkDriven', source: 'system' });
 
       // The checkBreakage block survives the _clonePlain projection for every mode.
       for (const mode of ['simple', 'routed', 'progressive']) {
@@ -424,7 +447,7 @@ describe('createAdminStore', () => {
       // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.modifiers = [
+      services._characterLibraries.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
         { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
       ];
@@ -448,24 +471,22 @@ describe('createAdminStore', () => {
       const selected = get(store.viewState).selectedSystem;
       const check = selected.craftingCheck;
 
-      // The library is a SYSTEM-level key since issue 1095 and is named `modifiers` since
-      // issue 1117; it is projected there and nowhere else.
+      // The library is WORLD scope since issue 1308, so it is projected as a top-level slice and
+      // NOT off the selection — hanging it there would make the same library appear to change
+      // when the GM merely clicks a different crafting system.
+      const worldModifiers = get(store.viewState).worldModifiers;
+      assert.equal(selected.modifiers, undefined, 'never projected off the selected system');
       assert.deepEqual(
-        selected.modifiers.map((modifier) => modifier.id),
+        worldModifiers.map((modifier) => modifier.id),
         ['med', 'alch'],
-        'the library surfaces through the projection allowlist, at the system level'
-      );
-      assert.notEqual(
-        selected.modifiers[0],
-        sys.modifiers[0],
-        'library entries are cloned, not shared with the live system'
+        'the library surfaces through the world projection'
       );
       // The BOUNDS survive the projection too. Without them the read-only chip on salvage
       // and gathering renders nothing and the crafting steppers read blank — an
       // absence-preserving field is exactly the kind an allowlist drops unnoticed.
-      assert.equal(selected.modifiers[0].min, -1);
-      assert.equal(selected.modifiers[0].max, 5);
-      assert.equal(Object.hasOwn(selected.modifiers[1], 'min'), false);
+      assert.equal(worldModifiers[0].min, -1);
+      assert.equal(worldModifiers[0].max, 5);
+      assert.equal(Object.hasOwn(worldModifiers[1], 'min'), false);
 
       assert.equal(check.defaultModifierPolicy, 'highest');
       assert.deepEqual(check.defaultModifierIds, ['med']);
@@ -635,7 +656,7 @@ describe('createAdminStore', () => {
         defaultModifierPolicy: 'addAll',
         defaultModifierIds: ['med', 'alch'],
       };
-      sys.modifiers = [
+      services._characterLibraries.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@med' },
         { id: 'alch', label: 'Alchemy', expression: '@alch' },
       ];
@@ -683,7 +704,7 @@ describe('createAdminStore', () => {
       );
       await store.refresh();
       assert.deepEqual(
-        get(store.viewState).selectedSystem.modifiers.map((entry) => entry.id),
+        get(store.viewState).worldModifiers.map((entry) => entry.id),
         ['med', 'alch'],
         'and the authored library is intact'
       );
@@ -702,7 +723,9 @@ describe('createAdminStore', () => {
         let updates = null;
         const services = createMockServices();
         const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-        sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+        services._characterLibraries.modifiers = [
+          { id: 'med', label: 'Medicine', expression: '@med' },
+        ];
         sys[key] = {
           enabled: true,
           routed: { type: 'relative', rollFormula: '1d20 + 3' },
@@ -737,16 +760,19 @@ describe('createAdminStore', () => {
       });
     }
 
-    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117). Every library op goes through
-    // `updateSystem({ modifiers })` — a TOP-LEVEL key, so the array is replaced wholesale and
-    // removing an entry persists with no `-=` deletion — and touches no activity selection,
-    // so it cannot re-default a rule it was never asked about.
-    it('addSystemModifier and deleteSystemModifier write the library at the SYSTEM level, alone', async () => {
+    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117), now at WORLD scope (issue 1308).
+    // Every library op replaces the whole array in the world setting — so removing an entry
+    // persists with no `-=` deletion — and writes NOTHING through `updateSystem`, so it cannot
+    // re-default an activity rule it was never asked about. That second half is asserted by the
+    // crafting system receiving no write at all.
+    it('addModifier and deleteModifier write the WORLD library, alone', async () => {
       const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy: 'highest' };
-      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 }];
+      services._characterLibraries.modifiers = [
+        { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
+      ];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -758,45 +784,43 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const added = await store.addSystemModifier('sys1', { id: 'alch', label: 'Alchemy' });
+      const added = await store.addModifier({ id: 'alch', label: 'Alchemy' });
       assert.equal(added.id, 'alch');
       assert.deepEqual(
-        calls.at(-1).modifiers.map((entry) => entry.id),
+        services._characterLibraries.modifiers.map((entry) => entry.id),
         ['med', 'alch'],
         'the whole array is written, appended in order'
       );
-      assert.equal(
-        Object.hasOwn(calls.at(-1), 'craftingCheck'),
-        false,
-        'a library write touches no activity selection'
-      );
+      assert.deepEqual(calls, [], 'a library write touches no crafting system at all');
 
-      assert.equal(await store.deleteSystemModifier('sys1', 'med'), true);
+      assert.equal(await store.deleteModifier('med'), true);
       assert.deepEqual(
-        calls.at(-1).modifiers.map((entry) => entry.id),
+        services._characterLibraries.modifiers.map((entry) => entry.id),
         ['alch'],
         'the removal persists as a whole-array replace'
       );
 
       await store.refresh();
-      const selected = get(store.viewState).selectedSystem;
-      assert.deepEqual(selected.modifiers.map((entry) => entry.id), ['alch']);
+      assert.deepEqual(
+        get(store.viewState).worldModifiers.map((entry) => entry.id),
+        ['alch']
+      );
       assert.equal(
-        selected.craftingCheck.defaultModifierPolicy,
+        get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy,
         'highest',
         'and the crafting rule survives the round trip rather than being re-defaulted'
       );
     });
 
-    // A no-op op writes NOTHING. `addSystemModifier` refuses a duplicate id and
-    // `deleteSystemModifier` refuses an id the library does not carry; without those
+    // A no-op op writes NOTHING. `addModifier` refuses a duplicate id and
+    // `deleteModifier` refuses an id the library does not carry; without those
     // guards each would re-persist and re-project the whole system for a request that
     // changes nothing.
     it('refuses a duplicate add and an unknown delete without writing', async () => {
       const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+      services._characterLibraries.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -808,9 +832,12 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      assert.equal(await store.addSystemModifier('sys1', { id: 'med' }), null);
-      assert.equal(await store.deleteSystemModifier('sys1', 'ghost'), false);
-      assert.equal(await store.updateSystemModifier('sys1', 'ghost', { label: 'X' }), false);
+      assert.equal(await store.addModifier({ id: 'med' }), null);
+      // The id goes in the FIRST argument since issue 1308 dropped the system id. Passing the old
+      // two-argument shape made this assert that `'sys1'` is not a modifier id, which is true and
+      // proves nothing — `'ghost'` was never tested at all.
+      assert.equal(await store.deleteModifier('ghost'), false);
+      assert.equal(await store.updateModifier('ghost', { label: 'X' }), false);
       assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 
@@ -884,8 +911,9 @@ describe('createAdminStore', () => {
       const selected = get(store.viewState).selectedSystem;
       assert.deepEqual(
         selected.toolBreakage,
-        { authority: 'toolSpecific' },
-        'a system with no toolBreakage projects the toolSpecific default'
+        { authority: 'toolSpecific', source: 'default' },
+        'a system with no toolBreakage, in a world with none either, projects the default — and ' +
+          'says which scope produced it (issue 1374), because the token alone cannot'
       );
     });
 
@@ -6061,6 +6089,90 @@ describe('createAdminStore', () => {
         'derived counts should not pollute the persisted environment object'
       );
       assert.equal(get(store.viewState).environmentTaskCounts['env-cave'].availableTaskCount, 1);
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-cave'].requiredToolCount,
+        0,
+        'neither composed task carries a toolId'
+      );
+    });
+
+    it('environmentTaskCounts.requiredToolCount counts distinct tool ids over the composed-and-available task population, not per-task occurrences or non-composed tasks', async () => {
+      // hb-env-ridge (tests/view-lab/world/labContent.js) is the acceptance's 0-to-1 fixture for
+      // this fact, but it lives in the view-lab world module and this suite's fixtures come from
+      // createMockServices()/services._store.gatheringConfig instead, so it is not reachable from
+      // here. This is an equivalent case built on the same rule this task adds: an automatic
+      // environment composing a mountain-biome task that carries a tool moves requiredToolCount
+      // from 0 (no composed task carries a tool) to a non-zero count once one does, the count is
+      // DISTINCT tool ids rather than a sum of per-task toolIds arrays, and a tool-bearing task
+      // that does not compose (wrong biome here) contributes nothing.
+      const environments = [
+        {
+          id: 'env-ridge',
+          craftingSystemId: 'sys1',
+          name: 'Ridge',
+          biomes: ['mountain'],
+          compositionMode: 'automatic',
+        },
+      ];
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => environments,
+          listBySystem: async () => environments,
+        }),
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [
+              // Composed (matches 'mountain'), no tools: contributes to availableTaskCount but
+              // not to requiredToolCount — this is the "0" half of the 0-to-1 case.
+              { id: 't-ridge-plain', name: 'Ridge Plain', biomes: ['mountain'], dropRows: [] },
+              // Composed, carries one tool: this is the "1" half of the 0-to-1 case.
+              {
+                id: 't-ridge-tool',
+                name: 'Ridge Tool',
+                biomes: ['mountain'],
+                toolIds: ['pick'],
+                dropRows: [],
+              },
+              // Also composed, re-uses 'pick' and adds 'rope': proves distinct-id counting
+              // rather than 2 (per-task occurrences of 'pick') or 3 (every mention).
+              {
+                id: 't-ridge-tool-2',
+                name: 'Ridge Tool 2',
+                biomes: ['mountain'],
+                toolIds: ['pick', 'rope'],
+                dropRows: [],
+              },
+              // Wrong biome, does not compose into env-ridge: 'shovel' must be excluded.
+              {
+                id: 't-desert-tool',
+                name: 'Desert Tool',
+                biomes: ['desert'],
+                toolIds: ['shovel'],
+                dropRows: [],
+              },
+            ],
+            events: [],
+          },
+        },
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-ridge'].availableTaskCount,
+        3,
+        'the three mountain-biome tasks all compose; the desert task does not'
+      );
+      assert.equal(
+        get(store.viewState).environmentTaskCounts['env-ridge'].requiredToolCount,
+        2,
+        'distinct tool ids across the composed-and-available tasks (pick, rope), excluding the ' +
+          'non-composed desert task and not double-counting the shared pick id'
+      );
     });
 
     it('exposes a composition view-model classifying each library record and counts', async () => {
@@ -6158,14 +6270,18 @@ describe('createAdminStore', () => {
       assert.equal(staleManualDisabled.runtimeState, 'unavailable');
       assert.equal(composition.counts.excludedTasks, 0);
 
+      // The editor offers no force add in manual mode any more (issue #1315), but the store
+      // method survives for the automatic-mode control, so this pins that writing the force list
+      // on a MANUAL environment classifies nothing: manual mode reads `enabledTaskIds` and no
+      // other list. A flip that made forces manual-only again reds here, on the draft state the
+      // GM would actually be looking at.
       store.forceIncludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
-      assert.ok(draft.forcedTaskIds.includes('t-desert'));
+      assert.ok(draft.forcedTaskIds.includes('t-desert'), 'the write itself still lands');
       composition = get(store.viewState).environmentComposition;
-      assert.equal(
-        composition.tasks.find((entry) => entry.id === 't-desert').compositionState,
-        'forceIncluded'
-      );
+      const inertForce = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(inertForce.compositionState, 'notMatching');
+      assert.equal(inertForce.runtimeState, 'unavailable');
 
       store.excludeEnvironmentRecord('task', 't-desert');
       draft = get(store.viewState).environmentDraft;
@@ -6175,6 +6291,57 @@ describe('createAdminStore', () => {
       const removedForced = composition.tasks.find((entry) => entry.id === 't-desert');
       assert.equal(removedForced.compositionState, 'notMatching');
       assert.equal(removedForced.runtimeState, 'unavailable');
+    });
+
+    it('automatic composition classifies a forced record as forceIncluded, matching or not', async () => {
+      // The mode where force add LIVES (issue #1315), and the classification arm that did not
+      // exist before it: without this, a flip making `forceIncluded` unreachable in either mode
+      // would ship green, because every other force test in this suite is a manual-mode one.
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [
+              { id: 't-cave', name: 'Cave', biomes: ['cave'], dropRows: [] },
+              { id: 't-desert', name: 'Desert', biomes: ['desert'], dropRows: [] },
+              { id: 't-off', name: 'Retired', enabled: false, biomes: ['desert'], dropRows: [] },
+            ],
+            events: [],
+          },
+        },
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.createEnvironmentDraft();
+      store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'automatic' });
+
+      store.forceIncludeEnvironmentRecord('task', 't-desert');
+      let draft = get(store.viewState).environmentDraft;
+      assert.ok(draft.forcedTaskIds.includes('t-desert'));
+      let composition = get(store.viewState).environmentComposition;
+      const forced = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(forced.matches, false, 'the record still does not match the environment');
+      assert.equal(forced.compositionState, 'forceIncluded');
+      assert.equal(forced.runtimeState, 'available', 'and it composes anyway, which is the point');
+
+      // Exclude beats force on the same record, and the GM-visible state says which won.
+      store.updateEnvironmentDraft({ disabledTaskIds: ['t-desert'] });
+      composition = get(store.viewState).environmentComposition;
+      const collided = composition.tasks.find((entry) => entry.id === 't-desert');
+      assert.equal(collided.compositionState, 'excluded');
+      assert.equal(collided.runtimeState, 'unavailable');
+
+      // A force cannot reach past the library gate either.
+      store.updateEnvironmentDraft({ disabledTaskIds: [] });
+      store.forceIncludeEnvironmentRecord('task', 't-off');
+      draft = get(store.viewState).environmentDraft;
+      assert.ok(draft.forcedTaskIds.includes('t-off'));
+      composition = get(store.viewState).environmentComposition;
+      const libraryDisabled = composition.tasks.find((entry) => entry.id === 't-off');
+      assert.equal(libraryDisabled.compositionState, 'libraryDisabled');
+      assert.equal(libraryDisabled.runtimeState, 'unavailable');
     });
 
     it('manual event removal clears include and force state without local exclusion', async () => {
@@ -6230,6 +6397,9 @@ describe('createAdminStore', () => {
       );
     });
 
+    // AUTOMATIC mode, because the two populations this test needs — records that compose by
+    // matching and a record that composes by force — can only coexist there since issue #1315.
+    // Manual mode composes exactly the picked list and ignores `forcedEventIds` entirely.
     it('reorders all included events including condition-blocked force-added events', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
@@ -6279,25 +6449,23 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({
         biomes: ['cave'],
         dangerLevel: 'hazardous',
-        compositionMode: 'manual',
+        compositionMode: 'automatic',
       });
 
-      store.includeEnvironmentRecord('event', 'h-cave');
-      store.includeEnvironmentRecord('event', 'h-gas');
-      store.includeEnvironmentRecord('event', 'h-storm');
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
+      // Seeded explicitly: force-adding appends to `eventOrder`, so without this the forced row
+      // would rank first and every index below would address a different record.
+      store.updateEnvironmentDraft({ eventOrder: ['h-cave', 'h-gas', 'h-storm', 'h-desert'] });
 
       let composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter((entry) =>
-            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
-          )
+          .filter((entry) => ['includedByMatch', 'forceIncluded'].includes(entry.compositionState))
           .map((entry) => entry.id),
         ['h-cave', 'h-gas', 'h-storm', 'h-desert']
       );
       const conditionBlocked = composition.events.find((entry) => entry.id === 'h-storm');
-      assert.equal(conditionBlocked.compositionState, 'explicitlyIncluded');
+      assert.equal(conditionBlocked.compositionState, 'includedByMatch');
       assert.equal(conditionBlocked.runtimeState, 'unavailable');
       const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.compositionState, 'forceIncluded');
@@ -6310,9 +6478,7 @@ describe('createAdminStore', () => {
       composition = get(store.viewState).environmentComposition;
       assert.deepEqual(
         composition.events
-          .filter((entry) =>
-            ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState)
-          )
+          .filter((entry) => ['includedByMatch', 'forceIncluded'].includes(entry.compositionState))
           .map((entry) => entry.id),
         ['h-storm', 'h-cave', 'h-gas', 'h-desert']
       );
@@ -6323,6 +6489,9 @@ describe('createAdminStore', () => {
     });
 
     it('keeps force-added events included after environment edits make them match', async () => {
+      // AUTOMATIC mode (issue #1315): force add is an automatic-mode override, so this is where a
+      // force can outlive the mismatch that motivated it. `h-cave` spans both biomes so that the
+      // edit below moves the FORCED record's match state without emptying the included list.
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -6334,7 +6503,7 @@ describe('createAdminStore', () => {
               {
                 id: 'h-cave',
                 name: 'Cave Event',
-                biomes: ['cave'],
+                biomes: ['cave', 'desert'],
                 dangerTags: ['hazardous'],
                 dropRate: 25,
               },
@@ -6355,18 +6524,29 @@ describe('createAdminStore', () => {
       store.updateEnvironmentDraft({
         biomes: ['cave'],
         dangerLevel: 'hazardous',
-        compositionMode: 'manual',
+        compositionMode: 'automatic',
       });
 
-      store.includeEnvironmentRecord('event', 'h-cave');
       store.forceIncludeEnvironmentRecord('event', 'h-desert');
+      let composition = get(store.viewState).environmentComposition;
+      assert.equal(
+        composition.events.find((entry) => entry.id === 'h-desert').matches,
+        false,
+        'the force starts out overriding a real mismatch'
+      );
+
       store.updateEnvironmentDraft({ biomes: ['desert'] });
 
-      let composition = get(store.viewState).environmentComposition;
+      composition = get(store.viewState).environmentComposition;
       const forced = composition.events.find((entry) => entry.id === 'h-desert');
       assert.equal(forced.matches, true);
       assert.equal(forced.compositionState, 'forceIncluded');
       assert.equal(forced.runtimeState, 'available');
+
+      // Seeded explicitly, because force-adding a record appends it to `eventOrder` and nothing
+      // else here writes that list — the matched record would otherwise rank last by default and
+      // the drag below would read as moving the wrong row.
+      store.updateEnvironmentDraft({ eventOrder: ['h-cave', 'h-desert'] });
 
       assert.equal(store.reorderEnvironmentRecord('event', 0, 1), true);
       const draft = get(store.viewState).environmentDraft;
@@ -6379,7 +6559,7 @@ describe('createAdminStore', () => {
               'includedByMatch',
               'explicitlyIncluded',
               'forceIncluded',
-              'includedButUnavailable',
+              'includedNotMatching',
             ].includes(entry.compositionState)
           )
           .map((entry) => entry.id),
@@ -6624,9 +6804,9 @@ describe('createAdminStore', () => {
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
-      // The library a drop-row reference points INTO is SYSTEM-owned (issue 1117); the
-      // gathering config carries only the tasks and events that reference it.
-      sys.modifiers = [
+      // The library a drop-row reference points INTO is the ONE library (issue 1117), WORLD scope
+      // since issue 1308; the gathering config carries only the tasks and events referencing it.
+      services._characterLibraries.modifiers = [
         {
           id: 'strength',
           label: 'Strength',
@@ -8089,6 +8269,129 @@ describe('createAdminStore', () => {
         { id: 'comp-2', name: 'Herb', img: 'item.png', description: '', category: 'general' },
         { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '', category: 'general' },
       ]);
+    });
+
+    // ── COMPLICATIONS ON THE COMPONENT-OPTION PROJECTION (issue 1286) ──────────────────
+    //
+    // `managedItemOptions` is the feed for BOTH GM read-only complication strips — the
+    // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
+    // rows. Each of those rows draws the complications of the component it REFERENCES, never
+    // of the component being edited, so this projection is the only route either strip has.
+    // It is the same reason `difficulty` is projected here, and the same failure mode: a
+    // field omitted from this allowlist reaches the editor as `undefined` and the surface
+    // reads as unauthored rather than as a dropped projection.
+    it('managedItemOptions carries the authored complications, and preserves their absence', async () => {
+      const complications = [
+        {
+          id: 'cx-1',
+          name: 'The spring lets go',
+          severity: 'severe',
+          visibility: 'gmOnly',
+          activities: { salvage: true, crafting: true },
+          when: { stageMissed: true },
+        },
+      ];
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [
+        makeItem({ id: 'comp-1', name: 'Coiled Mainspring', complications }),
+        makeItem({ id: 'comp-2', name: 'Brass Sheet' }),
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const [withComplications, without] = get(store.viewState).selectedSystem.managedItemOptions;
+
+      assert.deepEqual(
+        withComplications.complications,
+        complications,
+        'the authored list reaches the option unredacted — the strips are a GM surface, so ' +
+          'they must NOT be fed the visible-only player projection'
+      );
+      // Absence-preserving, exactly as `difficulty` is: `authoredComplications` keys the
+      // persisted field on a NON-EMPTY array, so a component with none carries no key and
+      // this projection must not invent an empty one for it.
+      assert.equal(
+        Object.hasOwn(without, 'complications'),
+        false,
+        'a component that authors none carries no key at all'
+      );
+    });
+
+    it('the projected complications are a CLONE, so a view edit cannot reach the stored component', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [
+        makeItem({
+          id: 'comp-1',
+          complications: [{ id: 'cx-1', name: 'Metal fatigue', when: { stagePartial: true } }],
+        }),
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const [option] = get(store.viewState).selectedSystem.managedItemOptions;
+      option.complications[0].name = 'Rewritten by a view';
+
+      assert.equal(
+        sys.components[0].complications[0].name,
+        'Metal fatigue',
+        'the stored component is untouched — the strips render this list, and a projection ' +
+          'handed out by reference is a write path into world data that no dirty guard sees'
+      );
+    });
+
+    // ── SAVE → RELOAD (issues 651, 676, and now 1286) ──────────────────────────────────
+    //
+    // The failure this pins has shipped twice: a field is authored, shown, and silently
+    // discarded on save, with persistence working perfectly the whole time. `complications`
+    // is a TOP-LEVEL sibling of `salvage`, so it rides `updates` on its own and every hop
+    // between the editor and the stored component has to carry it.
+    it('updateComponent round-trips complications back onto the reloaded component options', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      sys.components = [makeItem({ id: 'comp-1', name: 'Coiled Mainspring' })];
+      // Stands in for `CraftingSystemManager.updateItem`, which spreads the updates over the
+      // stored component and re-normalizes: no allowlist, so a field reaches storage iff the
+      // caller sent it.
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateItem: async (_sysId, itemId, updates) => {
+          const index = sys.components.findIndex((component) => component.id === itemId);
+          sys.components[index] = { ...sys.components[index], ...updates };
+        },
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const authored = [
+        {
+          id: 'cx-1',
+          name: 'Shrapnel',
+          severity: 'major',
+          visibility: 'visible',
+          activities: { salvage: true },
+          when: { stageMissed: true },
+        },
+      ];
+
+      assert.equal(await store.updateComponent('comp-1', { complications: authored }), true);
+
+      // `updateComponent` refreshes before it resolves, so this IS the reloaded view.
+      const [option] = get(store.viewState).selectedSystem.managedItemOptions;
+      assert.deepEqual(
+        option.complications,
+        authored,
+        'what the editor saved is what the strips read back on the next render'
+      );
+      const card = get(store.viewState).itemCards.find((entry) => entry.id === 'comp-1');
+      assert.deepEqual(
+        card.complications,
+        authored,
+        'and the item card the editor itself re-reads its draft from carries them too — ' +
+          'without this the section would repaint empty the moment Save succeeded'
+      );
     });
 
     it('viewState.essenceCards expose source state and component usage for manager', async () => {

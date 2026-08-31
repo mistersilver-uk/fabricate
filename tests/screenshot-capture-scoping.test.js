@@ -439,16 +439,13 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
 });
 
-test('Phase C seeds system modifiers canonically before the settings-list action', () => {
+test('Phase C seeds world modifiers and character prerequisites canonically before the settings-list action', () => {
   const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
   const gatheringStart = HARNESS.indexOf(
     "await game.settings.set('fabricate', 'gatheringConfig'",
     phaseCStart
   );
-  const systemPatchStart = HARNESS.indexOf(
-    '// Modifiers and Tools are SYSTEM-OWNED',
-    gatheringStart
-  );
+  const systemPatchStart = HARNESS.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
   const systemPatchEnd = HARNESS.indexOf(
     '// Reference the deliberately-unlabelled tool',
     systemPatchStart
@@ -485,10 +482,54 @@ test('Phase C seeds system modifiers canonically before the settings-list action
     'the retired-key guard must permit nested task, drop-row, and event references'
   );
   assert.doesNotMatch(gatheringPatch, topLevelCharacterModifiers);
-  assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
-  assert.match(systemPatch, /smoke-mod-herbalism/);
-  assert.match(systemPatch, /smoke-mod-survival/);
-  assert.match(systemPatch, /tools:\s*game\.settings\.get/);
+
+  // Tools stay on the canonical `csm.updateSystem` system-scoped write; modifiers moved to the
+  // WORLD `characterLibraries` setting (issue 1308/1311) and must NOT be a key of that same
+  // `updateSystem` payload any more — a regression back onto `system.modifiers` would silently
+  // stop feeding the World > Rules & Resources > Modifiers screen, which reads the world list
+  // only.
+  const updateSystemCallStart = systemPatch.indexOf('await csm.updateSystem(systemId, {');
+  const updateSystemCallEnd = systemPatch.indexOf('});', updateSystemCallStart);
+  assert.ok(
+    updateSystemCallStart >= 0 && updateSystemCallEnd > updateSystemCallStart,
+    'the canonical csm.updateSystem tools patch must remain bounded'
+  );
+  const updateSystemCall = systemPatch.slice(updateSystemCallStart, updateSystemCallEnd);
+  assert.match(updateSystemCall, /tools:\s*game\.settings\.get/);
+  assert.doesNotMatch(
+    updateSystemCall,
+    /modifiers\s*:/,
+    'system.modifiers must not be reintroduced onto the canonical updateSystem call'
+  );
+
+  const characterLibrariesCallStart = systemPatch.indexOf(
+    "await game.settings.set('fabricate', 'characterLibraries'",
+    updateSystemCallEnd
+  );
+  assert.ok(
+    characterLibrariesCallStart > updateSystemCallEnd,
+    'the world characterLibraries modifier seed must follow the tools-only system patch'
+  );
+  const characterLibrariesCall = systemPatch.slice(characterLibrariesCallStart, systemPatchEnd);
+  assert.match(characterLibrariesCall, /modifiers:\s*\[/);
+  assert.match(characterLibrariesCall, /smoke-mod-herbalism/);
+  assert.match(characterLibrariesCall, /smoke-mod-survival/);
+  // Character prerequisites moved to WORLD scope alongside modifiers (issue 1308/1311):
+  // the base 2-entry corpus must ride the SAME characterLibraries write, not a
+  // `characterPrerequisites` key on the system-creation payload — a regression there
+  // would silently stop feeding both the World > Rules & Resources > Character
+  // Prerequisites screen and the Tool Studio Requirements tab.
+  assert.match(characterLibrariesCall, /characterPrerequisites:\s*\[/);
+  assert.match(characterLibrariesCall, /smoke-pre-trained/);
+  assert.match(characterLibrariesCall, /smoke-pre-focused/);
+
+  const systemCreationPatch = HARNESS.slice(phaseCStart, gatheringStart);
+  assert.doesNotMatch(
+    systemCreationPatch,
+    /characterPrerequisites:\s*\[/,
+    'the system-creation payload must not carry its own characterPrerequisites list any more'
+  );
+
   assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
   assert.match(beforeFirstAction, /modifierRowCount !== 2/);
 });
@@ -1193,9 +1234,19 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
   assert.ok(HARNESS.includes('visibleToolRowCount !== 8'));
+  // Character prerequisites are WORLD scope (issue 1308/1311): the parity fixture must
+  // write the 5-row corpus through a read-modify-write `characterLibraries` settings.set
+  // AFTER the system-scoped tools/toolBreakage patch, never back onto
+  // `csm.updateSystem(systemId, { characterPrerequisites })` — that field is no longer
+  // what the Tool Studio Requirements tab (or any other screen) reads.
   assert.match(
     HARNESS,
-    /characterPrerequisites: parityPrerequisites,[\s\S]*?The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}/,
+    /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}[\s\S]*?\}\);[\s\S]*?settings\.set\('fabricate', 'characterLibraries', \{[\s\S]*?\.\.\.worldCharacterLibraries,[\s\S]*?characterPrerequisites: parityPrerequisites,/,
+  );
+  assert.doesNotMatch(
+    HARNESS,
+    /await csm\.updateSystem\(systemId, \{[\s\S]{0,40}characterPrerequisites: parityPrerequisites/,
+    'system.characterPrerequisites must not be reintroduced onto the Tool Studio updateSystem call',
   );
   assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
   assert.match(

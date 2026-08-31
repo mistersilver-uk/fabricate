@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-simple-check-characterization-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     // Added by the conversion, and ONLY the dependency manifest: no assertion below moved.

@@ -64,7 +64,12 @@ import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenanc
 export const MUTATION_CLEANUP_ENTITY_KINDS = Object.freeze({
   'orphaned crafting runs': Object.freeze(['recipes', 'systems']),
   'orphaned learned recipes': Object.freeze(['recipes']),
-  'orphaned crafting preferences': Object.freeze(['recipes', 'systems', 'components']),
+  'orphaned crafting preferences': Object.freeze([
+    'recipes',
+    'systems',
+    'components',
+    'componentIdentityRemap',
+  ]),
 });
 
 /**
@@ -91,6 +96,12 @@ export const MUTATION_CLEANUP_ENTITY_KINDS = Object.freeze({
  *   omission MUST be reported — the callers discard the return value, so an omitted sweep
  *   is otherwise indistinguishable from one that found nothing to prune.
  * @param {string} [options.subject] What the GM did, named in the warning.
+ * @param {Record<string, boolean>} [options.basis] The per-kind id basis. Defaults to
+ *   {@link WHOLE_CORPUS_ID_BASIS}, which answers COMPLETENESS only — so a pass declaring a
+ *   kind that constant does not carry is OMITTED unless the caller supplies it. That
+ *   fail-closed default is the point: `componentIdentityRemap` (issue 1363) asks whether
+ *   component ids are still CURRENT, which only a caller holding a settings accessor can
+ *   answer, and a caller that forgets to answer it must skip the sweep rather than run it.
  * @returns {Promise<{swept: string[], targeted: string[], omitted: string[],
  *   basis: Record<string, boolean>}>} what actually ran, so the decision is assertable at
  *   the call site rather than only observable through the collaborators.
@@ -99,11 +110,12 @@ export async function runGatedMutationCleanup({
   passes = [],
   warn = console.warn,
   subject = 'a content change',
+  basis = WHOLE_CORPUS_ID_BASIS,
 } = {}) {
   const omissions = [];
   const permitted = buildStartupPassList({
     candidates: passes.map((pass) => [pass.label, pass]),
-    basis: WHOLE_CORPUS_ID_BASIS,
+    basis,
     declarations: MUTATION_CLEANUP_ENTITY_KINDS,
     onOmit: (omission) => {
       omissions.push(omission);
@@ -119,13 +131,13 @@ export async function runGatedMutationCleanup({
   // omission notice with it.
   if (omitted.length > 0) {
     warn(
-      `Fabricate | Orphaned-flag cleanup after ${subject} skipped a sweep: the ids it would prune against are not known to be complete. ` +
+      `Fabricate | Orphaned-flag cleanup after ${subject} skipped a sweep: the ids it would prune against are not known to be complete, or have just been re-keyed by a migration whose identity repair has not run yet. ` +
         'Nothing beyond what was just removed was deleted, and the next boot on a complete corpus reconciles the rest. ' +
         `Skipped: ${omitted.join(', ')}`,
       {
         omitted: omissions,
         targetedFallbacks: fallbacks.map((pass) => pass.label),
-        basis: WHOLE_CORPUS_ID_BASIS,
+        basis,
       }
     );
   }
@@ -142,5 +154,5 @@ export async function runGatedMutationCleanup({
     targeted.push(pass.label);
   }
 
-  return { swept, targeted, omitted, basis: WHOLE_CORPUS_ID_BASIS };
+  return { swept, targeted, omitted, basis };
 }

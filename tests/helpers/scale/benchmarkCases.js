@@ -50,6 +50,96 @@ const BULK_ROWS = 5;
  */
 const CORPUS_ROW_SERIES = Object.freeze([25, 50, 100]);
 
+/**
+ * How many world-scope entities each issue-1359 case seeds (issue 1359, epic 1357).
+ *
+ * Half the 5,000-component library, deliberately, so BOTH halves of both unions are
+ * non-degenerate: 2,500 world entities with a membership record for the bench system beside a
+ * 5,000-entry in-system array. A fixture where the world corpus were empty would take each
+ * union's degenerate branch and measure nothing — which is exactly the gap these cases exist to
+ * close, since every OTHER case in this registry either runs against a hand-built stub that never
+ * calls `_normalizeSystem` or seeds no world setting at all.
+ *
+ * WHETHER THOSE 2,500 IDS OVERLAP THE IN-SYSTEM ARRAY IS PER CASE, and it decides what each
+ * case's counts can distinguish. See `worldComponentScope`.
+ */
+const WORLD_SCOPE_ENTITIES = 2500;
+
+/**
+ * How many times the scoped union case REPEATS the same read.
+ *
+ * The point is not the wall clock: it is that `identityIndexBuilds` stays at ONE across all of
+ * them. A memo that was silently rebuilt per call would be `SCOPED_UNION_READS` builds, each
+ * O(world entities + memberships), and the committed count is what says which of the two is
+ * happening. One read could never distinguish them.
+ */
+const SCOPED_UNION_READS = 25;
+
+/**
+ * The prefix that turns an in-system component id into one the in-system array does NOT carry.
+ *
+ * See `worldComponentScope`: which of the two rosters a case seeds decides what its counts can
+ * distinguish, so the choice is a per-case argument rather than a single shared fixture.
+ */
+const WORLD_ONLY_ID_PREFIX = 'world-only-';
+
+/**
+ * The world component scope payload for one bench world, in the PERSISTED shape.
+ *
+ * THE TWO ROSTERS ARE NOT INTERCHANGEABLE, and picking the wrong one makes a case blind to the
+ * failure it exists to catch.
+ *
+ * - `overlap: true` draws the roster from the FIRST `WORLD_SCOPE_ENTITIES` in-system components,
+ *   so every world row COLLIDES with a legacy row. That is what the READ UNION case wants: the
+ *   union's "world wins on an id collision" branch is what decides all 2,500 of them. Its row
+ *   count is 5,000 either way, so the row count alone cannot tell a two-half union from the
+ *   legacy half alone — which is why that case also commits `scopedUnionWorldWins`.
+ * - `overlap: false` mints ids the in-system array does not carry, so the BASIS union is
+ *   strictly WIDER than the legacy array: 5,000 + 2,500. A basis that ignored the world store
+ *   would answer 5,000, and a roster drawn from the in-system ids could not show the difference.
+ *
+ * @param {object} world
+ * @param {object} [options]
+ * @param {boolean} [options.overlap] Whether the roster reuses in-system ids. Defaults to `true`.
+ * @returns {object}
+ */
+function worldComponentScope(world, { overlap = true } = {}) {
+  const scoped = world.fixture.components.slice(0, WORLD_SCOPE_ENTITIES);
+  const entities = [];
+  const defaults = {};
+  const membership = {};
+  for (const component of scoped) {
+    const id = overlap ? component.id : `${WORLD_ONLY_ID_PREFIX}${component.id}`;
+    entities.push({ id, name: component.name, img: component.img });
+    defaults[id] = { id, category: component.category };
+    membership[`${id}|${world.system.id}`] = {
+      entityId: id,
+      systemId: world.system.id,
+      inherit: {},
+    };
+  }
+  return { entities, defaults, membership };
+}
+
+/**
+ * A real `CraftingSystemManager` holding the bench system, with a LOADED world component scope
+ * store injected — the seam `src/main.js` fills from `game.fabricate`.
+ *
+ * @param {object} world
+ * @returns {{manager: object, store: object}}
+ */
+function scopedManager(world) {
+  world.settings.set('componentScope', worldComponentScope(world));
+  const store = world.modules.worldScopeStores.createComponentScopeStore();
+  store.load();
+  const manager = new world.modules.CraftingSystemManager(world.recipeManager, {
+    componentScopeStore: store,
+  });
+  manager.systems = new Map([[world.system.id, world.system]]);
+  manager.initialized = true;
+  return { manager, store };
+}
+
 /** Rows the alchemy workbench listing is bounded to. */
 const ALCHEMY_ROWS = 100;
 
@@ -290,6 +380,96 @@ function simpleCorpusCases() {
         ),
       }),
     },
+    {
+      id: 'craftingSystemManager.scopedUnionRead',
+      profile: 'simple-corpus',
+      description:
+        'The world-scope READ UNION (issue 1359) over a 2,500-entity world component corpus ' +
+        'unioned with the 5,000-component in-system library, read ' +
+        `${SCOPED_UNION_READS} times through the REAL CraftingSystemManager. ` +
+        'identityIndexBuilds must stay at 1: it is the committed proof that the memo is HIT ' +
+        'rather than rebuilt per call, and scopedUnionWorldWins is the committed proof that the ' +
+        'WORLD half participated at all.',
+      setup: (context) => {
+        const world = worldFor(context);
+        return { world, ...scopedManager(world) };
+      },
+      run: ({ manager, world }) => {
+        let union = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          union = manager.resolveScopedComponents(world.system);
+        }
+        return union;
+      },
+      counts: ({ world }, union) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: union.length,
+        // THE ROW COUNT ALONE IS BLIND. This roster overlaps the in-system array exactly, so
+        // `scopedUnionRows` is 5,000 whether the world half participated or was dropped on the
+        // floor. Only a world row carries `member` — it is stamped by the three-layer resolver
+        // and a legacy row passes through verbatim — so this is the count that moves, from 2,500
+        // to 0, the moment the membership-filtered pass stops contributing.
+        scopedUnionWorldWins: union.filter((entry) => entry.member === true).length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        // The join payload cost of the new key, at this scale. World settings are delivered whole
+        // to every client and every edit rebroadcasts the whole value, so the BYTES are the fact
+        // #1070 asks for rather than the time.
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        // The harness shares ONE settings map across every case in a profile, so a case that left
+        // this key behind would silently change what `craftingSystemManager.normalizeImport` and
+        // `craftingSystemManager.save` measure afterwards.
+        world.settings.delete('componentScope');
+      },
+    },
+    {
+      id: 'craftingSystemManager.normalizeImport.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'The other half of issue 1359: initialize() runs _normalizeSystem over the whole ' +
+        '5,000-component library while the world component scope is SEEDED with a roster of ' +
+        '2,500 ids the in-system array does NOT carry, so scopedBasisComponentIds is 7,500 — ' +
+        'the committed proof that the Valid Id Basis really does union the world roster with ' +
+        'the in-system array instead of taking its degenerate branch.',
+      setup: (context) => {
+        const world = worldFor(context);
+        // DISJOINT, unlike the read-union case above. A roster drawn from the in-system ids would
+        // make the basis 5,000 whether or not the world half was consulted, so the count could
+        // not distinguish a real union from the legacy array alone. See `worldComponentScope`.
+        world.settings.set('componentScope', worldComponentScope(world, { overlap: false }));
+        world.settings.set('craftingSystems', [world.system]);
+        const store = world.modules.worldScopeStores.createComponentScopeStore();
+        store.load();
+        return { world, store };
+      },
+      run: async ({ world, store }) => {
+        const manager = new world.modules.CraftingSystemManager(world.recipeManager, {
+          componentScopeStore: store,
+        });
+        await manager.initialize();
+        return manager;
+      },
+      counts: ({ world }, manager) => ({
+        normalizedSystems: manager.systems.size,
+        normalizedComponents: [...manager.systems.values()].reduce(
+          (total, system) => total + (system.components?.length ?? 0),
+          0
+        ),
+        // MANAGER-DERIVED, and the only count here that can move. The other four are identical to
+        // the unscoped `craftingSystemManager.normalizeImport` case plus two facts read off the
+        // settings map, so a basis that ignored the world store outright would leave every one of
+        // them unchanged. This one is the basis the normalize run prunes against, asked of the
+        // manager itself: 5,000 in-system ids plus a disjoint 2,500-id world roster.
+        scopedBasisComponentIds: manager._scopeBasis(manager.getSystem(world.system.id))
+          .componentIds.size,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        world.settings.delete('componentScope');
+      },
+    },
     ...CORPUS_ROW_SERIES.map((rows) => ({
       id: `craftingListing.buildListing.corpusAxis@${rows}`,
       profile: 'simple-corpus',
@@ -313,6 +493,88 @@ function simpleCorpusCases() {
         availableRecipes: listing.counts.available,
       }),
     })),
+    // APPENDED, never inserted ahead of the cases above. A profile's FIRST case absorbs a
+    // one-off index build over the fixture's shared arrays, and several committed counts here
+    // depend on which case warmed which array first.
+    {
+      id: 'craftingSystemManager.getComponentsForSystem.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'THE REPOINTED READ ACCESSOR (issue 1370). `getComponentsForSystem` is the door every ' +
+        'manager-holding reader now enters through, and this reads it ' +
+        `${SCOPED_UNION_READS} times against a SEEDED 2,500-entity world corpus unioned with ` +
+        'the 5,000-component in-system library. identityIndexBuilds must stay at 1: the ' +
+        'accessor is called once per read and a memo rebuilt per call would be 25 builds, each ' +
+        'O(world entities + memberships), on a path the crafting UI opens on.',
+      setup: (context) => {
+        const world = worldFor(context);
+        return { world, ...scopedManager(world) };
+      },
+      run: ({ manager, world }) => {
+        let components = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          components = manager.getComponentsForSystem(world.system.id);
+        }
+        return components;
+      },
+      counts: ({ world }, components) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: components.length,
+        // THE ROW COUNT ALONE IS BLIND, exactly as in `scopedUnionRead`: this roster overlaps
+        // the in-system array, so the row count is 5,000 whether or not the world half
+        // participated. Only a MERGED row carries `member`.
+        //
+        // NOT `scopedUnionWorldWins`, which is what the issue-1359 case above still calls the
+        // identical measurement. That spelling described a rule issue 1370 INVERTED: while
+        // `## CraftingSystem` requirement 36 holds the world layer wins no key, row or order
+        // the in-system record decides. What this counts is how many rows the world half
+        // CONTRIBUTED to, which is what makes it a non-degenerate two-half union. The older
+        // case keeps its spelling because renaming it would move a committed baseline this
+        // change must not move; the two count the same thing.
+        scopedUnionMergedRows: components.filter((entry) => entry.member === true).length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        // The harness shares ONE settings map across a profile, so a case that left this key
+        // behind would change what every later case measures.
+        world.settings.delete('componentScope');
+      },
+    },
+    {
+      id: 'scopedEntityReads.resolvedComponentsFor.worldScoped',
+      profile: 'simple-corpus',
+      description:
+        'THE OTHER SPELLING of the same door (issue 1370): the shared read seam, taken by the ' +
+        'readers that hold a system RECORD and no manager. Same corpus, same read count, and ' +
+        'the same committed identityIndexBuilds of 1 — the two spellings share ONE body, so a ' +
+        'change that memoized only the manager path would move this number and not the other.',
+      setup: (context) => {
+        const world = worldFor(context);
+        world.settings.set('componentScope', worldComponentScope(world));
+        const store = world.modules.worldScopeStores.createComponentScopeStore();
+        store.load();
+        return { world, corpus: store.corpus() };
+      },
+      run: ({ world, corpus }) => {
+        let components = null;
+        for (let read = 0; read < SCOPED_UNION_READS; read++) {
+          components = world.modules.scopedEntityReads.resolvedComponentsFor(world.system, corpus);
+        }
+        return components;
+      },
+      counts: ({ world }, components) => ({
+        scopedUnionReads: SCOPED_UNION_READS,
+        scopedUnionRows: components.length,
+        // See the sibling case above for why this is not spelled `scopedUnionWorldWins`.
+        scopedUnionMergedRows: components.filter((entry) => entry.member === true).length,
+        worldScopeEntities: WORLD_SCOPE_ENTITIES,
+        worldScopeBytes: settingBytes(world.settings, 'componentScope'),
+      }),
+      teardown: ({ world }) => {
+        world.settings.delete('componentScope');
+      },
+    },
   ];
 }
 

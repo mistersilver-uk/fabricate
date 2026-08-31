@@ -17,7 +17,7 @@ See `openspec/README.md` for the block format and rules.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
-- Route quick-start documentation changes to `docs/quickstart.md` only.
+- Route quick-start documentation changes to `docs/help/quickstart.md` only.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 
 ## Default Agentic Workflow
@@ -419,8 +419,8 @@ Do NOT run it to photograph a view the registry already covers: the `screenshots
 - UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
 Evidence is always a FULL APPLICATION WINDOW — never a component on a blank page.
 Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
-- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 248 cases across both windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
-Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders, 36 cases — rather than every state of every screen.
+- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 269 cases across both windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
+Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders, 42 cases — rather than every state of every screen.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
 The per-frame rate is the durable figure; the whole-corpus total scales with the registry.
@@ -634,6 +634,14 @@ See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 A uuid-taking facade is a privilege hole, not a style choice: the uuid flows straight to `fromUuid` past the only gate that exists, and a stale, foreign, or console-supplied one reaches the server and surfaces as a **thrown exception**, not the `{ success: false, message }` every store is written to expect — so the failure is both a permission bypass and an unhandled shape.
 Keep new player entry points on `actorId`, and treat "the engine will check it" as false.
 Engine methods are the GM/API surface and are owner-scoped by their caller.
+- **Any ownership predicate whose FIRST disjunct reads `isOwner` is inert on a GM-side apply path**, and passes for a sender who owns nothing.
+`ClientDocumentMixin#isOwner` is `this.testUserPermission(game.user, "OWNER")` (`client/documents/abstract/client-document.mjs`), and `Document#testUserPermission` opens with `if ( user.isGM ) level = perms.OWNER` (`common/abstract/document.mjs`) — verified against both 13.351 and 14.365.
+So on the elected GM's client, which is the only client that runs a GM-side apply, `isOwner` is unconditionally true for every document in the world; a predicate shaped `actor.isOwner === true || actor.testUserPermission(sender, 'OWNER') === true` short-circuits on the first disjunct and never consults the attested sender at all.
+This is the failure mode a socket relay's re-authorization exists to prevent, so the relay must call `actor.testUserPermission(senderUser, 'OWNER')` **directly**, never through a shared "may this user select this actor" helper written for the client that owns the gesture.
+The two paths look identical in review and behave identically under every single-client test, because `npm test` fakes and the single-context smoke both run as one user; only reading the predicate's first disjunct catches it.
+`applyComplicationDelivery` (`src/main.js`) is the correct pattern; the blind-run gather relay carried the defect and #1288 removed it — `isGatheringActorSelectableByUser` (`src/config/preferencesCleanup.js`) now reads the passed user only, and denies rather than throwing on a nullish user (`Document#testUserPermission` reads `user.isGM` as its first statement) or slipping through on a user-id STRING (`getUserLevel` reads `user.id`, so a string falls through to `ownership.default`).
+Ownership predicates are not the only ambient read that goes wrong on a GM-side apply, and the same sweep found the second: `GatheringRunManager.createRun` stamped a run's `userId` from `game.user`, so a relayed blind start created a run **owned by the elected GM** — which `getGatheringRunViewer` reads back at maturity as a GM viewer, making `_isOpaqueBlindTask` false and writing the drawn task's real id into the player-readable actor flag.
+When a relay applies something on another user's behalf, thread that user through EVERY identity the applied work records, not just the one it authorizes against.
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
 `scope: 'user'` is the cross-device per-user scope **within one world** (NOT a per-account-globally scope — see the next bullet), and `scope: 'world'` is shared for the world.
 Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user".
@@ -714,6 +722,15 @@ See `_runOneEssencePropertyMacro` in `src/systems/CraftingEngine.js` (`try { mac
 `Macro#validateJoint` syntax-validates `command` as JavaScript only when `type === 'script'` (verified against Foundry 14.361), so a chat macro's `command` is guaranteed-unvalidated text that still passes a bare string-typeof guard.
 A drop-handler check that inspects the dragged payload's type guards only newly authored links; an imported system, a hand-edited world setting, or a macro whose own type the GM changes AFTER linking all reach runtime unguarded, so a consumer that compiles `command` as JavaScript (`MacroExecutor.run`) needs its own `macro.type !== 'script'` backstop at the point it resolves the macro, not only at the point the link is authored.
 See `_runOneEssencePropertyMacro` in `src/systems/CraftingEngine.js`.
+- **A whispered `ChatMessage` that carries `rolls` is VISIBLE to every client**, because `visible` tests `isRoll` BEFORE it tests the whisper list.
+The getter is `if ( this.whisper.length ) { if ( this.isRoll ) return true; ... }` (`client/documents/chat-message.mjs`; the quoted branch and its ordering are identical on 13.351 and 14.365, and only the elided tail differs cosmetically — 13 uses `indexOf(...) !== -1`, 14 uses `includes(...)`), so `whisper: [gmId]` plus a non-empty `rolls` renders the card in every player's sidebar.
+Two consequences, and both are design constraints rather than bugs to fix: a **GM-only card must carry no rolls at all**, and a **GM-only roll discloses its own existence** by design — core's Private GM Roll behaves the same way, showing every player that a hidden roll happened while `isContentVisible` hides the formula and total.
+So a feature that wants a private roll AND a private card needs two messages: a rolled one the players see the existence of, and a roll-free whispered one carrying the prose.
+- **Foundry does not scope whispers SERVER-side; `visible` and `isContentVisible` are purely presentational.**
+The document is broadcast in full to every connected client: `ChatMessage.metadata.permissions` declares only `create` and `delete` and no view predicate (`common/documents/chat-message.mjs`), and the server-side subclass adds only migrations and a timestamp default with no recipient projection (`dist/database/documents/chat-message.mjs`, 14.365).
+A player can therefore read a GM whisper's `content` straight out of `game.messages` in the console.
+This is core behaviour and is identical for core's own Private GM Roll, so it is not a Fabricate defect — but it is the honest limit on any claim that a whispered card is a safe home for secret text, and it belongs beside the world-setting disclosure note in `data-models/spec.md` § Component rather than being rediscovered.
+Fabricate's `visibility: 'gmOnly'` is therefore a **disclosure** guarantee (no Fabricate surface shows it) and never a **confidentiality** guarantee.
 - **A test double for a Foundry util must match the REAL helper's edge semantics, not just its happy path.** A stub LOOSER than core produces false passes, which is the direction nobody notices under `npm test`: the essence-macro test fixtures' hand-rolled `setProperty` stub vivified on `== null` (replacing a `null` intermediate with `{}`, where real Foundry throws) and omitted core's `__proto__`/`constructor`/`prototype` refusal, so no test built on that stub could ever fail on the `setProperty` defect above while the real code aborted crafts in production.
 See `tests/helpers/essenceFixtures.js`.
 - **Foundry's LIGHT application theme changes almost nothing about a Fabricate window, so a light-theme screenshot that looks dark is correct rather than broken.**
@@ -726,6 +743,51 @@ This does NOT mean the light theme leaks nothing into Fabricate, and the mechani
 For the manager that ancestor is the root itself, `.fabricate-manager`; for the player the shell root `.fabricate-app-shell` in `src/ui/svelte/apps/FabricateAppRoot.svelte` sets `color: var(--fab-text)` for every tab, while on the crafting tab a nearer rule — `.crafting-view-grid` in `src/ui/svelte/apps/crafting/CraftingView.svelte` — re-declares the same value, so either one would do the job.
 A Fabricate surface therefore leaks exactly when no Fabricate root colour covers it, which is the leak issue 972 owns, or when core sets a colour on the element itself rather than on an ancestor.
 Whether core does the latter for `h1`–`h6` under `theme-light` is unverified and needs the harvested `foundry2.css` above to settle.
+- **Hook listeners fire in REGISTRATION order, which is module-script EXECUTION order — not `module.json` declaration order and not `relationships.requires` order.**
+Foundry orders a world's `esmodules` first by the `library` manifest flag (a `library: true` package's scripts execute at internal priority 4, ahead of the game system at priority 6, a non-`library` module at priority 8, and the world's own scripts at priority 10) and then, among packages at the same priority, by WORLD MODULE-COLLECTION order; `relationships.requires` does not influence load order at all, however strongly it reads as a dependency declaration (issue 1289, verified against source rather than inferred).
+Fabricate declares no `library` flag, by decision: raising one WOULD close the ordering gap against a non-`library` companion — priority sort is stable, so every priority-4 esmodule runs before every priority-8 one, meaning `bindFabricateGlobal()` would then execute before a normal companion's `init` body — but Foundry defines the flag to mean a package "provides no user-facing functionality and is solely for use by other modules" (`common/packages/_types.mjs`), which Fabricate is not, so setting it would be a manifest lie and would additionally reorder Fabricate ahead of the game system, not a position a crafting module should take; `module.json` is on `HIGH_RISK_PATHS`, so that trade is declined regardless, and the residual gap against another `library: true` package would remain in any case.
+The consequence for anything assigned onto `game.fabricate`: **nothing there is guaranteed readable from another module's `init`.**
+A companion sorting ahead of Fabricate in its world's module collection reads `game.fabricate` as `undefined` at its own `init` — not as a descriptor with an unreadable field — because `bindFabricateGlobal()` is the line that CREATES `game.fabricate`, and it runs from Fabricate's own `init` listener.
+A companion MUST read anything Fabricate publishes in `setup` or `ready`, not at its own `init`, and MUST treat an absent `game.fabricate` there as *Fabricate has not loaded yet* and retry — never as *this Fabricate build has no such contract*, and never as a trigger for a degraded path.
+- **A `game.fabricate` accessor answering `null` before `initialize()` has run is a fact about the underlying FIELD, not something each accessor's own code checks.**
+`craftingEngine`, `actorInventoryCoinSpender`, and `actorPropertyCoinSpender` are all initialised to `null` in the `Fabricate` constructor and reassigned exactly once, inside `initialize()`; `getCurrencyConfigStore()` instead normalizes with `?? null` on every read.
+Verified at all four sites individually rather than assumed to generalise from one (issue 1289): none of the four getters — `getCraftingEngine`, `getActorPropertyCoinSpender`, `getActorInventoryCoinSpender`, `getCurrencyConfigStore` — is `_requireReady()`-gated, so a pre-readiness call never throws and always answers `null`, never an unrelated live object and never an exception.
+Do not add a readiness guard to one of these accessors on the assumption the others already have one, and do not remove the guardless pattern from a new sibling accessor expecting one to already exist elsewhere: none does, by design.
+The throw belongs to a caller that needs a value NOW (`_requireReady()`); a `null`-before-readiness accessor exists precisely so a companion can read it defensively without wrapping every read in a `whenReady()` gate.
+- **V14 retired the `rollMode` chat vocabulary in favour of `messageMode`.**
+On 14.365 `core.rollMode` survives only as a deprecated shim setting, registered in `client/game.mjs`, that maps `core.messageMode` back to a legacy string, so any read of it returns a truthy value and trips `Roll#toMessage`'s own deprecation warning in `client/dice/roll.mjs` — which carries **no `once`**, so it fires once per roll rather than once per session, unlike the setting-read warning itself, which **is** `{once: true}`.
+Do not conflate the two: reading the setting warns once per session; the truthy value it hands to `Roll#toMessage` then warns again on every single roll, which is the one that matters for a bulk resolve.
+An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on `CONFIG.ChatMessage.modes[mode]` being undefined.
+Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
+This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
+- **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
+On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
+On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
+So `i18n.format(key, data)` in `src/ui/svelte/util/foundryBridge.js` is correct on both supported builds today, but "modernising" it to `i18n.localize(key, data)` would silently break on V13.351, where `localize` ignores a second argument.
+Do not collapse the two calls into one without re-checking both builds' declared signatures.
+- **A Foundry document write is judged by its RETURN VALUE, not by whether it threw.**
+`createEmbeddedDocuments` resolves `[]` — not a rejection — when the document constructor throws on a bad payload, when `_preCreate` returns `false`, when a `preCreate<Type>` hook returns `false`, or when `_preCreateOperation` returns `false`; the client drops each such document with a `continue` and returns early on an empty batch (`client/data/client-backend.mjs`, `#preCreateDocumentArray` / `_createDocuments`, identical at 13.351 and 14.365).
+Only the constructor-throw case is additionally reported to the user, through `Hooks.onError(..., { notify: 'error' })`; the other three are `console.debug` only, and `_preCreate` returning `false` is indistinguishable from a hook returning `false` because both drop the document by that same `continue`.
+`Document#update` resolves `undefined` when the whole diff is empty — which a single off-schema key is enough to produce, since `SchemaField` prunes keys that are not in the data model — and it does so **at the default `diff: true`**, which is what `operation.diff ??= true` supplies.
+BOTH builds gate that drop on `diff`: 13.351 nests the empty-diff `continue` inside an `if ( options.diff )` block in `#preUpdateDocumentArray`, and 14.365 flattens the same gate into one conjunction, which is a syntactic refactor rather than a behavioural difference.
+So `{ diff: false }` sends the full payload and resolves the document at either build, and the caveat is needed at both ends rather than at 14 alone.
+A write REJECTS only for a server-side refusal, via `SocketInterface.dispatch`, which means the write did not happen.
+At V14 both returns are additionally filtered by `response.sideEffect`, which defaults `false` and is never set anywhere in the client bundle, so it is server-driven and whether a plain embedded create could ever come back marked is **unverified** from source.
+The consequence for any caller reporting an amount: derive it from what the write returned, never from the request.
+- **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
+A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
+Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.
+A call site that needs the distinction resolves the uuid itself and gates on `macro.type === 'script'` before delegating — the resolve-then-gate idiom — rather than discovering the problem from a `SyntaxError` after the fact.
+- **A synthetic (unlinked-token) actor carries the BASE actor's `_id`**, so `game.actors.get(id)` silently answers the world prototype and an id cannot disambiguate two tokens of one actor even in principle.
+`BaseActorDelta.applyDelta` takes `baseActor.toObject()` and deletes only the DELTA's `_id` before constructing the Actor, byte-identical at 13.351 and 14.365, and `ActorDelta#_initialize` asserts the same invariant by rebuilding whenever `syntheticActor?.id !== parent.actorId`.
+Foundry's own handle for one is `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActorId>")`: `TokenDocument#getEmbeddedCollection("Actor")` answers `this.actors` keyed by `this.actorId`, and `buildUuid` composes exactly that path.
+Only ADDRESSING is the gap — writes route correctly, because `#adjustActorDeltaRequest` rewrites `operation.parentUuid` to `token.delta.uuid` for any embedded write whose parent has a `TokenDocument` ancestor, byte-identical at both builds.
+On 14.365 `TokenDocument#actor` gained an `isLazyDelta && _preventActorDeltaAccess` early return, so it can answer `null` where 13.351 always answered the synthetic actor.
+- **Reading back a stack quantity reads PREPARED data, not `_source`**, so a re-read is a weaker signal than the write's own return.
+`probeStackQuantityPath`'s `'schema-discard'` verdict exists for exactly this divergence (`probeStackQuantityPath` in `src/systems/itemStackQuantity.js`): `SchemaField._cleanType` deletes keys that are not in the schema, so an off-schema write is discarded while a value some other module or active effect put at the same path still reads fine on the prepared document — and a system whose data preparation recomputes the path masks a successful `_source` write from the other direction.
+Prefer a write's own return when asking "did my write land", and prefer `_source` where a re-read is unavoidable.
+One generalisation to resist while doing so: the decisive axis is what a value RESOLVES AGAINST, never where it was declared.
+The CSS counter-example makes the same point one layer over — the `font` / `--button-size` argument does not transfer to fields, because `2em` resolves against the using element's own font size while `2rem` is root-relative and would not move even if it were declared on the element, so the UNIT is what decides and the declaration site is not.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
@@ -851,11 +913,31 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
 
-### Reference-led redesign and design-system migration
+### The design system is consulted before any UI work
 
-Non-trivial UI work follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
+`openspec/specs/design-system/spec.md` is the canonical record of the rules the shared primitive set obeys: the two-caller membership bar, the canonical geometry ladders, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
+The set ITSELF is enumerated in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, which also renders each at its geometry — open it in a browser when a written value needs to be seen rather than read.
+`scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped primitive keyed on the implementation path a diff names.
+`tests/design-system-coverage.test.js` reads the library and the manifest and fails when they describe different vocabularies.
+
+Every agent that plans, implements, reviews, or documents a change touching `src/ui/`, `styles/`, or a UI requirement in `openspec/specs/` MUST read that capability first and MUST cite the entry it relied on.
+The order is fixed: **reuse, then extend, then add.**
+
+- **Reuse.** If the set already contains a primitive whose meaning covers the case, import it.
+A surface that hand-rolls markup a primitive already owns is a defect, not a variant.
+- **Extend.** If the case needs behaviour the primitive lacks, add a prop to the primitive that owns the meaning.
+Adding flexibility there takes precedence over a second component that owns half of it.
+- **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
+That change adds its specimen to `openspec/specs/design-system/library.html` AND, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
+A component under `src/ui/svelte/components/` with no specimen is an undocumented primitive, a specimen with no row for a shipped primitive is a name no diff can be attributed to, and `tests/design-system-coverage.test.js` is the gate that fails on either: it requires every file in that directory to carry a manifest row, and requires no library entry recorded as unbuilt to ship as a component.
+
+A candidate that decomposes entirely into existing members is a composition and does not enter the set; it goes to the capability's ruled-out register with the composition that replaces it, so it is not re-proposed.
+Where a proposal conflicts with a shipped component, the shipped props are the specification — adopt them, or state in the same change why they are being replaced.
+Geometry, colour, spacing and elevation come from the ladders and tokens that capability names; a value off a ladder or a raw colour literal is a gate failure rather than a style choice.
+
+Non-trivial UI work also follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 Open every supplied artifact, assign authority per control and state, record dimensions and expected deviations, inventory shipped siblings and primitives before plan approval, and compare rendered output rather than source declarations.
-The shipped primitive catalog and semantic-slider geometry live in `.agents/skills/fabricate-ux-designer/references/design-system.md`.
+`.agents/skills/fabricate-ux-designer/references/design-system.md` remains the working reference for theming architecture, the token layers and the shipped inventory; where it and the `design-system` capability disagree, the capability wins.
 
 ## Markdown & Prose Conventions
 
@@ -979,6 +1061,9 @@ Plan-review, implementation-review, and docs-loop reviewers return their verdict
 - Delete test files.
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
+- Add a component under `src/ui/svelte/components/` without adding its specimen to `openspec/specs/design-system/library.html` and its row to `scripts/lib/designSystemPrimitives.json` in the same change.
+`tests/design-system-coverage.test.js` enforces this: it fails when a file in that directory carries no manifest row, and when the library and the manifest describe different vocabularies.
+Equally, do not hand-roll markup for a control the primitive set already owns, and do not introduce a second component that owns half a meaning an existing primitive owns — extend that primitive instead.
 - Patch dead UI / config / code branches as a workaround.
 When a control has nothing useful to configure or a code path has no remaining purpose, propose wholesale removal first.
 - Add static cloud credentials (e.g. AWS access keys) to CI.

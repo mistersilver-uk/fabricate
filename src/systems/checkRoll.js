@@ -15,6 +15,7 @@ import {
   stripRetiredModifierPlaceholder,
 } from '../utils/craftingCheckExpression.js';
 
+import { V14_CHAT_MODE_BY_LEGACY_ROLL_MODE } from './bulkChatVisibility.js';
 import { appendResolvedCheckModifier } from './checkModifierResolver.js';
 import {
   appendCheckModifierRollTerms,
@@ -517,6 +518,102 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     diceGroups: rolledDiceGroups(roll),
     resolvedFormula: resolved?.display ?? null,
   };
+}
+
+/**
+ * The chat option that carries a roll's visibility on the RUNNING Foundry, key and token
+ * chosen TOGETHER.
+ *
+ * V13 and V14 have disjoint vocabularies and crossing them fails two different ways: a legacy
+ * token handed to V14's `applyMode` THROWS, and a V14 token handed to V13 silently posts
+ * public. `Roll#toMessage` translates only the legacy `rollMode` key (it maps it internally),
+ * so a value passed as `messageMode` reaches `applyMode` UNTRANSLATED — which is why
+ * switching the key without switching the vocabulary is a new defect rather than a fix.
+ *
+ * The probe is `typeof ChatMessage.applyMode === 'function'`: a static, which a subclassed
+ * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool. It is deliberately a
+ * `ChatMessage` static deciding a `Roll` option, because `toMessage({rollMode})` is deprecated
+ * on V14 in favour of `messageMode` and the translation table is core's own.
+ *
+ * @param {string} rollMode A legacy token (`publicroll`/`gmroll`/`blindroll`/`selfroll`). A
+ *   token with no entry in the table passes through unchanged, matching
+ *   {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}.
+ * @returns {{rollMode: string}|{messageMode: string}} One option, spread into `toMessage`'s
+ *   options bag.
+ */
+function chatModeOption(rollMode) {
+  if (typeof globalThis.ChatMessage?.applyMode === 'function') {
+    return { messageMode: V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode };
+  }
+  return { rollMode };
+}
+
+/**
+ * Roll a SIDE expression — one that is not a crafting check — and post it to chat under an
+ * EXPLICIT visibility token.
+ *
+ * ## Why this is not {@link evaluateCheckRoll}
+ *
+ * Not because of the chat post: that function already posts for Dice So Nice, gated on
+ * `options.interactive`. It is because it also applies the retired-modifier shim, the
+ * check-modifier append and the advantage transform — three transforms that belong to a
+ * crafting CHECK and have no business on a complication's damage roll. A `2d6` shrapnel roll
+ * must not silently gain `+ 4[Modifiers]` because the system has a check-modifier catalogue.
+ *
+ * ## The mode token is always explicit
+ *
+ * `core.rollMode` / `core.messageMode` are `scope: "client"` settings, so falling back to them
+ * reads the WRITING client's own selector: a GM with Private GM Roll selected would silently
+ * turn a player-visible complication's roll GM-only. Callers pass `publicroll` or `gmroll` and
+ * never rely on the fallback. {@link chatModeOption} then picks the option key and the
+ * vocabulary together.
+ *
+ * This is the ONLY place besides {@link evaluateCheckRoll} that constructs a `Roll`.
+ *
+ * @param {string} formula The expression to roll, verbatim — no shim, no append, no transform.
+ * @param {object|null} actor The actor whose roll data resolves `@` placeholders.
+ * @param {object} [options]
+ * @param {string} [options.rollMode='publicroll'] The EXPLICIT legacy visibility token.
+ * @param {string} [options.flavor] Chat flavor.
+ * @param {object} [options.speaker] Chat speaker; omitted from the message data when absent so
+ *   core builds its own.
+ * @param {boolean} [options.post=true] Post the roll to chat. `false` evaluates only, for a
+ *   caller that carries the total somewhere other than a message.
+ * @returns {Promise<{engine: boolean, total: number, formula: string|null, posted: boolean,
+ *   roll: object|null}>} `engine: false` with no dice engine or an empty formula, the same
+ *   non-blocking shape every runner already treats as "no roll". Throws on a bad formula, which
+ *   the caller wraps — a complication's effect roll is guarded per effect precisely so a
+ *   malformed one still lets its macro run.
+ */
+export async function evaluateSideRoll(formula, actor, options = {}) {
+  const expression = String(formula ?? '').trim();
+  if (typeof globalThis.Roll !== 'function' || expression === '')
+    return { engine: false, total: 0, formula: null, posted: false, roll: null };
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  // `allowInteractive: false` for the same reason the check path passes it: never surface a
+  // manual roll-fulfilment dialog mid-resolution on a client configured for manual fulfilment.
+  const roll = await new globalThis.Roll(expression, rollData).evaluate({
+    allowInteractive: false,
+  });
+  const rolledTotal = Number(roll?.total);
+  const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
+  let posted = false;
+  if (options?.post !== false && typeof roll?.toMessage === 'function') {
+    const messageData = { flavor: options?.flavor };
+    if (options?.speaker) messageData.speaker = options.speaker;
+    try {
+      await roll.toMessage(messageData, {
+        ...chatModeOption(options?.rollMode || 'publicroll'),
+        create: true,
+      });
+      posted = true;
+    } catch (error) {
+      // Swallowed and logged, never thrown: a chat failure must not cost the caller the
+      // outcome it already committed (the same containment `evaluateCheckRoll` uses).
+      console.error('Fabricate | Failed to post side roll to chat:', error);
+    }
+  }
+  return { engine: true, total, formula: expression, posted, roll };
 }
 
 /**

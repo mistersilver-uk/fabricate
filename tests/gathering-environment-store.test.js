@@ -105,8 +105,12 @@ function environment(overrides = {}) {
     enabled: true,
     selectionMode: 'targeted',
     sceneUuid: 'Scene.stale',
-    // Tasks come from the system library (matched in); an environment is a valid
-    // task source via its enabled/forced library-task ids.
+    // Manual composition, because that is what `enabledTaskIds` alone means after issue 1315:
+    // the environment composes exactly this picked list. It used to be left mode-less — hence
+    // automatic — and still counted as a task source, because the enable gate consulted
+    // `enabledTaskIds` in any mode. Automatic ignores that list entirely, so the gate now asks
+    // the composition predicate there and this fixture has to say which mode it means.
+    compositionMode: 'manual',
     enabledTaskIds: ['lib-task'],
     ...overrides
   };
@@ -148,7 +152,7 @@ test('targeted environments may compose gathering task-library records by enable
   assert.deepEqual(created.enabledTaskIds, ['task-library-a', 'task-library-b']);
 });
 
-test('validation permits composition-only environments backed by matching library tasks or forced task ids', async () => {
+test('validation permits an automatic environment backed by a matching library task, and refuses a manual one backed only by a force list', async () => {
   const { store } = makeMemoryStore({
     gatheringConfig: {
       systems: {
@@ -172,13 +176,22 @@ test('validation permits composition-only environments backed by matching librar
   }));
   assert.deepEqual(automatic.enabledTaskIds, []);
 
-  const manualForced = await store.create(environment({
-    id: 'env-manual-forced',
-    enabledTaskIds: [],
-    compositionMode: 'manual',
-    forcedTaskIds: ['task-desert']
-  }));
-  assert.deepEqual(manualForced.forcedTaskIds, ['task-desert']);
+  // Issue 1315: manual composes exactly `enabledTaskIds`, so a force list is not a task source
+  // there — it is not consulted at all. This environment composes nothing, and the gate that
+  // used to accept it did so through a guard that read `forcedTaskIds` in manual mode.
+  const manualForced = store.validate(
+    environment({
+      id: 'env-manual-forced',
+      enabledTaskIds: [],
+      compositionMode: 'manual',
+      forcedTaskIds: ['task-desert'],
+    })
+  );
+  assert.equal(manualForced.valid, false);
+  assert.match(
+    manualForced.errors.join('\n'),
+    /must have at least one task before it can be enabled/
+  );
 
   const unmatched = store.validate(environment({
     id: 'env-unmatched-library',

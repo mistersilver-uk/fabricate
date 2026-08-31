@@ -64,6 +64,12 @@ export function providerHookPayload(provider) {
  * @property {string} subscriberFailureMessage Prefix logged when a subscriber throws.
  * @property {(...args: unknown[]) => void} [reportError] Error sink for a throwing subscriber.
  * @property {(name: string, payload: object) => void} emitHook Hook edge.
+ * @property {Record<string, Function>} [additionalPublicMethods] Further methods published on
+ *   `publicApi` beside the registration one. This exists because a registry may own a
+ *   page-session channel that is not a registration and must not die with a mount — the
+ *   Manager's `setWorldNavTabBadge` (issue 1302) — while the OTHER registry publishes nothing
+ *   of the kind. Omitting it leaves `publicApi`'s key set exactly as it was, which is what
+ *   keeps the player seam unchanged by a Manager-only feature.
  */
 
 /**
@@ -85,6 +91,7 @@ export function createExtensionRegistry({
   subscriberFailureMessage,
   reportError = console.error,
   emitHook,
+  additionalPublicMethods,
 }) {
   // One provider per surface id, not one provider full stop. The registry never
   // enumerates the ids it will accept, so a companion may claim a surface Core has never
@@ -224,7 +231,13 @@ export function createExtensionRegistry({
     return addListener(surfaceSetListeners, listener, Object.freeze(currentSurfaceIds()));
   }
 
-  const publicApi = Object.freeze({ [registerMethodName]: registerProvider });
+  // Spread AFTER the registration method, so a specialisation cannot displace the one method
+  // every registry must publish — it would have to name it, and then it is a stated override
+  // rather than an accident of key order.
+  const publicApi = Object.freeze({
+    [registerMethodName]: registerProvider,
+    ...additionalPublicMethods,
+  });
 
   return Object.freeze({
     publicApi,

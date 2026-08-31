@@ -24,6 +24,7 @@ const {
   FIXTURE_REALM_ID,
   normalizeExportEnvelope,
 } = await import('./helpers/fullAuthoringFixture.js');
+const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
 test('round-trip: export → import(keep) → export is deep-equal modulo volatile fields', async () => {
   const fixture = buildFullAuthoringFixture();
@@ -32,7 +33,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
   // Envelope carries the explicit schema markers.
-  assert.equal(first.schemaVersion, 4);
+  assert.equal(first.schemaVersion, 6);
   assert.equal(first.runtimeStateIncluded, false);
   // Runtime state stripped on export.
   for (const env of first.gatheringEnvironments) {
@@ -70,19 +71,53 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   // or authoredness-keyed, and the shape a dropped key produces is a legal shape — so the
   // round-trip has to be asserted POSITIVELY, against the non-default fixture values.
   const exported = second.system;
+  assert.equal(exported.modifiers, undefined, 'no per-system copy survives the round trip');
   assert.deepEqual(
-    exported.modifiers,
+    second.characterLibraries.modifiers,
     [
-      // NO `isRollExpression`: it is DERIVED by `CraftingSystemManager`, and this harness's
-      // system manager is a plain store rather than the real normalizer, so the round-trip
-      // under test is export/import fidelity of the AUTHORED fields.
-      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
-      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
-      { id: 'mod-skilled', label: 'Skilled', expression: '@abilities.str.mod' },
+      // `isRollExpression` IS present since issue 1308: the world slice is assembled through the
+      // real `normalizeModifierLibrary`, which derives it, whereas the old per-system copy rode
+      // this harness's plain-store system manager and was never normalized. Asserted rather than
+      // stripped, because a derived flag that failed to survive the round trip would leave the
+      // Roll chip and the roll-shaped-expression readiness rule reading a stale classification.
+      {
+        id: 'mod-medicine',
+        label: 'Medicine',
+        expression: '@abilities.med.mod',
+        isRollExpression: false,
+        min: -1,
+        max: 5,
+      },
+      {
+        id: 'mod-alchemy',
+        label: 'Alchemy',
+        expression: '@abilities.alch.mod',
+        isRollExpression: false,
+      },
+      {
+        id: 'mod-skilled',
+        label: 'Skilled',
+        expression: '@abilities.str.mod',
+        isRollExpression: false,
+      },
     ],
-    'the ONE library round-trips at the SYSTEM level, and the unbounded entries keep ' +
+    'the ONE library round-trips in the WORLD slice, and the unbounded entries keep ' +
       'NEITHER bound key — an absence-preserving field that acquired `min: 0` on the way ' +
       'through would still be a legal library'
+  );
+  assert.deepEqual(
+    second.characterLibraries.characterPrerequisites,
+    [
+      {
+        id: 'prereq-smith',
+        name: "Smith's Tools",
+        icon: 'fa-solid fa-hammer',
+        path: 'tools.smith.value',
+        op: 'gte',
+        value: 1,
+      },
+    ],
+    'and the prerequisite library rides the same slice, comparand and all'
   );
   assert.equal(
     Object.hasOwn(second.gatheringConfig.system, 'characterModifiers'),
@@ -166,7 +201,7 @@ test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', (
   const h = makeHarness(fixture);
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
-  const copy = prepareForImport(first, 'copy');
+  const copy = prepareForImport(first, 'copy', emptyCopyOptions());
 
   // System + environment container ids regenerated.
   assert.equal(copy.system.id, undefined, 'system id stripped for copy');

@@ -24,6 +24,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerModal from './ManagerModal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -283,9 +284,8 @@
             >
               {itemCountLabel(row.group.itemCount)}
             </Chip>
-            <button
-              type="button"
-              class={`manager-button is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
+            <ManagerButton
+              class={`is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
               data-import-mapping-skip
               aria-pressed={row.state.skipped}
               onclick={() => toggleSkip(row.index)}
@@ -297,7 +297,7 @@
                   ? text('FABRICATE.Admin.Items.ImportMapping.Unskip', 'Include')
                   : text('FABRICATE.Admin.Items.ImportMapping.Skip', 'Skip')}
               </span>
-            </button>
+            </ManagerButton>
           </div>
 
           {#if !row.state.skipped}
@@ -314,16 +314,15 @@
                   {/each}
                 </select>
               </label>
-              <button
-                type="button"
-                class="manager-button is-subtle manager-import-mapping-new-category"
+              <ManagerButton
+                class="is-subtle manager-import-mapping-new-category"
                 data-import-mapping-new-category
                 onclick={() =>
                   (creatingCategoryFor = creatingCategoryFor === row.index ? -1 : row.index)}
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
-              </button>
+              </ManagerButton>
 
               <RecipeRoutingAssignment
                 options={tagOptionsFor(row.state)}
@@ -381,17 +380,11 @@
   {/snippet}
 
   {#snippet footer()}
-    <button
-      type="button"
-      class="manager-button"
-      data-import-mapping-cancel
-      onclick={() => onClose()}
-    >
+    <ManagerButton data-import-mapping-cancel onclick={() => onClose()}>
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-    </button>
-    <button
-      type="button"
-      class="manager-button is-primary"
+    </ManagerButton>
+    <ManagerButton
+      role="primary"
       data-import-mapping-commit
       disabled={importDisabled}
       onclick={commit}
@@ -400,7 +393,7 @@
       <span>
         {commitLabel(importCount)}
       </span>
-    </button>
+    </ManagerButton>
   {/snippet}
 </ManagerModal>
 
@@ -424,11 +417,37 @@
 
   /* The row's inline actions — Skip / New / Add tag — are secondary to the dialog's own
      Cancel and Import, which keep the default 34px so the commit action stays the
-     heaviest thing in the footer. */
-  .manager-import-mapping-row :global(.manager-button) {
+     heaviest thing in the footer.
+
+     RE-CHAINED, and split in two, at the conversion (issue 1118, task 9). The `:global()`
+     was always here and is still load-bearing: the row is written by THIS component so it
+     carries the scoping hash, while the buttons inside it are not — two are
+     `<ManagerButton>`s now and the third never was. What changed is the arbitration. At
+     (0,3,0) this rule TIED `.fabricate-manager .manager-button.fab-manager-button` and kept
+     its 28px only because a component's injected sheet lands after the linked one; naming
+     the primitive's own class takes it to (0,4,0), which wins on specificity instead.
+
+     The SECOND selector is the half a plain re-chain would have broken, and it is the same
+     hazard as `.manager-knowledge-row-actions .manager-button`: the "Add tag" control in
+     this row is a `SearchablePopover` trigger rendered from `RecipeRoutingAssignment`'s
+     `triggerClass` STRING. It is population B, it is not converted, and it will never carry
+     `fab-manager-button` — so a chained rule cannot reach it and it would have snapped back
+     to the default 34px beside the two 28px controls it sits with. It is named by its own
+     trigger class instead, which puts it at (0,4,0) too. */
+  .manager-import-mapping-row :global(.manager-button.fab-manager-button),
+  .manager-import-mapping-row :global(.manager-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
     padding: 0 var(--fab-space-2);
     font-size: var(--fab-recipe-control-font);
+  }
+
+  /* `InlineVocabularyAdd`'s Add is `role="primary"`, and the primitive's `is-primary`
+     companion states `padding: 0 var(--fab-space-4)` at (0,4,0) — a tie with the rule
+     above, settled by injection order. This restates the row's compact padding one class
+     higher so the dense row wins on specificity. Only `padding` is repeated: `min-height`
+     and `font-size` are already uncontested at (0,4,0). */
+  .manager-import-mapping-row :global(.manager-button.fab-manager-button.is-primary) {
+    padding: 0 var(--fab-space-2);
   }
 
   .manager-import-mapping-list {

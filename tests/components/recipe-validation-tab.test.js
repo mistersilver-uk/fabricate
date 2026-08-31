@@ -12,6 +12,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-validation-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // recipeReadiness dispatches through the match-type registry, which reads
     // item flags — copy both so the harness module graph resolves.
     'src/config/flags.js',
@@ -24,6 +25,9 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // Each issue row's "View" renders through the manager's push-button primitive
+    // (issue 1118).
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'

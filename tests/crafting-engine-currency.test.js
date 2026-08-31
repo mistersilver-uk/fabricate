@@ -9,14 +9,17 @@ import {
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
 import {
+  CURRENCY_MACRO_KEYS,
   buildCurrencySpendUpdates,
   canAddCurrencySubUnit,
   currencySubUnitOptions,
+  currencyUnitDisplayName,
   formatCurrencyRequirement,
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
   normalizeWorldCurrencyConfig,
   readCurrencyBalances,
+  resolveCurrencyUnitByName,
   validateCurrencyProfile,
 } from '../src/systems/currencyProfile.js';
 
@@ -155,7 +158,18 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   assert.equal('inventoryMode' in defaults, false);
   assert.equal(defaults.spendStrategy, 'actorProperty');
   assert.equal(defaults.providerId, '');
-  assert.deepEqual(defaults.macros, { canAfford: '', increment: '', decrement: '' });
+  // Every DECLARED slot, emitted empty. Adding a key to `CURRENCY_MACRO_KEYS` is what backfills
+  // it into every existing world (there is no migration), so this asserts the whole set rather
+  // than three names: a normalizer that stopped emitting one would still satisfy a literal that
+  // was edited in the same commit.
+  assert.deepEqual(
+    Object.keys(defaults.macros).sort(),
+    [...CURRENCY_MACRO_KEYS].sort()
+  );
+  assert.deepEqual(
+    Object.values(defaults.macros),
+    CURRENCY_MACRO_KEYS.map(() => '')
+  );
 
   const trimmed = normalizeCurrencyConfig({
     enabled: true,
@@ -166,7 +180,12 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   assert.equal(trimmed.spendStrategy, 'macro');
   assert.equal('inventoryMode' in trimmed, false);
   assert.equal(trimmed.providerId, 'pf2e-inventory');
-  assert.deepEqual(trimmed.macros, { canAfford: 'Macro.a', increment: '', decrement: 'Macro.d' });
+  assert.deepEqual(trimmed.macros, {
+    canAfford: 'Macro.a',
+    increment: '',
+    decrement: 'Macro.d',
+    balance: '',
+  });
 
   // Legacy nested actorInventory + inventoryMode: 'macro' maps forward to the peer macro strategy
   // and drops inventoryMode; round-trips stably.
@@ -581,4 +600,128 @@ test('buildCurrencySpendUpdates stays exact when paying with mixed denominations
   assert.equal(result.updates['system.currency.cp'], 0);
   assert.equal(result.updates['system.currency.sp'], 0);
   assert.equal(result.updates['system.currency.gp'], 0);
+});
+
+// ---------------------------------------------------------------------------
+// Resolving a unit from a string a HUMAN wrote (issue 1342).
+//
+// `findCurrencyUnit` matches an id, exactly and case-sensitively, while every surface that RENDERS
+// a coin does so through `abbreviation` -> `label` -> `id`. Nothing resolved the other direction,
+// so a caller holding a string Fabricate itself printed could not hand it back — which is what
+// made the pooled holdings read's currency axis unusable by any caller that did not already know
+// Fabricate's internal unit ids, while its component and tool axes resolved names happily.
+//
+// These cases pin the two tiers, the precedence between them, and the ambiguity report that keeps
+// a genuine collision from being decided by a coin flip inside a read a caller may consume from.
+// ---------------------------------------------------------------------------
+
+/** Three coins whose ids, abbreviations and labels are all distinct, so a hit names its tier. */
+const NAMED_LADDER = [
+  { id: 'gp', label: 'Gold Pieces', abbreviation: 'GP', actorPath: 'system.currency.gp', contains: [] },
+  { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] },
+];
+
+test('currencyUnitDisplayName is the ONE abbreviation-then-label-then-id chain', () => {
+  assert.equal(currencyUnitDisplayName({ id: 'gp', label: 'Gold', abbreviation: 'gp' }), 'gp');
+  assert.equal(currencyUnitDisplayName({ id: 'K9grZcOMgO9Xbm41', label: 'Platinum' }), 'Platinum');
+  assert.equal(currencyUnitDisplayName({ id: 'ecu' }), 'ecu');
+  assert.equal(currencyUnitDisplayName(null), '', 'a unit that names itself in no way is blank');
+  // The tolerant aliases the normalizer accepts, so a RAW unit displays as its normalized form.
+  assert.equal(currencyUnitDisplayName({ id: 'gp', name: 'Gold Pieces' }), 'Gold Pieces');
+  assert.equal(currencyUnitDisplayName({ id: 'gp', abbr: 'gp', name: 'Gold Pieces' }), 'gp');
+});
+
+test('resolveCurrencyUnitByName accepts a unit id, an abbreviation or a label', () => {
+  const by = (name) => resolveCurrencyUnitByName(NAMED_LADDER, name);
+
+  assert.equal(by('gp').unit?.id, 'gp', 'the id itself');
+  assert.equal(by('GP').unit?.id, 'gp', 'the abbreviation');
+  assert.equal(by('Gold Pieces').unit?.id, 'gp', 'the label');
+  // Folded and trimmed the way the component definition index folds its own name lookup, so a
+  // caller typing a requirement by hand is not punished for its shift key.
+  assert.equal(by('gold pieces').unit?.id, 'gp');
+  assert.equal(by('  GOLD PIECES  ').unit?.id, 'gp');
+  assert.equal(by('Gp').unit?.id, 'gp');
+  assert.equal(by('SILVER').unit?.id, 'sp');
+
+  for (const miss of ['zorkmid', '', '   ', null, undefined]) {
+    assert.deepEqual(by(miss), { unit: null, ambiguous: false }, `"${miss}" names no coin`);
+  }
+});
+
+test('an exact id wins outright, so another unit’s label can never shadow it', () => {
+  // A world whose unit ids are ordinary words. If the folded tier ran first, renaming the SECOND
+  // coin's label would silently redirect a caller that has always asked for `gold` — an unrelated
+  // edit changing what a working request means.
+  const words = [
+    { id: 'bar', label: 'Gold Bar', abbreviation: 'bar', contains: [] },
+    { id: 'gold', label: 'Gold Coin', abbreviation: 'gc', contains: [] },
+    { id: 'gc', label: 'gold', abbreviation: 'g', contains: [] },
+  ];
+
+  const resolved = resolveCurrencyUnitByName(words, 'gold');
+
+  assert.equal(resolved.unit?.id, 'gold', 'the id match, not the third unit’s label');
+  assert.equal(resolved.ambiguous, false, 'and an exact id is never reported as a collision');
+  // The same string one case off falls to the folded tier and NOW sees both, which is the honest
+  // answer rather than a silent pick.
+  assert.equal(resolveCurrencyUnitByName(words, 'GOLD').ambiguous, true);
+});
+
+test('a name two coins answer to is reported ambiguous, never first-matched silently', () => {
+  const clash = [
+    { id: 'u1', label: 'Crown', abbreviation: 'cr', contains: [] },
+    { id: 'u2', label: 'Shilling', abbreviation: 'crown', contains: [] },
+  ];
+
+  const crossField = resolveCurrencyUnitByName(clash, 'Crown');
+  assert.equal(crossField.ambiguous, true, 'one coin’s label collides with another’s abbreviation');
+  assert.equal(crossField.unit?.id, 'u1', 'and the first in LADDER order is still offered');
+
+  const sameField = resolveCurrencyUnitByName(
+    [
+      { id: 'u1', label: 'Coin', contains: [] },
+      { id: 'u2', label: 'coin', contains: [] },
+    ],
+    'COIN'
+  );
+  assert.equal(sameField.ambiguous, true, 'two coins sharing a label collide too');
+
+  // One coin matching on SEVERAL of its own fields is not a collision: ambiguity is about how
+  // many COINS answered, not how many fields did.
+  const selfMatch = resolveCurrencyUnitByName([{ id: 'gp', label: 'gp', abbreviation: 'gp' }], 'GP');
+  assert.equal(selfMatch.ambiguous, false);
+  assert.equal(selfMatch.unit?.id, 'gp');
+});
+
+test('a coin with no id is unaddressable and is skipped rather than half-resolved', () => {
+  // Resolving a name to it could only produce an id lookup that then misses, which would read as
+  // `unitNotFound` for a coin the caller can plainly see on the ladder.
+  const ladder = [
+    { id: '', label: 'Ghost', contains: [] },
+    { id: 'gp', label: 'Gold', contains: [] },
+  ];
+
+  assert.equal(resolveCurrencyUnitByName(ladder, 'Ghost').unit, null);
+  assert.equal(resolveCurrencyUnitByName(ladder, 'Gold').unit?.id, 'gp');
+});
+
+test('every name a coin DISPLAYS is a name it ACCEPTS, across the shipped presets', () => {
+  // The round trip is the property the shared field list exists to guarantee, and it is why the
+  // reverse resolver reads the same declaration the display chain reads instead of choosing its
+  // own set: a string Fabricate printed must be a string Fabricate takes back. Run over the real
+  // presets rather than a fixture, because those are the coins most worlds actually carry.
+  for (const preset of [DND5E_CURRENCY_PRESETS, PF2E_CURRENCY_PRESETS]) {
+    const units = preset.map((entry) => normalizeCurrencyUnit(entry));
+    assert.ok(units.length > 0, 'the preset really does carry coins');
+    for (const unit of units) {
+      const displayed = currencyUnitDisplayName(unit);
+      assert.ok(displayed, `${unit.id} displays as something`);
+      const resolved = resolveCurrencyUnitByName(units, displayed);
+      assert.equal(resolved.unit?.id, unit.id, `"${displayed}" must resolve back to ${unit.id}`);
+      // And so must its label and its id, whatever the display chain happened to pick.
+      assert.equal(resolveCurrencyUnitByName(units, unit.label).unit?.id, unit.id);
+      assert.equal(resolveCurrencyUnitByName(units, unit.id).unit?.id, unit.id);
+    }
+  }
 });

@@ -25,6 +25,18 @@
   record. A stage still claiming to await a roll directly beneath a success ribbon is a
   contradiction the player would have to resolve for us.
 
+  Each stage may also carry a COMPLICATION BAND (issue 1286): what the GM has said can go
+  wrong when this result is produced, and — once the run has resolved — which of those
+  actually happened. The data rides on the stage row, published by
+  `InventoryListingBuilder._buildSalvage` and marked by `markFiredStageComplications`, so
+  this body passes only the TENSE. It never re-derives the list, and above all never
+  infers `fired` from a stage's missed state: `match` and the condition roll mean a short
+  stage need not have fired anything, so deriving one from the other asserts something
+  untrue about the roll that just happened.
+
+  The band offers no exclude toggle, no excluded-results list and no hidden-result note,
+  for the reason stated above: exclusion contradicts the reconciliation contract.
+
   The post-roll truth comes from the run record's `createdResults` — the engine's OWN
   list of what it awarded, keyed by componentId — not from matching the created Items
   by name, which is fragile. A salvage that ran without a run manager (the runless
@@ -176,6 +188,7 @@
       {stateChip}
       {fixedNoteKey}
       {fixedNoteFallback}
+      complications={resolved ? 'resolved' : 'forecast'}
     />
     <!-- The stage list explains itself only when the rows are FIXED. Silence in the
          other state leaves the affordance to be discovered: the grip is a small glyph,

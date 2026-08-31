@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-modifier-pill-select-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   compiledModules: [PILL_SELECT_PATH],

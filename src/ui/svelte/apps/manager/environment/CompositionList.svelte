@@ -10,9 +10,11 @@
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../../systems/gatheringComposition.js';
 
   let {
     kind = 'task',
@@ -79,14 +81,12 @@
       : entry?.runtimeState;
   }
 
+  // The INCLUDED vocabulary, from its one home (issue 1321). It answers "does the Included
+  // list show this", which is a different question from "does it compose" even though issue 1315
+  // leaves the two sets with the same four members: `includedNotMatching` belongs here because a
+  // manual pick composes whether or not it matches, and the GM still needs to see which is which.
   const included = $derived(
-    records.filter(
-      (entry) =>
-        entry.compositionState === 'includedByMatch' ||
-        entry.compositionState === 'explicitlyIncluded' ||
-        entry.compositionState === 'forceIncluded' ||
-        entry.compositionState === 'includedButUnavailable'
-    )
+    records.filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
   );
   const includedWeightTotal = $derived(
     included.reduce((total, entry) => total + weightFor(entry.id), 0)
@@ -179,9 +179,14 @@
     return entry?.compositionState === 'candidate' ? 'candidate' : 'non-matching';
   }
 
+  // This list is manual-mode only (its section is gated on `mode === 'manual'`), and manual
+  // mode composes exactly what the GM picks, matching or not. So a non-matching record is
+  // plainly added here — there is no filter for a force to override, and no `'force-include'`
+  // for this function to return. Force add belongs to automatic mode's Non-matching section.
+  // `libraryDisabled` is still not addable: the library gate precedes both modes.
   function availableRowAction(entry) {
-    if (entry?.compositionState === 'candidate') return 'include';
-    if (entry?.compositionState === 'notMatching') return 'force-include';
+    if (entry?.compositionState === 'candidate' || entry?.compositionState === 'notMatching')
+      return 'include';
     if (entry?.compositionState === 'libraryDisabled') return 'library-disabled';
     return '';
   }
@@ -528,24 +533,6 @@
                   >
                     <i class="fas fa-circle-plus" aria-hidden="true"></i>
                   </button>
-                {:else if availableRowAction(entry) === 'force-include'}
-                  <button
-                    type="button"
-                    class="manager-icon-button is-warning-action manager-environment-comp-quick-action"
-                    data-quick-action="force-include"
-                    data-action="force-include"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
-                      'Force add'
-                    )}
-                    title={text(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
-                      'Force add'
-                    )}
-                    onclick={() => onForceInclude(kind, entry.id)}
-                  >
-                    <i class="fas fa-circle-plus" aria-hidden="true"></i>
-                  </button>
                 {/if}
                 <div
                   class="manager-environment-comp-menu-wrap"
@@ -582,22 +569,6 @@
                             >{text(
                               'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include',
                               'Include'
-                            )}</span
-                          ></button
-                        >
-                      {:else if availableRowAction(entry) === 'force-include'}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          data-action="force-include"
-                          onclick={() => {
-                            onForceInclude(kind, entry.id);
-                            closeMenu();
-                          }}
-                          ><i class="fas fa-plus" aria-hidden="true"></i><span
-                            >{text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
-                              'Force add'
                             )}</span
                           ></button
                         >
@@ -760,9 +731,8 @@
                     {/if}
                   </div>
                 {:else}
-                  <button
-                    type="button"
-                    class="manager-button manager-environment-restore"
+                  <ManagerButton
+                    class="manager-environment-restore"
                     data-action="restore"
                     onclick={() => onRestore(kind, entry.id)}
                   >
@@ -773,7 +743,7 @@
                         'Restore'
                       )}</span
                     >
-                  </button>
+                  </ManagerButton>
                 {/if}
               </div>
             </li>
@@ -782,7 +752,7 @@
       {/if}
     </section>
 
-    <!-- Non-matching (replaces the diagnostics disclosure; manual mode allows force-add). -->
+    <!-- Non-matching (replaces the diagnostics disclosure; automatic mode allows force-add). -->
     <section class="manager-environment-comp-section" data-section="non-matching">
       <header class="manager-environment-comp-band">
         <h4>
@@ -864,7 +834,7 @@
                     </button>
                     {#if openMenuId === entry.id}
                       <div class="manager-environment-comp-menu" role="menu">
-                        {#if mode === 'manual' && entry.compositionState === 'notMatching'}
+                        {#if entry.compositionState === 'notMatching'}
                           <button
                             type="button"
                             role="menuitem"
@@ -880,7 +850,7 @@
                               )}</span
                             ></button
                           >
-                        {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
+                        {:else if entry.compositionState === 'libraryDisabled'}
                           <button
                             type="button"
                             role="menuitem"
@@ -917,10 +887,24 @@
                     {/if}
                   </div>
                 {:else}
-                  {#if mode === 'manual' && entry.compositionState === 'notMatching'}
-                    <button
-                      type="button"
-                      class="manager-button is-warning manager-environment-force-include"
+                  {#if entry.compositionState === 'notMatching'}
+                    <!-- THE `warning` REPAIR (issue 1118). This spelt its modifier
+                         `is-warning`, and the sheet declares `.manager-button.is-warning-action`
+                         while declaring `.manager-button.is-warning` NOWHERE — so Force add
+                         shipped with no warning treatment at all, and the amber treatment
+                         shipped with no call site. `role="warning"` emits the class that
+                         exists, which is why the role-to-class relation in the primitive is a
+                         NAMED MAPPING rather than a template over the role name.
+
+                         The typo survived review because the control never rendered: its
+                         guard demanded `mode === 'manual'` inside a section gated on
+                         `mode !== 'manual'`. Issue 1315 settled where a force add belongs —
+                         automatic mode, the one mode with a filter for it to override — so
+                         the guard now tests composition state alone and takes its mode from
+                         the enclosing section. This is the `warning` role's live consumer. -->
+                    <ManagerButton
+                      role="warning"
+                      class="manager-environment-force-include"
                       data-action="force-include"
                       onclick={() => onForceInclude(kind, entry.id)}
                     >
@@ -931,8 +915,8 @@
                           'Force add'
                         )}</span
                       >
-                    </button>
-                  {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
+                    </ManagerButton>
+                  {:else if entry.compositionState === 'libraryDisabled'}
                     <span class="manager-muted manager-environment-comp-disabled-note"
                       >{text(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',

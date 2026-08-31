@@ -26,7 +26,12 @@
       <span class="alchemy-chooser-mark" aria-hidden="true">
         <i class="fas fa-flask-vial"></i>
       </span>
-      <h2 class="alchemy-chooser-heading" tabindex="-1" bind:this={heading}>
+      <h2
+        class="alchemy-chooser-heading"
+        tabindex="-1"
+        data-keyboard-focus="true"
+        bind:this={heading}
+      >
         {localize('FABRICATE.App.Alchemy.ChooseDiscipline')}
       </h2>
       <p class="alchemy-chooser-hint">{localize('FABRICATE.App.Alchemy.ChooseDisciplineHint')}</p>

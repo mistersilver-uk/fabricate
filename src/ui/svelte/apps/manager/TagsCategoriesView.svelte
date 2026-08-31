@@ -242,6 +242,7 @@
         aria-selected={activeTab === tab.id}
         aria-controls={`vocabulary-panel-${tab.id}`}
         tabindex={activeTab === tab.id ? 0 : -1}
+        data-keyboard-focus="true"
         data-vocabulary-tab={tab.id}
         onclick={() => onTabChange(tab.id)}
         onkeydown={(event) => handleTabKeydown(event, index)}

@@ -105,7 +105,7 @@ function modifierRow(label, expression) {
        </span>`
     : '';
   return `
-    <li class="manager-modifier-item" data-system-modifier="${label}">
+    <li class="manager-modifier-item" data-world-modifier="${label}">
       <div class="manager-modifier-header">
         <button type="button" class="manager-modifier-summary" data-toggle-modifier>
           <i class="fa-solid fa-chevron-right manager-modifier-chevron" aria-hidden="true"></i>
@@ -124,7 +124,7 @@ const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
-      <section class="manager-inspector-card" data-system-modifiers style="width: 720px">
+      <section class="manager-inspector-card" data-world-modifiers style="width: 720px">
         <ul class="manager-character-modifier-list">
           ${modifierRow('Survival', '@skills.sur.mod')}
           ${modifierRow('Modifier', '')}
@@ -207,11 +207,11 @@ const FIELD_FIXTURE = `
       <div class="manager-modifier-body" style="width: 520px">
         <label class="manager-field" data-case="label">
           <span>Label</span>
-          <input type="text" data-system-modifier-field="label" value="Medicine" />
+          <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
         <label class="manager-field" data-case="plain">
           <span>Expression</span>
-          <input type="text" data-system-modifier-field="expression" value="@abilities.med.mod" />
+          <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
         </label>
         <label class="manager-tool-bonus-field" data-case="capped">
           <span>Bonus expression</span>

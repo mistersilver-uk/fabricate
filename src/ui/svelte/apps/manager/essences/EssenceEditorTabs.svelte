@@ -103,6 +103,7 @@
       aria-selected={activeTab === tab.id}
       aria-controls={`essence-panel-${tab.id}`}
       tabindex={activeTab === tab.id ? 0 : -1}
+      data-keyboard-focus="true"
       class="manager-editor-tab-button"
       class:is-active={activeTab === tab.id}
       class:is-danger={tab.id === 'validation' && blockingCount > 0}

@@ -384,10 +384,53 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     assert.equal(parts.length, 2);
     assert.ok(parts[0].hasAttribute('data-progressive-stage-ordinal'), 'the ordinal leads');
     assert.ok(parts[1].hasAttribute('data-progressive-stage-move'), 'the chevrons trail');
+    // Read off the stage's own LINE rather than off the row. Since issue 1286 the row is a
+    // wrapper that MAY carry a full-bleed complication band beneath its line, so `row`'s
+    // last element child is the line (or the band), never the chevrons. The claim under
+    // test is unchanged: the chevrons end the line the stage reads on.
     assert.equal(
-      row.lastElementChild.hasAttribute('data-progressive-stage-move'),
+      row.querySelector('.crafting-stage-line').lastElementChild.hasAttribute(
+        'data-progressive-stage-move'
+      ),
       true,
-      'and they are the last thing on the row'
+      'and they are the last thing on the line'
+    );
+  });
+
+  // ── 1286: the crafting body opts into the complication band, FORECAST-only ───────
+
+  it('1286: forwards the forecast tense, so a crafting stage draws its band', async () => {
+    const stages = [
+      { ...STAGES[0] },
+      {
+        ...STAGES[1],
+        complications: [
+          {
+            id: 'x-scald',
+            name: 'Scalding steam',
+            description: 'The quench bath flashes to steam.',
+            severity: 'major',
+            visibility: 'visible',
+            // Deliberately TRUE on the row. Crafting must render it as a forecast anyway:
+            // the fired record is defined on the salvage RUN record and the immediate
+            // crafting path writes none, so there is nothing here that could have fired
+            // and a body that forwarded a resolved tense would be asserting one.
+            fired: true,
+          },
+        ],
+      },
+      { ...STAGES[2] },
+    ];
+    const target = await mountBody({ stages });
+    const band = target.querySelector(
+      '[data-progressive-stage="s2"] [data-progressive-stage-complications]'
+    );
+    assert.ok(band, 'the crafting body passes the extension, so the band renders');
+    assert.equal(band.getAttribute('data-progressive-stage-complication-tense'), 'forecast');
+    assert.match(band.textContent, /This can go wrong/);
+    assert.ok(
+      !target.querySelector('[data-progressive-stage="s1"] [data-progressive-stage-complications]'),
+      'and a stage carrying nothing is untouched'
     );
   });
 });

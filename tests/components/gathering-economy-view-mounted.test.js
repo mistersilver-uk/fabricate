@@ -103,6 +103,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // (issue 1050); omitting it leaves the compiled component with an unresolvable import.
     for (const modulePath of [
       'src/ui/svelte/util/foundryBridge.js',
+      'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
     ]) {
       writeRawModule(modulePath);
@@ -112,6 +113,10 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
+    // The manager's ONE labelled push-button (issue 1118): the actor list's bulk Save renders
+    // it. This suite predates the shared harness and so has no dependency-closure check —
+    // omitting this line leaves the compiled view importing a module that is not there.
+    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(
       pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js'))

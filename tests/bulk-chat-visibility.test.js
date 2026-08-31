@@ -189,14 +189,24 @@ describe('applyBulkChatVisibility: it mutates in place, as both core appliers do
     assert.equal(chatData.applied, 'blind', "the applier wrote onto the caller's object");
   });
 
-  it('tolerates a V13 build exposing neither applier without throwing', () => {
-    // `applyRollMode?.()` is optional for a reason: a harness (or a very old build) that
-    // exposes neither must not cost a completed run its report.
+  it('THROWS when a build exposes neither applier, rather than passing the data through', () => {
+    // Fail CLOSED. A build exposing neither applier cannot establish visibility at all, and
+    // returning `chatData` untouched would hand the caller data that core then creates under
+    // its own default — which is PUBLIC. A future rename of `applyRollMode` would therefore
+    // have turned a whispered GM complication card, and a blind bulk run's whole result
+    // table, into table-wide chat with no error anywhere. Every call site already runs inside
+    // a `try`/`catch` that logs and posts nothing, so the throw costs a card and never an
+    // award.
     const original = globalThis.ChatMessage;
     globalThis.ChatMessage = {};
     try {
       const chatData = { speaker: { actor: null } };
-      assert.equal(applyBulkChatVisibility(chatData, 'blindroll'), chatData);
+      assert.throws(() => applyBulkChatVisibility(chatData, 'blindroll'), TypeError);
+      assert.equal(
+        'whisper' in chatData || 'blind' in chatData,
+        false,
+        'and nothing half-applied reaches the caller'
+      );
     } finally {
       if (original === undefined) delete globalThis.ChatMessage;
       else globalThis.ChatMessage = original;

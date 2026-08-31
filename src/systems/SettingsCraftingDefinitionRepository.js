@@ -1,6 +1,7 @@
 import {
   getSetting as defaultGetSetting,
   setSetting as defaultSetSetting,
+  SETTING_KEYS,
 } from '../config/settings.js';
 
 import { CraftingDefinitionRepository } from './CraftingDefinitionRepository.js';
@@ -211,5 +212,37 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
       this.settingKey,
       records.map((record) => this._serialize(record))
     );
+  }
+}
+
+/**
+ * The PERSISTED crafting-system corpus, read RAW (issue 1370).
+ *
+ * IT LIVES HERE BECAUSE THIS MODULE IS THE ONE PRODUCTION PATH TO THAT SETTING KEY, and
+ * `tests/crafting-definition-repository.test.js` enforces that as an architectural boundary
+ * rather than a convention. The world identity drift audit needs the corpus BEFORE either manager
+ * is constructed — that is the whole point of where it runs, since it is the last moment at which
+ * nothing has read the union — so it cannot ask a manager, and reading the key at its call site
+ * would put a second reader of these bytes outside the adapter.
+ *
+ * RAW, and deliberately so: its subject is what is on disk, not what a normalizer would answer.
+ * It is a READ ONLY — there is no writing counterpart and there must not be one, because
+ * {@link SettingsCraftingDefinitionRepository#put} is the single write path.
+ *
+ * @param {(key: string) => unknown} [getSetting] Injected by unit fixtures.
+ * @returns {Array<object>} the persisted array, or `[]` when the key holds anything else.
+ */
+export function readPersistedCraftingSystems(getSetting = defaultGetSetting) {
+  try {
+    const raw = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS);
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    // GUARDED, on the three scope stores' own precedent, and the reason is the CALLER'S SHAPE
+    // rather than this key's likelihood of throwing. `initialize()` is awaited inside an async
+    // `ready` hook, and Foundry's hook dispatch catches SYNCHRONOUS throws only - so a rejection
+    // here escapes unhandled and silently skips everything sited after it: the world-time pass,
+    // all three flag auto-stamps and the identity remap. A disclosure notice must not be able
+    // to cost a world its startup work.
+    return [];
   }
 }

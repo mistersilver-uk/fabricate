@@ -10,7 +10,9 @@
  * afterwards. It pins the three things a new prop could plausibly break:
  *
  * 1. the TONE MATRIX — every accepted tone emits exactly its `is-<tone>` class, and an
- *    unrecognised tone is DROPPED rather than emitted as an unstyled class;
+ *    unrecognised tone is DROPPED rather than emitted as an unstyled class. The matrix is
+ *    DERIVED from the component's own `TONES` literal (issue 1286), so a tone added to one
+ *    and not the other fails here instead of shipping unpinned;
  * 2. the CLASS SET of a bare chip, which is `manager-chip` and nothing else. A new prop
  *    that leaks a class onto every chip would repaint 63 call sites at once;
  * 3. the rest spread and `tag` polymorphism, which is how every call site attaches its
@@ -40,18 +42,39 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/Chip.svelte',
 });
 
+/**
+ * The accepted tone vocabulary, DERIVED from the component's own `TONES` literal rather
+ * than restated here (issue 1286).
+ *
+ * A hand-copied matrix is a mirror, and a mirror of a nine-entry list is exactly the kind
+ * that rots quietly: a tone added to `Chip.svelte` and not to this file leaves the new tone
+ * unpinned while every assertion here still passes, which reads as "the chip is
+ * characterized" when the newest tone is the one nothing covers. `TONES` is a local `const`
+ * inside an instance `<script>`, so it cannot be imported — the suite already reads
+ * `chipSource` for the `--fab-chip-color` scope assertion below, and this reads the same
+ * text.
+ *
+ * Comments are stripped first. The literal is heavily annotated and those annotations quote
+ * tone NAMES in prose, so a naive scan for quoted words inside the block would invent
+ * entries that no `TONES.has(...)` will ever match.
+ */
+function declaredTones() {
+  const start = chipSource.indexOf('const TONES = new Set([');
+  assert.notEqual(start, -1, 'Chip.svelte still declares its tone vocabulary as `TONES`');
+  const open = chipSource.indexOf('[', start);
+  const close = chipSource.indexOf(']);', open);
+  assert.ok(close > open, 'the `TONES` literal is closed');
+  const body = chipSource
+    .slice(open + 1, close)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  const tones = [...body.matchAll(/'([\w-]+)'/g)].map(([, tone]) => tone);
+  assert.ok(tones.length > 0, 'at least one tone is declared');
+  return tones;
+}
+
 /** Tone → the single class it must add. The whole accepted vocabulary, in source order. */
-const TONE_MATRIX = [
-  ['active', 'is-active'],
-  ['positive', 'is-positive'],
-  ['disabled', 'is-disabled'],
-  ['warning', 'is-warning'],
-  ['info', 'is-info'],
-  ['danger', 'is-danger'],
-  ['neutral', 'is-neutral'],
-  ['negative', 'is-negative'],
-  ['tag', 'is-tag'],
-];
+const TONE_MATRIX = declaredTones().map((tone) => [tone, `is-${tone}`]);
 
 function chipNode(target) {
   return target.querySelector('.manager-chip');
@@ -83,6 +106,19 @@ describe('1036 Chip — tone matrix characterization', () => {
       assert.ok(chip.classList.contains('manager-chip'), 'the literal hook class is kept');
       harness.remount();
     }
+  });
+
+  it('paints every declared tone in the scoped style block', () => {
+    // The other half of deriving the matrix. A tone added to `TONES` but never given a rule
+    // renders as the DEFAULT chip while the class-emission assertion above still passes —
+    // the class is there, the colour is not, and nothing says so. `is-disabled` and
+    // `is-negative` ride joined selectors with `is-warning` / `is-danger`, so the check is
+    // "the selector appears in a rule head", not "a rule starts with it".
+    const styleBlock = chipSource.slice(chipSource.indexOf('<style>'));
+    const unpainted = TONE_MATRIX.filter(
+      ([, className]) => !styleBlock.includes(`.manager-chip.${className}`)
+    ).map(([tone]) => tone);
+    assert.deepEqual(unpainted, [], 'every accepted tone declares a colour family');
   });
 
   it('DROPS an unrecognised tone rather than emitting an unstyled class', async () => {

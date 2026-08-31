@@ -36,7 +36,7 @@ globalThis.fromUuid = globalThis.fromUuid || (async () => null); // all external
 /**
  * Stand up the shared single-store harness for a fixture.
  *
- * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig?: object }} fixture
+ * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig?: object, characterLibraries?: object }} fixture
  * @returns {{ settings: Map, getSetting: Function, setSetting: Function, systemManager: object, recipeManager: object, environmentStore: GatheringEnvironmentStore }}
  */
 export function makeHarness(fixture) {
@@ -46,6 +46,12 @@ export function makeHarness(fixture) {
   // on the system, so the single shared settings map is where an export reads it from and where
   // an import writes it back to.
   settings.set('travelConfig', structuredClone(fixture.travelConfig ?? {}));
+  settings.set('characterLibraries', structuredClone(fixture.characterLibraries ?? {}));
+  // The three WORLD-SCOPE ENTITY settings (issue 1364), seeded from the fixture for the same
+  // reason: an export reads them from this one shared map and an import writes them back to it.
+  settings.set('componentScope', structuredClone(fixture.componentScope ?? {}));
+  settings.set('essenceScope', structuredClone(fixture.essenceScope ?? {}));
+  settings.set('toolScope', structuredClone(fixture.toolScope ?? {}));
   const getSetting = (key) => settings.get(key);
   const setSetting = async (key, value) => {
     settings.set(key, structuredClone(value));
@@ -120,6 +126,10 @@ export function exportViaPublicApiResolution(h, systemId) {
   const gatheringConfig = h.getSetting('gatheringConfig') || {};
   const currencyConfig = h.getSetting('currencyConfig') || {};
   const travelConfig = h.getSetting('travelConfig') || {};
+  const characterLibraries = h.getSetting('characterLibraries') || {};
+  const componentScope = h.getSetting('componentScope') ?? {};
+  const essenceScope = h.getSetting('essenceScope') ?? {};
+  const toolScope = h.getSetting('toolScope') ?? {};
   return buildExportPayload(
     system,
     recipes,
@@ -127,7 +137,11 @@ export function exportViaPublicApiResolution(h, systemId) {
     gatheringEnvironments,
     gatheringConfig,
     currencyConfig,
-    travelConfig
+    travelConfig,
+    characterLibraries,
+    componentScope,
+    essenceScope,
+    toolScope
   );
 }
 
@@ -151,6 +165,10 @@ export function exportViaAdminStoreResolution(h, systemId) {
   const gatheringConfig = h.getSetting?.('gatheringConfig') || {};
   const currencyConfig = h.getSetting?.('currencyConfig') || {};
   const travelConfig = h.getSetting?.('travelConfig') || {};
+  const characterLibraries = h.getSetting('characterLibraries') || {};
+  const componentScope = h.getSetting('componentScope') || {};
+  const essenceScope = h.getSetting('essenceScope') || {};
+  const toolScope = h.getSetting('toolScope') || {};
   return buildExportPayload(
     system,
     recipes,
@@ -158,7 +176,11 @@ export function exportViaAdminStoreResolution(h, systemId) {
     gatheringEnvironments,
     gatheringConfig,
     currencyConfig,
-    travelConfig
+    travelConfig,
+    characterLibraries,
+    componentScope,
+    essenceScope,
+    toolScope
   );
 }
 

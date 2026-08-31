@@ -21,9 +21,32 @@ export const BLIND_GM = Object.freeze({ id: 'user-blind-gm', isGM: true });
 export const BLIND_SYSTEM_ID = 'system-blind';
 export const BLIND_ENVIRONMENT_ID = 'env-blind';
 
-/** Minimal flag-backed actor: the run container lives in `flags.fabricate`. */
-export function blindActor({ id = 'actor-blind', uuid = 'Actor.actor-blind' } = {}) {
+/**
+ * Minimal flag-backed actor: the run container lives in `flags.fabricate`.
+ *
+ * The two OWNERSHIP reads are modelled the way Foundry actually defines them, because
+ * the difference between them is the whole subject of issue 1288:
+ *
+ *  - `testUserPermission(user, level)` asks about the PASSED user, and short-circuits any
+ *    GM to OWNER (`common/abstract/document.mjs`);
+ *  - `isOwner` is `testUserPermission(game.user, 'OWNER')` — the AMBIENT user
+ *    (`client/documents/abstract/client-document.mjs`), so it says nothing whatsoever
+ *    about the user a relayed request names.
+ *
+ * A fixture that hard-codes `isOwner: true` cannot tell those apart and would report a
+ * GM-side authorization defect as healthy, so this one derives `isOwner` from the
+ * installed `globalThis.game.user` exactly as Foundry does.
+ *
+ * @param {object} [options]
+ * @param {string[]} [options.ownerIds] User ids holding Foundry OWNER on this actor.
+ */
+export function blindActor({
+  id = 'actor-blind',
+  uuid = 'Actor.actor-blind',
+  ownerIds = [],
+} = {}) {
   const flags = { fabricate: {} };
+  const owners = new Set(ownerIds.map((ownerId) => String(ownerId)));
   return {
     id,
     uuid,
@@ -35,6 +58,14 @@ export function blindActor({ id = 'actor-blind', uuid = 'Actor.actor-blind' } = 
       flags[namespace] = flags[namespace] || {};
       flags[namespace][key] = JSON.parse(JSON.stringify(value));
       return value;
+    },
+    testUserPermission(user, level) {
+      if (!user) return false;
+      if (user.isGM === true) return true;
+      return level === 'OWNER' && owners.has(String(user.id ?? ''));
+    },
+    get isOwner() {
+      return this.testUserPermission(globalThis.game?.user ?? null, 'OWNER');
     },
   };
 }
@@ -96,6 +127,16 @@ function blindEnvironment(id) {
  * @param {Function|null} [options.relayStart] Blind-start relay seam.
  * @param {Function|null} [options.isRunActive] Reservation liveness predicate.
  * @param {number[]} [options.rolls] d100 rolls (1 finds every 100%-rate row).
+ * @param {object} [options.actor] The fixture actor (override to model ownership).
+ * @param {Function} [options.getUserId] Whose id a created run is stamped with. Production
+ *   reads the AMBIENT `game.user`, so on a relayed GM-side start this is the GM.
+ * @param {Function|null} [options.isActorSelectable] The engine's actor-authorization
+ *   seam. Defaults to permissive; pass the production predicate to exercise it.
+ * @param {Function|null} [options.getSelectableActors] The engine's selectable-actor
+ *   getter. Defaults to the fixture actor unconditionally.
+ * @param {Function|null} [options.getRunViewer] How a matured run's viewer is resolved
+ *   from the run's own `userId`. Production injects `getGatheringRunViewer`; absent, the
+ *   engine's fallback hard-codes `isGM: false` and cannot see a mis-stamped owner.
  */
 export function makeBlindWorld({
   tasks = [blindLibraryTask()],
@@ -105,6 +146,11 @@ export function makeBlindWorld({
   relayStart = null,
   isRunActive = null,
   rolls = [],
+  actor: suppliedActor = null,
+  getUserId = () => BLIND_PLAYER.id,
+  isActorSelectable = null,
+  getSelectableActors = null,
+  getRunViewer = null,
 } = {}) {
   const clock = { worldTime: 1000 };
   const environments = environmentIds.map((id) => blindEnvironment(id));
@@ -152,7 +198,7 @@ export function makeBlindWorld({
     hooks: { callAll: () => {} },
   });
 
-  const actor = blindActor();
+  const actor = suppliedActor ?? blindActor();
   const runIds = [];
   const runManager = new GatheringRunManager({
     randomID: () => {
@@ -161,7 +207,7 @@ export function makeBlindWorld({
       return id;
     },
     nowWorldTime: () => clock.worldTime,
-    getUserId: () => BLIND_PLAYER.id,
+    getUserId,
     getActors: () => [actor],
   });
 
@@ -189,8 +235,9 @@ export function makeBlindWorld({
         tools: [],
       },
     ],
-    getSelectableActors: () => [actor],
-    isActorSelectable: () => true,
+    getSelectableActors: getSelectableActors ?? (() => [actor]),
+    isActorSelectable: isActorSelectable ?? (() => true),
+    getRunViewer,
     isGamePaused: () => false,
     evaluator: { evaluateVisibility: async () => ({ visible: true }) },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },

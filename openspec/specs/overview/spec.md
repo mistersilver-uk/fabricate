@@ -107,6 +107,18 @@ World:
 - `fabricate.gatheringConfig`
 - `fabricate.gatheringParties` for world-level Fabricate-managed gathering parties (excluded from crafting-system import/export)
 - `fabricate.currencyConfig` for the world currency configuration — the coin ladder, spend strategy, provider and GM macro set (a crafting system carries only `requirements.currency.enabled`; the config rides along with crafting-system import/export as its own envelope slice)
+- `fabricate.travelConfig` for the world travel configuration — the realm library, its reveal mode and its modifier visibility, including each realm's Foundry Scene Region `sceneMappings` (a crafting system carries only `gatheringRealmSettings.enabled`; the config rides along with crafting-system import/export as its own envelope slice)
+- `fabricate.characterLibraries` for the world character libraries — the character-prerequisite library and the modifier library, as `{ characterPrerequisites, modifiers }` (a crafting system carries NEITHER, and no participation flag either; the libraries ride along with crafting-system import/export as their own envelope slice)
+- `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope` for the world-scope entity definitions — each `{ entities, defaults, membership }`, with the WORLD tool-breakage authority carried by `fabricate.toolScope` alone (see `## Scoped Entity Definitions` in `data-models`).
+  THREE keys rather than one, because `isSeeded()` cannot be honest per entity type on a shared key: a store writes the whole object, so one entity type's first write persists the others as empty and turns an UNKNOWN Valid Id Basis into a real, empty, prunable one.
+  THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM, plus one fully-overriding membership record per original definition.
+  COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; ESSENCES group by trimmed `id` instead, and essence ids are NEVER re-keyed.
+  It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE while `## CraftingSystem` requirement 36 in `data-models` holds.
+  THE THREE SCOPES ARE NOW READ THROUGH ONE SHARED SEAM: every non-UI consumer of a system's components, essence definitions or tools enters through the read union rather than touching the array.
+  READING IS NOT AUTHORITY — the in-system arrays still decide every field, every row and the row ORDER, re-derived from them at read time — so a world that has authored no world entity reads exactly as the previous release did.
+  Every membership record is created fully OVERRIDING, so resolved behaviour is unchanged and a world default matters only for a system added later.
+  All three ride along with crafting-system import/export as their own envelope slices, at schema `6` — but unlike the three world-scope slices above them they are FILTERED BY MEMBERSHIP to the exported system, because here there IS an owning relation and it is membership.
+  An import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination's three settings stay absent and it behaves exactly as the previous schema does.
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
 - `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder and the GM Manager's world `Downtime` surface (no longer the crafting authoring group, which is always available), disabled by default
@@ -114,6 +126,9 @@ World:
 - `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.ownedItemComponentStampVersion` (one-shot flag-stamp version)
+- `fabricate.worldScopeIdentityFlagVersion` (one-shot flag-stamp version, for the `1.30.0` durable-identity remap)
+- `fabricate.worldScopeRekeyMap` — TRANSIENT.
+  The `1.30.0` migration's durable decision record, `{ [systemId]: { components: {oldId: newId}, tools: {...} } }`, written as the FIRST leg of its writeback and CLEARED by the one-shot pass that consumes it, once that migration has completed
 
 Client (per client/device):
 

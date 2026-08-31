@@ -27,6 +27,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
@@ -211,9 +212,7 @@
       role="group"
       aria-label={text('FABRICATE.Admin.Manager.Knowledge.RowActions', 'Copy actions')}
     >
-      <button
-        type="button"
-        class="manager-button"
+      <ManagerButton
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
@@ -224,7 +223,7 @@
              glyph, and repeating it on the action beside it reads as the same thing. -->
         <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
-      </button>
+      </ManagerButton>
       <ArmedDangerButton
         token={deleteToken}
         armed={armedToken === deleteToken}

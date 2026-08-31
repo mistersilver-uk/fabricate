@@ -130,7 +130,12 @@ const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-dock-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: [SHELL_PATH],
+  // THE manager's labelled push-button (issue 1118). Apply renders through the primitive
+  // now, so it is a static import of the shell and belongs in its closure. This suite is
+  // NOT covered by `mounted-harness-primitive-allowlist.test.js`, which gates the
+  // hand-rolled harnesses only — `createMountedComponentHarness` carries its own closure
+  // validator, and that is what named this omission rather than hanging on it.
+  compiledModules: ['src/ui/svelte/components/ManagerButton.svelte', SHELL_PATH],
   componentPath: SHELL_PATH,
 });
 

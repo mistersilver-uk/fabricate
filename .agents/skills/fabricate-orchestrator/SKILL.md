@@ -15,6 +15,7 @@ Make behavior changes here, not in the bindings.
 - `openspec/README.md` for the issue-based change-delta format and managed-block rules
 - the work's GitHub issue context supplied by the workflow driver, including any existing `openspec-delta` block
 - relevant canonical specs under `openspec/specs/`
+- `openspec/specs/design-system/spec.md` when planning any UI-touching change, so the plan names the primitives it reuses and states explicitly which, if any, it extends or adds
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
 - the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
@@ -132,7 +133,7 @@ Before rebasing any branch at all, check whether its own PR already merged (`gh 
 Parallel (not stacked) PRs need the same care for a different reason: when two independent branches off `main` touch the SAME file or reference each other's paths, GitHub's `mergeable` flag only checks for a TEXTUAL conflict — a clean auto-merge can still leave a semantic duplicate (two copies of a rewritten section) or a dangling reference (one PR deletes a file a doc in the other still cites by path, which then fails `validate:agents`).
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
-- For quick-start docs work, route changes only to `docs/quickstart.md`.
+- For quick-start docs work, route changes only to `docs/help/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.
 - For UI work, do not let “screenshot captured” stand as acceptance.
 Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
@@ -143,7 +144,7 @@ Skills and agents should point to those documents instead of carrying detailed p
 **The default producer is the View Lab, and for a registry-covered view you usually plan NO capture work at all**: the `capture` CI job maps the PR's changed files to cases and publishes the affected frames into the PR body on every push, so evidence exists before anyone asks.
 Plan a local run only when you need frames before pushing or want to inspect a state directly: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes into `ui-screenshot-artifact/apps/` in seconds, and `ui-screenshot-artifact/apps/index.html` browses them by screen with a multi-tag filter.
 Targeting is per changed file: a typical UI file selects a handful of cases, the widest selects 35 (~3 min).
-A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders, 36 of 248 cases — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
+A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders, 42 of 269 cases — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
 Do NOT plan the smoke as the routine producer.
 Its `screenshots` profile costs ~31s per frame against the lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner at all — so it produces nothing per-PR and serialises the lane on one machine.
 Reserve it for a view the registry does not cover, or for a question about real Foundry runtime behaviour: `npm run test:foundry:screenshots` captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
