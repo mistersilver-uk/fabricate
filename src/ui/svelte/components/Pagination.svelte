@@ -33,6 +33,29 @@
     // the disabled-arrow rule and the range arithmetic are identical, and this is the one part
     // that differs.
     showPageSize = true,
+    // Issue 1372, opt-in and DEFAULT OFF so every shipped surface renders unchanged.
+    //
+    // "Render the footer only when there is more than one page" — the maintainer's ruling on the
+    // world catalogues, whose prototype frame draws six rows and NO foot pager (`essences.png`)
+    // while the shipped screen drew a full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25`
+    // band under them. A bar that can only ever say `Page 1 of 1` states nothing the list does
+    // not already show.
+    //
+    // It is a THIRD MODE rather than a relaxation of `persistent`, because the default is
+    // neither: `persistent || totalCount > minPageSize` renders the bar for eleven rows on a
+    // twenty-five-row page, which is one page but more items than the smallest offered size — so
+    // the per-page selector is still a meaningful control there. This mode says the stricter
+    // thing, and it is opt-in so that no other surface changes.
+    //
+    // `persistent` WINS if both are set, which is a contradiction rather than a case: they are
+    // mutually exclusive by meaning, and one of them has to be answered first.
+    //
+    // THE COST, RECORDED RATHER THAN DISCOVERED: hiding the bar hides the per-page selector with
+    // it, so a GM who chooses a size that fits the whole list on one page cannot choose a smaller
+    // one again from this screen. It is bounded — the size is component state that resets when
+    // the route unmounts, and it is unreachable at the default size on any list the choice could
+    // matter for — but it is the one thing this mode gives up.
+    multiPageOnly = false,
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -45,7 +68,9 @@
   const minPageSize = $derived(
     pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize
   );
-  const showPagination = $derived(persistent || totalCount > minPageSize);
+  const showPagination = $derived(
+    persistent || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
+  );
   const showNav = $derived(persistent || totalPages > 1);
 
   function text(key, fallback) {

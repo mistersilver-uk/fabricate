@@ -953,19 +953,45 @@ describe('the page index is clamped and the footer reads the clamped value', () 
       'the fixture never reached page three, so nothing below has a stale index to clamp'
     );
 
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
-
+    // ── (1) CLAMPED INTO A CORPUS THAT IS STILL MULTI-PAGE, where the FOOTER is the observation.
+    //
+    // 30 rows at the default page size is two pages, so the bar renders and states the clamped
+    // index directly. This half is here because the foot pager is `multiPageOnly` since issue
+    // 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only ever
+    // measured the no-footer case would stop covering the footer-reads-the-clamped-value half of
+    // `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 30 }) });
     assert.equal(
       rows(root).length,
-      10,
+      5,
       'an unclamped index slices past the end of the shorter corpus and renders ZERO rows — ' +
         'under a set that is not empty, and therefore with no empty state to explain it'
     );
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 2/);
     assert.match(
       root.querySelector('[data-pagination-summary]').textContent,
-      /Showing 1–10 of 10/,
+      /Showing 26–30 of 30/,
       'the footer states a range the list does not show'
+    );
+
+    // ── (2) CLAMPED INTO A ONE-PAGE CORPUS, where the ROW SLICE is the observation.
+    //
+    // The bar is gone here — one page — so the clamped value is read off the rows instead, and it
+    // is read as an IDENTIFIED slice rather than a count: `slice(50, 75)` over ten entries is
+    // empty, and any index above zero over a ten-row single page is empty too, so the whole
+    // corpus being present AND starting at its first record is what says the index came back to
+    // zero. The count alone would be satisfied by a frame that rendered ten unrelated rows.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'ten rows on a twenty-five-row page is ONE page, so this half is measuring the no-footer ' +
+        'case it exists for'
+    );
+    assert.deepEqual(
+      rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
+      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
+      'the list does not show the whole ten-record corpus from its first row, so the stale page ' +
+        'index was not clamped back to zero'
     );
     assert.equal(
       root.querySelector('.manager-scoped-list-rows').querySelectorAll('.manager-empty').length,
@@ -988,17 +1014,55 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     search.value = 'Ash 0';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await catalogueHarness.setProps({});
-    assert.equal(rows(root).length, 10, 'Ash 00–Ash 09');
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
+    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page, so since issue 1372 there is no
+    // footer to read the reset index off. The rows say it instead, and they say it as an
+    // IDENTIFIED slice: a page index left at 1 slices `component-25` onward out of a ten-row set
+    // and renders nothing, and any index above zero renders nothing, so the whole filtered set
+    // being present AND starting at its first record is what says the index went back to zero.
+    assert.deepEqual(
+      rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
+      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
+      'Ash 00–Ash 09, from the first of them: the filter did not reset the page index'
+    );
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'the filtered set is one page, so this half is measuring the no-footer case it exists for'
+    );
   });
 
-  it('keeps the pagination footer present below one page of rows', async () => {
-    // `Pagination` defaults `persistent` to false, which hides the footer — and a browse screen
-    // never hides its disabled arrows.
-    const root = await catalogueHarness.mount(catalogueProps('component', { count: 3 }));
-    assert.ok(Boolean(root.querySelector('[data-pagination-summary]')));
+  it('HIDES the pagination footer at one page of rows and restores it at two', async () => {
+    // THE MAINTAINER'S RULING, IN BOTH DIRECTIONS (issue 1372, parity round 4). The prototype's
+    // catalogue draws no foot pager under its six rows (`essences.png`), and this shipped a
+    // full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25` band there — a control with no
+    // reachable second state. `design-system/spec.md`'s browse recipe now permits exactly that
+    // suppression and requires the bar back the moment a second page exists.
+    //
+    // BOTH HALVES, in one case and against one mount, because either alone is passed by a
+    // mutation the other catches: an absent bar is satisfied by a frame that renders no pager at
+    // all, and a present bar is satisfied by `persistent={true}` coming back.
+    const root = await catalogueHarness.mount(catalogueProps('component'));
+    assert.equal(
+      rows(root).length,
+      3,
+      'the fixture rendered no rows at all, so the absence asserted next is vacuous'
+    );
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'three rows on a twenty-five-row page is ONE page, and a bar that can only say ' +
+        '"Page 1 of 1" states nothing the rows do not'
+    );
+
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 60 }) });
+    assert.ok(
+      Boolean(root.querySelector('[data-pagination-summary]')),
+      'sixty rows is three pages, and the browse recipe requires the bar back'
+    );
     assert.ok(Boolean(root.querySelector('[data-pagination-prev]')));
-    assert.equal(root.querySelector('[data-pagination-prev]').disabled, true);
+    assert.equal(
+      root.querySelector('[data-pagination-prev]').disabled,
+      true,
+      'and where it renders it never hides its disabled arrows'
+    );
   });
 });
 

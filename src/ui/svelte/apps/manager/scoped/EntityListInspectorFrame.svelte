@@ -823,30 +823,34 @@
         </div>
 
         <!--
-          THE FOOT PAGER IS PERSISTENT, AND THIS IS THE ONE PROTOTYPE DIFFERENCE THIS FILE KEEPS.
+          THE FOOT PAGER RENDERS ONLY WHEN THERE IS MORE THAN ONE PAGE (issue 1372, maintainer
+          parity round 4).
 
-          The prototype's catalogue draws no foot pager (`essences.png`); its only pager is the
-          inspector's, over the system list. That was tried here — `persistent` removed, so the bar
-          hides while every row fits the smallest page size — and it is REVERTED, because the
-          prototype's frame is a six-row mock rather than a ruling about a two-hundred-essence
-          world, and hiding the bar breaks four things that are:
+          The prototype's catalogue draws no foot pager at all (`essences.png`); its only pager is
+          the inspector's, over the system list. This shipped `persistent`, so a six-essence world
+          drew a full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25` band under six rows —
+          a control that can only restate what the rows already show.
 
-           - `design-system/spec.md` line 562: "The pagination bar sits OUTSIDE the scroll area so
-             it never moves, and it never hides its disabled arrows";
-           - `scoped-entity-list-shells-mounted.test.js` "keeps the pagination footer present below
-             one page of rows", which asserts exactly that sentence;
-           - the clamp case in the same file, which reads the footer to prove the index was clamped
-             — with the bar hidden at ten rows it reads `null`;
-           - `scoped-list-inspector-geometry.test.js` "keeps the pagination bar at the FOOT of a
-             short list", which is the only measurement proving the rows region takes the column's
-             slack rather than the pager riding up under the last row.
+          A PREVIOUS ATTEMPT REMOVED IT OUTRIGHT and was reverted, because `persistent={false}`
+          means "more items than the smallest offered page size", which is not the same rule and
+          broke four things that assert the browse archetype's guarantee. `multiPageOnly` is the
+          ruling itself, so all four are re-pointed at it rather than deleted:
 
-          Three of those four are about the SHORT-LIST case specifically, which is the only case
-          where hiding it changes anything — so the behaviour the prototype's frame implies is the
-          exact behaviour they were written to forbid.
+           - `design-system/spec.md`'s browse recipe now states the condition, and still binds the
+             bar's position and its disabled arrows wherever it renders;
+           - `scoped-entity-list-shells-mounted.test.js` asserts BOTH directions — absent at one
+             page, present with its disabled prev arrow at two;
+           - the clamp case in the same file clamps into a two-page corpus, where the footer is
+             still the observation, and into a one-page corpus, where the row slice is;
+           - `scoped-list-inspector-geometry.test.js` measures the rows region taking the column's
+             slack on a short one-page list (no pager at all) and the pager NOT taking it on a
+             short multi-page one.
+
+          The per-page selector goes with the bar, which is the one thing this gives up; see
+          `Pagination`'s own note for why that is bounded.
         -->
         <Pagination
-          persistent={true}
+          multiPageOnly={true}
           totalCount={page.totalCount}
           pageIndex={page.pageIndex}
           {pageSize}

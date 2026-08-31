@@ -595,7 +595,10 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
 The selection bar replaces the filter bar in place when anything is selected.
-The pagination bar sits OUTSIDE the scroll area so it never moves, and it never hides its disabled arrows.
+The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
+A browse surface MAY suppress the bar entirely while the whole filtered list fits ONE page, and MUST restore it the moment a second page exists; suppression is per surface and opt-in, so a surface that says nothing keeps the bar.
+The permission is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
+Suppressing it also suppresses the per-page selector, so a surface that opts in accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
 
 An EDITOR screen orders the breadcrumb, the title block with its lede, the action pair with back before save, the tab bar, and then the body.
 An inspector rail is OPTIONAL and several shipped editors have none; where one is present it is the third track, and where an editor repurposes that track for something else it says so.

@@ -2075,7 +2075,8 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The selection count is the size of the whole selection rather than its intersection with the page; the tri-state box acts on rendered rows; select-all-results acts on the whole filtered set.
     A filter change prunes the selection and clamps the page, and any selection, filter, sort or page change disarms.
 13. **Filter, sort and paging arithmetic and selection reduction are COMPOSED from the shipped pure models, never restated.**
-    A page index is clamped by the model that owns the arithmetic, and the clamped value is what both the row slice and the pagination footer read — a footer fed an unclamped index states a range the list does not show.
+    A page index is clamped by the model that owns the arithmetic, and the clamped value is what the row slice reads — and what the pagination footer reads wherever the footer renders, because a footer fed an unclamped index states a range the list does not show.
+    Where the footer is suppressed under requirement 20 the row slice is the only observation of the clamp, and it is read as an IDENTIFIED slice rather than as a count: any stale index over a single page renders zero rows, so the whole set being present AND starting at its first record is what says the index came back.
 14. **Membership rows come from the projection's joined rows, and the roster prop supplies ONLY `id` and `name`**, with an id fallback.
     The shells read `entries` and never the corpus roster `entities`.
 15. **The snippet parameter lists are part of the contract**, carrying the whole projection so a lane reaches a conditionally present field without adding a shell prop or reaching around the shells.
@@ -2090,6 +2091,11 @@ The world catalogues and the system-scope rules lists share ONE list composition
 19. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
     `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
+20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
+    These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
+    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a single page of eleven rows.
+    Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, per-page selector offered.
+    The ROWS REGION takes the column's slack whether or not a pager is under it, and the pager never does — the two are separate declarations and a gate that measured only "the pager ends at the foot of the column" is satisfied by a pager that fills it.
 
 ### GM Travel Route
 
