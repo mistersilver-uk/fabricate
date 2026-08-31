@@ -137,6 +137,10 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
+  // The strip is a thin caller of the promoted primitive (issue 1038), so the primitive is
+  // a STATIC import of this tree now. A `.svelte` the tree renders but this list omits HANGS
+  // the suite (`# cancelled`) rather than failing it.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.

@@ -96,6 +96,12 @@ const SHARED_PRIMITIVES = [
   // Tool Studio header, which is the authority the primitive reproduces — and they already
   // sit in four different mounted trees between them.
   'src/ui/svelte/components/ManagerButton.svelte',
+  // THE manager's editor tab strip (issue 1362, converted onto by issue 1038). Six wrapping
+  // editors call it — system, environment, recipe-item, recipe, essence and tool — and each
+  // of those wrappers sits in a different mounted tree, so it entered three more of them in
+  // one change. That is the shape this list exists for: the omission does not fail the
+  // suite that rendered the newly-converted strip, it hangs it.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

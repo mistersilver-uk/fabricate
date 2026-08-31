@@ -64,6 +64,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
+    // The strip is a thin caller of the promoted primitive (issue 1038), so the primitive is
+    // a STATIC import of this tree now. A `.svelte` the tree renders but this list omits
+    // HANGS the suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
     // The shared scoped validation shell (issue 1362).

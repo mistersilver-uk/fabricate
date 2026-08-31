@@ -291,12 +291,19 @@ test('no library entry recorded as unbuilt ships as a component', () => {
 });
 
 /**
- * The 24 shipped rows the library does not name.
+ * The 26 shipped rows the library does not name.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
  * slot every time debt is paid, and it permits a net-zero swap — document one, undocument another,
  * and the count never moves.
+ *
+ * GROWTH HERE IS NOT ALWAYS DEBT, and the two 1038 entries are the worked example. This list is
+ * every manifest row with `library: null`, and `MANIFEST_ROWS` spans BOTH tables — so recording a
+ * NON-MEMBER lands here too. `checks/ChecksEditorTabs` and `downtime/WorldDowntimeTabs` arrived by
+ * being adjudicated against `<TabBar>` and ruled out with their measurements, which is the register
+ * doing its job; neither is a primitive that shipped undocumented. The failure message below states
+ * the other reading because it is the commoner one, not the only one.
  */
 const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -312,6 +319,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
+  'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',

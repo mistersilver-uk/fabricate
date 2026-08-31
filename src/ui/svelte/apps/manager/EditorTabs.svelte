@@ -10,6 +10,26 @@
   are callers of this component now, and the six scoped-entity editors PRs 6a-c and 7 add
   consume it rather than authoring a tenth copy.
 
+  Issue 1038 converted three more — `recipe/RecipeEditorTabs`, `essences/EssenceEditorTabs`
+  and `tools/ToolEditorTabs` — and every capability those three needed is BELOW, on this
+  component, rather than left behind as a hand-rolled strip that happened to render the
+  same classes. What they needed, and what each is:
+
+   - HOME AND END. The ARIA tablist pattern asks a horizontal strip for four keys and this
+     component handled two. Two of the three converted callers already implemented all four
+     for themselves, as do the four manager strips that are NOT callers, so this is the
+     majority behaviour arriving at the owner rather than a new one being invented — and it
+     renders nothing, so no converted site's markup moves. The three earlier callers gain
+     the two keys; nothing they render changes.
+   - A BADGE ACCESSIBLE NAME (`ariaLabel`). A badge whose whole label is `✓` has no
+     readable name at all without one; both converted validation strips carried one.
+   - A BADGE MODIFIER CLASS (`class`). `styles/fabricate.css` states
+     `.manager-tool-editor-tabs > button > span.is-valid`, so the treatment is a real
+     shipped rule and the class has to reach the chip.
+   - AN OPTIONAL HOOK ATTRIBUTE. `ToolEditorTabs` renders NO `data-*` tab hook, and
+     `hookAttribute=''` is how it keeps rendering none — the same '' -means-none rule
+     `badgeAttribute` already had.
+
   ── THE DOM CONTRACT IS A PROP, because the three sites do not share one ────────────────
 
   A naive extraction of "tabs, activeTab, badges, onSelect" silently drops three
@@ -41,10 +61,13 @@
    - tabs: `{id, icon, labelKey, label}[]`, in render order. `labelKey` is looked up and
      `label` is the English fallback, matching the `text()` contract everywhere else.
    - activeTab / onSelect(tabId) / badges: as before. A badge is a plain value or
-     `{label, tone}` where tone is one of neutral/success/warning/danger.
+     `{label, tone, ariaLabel, class}` where tone is one of
+     neutral/success/positive/warning/danger, `ariaLabel` is the chip's accessible name
+     (required when the label is a bare glyph such as `✓`) and `class` is one modifier
+     class appended to `badgeClass`.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
-   - hookAttribute: the per-button `data-*` name carrying the tab id.
+   - hookAttribute: the per-button `data-*` name carrying the tab id; '' renders none.
    - badgeAttribute: the per-badge `data-*` name carrying the tab id; '' renders none.
    - containerClass / buttonClass / badgeClass: the site's existing classes, kept so no
      shipped rule in `styles/fabricate.css` stops matching.
@@ -75,6 +98,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // A ZERO IS NOT A COUNT WORTH A BADGE, and neither is a `null`: a strip whose every tab
+  // wears a `0` is chrome, not information. Both are dropped, twice over — a falsy value
+  // never reaches the array at all, and the filter below catches a `0` that arrived inside
+  // one. `checks/ChecksEditorTabs` states the identical rule for itself in prose; this is
+  // where it belongs, because a badge rule belongs to the badge.
   function badgeList(tab) {
     const value = badges?.[tab.id];
     const values = Array.isArray(value) ? value : value ? [value] : [];
@@ -84,11 +112,15 @@
           return {
             label: badge.label ?? badge.value ?? '',
             tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
+            ariaLabel: badge.ariaLabel ?? '',
+            class: badge.class ?? '',
           };
         }
         return {
           label: badge,
           tone: tab.id === 'validation' ? 'danger' : 'neutral',
+          ariaLabel: '',
+          class: '',
         };
       })
       .filter((badge) => badge.label !== '' && badge.label !== 0);
@@ -97,10 +129,18 @@
   // A badge tone name is this component's own vocabulary; `Chip` names the colour families
   // differently (`success` is `active` there), so translate rather than leak one spelling
   // into the other (issue 883).
+  //
+  // `positive` is `Chip`'s OWN spelling of that same family — its `is-active` and
+  // `is-positive` selectors share ONE rule there, so the two paint identically — and it is
+  // passed through rather than folded into `active` because two converted callers render
+  // `is-positive` today (issue 1038), and a conversion that renamed a shipped class would be
+  // a markup change wearing a tidy-up's clothes. A caller picking between the two is picking
+  // a class name, not a colour.
   function badgeTone(tone) {
     if (tone === 'danger') return 'danger';
     if (tone === 'warning') return 'warning';
     if (tone === 'success') return 'active';
+    if (tone === 'positive') return 'positive';
     return 'neutral';
   }
 
@@ -108,20 +148,51 @@
     return danger && badgeList(tab).some((badge) => badge.tone === 'danger');
   }
 
+  // Joined with the empties dropped, so an inactive button reads `manager-editor-tab-button`
+  // rather than that plus two spaces standing in for the classes it does not carry.
+  function buttonClasses(tab) {
+    return [
+      buttonClass,
+      activeTab === tab.id ? 'is-active' : '',
+      isDangerTab(tab) ? 'is-danger' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function badgeClasses(badge) {
+    return [badgeClass, badge.class].filter(Boolean).join(' ');
+  }
+
   function buttonAttributes(tab) {
+    if (!hookAttribute) return {};
     return { [hookAttribute]: tab.id };
   }
 
   function badgeAttributes(tab, badge) {
-    if (!badgeAttribute) return {};
-    return { [badgeAttribute]: tab.id, 'data-badge-tone': badge.tone };
+    const attributes = badgeAttribute
+      ? { [badgeAttribute]: tab.id, 'data-badge-tone': badge.tone }
+      : {};
+    if (badge.ariaLabel) attributes['aria-label'] = badge.ariaLabel;
+    return attributes;
+  }
+
+  // Arrow / Home / End, the four keys the ARIA tablist pattern asks a horizontal strip for.
+  // Home and End are the two jumps a long strip repeats — "back to the first section" and
+  // "the last one" — and a strip that handled the arrows alone left them doing whatever the
+  // browser does with Home inside a button row, which is nothing.
+  function targetIndex(key, index) {
+    if (key === 'ArrowRight') return (index + 1) % tabs.length;
+    if (key === 'ArrowLeft') return (index - 1 + tabs.length) % tabs.length;
+    if (key === 'Home') return 0;
+    if (key === 'End') return tabs.length - 1;
+    return -1;
   }
 
   function onKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const nextIndex = targetIndex(event.key, index);
+    if (nextIndex < 0) return;
     event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + tabs.length) % tabs.length;
     onSelect(tabs[nextIndex].id);
     const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
     buttons?.[nextIndex]?.focus();
@@ -134,7 +205,7 @@
       type="button"
       role="tab"
       id={`${idStem}-tab-${tab.id}`}
-      class={`${buttonClass} ${activeTab === tab.id ? 'is-active' : ''} ${isDangerTab(tab) ? 'is-danger' : ''}`}
+      class={buttonClasses(tab)}
       aria-selected={activeTab === tab.id}
       aria-controls={`${idStem}-panel-${tab.id}`}
       tabindex={activeTab === tab.id ? 0 : -1}
@@ -146,8 +217,10 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(tab.labelKey, tab.label)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <Chip tone={badgeTone(badge.tone)} class={badgeClass} {...badgeAttributes(tab, badge)}
-          >{badge.label}</Chip
+        <Chip
+          tone={badgeTone(badge.tone)}
+          class={badgeClasses(badge)}
+          {...badgeAttributes(tab, badge)}>{badge.label}</Chip
         >
       {/each}
     </button>

@@ -340,7 +340,23 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
   const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(selector);
   if (editorTab) {
     const [, family, tabId] = editorTab;
-    const builders = [...sources].filter(([, text]) => text.includes(`${family}-tab-\${`));
+    // TWO WAYS to build the stem, because `EditorTabs.svelte` took the interpolation over
+    // (issues 1362 and 1038). A strip that still writes its own ids carries the literal
+    // `<family>-tab-${`; a strip converted onto the primitive carries `idStem="<family>"`
+    // instead, and the primitive interpolates for it.
+    //
+    // BOTH forms have to be recognised or this branch silently repoints. Measured on
+    // `#tool-tab-validation`: with only the first form, the sole remaining match was
+    // `ToolEditView.svelte` — the PANEL, which builds `tool-tab-${activeTab}` for its
+    // `aria-labelledby` and branches on three of the four ids — so the guard reported that the
+    // Tool editor "declares no validation tab" while the tab was rendering perfectly. The
+    // converse is the worse half: `#environment-tab-tasks` resolved through
+    // `EnvironmentEditView.svelte` for the same reason and PASSED, because that panel happens
+    // to carry the id literals its strip does. A guard that reads the panel instead of the
+    // strip is right by luck in one case and wrong in the other.
+    const builders = [...sources].filter(
+      ([, text]) => text.includes(`${family}-tab-\${`) || text.includes(`idStem="${family}"`)
+    );
     if (builders.length === 0) {
       missing.push(
         `${viewCase.id}: selector "${selector}" (no component builds ${family}-tab-* ids)`

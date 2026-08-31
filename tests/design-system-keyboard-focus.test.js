@@ -134,10 +134,20 @@ function focusTargets() {
 }
 
 describe('design system: a programmatic focus target declares itself focused to Foundry', () => {
+  // THE FLOOR MOVES DOWN AS THE CORPUS CONVERGES, and that is not the same thing as debt being
+  // paid or a gate being loosened. A programmatic focus target is an ELEMENT, so three tab strips
+  // that each rendered their own roving-tabindex button are three targets, and converting all
+  // three onto `EditorTabs` leaves one — issue 1038 did exactly that and took the walk from 26 to
+  // 23. Re-lowering the floor per conversion would be the cheapest-repair anti-pattern, so the
+  // slack is stated once and bounded instead: four hand-rolled strips remain (`KnowledgeTabs`,
+  // `ChecksEditorTabs`, `WorldDowntimeTabs`, `TagsCategoriesView`), the last three of which are
+  // recorded as justified non-reuse or not yet adjudicated, so the reachable floor from converging
+  // tab strips alone is 20. The property this guards is that the walk is neither EMPTY nor
+  // TRUNCATED; a real truncation loses far more than three.
   it('finds programmatic focus targets, so the assertions below are not vacuous', () => {
     const targets = focusTargets();
     assert.ok(
-      targets.length >= 24,
+      targets.length >= 20,
       `the walk reached ${targets.length} focus targets. A walk that reaches an empty or ` +
         'truncated set passes every assertion below while proving nothing.'
     );
