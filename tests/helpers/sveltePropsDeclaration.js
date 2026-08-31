@@ -49,5 +49,5 @@ export function declaredPropNames(source) {
     .filter(Boolean)
     .map((entry) => (entry.startsWith('...') ? entry : entry.split(/[=:]/)[0].trim()))
     .filter(Boolean)
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
 }
