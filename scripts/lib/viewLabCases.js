@@ -5390,7 +5390,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-overview' },
     ],
     expectView: 'tool-edit',
@@ -5412,7 +5412,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-overview' },
     ],
@@ -5428,7 +5428,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
@@ -5449,7 +5449,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
       // The repair editor sits below the breakage tab's own fold; without this the frame shows
@@ -5472,8 +5472,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
-        selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] .manager-icon-button[aria-label^="Edit"]',
+        selector: '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
       { selector: '[data-tool-replacement-target]', scroll: true },
@@ -5498,7 +5497,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-authority-segment="checkDriven"]' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-anvilstone"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-anvilstone"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
     ],
@@ -5514,7 +5513,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-requirements' },
     ],
     expectView: 'tool-edit',
@@ -5530,7 +5529,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
@@ -5553,7 +5552,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
-          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-requirements' },
       { selector: '.manager-checklist-card-row:has(input[value="rw-prereq-arcana"])' },
@@ -5571,7 +5570,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-edit-rules]' },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',

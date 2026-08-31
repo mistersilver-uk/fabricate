@@ -5711,10 +5711,10 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
-  const editButton = row.locator('.manager-icon-button');
+  const editButton = row.locator('[data-tool-edit-rules]');
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
-  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
+  await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit');
   const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
   const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
   if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
@@ -5782,7 +5782,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       repairRequirements: [],
     },
   });
-  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 tools' })
+  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 shown' })
     .waitFor({ state: 'visible', timeout: 5_000 });
   await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1 });
   await setManagerWindowSize(page, {

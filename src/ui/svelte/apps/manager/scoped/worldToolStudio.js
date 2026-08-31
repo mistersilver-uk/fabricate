@@ -60,15 +60,19 @@ import { WORLD_SCOPE_DESCRIPTORS } from '../../../stores/worldScopeProjection.js
 export const INHERIT_BREAK_MODE = 'inherit';
 
 /**
- * The glyph each segment leads with. The two authority glyphs match the shipped two-state
- * control exactly, so the segments a GM already knows do not move or change.
+ * The glyph each segment leads with, for the WORLD card ALONE.
+ *
+ * The system card's segments carry no glyph, which is the prototype's own composition rather
+ * than an omission: the world screen AUTHORS the break mode and leads each choice with the
+ * thing it is about, while the system screen is choosing between three provenances of the
+ * same value and a glyph there labels the wrong noun. There is consequently no icon for
+ * {@link INHERIT_BREAK_MODE}, because inherit is only ever a SYSTEM segment.
  *
  * @type {Readonly<Record<string, string>>}
  */
 export const TOOL_BREAK_MODE_ICONS = Object.freeze({
   toolSpecific: 'fas fa-screwdriver-wrench',
   checkDriven: 'fas fa-dice-d20',
-  [INHERIT_BREAK_MODE]: 'fas fa-earth-americas',
 });
 
 /**
@@ -157,7 +161,7 @@ export function inheritBreakModeLabel(worldAuthority, text) {
  * @param {unknown} [options.systemAuthority] the RESOLVED token published to the screen.
  * @param {unknown} [options.source] `system` / `world` / `default`.
  * @param {(key: string, fallback: string) => string} options.text
- * @returns {Array<{value: string, label: string, icon: string, selected: boolean}>}
+ * @returns {Array<{value: string, label: string, selected: boolean}>}
  */
 export function systemBreakModeOptions({ worldAuthority, systemAuthority, source, text }) {
   const authored = source === 'system' ? toolBreakModeToken(systemAuthority) : '';
@@ -165,13 +169,11 @@ export function systemBreakModeOptions({ worldAuthority, systemAuthority, source
     {
       value: INHERIT_BREAK_MODE,
       label: inheritBreakModeLabel(worldAuthority, text),
-      icon: TOOL_BREAK_MODE_ICONS[INHERIT_BREAK_MODE],
       selected: authored === '',
     },
     ...TOOL_BREAKAGE_AUTHORITIES.map((value) => ({
       value,
       label: toolBreakModeLabel(value, text),
-      icon: TOOL_BREAK_MODE_ICONS[value],
       selected: authored === value,
     })),
   ];
