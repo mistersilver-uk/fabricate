@@ -250,8 +250,9 @@
     <i class={glyphOf(entry)} aria-hidden="true"></i>
   </span>
   <span class="manager-scoped-essence-count" data-scoped-essence-membership-count={entry.id}>
-    {format('FABRICATE.Admin.Manager.Scoped.Essence.MemberCount', 'In {count} systems', {
+    {format('FABRICATE.Admin.Manager.Scoped.Essence.MemberCount', '{count} of {total} systems', {
       count: Number(entry.membershipCount) || 0,
+      total: systems.length,
     })}
   </span>
   <span class="manager-scoped-essence-states" role="list">
@@ -265,7 +266,6 @@
         title={`${systemLabel(row)} — ${stateLabels[state]}`}
       >
         <i class={stateIcon(state)} aria-hidden="true"></i>
-        <span class="manager-scoped-essence-state-name">{systemLabel(row)}</span>
       </span>
     {/each}
   </span>
@@ -339,10 +339,24 @@
     font-size: 0.72rem;
   }
 
+  /*
+     ONE PIP PER SYSTEM, not a list of system names.
+
+     This shipped rendering every member system's full name inline. At six systems that wrapped
+     to two lines and roughly tripled the row height, which is what the capture frame showed: a
+     row of mostly empty space with a name list under it. The prototype's row carries COMPACT
+     STATS instead — components, recipes, and systems as `{n}/{total}` — and puts the per-system
+     detail in the inspector, which is exactly where this shell already renders membership rows.
+
+     The state and the system are still on each pip as `data-scoped-system-state` and
+     `data-scoped-system`, and the accessible name is still the full `system — state` pair in
+     `title`, so nothing that could read the roster before has lost it.
+  */
   .manager-scoped-essence-states {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--fab-space-chip);
+    align-items: center;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
